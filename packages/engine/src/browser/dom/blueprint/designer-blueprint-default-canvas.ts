@@ -177,6 +177,7 @@ export function createDesignerBlueprintDefaultCanvas(
     const item = createDesignerButton(ownerDocument, {
       className: 'designer-blueprint-canvas-menu-item',
       text: label,
+      variant: 'canvas-tool',
     });
     item.dataset.canvasInsert = kind;
     item.setAttribute('role', 'menuitem');
@@ -187,6 +188,7 @@ export function createDesignerBlueprintDefaultCanvas(
   const layoutButton = textButton(ownerDocument, 'grid', blueprintText.autoLayout, 'auto-layout');
   const problemsButton = createDesignerButton(ownerDocument, {
     className: 'designer-blueprint-canvas-problems-button',
+    variant: 'canvas-tool',
   });
   problemsButton.dataset.canvasAction = 'problems';
   problemsButton.dataset.state = 'ok';
@@ -330,6 +332,7 @@ export function createDesignerBlueprintDefaultCanvas(
     text.expandSimulation,
     'simulation-expand',
   );
+  simulationExpand.dataset.density = 'tight';
   simulationBar.append(simulationBarIcon, simulationBarLabel, simulationExpand);
 
   const simulation = ownerDocument.createElement('section');
@@ -363,6 +366,7 @@ export function createDesignerBlueprintDefaultCanvas(
   });
   eventSelect.dataset.canvasSimulationEvent = 'true';
   const eventSelectControl = enhanceDesignerSelect(eventSelect);
+  eventSelectControl.trigger.dataset.density = 'compact';
   eventLabel.append(eventLabelText, eventSelectControl.element);
   const payloadLabel = ownerDocument.createElement('label');
   payloadLabel.className = 'designer-blueprint-canvas-simulation-field';
@@ -467,6 +471,7 @@ export function createDesignerBlueprintDefaultCanvas(
       ariaLabel: label,
       className: 'designer-blueprint-canvas-bar-button',
       tip: label,
+      variant: 'canvas-tool',
     });
     button.dataset.canvasAction = action;
     button.insertAdjacentHTML('afterbegin', designerIcon(icon));
@@ -487,6 +492,7 @@ export function createDesignerBlueprintDefaultCanvas(
       className: 'designer-blueprint-canvas-bar-button',
       icon,
       label,
+      variant: 'canvas-tool',
     });
     button.dataset.canvasAction = action;
     return button;
@@ -878,11 +884,6 @@ export function createDesignerBlueprintDefaultCanvas(
         return `${blueprintText.relationEffects['host-action']} ${edge.actionId ?? ''}`;
       }
       return edge.eventName ?? '';
-    }
-    if (edge.kind === 'trigger') {
-      return edge.sourceHandle.startsWith('event:')
-        ? edge.sourceHandle.slice('event:'.length)
-        : 'true';
     }
     if (edge.operation !== undefined) return blueprintText.visibilityOperation[edge.operation];
     if (edge.sourceHandle.startsWith('event:')) return edge.sourceHandle.slice('event:'.length);
@@ -1356,8 +1357,6 @@ export function createDesignerBlueprintDefaultCanvas(
   }
 
   function nodeSummaryText(node: BaseScreenBlueprintCanvasNode): string {
-    const provided = node.summary?.secondary ?? '';
-    if (provided !== '') return provided;
     if (node.kind === 'component' && (node.childCount ?? 0) > 0) {
       return `${blueprintText.structureTitle} · ${blueprintText.structure.children} ${node.childCount}`;
     }

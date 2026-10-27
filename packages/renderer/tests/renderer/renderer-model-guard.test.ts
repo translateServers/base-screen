@@ -27,6 +27,26 @@ function derive(documentInput: ScreenDocument, components: readonly ScreenCompon
 }
 
 describe('material model reassignment guard', () => {
+  it('keeps a material-declared max-content width when the model is not reassigned', () => {
+    const root = new FakeRoot();
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createCatalog(),
+      mode: 'design',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+    const a = component('a', 0);
+    const first = document([a]);
+    expect(renderer.render(first).ok).toBe(true);
+    elementOf(root, 'a').style.width = 'max-content';
+
+    // 只移动位置、模型引用不变：几何帧仍会跑，但不能把自适应宽度写回 canonical 保存值。
+    expect(renderer.render(derive(first, [{ ...a, position: { x: 10, y: 0 } }])).ok).toBe(true);
+    expect(elementOf(root, 'a').style.width).toBe('max-content');
+  });
+
   it('keeps the applied model of untouched components while reapplying the edited one', () => {
     const root = new FakeRoot();
     const renderer = createBaseScreenRenderer({

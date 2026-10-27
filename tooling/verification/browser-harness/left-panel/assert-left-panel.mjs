@@ -477,12 +477,27 @@ export async function assertLeftPanelLayers(page, viewport) {
     };
     // 选中块与面板底的距离必须大于划过档与面板底的距离 —— 浅色主题变深、深色主题变浅，
     // 所以不能写死"比 hover 更深"，只能写"离面板底更远"。
+    // 选中底色来自 color-mix(in oklab, ...)，Chrome 会按插值空间回读成 oklab(...)；
+    // 面板底是 rgb。两侧统一折成线性 sRGB 亮度再比较，避免把 oklab 三元组当 0-255 通道。
+    const linearChannel = (channel) => {
+      const scaled = channel / 255;
+      return scaled <= 0.03928 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
+    };
+    const clamp = (value) => Math.min(1, Math.max(0, value));
+    const luminanceFromOklab = ([lightness = 0, a = 0, b = 0]) => {
+      const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return (
+        0.2126 * clamp(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s) +
+        0.7152 * clamp(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s) +
+        0.0722 * clamp(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s)
+      );
+    };
     const luminance = (value) => {
       const channels = (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
-      const [r = 0, g = 0, b = 0] = channels.map((channel) => {
-        const scaled = channel / 255;
-        return scaled <= 0.03928 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
-      });
+      if (value.startsWith('oklab(')) return luminanceFromOklab(channels);
+      const [r = 0, g = 0, b = 0] = channels.map(linearChannel);
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     };
     const gaps = (value, panel) => Math.abs(luminance(value) - luminance(panel));
@@ -1569,7 +1584,7 @@ async function assertHostLeftPanelGroups(designer) {
     result.selected.title !== 'Host assets' ||
     !result.selected.countHidden ||
     !result.selected.assigned ||
-    result.selected.fallback !== '宿主尚未提供此分组的内容。' ||
+    result.selected.fallback !== '此分组暂无内容。' ||
     !result.selected.icon ||
     !result.selected.controls ||
     !result.selected.labelled ||

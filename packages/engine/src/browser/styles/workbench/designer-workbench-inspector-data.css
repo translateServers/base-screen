@@ -41,7 +41,7 @@
 }
 
 .properties .designer-inspector-data-flow-content .designer-dataset-actions {
-  padding-bottom: 18px;
+  padding-bottom: calc(var(--designer-space-6) + var(--designer-space-1));
 }
 
 .properties .designer-inspector-data-flow-content [data-workbench-section] {
@@ -58,22 +58,22 @@
 .properties .designer-inspector-data-flow-content .designer-host-connection,
 .properties .designer-inspector-data-flow-content .designer-dataset-browser,
 .properties .designer-inspector-data-flow-content .designer-dataset-descriptor {
-  padding-top: 13px;
+  padding-top: calc(var(--designer-space-5) + 1px);
   border-top-color: var(--designer-border-subtle);
 }
 
 .properties .designer-dataset-authoring[data-authoring-part="editor"],
 .properties .designer-inspector-advanced-settings {
-  margin-top: 14px;
-  padding-top: 14px;
+  margin-top: calc(var(--designer-space-5) + var(--designer-space-1));
+  padding-top: calc(var(--designer-space-5) + var(--designer-space-1));
   border-top-color: var(--designer-border-subtle);
 }
 
 .properties .designer-inspector-preview-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--designer-space-4);
+  margin-bottom: var(--designer-space-5);
 }
 
 .properties .designer-data-workbench-preview {
@@ -86,14 +86,14 @@
 
 .properties .designer-data-workbench-preview pre {
   min-height: 120px;
-  padding: 10px;
+  padding: calc(var(--designer-space-4) + var(--designer-space-1));
   background: var(--designer-surface-canvas);
   font-size: var(--designer-font-size-sm);
 }
 
 .properties .designer-data-source-feedback {
-  margin-top: 10px;
-  padding: 7px 8px;
+  margin-top: calc(var(--designer-space-4) + var(--designer-space-1));
+  padding: calc(var(--designer-space-3) + 1px) var(--designer-space-4);
   border: 1px solid var(--designer-border-subtle);
   border-radius: var(--designer-radius-1);
   background: var(--designer-surface-workspace);
@@ -333,7 +333,7 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: var(--designer-space-3);
 }
 
 .properties .designer-dataset-summary-name-line .designer-dataset-summary-title {
@@ -349,7 +349,7 @@
 /* 类型徽标：等宽小字 + 大写。它是「这份来源是什么」的常量信息，不参与层级。 */
 .properties .designer-dataset-summary-kind {
   flex: none;
-  padding: 1px 4px;
+  padding: 1px var(--designer-space-2);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-text-secondary);
@@ -374,14 +374,14 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px var(--designer-space-5);
+  gap: calc(var(--designer-space-2) + 1px) var(--designer-space-5);
   margin-top: var(--designer-space-4);
 }
 
 .properties .designer-dataset-health-item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--designer-space-2);
   color: var(--designer-text-muted);
   font-family: var(--designer-font-family-mono);
   font-size: var(--designer-font-size-xs);
@@ -452,29 +452,6 @@
   background: currentcolor;
 }
 
-/* 主操作在数据面板作用域内单独换档：不碰全局 primary（那是页面级 CTA 的反色档）。 */
-.properties .designer-dataset-actions .designer-button[data-variant="apply"] {
-  flex: 0 0 auto;
-  min-width: 64px;
-  padding: 0 var(--designer-space-4);
-  background: var(--designer-accent);
-  box-shadow: none;
-  color: var(--designer-text-on-accent);
-  font-size: var(--designer-font-size-sm);
-  font-weight: 500;
-}
-
-.properties .designer-dataset-actions .designer-button[data-variant="apply"]:hover:not(:disabled) {
-  background: var(--designer-button-primary-hover);
-}
-
-/* 非 dirty：同一颗按钮变幽灵禁用（文案「已应用」），不做整体透明度。 */
-.properties .designer-dataset-actions .designer-button[data-variant="apply"]:disabled {
-  background: transparent;
-  box-shadow: var(--designer-elev-ring);
-  color: var(--designer-text-disabled);
-}
-
 /* Page configuration uses compact label/control rows and intentionally omits component
    context, search and tab chrome. */
 .designer:not([data-right-collapsed="true"]) .properties[data-inspector-context-kind="canvas"] {
@@ -485,7 +462,7 @@
   grid-row: 1;
   height: 44px;
   justify-content: flex-start;
-  padding: 0 20px;
+  padding: 0 calc(var(--designer-space-6) + var(--designer-space-2));
   border-bottom-color: var(--designer-border-subtle);
   background: var(--designer-surface-panel);
 }
@@ -506,7 +483,7 @@
 
 .properties[data-inspector-context-kind="canvas"] > .inspector-pane {
   grid-row: 2;
-  padding: 0 20px 24px;
+  padding: 0 calc(var(--designer-space-6) + var(--designer-space-2)) var(--designer-space-7);
 }
 
 /* 页面配置用可折叠分节承载内容（原型 .insp-section）：段标题带发丝线，段间只留留白、
@@ -515,13 +492,13 @@
 .properties[data-inspector-context-kind="canvas"] .designer-canvas-background-section,
 .properties[data-inspector-context-kind="canvas"] .designer-canvas-image-section {
   display: grid;
-  gap: 8px;
-  padding: 16px 0;
+  gap: var(--designer-space-4);
+  padding: var(--designer-space-6) 0;
   border-top: 0;
 }
 
 .properties[data-inspector-context-kind="canvas"] .designer-canvas-section {
-  padding-top: 6px;
+  padding-top: var(--designer-space-3);
 }
 
 .properties[data-inspector-context-kind="canvas"]
@@ -533,7 +510,7 @@
 .properties[data-inspector-context-kind="canvas"]
   .designer-canvas-image-section
   > .designer-inspector-section-title {
-  margin-bottom: 4px;
+  margin-bottom: var(--designer-space-2);
 }
 
 /* 段内字段沿用组件检查器的行骨架（74px 标签列 + 控件列）。
@@ -542,28 +519,6 @@
    只作用在「标题 → 内容」这一层；此前把 margin 归零，两行字段就直接贴在一起了。 */
 .properties[data-inspector-context-kind="canvas"] .inspector-pane .designer-field {
   margin-bottom: var(--designer-space-2);
-}
-
-/* 数字字段：符号内嵌右缘（与组件几何网格同一形态），标签列留给字段名。 */
-.designer-geo-field {
-  position: relative;
-  display: block;
-  min-width: 0;
-  padding: 0;
-}
-
-.designer-geo-field::before {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  z-index: 1;
-  color: var(--designer-text-muted);
-  content: attr(data-symbol);
-  font: var(--designer-font-numeric);
-  font-size: var(--designer-font-size-xs);
-  line-height: 1;
-  pointer-events: none;
-  translate: 0 -50%;
 }
 
 /* 画布尺寸：W / H 一对输入等分控件列。 */
@@ -577,7 +532,7 @@
    这里只补“读数内嵌 % 符号”需要让出的右内边距。读数读作「100%」而不是裸数字。
    特异性要压过公共读数规则（`.designer-field-range-value` 的 padding），否则 % 会压住数字。 */
 .properties .inspector-pane .designer-canvas-opacity-value {
-  padding-right: 18px;
+  padding-right: calc(var(--designer-space-6) + var(--designer-space-1));
 }
 
 /* 缩放方式是六档分段控件：标签在上、整行等分（原型 .insp-field + .segmented）。 */
@@ -747,29 +702,11 @@
 
 /* ---- 参数行（v7）：标签 + 两段取值方式；下一行是整行取值控件 ---- */
 
-.properties .designer-field.designer-dataset-parameter,
-.designer-data-workbench-shell .designer-field.designer-dataset-parameter {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--designer-space-2);
-  margin: 0;
-  padding: 8px 0 9px;
-  white-space: normal;
-}
-
 .properties .designer-data-group[data-details-group="parameters"] .designer-dataset-config-section,
 .designer-data-workbench-shell
   .designer-data-group[data-details-group="parameters"]
   .designer-dataset-config-section {
   gap: 0;
-}
-
-.properties .designer-dataset-parameter + .designer-dataset-parameter,
-.designer-data-workbench-shell
-  .designer-field.designer-dataset-parameter
-  + .designer-field.designer-dataset-parameter {
-  border-top: 1px solid var(--designer-border-subtle);
 }
 
 .properties .designer-dataset-parameter-head,
@@ -792,17 +729,10 @@
   display: inline-flex;
   min-width: 0;
   align-items: baseline;
-  gap: 2px;
+  gap: var(--designer-space-1);
   color: var(--designer-text-secondary);
   font-size: var(--designer-font-size-sm);
   line-height: 1.4;
-}
-
-.properties .designer-field-required,
-.designer-data-workbench-shell .designer-field-required {
-  color: var(--designer-text-muted);
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
 }
 
 /* 两段开关比通用分段再收一档（20px 段位），轨道与状态语义仍来自 `.designer-segmented`。 */
@@ -811,7 +741,7 @@
   flex: 0 0 auto;
   grid-auto-columns: auto;
   gap: 1px;
-  padding: 2px;
+  padding: var(--designer-space-1);
   /* 检查器里的通用分段被 `.inspector-pane .designer-segmented` 拉成整行；
      参数标签旁的开关必须贴合内容宽度。 */
   width: auto;
@@ -843,16 +773,6 @@
 .designer-data-workbench-shell
   .designer-dataset-parameter-mode
   .designer-dataset-parameter-mode-option[aria-pressed="true"] {
-  background: var(--designer-surface-control-hover);
-  box-shadow: inset 0 0 0 1px var(--designer-border-default);
-  color: var(--designer-text-primary);
-}
-
-/* 检查器的通用分段选中态是强调色文字；这里的开关是局部枚举，选中只抬一档中性面。 */
-.properties
-  .inspector-pane
-  .designer-segmented.designer-dataset-parameter-mode
-  .designer-segmented-option[aria-pressed="true"] {
   background: var(--designer-surface-control-hover);
   box-shadow: inset 0 0 0 1px var(--designer-border-default);
   color: var(--designer-text-primary);
@@ -891,29 +811,6 @@
 .designer-data-workbench-shell .designer-dataset-parameter-control .designer-date-field {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-.properties .designer-dataset-parameter-control > .designer-input,
-.designer-data-workbench-shell .designer-dataset-parameter-control > .designer-input {
-  height: 100%;
-  min-height: 28px;
-  padding: 0 var(--designer-space-2);
-  background: transparent;
-  box-shadow: none;
-}
-
-.properties .designer-dataset-parameter-control > .designer-input:focus,
-.properties .designer-dataset-parameter-control > .designer-input:focus-visible,
-.designer-data-workbench-shell .designer-dataset-parameter-control > .designer-input:focus,
-.designer-data-workbench-shell .designer-dataset-parameter-control > .designer-input:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-
-.properties .designer-dataset-parameter-control > .designer-number,
-.designer-data-workbench-shell .designer-dataset-parameter-control > .designer-number {
-  font-family: var(--designer-font-family-mono);
-  font-variant-numeric: tabular-nums;
 }
 
 .properties .designer-dataset-parameter-control > .designer-switch,
@@ -978,7 +875,7 @@
   min-height: 24px;
   flex: 0 0 auto;
   place-items: center;
-  margin-right: 3px;
+  margin-right: calc(var(--designer-space-1) + 1px);
   padding: 0;
   border-radius: var(--designer-radius-1);
   background: transparent;
@@ -1020,7 +917,7 @@
 /* 变量方式：整行芯片（{ } + 变量名）+ 清除，浅一档的底把「引用」与「值」区分开。 */
 .properties .designer-dataset-parameter-control[data-mode="variable"],
 .designer-data-workbench-shell .designer-dataset-parameter-control[data-mode="variable"] {
-  padding: 0 3px 0 5px;
+  padding: 0 calc(var(--designer-space-1) + 1px) 0 calc(var(--designer-space-2) + 1px);
   background: var(--designer-surface-panel);
   box-shadow: inset 0 0 0 1px var(--designer-border-default);
 }
@@ -1053,7 +950,7 @@
   min-height: 28px;
   align-items: center;
   justify-content: flex-start;
-  gap: 5px;
+  gap: calc(var(--designer-space-2) + 1px);
   margin: 0;
   padding: 0 var(--designer-space-1);
   color: var(--designer-text-primary);
@@ -1172,7 +1069,7 @@
   /* 设计稿 .subtab：高 30、页签间距 14、下划线紧贴文字块底部（不再留 8px 空档）。 */
   min-height: 30px;
   padding: 0;
-  margin-right: 14px;
+  margin-right: calc(var(--designer-space-5) + var(--designer-space-1));
   border-radius: 0;
   background: transparent;
   color: var(--designer-text-muted);
@@ -1232,7 +1129,7 @@
 
 .properties .designer-data-preview-table-wrap th,
 .properties .designer-data-preview-table-wrap td {
-  padding: 6px 5px;
+  padding: var(--designer-space-3) calc(var(--designer-space-2) + 1px);
   border-right: 0;
   border-bottom: 1px solid var(--designer-border-subtle);
 }
@@ -1336,32 +1233,6 @@
   display: none;
 }
 
-.properties .designer-dataset-status-bar .designer-button[data-dataset-action="test"],
-.properties .designer-dataset-status-bar .designer-button[data-dataset-action="sync"],
-.properties .designer-dataset-status-bar .designer-button[data-dataset-action="apply"] {
-  flex: 0 0 auto;
-  min-width: 72px;
-  min-height: var(--designer-control-height);
-  padding: 0 var(--designer-space-4);
-  background: var(--designer-surface-control);
-  box-shadow: var(--designer-elev-ring);
-  color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-sm);
-  font-weight: 500;
-}
-
-.properties
-  .designer-dataset-status-bar
-  .designer-button[data-dataset-action="test"]:hover:not(:disabled),
-.properties
-  .designer-dataset-status-bar
-  .designer-button[data-dataset-action="sync"]:hover:not(:disabled),
-.properties
-  .designer-dataset-status-bar
-  .designer-button[data-dataset-action="apply"]:hover:not(:disabled) {
-  background: var(--designer-surface-control-hover);
-}
-
 /* 提示条为空时 grid 只剩数据流：让它占满整行，避免面板底部留出一整条空白。 */
 .properties .designer-data-source-panel {
   grid-template-rows: minmax(0, 1fr);
@@ -1390,7 +1261,7 @@
 /* 与设计稿面板主体一致：外层只留 2px，首个分块自己带 11px（合起来 13px 到组头），
    左右 14px，底部 0——状态条在流内 sticky，多给 padding 会让它悬空。 */
 .properties .designer-inspector-data-flow-content {
-  padding: var(--designer-space-1) 14px 0;
+  padding: var(--designer-space-1) calc(var(--designer-space-5) + 1px) 0;
 }
 
 /* 绑定行与「当前来源」之间只留一条发丝线。 */
@@ -1422,7 +1293,7 @@
   grid-template-columns: 62px minmax(0, 1fr);
   align-items: center;
   gap: var(--designer-space-4);
-  padding: 5px 0;
+  padding: calc(var(--designer-space-2) + 1px) 0;
 }
 
 .properties .designer-data-group[data-details-group="mapping"] .designer-dataset-binding-heading {
@@ -1489,7 +1360,8 @@
   place-items: center;
   /* 撤掉 workbench 数据编辑器的虚线占位框（那是工作台提示块的样式）。
      面板里的空态是一块安静的内容区，不是"还没做完的占位"。 */
-  padding: 20px 14px;
+  padding: calc(var(--designer-space-6) + var(--designer-space-2))
+    calc(var(--designer-space-5) + 1px);
   border: 0;
   background: transparent;
   text-align: center;
@@ -1500,7 +1372,7 @@
   width: 28px;
   height: 28px;
   place-items: center;
-  margin: 0 auto 7px;
+  margin: 0 auto calc(var(--designer-space-3) + 1px);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
@@ -1520,7 +1392,7 @@
 }
 
 .properties .designer-data-preview-empty p {
-  margin: 3px 0 0;
+  margin: calc(var(--designer-space-1) + 1px) 0 0;
   color: var(--designer-text-muted);
   font-size: var(--designer-font-size-xs);
   line-height: 1.55;
@@ -1531,7 +1403,7 @@
   max-width: 100%;
   margin-top: var(--designer-space-2);
   overflow: hidden;
-  padding: 3px 7px;
+  padding: calc(var(--designer-space-1) + 1px) calc(var(--designer-space-3) + 1px);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
@@ -1543,7 +1415,7 @@
 
 /* 请求中：骨架行（不转圈、不遮罩——请求期间面板仍要能读）。 */
 .properties .designer-data-preview-skeleton {
-  padding: 4px 0 2px;
+  padding: var(--designer-space-2) 0 var(--designer-space-1);
 }
 
 .properties .designer-data-preview-skeleton-row {
@@ -1581,7 +1453,8 @@
 /* 失败：一块可读的错误卡（标题 + 消息），消息不靠悬停才看得见。 */
 .properties .designer-data-preview-error {
   margin-top: var(--designer-space-2);
-  padding: 9px 9px 10px;
+  padding: calc(var(--designer-space-4) + 1px) calc(var(--designer-space-4) + 1px)
+    calc(var(--designer-space-4) + var(--designer-space-1));
   border-radius: var(--designer-radius-3);
   background: var(--designer-danger-surface);
   box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
@@ -1595,7 +1468,7 @@
 }
 
 .properties .designer-data-preview-error p {
-  margin: 4px 0 0;
+  margin: var(--designer-space-2) 0 0;
   color: var(--designer-text-secondary);
   font-size: var(--designer-font-size-xs);
   line-height: 1.55;
@@ -1689,14 +1562,6 @@
   display: none;
 }
 
-.properties
-  .designer-inspector-data-flow-content
-  .designer-descriptor-fields
-  .designer-field-label-text {
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-sm);
-}
-
 /* ---- 全屏工作台：与检查器共用同一套数据源表单语言 ---- */
 
 .designer-data-workbench-shell .designer-data-group-summary {
@@ -1773,19 +1638,8 @@
   display: none;
 }
 
-.designer-data-workbench-shell .designer-field-label-text {
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-sm);
-}
-
 .designer-data-workbench-shell .designer-data-group-content {
   padding-left: var(--designer-space-6);
-}
-
-.designer-data-workbench-shell
-  .designer-field.designer-dataset-parameter
-  + .designer-field.designer-dataset-parameter {
-  border-top: 1px solid var(--designer-border-subtle);
 }
 
 /* ---- 固定值表格：tabs/摘要/数据行/绑定统一到数据源表单语言 ---- */
@@ -1794,34 +1648,6 @@
   gap: var(--designer-space-5);
   padding: 0 0 var(--designer-space-2);
   border-bottom: 1px solid var(--designer-border-subtle);
-}
-
-.properties .designer-inspector-data-flow-content .designer-static-data-tabs .designer-button {
-  min-height: 26px;
-  padding: 0 0 var(--designer-space-2);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-xs);
-}
-
-.properties
-  .designer-inspector-data-flow-content
-  .designer-static-data-tabs
-  .designer-button:hover:not([aria-pressed="true"]) {
-  background: transparent;
-  color: var(--designer-text-primary);
-}
-
-.properties
-  .designer-inspector-data-flow-content
-  .designer-static-data-tabs
-  .designer-button[aria-pressed="true"] {
-  background: transparent;
-  box-shadow: inset 0 -1px 0 var(--designer-text-primary);
-  color: var(--designer-text-primary);
 }
 
 .properties .designer-inspector-data-flow-content .designer-static-tabular-summary {
@@ -1856,7 +1682,7 @@
 .properties .designer-inspector-data-flow-content .designer-static-rows th,
 .properties .designer-inspector-data-flow-content .designer-static-rows td {
   min-width: 110px;
-  padding: 3px 4px;
+  padding: calc(var(--designer-space-1) + 1px) var(--designer-space-2);
   border-color: var(--designer-border-subtle);
 }
 
@@ -1865,46 +1691,6 @@
   color: var(--designer-text-muted);
   font-size: var(--designer-font-size-xs);
   font-weight: 500;
-}
-
-.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-input {
-  min-height: 28px;
-  padding: 0 6px;
-  border-radius: var(--designer-radius-1);
-  background: transparent;
-  box-shadow: none;
-  font-size: var(--designer-font-size-xs);
-}
-
-/* 单元格自己就是表格的编辑面：常态不画第二层描边，悬停/聚焦才出环。 */
-.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-input:hover {
-  background: var(--designer-surface-control);
-  box-shadow: inset 0 0 0 1px var(--designer-border-default);
-}
-
-.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-input:focus {
-  outline: none;
-  background: var(--designer-surface-control);
-  box-shadow: 0 0 0 2px var(--designer-focus-ring);
-}
-
-.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-button {
-  min-height: 28px;
-  padding: 0 6px;
-  font-size: var(--designer-font-size-xs);
-}
-
-.properties
-  .designer-inspector-data-flow-content
-  .designer-static-rows
-  .designer-static-rows-footer
-  > .designer-button {
-  min-height: 24px;
-  padding: 0 var(--designer-space-2);
-  background: transparent;
-  box-shadow: none;
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-xs);
 }
 
 .properties
@@ -1952,7 +1738,8 @@
   .designer-static-bindings
   .designer-dataset-field-option {
   min-height: 30px;
-  padding: 4px 34px 4px 0;
+  padding: var(--designer-space-2) calc(var(--designer-space-8) + var(--designer-space-1))
+    var(--designer-space-2) 0;
   border: 0;
   border-bottom: 1px solid var(--designer-border-subtle);
   border-radius: 0;
@@ -1966,15 +1753,6 @@
   border-radius: 0;
   box-shadow: none;
   color: var(--designer-text-primary);
-}
-
-.properties
-  .designer-inspector-data-flow-content
-  .designer-static-bindings
-  .designer-dataset-field-option
-  .designer-field-label {
-  color: inherit;
-  font-weight: 500;
 }
 
 /* 字段选择是复选框而不是单选圆点：去掉外层光晕，收成 14px 方形。 */
@@ -2081,7 +1859,8 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--designer-space-3);
-  padding: 13px 14px 9px;
+  padding: calc(var(--designer-space-5) + 1px) calc(var(--designer-space-5) + 1px)
+    calc(var(--designer-space-4) + 1px);
 }
 
 .designer-source-sheet-head h2 {
@@ -2120,7 +1899,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
-  padding: 0 14px;
+  padding: 0 calc(var(--designer-space-5) + 1px);
   border-bottom: 1px solid var(--designer-border-subtle);
 }
 
@@ -2156,7 +1935,8 @@
 }
 
 .designer-source-sheet-tools {
-  padding: 9px 14px 7px;
+  padding: calc(var(--designer-space-4) + 1px) calc(var(--designer-space-5) + 1px)
+    calc(var(--designer-space-3) + 1px);
 }
 
 .designer-source-sheet-tools[hidden] {
@@ -2185,7 +1965,8 @@
 .designer-source-sheet-search-input {
   width: 100%;
   height: 30px;
-  padding: 0 9px 0 28px;
+  padding: 0 calc(var(--designer-space-4) + 1px) 0
+    calc(var(--designer-space-7) + var(--designer-space-2));
   border: 0;
   border-radius: var(--designer-radius-control);
   background: var(--designer-surface-control);
@@ -2203,7 +1984,8 @@
   min-height: 170px;
   flex: 1;
   overflow-y: auto;
-  padding: 2px 10px 12px;
+  padding: var(--designer-space-1) calc(var(--designer-space-4) + var(--designer-space-1))
+    var(--designer-space-5);
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
@@ -2218,7 +2000,7 @@
   min-height: 46px;
   align-items: flex-start;
   gap: var(--designer-space-2);
-  padding: 7px;
+  padding: calc(var(--designer-space-3) + 1px);
   border: 0;
   border-radius: var(--designer-radius-control);
   background: transparent;
@@ -2283,7 +2065,8 @@
   flex: 1;
   flex-direction: column;
   gap: var(--designer-space-2);
-  padding: 11px 14px 0;
+  padding: calc(var(--designer-space-4) + var(--designer-space-1) + 1px)
+    calc(var(--designer-space-5) + 1px) 0;
 }
 
 .designer-source-sheet-fixed-toolbar {
@@ -2300,7 +2083,7 @@
   width: 100%;
   min-height: 168px;
   flex: 1;
-  padding: 8px 9px;
+  padding: var(--designer-space-4) calc(var(--designer-space-4) + 1px);
   border: 0;
   border-radius: var(--designer-radius-control);
   background: var(--designer-surface-control);
@@ -2326,7 +2109,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--designer-space-3);
-  padding: 8px 14px;
+  padding: var(--designer-space-4) calc(var(--designer-space-5) + 1px);
   border-top: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
 }
@@ -2357,7 +2140,7 @@
 
 .designer-source-sheet-link {
   min-height: 24px;
-  padding: 0 6px;
+  padding: 0 var(--designer-space-3);
   border: 0;
   border-radius: var(--designer-radius-3);
   background: transparent;
@@ -2374,7 +2157,7 @@
 
 .designer-source-sheet-primary {
   min-height: 26px;
-  padding: 0 10px;
+  padding: 0 calc(var(--designer-space-4) + var(--designer-space-1));
   border: 0;
   border-radius: var(--designer-radius-control);
   background: var(--designer-button-primary-background);
@@ -2400,7 +2183,7 @@
   min-height: 46px;
   align-items: flex-start;
   gap: var(--designer-space-2);
-  padding: 7px;
+  padding: calc(var(--designer-space-3) + 1px);
   border-radius: var(--designer-radius-control);
   background: transparent;
   box-shadow: none;
@@ -2444,7 +2227,7 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 5px;
+  gap: calc(var(--designer-space-2) + 1px);
 }
 
 .designer-dataset-item-name-line strong {
@@ -2458,7 +2241,7 @@
 
 .designer-dataset-item-current {
   flex: none;
-  padding: 1px 4px;
+  padding: 1px var(--designer-space-2);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
@@ -2482,7 +2265,7 @@
 
 .properties .designer-dataset-list .designer-dataset-item-action {
   flex: none;
-  margin-top: 4px;
+  margin-top: var(--designer-space-2);
   color: var(--designer-text-muted);
   font-family: var(--designer-font-family-mono);
   font-size: var(--designer-font-size-xs);
@@ -2500,13 +2283,13 @@
  * 设计稿的模型是每个分块 `padding: 12px 0 13px` + 顶部一条发丝线：
  * 折叠态组头之间是 12+13+1=26px，展开态是 组头 24 + 8 + 内容 + 13。 */
 .properties .designer-data-group {
-  padding: 12px 0 13px;
+  padding: var(--designer-space-5) 0 calc(var(--designer-space-5) + 1px);
   border-top: 1px solid var(--designer-border-subtle);
 }
 
 /* 首组：段本身已经划了分隔，不再叠一条线，顶部按设计稿收 11px。 */
 .properties .designer-dataset-descriptor > .designer-data-group:first-child {
-  padding-top: 11px;
+  padding-top: calc(var(--designer-space-4) + var(--designer-space-1) + 1px);
   border-top: 0;
 }
 
@@ -2532,11 +2315,11 @@
 
 /* 共享实例选择：与请求参数同列，提示行落在字段下方，不挤压来源卡片高度。 */
 .designer-dataset-summary .designer-dataset-instance {
-  margin-top: 8px;
+  margin-top: var(--designer-space-4);
 }
 
 .designer-dataset-instance-hint {
-  margin: 4px 0 0;
+  margin: var(--designer-space-2) 0 0;
   color: var(--designer-text-muted);
   font-size: 11px;
   line-height: 1.5;

@@ -417,26 +417,34 @@ export async function assertMaterialGroupUpdates(page, designer) {
         .map((entry) => ({ id: entry.manifest.type, materialType: entry.manifest.type })),
     ];
   });
+  const expectedTypeCount = await designer.evaluate(
+    (element) =>
+      element.catalog.list().filter((entry) => entry.manifest.libraryVisible !== false).length,
+  );
   const count = () =>
     designer.locator('[data-material-group-current="library"] .material-group-count').textContent();
   // 分组计数按 canonical 物料类型算，卡片按条目算：两条 base.text 条目只贡献一个类型，
   // 所以卡片数 = 类型数 + 1。目录新增物料时两处一起加一。
-  if ((await count()) !== '16' || (await designer.locator('[data-material-card]').count()) !== 17)
+  if (
+    (await count()) !== String(expectedTypeCount) ||
+    (await designer.locator('[data-material-card]').count()) !== expectedTypeCount + 1
+  )
     throw new Error('MATERIAL_GROUP_TYPE_VS_ITEM_COUNT_FAILED');
   await designer.locator('[data-material-search]').fill('Alpha');
   await designer.locator('[data-material-search-clear]').waitFor({ state: 'visible' });
   if (
     (await designer.locator('[data-material-card]:not([hidden])').count()) !== 1 ||
-    (await count()) !== '16'
+    (await count()) !== String(expectedTypeCount)
   )
     throw new Error('MATERIAL_GROUP_SEARCH_CHANGED_COUNT');
   await designer.locator('[data-material-favorite="text:one"]').click();
   await designer.locator('[data-material-filter="favorite"]').click();
-  if ((await count()) !== '16') throw new Error('MATERIAL_GROUP_FAVORITE_CHANGED_COUNT');
+  if ((await count()) !== String(expectedTypeCount))
+    throw new Error('MATERIAL_GROUP_FAVORITE_CHANGED_COUNT');
   await designer.locator('[data-material-search-clear]').click();
   await designer.locator('[data-material-filter="recent"]').click();
   const empty = designer.locator('[data-material-search-empty]');
-  if (!(await empty.isVisible()) || (await count()) !== '16')
+  if (!(await empty.isVisible()) || (await count()) !== String(expectedTypeCount))
     throw new Error('MATERIAL_GROUP_EMPTY_STATE_FAILED');
   const emptyBounds = await empty.boundingBox();
   const resultsBounds = await designer.locator('.material-library-results').boundingBox();
@@ -560,6 +568,8 @@ export async function assertMaterialGroupUsability(page, designer) {
       allGroups: root.querySelector('[data-material-group-all]').ariaPressed,
       allItems: root.querySelector('[data-material-filter="all"]').ariaPressed,
       visible: root.querySelectorAll('[data-material-card]:not([hidden])').length,
+      expected: element.catalog.list().filter((entry) => entry.manifest.libraryVisible !== false)
+        .length,
       emptyHidden: root.querySelector('[data-material-search-empty]').hidden,
     };
   });
@@ -567,7 +577,7 @@ export async function assertMaterialGroupUsability(page, designer) {
     reset.query !== '' ||
     reset.allGroups !== 'true' ||
     reset.allItems !== 'true' ||
-    reset.visible !== 16 ||
+    reset.visible !== reset.expected ||
     !reset.emptyHidden
   )
     throw new Error(`MATERIAL_GROUP_EMPTY_RECOVERY_FAILED:${JSON.stringify(reset)}`);
@@ -727,6 +737,10 @@ async function assertMaterialLibraryGrouping(page, designer) {
     'board.scroll-board',
     'board.water-level',
     'board.border-box',
+    'board.capsule-progress',
+    'board.marquee',
+    'board.pipeline',
+    'board.status-grid',
     'harness.react-button',
     'harness.vue-button',
     'harness.dataset-ranking',
@@ -766,7 +780,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     ![1, 2, 3].includes(rootState.visual.firstRowCardCount) ||
     rootState.visual.panelCountRole !== 'status' ||
     rootState.visual.panelCountLive !== 'polite' ||
-    rootState.visual.panelCountLabel !== '素材：16 项' ||
+    rootState.visual.panelCountLabel !== `素材：${expectedCards.length} 项` ||
     rootState.visual.searchDescribedBy !== 'designer-left-panel-count'
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_ROOT_FAILED:${JSON.stringify(rootState)}`);
@@ -905,7 +919,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     !dynamic.sameCanvas ||
     dynamic.groups.join(',') !== 'bridges,best-practices,board,foundation,data' ||
     dynamic.cards.join(',') !==
-      'harness.react-button,harness.vue-button,harness.dataset-ranking,board.digital-flop,board.scroll-board,board.water-level,board.border-box,base.text,base.rectangle,base.ellipse,base.image,base.rule,base.chart,harness.semantic-chart,plugin.echarts,base.table'
+      'harness.react-button,harness.vue-button,harness.dataset-ranking,board.digital-flop,board.scroll-board,board.water-level,board.border-box,board.capsule-progress,board.marquee,board.pipeline,board.status-grid,base.text,base.rectangle,base.ellipse,base.image,base.rule,base.chart,harness.semantic-chart,plugin.echarts,base.table'
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_UPDATE_FAILED:${JSON.stringify(dynamic)}`);
   }
@@ -994,7 +1008,9 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
       expanded: root.querySelector('[data-error-console-toggle]')?.getAttribute('aria-expanded'),
       focusedClose: root.activeElement?.hasAttribute('data-error-console-close'),
       entryCount: root.querySelectorAll('[data-error-console-entry]').length,
-      currentHeading: root.querySelector('.error-console-section-title')?.textContent?.trim(),
+      currentHeading: root
+        .querySelector('.error-console-current .designer-panel-section-title')
+        ?.textContent?.trim(),
       historyHeading: root.querySelector('.error-console-history-heading h3')?.textContent?.trim(),
       historySummary: root
         .querySelector('[data-error-console-history-summary]')

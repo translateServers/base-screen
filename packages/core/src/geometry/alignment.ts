@@ -29,9 +29,16 @@ export function calculateScreenAlignment(
     return [];
   }
   const fixed = visible.filter(({ locked }) => locked);
-  const reference = Math.min(
-    ...(fixed.length > 0 ? fixed : visible).map(({ bounds }) => axisValue(bounds, axis, mode)),
-  );
+  const candidates = fixed.length > 0 ? fixed : visible;
+  const starts = candidates.map(({ bounds }) => axisStart(bounds, axis));
+  const ends = candidates.map(({ bounds }) => axisEnd(bounds, axis));
+  // start 对齐到最左/最上，end 对齐到最右/最下；center 对齐到选区并集的中心。
+  const reference =
+    mode === 'start'
+      ? Math.min(...starts)
+      : mode === 'end'
+        ? Math.max(...ends)
+        : (Math.min(...starts) + Math.max(...ends)) / 2;
   return visible
     .filter(({ locked }) => !locked)
     .map(({ component, bounds }) => ({

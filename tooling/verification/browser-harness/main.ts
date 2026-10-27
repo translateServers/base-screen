@@ -539,12 +539,16 @@ const materialLibraryGrouping = {
     {
       id: 'board',
       label: '大屏',
-      // 外围插件 plugin-board-materials 贡献的四个物料；分组必须覆盖目录中每个可见物料。
+      // 外围插件 plugin-board-materials 贡献的全部可见物料；分组必须覆盖目录中每个可见物料。
       materialTypes: [
         'board.digital-flop',
         'board.scroll-board',
         'board.water-level',
         'board.border-box',
+        'board.capsule-progress',
+        'board.marquee',
+        'board.pipeline',
+        'board.status-grid',
       ],
     },
     {
@@ -598,6 +602,10 @@ const materialLibraryStressGrouping = {
         'board.scroll-board',
         'board.water-level',
         'board.border-box',
+        'board.capsule-progress',
+        'board.marquee',
+        'board.pipeline',
+        'board.status-grid',
       ],
     },
     {

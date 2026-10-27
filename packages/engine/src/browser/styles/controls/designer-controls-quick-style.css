@@ -56,6 +56,11 @@
   outline-offset: 4px;
 }
 
+/* 可选数值尚未设置：滑杆退到弱化档，避免把最小值误读成已设值。 */
+.designer-range[data-empty="true"] {
+  opacity: 0.45;
+}
+
 .designer-range:disabled {
   cursor: not-allowed;
 }

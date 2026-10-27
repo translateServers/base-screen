@@ -32,7 +32,9 @@ export function applyMaterialFrame(
   const top = `${position.y}px`;
   if (style.top !== top) style.top = top;
   const width = `${component.size.width}px`;
-  if (style.width !== width) style.width = width;
+  // 物料自行声明的 max-content 宽度（如自适应文本）在 model 未重赋值时必须保留：
+  // 几何帧每次 reconcile 都跑，不能把它重新写成 canonical 保存宽度。
+  if (style.width !== 'max-content' && style.width !== width) style.width = width;
   const height = `${component.size.height}px`;
   if (style.height !== height) style.height = height;
   // Core painter order makes root subtrees indivisible spans. A unique order avoids child zIndex

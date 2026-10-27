@@ -442,10 +442,13 @@ export async function assertComponentTextAuthoring(designer, page, hostEventCoun
     throw new Error(`BROWSER_HARNESS_TEXT_HOST_COMMIT_FAILED:${JSON.stringify(textCommit)}`);
   }
   await page.waitForFunction(() => {
-    const source = window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'dataset-ranking-demo',
-    )?.dataSource;
-    return source?.type === 'dataset' && source.params.region?.value === 'south';
+    const document = window.baseScreenHarness.designer.document;
+    const component = document.components.find((item) => item.id === 'dataset-ranking-demo');
+    if (component?.dataValue?.kind !== 'data-source-field') return false;
+    const instance = (document.dataSources ?? []).find(
+      (source) => source.id === component.dataValue.dataSourceId,
+    );
+    return instance?.params.region?.kind === 'inline' && instance.params.region.value === 'south';
   });
   // 无效 JSON 文本提交被拒绝，document 与 history 不变。
   const invalidText = await page.evaluate(() => {
@@ -496,6 +499,11 @@ export async function assertComponentTextAuthoring(designer, page, hostEventCoun
 // ---- 源模块：assert-semantic-chart-authoring.mjs ----
 export async function assertSemanticChartAuthoring(designer, page) {
   const events = designer.locator('[data-events-panel]');
+  // 上一段蓝图工作台断言结束时仍停在 blueprint 模式，检查器页签在该模式下被隐藏；
+  // 先切回画布模式再走样式页的真实路径。
+  await designer.evaluate((element) => {
+    if (element.workbenchMode !== 'canvas') element.setWorkbenchMode('canvas');
+  });
   // AE-ED-C01 语义图表面板：受限 Descriptor 完成常见配置，无需 raw option。
   await designer.getByRole('tab', { name: '\u6837\u5f0f' }).click();
   await designer.locator('[data-base-screen-component-id=semantic-chart-demo]').click();
@@ -853,11 +861,15 @@ export async function assertSemanticChartAuthoring(designer, page) {
   );
   // AE-ED-C04 数据 tab：字段选择器投影到宿主数据集字段。
   await designer.getByRole('tab', { name: '\u6570\u636e' }).click();
-  await designer
-    .locator(
-      '[data-inspector-pane=data] [data-dataset-action="select-step"][data-dataset-workbench-target="mapping"]',
-    )
-    .click();
+  // 数据面板已删除步骤条：导航由滚动表达，滚到「字段映射」段即进入映射配置。
+  await designer.evaluate((element) => {
+    const panel = element.shadowRoot.querySelector('[data-inspector-pane=data]');
+    const content = panel?.querySelector('.designer-inspector-data-flow-content');
+    const target = panel?.querySelector('[data-workbench-section="mapping"]');
+    if (!(content instanceof HTMLElement) || !(target instanceof HTMLElement)) return;
+    content.scrollTop += target.getBoundingClientRect().top - content.getBoundingClientRect().top;
+  });
+  await page.waitForTimeout(250);
   const fieldSelector = designer.locator(
     '[data-inspector-pane=data] [data-descriptor-field-id="dimensionField"]',
   );
@@ -866,19 +878,21 @@ export async function assertSemanticChartAuthoring(designer, page) {
     throw new Error('BROWSER_HARNESS_SEMANTIC_CHART_FIELD_SELECTOR_FAILED');
   }
   await fieldSelector.selectOption('amount');
-  await page.waitForFunction(
-    () =>
-      window.baseScreenHarness.designer.document.components.find(
-        (component) => component.id === 'semantic-chart-demo',
-      )?.dataSource?.binding?.fields?.dimension?.[0] === 'amount',
-  );
+  await page.waitForFunction(() => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'semantic-chart-demo',
+    );
+    const binding = component?.dataBinding ?? component?.dataSource?.binding;
+    return binding?.fields?.dimension?.[0] === 'amount';
+  });
   await fieldSelector.selectOption('category');
-  await page.waitForFunction(
-    () =>
-      window.baseScreenHarness.designer.document.components.find(
-        (component) => component.id === 'semantic-chart-demo',
-      )?.dataSource?.binding?.fields?.dimension?.[0] === 'category',
-  );
+  await page.waitForFunction(() => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'semantic-chart-demo',
+    );
+    const binding = component?.dataBinding ?? component?.dataSource?.binding;
+    return binding?.fields?.dimension?.[0] === 'category';
+  });
   // AE-ED-C05 事件 tab：结构化事件声明 label 与能力提示。
   await designer.getByRole('tab', { name: '\u9ad8\u7ea7' }).click();
   const eventText = await events.textContent();

@@ -17,6 +17,7 @@ import {
   DESIGNER_LAYER_PAGE_SIZE,
   type DesignerLayerDropIndicator,
   type DesignerLayerSelectionDirection,
+  type DesignerLayersRenderOptions,
   type DesignerLayerView,
   filterDesignerLayerItems,
   getDesignerLayerSelectionTarget,
@@ -61,6 +62,9 @@ export class DesignerLayersController {
   #visibleIds: readonly string[] = [];
   /** 最近一次树渲染的内容签名：再次渲染输入全同时跳过整树重建。 */
   #renderedSignature: string | undefined;
+  /** 换树期间再次收到的渲染请求：只记脏，外层结束后按最新状态重跑。 */
+  #rendering = false;
+  #renderQueued = false;
 
   constructor(private readonly callbacks: DesignerLayersControllerCallbacks) {
     this.#drag = new DesignerLayerDragController({
@@ -150,6 +154,14 @@ export class DesignerLayersController {
 
   render(layers: HTMLElement | undefined): void {
     if (layers === undefined) return;
+    // 重渲染会移除聚焦中的重命名输入，浏览器同步派发 focusout/change 并可能再次
+    // 触发重渲染。此时外层正在换树，内层若立即执行会把「无重命名」的树建好，外层
+    // 随后又按开始时的旧快照把输入追加回去，残留的输入再也等不到下一次渲染清理。
+    // 内层请求只记脏，等外层渲染结束后按最新状态重跑一次。
+    if (this.#rendering) {
+      this.#renderQueued = true;
+      return;
+    }
     this.#layers = layers;
     const view = createDesignerLayerView(this.callbacks.getDocument(), this.callbacks.getCatalog());
     // 行序与面板实际渲染的那一屏保持一致：搜索过滤、折叠与分页都会改变可见区间，
@@ -177,7 +189,7 @@ export class DesignerLayersController {
     }
     this.#renderedSignature = signature;
     const focusedRowId = activeLayerSelectId(layers);
-    renderDesignerLayers(layers, view, {
+    const options: DesignerLayersRenderOptions = {
       interaction,
       search: this.#search,
       collapsed: this.#collapsed,
@@ -197,7 +209,13 @@ export class DesignerLayersController {
         ungroup: this.callbacks.canUngroup?.() ?? false,
       },
       canMove: (id, direction, siblings) => this.canMove(id, direction, siblings),
-    });
+    };
+    this.#rendering = true;
+    try {
+      renderDesignerLayers(layers, view, options);
+    } finally {
+      this.#rendering = false;
+    }
     // 重渲染会把聚焦按钮连同节点一起换掉，焦点随之掉到空处 —— 那样单击之后
     // Shift+方向键就接不上了。只在「刚才焦点在行上、渲染后掉了」时接回来：
     // 若焦点已被别处接管（点击画布、切到重命名输入框），这里不抢。
@@ -208,6 +226,10 @@ export class DesignerLayersController {
       next?.focus({ preventScroll: true });
     }
     if (view.diagnostics.length > 0) this.callbacks.emitDiagnostics(view.diagnostics);
+    if (this.#renderQueued) {
+      this.#renderQueued = false;
+      this.render(this.#layers);
+    }
   }
 
   onClick(event: Event): boolean {

@@ -172,6 +172,29 @@ describe('alignment, distribution, and snap', () => {
     ]);
   });
 
+  it('aligns end edges to the widest right edge instead of collapsing to the leftmost', () => {
+    const components = [
+      makeComponent({ id: 'left', position: { x: 20, y: 0 }, size: { width: 40, height: 10 } }),
+      makeComponent({ id: 'wide', position: { x: 100, y: 0 }, size: { width: 120, height: 10 } }),
+    ];
+
+    expect(calculateScreenAlignment(components, 'x', 'end')).toEqual([
+      { componentId: 'left', delta: { x: 160, y: 0 } },
+    ]);
+  });
+
+  it('aligns centers to the union bounds center', () => {
+    const components = [
+      makeComponent({ id: 'left', position: { x: 0, y: 0 }, size: { width: 20, height: 10 } }),
+      makeComponent({ id: 'right', position: { x: 80, y: 0 }, size: { width: 40, height: 10 } }),
+    ];
+
+    expect(calculateScreenAlignment(components, 'x', 'center')).toEqual([
+      { componentId: 'left', delta: { x: 50, y: 0 } },
+      { componentId: 'right', delta: { x: -40, y: 0 } },
+    ]);
+  });
+
   it('distributes movable items between fixed endpoints by edge gaps', () => {
     const components = [
       makeComponent({ id: 'first', position: { x: 0, y: 0 }, size: { width: 20, height: 10 } }),

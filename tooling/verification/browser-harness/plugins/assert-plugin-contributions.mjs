@@ -36,22 +36,29 @@ export async function assertPluginMaterialRenders(designer, page) {
           zIndex: 30,
           status: { locked: false, hidden: false },
           props: { titleText: 'plugin', showTooltip: true, seriesType: 'line' },
-          style: { backgroundColor: '#111827', color: '#f9fafb', gridColor: '#374151', opacity: 1 },
+          style: {
+            backgroundColor: '#111827',
+            color: '#f9fafb',
+            gridColor: '#374151',
+            seriesColor: '#38bdf8',
+            opacity: 1,
+          },
           dataSource: {
             type: 'static',
+            // 图表物料消费 tabular 数据集（fields + rows），由字段映射投影成 series；
+            // 没有 dataBinding 时表格静态值无法投影（会落到绑定无效错误态）。
             value: {
-              series: [
-                {
-                  id: 's1',
-                  label: 'series',
-                  points: [
-                    { x: 'a', y: 1 },
-                    { x: 'b', y: 2 },
-                  ],
-                },
+              fields: [
+                { id: 'category', label: 'category', valueType: 'string' },
+                { id: 'value', label: 'value', valueType: 'number' },
+              ],
+              rows: [
+                { category: 'a', value: 1 },
+                { category: 'b', value: 2 },
               ],
             },
           },
+          dataBinding: { fields: { dimension: ['category'], measures: ['value'] } },
         },
       });
       return { inDesignerCatalog, ok: result.ok, diagnostics: result.diagnostics };
@@ -67,6 +74,20 @@ export async function assertPluginMaterialRenders(designer, page) {
       `BROWSER_HARNESS_PLUGIN_MATERIAL_ADD_FAILED:${JSON.stringify(entered.diagnostics)}`,
     );
   }
+
+  // ECharts 在宿主挂载后按帧绘制 canvas：等真图表实例产出 canvas 再断言，
+  // 避免把「初始化尚未完成」误判成「没有渲染」。
+  await page.waitForFunction(
+    ([id, tag]) => {
+      const root = window.baseScreenHarness.designer.shadowRoot;
+      const node = root.querySelector(`[data-base-screen-component-id=${id}]`);
+      const host =
+        node !== null && node.matches(tag) ? node.querySelector('[_echarts_instance_]') : null;
+      return host?.querySelector('canvas') !== null;
+    },
+    [ECHARTS_COMPONENT_ID, ECHARTS_TAG],
+    { timeout: 5000 },
+  );
 
   const rendered = await page.evaluate(
     ([id, tag]) => {

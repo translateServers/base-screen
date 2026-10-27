@@ -91,13 +91,14 @@
   border-radius: var(--designer-radius-3);
   background: transparent;
   box-shadow: none;
-  color: var(--designer-text-secondary);
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-base);
   font-weight: 500;
 }
 
 .inspector-tabs .designer-tab:hover:not([aria-selected="true"]) {
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-text-primary);
+  background: var(--designer-surface-raised);
+  color: var(--designer-text-secondary);
   box-shadow: none;
 }
 

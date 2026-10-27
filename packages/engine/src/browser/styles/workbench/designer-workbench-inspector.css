@@ -66,21 +66,16 @@
 }
 
 .properties .inspector-tabs {
-  padding: 0 38px 0 0;
+  padding: 0 calc(var(--designer-space-8) + var(--designer-space-3)) 0 0;
   border-bottom-color: var(--designer-border-subtle);
   background: var(--designer-surface-workspace);
 }
 
 .properties .inspector-tabs .designer-tab {
   display: inline-flex;
-  min-height: 30px;
   align-items: center;
   justify-content: center;
   gap: 0;
-  padding: 0 var(--designer-space-4);
-  border: 0;
-  color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-base);
 }
 
 /* 页签按物料能力用 hidden 摘除，上面的显式 display 会盖掉 UA 的 [hidden]，必须就地压回。 */
@@ -88,24 +83,13 @@
   display: none;
 }
 
-.properties .inspector-tabs .designer-tab:hover:not([aria-selected="true"]) {
-  background: var(--designer-surface-raised);
-  color: var(--designer-text-secondary);
-}
-
-.properties .inspector-tabs .designer-tab[aria-selected="true"] {
-  border: 0;
-  background: var(--designer-surface-control-active);
-  color: var(--designer-text-primary);
-  box-shadow: inset 0 0 0 1px var(--designer-border-default);
-  font-weight: 600;
-}
-
 .properties .inspector-context {
   display: flex;
   min-height: 58px;
-  gap: 2px;
-  padding: 12px 132px 10px 20px;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-5) calc(var(--designer-space-7) * 5 + var(--designer-space-5))
+    calc(var(--designer-space-4) + var(--designer-space-1))
+    calc(var(--designer-space-6) + var(--designer-space-2));
   border-bottom: 0;
   background: var(--designer-surface-panel);
 }
@@ -188,11 +172,11 @@
   min-height: 28px;
   grid-template-columns: 28px auto;
   align-self: start;
-  gap: 7px;
+  gap: calc(var(--designer-space-3) + 1px);
   justify-self: end;
   justify-content: end;
-  margin-top: 14px;
-  padding: 0 18px 0 0;
+  margin-top: calc(var(--designer-space-5) + var(--designer-space-1));
+  padding: 0 calc(var(--designer-space-6) + var(--designer-space-1)) 0 0;
   border-bottom: 0;
   background: transparent;
 }
@@ -233,8 +217,8 @@
   min-height: 40px;
   grid-template-columns: 28px minmax(0, 1fr) 20px;
   align-items: center;
-  gap: 4px;
-  padding: 0 12px 0 8px;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-5) 0 var(--designer-space-4);
   color: var(--designer-text-primary);
 }
 
@@ -263,13 +247,14 @@
 .inspector-search-workspace .inspector-search {
   position: relative;
   width: auto;
-  margin: 0 12px 8px;
+  margin: 0 var(--designer-space-5) var(--designer-space-4);
 }
 
 .inspector-search-workspace .inspector-search input {
   width: 100%;
   height: 30px;
-  padding: 0 9px 0 30px;
+  padding: 0 calc(var(--designer-space-4) + 1px) 0
+    calc(var(--designer-space-7) + var(--designer-space-3));
   border-color: var(--designer-border-subtle);
   border-radius: var(--designer-radius-1);
   background: var(--designer-surface-control);
@@ -279,8 +264,8 @@
 
 .inspector-search-instructions {
   display: grid;
-  gap: 4px;
-  padding: 0 14px 12px;
+  gap: var(--designer-space-2);
+  padding: 0 calc(var(--designer-space-5) + 1px) var(--designer-space-5);
   border-bottom: 1px solid var(--designer-border-subtle);
   color: var(--designer-text-muted);
   font-size: var(--designer-font-size-xs);
@@ -295,7 +280,7 @@
 
 .inspector-search-workspace .inspector-search-empty {
   margin: 0;
-  padding: 24px 14px;
+  padding: var(--designer-space-7) calc(var(--designer-space-5) + 1px);
 }
 
 /* Multi-selection switches the inspector into the compact batch configuration surface. */
@@ -315,7 +300,7 @@
   height: 44px;
   grid-row: 1 !important;
   justify-content: flex-start;
-  padding: 0 20px;
+  padding: 0 calc(var(--designer-space-6) + var(--designer-space-2));
   border-bottom: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
 }
@@ -337,14 +322,14 @@
 
 .properties[data-inspector-context-kind="multi-selection"] > .inspector-pane {
   grid-row: 2 !important;
-  padding: 0 14px 24px;
+  padding: 0 calc(var(--designer-space-5) + 1px) var(--designer-space-7);
 }
 
 .properties .designer-inspector-batch-arrange,
 .properties .designer-inspector-batch-geometry,
 .properties .designer-inspector-batch-unified-style,
 .properties .designer-inspector-quick-style-section[data-quick-style-variant="batch"] {
-  padding: 13px 0;
+  padding: calc(var(--designer-space-5) + 1px) 0;
 }
 
 .properties
@@ -356,7 +341,7 @@
 .properties .designer-inspector-batch-arrange-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 2px;
+  gap: var(--designer-space-1);
 }
 
 .properties .designer-inspector-batch-arrange-button {
@@ -386,7 +371,7 @@
   min-height: 36px;
   grid-template-columns: 76px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: var(--designer-space-4);
 }
 
 .properties .designer-inspector-batch-field-row-label {
@@ -398,7 +383,7 @@
   display: grid;
   min-width: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: var(--designer-space-3);
 }
 
 .properties .designer-inspector-batch-field-row-controls .designer-field {
@@ -406,25 +391,17 @@
   min-width: 0;
   grid-template-columns: 12px minmax(0, 1fr);
   align-items: center;
-  gap: 4px;
+  gap: var(--designer-space-2);
   margin: 0;
   overflow: visible;
-  color: var(--designer-text-muted);
 }
 
 .properties .designer-inspector-batch-field-row-controls .designer-input {
-  height: 28px;
-  padding: 0 7px;
   text-align: right;
 }
 
-.properties .designer-inspector-batch-readonly .designer-input:disabled {
-  background: var(--designer-surface-workspace);
-  color: var(--designer-text-muted);
-}
-
 .properties .designer-inspector-batch-geometry > .designer-field[data-inspector-advanced] {
-  margin: 8px 0 0 84px;
+  margin: var(--designer-space-4) 0 0 calc(var(--designer-space-7) * 3 + var(--designer-space-5));
 }
 
 .properties .designer-inspector-quick-style-section[data-quick-style-variant="batch"] details,
@@ -438,8 +415,8 @@
   .designer-inspector-quick-style-section[data-quick-style-variant="batch"]
   .designer-quick-config-row {
   grid-template-columns: 76px minmax(0, 1fr);
-  gap: 8px;
-  margin-bottom: 9px;
+  gap: var(--designer-space-4);
+  margin-bottom: calc(var(--designer-space-4) + 1px);
 }
 
 .properties
@@ -477,7 +454,7 @@
 }
 
 .properties .designer-inspector-batch-secondary-actions .designer-button {
-  margin: 0 4px 4px 0;
+  margin: 0 var(--designer-space-2) var(--designer-space-2) 0;
 }
 
 /* 不设 scroll-padding：该属性会把边框附近（上下各 12px/72px 内）的焦点控件视为
@@ -485,7 +462,7 @@
    拖向控件中间，导致每次值变化滚动条都跳一下、直到控件稳定在 padding 区域内。
    移除后焦点滚动退化为原生语义（仅在控件被裁剪时最小滚动）。 */
 .properties .inspector-pane {
-  padding: 0 16px 24px;
+  padding: 0 var(--designer-space-6) var(--designer-space-7);
   background: var(--designer-surface-panel);
 }
 
@@ -496,11 +473,8 @@
   grid-template-columns: 74px minmax(0, 1fr);
   align-items: center;
   gap: var(--designer-space-2);
-  min-height: 34px;
   margin-bottom: var(--designer-space-2);
   overflow: visible;
-  color: var(--designer-text-secondary);
-  font: var(--designer-font);
   white-space: normal;
 }
 
@@ -511,8 +485,6 @@
 .properties .inspector-pane .designer-field-label-text {
   min-width: 0;
   overflow: hidden;
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-base);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -582,50 +554,12 @@
 
 .properties .inspector-pane .designer-field-range-value {
   width: 58px;
-  height: 28px;
-  padding: 0 7px;
-  font: var(--designer-font-numeric);
   text-align: right;
 }
 
 .properties .inspector-pane .designer-range {
   width: 100%;
-  height: 6px;
   margin: 0;
-  appearance: none;
-  border: 0;
-  border-radius: var(--designer-radius-pill);
-  background: var(--designer-range-track);
-  box-shadow: none;
-}
-
-.properties .inspector-pane .designer-range::-webkit-slider-thumb {
-  width: 14px;
-  height: 14px;
-  appearance: none;
-  border: 2px solid var(--designer-surface-raised);
-  border-radius: 50%;
-  background: var(--designer-text-primary);
-  cursor: pointer;
-}
-
-.properties .inspector-pane .designer-range::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--designer-surface-raised);
-  border-radius: 50%;
-  background: var(--designer-text-primary);
-  cursor: pointer;
-}
-
-.properties .inspector-pane .designer-range:focus-visible {
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: 4px;
-}
-
-/* 可选数值尚未设置：滑杆退到弱化档，数字框显示“自动”占位，避免把最小值误读成已设值。 */
-.properties .inspector-pane .designer-range[data-empty="true"] {
-  opacity: 0.45;
 }
 
 .properties .inspector-pane .designer-segmented {
@@ -650,8 +584,8 @@
 }
 
 .properties .designer-inspector-lock-notice {
-  margin: 12px 0 0;
-  padding: 8px 10px;
+  margin: var(--designer-space-5) 0 0;
+  padding: var(--designer-space-4) calc(var(--designer-space-4) + var(--designer-space-1));
   border: 1px solid var(--designer-border-subtle);
   border-radius: var(--designer-radius-1);
   background: var(--designer-surface-workspace);
@@ -660,13 +594,12 @@
   line-height: 1.5;
 }
 
-.properties .designer-inspector-geometry-section {
-  padding-top: 14px;
-}
+/* 几何首段的上距属于分区外观，按分层约定落在 chrome 层（designer-workbench-chrome.css）。 */
 
 .properties .designer-inspector-geometry-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px 14px;
+  gap: calc(var(--designer-space-4) + var(--designer-space-1))
+    calc(var(--designer-space-5) + var(--designer-space-1));
   margin: 0;
 }
 
@@ -674,7 +607,6 @@
   position: relative;
   display: block;
   min-width: 0;
-  min-height: 28px;
   margin: 0;
 }
 
@@ -703,15 +635,10 @@
 }
 
 .properties .designer-inspector-geometry-grid [data-property-symbol] .designer-input {
-  height: 28px;
-  padding-right: 25px;
-  color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-base);
   text-align: left;
 }
 
 .properties .designer-inspector-geometry-grid .designer-field-message {
-  font-size: var(--designer-font-size-xs);
   white-space: normal;
 }
 
@@ -747,7 +674,7 @@
   grid-column: 1 / -1;
   grid-template-columns: 56px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: var(--designer-space-4);
   color: var(--designer-text-secondary);
   font-size: var(--designer-font-size-base);
 }
@@ -785,7 +712,7 @@
 }
 
 .properties .designer-inspector-common-section {
-  padding-top: 14px;
+  padding-top: calc(var(--designer-space-5) + var(--designer-space-1));
   border-top: 1px solid var(--designer-border-subtle);
 }
 
@@ -803,7 +730,7 @@
   display: flex;
   align-items: center;
   gap: var(--designer-space-3);
-  margin: 0 0 10px;
+  margin: 0 0 calc(var(--designer-space-4) + var(--designer-space-1));
   color: var(--designer-text-primary);
   font: inherit;
   font-size: var(--designer-font-size-base);
@@ -837,8 +764,8 @@
 }
 
 .properties .designer-quick-style-grid {
-  gap: 7px;
-  margin-bottom: 12px;
+  gap: calc(var(--designer-space-3) + 1px);
+  margin-bottom: var(--designer-space-5);
 }
 
 .properties .designer-inspector-quick-style-section .designer-quick-config-row:last-child {
@@ -858,7 +785,7 @@
 
 /* 条件样式：规则卡片列表。间距只在容器内增长，避免规则增删时整块面板跳动。 */
 .properties .designer-style-rule-hint {
-  margin: 0 0 8px;
+  margin: 0 0 var(--designer-space-4);
   color: var(--designer-text-muted);
   font-size: 11px;
   line-height: 1.5;
@@ -866,14 +793,14 @@
 
 .properties .designer-style-rules {
   display: grid;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--designer-space-4);
+  margin-bottom: var(--designer-space-4);
 }
 
 .properties .designer-style-rule {
   display: grid;
-  gap: 6px;
-  padding: 8px;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-4);
   border: 1px solid var(--designer-border-subtle);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
@@ -883,14 +810,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--designer-space-4);
   color: var(--designer-text-primary);
   font-size: 11px;
 }
 
 .properties .designer-style-rule-actions {
   display: flex;
-  gap: 2px;
+  gap: var(--designer-space-1);
 }
 
 .properties .designer-style-rule-action {
@@ -903,7 +830,7 @@
 
 .properties .designer-style-rule-fields {
   display: grid;
-  gap: 6px;
+  gap: var(--designer-space-3);
 }
 
 .properties .designer-style-rule-fields .designer-field {
@@ -922,12 +849,12 @@
 
 /* 宿主条件样式：条件源表单与保存状态。状态行固定最小高度，切换文案不让面板跳动。 */
 .properties .designer-host-style-form {
-  margin-top: 8px;
+  margin-top: var(--designer-space-4);
 }
 
 .properties .designer-host-style-status {
   min-height: 16px;
-  margin: 6px 0 0;
+  margin: var(--designer-space-3) 0 0;
   color: var(--designer-text-muted);
   font-size: 11px;
   line-height: 1.4;

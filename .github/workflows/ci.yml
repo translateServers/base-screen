@@ -53,3 +53,81 @@ jobs:
         run: pnpm check:api-changesets
       - name: Ensure verification leaves tracked files unchanged
         run: git diff --exit-code
+
+  coverage-signal:
+    name: Coverage signal
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+      - run: corepack enable pnpm
+      - run: corepack install --global pnpm@11.18.0
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Restore pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-22.23.2-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-node-22.23.2-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-node-22.23.2-
+      - run: pnpm install --frozen-lockfile
+      - name: Collect package line coverage
+        shell: bash
+        run: |
+          set -e
+          for pkg in contracts core renderer engine material plugin-core plugin-manager plugin-sdk react vue sdk testing; do
+            pnpm test:baseline --coverage "$pkg"
+          done
+      - name: Upload coverage metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-signal
+          path: .base-screen/local/metrics/coverage-*.json
+          if-no-files-found: warn
+
+  browser-verification:
+    name: Browser verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+      - run: corepack enable pnpm
+      - run: corepack install --global pnpm@11.18.0
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Restore pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-22.23.2-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-node-22.23.2-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-node-22.23.2-
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm verify:browser
+      - name: Upload browser verification screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-verification-screenshots
+          path: test-results/designer-workbench
+          if-no-files-found: ignore

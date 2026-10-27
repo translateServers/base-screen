@@ -63,9 +63,9 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             </button>
           </div>
           <div class="material-filters" role="group" aria-label="${DESIGNER_UI_TEXT.materialFilters}">
-            <button type="button" class="designer-control designer-button" data-material-filter="all" aria-pressed="true">${DESIGNER_UI_TEXT.allMaterials}</button>
-            <button type="button" class="designer-control designer-button" data-material-filter="favorite" aria-pressed="false">${DESIGNER_UI_TEXT.favoriteMaterials}</button>
-            <button type="button" class="designer-control designer-button" data-material-filter="recent" aria-pressed="false">${DESIGNER_UI_TEXT.recentMaterials}</button>
+            <button type="button" class="designer-control designer-button" data-variant="filter" data-material-filter="all" aria-pressed="true">${DESIGNER_UI_TEXT.allMaterials}</button>
+            <button type="button" class="designer-control designer-button" data-variant="filter" data-material-filter="favorite" aria-pressed="false">${DESIGNER_UI_TEXT.favoriteMaterials}</button>
+            <button type="button" class="designer-control designer-button" data-variant="filter" data-material-filter="recent" aria-pressed="false">${DESIGNER_UI_TEXT.recentMaterials}</button>
           </div>
           <button type="button" class="designer-control designer-button material-group-toggle" data-material-group-toggle data-material-group-action="toggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="designer-material-group-popover" hidden>
             <span class="material-group-toggle-glyph" aria-hidden="true">${designerIcon('grid')}</span>

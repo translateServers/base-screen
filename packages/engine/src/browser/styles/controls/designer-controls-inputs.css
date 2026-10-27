@@ -79,6 +79,33 @@
   height: var(--designer-control-height-compact);
 }
 
+/* 密集容器里的下拉只收字号，不改控件高度。 */
+.designer-select-trigger[data-density="compact"] {
+  font-size: var(--designer-font-size-sm);
+}
+
+/* 右栏检查器：批次几何输入为紧凑档，几何网格输入给符号留出内距。 */
+.designer-inspector-batch-field-row-controls .designer-input {
+  height: var(--designer-control-height-compact);
+  padding: 0 calc(var(--designer-space-3) + 1px);
+}
+
+.designer-inspector-batch-readonly .designer-input:disabled {
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-muted);
+}
+
+.designer-inspector-geometry-grid [data-property-symbol] .designer-input {
+  height: var(--designer-control-height-compact);
+  padding-right: calc(var(--designer-space-7) + 1px);
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-base);
+}
+
+.designer-inspector-geometry-grid .designer-field-message {
+  font-size: var(--designer-font-size-xs);
+}
+
 .designer-color[data-size="compact"] {
   width: var(--designer-control-height-compact);
   height: var(--designer-control-height-compact);
@@ -655,4 +682,50 @@
 
 .designer-control-shell .designer-control[data-flush="true"]:focus-visible {
   outline: none;
+}
+
+/* 右栏数据面板的输入档位（原 workbench 覆写，迁到控件层统一维护）。
+   整行参数控件：描边在容器上，内部输入退成透明，焦点只换外环。 */
+.properties .designer-dataset-parameter-control > .designer-input,
+.designer-data-workbench-shell .designer-dataset-parameter-control > .designer-input {
+  height: 100%;
+  min-height: 28px;
+  padding: 0 var(--designer-space-2);
+  background: transparent;
+  box-shadow: none;
+}
+
+.properties .designer-dataset-parameter-control > .designer-input:focus,
+.properties .designer-dataset-parameter-control > .designer-input:focus-visible,
+.designer-data-workbench-shell .designer-dataset-parameter-control > .designer-input:focus,
+.designer-data-workbench-shell .designer-dataset-parameter-control > .designer-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.properties .designer-dataset-parameter-control > .designer-number,
+.designer-data-workbench-shell .designer-dataset-parameter-control > .designer-number {
+  font-family: var(--designer-font-family-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 固定值表格单元格：常态不画第二层描边，悬停/聚焦才出环。 */
+.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-input {
+  min-height: 28px;
+  padding: 0 var(--designer-space-3);
+  border-radius: var(--designer-radius-1);
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--designer-font-size-xs);
+}
+
+.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-input:hover {
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
+}
+
+.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-input:focus {
+  outline: none;
+  background: var(--designer-surface-control);
+  box-shadow: 0 0 0 2px var(--designer-focus-ring);
 }

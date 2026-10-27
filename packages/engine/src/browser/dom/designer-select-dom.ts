@@ -14,6 +14,8 @@ export interface DesignerSelectControlHandle {
   readonly element: HTMLDivElement;
   /** 原生 select（值载体，保持原契约）。 */
   readonly select: HTMLSelectElement;
+  /** 自绘触发器；调用方可在其上挂 size/density 等视觉钩子。 */
+  readonly trigger: HTMLButtonElement;
   /** 原生 select 的选项被重建后调用：镜像选项、同步触发器与禁用态。 */
   refresh(): void;
 }
@@ -226,5 +228,5 @@ export function enhanceDesignerSelect(select: HTMLSelectElement): DesignerSelect
   element.appendChild(select);
   mirrorOptions();
   sync();
-  return { element, select, refresh };
+  return { element, select, trigger, refresh };
 }

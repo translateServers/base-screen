@@ -14,8 +14,6 @@ import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-cor
 import { PluginCommandPort } from '@base-screen/plugin-core';
 import type { PluginDesignReadPort } from '@base-screen/plugin-core';
 import type { ScreenAuthoringEditorContext } from '@base-screen/contracts';
-import type { ScreenBlueprintAction } from '@base-screen/contracts';
-import type { ScreenBlueprintCondition } from '@base-screen/contracts';
 import type { ScreenBlueprintLayoutNode } from '@base-screen/contracts';
 import type { ScreenBlueprintLayoutViewport } from '@base-screen/contracts';
 import type { ScreenCanvasBackground } from '@base-screen/contracts';
@@ -156,8 +154,6 @@ export interface BaseScreenBlueprintCanvasCommandResult {
 export interface BaseScreenBlueprintCanvasEdge {
     // (undocumented)
     readonly actionId?: string;
-    // @deprecated (undocumented)
-    readonly actionIndex?: number;
     // (undocumented)
     readonly deletable?: boolean;
     // (undocumented)
@@ -176,8 +172,6 @@ export interface BaseScreenBlueprintCanvasEdge {
     readonly relationId?: string;
     // (undocumented)
     readonly relationKind?: 'behavior' | 'semantic';
-    // @deprecated (undocumented)
-    readonly ruleId?: string;
     // (undocumented)
     readonly semanticRole?: 'related' | 'detail' | 'group' | 'drill-down';
     // (undocumented)
@@ -193,11 +187,7 @@ export interface BaseScreenBlueprintCanvasEdge {
 }
 
 // @public (undocumented)
-type BaseScreenBlueprintCanvasEdgeKind = 'relation' | 'semantic' | 'containment' | 'dependency'
-/** @deprecated 旧事件图边；引擎不再产出。 */
-| 'trigger'
-/** @deprecated 旧事件图边；引擎不再产出。 */
-| 'action';
+type BaseScreenBlueprintCanvasEdgeKind = 'relation' | 'semantic' | 'containment' | 'dependency';
 
 // @public (undocumented)
 export interface BaseScreenBlueprintCanvasEventOption {
@@ -237,10 +227,6 @@ export type BaseScreenBlueprintCanvasInsertNode = {
 
 // @public (undocumented)
 export interface BaseScreenBlueprintCanvasNode {
-    // @deprecated (undocumented)
-    readonly action?: ScreenBlueprintAction;
-    // @deprecated (undocumented)
-    readonly actionIndex?: number;
     // (undocumented)
     readonly childCount?: number;
     // (undocumented)
@@ -249,8 +235,6 @@ export interface BaseScreenBlueprintCanvasNode {
     readonly componentId?: string;
     // (undocumented)
     readonly componentName?: string;
-    // @deprecated (undocumented)
-    readonly condition?: ScreenBlueprintCondition;
     // (undocumented)
     readonly events?: readonly BaseScreenBlueprintCanvasEventOption[];
     // (undocumented)
@@ -275,12 +259,6 @@ export interface BaseScreenBlueprintCanvasNode {
     readonly readCount?: number;
     // (undocumented)
     readonly relationCount?: number;
-    // @deprecated (undocumented)
-    readonly ruleId?: string;
-    // @deprecated (undocumented)
-    readonly summary?: BaseScreenBlueprintCanvasNodeSummary;
-    // @deprecated (undocumented)
-    readonly unconnected?: true;
     // (undocumented)
     readonly variableDescription?: string;
     // (undocumented)
@@ -300,11 +278,7 @@ export interface BaseScreenBlueprintCanvasNode {
 }
 
 // @public (undocumented)
-type BaseScreenBlueprintCanvasNodeKind = 'component' | 'variable' | 'host'
-/** @deprecated 关系模型不再产出条件节点；保留字面量供旧宿主画布类型兼容。 */
-| 'condition'
-/** @deprecated 关系模型不再产出动作节点；保留字面量供旧宿主画布类型兼容。 */
-| 'action';
+type BaseScreenBlueprintCanvasNodeKind = 'component' | 'variable' | 'host';
 
 // @public (undocumented)
 export interface BaseScreenBlueprintCanvasNodePosition {
@@ -312,18 +286,6 @@ export interface BaseScreenBlueprintCanvasNodePosition {
     readonly x: number;
     // (undocumented)
     readonly y: number;
-}
-
-// @public (undocumented)
-export interface BaseScreenBlueprintCanvasNodeSummary {
-    // (undocumented)
-    readonly kind: 'condition' | 'set-variable' | 'request-variable' | 'request-component-data' | 'emit-host-event' | 'host-action';
-    // (undocumented)
-    readonly order?: number;
-    // (undocumented)
-    readonly primary: string;
-    // (undocumented)
-    readonly secondary?: string;
 }
 
 // @public (undocumented)

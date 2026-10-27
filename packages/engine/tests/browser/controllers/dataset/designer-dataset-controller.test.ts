@@ -578,7 +578,11 @@ describe('DesignerDatasetController', () => {
           {
             type: 'update-components',
             componentIds: ['text-1'],
-            patch: { dataSource: { type: 'static', value: { ready: true } } },
+            patch: {
+              // 切回旧形态时清掉新取值字段：契约禁止 dataSource 与 dataValue 并存。
+              dataValue: null,
+              dataSource: { type: 'static', value: { ready: true } },
+            },
           },
         ],
       },

@@ -70,22 +70,41 @@ export async function assertStaticSourceSwitch(browser, baseUrl) {
     await page.waitForFunction(
       (id) =>
         window.baseScreenHarness.designer.document.components.find((node) => node.id === id)
-          ?.dataSource?.type === 'dataset',
+          ?.dataValue?.kind === 'data-source-field',
       componentId,
     );
 
     // 自动匹配把第一个字符串字段接到 text 的 `value` 角色上，画布立刻显示数据集里的值。
+    // 数据集走文档级实例 + dataValue 引用；组件本身不再持有旧式 dataSource。
     const bound = await page.evaluate((id) => {
       const api = window.baseScreenHarness.designer;
       const component = api.document.components.find((node) => node.id === id);
+      const reference = component?.dataValue;
+      const instance =
+        reference?.kind === 'data-source-field'
+          ? (api.document.dataSources ?? []).find(
+              (candidate) => candidate.id === reference.dataSourceId,
+            )
+          : undefined;
       const element = api.shadowRoot.querySelector(`[data-base-screen-component-id="${id}"]`);
-      return { dataSource: component?.dataSource ?? null, rendered: element?.textContent ?? null };
+      return {
+        dataSource: component?.dataSource ?? null,
+        dataValue: reference ?? null,
+        dataBinding: component?.dataBinding ?? null,
+        instance: instance ?? null,
+        rendered: element?.textContent ?? null,
+      };
     }, componentId);
-    expect(bound.dataSource).toMatchObject({
-      type: 'dataset',
-      datasetId: 'tabular-orders',
-      binding: { fields: { value: ['category'] } },
+    expect(bound.dataSource).toBeNull();
+    expect(bound.dataValue).toMatchObject({ kind: 'data-source-field', path: [] });
+    expect(bound.instance).toMatchObject({
+      source: { kind: 'dataset', datasetId: 'tabular-orders' },
+      params: {
+        limit: { kind: 'inline', value: 2 },
+        rangeStart: { kind: 'inline', value: '2026-10-01' },
+      },
     });
+    expect(bound.dataBinding).toEqual({ fields: { value: ['category'] } });
     expect(bound.rendered).toBe('A');
 
     // 回程：数据集靠来源卡的「更换来源」回到浮层，固定值页签应用后回到静态值。
@@ -94,6 +113,7 @@ export async function assertStaticSourceSwitch(browser, baseUrl) {
     await sheet.locator('[data-source-sheet-tab="fixed"]').click();
     await sheet.locator('[data-source-sheet-fixed]').fill('"回程文本"');
     await sheet.locator('[data-source-sheet-apply-fixed]').click();
+    await page.waitForTimeout(500);
     await sheet.waitFor({ state: 'detached' });
 
     const restored = await page.evaluate((id) => {

@@ -28,6 +28,10 @@ export class DesignerAutoWidthController {
 
   project(document: ScreenDocument | undefined): ScreenDocument | undefined {
     if (document === undefined) return undefined;
+    // 几何读数（对齐/分布/检查器）不能依赖 ResizeObserver 的回调时机：先按当前 DOM
+    // 重建观察集合并重新测量，避免刚插入或撤销后第一次对齐拿到旧的保存宽度。
+    // 只对「当前已同步的文档」重测：投影历史快照时不能把已移除的组件重新挂回观察集合。
+    if (!this.#frozen && document === this.#document) this.sync(document);
     if (document !== this.#cachedInput || this.#cachedProjection === undefined) {
       this.#cachedInput = document;
       this.#cachedProjection = projectDesignerAutoWidths(document, this.#widths);

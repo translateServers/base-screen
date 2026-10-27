@@ -135,9 +135,15 @@ export function applyUpdateComponentsCommand(
     );
   }
   const targetSet = new Set(targets);
-  const components = document.components.map((component) =>
-    targetSet.has(component.id) ? patchDocument(component, patch) : component,
-  );
+  const components = document.components.map((component) => {
+    if (!targetSet.has(component.id)) return component;
+    const next = patchDocument(component, patch);
+    // `dataValue: null` 表示清除取值引用；保留 null 键会被严格解析视为与 dataSource 并存。
+    if ('dataValue' in patch && patch.dataValue === null) {
+      delete (next as { dataValue?: unknown }).dataValue;
+    }
+    return next;
+  });
   const changed = targets.filter((id) => {
     const entry = index.byId.get(id)!;
     return !screenJsonEquals(entry.component, components[entry.index]);

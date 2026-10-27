@@ -218,28 +218,36 @@ export async function assertDatasetAuthoring(designer, page) {
       `BROWSER_HARNESS_DATASET_MAPPING_SURFACE_FAILED:${JSON.stringify(mappingSurface)}`,
     );
   }
-  // v7 无 Apply：参数改动失焦/change 后自动提交，等待文档落库即可。
+  // 新形态：组件只持有 dataValue（data-source-field）引用，参数落在文档级 dataSources 实例上。
   await page.waitForFunction(() => {
-    const source = window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'dataset-ranking-demo',
-    )?.dataSource;
+    const document = window.baseScreenHarness.designer.document;
+    const component = document.components.find((item) => item.id === 'dataset-ranking-demo');
+    if (component?.dataValue?.kind !== 'data-source-field') return false;
+    const instance = (document.dataSources ?? []).find(
+      (source) => source.id === component.dataValue.dataSourceId,
+    );
     return (
-      source?.type === 'dataset' &&
-      source.datasetId === 'tabular-orders' &&
-      source.params.region?.kind === 'literal'
+      instance?.source.kind === 'dataset' &&
+      instance.source.datasetId === 'tabular-orders' &&
+      instance.params.region?.kind === 'inline'
     );
   });
-  const appliedDatasetSource = await page.evaluate(
-    () =>
-      window.baseScreenHarness.designer.document.components.find(
-        (component) => component.id === 'dataset-ranking-demo',
-      )?.dataSource,
-  );
+  const appliedDatasetSource = await page.evaluate(() => {
+    const document = window.baseScreenHarness.designer.document;
+    const component = document.components.find((item) => item.id === 'dataset-ranking-demo');
+    const instance =
+      component?.dataValue?.kind === 'data-source-field'
+        ? (document.dataSources ?? []).find(
+            (source) => source.id === component.dataValue.dataSourceId,
+          )
+        : undefined;
+    return { binding: component?.dataBinding ?? null, instance: instance ?? null };
+  });
   if (
-    appliedDatasetSource?.type !== 'dataset' ||
+    appliedDatasetSource.instance?.source.kind !== 'dataset' ||
     appliedDatasetSource.binding?.fields.dimension?.[0] !== 'category' ||
     appliedDatasetSource.binding.fields.measures?.[0] !== 'amount' ||
-    appliedDatasetSource.params.region?.kind !== 'literal'
+    appliedDatasetSource.instance.params.region?.kind !== 'inline'
   ) {
     throw new Error('BROWSER_HARNESS_DATASET_TRANSACTION_FAILED');
   }
@@ -327,20 +335,26 @@ export async function assertDatasetAuthoring(designer, page) {
     );
   }
   await page.waitForFunction(() => {
-    const source = window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'dataset-ranking-demo',
-    )?.dataSource;
+    const document = window.baseScreenHarness.designer.document;
+    const component = document.components.find((item) => item.id === 'dataset-ranking-demo');
+    if (component?.dataValue?.kind !== 'data-source-field') return false;
+    const instance = (document.dataSources ?? []).find(
+      (source) => source.id === component.dataValue.dataSourceId,
+    );
     return (
-      source?.type === 'dataset' &&
-      source.params.region?.kind === 'variable' &&
-      source.params.region.variableId === 'region'
+      instance?.params.region?.kind === 'variable' && instance.params.region.variableId === 'region'
     );
   });
   const afterVariableApply = await page.evaluate(() => {
-    const source = window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'dataset-ranking-demo',
-    )?.dataSource;
-    return source?.type === 'dataset' ? source.params.region : null;
+    const document = window.baseScreenHarness.designer.document;
+    const component = document.components.find((item) => item.id === 'dataset-ranking-demo');
+    const instance =
+      component?.dataValue?.kind === 'data-source-field'
+        ? (document.dataSources ?? []).find(
+            (source) => source.id === component.dataValue.dataSourceId,
+          )
+        : undefined;
+    return instance?.params.region ?? null;
   });
   if (afterVariableApply?.kind !== 'variable' || afterVariableApply.variableId !== 'region') {
     throw new Error(
@@ -401,22 +415,26 @@ export async function assertDatasetAuthoring(designer, page) {
     );
   }
   await page.waitForFunction(() => {
-    const source = window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'dataset-ranking-demo',
-    )?.dataSource;
-    return (
-      source?.type === 'dataset' &&
-      source.params.region?.kind === 'literal' &&
-      source.params.region.value === 'north'
+    const document = window.baseScreenHarness.designer.document;
+    const component = document.components.find((item) => item.id === 'dataset-ranking-demo');
+    if (component?.dataValue?.kind !== 'data-source-field') return false;
+    const instance = (document.dataSources ?? []).find(
+      (source) => source.id === component.dataValue.dataSourceId,
     );
+    return instance?.params.region?.kind === 'inline' && instance.params.region.value === 'north';
   });
   const afterInlineApply = await page.evaluate(() => {
-    const source = window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'dataset-ranking-demo',
-    )?.dataSource;
-    return source?.type === 'dataset' ? source.params.region : null;
+    const document = window.baseScreenHarness.designer.document;
+    const component = document.components.find((item) => item.id === 'dataset-ranking-demo');
+    const instance =
+      component?.dataValue?.kind === 'data-source-field'
+        ? (document.dataSources ?? []).find(
+            (source) => source.id === component.dataValue.dataSourceId,
+          )
+        : undefined;
+    return instance?.params.region ?? null;
   });
-  if (afterInlineApply?.kind !== 'literal' || afterInlineApply.value !== 'north') {
+  if (afterInlineApply?.kind !== 'inline' || afterInlineApply.value !== 'north') {
     throw new Error(
       `BROWSER_HARNESS_DATASET_PARAMETER_INLINE_APPLY_FAILED:${JSON.stringify(afterInlineApply)}`,
     );
@@ -458,10 +476,13 @@ export async function assertDatasetAuthoring(designer, page) {
   await regionForReplay.dispatchEvent('change');
   // 自动应用是唯一的重建触发点：先等文档落库，再等参数组节点真的被替换。
   await page.waitForFunction(() => {
-    const source = window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'dataset-ranking-demo',
-    )?.dataSource;
-    return source?.type === 'dataset' && source.params.region?.value === 'south';
+    const document = window.baseScreenHarness.designer.document;
+    const component = document.components.find((item) => item.id === 'dataset-ranking-demo');
+    if (component?.dataValue?.kind !== 'data-source-field') return false;
+    const instance = (document.dataSources ?? []).find(
+      (source) => source.id === component.dataValue.dataSourceId,
+    );
+    return instance?.params.region?.kind === 'inline' && instance.params.region.value === 'south';
   });
   await page.waitForFunction(() => {
     const panel = document
@@ -570,10 +591,10 @@ export async function assertDatasetAuthoring(designer, page) {
   });
   await dataPanel.locator('[data-dataset-auto-match]').click();
   await page.waitForFunction(() => {
-    const source = window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'dataset-ranking-demo',
-    )?.dataSource;
-    return source?.type === 'dataset' && source.binding?.fields.measures?.[0] === 'amount';
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'dataset-ranking-demo',
+    );
+    return component?.dataBinding?.fields.measures?.[0] === 'amount';
   });
   const autoMatched = await dataPanel.evaluate((panel) => {
     const group = panel.querySelector('details[data-details-group="mapping"]');
@@ -1214,13 +1235,20 @@ export async function assertDatasetSurface(designer, page) {
       `BROWSER_HARNESS_DATASET_SCROLL_STEP_MAPPING_FAILED:${JSON.stringify(scrolledToMapping)}`,
     );
   }
-  // 预览组被上面展开过；这里再滚到底读派生步骤。
-  await dataPanel.evaluate((panel) => {
-    const content = panel.querySelector('.designer-inspector-data-flow-content');
-    if (content instanceof HTMLElement) content.scrollTop = content.scrollHeight;
-  });
-  await page.waitForTimeout(300);
-  const scrolledToPreview = await readInlineNavigation(dataPanel, 'preview');
+  // 预览组被上面展开过；这里再滚到底读派生步骤。滚动后段内容可能才完成布局
+  // （预览组懒加载/换高），一次 scrollTop 赋值不一定落在最终的底部，重试到派生步骤稳定。
+  let scrolledToPreview;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await dataPanel.evaluate((panel) => {
+      const content = panel.querySelector('.designer-inspector-data-flow-content');
+      if (content instanceof HTMLElement) content.scrollTop = content.scrollHeight;
+    });
+    await page.waitForTimeout(250);
+    scrolledToPreview = await readInlineNavigation(dataPanel, 'preview');
+    if (scrolledToPreview.activeStep === 'preview' && scrolledToPreview.sectionVisible === true) {
+      break;
+    }
+  }
   if (scrolledToPreview.activeStep !== 'preview' || scrolledToPreview.sectionVisible !== true) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_SCROLL_STEP_PREVIEW_FAILED:${JSON.stringify(scrolledToPreview)}`,

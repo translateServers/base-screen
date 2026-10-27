@@ -1687,8 +1687,8 @@ async function assertDesignerControlStyles(designer) {
   });
   if (
     styles === undefined ||
-    // 工作区工具栏按钮随设计值 28px（40px 列头内上下各留 6px）。
-    styles.toolbarHeight !== 28 ||
+    // 工作区工具栏按钮跟随控件默认高度 30px（40px 列头内上下各留 5px）。
+    styles.toolbarHeight !== 30 ||
     // 缺省主题即黑夜：与显式 dark 同值、与显式 light 必然不同；材质缩略图跟随同一套表面色。
     styles.theme !== styles.darkTheme ||
     styles.theme === styles.lightTheme ||

@@ -144,6 +144,7 @@ export function populateMaterialLibrary(
         const button = createDesignerButton(categoryRail.ownerDocument, {
           className: 'material-category-chip',
           pressed: false,
+          variant: 'category',
         });
         button.dataset.materialCategoryFilter = category;
         // 图标 + 文字分段：图标装饰性 aria-hidden，可访问名称仍由文字标签提供。

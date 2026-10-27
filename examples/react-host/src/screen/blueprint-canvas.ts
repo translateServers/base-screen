@@ -658,8 +658,6 @@ export function createBlueprintCanvas(): HTMLElement {
   }
 
   function geometryOf(node: BaseScreenBlueprintCanvasNode): NodeGeometry {
-    const summary = node.summary?.secondary ?? '';
-    const summaryHeight = summary === '' ? 0 : SUMMARY_ROW;
     if (node.kind === 'component' || node.kind === 'variable') {
       const valueHeight = node.kind === 'variable' ? VARIABLE_VALUE_ROW : 0;
       const portStart = NODE_HEADER + SUBTITLE_HEIGHT + valueHeight;
@@ -692,10 +690,7 @@ export function createBlueprintCanvas(): HTMLElement {
           rowCount += 1;
         }
       }
-      const height =
-        portStart +
-        rowCount * PORT_ROW +
-        (summaryHeight === 0 ? NODE_BOTTOM_PADDING : summaryHeight);
+      const height = portStart + rowCount * PORT_ROW + NODE_BOTTOM_PADDING;
       return {
         width: NODE_WIDTH,
         height,
@@ -1312,15 +1307,7 @@ export function createBlueprintCanvas(): HTMLElement {
   }
 
   function nodeKindLabel(node: BaseScreenBlueprintCanvasNode): string {
-    return node.kind === 'component'
-      ? '组件'
-      : node.kind === 'variable'
-        ? '变量'
-        : node.kind === 'host'
-          ? '业务系统'
-          : node.kind === 'condition'
-            ? '条件'
-            : '动作';
+    return node.kind === 'component' ? '组件' : node.kind === 'variable' ? '变量' : '业务系统';
   }
 
   function nodeKindLine(node: BaseScreenBlueprintCanvasNode): string {
@@ -1333,8 +1320,7 @@ export function createBlueprintCanvas(): HTMLElement {
   function nodeTitle(node: BaseScreenBlueprintCanvasNode): string {
     if (node.kind === 'component') return node.componentName ?? node.componentId ?? node.id;
     if (node.kind === 'variable') return node.variableName ?? node.variableId ?? node.id;
-    if (node.kind === 'host') return '业务系统';
-    return node.summary?.primary ?? node.id;
+    return '业务系统';
   }
 
   function nodeSubtitle(node: BaseScreenBlueprintCanvasNode): string {
@@ -1344,14 +1330,10 @@ export function createBlueprintCanvas(): HTMLElement {
     if (node.kind === 'variable') {
       return `${node.variableType ?? 'variable'} · ${node.variableId ?? node.id}`;
     }
-    if (node.kind === 'host') return `${node.exitCount ?? 0} 个业务出口`;
-    if (node.kind === 'condition') return node.condition?.operator ?? 'condition';
-    return node.action?.type ?? node.summary?.kind ?? 'action';
+    return `${node.exitCount ?? 0} 个业务出口`;
   }
 
   function nodeSummaryText(node: BaseScreenBlueprintCanvasNode): string {
-    const provided = node.summary?.secondary ?? '';
-    if (provided !== '') return provided;
     if (node.kind === 'component' && (node.childCount ?? 0) > 0) {
       return `结构 · 子组件 ${node.childCount}`;
     }
@@ -2005,11 +1987,7 @@ export function createBlueprintCanvas(): HTMLElement {
 
   function columnOf(node: BaseScreenBlueprintCanvasNode | undefined): number {
     if (node === undefined) return 0;
-    return node.kind === 'component' || node.kind === 'variable'
-      ? 0
-      : node.kind === 'condition'
-        ? 1
-        : 2;
+    return node.kind === 'component' || node.kind === 'variable' ? 0 : 2;
   }
 
   /** 新节点落到同类列的底部：不做每次插入都重排，但也不会叠在已有节点上。 */

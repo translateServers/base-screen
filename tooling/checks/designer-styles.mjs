@@ -219,7 +219,6 @@ const nonTokenLayers = [...baseLayers, ...controlLayers, ...workbenchLayers];
 const styleDebtBaseline = {
   'base/designer-base-menus.css': { spacing: 3 },
   'base/designer-base-tooltip.css': { spacing: 1 },
-  'base/designer-base-library.css': { control: 30, spacing: 5 },
   'base/designer-base-material-groups.css': { control: 5 },
   'base/designer-base-adaptivity.css': { control: 9 },
   'controls/designer-controls-color-palette.css': { spacing: 21 },
@@ -231,7 +230,6 @@ const styleDebtBaseline = {
   'workbench/designer-workbench-topbar.css': { control: 4, spacing: 9 },
   'workbench/designer-workbench-feedback.css': { control: 8, spacing: 2 },
   'workbench/designer-workbench-panels.css': { control: 1, spacing: 8 },
-  'workbench/designer-workbench-blueprint-canvas.css': { control: 21, spacing: 14 },
   'workbench/designer-workbench-blueprint-panels.css': { spacing: 1 },
   'workbench/designer-workbench-blueprint-details.css': { spacing: 8 },
   'workbench/designer-workbench-materials.css': { spacing: 1 },
@@ -243,8 +241,6 @@ const styleDebtBaseline = {
   'workbench/designer-workbench-variable-editor.css': { spacing: 15 },
   'workbench/designer-workbench-variable-inspector.css': { control: 4, spacing: 25 },
   'workbench/designer-workbench-canvas.css': { spacing: 4 },
-  'workbench/designer-workbench-inspector.css': { control: 49, spacing: 47 },
-  'workbench/designer-workbench-inspector-data.css': { control: 80, spacing: 60 },
 };
 
 const controlLayerSet = new Set(controlLayers);

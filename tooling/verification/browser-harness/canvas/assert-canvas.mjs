@@ -622,12 +622,49 @@ async function assertCanvasPrecision(designer, page) {
     if (guide === undefined || guide === null) return null;
     const rect = guide.getBoundingClientRect();
     const canvasBox = root.querySelector('[data-canvas]').getBoundingClientRect();
-    return { x: canvasBox.x + 200, y: rect.y + rect.height / 2 };
+    // 命中点必须落在参考线上：竖线取线自身的 x，横线取线自身的 y。
+    // 参考线可能被变量检查器之类的工作台浮层盖住一段，沿参考线扫描未被遮挡的
+    // 位置再双击；只断言"挡住就报出命中栈"，而不是靠固定坐标赌浮层不在那儿。
+    const vertical = guide.dataset.axis === 'x';
+    const covered = (point) => {
+      const hit = root.elementsFromPoint(point.x, point.y)[0];
+      return hit?.closest?.('[data-canvas-guide]') !== guide;
+    };
+    let point = vertical
+      ? { x: rect.x + rect.width / 2, y: canvasBox.top + 24 }
+      : { x: canvasBox.left + 24, y: rect.y + rect.height / 2 };
+    const start = vertical ? canvasBox.top + 24 : canvasBox.left + 24;
+    const end = vertical ? canvasBox.bottom - 24 : canvasBox.right - 24;
+    for (let value = start; value <= end; value += 24) {
+      point = vertical
+        ? { x: rect.x + rect.width / 2, y: value }
+        : { x: value, y: rect.y + rect.height / 2 };
+      if (!covered(point)) break;
+    }
+    const stack = root
+      .elementsFromPoint(point.x, point.y)
+      .map((element) => element.className || element.tagName);
+    return { ...point, axis: guide.dataset.axis, stack };
   });
   if (dblGuidePoint === null) {
     throw new Error('BROWSER_HARNESS_GUIDE_DBLCLICK_PROBE_FAILED:null');
   }
+  if (!dblGuidePoint.stack.some((name) => String(name).includes('canvas-guide-persistent'))) {
+    throw new Error(`BROWSER_HARNESS_GUIDE_DBLCLICK_OBSTRUCTED:${JSON.stringify(dblGuidePoint)}`);
+  }
   await page.mouse.dblclick(dblGuidePoint.x, dblGuidePoint.y, { delay: 60 });
+  await page.waitForTimeout(150);
+  const guideCountAfterDbl = await page.evaluate(
+    () =>
+      window.baseScreenHarness.designer.shadowRoot?.querySelectorAll(
+        '[data-canvas-guides] > .canvas-guide-persistent',
+      ).length,
+  );
+  if (guideCountAfterDbl !== 1) {
+    throw new Error(
+      `BROWSER_HARNESS_GUIDE_DBLCLICK_REMOVE_FAILED:${JSON.stringify({ point: dblGuidePoint, guideCountAfterDbl })}`,
+    );
+  }
   await page.waitForFunction(
     (count) =>
       window.baseScreenHarness.designer.shadowRoot?.querySelectorAll(
@@ -650,7 +687,7 @@ async function assertCanvasPrecision(designer, page) {
     const canvas = window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-canvas]');
     return canvas?.style.transform === 'translate(0px, 0px) scale(1)';
   });
-  await designer.locator('[data-tip^="\u653e\u5927"]').click();
+  await designer.locator('[data-canvas-local-toolbar] [data-action="zoom-in"]').click();
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-zoom]')?.textContent ===

@@ -167,7 +167,8 @@ export async function assertAuthoringVariables(page, designer) {
         ?.getAttribute('aria-label'),
       cancel: root.querySelector('[data-variable-action="cancel"]')?.getAttribute('aria-label'),
       focused: root.activeElement === root.querySelector('[data-variable-create-name]'),
-      labels: root.querySelectorAll('.variable-field-label').length,
+      labels: root.querySelectorAll('[data-variable-editor="create"] .designer-field-label-text')
+        .length,
       usesVectorIcon:
         root
           .querySelector('[data-variable-action="confirm-create"] svg')
@@ -182,7 +183,9 @@ export async function assertAuthoringVariables(page, designer) {
     variableActionNames.labels !== 4 ||
     !variableActionNames.usesVectorIcon
   ) {
-    throw new Error('BROWSER_HARNESS_VARIABLE_ACTION_ACCESSIBLE_NAMES_FAILED');
+    throw new Error(
+      `BROWSER_HARNESS_VARIABLE_ACTION_ACCESSIBLE_NAMES_FAILED:${JSON.stringify(variableActionNames)}`,
+    );
   }
   const buttonSystemQuality = await page.evaluate(async () => {
     const designer = window.baseScreenHarness.designer;
@@ -206,7 +209,7 @@ export async function assertAuthoringVariables(page, designer) {
     };
     const sample = () => {
       const primary = root.querySelector('[data-variable-action="confirm-create"]');
-      const neutral = root.querySelector('[data-canvas-setting="scaleMode"][aria-pressed="false"]');
+      const neutral = root.querySelector('.designer-button[data-variant="neutral"]:not(:disabled)');
       const ghost = root.querySelector('[data-panel-collapse="left"]');
       const pressed = root.querySelector('[data-material-filter="all"]');
       const primaryStyle = getComputedStyle(primary);
@@ -232,15 +235,28 @@ export async function assertAuthoringVariables(page, designer) {
     };
     designer.setAttribute('theme', 'dark');
     const dark = sample();
+    // 主题原子性指 token 一次性生效，而不是颜色过渡的中间帧：采样期间临时关掉
+    // 过渡/动画，否则任何带 color/background 过渡的控件都会被读成"尚未同步"。
+    const noMotion = document.createElement('style');
+    noMotion.textContent =
+      '*, *::before, *::after { transition: none !important; animation: none !important; }';
+    designer.shadowRoot.appendChild(noMotion);
     designer.setAttribute('theme', 'light');
     const lightImmediate = sample();
     await new Promise((resolve) => setTimeout(resolve, 200));
     const lightSettled = sample();
+    noMotion.remove();
+    // 质量档读取恢复后的过渡契约（noMotion 期间 computed transition 恒为 none）。
+    const light = sample();
     designer.removeAttribute('theme');
     return {
       atomic: JSON.stringify(lightImmediate) === JSON.stringify(lightSettled),
+      lightDiff: Object.keys(lightImmediate).filter(
+        (key) => JSON.stringify(lightImmediate[key]) !== JSON.stringify(lightSettled[key]),
+      ),
+      lightImmediate,
       dark,
-      light: lightSettled,
+      light,
     };
   });
   for (const theme of [buttonSystemQuality.dark, buttonSystemQuality.light]) {
@@ -455,8 +471,10 @@ export async function assertHostVariableAuthoring(page, designer) {
   await createHostVariable(page, designer, 'tenant-region', 'tenantRegion');
   await createHostVariable(page, designer, 'private-token', 'privateToken');
 
-  const references = await (await expandedVariableRow(designer, 'region'))
-    .locator('.variable-reference-count')
+  // 变量详情（含引用计数）在选中变量后的检查器浮层里，不再挂在列表行内。
+  await expandedVariableRow(designer, 'region');
+  const references = await designer
+    .locator('[data-variable-inspector] .variable-reference-count')
     .textContent();
   if (Number.parseInt(references ?? '0', 10) < 2) {
     throw new Error(`BROWSER_HARNESS_VARIABLE_REFERENCE_COUNT_FAILED:${references}`);
@@ -466,11 +484,18 @@ export async function assertHostVariableAuthoring(page, designer) {
   await assertDescriptionDuplicateAndPreview(page, designer);
   await assertAtomicRenames(page, designer);
   await assertHostVariableRefresh(page);
+  // 收尾：变量检查器是浮层，留着会盖住画布/顶栏菜单的命中区，后续断言无法点击。
+  const inspectorClose = designer.locator('[data-variable-inspector-close]');
+  if ((await inspectorClose.count()) > 0) await inspectorClose.click();
 }
 
 async function assertReferenceNavigation(page, designer) {
   const region = await expandedVariableRow(designer, 'region');
-  await designer.locator('[data-variable-action="references"]').click();
+  // 检查器里有两个"查看引用"入口（用量行与页脚按钮），展开状态由用量行承载。
+  const referenceToggle = designer.locator(
+    '[data-variable-inspector] .variable-reference-count[data-variable-action="references"]',
+  );
+  await referenceToggle.click();
   const actual = await designer
     .locator('[data-variable-reference-target="component-parameter"]')
     .evaluateAll((links) => links.map((link) => link.dataset.layerSelect));
@@ -496,17 +521,15 @@ async function assertReferenceNavigation(page, designer) {
       window.__browserHarnessSelectionEvents.at(-1)?.selectedComponentIds?.[0] === componentId,
     actual[0],
   );
-  const expanded = await designer
-    .locator('[data-variable-action="references"]')
-    .getAttribute('aria-expanded');
+  const expanded = await referenceToggle.getAttribute('aria-expanded');
   if (expanded !== 'true') {
     throw new Error(`BROWSER_HARNESS_VARIABLE_REFERENCE_EXPANSION_FAILED:${expanded}`);
   }
-  await designer.locator('[data-variable-action="references"]').click();
+  await referenceToggle.click();
 }
 
 async function createHostVariable(page, designer, variableId, expectedName) {
-  await designer.locator('[data-variable-action="add"]').click();
+  await designer.locator('.variable-add-button[data-variable-action="add"]').click();
   // 来源类型是分段控件，直接切到数据集；目录默认折叠，先展开。
   await designer.locator('[data-variable-action="create-type-data-source"]').click();
   await designer.locator('[data-variable-catalog-summary]').click();
@@ -538,10 +561,10 @@ async function assertDescriptionDuplicateAndPreview(page, designer) {
     ),
   );
 
-  tenant = variableRow(designer, 'tenantRegion');
+  tenant = await variableRow(designer, 'tenantRegion');
   await tenant.hover();
   await tenant.locator('[data-variable-action="more"]').click();
-  await designer.locator('[data-variable-action="duplicate"]').click();
+  await designer.locator('[data-variable-row-menu] [data-variable-action="duplicate"]').click();
   const duplicate = await designer.locator('[data-variable-editor]').evaluate((editor) => ({
     name: editor.querySelector('[data-variable-create-name]')?.value,
     variableId: editor.querySelector('[data-variable-selected-host-id]')?.textContent,
@@ -549,12 +572,12 @@ async function assertDescriptionDuplicateAndPreview(page, designer) {
   if (duplicate.name !== 'tenantRegionCopy' || duplicate.variableId !== 'tenant-region') {
     throw new Error(`BROWSER_HARNESS_VARIABLE_DUPLICATE_DRAFT_FAILED:${JSON.stringify(duplicate)}`);
   }
-  await designer.locator('[data-variable-action="cancel"]').click();
+  await designer.locator('[data-variable-inspector-foot] [data-variable-action="cancel"]').click();
 
-  tenant = variableRow(designer, 'tenantRegion');
+  tenant = await variableRow(designer, 'tenantRegion');
   await tenant.hover();
   await tenant.locator('[data-variable-action="more"]').click();
-  await designer.locator('[data-variable-action="preview"]').click();
+  await designer.locator('[data-variable-row-menu] [data-variable-action="preview"]').click();
   await designer.locator('[data-variable-preview-status="ready"]').waitFor();
   const tenantPreview = await designer.locator('.variable-preview').textContent();
   if (!tenantPreview?.includes('north')) {
@@ -564,7 +587,7 @@ async function assertDescriptionDuplicateAndPreview(page, designer) {
   const privateVariable = await expandedVariableRow(designer, 'privateToken');
   await privateVariable.hover();
   await privateVariable.locator('[data-variable-action="more"]').click();
-  await designer.locator('[data-variable-action="preview"]').click();
+  await designer.locator('[data-variable-row-menu] [data-variable-action="preview"]').click();
   await designer.locator('[data-variable-preview-status="error"]').waitFor();
   const leak = await designer.evaluate((element) =>
     element.shadowRoot.textContent.includes('secret-value-should-never-render'),
@@ -750,15 +773,23 @@ async function assertHostVariableRefresh(page) {
   if (!restored) throw new Error('BROWSER_HARNESS_HOST_VARIABLE_DEPENDENCY_RESTORE_FAILED');
 }
 
-function variableRow(designer, name) {
-  return designer.locator('[data-variable-row]').filter({ hasText: name }).first();
+async function variableRow(designer, name) {
+  // 名称是显示字段，行标识是文档里的 variable id（新建变量为 variable-N）。
+  // 先按名称解析 id 再定位，避免 hasText 子串把 tenantRegion 也算成 region。
+  const id = await designer.evaluate(
+    (element, variableName) =>
+      element.document.variables.find((variable) => variable.name === variableName)?.id,
+    name,
+  );
+  if (id === undefined) throw new Error(`BROWSER_HARNESS_VARIABLE_ROW_MISSING:${name}`);
+  return designer.locator(`[data-variable-row][data-variable-id="${id}"]`);
 }
 
 async function expandedVariableRow(designer, name) {
-  let row = variableRow(designer, name);
+  let row = await variableRow(designer, name);
   const toggle = row.locator('[data-variable-action="toggle-variable"]');
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
-  row = variableRow(designer, name);
+  row = await variableRow(designer, name);
   return row;
 }
 

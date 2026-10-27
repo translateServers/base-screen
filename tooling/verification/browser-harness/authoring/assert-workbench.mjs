@@ -121,6 +121,34 @@ async function assertDesktopWorkbench(designer, viewport) {
   }
   assertPositiveNonOverlappingRects(workbench.horizontal, 'HORIZONTAL', viewport);
   assertPositiveNonOverlappingRects(workbench.vertical, 'VERTICAL', viewport);
+
+  // 页面配置的缩放方式是 3×2 的六档分段：第二行必须留在容器内，且不能压到下一个字段。
+  const canvasScale = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const field = root?.querySelector('.designer-canvas-scale-field');
+    if (field === null || field === undefined) return null;
+    const segmented = field.querySelector('.designer-canvas-scale-segmented');
+    const options = [...(segmented?.querySelectorAll('.designer-segmented-option') ?? [])];
+    return {
+      optionCount: options.length,
+      segmentedBottom: segmented?.getBoundingClientRect().bottom ?? 0,
+      lastOptionBottom: Math.max(
+        ...options.map((option) => option.getBoundingClientRect().bottom),
+        0,
+      ),
+      nextTop: field.nextElementSibling?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
+    };
+  });
+  if (
+    canvasScale !== null &&
+    (canvasScale.optionCount !== 6 ||
+      canvasScale.segmentedBottom < canvasScale.lastOptionBottom - 1 ||
+      canvasScale.nextTop < canvasScale.segmentedBottom - 1)
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_CANVAS_SCALE_SEGMENTED_OVERFLOW_FAILED:${JSON.stringify(canvasScale)}`,
+    );
+  }
 }
 
 export {

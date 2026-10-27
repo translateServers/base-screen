@@ -1,7 +1,9 @@
 import type {
   ScreenAuthoringEditorContext,
+  ScreenComponentNode,
   ScreenComponentTextCommitRequest,
   ScreenComponentTextTarget,
+  ScreenDataSource,
   ScreenDiagnostic,
   ScreenDocument,
   ScreenJsonObject,
@@ -11,6 +13,8 @@ import type {
 import {
   MAX_AUTHORING_SOURCE_BYTES,
   parseScreenTabularDataset,
+  readScreenComponentValueRef,
+  readScreenDocumentDataSources,
   SCREEN_AUTHORING_REQUEST_EVENT,
 } from '@base-screen/contracts';
 import {
@@ -64,19 +68,21 @@ export function requestComponentTextEdit(
     sourceValue = component.style;
   } else if (target === 'props') {
     sourceValue = component.props;
-  } else if (component.dataSource?.type === 'static') {
-    sourceValue = component.dataSource.value;
-  } else if (
-    component.dataSource?.type === 'host-resource' ||
-    component.dataSource?.type === 'dataset'
-  ) {
-    sourceValue = Object.fromEntries(
-      Object.entries(component.dataSource.params).flatMap(([name, parameter]) =>
-        parameter.kind === 'literal' ? [[name, parameter.value]] : [],
-      ),
-    );
   } else {
-    return null;
+    const view = resolveComponentDataSource(document, component);
+    if (view?.kind === 'inline') {
+      sourceValue = view.value;
+    } else if (view?.kind === 'instance') {
+      const { source: instanceSource, params } = view.instance;
+      if (instanceSource.kind !== 'dataset' && instanceSource.kind !== 'host-resource') return null;
+      sourceValue = Object.fromEntries(
+        Object.entries(params).flatMap(([name, ref]) =>
+          ref.kind === 'inline' ? [[name, ref.value]] : [],
+        ),
+      );
+    } else {
+      return null;
+    }
   }
   elementState.pendingAuthoringRequests.set(requestId, {
     kind: 'component-text',
@@ -165,8 +171,11 @@ export function commitComponentTextEdit(
     if (result.ok) elementState.pendingAuthoringRequests.delete(request.requestId);
     return result;
   }
-  const currentSource = component.dataSource;
-  if (currentSource?.type === 'static') {
+  const view = resolveComponentDataSource(document, component);
+  if (view === undefined) {
+    return elementState.runtime.commitGuardFailure(element, 'AUTHORING_PAYLOAD_INVALID');
+  }
+  if (view.kind === 'inline') {
     if (manifest.staticData?.kind === 'scalar') {
       if (typeof source.value !== manifest.staticData.valueType) {
         return elementState.runtime.commitGuardFailure(element, 'AUTHORING_SOURCE_INVALID');
@@ -175,26 +184,84 @@ export function commitComponentTextEdit(
       const dataset = parseScreenTabularDataset(source.value);
       if (!dataset.ok) return { ok: false, diagnostics: dataset.diagnostics };
     }
-    const result = element.executeTransaction({
-      commands: [
-        {
-          type: 'update-components',
-          componentIds: [request.componentId],
-          patch: { dataSource: { ...currentSource, value: source.value } },
-        },
-      ],
-    });
+    const result =
+      component.dataValue !== undefined
+        ? element.executeTransaction({
+            commands: [
+              {
+                type: 'update-components',
+                componentIds: [request.componentId],
+                patch: { dataValue: { kind: 'inline', value: source.value } },
+              },
+            ],
+          })
+        : component.dataSource?.type === 'static'
+          ? element.executeTransaction({
+              commands: [
+                {
+                  type: 'update-components',
+                  componentIds: [request.componentId],
+                  patch: { dataSource: { ...component.dataSource, value: source.value } },
+                },
+              ],
+            })
+          : elementState.runtime.commitGuardFailure(element, 'AUTHORING_PAYLOAD_INVALID');
     if (result.ok) elementState.pendingAuthoringRequests.delete(request.requestId);
     return result;
   }
-  if (currentSource?.type !== 'host-resource' && currentSource?.type !== 'dataset') {
+  if (view.kind === 'variable') {
     return elementState.runtime.commitGuardFailure(element, 'AUTHORING_PAYLOAD_INVALID');
   }
   if (source.value === null || typeof source.value !== 'object' || Array.isArray(source.value)) {
     return elementState.runtime.commitGuardFailure(element, 'AUTHORING_SOURCE_INVALID');
   }
   const params = source.value as ScreenJsonObject;
-  const parameters = {
+  const result = view.declared
+    ? commitDeclaredInstanceParams(element, document, view.instance, params)
+    : commitLegacySourceParams(element, component, params);
+  if (result.ok) elementState.pendingAuthoringRequests.delete(request.requestId);
+  return result;
+}
+
+/**
+ * 文档级实例的参数写回：只替换内联量，变量等其它引用原样保留，
+ * 否则一次文本提交会把绑定到变量的参数覆盖成字面量。
+ */
+function commitDeclaredInstanceParams(
+  element: DesignerElementHost,
+  document: ScreenDocument,
+  instance: ScreenDataSource,
+  params: ScreenJsonObject,
+): ScreenParseResult<ScreenDocument> {
+  const nextParams = {
+    ...Object.fromEntries(
+      Object.entries(instance.params).flatMap(([name, ref]) =>
+        ref.kind === 'inline' ? [] : [[name, ref]],
+      ),
+    ),
+    ...Object.fromEntries(
+      Object.entries(params).map(([name, value]) => [name, { kind: 'inline' as const, value }]),
+    ),
+  };
+  const dataSources = (document.dataSources ?? []).map((candidate) =>
+    candidate.id === instance.id ? { ...instance, params: nextParams } : candidate,
+  );
+  return element.executeTransaction({
+    commands: [{ type: 'replace-data-sources', dataSources }],
+  });
+}
+
+/** 旧形态组件的参数写回：保持 legacy `dataSource` 与 `literal` 参数词法。 */
+function commitLegacySourceParams(
+  element: DesignerElementHost,
+  component: ScreenComponentNode,
+  params: ScreenJsonObject,
+): ScreenParseResult<ScreenDocument> {
+  const currentSource = component.dataSource;
+  if (currentSource?.type !== 'host-resource' && currentSource?.type !== 'dataset') {
+    return elementStateGuard(element, 'AUTHORING_PAYLOAD_INVALID');
+  }
+  const nextParams = {
     ...Object.fromEntries(
       Object.entries(currentSource.params).flatMap(([name, parameter]) =>
         parameter.kind === 'variable' ? [[name, parameter]] : [],
@@ -204,17 +271,54 @@ export function commitComponentTextEdit(
       Object.entries(params).map(([name, value]) => [name, { kind: 'literal' as const, value }]),
     ),
   };
-  const result = element.executeTransaction({
+  return element.executeTransaction({
     commands: [
       {
         type: 'update-components',
-        componentIds: [request.componentId],
-        patch: { dataSource: { ...currentSource, params: parameters } },
+        componentIds: [component.id],
+        patch: { dataSource: { ...currentSource, params: nextParams } },
       },
     ],
   });
-  if (result.ok) elementState.pendingAuthoringRequests.delete(request.requestId);
-  return result;
+}
+
+/** 与 `commitComponentTextEdit` 的 guard 失败同形，供无 element 上下文的 helper 复用。 */
+function elementStateGuard(
+  element: DesignerElementHost,
+  code: ScreenDiagnostic['code'],
+): ScreenParseResult<ScreenDocument> {
+  return getDesignerElementState(element).runtime.commitGuardFailure(element, code);
+}
+
+/**
+ * 组件当前数据源的规范视图：新形态走 `dataValue` 引用 + 文档级实例，
+ * 旧写法由契约适配器推导等价视图；只有该视图才知道参数该写回哪里。
+ */
+type DesignerComponentDataSourceView =
+  | { readonly kind: 'inline'; readonly value: ScreenJsonValue }
+  | { readonly kind: 'variable' }
+  | {
+      readonly kind: 'instance';
+      readonly instance: ScreenDataSource;
+      /** false = 由旧 `dataSource` 合成的只读实例，写回必须落回组件自身。 */
+      readonly declared: boolean;
+    };
+
+function resolveComponentDataSource(
+  document: ScreenDocument,
+  component: ScreenComponentNode,
+): DesignerComponentDataSourceView | undefined {
+  const ref = readScreenComponentValueRef(component);
+  if (ref === null) return undefined;
+  if (ref.kind === 'inline') return { kind: 'inline', value: ref.value };
+  if (ref.kind === 'variable') return { kind: 'variable' };
+  const declared = (document.dataSources ?? []).find((item) => item.id === ref.dataSourceId);
+  const instance =
+    declared ??
+    readScreenDocumentDataSources(document).find((item) => item.id === ref.dataSourceId);
+  return instance === undefined
+    ? undefined
+    : { kind: 'instance', instance, declared: declared !== undefined };
 }
 
 export function commitGuardFailure(

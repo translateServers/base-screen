@@ -465,6 +465,10 @@ export async function assertTextAutoWidthGeometry(page) {
   expect(Math.abs(snappedX - edge)).toBeLessThan(1);
   await undo();
   await selectAll(page, viewport);
+  // 自适应文本的宽度由渲染后的 DOM 反投影；等两帧让测量回写完成再读几何。
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   expect(await page.evaluate(() => window.baseScreenHarness.designer.align('right').ok)).toBe(true);
   let measured = await measuredComponents(page);
   const edges = measured.map((item) => item.x + item.width);

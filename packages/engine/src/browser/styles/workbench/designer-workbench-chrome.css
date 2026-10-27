@@ -19,6 +19,12 @@
   padding-top: 0;
 }
 
+/* 几何是首段：`:first-child` 会把它压成 padding-top:0。用双类选择器把原型要求的
+   14px 上距拿回来，不靠文件顺序决胜。 */
+.properties .designer-panel-section.designer-inspector-geometry-section {
+  padding-top: calc(var(--designer-space-5) + var(--designer-space-1));
+}
+
 .designer-panel-section-title {
   display: flex;
   align-items: center;

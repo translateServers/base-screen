@@ -6,6 +6,28 @@
   font: var(--designer-font-small);
 }
 
+/* 右栏检查器字段密度：行高 34px、正文档读数；几何网格另行收紧到 28px。 */
+.inspector-pane .designer-field {
+  min-height: 34px;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font);
+}
+
+.inspector-pane .designer-field-label-text {
+  color: var(--designer-text-secondary);
+  font-size: var(--designer-font-size-base);
+}
+
+.inspector-pane .designer-field-range-value {
+  height: var(--designer-control-height-compact);
+  padding: 0 calc(var(--designer-space-3) + 1px);
+  font: var(--designer-font-numeric);
+}
+
+.designer-inspector-geometry-grid .designer-field {
+  min-height: var(--designer-control-height-compact);
+}
+
 .designer-field-label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -60,4 +82,74 @@
 
 .designer-field-grid .designer-field {
   margin-bottom: 0;
+}
+
+/* 右栏数据面板的字段档位（原 workbench 覆写，迁到控件层统一维护）。 */
+.properties .designer-field.designer-dataset-parameter,
+.designer-data-workbench-shell .designer-field.designer-dataset-parameter {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--designer-space-2);
+  margin: 0;
+  padding: var(--designer-space-4) 0 calc(var(--designer-space-4) + 1px);
+  white-space: normal;
+}
+
+.properties .designer-dataset-parameter + .designer-dataset-parameter,
+.designer-data-workbench-shell
+  .designer-field.designer-dataset-parameter
+  + .designer-field.designer-dataset-parameter {
+  border-top: 1px solid var(--designer-border-subtle);
+}
+
+.properties .designer-field-required,
+.designer-data-workbench-shell .designer-field-required {
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+}
+
+/* 数字字段：符号内嵌右缘（与组件几何网格同一形态），标签列留给字段名。 */
+.designer-geo-field {
+  position: relative;
+  display: block;
+  min-width: 0;
+  padding: 0;
+}
+
+.designer-geo-field::before {
+  position: absolute;
+  top: 50%;
+  right: var(--designer-space-4);
+  z-index: 1;
+  color: var(--designer-text-muted);
+  content: attr(data-symbol);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+  line-height: 1;
+  pointer-events: none;
+  translate: 0 -50%;
+}
+
+.properties
+  .designer-inspector-data-flow-content
+  .designer-descriptor-fields
+  .designer-field-label-text {
+  color: var(--designer-text-secondary);
+  font-size: var(--designer-font-size-sm);
+}
+
+.designer-data-workbench-shell .designer-field-label-text {
+  color: var(--designer-text-secondary);
+  font-size: var(--designer-font-size-sm);
+}
+
+.properties
+  .designer-inspector-data-flow-content
+  .designer-static-bindings
+  .designer-dataset-field-option
+  .designer-field-label {
+  color: inherit;
+  font-weight: 500;
 }

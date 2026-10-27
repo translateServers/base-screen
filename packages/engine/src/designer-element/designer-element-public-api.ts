@@ -13,7 +13,6 @@ export {
   type BaseScreenBlueprintCanvasInsertNode,
   type BaseScreenBlueprintCanvasNode,
   type BaseScreenBlueprintCanvasNodePosition,
-  type BaseScreenBlueprintCanvasNodeSummary,
   type BaseScreenBlueprintCanvasSelection,
   type BaseScreenBlueprintCanvasState,
   type BaseScreenBlueprintCanvasStateEventDetail,

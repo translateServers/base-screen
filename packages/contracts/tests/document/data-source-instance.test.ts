@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseScreenDataSource } from '../../src/document/parse.js';
 import { component, document, parse } from './__fixtures__/document-test-fixtures.js';
 
 /**
@@ -69,6 +70,23 @@ describe('data source instance shape', () => {
     if (!missingField.ok) {
       expect(missingField.diagnostics[0]?.code).toBe('DATA_SOURCE_SOURCE_INVALID');
       expect(missingField.diagnostics[0]?.path).toEqual(['dataSources', 0, 'source', 'datasetId']);
+    }
+  });
+});
+
+describe('single data source parse entry', () => {
+  it('accepts a canonical data source without synthesizing legacy blueprint rules', () => {
+    const result = parseScreenDataSource({ type: 'static', value: { a: 1 } });
+    expect(result).toMatchObject({ ok: true, diagnostics: [] });
+    if (result.ok) expect(result.value).toEqual({ type: 'static', value: { a: 1 } });
+  });
+
+  it('keeps diagnostics relative to the data source itself', () => {
+    const result = parseScreenDataSource({ type: 'static', value: {}, extra: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('DOCUMENT_UNKNOWN_FIELD');
+      expect(result.diagnostics[0]?.path).toEqual(['extra']);
     }
   });
 });

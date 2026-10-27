@@ -14,7 +14,7 @@
 }
 
 .material-search input {
-  padding-right: calc(var(--designer-space-4) + 24px);
+  padding-right: calc(var(--designer-space-4) + var(--designer-space-7));
 }
 
 .material-search input::-webkit-search-cancel-button {
@@ -92,7 +92,7 @@
   height: 30px;
   gap: 1px;
   margin: var(--designer-space-3) 0 0;
-  padding: 2px;
+  padding: var(--designer-space-1);
   overflow: hidden;
   border: 0;
   border-radius: var(--designer-radius-3);
@@ -102,34 +102,6 @@
 
 .material-filters .designer-button {
   flex: 1 1 0;
-  min-height: 24px;
-  padding: 0 var(--designer-space-2);
-  border-color: transparent;
-  border-radius: var(--designer-radius-1);
-  background-color: transparent;
-  box-shadow: none;
-  color: var(--designer-text-muted);
-  font-weight: 500;
-}
-
-.material-filters .designer-button:hover:not(:disabled) {
-  border-color: transparent;
-  background-color: var(--designer-surface-control-hover);
-  color: var(--designer-text-primary);
-}
-
-.material-filters .designer-button[aria-pressed="true"] {
-  border-color: transparent;
-  background-color: var(--designer-surface-control-hover);
-  color: var(--designer-accent-text);
-  box-shadow: none;
-}
-
-.material-search .material-search-clear:not(:disabled):active,
-.material-library-status-actions .designer-button:not(:disabled):active,
-.material-filters .designer-button:not(:disabled):active,
-.material-categories .designer-button:not(:disabled):active {
-  transform: translateZ(0);
 }
 
 /* 分类药丸：横向滚动条（无可见滚动条），图标 + 文字，选中态为品牌色描边浅底。 */
@@ -137,7 +109,7 @@
   display: flex;
   gap: var(--designer-space-2);
   margin: var(--designer-space-3) 0 0;
-  padding: 1px 1px 3px;
+  padding: 1px 1px calc(var(--designer-space-1) + 1px);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -155,31 +127,6 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  min-height: 28px;
-  gap: 5px;
-  padding: 0 10px;
-  border-color: var(--designer-border-subtle);
-  border-radius: var(--designer-radius-pill);
-  background-color: color-mix(
-    in srgb,
-    var(--designer-surface-raised) 82%,
-    var(--designer-surface-panel)
-  );
-  color: var(--designer-text-secondary);
-  font-weight: 500;
-}
-
-.material-categories .designer-button:hover:not(:disabled) {
-  border-color: var(--designer-border-strong);
-  background-color: var(--designer-surface-control-hover);
-  color: var(--designer-text-primary);
-}
-
-.material-categories .designer-button[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--designer-accent) 46%, var(--designer-border-default));
-  background-color: var(--designer-accent-surface);
-  color: var(--designer-accent);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--designer-accent) 14%, transparent);
 }
 
 .material-category-glyph {

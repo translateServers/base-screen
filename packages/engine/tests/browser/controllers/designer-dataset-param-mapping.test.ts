@@ -139,6 +139,8 @@ describe('数据源事务：草稿取值引用 → 文档旧形态', () => {
           type: 'update-components',
           componentIds: ['text-1'],
           patch: {
+            // 旧形态写回时同时清掉新取值字段：契约禁止 dataSource 与 dataValue 并存。
+            dataValue: null,
             dataSource: {
               type: 'dataset',
               datasetId: 'orders',

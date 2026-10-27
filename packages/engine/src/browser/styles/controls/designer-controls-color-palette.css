@@ -560,8 +560,11 @@
   pointer-events: none;
 }
 
-.designer-fill-color-hue,
-.designer-fill-color-alpha {
+/* 与通用数值滑杆（.designer-range，6px 发丝轨）同用 .designer-range 类，
+   这里用双类选择器声明色相/透明度滑杆自己的 16px 走道与 ew-resize：
+   两者同为单类时只能靠文件加载顺序决胜，换一次 import 顺序就会把渐变轨压扁。 */
+.designer-range.designer-fill-color-hue,
+.designer-range.designer-fill-color-alpha {
   --designer-fill-slider-thumb-background: color-mix(
     in srgb,
     var(--designer-surface-overlay) 18%,
@@ -586,22 +589,22 @@
   touch-action: none;
 }
 
-.designer-fill-color-hue::-webkit-slider-runnable-track,
-.designer-fill-color-alpha::-webkit-slider-runnable-track {
+.designer-range.designer-fill-color-hue::-webkit-slider-runnable-track,
+.designer-range.designer-fill-color-alpha::-webkit-slider-runnable-track {
   height: 16px;
   border: 0;
   background: transparent;
 }
 
-.designer-fill-color-hue::-moz-range-track,
-.designer-fill-color-alpha::-moz-range-track {
+.designer-range.designer-fill-color-hue::-moz-range-track,
+.designer-range.designer-fill-color-alpha::-moz-range-track {
   height: 16px;
   border: 0;
   background: transparent;
 }
 
-.designer-fill-color-hue::-webkit-slider-thumb,
-.designer-fill-color-alpha::-webkit-slider-thumb {
+.designer-range.designer-fill-color-hue::-webkit-slider-thumb,
+.designer-range.designer-fill-color-alpha::-webkit-slider-thumb {
   box-sizing: border-box;
   width: 14px;
   height: 14px;
@@ -617,8 +620,8 @@
     box-shadow var(--designer-motion);
 }
 
-.designer-fill-color-hue::-moz-range-thumb,
-.designer-fill-color-alpha::-moz-range-thumb {
+.designer-range.designer-fill-color-hue::-moz-range-thumb,
+.designer-range.designer-fill-color-alpha::-moz-range-thumb {
   box-sizing: border-box;
   width: 14px;
   height: 14px;

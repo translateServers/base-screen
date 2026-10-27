@@ -152,6 +152,94 @@
   color: var(--designer-text-primary);
 }
 
+/* 素材筛选段：内凹轨道里的紧凑分段按钮，选中只换静止底与强调文字，不加几何。 */
+.designer-button[data-variant="filter"] {
+  min-height: 24px;
+  padding: 0 var(--designer-space-2);
+  border-color: transparent;
+  border-radius: var(--designer-radius-1);
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-muted);
+  font-weight: 500;
+}
+
+.designer-button[data-variant="filter"]:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.designer-button[data-variant="filter"][aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-accent-text);
+  box-shadow: none;
+}
+
+/* 素材分类药丸：图标 + 文字的横向滚动条目，选中态为品牌色描边浅底。 */
+.designer-button[data-variant="category"] {
+  min-height: 28px;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-4);
+  border-color: var(--designer-border-subtle);
+  border-radius: var(--designer-radius-pill);
+  background: color-mix(in srgb, var(--designer-surface-raised) 82%, var(--designer-surface-panel));
+  color: var(--designer-text-secondary);
+  font-weight: 500;
+}
+
+.designer-button[data-variant="category"]:hover:not(:disabled) {
+  border-color: var(--designer-border-strong);
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.designer-button[data-variant="category"][aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--designer-accent) 46%, var(--designer-border-default));
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--designer-accent) 14%, transparent);
+}
+
+/* 蓝图画布工具条：小号透明按钮，选中态用静止底而不是强调色。 */
+.designer-button[data-variant="canvas-tool"] {
+  height: 24px;
+  min-height: 24px;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-4);
+  color: var(--designer-text-secondary);
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--designer-font-size-xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.designer-button[data-variant="canvas-tool"][data-density="tight"] {
+  gap: var(--designer-space-3);
+  padding: 0 var(--designer-space-2);
+}
+
+.designer-button[data-variant="canvas-tool"].designer-icon-button {
+  padding: 0;
+}
+
+.designer-button[data-variant="canvas-tool"] svg {
+  width: var(--designer-icon-size-sm);
+  height: var(--designer-icon-size-sm);
+}
+
+.designer-button[data-variant="canvas-tool"]:hover:not(:disabled) {
+  color: var(--designer-text-primary);
+  background: var(--designer-surface-control-hover);
+}
+
+.designer-button[data-variant="canvas-tool"][data-active="true"] {
+  color: var(--designer-text-primary);
+  background: var(--designer-surface-control);
+}
+
 .designer-button[aria-pressed="true"],
 .designer-tab[aria-selected="true"] {
   border-color: color-mix(in srgb, var(--designer-accent) 56%, var(--designer-border-default));
@@ -256,4 +344,102 @@
 .designer-button[hidden],
 .designer-tab[hidden] {
   display: none;
+}
+
+/* 右栏数据面板的按钮档位（原 workbench 覆写，迁到控件层统一维护）。
+   主操作在数据面板作用域内不套用页面级 primary 反色档。 */
+.properties .designer-dataset-actions .designer-button[data-variant="apply"] {
+  flex: 0 0 auto;
+  min-width: 64px;
+  padding: 0 var(--designer-space-4);
+  background: var(--designer-accent);
+  box-shadow: none;
+  color: var(--designer-text-on-accent);
+  font-size: var(--designer-font-size-sm);
+  font-weight: 500;
+}
+
+.properties .designer-dataset-actions .designer-button[data-variant="apply"]:hover:not(:disabled) {
+  background: var(--designer-button-primary-hover);
+}
+
+/* 非 dirty：同一颗按钮变幽灵禁用（文案「已应用」），不做整体透明度。 */
+.properties .designer-dataset-actions .designer-button[data-variant="apply"]:disabled {
+  background: transparent;
+  box-shadow: var(--designer-elev-ring);
+  color: var(--designer-text-disabled);
+}
+
+.properties .designer-dataset-status-bar .designer-button[data-dataset-action="test"],
+.properties .designer-dataset-status-bar .designer-button[data-dataset-action="sync"],
+.properties .designer-dataset-status-bar .designer-button[data-dataset-action="apply"] {
+  flex: 0 0 auto;
+  min-width: 72px;
+  min-height: var(--designer-control-height);
+  padding: 0 var(--designer-space-4);
+  background: var(--designer-surface-control);
+  box-shadow: var(--designer-elev-ring);
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-sm);
+  font-weight: 500;
+}
+
+.properties
+  .designer-dataset-status-bar
+  .designer-button[data-dataset-action="test"]:hover:not(:disabled),
+.properties
+  .designer-dataset-status-bar
+  .designer-button[data-dataset-action="sync"]:hover:not(:disabled),
+.properties
+  .designer-dataset-status-bar
+  .designer-button[data-dataset-action="apply"]:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+}
+
+/* 固定值表格的页签是下划线档，不是胶囊按钮。 */
+.properties .designer-inspector-data-flow-content .designer-static-data-tabs .designer-button {
+  min-height: 26px;
+  padding: 0 0 var(--designer-space-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+}
+
+.properties
+  .designer-inspector-data-flow-content
+  .designer-static-data-tabs
+  .designer-button:hover:not([aria-pressed="true"]) {
+  background: transparent;
+  color: var(--designer-text-primary);
+}
+
+.properties
+  .designer-inspector-data-flow-content
+  .designer-static-data-tabs
+  .designer-button[aria-pressed="true"] {
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--designer-text-primary);
+  color: var(--designer-text-primary);
+}
+
+.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-button {
+  min-height: 28px;
+  padding: 0 var(--designer-space-3);
+  font-size: var(--designer-font-size-xs);
+}
+
+.properties
+  .designer-inspector-data-flow-content
+  .designer-static-rows
+  .designer-static-rows-footer
+  > .designer-button {
+  min-height: 24px;
+  padding: 0 var(--designer-space-2);
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-secondary);
+  font-size: var(--designer-font-size-xs);
 }

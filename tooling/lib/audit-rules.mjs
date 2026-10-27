@@ -272,11 +272,14 @@ export function detectNoSelection(testFiles, rootDir, thresholds, now = new Date
 // ---------------------------------------------------------------------------
 
 /**
- * 词法归一化：去注释、抹平字符串与模板字面量内容、压缩空白。
- * 引号抹平用单次字符扫描（按出现顺序配对同类引号，跨引号转义安全），
+ * 词法归一化：去注释、压缩空白，按需保留或抹平字符串与模板字面量内容。
+ * 引号扫描用单次字符扫描（按出现顺序配对同类引号，跨引号转义安全），
  * 避免"双引号串内撇号被误当单引号串起点、吞掉后续 expect"的错序问题。
+ *
+ * 默认 `preserveStrings: false` 用于空断言检测：只关心是否出现 expect，字面量内容无关。
+ * 重复检测必须传 `preserveStrings: true`，否则 `toBe('A')` 与 `toBe('B')` 会塌成同一骨架。
  */
-export function normalizeChunk(text) {
+export function normalizeChunk(text, { preserveStrings = false } = {}) {
   const withoutComments = text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
   let out = '';
   let index = 0;
@@ -292,7 +295,11 @@ export function normalizeChunk(text) {
         if (withoutComments[close] === ch) break;
         close += 1;
       }
-      out += ch === '`' ? '``' : ch === '"' ? '""' : "''";
+      if (preserveStrings) {
+        out += withoutComments.slice(index, Math.min(close + 1, withoutComments.length));
+      } else {
+        out += ch === '`' ? '``' : ch === '"' ? '""' : "''";
+      }
       index = Math.min(close + 1, withoutComments.length);
       continue;
     }
@@ -367,6 +374,95 @@ function jaccard(setA, setB) {
   return union === 0 ? 0 : intersection / union;
 }
 
+function sortDuplicateGroups(pairGroups) {
+  return [...pairGroups.values()].sort(
+    (a, b) => b.similarity - a.similarity || a.files.join('|').localeCompare(b.files.join('|')),
+  );
+}
+
+/**
+ * 纯重复分组（§6.2）：输入已切好的测试块，输出按文件对去重的重复组。
+ *
+ * 精确骨架组必须同时满足正文 5-shingle Jaccard ≥ 阈值：断言形状相同但夹具/解析入口
+ * 不同的用例不是重复。近重复阶段同样按文件对去重，避免同一对文件报出多组。
+ */
+export function groupDuplicateBlocks(blocks, thresholds) {
+  const pairGroups = new Map();
+  const record = (files, similarity, basis) => {
+    const unique = [...new Set(files)].sort();
+    if (unique.length < 2) return;
+    const key = unique.join('|');
+    const rounded = Math.round(similarity * 100) / 100;
+    const previous = pairGroups.get(key);
+    if (previous === undefined) {
+      pairGroups.set(key, { files: unique, similarity: rounded, basis });
+      return;
+    }
+    pairGroups.set(key, {
+      files: unique,
+      similarity: Math.max(previous.similarity, rounded),
+      // 同一文件对既有精确骨架组又有近重复块时，以精确组的名义输出。
+      basis: previous.basis === 'assertion-hash' ? 'assertion-hash' : basis,
+    });
+  };
+
+  const byHash = new Map();
+  for (const block of blocks) {
+    const hash = createHash('md5').update(block.skeleton).digest('hex');
+    byHash.set(hash, (byHash.get(hash) ?? []).concat(block));
+  }
+  const shingleCache = new Map();
+  const blockShingles = (block) => {
+    if (!shingleCache.has(block)) shingleCache.set(block, shingles(block.normalized));
+    return shingleCache.get(block);
+  };
+  for (const group of byHash.values()) {
+    const blocksByFile = new Map();
+    for (const block of group) {
+      blocksByFile.set(block.file, (blocksByFile.get(block.file) ?? []).concat(block));
+    }
+    const files = [...blocksByFile.keys()].sort();
+    if (files.length < 2) continue;
+    const similarities = [];
+    for (let i = 0; i < files.length; i += 1) {
+      for (let j = i + 1; j < files.length; j += 1) {
+        let best = 0;
+        for (const a of blocksByFile.get(files[i])) {
+          for (const b of blocksByFile.get(files[j])) {
+            best = Math.max(best, jaccard(blockShingles(a), blockShingles(b)));
+          }
+        }
+        similarities.push(best);
+      }
+    }
+    const minimum = Math.min(...similarities);
+    if (minimum >= thresholds.duplicateJaccard) record(files, minimum, 'assertion-hash');
+  }
+
+  if (blocks.length > 2000) return sortDuplicateGroups(pairGroups); // 组合爆炸保护：超大包跳过近重复阶段
+
+  for (let i = 0; i < blocks.length; i += 1) {
+    for (let j = i + 1; j < blocks.length; j += 1) {
+      const a = blocks[i];
+      const b = blocks[j];
+      if (a.file === b.file) continue; // 同文件近重复不构成跨文件清理候选
+      if (a.skeleton === b.skeleton) continue; // 已被精确分组覆盖
+      if (
+        Math.abs(a.normalized.length - b.normalized.length) >
+        Math.max(a.normalized.length, b.normalized.length) * 0.5
+      ) {
+        continue;
+      }
+      const similarity = jaccard(blockShingles(a), blockShingles(b));
+      if (similarity >= thresholds.duplicateJaccard) {
+        record([a.file, b.file], similarity, 'shingle-jaccard');
+      }
+    }
+  }
+
+  return sortDuplicateGroups(pairGroups);
+}
+
 /**
  * 重复检测（§6.2）。仅在同一包内比较；块规模超上限时跳过 shingle 阶段防组合爆炸。
  */
@@ -378,55 +474,13 @@ export function detectDuplicates(rootDir, thresholds) {
     for (const file of packageFiles) {
       const source = readFileSync(join(rootDir, 'packages', packageDir, 'tests', file), 'utf8');
       for (const block of splitTestBlocks(source)) {
-        const normalized = normalizeChunk(block);
+        const normalized = normalizeChunk(block, { preserveStrings: true });
         const skeleton = assertionSkeleton(normalized);
         if (!skeleton) continue;
         blocks.push({ file: `packages/${packageDir}/tests/${file}`, skeleton, normalized });
       }
     }
-
-    const byHash = new Map();
-    for (const block of blocks) {
-      const hash = createHash('md5').update(block.skeleton).digest('hex');
-      byHash.set(hash, (byHash.get(hash) ?? []).concat(block));
-    }
-    for (const group of byHash.values()) {
-      const uniqueFiles = [...new Set(group.map((block) => block.file))].sort();
-      if (uniqueFiles.length >= 2) {
-        duplicateGroups.push({
-          files: uniqueFiles,
-          similarity: 1,
-          basis: 'assertion-hash',
-        });
-      }
-    }
-
-    if (blocks.length > 2000) continue; // 组合爆炸保护：超大包跳过近重复阶段
-    const shingleCache = new Map();
-    for (let i = 0; i < blocks.length; i += 1) {
-      for (let j = i + 1; j < blocks.length; j += 1) {
-        const a = blocks[i];
-        const b = blocks[j];
-        if (a.file === b.file) continue; // 同文件近重复不构成跨文件清理候选
-        if (a.skeleton === b.skeleton) continue; // 已被精确分组覆盖
-        if (
-          Math.abs(a.normalized.length - b.normalized.length) >
-          Math.max(a.normalized.length, b.normalized.length) * 0.5
-        ) {
-          continue;
-        }
-        if (!shingleCache.has(a)) shingleCache.set(a, shingles(a.normalized));
-        if (!shingleCache.has(b)) shingleCache.set(b, shingles(b.normalized));
-        const similarity = jaccard(shingleCache.get(a), shingleCache.get(b));
-        if (similarity >= thresholds.duplicateJaccard) {
-          duplicateGroups.push({
-            files: [...new Set([a.file, b.file])].sort(),
-            similarity: Math.round(similarity * 100) / 100,
-            basis: 'shingle-jaccard',
-          });
-        }
-      }
-    }
+    duplicateGroups.push(...groupDuplicateBlocks(blocks, thresholds));
   }
   return duplicateGroups;
 }

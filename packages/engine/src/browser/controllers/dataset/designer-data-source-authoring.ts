@@ -600,7 +600,8 @@ function updateDataSource(
       {
         type: 'update-components',
         componentIds: [componentId],
-        patch: { dataSource },
+        // 从数据集实例切回静态/变量时必须同时清掉 dataValue 引用：两者并存会被严格契约拒绝。
+        patch: { dataSource, dataValue: null },
       },
     ],
   };

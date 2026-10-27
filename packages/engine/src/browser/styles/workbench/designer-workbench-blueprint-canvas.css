@@ -35,27 +35,8 @@
   background: var(--designer-surface-panel);
 }
 
-.designer-blueprint-canvas-bar .designer-button {
-  height: 24px;
-  min-height: 24px;
-  gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-4);
-  color: var(--designer-text-secondary);
-  background: transparent;
-  box-shadow: none;
-  font-size: var(--designer-font-size-xs);
-  line-height: 1;
-  white-space: nowrap;
-}
-
 .designer-blueprint-canvas-bar .designer-icon-button {
   width: 24px;
-  padding: 0;
-}
-
-.designer-blueprint-canvas-bar .designer-button svg {
-  width: 14px;
-  height: 14px;
 }
 
 .designer-blueprint-canvas-bar .designer-blueprint-canvas-bar-chevron {
@@ -68,16 +49,6 @@
 .designer-blueprint-canvas-bar .designer-blueprint-canvas-bar-chevron svg {
   width: 12px;
   height: 12px;
-}
-
-.designer-blueprint-canvas-bar .designer-button:hover:not(:disabled) {
-  color: var(--designer-text-primary);
-  background: var(--designer-surface-control-hover);
-}
-
-.designer-blueprint-canvas-bar .designer-button[data-active="true"] {
-  color: var(--designer-text-primary);
-  background: var(--designer-surface-control);
 }
 
 .designer-blueprint-canvas-bar-spacer {
@@ -303,10 +274,10 @@
   position: absolute;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--designer-space-2);
   height: 22px;
   max-width: 168px;
-  padding: 0 7px;
+  padding: 0 calc(var(--designer-space-3) + 1px);
   overflow: hidden;
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-overlay);
@@ -478,9 +449,10 @@
   box-sizing: border-box;
   grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
+  gap: var(--designer-space-3);
   height: 45px;
-  padding: 7px 10px;
+  padding: calc(var(--designer-space-3) + 1px)
+    calc(var(--designer-space-4) + var(--designer-space-1));
   overflow: hidden;
   border-radius: var(--designer-radius-3) var(--designer-radius-3) 0 0;
 }
@@ -549,9 +521,9 @@
 .designer-blueprint-canvas-node-relcount {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: calc(var(--designer-space-1) + 1px);
   height: 16px;
-  padding: 0 5px;
+  padding: 0 calc(var(--designer-space-2) + 1px);
   border-radius: var(--designer-radius-pill);
   background: var(--designer-surface-control);
   box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
@@ -570,7 +542,7 @@
 .designer-blueprint-canvas-node-subtitle {
   box-sizing: border-box;
   height: 21px;
-  padding: 0 10px;
+  padding: 0 calc(var(--designer-space-4) + var(--designer-space-1));
   overflow: hidden;
   color: var(--designer-text-muted);
   font-family: var(--designer-font-family-mono);
@@ -586,9 +558,9 @@
   box-sizing: border-box;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: var(--designer-space-3);
   height: 40px;
-  padding: 0 10px;
+  padding: 0 calc(var(--designer-space-4) + var(--designer-space-1));
   border-top: 1px solid var(--designer-border-subtle);
   color: var(--designer-text-muted);
   font-size: var(--designer-font-size-xs);
@@ -619,7 +591,7 @@
   display: flex;
   box-sizing: border-box;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 calc(var(--designer-space-4) + var(--designer-space-1));
   overflow: hidden;
   border-top: 1px solid var(--designer-border-subtle);
   border-radius: 0 0 var(--designer-radius-3) var(--designer-radius-3);
@@ -640,9 +612,10 @@
 .designer-blueprint-canvas-port-row {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: calc(var(--designer-space-2) + 1px);
   height: 28px;
-  padding: 0 14px 0 10px;
+  padding: 0 calc(var(--designer-space-5) + var(--designer-space-1)) 0
+    calc(var(--designer-space-4) + var(--designer-space-1));
   overflow: hidden;
   border-top: 1px solid var(--designer-border-subtle);
   color: var(--designer-text-secondary);
@@ -891,7 +864,7 @@
   display: flex;
   max-width: min(560px, calc(100% - 32px));
   gap: var(--designer-space-2);
-  padding: 8px 12px;
+  padding: var(--designer-space-4) var(--designer-space-5);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-overlay);
   box-shadow: var(--designer-elev-ring);
@@ -912,7 +885,7 @@
   left: 50%;
   z-index: var(--designer-z-popover);
   max-width: calc(100% - 32px);
-  padding: 6px 10px;
+  padding: var(--designer-space-3) calc(var(--designer-space-4) + var(--designer-space-1));
   border-radius: var(--designer-radius-pill);
   background: var(--designer-surface-overlay);
   box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
@@ -1046,15 +1019,6 @@
   white-space: nowrap;
 }
 
-.designer-blueprint-canvas-simulation-bar .designer-button {
-  height: 24px;
-  padding: 0 var(--designer-space-2);
-  color: var(--designer-text-secondary);
-  background: transparent;
-  box-shadow: none;
-  font-size: var(--designer-font-size-xs);
-}
-
 .designer-blueprint-canvas-simulation {
   position: absolute;
   right: 0;
@@ -1105,10 +1069,6 @@
   gap: var(--designer-space-1);
   color: var(--designer-text-muted);
   font-size: var(--designer-font-size-xs);
-}
-
-.designer-blueprint-canvas-simulation-field .designer-select-trigger {
-  font-size: var(--designer-font-size-sm);
 }
 
 .designer-blueprint-canvas-simulation-payload {

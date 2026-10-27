@@ -469,7 +469,7 @@ export async function assertDatasetPanelInteraction(designer, page) {
     JSON.stringify(
       window.baseScreenHarness.designer.document.components.find(
         (component) => component.id === 'dataset-ranking-demo',
-      )?.dataSource ?? null,
+      )?.dataValue ?? null,
     ),
   );
   await designer.evaluate(() => {
@@ -478,7 +478,7 @@ export async function assertDatasetPanelInteraction(designer, page) {
         {
           type: 'update-components',
           componentIds: ['dataset-ranking-demo'],
-          patch: { dataSource: null },
+          patch: { dataValue: null },
         },
       ],
     });
@@ -528,7 +528,7 @@ export async function assertDatasetPanelInteraction(designer, page) {
         {
           type: 'update-components',
           componentIds: ['dataset-ranking-demo'],
-          patch: { dataSource: JSON.parse(json) },
+          patch: { dataValue: JSON.parse(json) },
         },
       ],
     });

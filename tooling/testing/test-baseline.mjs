@@ -139,7 +139,8 @@ function reconcileCoverage(rootDir, packageDir) {
     exitCode,
   };
   writeJsonFile(join(rootDir, METRICS_ROOT, `coverage-${packageDir}.json`), coverage);
-  return { exitCode: EXIT_OK, baseline: coverage };
+  // 覆盖率采集必须保留测试本身的退出码：只报告覆盖率不能掩盖测试失败。
+  return { exitCode: exitCode === 0 ? EXIT_OK : exitCode, baseline: coverage };
 }
 
 function printUsage() {

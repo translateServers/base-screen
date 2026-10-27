@@ -323,19 +323,19 @@ describe('designer workbench interaction and accessibility', () => {
     expect(workbenchCss).toContain('container-name: material-library;');
     expect(baseCss).toMatch(/\.material-group-overlay\s*\{[^}]*position: absolute;/s);
     expect(baseCss).toMatch(/\.material-group-popover\s*\{[^}]*width: 288px;[^}]*height: 360px;/s);
-    expect(baseCss).toContain('.material-filters .designer-button[aria-pressed="true"]');
+    expect(controlsCss).toContain('.designer-button[data-variant="filter"][aria-pressed="true"]');
+    expect(baseCss).toContain('.material-filters .designer-button {');
     expect(baseCss).toMatch(
       /\.material-search input,\s*\.layer-search input\s*\{[^}]*padding-left: calc\(var\(--designer-space-3\) \+ var\(--designer-control-height\)\);/s,
     );
-    expect(baseCss).toContain('.material-search-clear:not(:disabled):active');
+    expect(controlsCss).toMatch(
+      /\.designer-button:not\(:disabled\):active\s*\{[^}]*transform: translateZ\(0\);/s,
+    );
     expect(baseCss).toMatch(
       /\.material-search \.material-search-clear\s*\{[^}]*top: 0;[^}]*bottom: 0;[^}]*width: 24px;[^}]*height: 24px;[^}]*margin-block: auto;/s,
     );
     expect(baseCss).toMatch(
       /\.material-search input::-webkit-search-cancel-button\s*\{[^}]*display: none;/s,
-    );
-    expect(baseCss).toContain(
-      '.material-library-status-actions .designer-button:not(:disabled):active',
     );
     expect(workbenchCss).toContain('.status-console-trigger {');
     expect(workbenchCss).toContain('width: 84px;');

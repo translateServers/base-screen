@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { PACKAGE_DEFINITIONS } from '../../tooling/checks/packages.mjs';
 import {
   assertionSkeleton,
+  groupDuplicateBlocks,
   normalizeChunk,
   splitTestBlocks,
 } from '../../tooling/lib/audit-rules.mjs';
@@ -245,6 +246,70 @@ describe('审计词法分析守护（QA round2 根因 a-d）', () => {
   it('(b/d 组合) 残片块不会产生空断言骨架，重复检测不受引号错序影响', () => {
     const normalized = normalizeChunk('expect(a).toBe(true); expect(b).toBe(false);');
     expect(assertionSkeleton(normalized)).toContain('toBe(false)');
+  });
+
+  function auditBlock(file: string, body: string) {
+    const normalized = normalizeChunk(body, { preserveStrings: true });
+    return { file, skeleton: assertionSkeleton(normalized), normalized };
+  }
+
+  it('(e) 字符串期望值参与骨架：不同期望值不成组', () => {
+    const left = auditBlock(
+      'a.test.ts',
+      "it('x', () => { const value = parse(1); expect(value.status).toBe('alpha'); expect(value.ready).toBe('alpha'); });",
+    );
+    const right = auditBlock(
+      'b.test.ts',
+      "it('x', () => { const value = parse(1); expect(value.status).toBe('beta'); expect(value.ready).toBe('beta'); });",
+    );
+    expect(left.skeleton).not.toBe(right.skeleton);
+    expect(groupDuplicateBlocks([left, right], { duplicateJaccard: 0.85 })).toEqual([]);
+  });
+
+  it('(f) 断言形状相同但夹具不同不成组', () => {
+    const left = auditBlock(
+      'a.test.ts',
+      "it('x', () => { const value = parseAlpha(snapshotOne); expect(value.ok).toBe(false); expect(value.code).toBe('E_ONE'); });",
+    );
+    const right = auditBlock(
+      'b.test.ts',
+      "it('x', () => { const value = parseBeta(snapshotTwo); expect(value.ok).toBe(false); expect(value.code).toBe('E_ONE'); });",
+    );
+    expect(left.skeleton).toBe(right.skeleton);
+    expect(groupDuplicateBlocks([left, right], { duplicateJaccard: 0.85 })).toEqual([]);
+  });
+
+  it('(g) 逐字复制的用例块成组，且记录最小相似度', () => {
+    const body =
+      "it('copied', () => { const value = buildValue(); expect(value.id).toBe('alpha'); expect(value.ready).toBe(true); });";
+    const groups = groupDuplicateBlocks(
+      [auditBlock('a.test.ts', body), auditBlock('b.test.ts', body)],
+      { duplicateJaccard: 0.85 },
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({
+      files: ['a.test.ts', 'b.test.ts'],
+      similarity: 1,
+      basis: 'assertion-hash',
+    });
+  });
+
+  it('(h) 同一文件对的多个重复块只输出一组', () => {
+    const bodyOne =
+      "it('one', () => { const a = first(); expect(a.ok).toBe(true); expect(a.id).toBe('one'); });";
+    const bodyTwo =
+      "it('two', () => { const b = second(); expect(b.ok).toBe(false); expect(b.id).toBe('two'); });";
+    const groups = groupDuplicateBlocks(
+      [
+        auditBlock('a.test.ts', bodyOne),
+        auditBlock('b.test.ts', bodyOne),
+        auditBlock('a.test.ts', bodyTwo),
+        auditBlock('b.test.ts', bodyTwo),
+      ],
+      { duplicateJaccard: 0.85 },
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.files).toEqual(['a.test.ts', 'b.test.ts']);
   });
 });
 

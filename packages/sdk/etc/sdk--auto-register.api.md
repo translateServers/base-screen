@@ -24,7 +24,6 @@ import { BaseScreenBlueprintCanvasGraph } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasInsertNode } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasNode } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasNodePosition } from '@base-screen/engine';
-import { BaseScreenBlueprintCanvasNodeSummary } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasSelection } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasState } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasStateEventDetail } from '@base-screen/engine';
@@ -115,8 +114,6 @@ export { BaseScreenBlueprintCanvasInsertNode }
 export { BaseScreenBlueprintCanvasNode }
 
 export { BaseScreenBlueprintCanvasNodePosition }
-
-export { BaseScreenBlueprintCanvasNodeSummary }
 
 export { BaseScreenBlueprintCanvasSelection }
 
