@@ -612,6 +612,17 @@
   bottom: 250px;
 }
 
+/* 抓手势只属于画布背景：画布内的浮层、抽屉与空态不继承 grab。 */
+.designer-blueprint-canvas-simulation-bar,
+.designer-blueprint-canvas-simulation,
+.designer-blueprint-canvas-problems,
+.designer-blueprint-canvas-empty,
+.designer-blueprint-canvas-no-events,
+.designer-blueprint-canvas-status,
+.designer-blueprint-canvas-edge-labels {
+  cursor: default;
+}
+
 /* 校验浮层 */
 .designer-blueprint-canvas-problems {
   position: absolute;
