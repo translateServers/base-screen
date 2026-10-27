@@ -7,7 +7,7 @@
   left: 0;
   top: 0;
   max-width: min(240px, calc(100vw - 20px));
-  padding: 5px 9px;
+  padding: calc(var(--designer-space-2) + 1px) calc(var(--designer-space-4) + 1px);
   border-radius: var(--designer-radius-3);
   background: var(--designer-text-primary);
   color: var(--designer-surface-raised);

@@ -77,7 +77,7 @@
 }
 
 .blueprint-library-main > .blueprint-panel-scroll {
-  padding: 8px 8px 12px;
+  padding: var(--designer-space-4) var(--designer-space-4) var(--designer-space-5);
 }
 
 .blueprint-inspector-shell > .blueprint-panel-scroll {
@@ -100,7 +100,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--designer-space-2);
-  padding: 0 6px;
+  padding: 0 var(--designer-space-3);
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
   font-size: var(--designer-font-size-xs);
@@ -170,8 +170,8 @@
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
-  padding: 2px 6px;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-1) var(--designer-space-3);
   text-align: left;
 }
 
@@ -294,7 +294,7 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 2px;
+  gap: var(--designer-space-1);
 }
 
 .blueprint-inspector-mode {
@@ -339,7 +339,7 @@
   right: -3px;
   min-width: 14px;
   height: 14px;
-  padding: 0 3px;
+  padding: 0 calc(var(--designer-space-1) + 1px);
   border-radius: var(--designer-radius-4);
   background: var(--designer-danger);
   color: var(--designer-text-on-accent);
@@ -411,7 +411,7 @@
   position: relative;
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--designer-space-1);
   padding: var(--designer-space-2);
   border: 1px solid var(--designer-border-subtle);
   border-radius: var(--designer-radius-3);
@@ -432,7 +432,7 @@
 }
 
 .blueprint-inspector-pair strong {
-  padding-right: 14px;
+  padding-right: calc(var(--designer-space-5) + var(--designer-space-1));
   color: var(--designer-text-primary);
   font-weight: 600;
 }

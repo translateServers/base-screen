@@ -73,7 +73,7 @@
 }
 
 .designer-workbench-draft {
-  padding: 2px var(--designer-space-3);
+  padding: var(--designer-space-1) var(--designer-space-3);
   border-radius: var(--designer-radius-pill);
   background: var(--designer-warning-surface);
   color: var(--designer-warning);
@@ -109,7 +109,7 @@
 
 .designer-workbench-confirm > span:first-child {
   display: grid;
-  gap: 2px;
+  gap: var(--designer-space-1);
 }
 
 .designer-workbench-confirm small {
@@ -120,19 +120,6 @@
   justify-content: flex-end;
   border-top: 1px solid var(--designer-border-default);
   border-bottom: 0;
-}
-
-/* 静态数据 tab 按下态收敛到分段控件统一语言（移植批 2g，controls 层单一形态）：
-   悬停档底 + accent-text（对比度安全档），黑夜用更深一档的 active 底。
-   原先写的是裸 accent 描边 + accent-surface 底 + 裸 accent 字，与统一形态脱节。 */
-.designer-static-data-tabs .designer-button[aria-pressed="true"] {
-  border-color: transparent;
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-accent-text);
-}
-
-:host(:not([theme="light"])) .designer-static-data-tabs .designer-button[aria-pressed="true"] {
-  background: var(--designer-surface-control-active);
 }
 
 .designer-static-data-content {
@@ -443,7 +430,7 @@
 .designer-blueprint-event > header > span:first-child {
   display: grid;
   min-width: 0;
-  gap: 2px;
+  gap: var(--designer-space-1);
 }
 
 .designer-blueprint-variable-row strong,
@@ -470,7 +457,7 @@
 
 .designer-blueprint-state {
   flex: 0 0 auto;
-  padding: 2px var(--designer-space-2);
+  padding: var(--designer-space-1) var(--designer-space-2);
   border-radius: var(--designer-radius-pill);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
@@ -550,7 +537,7 @@
 .designer-blueprint-action-row {
   display: grid;
   min-width: 0;
-  gap: 2px;
+  gap: var(--designer-space-1);
   padding: var(--designer-space-2);
   border-left: 2px solid var(--designer-accent);
   background: var(--designer-accent-surface);
@@ -626,12 +613,6 @@
   gap: var(--designer-space-2);
 }
 
-.designer-static-paste .designer-textarea {
-  min-height: 90px;
-  resize: vertical;
-  font: var(--designer-font-numeric);
-}
-
 .designer-static-field-row {
   display: grid;
   min-width: 0;
@@ -682,25 +663,6 @@
   flex-wrap: nowrap;
 }
 
-.designer-static-pagination .designer-control {
-  height: var(--designer-control-height-compact);
-  min-height: var(--designer-control-height-compact);
-  font: var(--designer-font-small);
-}
-
-.designer-static-rows .designer-static-pagination .designer-select {
-  height: var(--designer-control-height-compact);
-  width: auto;
-  min-width: 58px;
-  font-size: var(--designer-font-size-sm);
-  padding-left: var(--designer-space-2);
-  padding-right: 18px;
-  background-position:
-    calc(100% - 10px) 50%,
-    calc(100% - 6px) 50%;
-  background-size: 4px 4px;
-}
-
 .designer-static-pagination .designer-static-page-button {
   width: var(--designer-control-height-compact);
   min-width: var(--designer-control-height-compact);
@@ -733,8 +695,9 @@
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 8px;
-  padding: 9px 10px 8px;
+  gap: var(--designer-space-4);
+  padding: calc(var(--designer-space-4) + 1px)
+    calc(var(--designer-space-4) + var(--designer-space-1)) var(--designer-space-4);
   border-bottom: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
   box-shadow: 0 5px 14px color-mix(in srgb, var(--designer-surface-workspace) 30%, transparent);

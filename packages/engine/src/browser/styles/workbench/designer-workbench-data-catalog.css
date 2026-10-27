@@ -78,14 +78,6 @@
   white-space: normal;
 }
 
-.designer-data-source-static .designer-textarea {
-  min-height: 180px;
-  resize: vertical;
-  font: var(--designer-font-numeric);
-  font-weight: 400;
-  line-height: 1.5;
-}
-
 .designer-host-resource-summary,
 .designer-data-source-feedback {
   margin: 0;
@@ -169,7 +161,7 @@
 .designer-dataset-item > span:first-child {
   display: grid;
   min-width: 0;
-  gap: 2px;
+  gap: var(--designer-space-1);
 }
 
 .designer-dataset-item strong,
@@ -224,7 +216,7 @@
 .designer-dataset-summary-title {
   display: grid;
   min-width: 0;
-  gap: 2px;
+  gap: var(--designer-space-1);
 }
 
 .designer-dataset-summary small,
@@ -513,7 +505,8 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--designer-space-2);
-  padding: var(--designer-space-1) 38px var(--designer-space-1) var(--designer-space-3);
+  padding: var(--designer-space-1) calc(var(--designer-space-8) + var(--designer-space-3))
+    var(--designer-space-1) var(--designer-space-3);
   border: 0;
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
@@ -522,15 +515,6 @@
   cursor: pointer;
   font: inherit;
   text-align: left;
-}
-
-.designer-dataset-field-option .designer-field-label-text {
-  min-width: 0;
-  overflow: hidden;
-  color: inherit;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .designer-dataset-field-option small {

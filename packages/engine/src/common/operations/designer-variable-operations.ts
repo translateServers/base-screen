@@ -57,9 +57,6 @@ export function referencedVariableIds(document: ScreenDocument): ReadonlySet<str
   return new Set(variableReferenceCounts(document).keys());
 }
 
-/** @deprecated The returned keys are stable ids. */
-export const referencedVariableNames = referencedVariableIds;
-
 /** Counts every canonical reference location for variable-panel disclosure. */
 export function variableReferenceCounts(document: ScreenDocument): ReadonlyMap<string, number> {
   const referenced = new Map<string, number>();

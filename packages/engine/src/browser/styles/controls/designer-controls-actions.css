@@ -1,7 +1,7 @@
 .designer-color {
   width: var(--designer-control-height);
   height: var(--designer-control-height);
-  padding: 3px;
+  padding: calc(var(--designer-space-1) + 1px);
   cursor: pointer;
 }
 
@@ -202,6 +202,21 @@
   box-shadow: 0 2px 8px color-mix(in srgb, var(--designer-accent) 14%, transparent);
 }
 
+/* 素材分组导航 / 弹层：图标按钮的紧凑盒模型与内嵌焦点环
+   （原 base 层覆写，迁到控件层统一维护）。 */
+.material-group-navigation .designer-button:focus-visible,
+.material-group-popover .designer-button:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -3px;
+}
+
+.material-group-popover-heading .designer-button {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+}
+
 /* 蓝图画布工具条：小号透明按钮，选中态用静止底而不是强调色。 */
 .designer-button[data-variant="canvas-tool"] {
   height: 24px;
@@ -346,6 +361,46 @@
   display: none;
 }
 
+/* 顶栏工具簇：按下态用切面底 + 内描边，不与全局强调色档叠加。 */
+.designer-tool-cluster .designer-tool-button[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  box-shadow: inset 0 0 0 1px var(--designer-border-active);
+}
+
+/* 素材库状态条的动作按钮跟随状态色（宿主注入 --material-library-status-color）。 */
+.material-library-status-actions .designer-button {
+  min-height: 24px;
+  padding: var(--designer-space-1) var(--designer-space-4);
+  border-color: color-mix(in srgb, var(--material-library-status-color) 34%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--material-library-status-color) 9%,
+    var(--designer-surface-control)
+  );
+  color: var(--material-library-status-color);
+  font: var(--designer-font-small);
+}
+
+.material-library-status-actions .designer-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--material-library-status-color) 56%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--material-library-status-color) 16%,
+    var(--designer-surface-control-hover)
+  );
+}
+
+/* 侧栏与右栏内的焦点环内嵌，避免被面板边缘裁切。 */
+.rail .designer-button:focus-visible,
+.rail .designer-tab:focus-visible,
+.properties .designer-button:focus-visible,
+.properties .designer-tab:focus-visible,
+.properties .designer-checkbox:focus-visible {
+  outline-offset: -2px;
+}
+
 /* 右栏数据面板的按钮档位（原 workbench 覆写，迁到控件层统一维护）。
    主操作在数据面板作用域内不套用页面级 primary 反色档。 */
 .properties .designer-dataset-actions .designer-button[data-variant="apply"] {
@@ -394,6 +449,18 @@
   .designer-dataset-status-bar
   .designer-button[data-dataset-action="apply"]:hover:not(:disabled) {
   background: var(--designer-surface-control-hover);
+}
+
+/* 静态数据页签按下态：悬停档底 + accent-text，黑夜用更深一档的 active 底
+   （原 workbench 覆写，与分段控件统一语言）。 */
+.designer-static-data-tabs .designer-button[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-accent-text);
+}
+
+:host(:not([theme="light"])) .designer-static-data-tabs .designer-button[aria-pressed="true"] {
+  background: var(--designer-surface-control-active);
 }
 
 /* 固定值表格的页签是下划线档，不是胶囊按钮。 */

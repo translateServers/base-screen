@@ -34,7 +34,7 @@
 
 .blueprint-library-search input {
   width: 100%;
-  padding-left: 32px;
+  padding-left: var(--designer-space-8);
 }
 
 /* 分节首项不补外边距：蓝图检查器与蓝图库共用同一条滚动区。 */

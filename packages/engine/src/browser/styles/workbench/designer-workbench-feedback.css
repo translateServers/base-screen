@@ -116,7 +116,7 @@
 .designer-help-dialog .help-content p kbd {
   flex: 0 0 auto;
   min-width: 20px;
-  padding: 2px 4px;
+  padding: var(--designer-space-1) var(--designer-space-2);
   border: 0;
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
@@ -311,28 +311,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--designer-space-2);
-}
-
-.material-library-status-actions .designer-button {
-  min-height: 24px;
-  padding: 2px var(--designer-space-4);
-  border-color: color-mix(in srgb, var(--material-library-status-color) 34%, transparent);
-  background-color: color-mix(
-    in srgb,
-    var(--material-library-status-color) 9%,
-    var(--designer-surface-control)
-  );
-  color: var(--material-library-status-color);
-  font: var(--designer-font-small);
-}
-
-.material-library-status-actions .designer-button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--material-library-status-color) 56%, transparent);
-  background-color: color-mix(
-    in srgb,
-    var(--material-library-status-color) 16%,
-    var(--designer-surface-control-hover)
-  );
 }
 
 .error-console-history-heading {

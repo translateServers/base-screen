@@ -24,6 +24,7 @@ const controlLayers = [
   'packages/engine/src/browser/styles/controls/designer-controls-actions.css',
   'packages/engine/src/browser/styles/controls/designer-controls-tabs.css',
   'packages/engine/src/browser/styles/controls/designer-controls-descriptor.css',
+  'packages/engine/src/browser/styles/controls/designer-controls-adaptivity.css',
 ];
 const workbenchLayers = [
   'packages/engine/src/browser/styles/workbench/designer-workbench-topbar.css',
@@ -70,6 +71,7 @@ const controlBindings = [
   'actionsCss',
   'tabsCss',
   'descriptorCss',
+  'adaptivityCss',
 ];
 const workbenchBindings = [
   'topbarCss',
@@ -213,35 +215,9 @@ if (!/^:host,\s*:host\(\[theme="dark"\]\)\s*\{/m.test(tokensCss)) {
 const stylesPrefix = 'packages/engine/src/browser/styles/';
 const nonTokenLayers = [...baseLayers, ...controlLayers, ...workbenchLayers];
 
-// Temporary debt for the consolidation pass. Every number is produced by
-// `node tooling/checks/designer-styles.mjs --report`; entries may only shrink and must be
-// deleted once all of their metrics reach zero (the stale guard below enforces that).
-const styleDebtBaseline = {
-  'base/designer-base-menus.css': { spacing: 3 },
-  'base/designer-base-tooltip.css': { spacing: 1 },
-  'base/designer-base-material-groups.css': { control: 5 },
-  'base/designer-base-adaptivity.css': { control: 9 },
-  'controls/designer-controls-color-palette.css': { spacing: 21 },
-  'controls/designer-controls-inputs.css': { spacing: 1 },
-  'controls/designer-controls-date-field.css': { spacing: 13 },
-  'controls/designer-controls-segmented.css': { spacing: 1 },
-  'controls/designer-controls-quick-style.css': { spacing: 3 },
-  'controls/designer-controls-actions.css': { spacing: 1 },
-  'workbench/designer-workbench-topbar.css': { control: 4, spacing: 9 },
-  'workbench/designer-workbench-feedback.css': { control: 8, spacing: 2 },
-  'workbench/designer-workbench-panels.css': { control: 1, spacing: 8 },
-  'workbench/designer-workbench-blueprint-panels.css': { spacing: 1 },
-  'workbench/designer-workbench-blueprint-details.css': { spacing: 8 },
-  'workbench/designer-workbench-materials.css': { spacing: 1 },
-  'workbench/designer-workbench-data-catalog.css': { control: 6, spacing: 3 },
-  'workbench/designer-workbench-data-binding.css': { spacing: 7 },
-  'workbench/designer-workbench-data-editor.css': { control: 15, spacing: 8 },
-  'workbench/designer-workbench-layers.css': { spacing: 7 },
-  'workbench/designer-workbench-variables.css': { spacing: 12 },
-  'workbench/designer-workbench-variable-editor.css': { spacing: 15 },
-  'workbench/designer-workbench-variable-inspector.css': { control: 4, spacing: 25 },
-  'workbench/designer-workbench-canvas.css': { spacing: 4 },
-};
+// Control/spacing debt is fully cleared: every layer file must stay at zero. The map stays
+// as the (empty) ratchet so a future regression has a single place to be baselined.
+const styleDebtBaseline = {};
 
 const controlLayerSet = new Set(controlLayers);
 const chromeLayerFile = 'workbench/designer-workbench-chrome.css';

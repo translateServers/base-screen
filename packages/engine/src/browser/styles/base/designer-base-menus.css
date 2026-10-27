@@ -89,7 +89,7 @@
   position: absolute;
   z-index: var(--designer-z-dialog);
   min-width: 248px;
-  padding: 6px;
+  padding: var(--designer-space-3);
   /* 浮层描边用真 1px：压在画布图像与面板上比阴影 ring 更稳，也与子菜单同源。
      ring 留给按钮/输入/卡片这类没有外阴影的交互面。 */
   border: 1px solid var(--designer-border-default);
@@ -318,7 +318,7 @@
   top: -1px;
   left: calc(100% - 4px);
   min-width: 220px;
-  padding: 6px;
+  padding: var(--designer-space-3);
   overflow: auto;
   overflow-x: hidden;
   background: var(--designer-surface-overlay);
@@ -391,7 +391,7 @@
 .designer-context-menu .designer-context-menu-heading-actions {
   display: inline-flex;
   flex: 0 0 auto;
-  gap: 2px;
+  gap: var(--designer-space-1);
 }
 
 .designer-context-menu .designer-context-menu-icon-action {

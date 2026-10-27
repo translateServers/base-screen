@@ -35,7 +35,7 @@
 
 .designer-data-summary-status > span {
   flex: 0 0 auto;
-  padding: 2px var(--designer-space-2);
+  padding: var(--designer-space-1) var(--designer-space-2);
   border-radius: var(--designer-radius-pill);
   background: var(--designer-danger-surface);
   color: var(--designer-danger);
@@ -124,7 +124,7 @@
   height: 21px;
   align-items: center;
   gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-2) 0 7px;
+  padding: 0 var(--designer-space-2) 0 calc(var(--designer-space-3) + 1px);
   border-radius: var(--designer-radius-3);
   background: var(--designer-accent-surface);
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--designer-accent) 32%, transparent);
@@ -284,7 +284,7 @@
 
 .designer-bind-foot {
   margin-top: var(--designer-space-2);
-  padding: 6px var(--designer-space-4) 2px;
+  padding: var(--designer-space-3) var(--designer-space-4) var(--designer-space-1);
   box-shadow: inset 0 1px 0 var(--designer-border-subtle);
   color: var(--designer-text-muted);
   font-size: var(--designer-font-size-xs);
@@ -296,7 +296,7 @@
 
 .designer-dataset-shape {
   width: fit-content;
-  padding: 2px var(--designer-space-2);
+  padding: var(--designer-space-1) var(--designer-space-2);
   border: 1px solid var(--designer-border-default);
   border-radius: var(--designer-radius-control);
   color: var(--designer-text-secondary);
@@ -411,7 +411,7 @@
   display: block;
   max-width: 88px;
   min-width: 0;
-  padding: 2px var(--designer-space-2);
+  padding: var(--designer-space-1) var(--designer-space-2);
   border-radius: var(--designer-radius-pill);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -454,7 +454,7 @@
   grid-template-columns: 5px minmax(0, 1fr);
   align-items: start;
   gap: var(--designer-space-2);
-  padding: 2px 0;
+  padding: var(--designer-space-1) 0;
   overflow-wrap: anywhere;
   color: var(--designer-text-secondary);
   font: var(--designer-font-small);
@@ -491,7 +491,7 @@
   min-height: 26px;
   align-items: center;
   justify-content: flex-end;
-  gap: 3px;
+  gap: calc(var(--designer-space-1) + 1px);
 }
 
 .designer-dataset-authoring-icon-action {

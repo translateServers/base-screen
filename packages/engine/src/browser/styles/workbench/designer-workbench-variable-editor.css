@@ -318,10 +318,10 @@
 .variable-editor-section {
   display: flex;
   align-items: baseline;
-  gap: 7px;
+  gap: calc(var(--designer-space-3) + 1px);
   min-width: 0;
-  margin: 14px 0 0;
-  padding: 14px 0 0;
+  margin: calc(var(--designer-space-5) + var(--designer-space-1)) 0 0;
+  padding: calc(var(--designer-space-5) + var(--designer-space-1)) 0 0;
   border-top: 1px solid var(--designer-border-subtle);
   color: var(--designer-text-primary);
   font: var(--designer-font-small);
@@ -445,10 +445,10 @@
 .variable-catalog-summary {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: calc(var(--designer-space-3) + 1px);
   width: 100%;
   min-height: 38px;
-  padding: 6px 8px;
+  padding: var(--designer-space-3) var(--designer-space-4);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-text-secondary);
@@ -534,7 +534,7 @@
 .variable-host-catalog-list {
   max-height: 178px;
   gap: 1px;
-  padding: 3px;
+  padding: calc(var(--designer-space-1) + 1px);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   scrollbar-gutter: stable;
@@ -543,8 +543,8 @@
 .variable-host-catalog-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
-  padding: 6px;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-3);
   border: 0;
   border-radius: var(--designer-radius-3);
   background: transparent;
@@ -588,8 +588,8 @@
 }
 
 .variable-response-field {
-  gap: 6px;
-  margin-top: 10px;
+  gap: var(--designer-space-3);
+  margin-top: calc(var(--designer-space-4) + var(--designer-space-1));
   padding: 0;
   border: 0;
   border-radius: var(--designer-radius-3);
@@ -599,29 +599,29 @@
 }
 
 .variable-response-field > div {
-  padding: 5px 8px;
+  padding: calc(var(--designer-space-2) + 1px) var(--designer-space-4);
   border-bottom: 1px solid var(--designer-border-subtle);
 }
 
 .variable-response-field p,
 .variable-response-field pre {
   max-height: 104px;
-  padding: 7px 8px;
+  padding: calc(var(--designer-space-3) + 1px) var(--designer-space-4);
   color: var(--designer-text-secondary);
   font: 500 var(--designer-font-size-xs) / 1.65 var(--designer-font-numeric);
 }
 
 .variable-run-section {
   min-width: 0;
-  margin-top: 14px;
-  padding-top: 14px;
+  margin-top: calc(var(--designer-space-5) + var(--designer-space-1));
+  padding-top: calc(var(--designer-space-5) + var(--designer-space-1));
   border-top: 1px solid var(--designer-border-subtle);
 }
 
 .variable-run-section > summary {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--designer-space-3);
   min-width: 0;
   list-style: none;
   cursor: pointer;

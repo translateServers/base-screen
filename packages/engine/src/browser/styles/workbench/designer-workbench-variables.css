@@ -20,7 +20,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--designer-space-2);
-  padding: 10px 12px;
+  padding: calc(var(--designer-space-4) + var(--designer-space-1)) var(--designer-space-5);
   border-bottom: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
 }
@@ -51,8 +51,8 @@
 
 .variable-search-input {
   width: 100%;
-  padding-left: 28px;
-  padding-right: 28px;
+  padding-left: calc(var(--designer-space-7) + var(--designer-space-2));
+  padding-right: calc(var(--designer-space-7) + var(--designer-space-2));
 }
 
 .variable-search-input::-webkit-search-cancel-button {
@@ -103,22 +103,24 @@
 .variable-panel-content {
   min-height: 0;
   overflow: hidden auto;
-  padding: 8px 8px 28px;
+  padding: var(--designer-space-4) var(--designer-space-4)
+    calc(var(--designer-space-7) + var(--designer-space-2));
   scrollbar-gutter: stable;
 }
 
 .variable-group {
   min-width: 0;
-  margin-bottom: 4px;
+  margin-bottom: var(--designer-space-2);
 }
 
 .variable-group > .list-heading {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--designer-space-3);
   min-height: 28px;
   margin: 0;
-  padding: 6px 6px 3px 8px;
+  padding: var(--designer-space-3) var(--designer-space-3) calc(var(--designer-space-1) + 1px)
+    var(--designer-space-4);
   color: var(--designer-text-muted);
   font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-numeric);
   letter-spacing: 0.05em;
@@ -210,8 +212,8 @@
   min-height: 38px;
   grid-template-columns: 16px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  padding: 0 8px;
+  gap: var(--designer-space-4);
+  padding: 0 var(--designer-space-4);
   border-radius: var(--designer-radius-3);
   color: var(--designer-text-secondary);
   transition: background-color var(--designer-motion);
@@ -357,7 +359,7 @@
   display: flex;
   align-items: center;
   gap: 1px;
-  padding: 2px;
+  padding: var(--designer-space-1);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control-hover);
   box-shadow: -10px 0 12px -5px var(--designer-surface-control-hover);
@@ -395,7 +397,12 @@
   min-width: 0;
   gap: var(--designer-space-2);
   margin: 0 var(--designer-space-2) var(--designer-space-2)
-    calc(var(--designer-space-2) + 20px + var(--designer-space-2));
+    calc(
+      var(--designer-space-2) +
+      var(--designer-space-6) +
+      var(--designer-space-2) +
+      var(--designer-space-2)
+    );
   padding: var(--designer-space-2) 0 0;
   border-top: 1px solid var(--designer-border-subtle);
 }
@@ -644,7 +651,7 @@ button.variable-reference-count:focus-visible {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: 30px;
+  padding: calc(var(--designer-space-7) + var(--designer-space-3));
   /* 画布表面不交给浏览器手势：平移/缩放由 wheel 通道接管（触控板双指对应 ctrl+wheel）。 */
   touch-action: none;
   background-color: var(--designer-surface-canvas);

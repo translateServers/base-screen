@@ -35,7 +35,7 @@
   box-sizing: border-box;
   width: 14px;
   height: 14px;
-  margin-top: -4px;
+  margin-top: calc(-1 * var(--designer-space-2));
   appearance: none;
   border: 2px solid var(--designer-surface-raised);
   border-radius: 50%;
@@ -132,8 +132,8 @@
   height: 42px;
   align-items: flex-end;
   justify-content: center;
-  gap: 3px;
-  padding: 5px;
+  gap: calc(var(--designer-space-1) + 1px);
+  padding: calc(var(--designer-space-2) + 1px);
   overflow: hidden;
   border-radius: var(--designer-radius-1);
   background: linear-gradient(

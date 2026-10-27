@@ -6,7 +6,7 @@ import {
   collectVariableReferences,
   isVariableNameTaken,
   isVariableReferenced,
-  referencedVariableNames,
+  referencedVariableIds,
   variableReferenceCounts,
 } from '../../../src/common/operations/designer-variable-operations.js';
 import { relationsFromRules } from '../../__fixtures__/blueprint-relations.js';
@@ -59,7 +59,7 @@ describe('designer variable operations', () => {
       ],
     );
 
-    expect(referencedVariableNames(source)).toEqual(new Set(['region']));
+    expect(referencedVariableIds(source)).toEqual(new Set(['region']));
     expect(isVariableReferenced(source, 'region')).toBe(true);
     expect(isVariableReferenced(source, 'limit')).toBe(false);
   });
@@ -105,7 +105,7 @@ describe('designer variable operations', () => {
       ]),
     });
 
-    const referenced = referencedVariableNames(source);
+    const referenced = referencedVariableIds(source);
     expect(referenced.has('count')).toBe(true);
     expect(referenced.has('total')).toBe(true);
     expect(referenced.has('nested')).toBe(true);

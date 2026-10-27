@@ -86,34 +86,7 @@
     scrollbar-color: auto;
   }
 
-  .designer-control:focus-visible,
-  .designer-tab:focus-visible,
-  .designer-checkbox:focus-visible,
-  .designer-switch:focus-visible {
-    outline: 2px solid Highlight;
-    outline-offset: 2px;
-  }
-
-  .designer-control[aria-invalid="true"] {
-    outline: 2px solid Mark;
-    outline-offset: 2px;
-  }
-
-  .designer-button[aria-pressed="true"],
-  .designer-tab[aria-selected="true"] {
-    outline: 2px solid Highlight;
-    outline-offset: -2px;
-  }
-
-  .material-group-navigation .material-group-button[aria-pressed="true"],
-  .material-group-navigation .material-group-button[aria-pressed="true"]:hover:not(:disabled),
-  .material-filters .designer-button[aria-pressed="true"],
-  .material-categories .designer-button[aria-pressed="true"] {
-    background: Highlight;
-    color: HighlightText;
-    box-shadow: none;
-  }
-
+  /* 共享控件在强制配色下的外观统一在 controls/designer-controls-adaptivity.css。 */
   .material-group-button[aria-pressed="true"] .material-group-glyph {
     color: HighlightText;
   }

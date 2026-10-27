@@ -1,4 +1,5 @@
 import actionsCss from './designer-controls-actions.css?inline';
+import adaptivityCss from './designer-controls-adaptivity.css?inline';
 import colorPaletteCss from './designer-controls-color-palette.css?inline';
 import dateFieldCss from './designer-controls-date-field.css?inline';
 import descriptorCss from './designer-controls-descriptor.css?inline';
@@ -18,4 +19,5 @@ export const DESIGNER_CONTROLS_CSS = [
   actionsCss,
   tabsCss,
   descriptorCss,
+  adaptivityCss,
 ].join('\n');

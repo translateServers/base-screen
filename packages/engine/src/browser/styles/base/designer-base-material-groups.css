@@ -233,12 +233,6 @@
   transform: translateZ(0);
 }
 
-.material-group-navigation .designer-button:focus-visible,
-.material-group-popover .designer-button:focus-visible {
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: -3px;
-}
-
 /* 工具栏切换按钮（窄容器时替代内联导航）。 */
 .material-library-toolbar .material-group-toggle {
   display: none;
@@ -296,13 +290,6 @@
   border-bottom: 1px solid var(--designer-border-subtle);
   color: var(--designer-text-secondary);
   font: var(--designer-font-small);
-}
-
-.material-group-popover-heading .designer-button {
-  width: 24px;
-  height: 24px;
-  min-height: 24px;
-  padding: 0;
 }
 
 .material-group-popover .material-group-navigation {

@@ -197,3 +197,13 @@
   color: inherit;
   font-weight: 500;
 }
+
+/* 数据源字段选项：标签单行省略并强调（原 workbench 覆写）。 */
+.designer-dataset-field-option .designer-field-label-text {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

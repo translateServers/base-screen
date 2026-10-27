@@ -30,9 +30,10 @@
   grid-template-columns: 28px minmax(0, 1fr) 26px;
   flex: none;
   align-items: start;
-  gap: 10px;
+  gap: calc(var(--designer-space-4) + var(--designer-space-1));
   min-width: 0;
-  padding: 14px 14px 12px;
+  padding: calc(var(--designer-space-5) + var(--designer-space-1))
+    calc(var(--designer-space-5) + var(--designer-space-1)) var(--designer-space-5);
   border-bottom: 1px solid var(--designer-border-subtle);
 }
 
@@ -79,13 +80,13 @@
 .variable-inspector-head-copy {
   display: grid;
   min-width: 0;
-  gap: 2px;
+  gap: var(--designer-space-1);
 }
 
 .variable-inspector-eyebrow {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: calc(var(--designer-space-2) + 1px);
   min-width: 0;
   color: var(--designer-text-muted);
   font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-numeric);
@@ -121,7 +122,7 @@
   width: 26px;
   height: 26px;
   min-height: 26px;
-  margin-top: -2px;
+  margin-top: calc(-1 * var(--designer-space-1));
   padding: 0;
 }
 
@@ -129,7 +130,8 @@
   flex: 1;
   min-height: 0;
   overflow: hidden auto;
-  padding: 12px 14px 16px;
+  padding: var(--designer-space-5) calc(var(--designer-space-5) + var(--designer-space-1))
+    var(--designer-space-6);
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }
@@ -138,8 +140,9 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
+  gap: var(--designer-space-3);
+  padding: calc(var(--designer-space-4) + var(--designer-space-1))
+    calc(var(--designer-space-5) + var(--designer-space-1));
   border-top: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-raised);
 }
@@ -153,7 +156,7 @@
   width: 100%;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: var(--designer-space-3);
   padding: 0;
   background: transparent;
 }
@@ -164,8 +167,9 @@
 
 .variable-inspector-card > .variable-error-summary {
   flex: none;
-  margin: 10px 14px 0;
-  padding: 8px;
+  margin: calc(var(--designer-space-4) + var(--designer-space-1))
+    calc(var(--designer-space-5) + var(--designer-space-1)) 0;
+  padding: var(--designer-space-4);
   border-radius: var(--designer-radius-3);
   background: color-mix(
     in srgb,
@@ -186,18 +190,18 @@
   margin: 0;
   padding: 0;
   border-top: 0;
-  gap: 14px;
+  gap: calc(var(--designer-space-5) + var(--designer-space-1));
 }
 
 .variable-detail-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: var(--designer-space-2);
 }
 
 .variable-detail-chip {
-  padding: 1px 7px;
+  padding: 1px calc(var(--designer-space-3) + 1px);
   border-radius: var(--designer-radius-pill);
   background: var(--designer-surface-control);
   color: var(--designer-text-secondary);
@@ -212,8 +216,9 @@
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   align-items: start;
-  gap: 5px;
-  padding: 9px 10px;
+  gap: calc(var(--designer-space-2) + 1px);
+  padding: calc(var(--designer-space-4) + 1px)
+    calc(var(--designer-space-4) + var(--designer-space-1));
   border: 0;
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
@@ -231,7 +236,7 @@
   grid-column: 1;
   grid-row: 1;
   align-items: center;
-  gap: 6px;
+  gap: var(--designer-space-3);
   color: var(--designer-text-muted);
   font: 500 var(--designer-font-size-xs) / 1.5 var(--designer-font-numeric);
   letter-spacing: 0.06em;
@@ -239,7 +244,7 @@
 }
 
 .variable-detail-value-type {
-  padding: 1px 5px;
+  padding: 1px calc(var(--designer-space-2) + 1px);
   border-radius: var(--designer-radius-pill);
   background: var(--designer-surface-raised);
   color: var(--designer-text-muted);
@@ -275,7 +280,7 @@
 
 .variable-inspector-scroll .variable-detail-line {
   grid-template-columns: 66px minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--designer-space-4);
 }
 
 .variable-inspector-scroll .variable-detail-label {
@@ -338,7 +343,7 @@
 }
 
 .variable-inspector-scroll .variable-preview strong {
-  padding: 5px 8px;
+  padding: calc(var(--designer-space-2) + 1px) var(--designer-space-4);
   border-bottom: 1px solid var(--designer-border-subtle);
   color: var(--designer-text-secondary);
   font-size: var(--designer-font-size-xs);
@@ -347,7 +352,7 @@
 
 .variable-inspector-scroll .variable-preview pre {
   max-height: 104px;
-  padding: 7px 8px;
+  padding: calc(var(--designer-space-3) + 1px) var(--designer-space-4);
   overflow: hidden auto;
   color: var(--designer-text-secondary);
   font: 500 var(--designer-font-size-xs) / 1.65 var(--designer-font-numeric);
@@ -372,7 +377,7 @@
   display: grid;
   width: 148px;
   min-width: 0;
-  padding: 4px;
+  padding: var(--designer-space-2);
   border: 0;
   border-radius: var(--designer-radius-4);
   background: var(--designer-surface-overlay);
@@ -383,10 +388,10 @@
 .variable-row-menu-item {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: calc(var(--designer-space-3) + 1px);
   width: 100%;
   min-height: 29px;
-  padding: 0 8px;
+  padding: 0 var(--designer-space-4);
   border: 0;
   border-radius: var(--designer-radius-3);
   background: transparent;

@@ -1,0 +1,32 @@
+/* 强制配色下共享控件的可访问性外观。
+   浏览器特性适配的其余部分（滚动条、面板滚动区域）仍在 base-adaptivity；
+   但控件外观只有一个落点——控件层，避免 base/workbench 出现第二套控件定义。 */
+@media (forced-colors: active) {
+  .designer-control:focus-visible,
+  .designer-tab:focus-visible,
+  .designer-checkbox:focus-visible,
+  .designer-switch:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  .designer-control[aria-invalid="true"] {
+    outline: 2px solid Mark;
+    outline-offset: 2px;
+  }
+
+  .designer-button[aria-pressed="true"],
+  .designer-tab[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .material-group-navigation .material-group-button[aria-pressed="true"],
+  .material-group-navigation .material-group-button[aria-pressed="true"]:hover:not(:disabled),
+  .material-filters .designer-button[aria-pressed="true"],
+  .material-categories .designer-button[aria-pressed="true"] {
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: none;
+  }
+}

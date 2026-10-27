@@ -8,7 +8,7 @@
   box-sizing: border-box;
   height: var(--designer-segmented-height);
   gap: 1px;
-  padding: 2px;
+  padding: var(--designer-space-1);
   border: 0;
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-workspace);

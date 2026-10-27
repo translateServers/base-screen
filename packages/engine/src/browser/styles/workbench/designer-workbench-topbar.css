@@ -81,8 +81,8 @@
   display: inline-flex;
   min-height: 32px;
   align-items: center;
-  gap: 2px;
-  padding: 2px;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-1);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-workspace);
   box-shadow: var(--designer-elev-ring);
@@ -96,7 +96,7 @@
   min-height: 28px;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: calc(var(--designer-space-2) + 1px);
   padding: 0 var(--designer-space-5);
   border: 1px solid transparent;
   border-radius: var(--designer-radius-2);
@@ -146,7 +146,7 @@ button.topbar-mode-button:disabled {
 .topbar-segment {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--designer-space-1);
   flex: none;
 }
 
@@ -156,13 +156,6 @@ button.topbar-mode-button:disabled {
 
 .designer-tool-cluster {
   flex: none;
-}
-
-.designer-tool-cluster .designer-tool-button[aria-pressed="true"] {
-  border-color: transparent;
-  background: var(--designer-surface-control-active);
-  color: var(--designer-text-primary);
-  box-shadow: inset 0 0 0 1px var(--designer-border-active);
 }
 
 .zoom-value {
@@ -271,7 +264,7 @@ button.topbar-mode-button:disabled {
 
 .topbar-search-trigger kbd {
   flex: none;
-  padding: 1px 5px;
+  padding: 1px calc(var(--designer-space-2) + 1px);
   border: 1px solid var(--designer-border-default);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-workspace);
@@ -343,7 +336,7 @@ button.topbar-mode-button:disabled {
   right: -2px;
   min-width: 14px;
   height: 14px;
-  padding: 0 3px;
+  padding: 0 calc(var(--designer-space-1) + 1px);
   border-radius: var(--designer-radius-4);
   background: var(--designer-danger);
   color: var(--designer-surface-panel);
@@ -601,7 +594,7 @@ button.topbar-mode-button:disabled {
   justify-content: flex-start;
   gap: 1px;
   overflow: hidden;
-  padding: 2px;
+  padding: var(--designer-space-1);
 }
 
 .designer-menu-trigger {
@@ -655,8 +648,8 @@ button.topbar-mode-button:disabled {
   justify-content: center;
   min-height: 26px;
   height: 26px;
-  gap: 4px;
-  padding: 0 8px;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-4);
   border: 1px solid transparent;
   border-radius: var(--designer-radius-3);
   background: transparent;
