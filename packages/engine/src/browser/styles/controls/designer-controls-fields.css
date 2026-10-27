@@ -28,10 +28,54 @@
   min-height: var(--designer-control-height-compact);
 }
 
-.designer-field-label {
+/* 省略只属于标签文本。字段行本身若 nowrap，说明/错误等附加行会被继承成不换行。 */
+.designer-field-label-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 字段行骨架：标签列 74px + 控件列 1fr。这是 `.designer-field` 的共享语义，
+   右栏检查器、页面配置、变量检查器浮层都走同一行结构；上下文按需覆盖
+   （堆叠字段、表格参数、画布缩放、开关行）。此前只写在右栏作用域里，
+   变量浮层因此退回单列堆叠，字体与行高也跟着另一套档位。
+   标签文本的字体与颜色从字段行继承，上下文仍可用更低特异性覆盖
+   `.designer-field-label-text`，不会被骨架提权压掉。 */
+.designer-field:has(> .designer-field-control) {
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  min-height: 34px;
+  overflow: visible;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font);
+}
+
+/* 骨架的第二行（说明、错误、行内操作）横跨两列。字段构建器把附加行直接挂在字段上，
+   不逐个补 grid-column，也不让它们掉进 74px 标签列。 */
+.designer-field:has(> .designer-field-control)
+> :not(.designer-field-label-text, .designer-field-control) {
+  grid-column: 1 / -1;
+}
+
+.designer-field-control {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-2);
+}
+
+.designer-field-control > .designer-input,
+.designer-field-control > .designer-select-control,
+.designer-field-control > .designer-color-palette,
+.designer-field-control > .designer-textarea {
+  width: 100%;
+}
+
+/* 长控件（取色器、文本域）标签在上、控件在下。 */
+.designer-field-stacked {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
 }
 
 .designer-field-toggle-copy {

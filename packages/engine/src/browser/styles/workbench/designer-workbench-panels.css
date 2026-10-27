@@ -233,10 +233,6 @@
   margin: 0 12px 12px 36px;
 }
 
-.inspector-search-result-editor.designer-field-label {
-  overflow: visible;
-}
-
 .inspector-search-context-menu {
   position: absolute;
   top: 42px;

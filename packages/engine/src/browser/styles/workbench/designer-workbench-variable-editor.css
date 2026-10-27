@@ -368,6 +368,13 @@
   color: var(--designer-danger-text);
 }
 
+/* 变量表单的标签名比右栏检查器长（“说明（可选）”“自动更新频率”），共享的 74px 标签列
+   会把它们截断；这里只加宽标签列，行骨架、字段字体与控件档位仍由控件层提供。 */
+.variable-editor .designer-field:has(> .designer-field-control),
+.variable-row[data-variable-editor] .designer-field:has(> .designer-field-control) {
+  grid-template-columns: 84px minmax(0, 1fr);
+}
+
 .variable-input-wrap {
   position: relative;
   min-width: 0;

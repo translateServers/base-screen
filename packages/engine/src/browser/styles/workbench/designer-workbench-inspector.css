@@ -466,53 +466,18 @@
   background: var(--designer-surface-panel);
 }
 
-/* 字段行（原型 .insp-row / .insp-field）：标签列固定 74px，控件列吃满剩余宽度。
-   连续数值字段（字号/行高…）的滑杆 + 数字、自绘下拉都落在同一控件列。 */
+/* 字段行骨架（标签列 + 控件列）在控件层 designer-controls-fields.css；
+   右栏只保留面板密度与换行策略。 */
 .properties .inspector-pane .designer-field {
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
-  align-items: center;
   gap: var(--designer-space-2);
   margin-bottom: var(--designer-space-2);
-  overflow: visible;
   white-space: normal;
 }
 
-.properties .inspector-pane .designer-field-label {
-  overflow: visible;
-}
-
-.properties .inspector-pane .designer-field-label-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.properties .inspector-pane .designer-field-control {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--designer-space-2);
-}
-
-.properties .inspector-pane .designer-field-control > .designer-input,
-.properties .inspector-pane .designer-field-control > .designer-select-control,
-.properties .inspector-pane .designer-field-control > .designer-color-palette,
-.properties .inspector-pane .designer-field-control > .designer-textarea {
-  width: 100%;
-}
-
+/* 字段附加行横跨两列由控件骨架负责，这里只收紧它与控件列的间距。 */
 .properties .inspector-pane .designer-field-message {
-  grid-column: 1 / -1;
   margin-top: calc(var(--designer-space-1) * -1);
-}
-
-/* 长控件（取色器、文本域）标签在上、控件在下，与原型 .insp-field 同构。 */
-.properties .inspector-pane .designer-field-stacked {
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-  gap: var(--designer-space-2);
 }
 
 .properties .inspector-pane .designer-descriptor-help {
