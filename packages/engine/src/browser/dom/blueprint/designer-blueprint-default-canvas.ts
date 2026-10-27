@@ -17,6 +17,7 @@ import {
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerIconName } from '../../ui/designer-icons.js';
 import { designerIcon } from '../../ui/designer-icons.js';
+import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
   createDesignerButton,
   createDesignerIconButton,
@@ -337,7 +338,7 @@ export function createDesignerBlueprintDefaultCanvas(
   simulationContent.className = 'designer-blueprint-canvas-simulation-content';
   const simulationControls = ownerDocument.createElement('div');
   simulationControls.className = 'designer-blueprint-canvas-simulation-controls';
-  const eventLabel = ownerDocument.createElement('label');
+  const eventLabel = ownerDocument.createElement('div');
   eventLabel.className = 'designer-blueprint-canvas-simulation-field';
   const eventLabelText = ownerDocument.createElement('span');
   eventLabelText.textContent = text.simulationEventLabel;
@@ -346,7 +347,8 @@ export function createDesignerBlueprintDefaultCanvas(
     className: 'designer-blueprint-canvas-simulation-select',
   });
   eventSelect.dataset.canvasSimulationEvent = 'true';
-  eventLabel.append(eventLabelText, eventSelect);
+  const eventSelectControl = enhanceDesignerSelect(eventSelect);
+  eventLabel.append(eventLabelText, eventSelectControl.element);
   const payloadLabel = ownerDocument.createElement('label');
   payloadLabel.className = 'designer-blueprint-canvas-simulation-field';
   const payloadLabelText = ownerDocument.createElement('span');
@@ -1109,6 +1111,7 @@ export function createDesignerBlueprintDefaultCanvas(
       option.value = '';
       eventSelect.append(option);
       eventSelect.disabled = true;
+      eventSelectControl.refresh();
       runButton.disabled = true;
       return;
     }
@@ -1124,6 +1127,7 @@ export function createDesignerBlueprintDefaultCanvas(
     } else if (previous !== '') {
       eventSelect.value = options[0]?.value ?? '';
     }
+    eventSelectControl.refresh();
     runButton.disabled = eventSelect.value === '';
   }
 

@@ -778,9 +778,8 @@
   font-size: var(--designer-font-size-xs);
 }
 
-.designer-blueprint-canvas-simulation-select {
-  height: var(--designer-control-height-compact);
-  font-size: var(--designer-font-size-xs);
+.designer-blueprint-canvas-simulation-field .designer-select-trigger {
+  font-size: var(--designer-font-size-sm);
 }
 
 .designer-blueprint-canvas-simulation-payload {
@@ -816,7 +815,7 @@
 }
 
 .designer-blueprint-canvas-simulation-run {
-  height: var(--designer-control-height-compact);
+  height: var(--designer-control-height);
   font-size: var(--designer-font-size-sm);
 }
 

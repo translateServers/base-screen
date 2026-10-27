@@ -14,6 +14,8 @@ export interface DesignerSelectControlHandle {
   readonly element: HTMLDivElement;
   /** 原生 select（值载体，保持原契约）。 */
   readonly select: HTMLSelectElement;
+  /** 原生 select 的选项被重建后调用：镜像选项、同步触发器与禁用态。 */
+  refresh(): void;
 }
 
 const SELECT_POPOVER_GAP = 16;
@@ -46,27 +48,31 @@ export function enhanceDesignerSelect(select: HTMLSelectElement): DesignerSelect
   menu.hidden = true;
 
   // 选项镜像自原生 select（DOM 替身可能不实现 options，取空表即可，值仍走原生元素）。
-  const optionButtons: HTMLButtonElement[] = [];
-  for (const option of Array.from(select.options ?? [])) {
-    const button = ownerDocument.createElement('button');
-    button.type = 'button';
-    button.className = 'designer-select-option';
-    button.setAttribute('role', 'option');
-    button.dataset.value = option.value;
-    button.disabled = option.disabled;
-    const text = ownerDocument.createElement('span');
-    text.textContent = option.textContent;
-    const check = ownerDocument.createElement('span');
-    check.className = 'designer-select-check';
-    check.innerHTML = designerIcon('check');
-    button.appendChild(text);
-    button.appendChild(check);
-    menu.appendChild(button);
-    optionButtons.push(button);
-  }
-  optionButtons.forEach((button, index) => {
-    button.addEventListener('click', () => choose(index));
-  });
+  let optionButtons: HTMLButtonElement[] = [];
+  const mirrorOptions = (): void => {
+    menu.replaceChildren();
+    optionButtons = [];
+    for (const option of Array.from(select.options ?? [])) {
+      const button = ownerDocument.createElement('button');
+      button.type = 'button';
+      button.className = 'designer-select-option';
+      button.setAttribute('role', 'option');
+      button.dataset.value = option.value;
+      button.disabled = option.disabled;
+      const text = ownerDocument.createElement('span');
+      text.textContent = option.textContent;
+      const check = ownerDocument.createElement('span');
+      check.className = 'designer-select-check';
+      check.innerHTML = designerIcon('check');
+      button.appendChild(text);
+      button.appendChild(check);
+      menu.appendChild(button);
+      optionButtons.push(button);
+    }
+    optionButtons.forEach((button, index) => {
+      button.addEventListener('click', () => choose(index));
+    });
+  };
 
   select.className =
     select.className === ''
@@ -194,6 +200,12 @@ export function enhanceDesignerSelect(select: HTMLSelectElement): DesignerSelect
       choose(index);
     }
   });
+  const refresh = (): void => {
+    close(false);
+    mirrorOptions();
+    trigger.disabled = select.disabled;
+    sync();
+  };
   const onDocumentPointerDown = (event: Event): void => {
     // 面板重渲染整段替换 DOM：顺带回收域外监听，避免每次重渲染留一份。
     if (!element.isConnected) {
@@ -211,6 +223,7 @@ export function enhanceDesignerSelect(select: HTMLSelectElement): DesignerSelect
   element.appendChild(trigger);
   element.appendChild(menu);
   element.appendChild(select);
+  mirrorOptions();
   sync();
-  return { element, select };
+  return { element, select, refresh };
 }
