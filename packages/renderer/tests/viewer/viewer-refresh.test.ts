@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { relationsFromRules } from '../__fixtures__/blueprint-relations.js';
 import {
   component,
   createDeferredResourcePort,
@@ -422,7 +423,7 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
         hostVariable('page', 'page'),
       ],
       {
-        rules: [
+        relations: relationsFromRules([
           {
             id: 'set-region',
             trigger: { type: 'material-event', componentId: 'trigger', eventName: 'change' },
@@ -434,7 +435,7 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
               },
             ],
           },
-        ],
+        ]),
       },
     );
     const { mount } = await createViewerHarness({
@@ -442,6 +443,25 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
       document: screen,
       resourcePort: resources.port,
       variablePort: variables.port,
+      runtimeContributions: {
+        getResourceType: (resourceType: string) =>
+          resourceType === 'dataset'
+            ? {
+                kind: 'dataResourceType' as const,
+                id: 'dataset',
+                name: 'Dataset',
+                configSchema: {
+                  kind: 'object' as const,
+                  properties: {
+                    region: { kind: 'string' as const },
+                    page: { kind: 'number' as const },
+                  },
+                  required: [],
+                },
+              }
+            : undefined,
+        hasBlueprintCapability: () => true,
+      },
     });
     await flush();
 

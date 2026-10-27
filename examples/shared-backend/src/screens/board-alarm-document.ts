@@ -627,38 +627,36 @@ export const BOARD_ALARM_DOCUMENT = {
     },
   ],
   blueprint: {
-    // 两条规则形态一致：选择器 rowClick → set-variable；`event-payload` 路径取自物料
+    // 两条关系形态一致：选择器 rowClick → set-variable；`event-payload` 路径取自物料
     // 事件 payload 的 `{ rowIndex, row }`。
-    rules: [
+    relations: [
       {
+        type: 'behavior' as const,
         id: 'rule-line',
-        trigger: {
-          type: 'material-event' as const,
+        source: {
+          kind: 'component' as const,
           componentId: 'sel-line',
-          eventName: 'rowClick',
+          event: { type: 'material-event' as const, eventName: 'rowClick' },
         },
-        actions: [
-          {
-            type: 'set-variable' as const,
-            variableId: 'line',
-            value: { kind: 'event-payload' as const, path: ['row', 'line'] },
-          },
-        ],
+        target: { kind: 'variable' as const, variableId: 'line' },
+        effect: {
+          type: 'set-variable' as const,
+          value: { kind: 'event-payload' as const, path: ['row', 'line'] },
+        },
       },
       {
+        type: 'behavior' as const,
         id: 'rule-severity',
-        trigger: {
-          type: 'material-event' as const,
+        source: {
+          kind: 'component' as const,
           componentId: 'sel-severity',
-          eventName: 'rowClick',
+          event: { type: 'material-event' as const, eventName: 'rowClick' },
         },
-        actions: [
-          {
-            type: 'set-variable' as const,
-            variableId: 'severity',
-            value: { kind: 'event-payload' as const, path: ['row', 'level'] },
-          },
-        ],
+        target: { kind: 'variable' as const, variableId: 'severity' },
+        effect: {
+          type: 'set-variable' as const,
+          value: { kind: 'event-payload' as const, path: ['row', 'level'] },
+        },
       },
     ],
   },

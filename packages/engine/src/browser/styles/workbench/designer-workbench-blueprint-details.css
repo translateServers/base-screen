@@ -66,7 +66,7 @@
   overflow: hidden;
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -114,10 +114,10 @@
 .blueprint-palette-group > header span {
   min-width: 18px;
   padding: 0 var(--designer-space-1);
-  border-radius: 7px;
+  border-radius: var(--designer-radius-4);
   background: var(--designer-surface-control);
   font: var(--designer-font-numeric);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
   line-height: 14px;
   text-align: center;
 }
@@ -128,23 +128,13 @@
 }
 
 .blueprint-palette-item {
-  --blueprint-palette-row-surface: transparent;
-
   position: relative;
   box-sizing: border-box;
   min-width: 0;
-  min-height: 44px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 28px;
   align-items: stretch;
-  margin-bottom: 2px;
-  border: 0;
-  border-radius: var(--designer-radius-control);
-  background-color: var(--blueprint-palette-row-surface);
-  color: var(--designer-text-secondary);
-  transition:
-    background-color var(--designer-motion),
-    box-shadow var(--designer-motion);
+  margin-bottom: var(--designer-space-1);
 }
 
 .blueprint-palette-item[draggable="true"] {
@@ -162,13 +152,8 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-.blueprint-palette-item:hover:not([data-disabled="true"]),
 .blueprint-palette-item:focus-within {
-  --blueprint-palette-row-surface: var(--designer-surface-control-hover);
-}
-
-.blueprint-palette-item[data-disabled="true"] {
-  opacity: 0.52;
+  --designer-list-row-surface: var(--designer-surface-control-hover);
 }
 
 .blueprint-palette-primary,
@@ -200,12 +185,6 @@
   outline: none;
 }
 
-.blueprint-palette-item:has(.blueprint-palette-primary:focus-visible),
-.blueprint-palette-item:has(.blueprint-palette-action:focus-visible) {
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: -2px;
-}
-
 .blueprint-palette-primary > span:nth-child(2) {
   min-width: 0;
   display: grid;
@@ -228,7 +207,7 @@
 .blueprint-palette-primary small {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
 }
 
 .blueprint-palette-primary em {
@@ -238,17 +217,34 @@
   background: color-mix(in srgb, var(--designer-border-default) 32%, transparent);
   color: var(--designer-accent);
   font: var(--designer-font-small);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
   font-style: normal;
+}
+
+.blueprint-palette-primary .blueprint-palette-counts {
+  min-height: 16px;
+  padding: 0 var(--designer-space-1);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  font-style: normal;
+  white-space: nowrap;
 }
 
 .blueprint-palette-glyph {
   display: inline-grid;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+  color: var(--designer-text-secondary);
   place-items: center;
-  color: var(--designer-text-muted);
-  transition: color var(--designer-motion);
+  transition:
+    background-color var(--designer-motion),
+    color var(--designer-motion);
 }
 
 .blueprint-palette-glyph svg,
@@ -258,19 +254,11 @@
   height: 12px;
 }
 
-.blueprint-palette-item:hover .blueprint-palette-glyph {
-  color: var(--designer-text-secondary);
-}
-
-.blueprint-palette-item[data-placed="true"] .blueprint-palette-glyph {
-  color: var(--designer-accent);
-}
-
 .blueprint-palette-action {
   display: grid;
   width: 28px;
   place-items: center;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   color: var(--designer-text-muted);
 }
 
@@ -289,7 +277,7 @@
 
 .blueprint-library-hint {
   padding: 0 var(--designer-space-1);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
 }
 
 .blueprint-inspector-shell {
@@ -317,7 +305,7 @@
   place-items: center;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: transparent;
   color: var(--designer-text-muted);
   cursor: pointer;
@@ -352,11 +340,11 @@
   min-width: 14px;
   height: 14px;
   padding: 0 3px;
-  border-radius: 7px;
+  border-radius: var(--designer-radius-4);
   background: var(--designer-danger);
   color: var(--designer-text-on-accent);
   font: var(--designer-font-numeric);
-  font-size: 8px;
+  font-size: var(--designer-font-size-xs);
   font-style: normal;
   line-height: 14px;
   text-align: center;
@@ -372,30 +360,6 @@
 
 .blueprint-inspector-section {
   margin: 0;
-  border-bottom: 1px solid var(--designer-border-subtle);
-}
-
-.blueprint-inspector-section > header {
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--designer-space-3);
-  padding: 0 var(--designer-space-3);
-  background: color-mix(in srgb, var(--designer-surface-raised) 74%, var(--designer-surface-panel));
-}
-
-.blueprint-inspector-section > header h3 {
-  margin: 0;
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  font-weight: 600;
-}
-
-.blueprint-inspector-section > header svg {
-  width: 12px;
-  height: 12px;
-  color: var(--designer-text-muted);
 }
 
 .blueprint-inspector-section-content {
@@ -450,7 +414,7 @@
   gap: 2px;
   padding: var(--designer-space-2);
   border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-raised);
 }
 
@@ -464,7 +428,7 @@
 
 .blueprint-inspector-pair small {
   color: var(--designer-text-muted);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
 }
 
 .blueprint-inspector-pair strong {
@@ -505,7 +469,7 @@
   gap: var(--designer-space-2);
   padding: var(--designer-space-1) var(--designer-space-2);
   border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-raised);
 }
 
@@ -518,7 +482,7 @@
   background: var(--designer-accent-surface);
   color: var(--designer-accent);
   font: var(--designer-font-numeric);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
   font-style: normal;
 }
 
@@ -541,7 +505,7 @@
 .blueprint-action-summary-list small,
 .blueprint-port-list small {
   color: var(--designer-text-muted);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
 }
 
 .blueprint-port-list > span {
@@ -569,7 +533,6 @@
   margin: var(--designer-space-4) var(--designer-space-3);
 }
 
-.blueprint-inspector-shell .blueprint-inspector-empty,
 .blueprint-inspector-shell .blueprint-inspector-status {
   padding: var(--designer-space-5) var(--designer-space-4);
 }
@@ -588,3 +551,5 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* 组件列表按容器父子缩进，表达结构层级（只读）；缩进外观归 chrome 层。 */

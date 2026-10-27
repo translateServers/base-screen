@@ -66,7 +66,7 @@ describe('engine default blueprint canvas', () => {
     expect(css).toMatch(
       /\.designer-blueprint-canvas-port\s*\{[^}]*width: 24px;[^}]*height: 24px;/s,
     );
-    expect(css).toMatch(/background-size:\s*120px 120px,\s*24px 24px;/);
+    expect(css).toMatch(/background-size:\s*20px 20px;/);
     expect(css).toContain('.designer-blueprint-canvas-viewport[data-zoom-far="true"]');
   });
 

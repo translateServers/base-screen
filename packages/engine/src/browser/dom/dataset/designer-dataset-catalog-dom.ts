@@ -2,7 +2,11 @@ import type { ScreenDatasetEntry } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
-import { createDesignerInput, createDesignerSelect } from '../designer-ui-primitives.js';
+import {
+  createDesignerButton,
+  createDesignerInput,
+  createDesignerSelect,
+} from '../designer-ui-primitives.js';
 import { createDataGroup } from './designer-data-group-dom.js';
 import type {
   DesignerDataSourcePanelOptions,
@@ -56,11 +60,10 @@ export function renderHostConnection(options: DesignerDataSourcePanelOptions): H
     connection.appendChild(hint);
   }
   if (hasFailedLink(options.link)) {
-    const retry = ownerDocument.createElement('button');
-    retry.type = 'button';
-    retry.className = 'designer-control designer-button';
+    const retry = createDesignerButton(ownerDocument, {
+      text: DESIGNER_UI_TEXT.dataSource.linkRetry,
+    });
     retry.dataset.datasetAction = 'retry-link';
-    retry.textContent = DESIGNER_UI_TEXT.dataSource.linkRetry;
     connection.appendChild(retry);
   }
   return connection;
@@ -183,11 +186,10 @@ export function renderDatasetPickerPlaceholder(
   const empty = ownerDocument.createElement('p');
   empty.className = 'designer-empty-state';
   empty.textContent = DESIGNER_UI_TEXT.dataSource.pickerPlaceholder;
-  const open = ownerDocument.createElement('button');
-  open.type = 'button';
-  open.className = 'designer-control designer-button';
+  const open = createDesignerButton(ownerDocument, {
+    text: DESIGNER_UI_TEXT.dataSource.sourceChange,
+  });
   open.dataset.datasetChange = 'true';
-  open.textContent = DESIGNER_UI_TEXT.dataSource.sourceChange;
   placeholder.append(empty, open);
   return placeholder;
 }
@@ -271,11 +273,10 @@ export function renderDatasetCatalogResults(options: DesignerDataSourcePanelOpti
     }
   }
   if (options.cursor !== undefined) {
-    const button = ownerDocument.createElement('button');
-    button.type = 'button';
-    button.className = 'designer-control designer-button';
+    const button = createDesignerButton(ownerDocument, {
+      text: DESIGNER_UI_TEXT.dataset.loadMore,
+    });
     button.dataset.datasetLoadMore = 'true';
-    button.textContent = DESIGNER_UI_TEXT.dataset.loadMore;
     results.appendChild(button);
   }
   return results;
@@ -307,16 +308,13 @@ function datasetItem(
   item: ScreenDatasetEntry,
   selected: DesignerDataSourcePanelOptions['descriptor'],
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button designer-dataset-item';
-  button.dataset.datasetResourceId = item.datasetId;
   const current = selected?.datasetId === item.datasetId;
-  button.setAttribute('aria-pressed', String(current));
-  button.setAttribute(
-    'aria-label',
-    item.description === null ? item.name : item.name + '：' + item.description,
-  );
+  const button = createDesignerButton(ownerDocument, {
+    ariaLabel: item.description === null ? item.name : item.name + '：' + item.description,
+    className: 'designer-dataset-item',
+    pressed: current,
+  });
+  button.dataset.datasetResourceId = item.datasetId;
   // 设计稿 .catalog-item：图标列 + 三行文案（名称 / key / 描述）+ 右侧动作。
   // 名称行带「当前」标记是必要的：列表里点过项之后，光看高亮分不清是 hover 还是已绑定。
   const glyph = ownerDocument.createElement('span');

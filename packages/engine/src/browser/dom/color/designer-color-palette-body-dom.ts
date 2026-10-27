@@ -1,5 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../../ui/designer-icons.js';
+import { createDesignerIconButton } from '../designer-ui-primitives.js';
 import {
   type ColorPaletteState,
   cacheColorPaletteHue,
@@ -245,13 +245,11 @@ function colorPaletteActionButton(
   label: string,
   icon: 'plus' | 'trash',
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className =
-    'designer-control designer-button designer-icon-button designer-color-palette-action';
+  const button = createDesignerIconButton(ownerDocument, {
+    className: 'designer-color-palette-action',
+    icon,
+    label,
+  });
   button.dataset.colorPaletteAction = action;
-  button.setAttribute('aria-label', label);
-  button.setAttribute('data-tip', label);
-  button.innerHTML = designerIcon(icon);
   return button;
 }

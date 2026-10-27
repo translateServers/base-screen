@@ -41,7 +41,7 @@
 .direct-preview::-webkit-scrollbar-thumb,
 .project-workspace::-webkit-scrollbar-thumb {
   background: var(--designer-scrollbar-thumb);
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
 }
 
 .designer-menu .designer-submenu::-webkit-scrollbar-thumb:hover,
@@ -136,7 +136,7 @@
   min-height: 30px;
   padding: 0 var(--designer-space-4);
   border: 0;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: transparent;
   box-shadow: none;
   color: var(--designer-text-primary);

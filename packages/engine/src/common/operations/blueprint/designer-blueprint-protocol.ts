@@ -130,30 +130,17 @@ export function parseBaseScreenBlueprintCanvasCommand(
           ...(position.value === undefined ? {} : { position: position.value }),
         });
       }
-      if (
-        input.kind !== 'condition' &&
-        input.kind !== 'set-variable' &&
-        input.kind !== 'emit-host-event'
-      ) {
+      if (input.kind !== 'host') {
         return failure([], 'Blueprint insert command is invalid.');
       }
-      const allowed = new Set([
-        ...COMMON_FIELDS,
-        'kind',
-        'position',
-        ...(input.kind === 'set-variable' ? ['variableId'] : []),
-      ]);
-      const unknown = firstUnknownField(input, allowed);
+      const unknown = firstUnknownField(input, new Set([...COMMON_FIELDS, 'kind', 'position']));
       if (unknown !== undefined) return failure([unknown], 'Unknown insert command field.');
       const position = parseOptionalPosition(input.position);
-      if (!position.ok || (input.variableId !== undefined && !isIdentifier(input.variableId))) {
-        return failure([], 'Blueprint insert command is invalid.');
-      }
+      if (!position.ok) return failure([], 'Blueprint insert command is invalid.');
       return success({
         ...base,
         type: input.type,
         kind: input.kind,
-        ...(input.variableId === undefined ? {} : { variableId: input.variableId }),
         ...(position.value === undefined ? {} : { position: position.value }),
       });
     }

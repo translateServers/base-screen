@@ -41,18 +41,19 @@ export function collectCatalogCompatibilityDiagnostics(
   }
 
   const componentsById = new Map(document.components.map((component) => [component.id, component]));
-  const rules = document.blueprint?.rules ?? [];
-  for (let ruleIndex = 0; ruleIndex < rules.length; ruleIndex++) {
-    const trigger = rules[ruleIndex]!.trigger;
-    if (trigger.type !== 'material-event') continue;
-    const component = componentsById.get(trigger.componentId);
+  const relations = document.blueprint.relations;
+  for (let relationIndex = 0; relationIndex < relations.length; relationIndex++) {
+    const relation = relations[relationIndex]!;
+    if (relation.type !== 'behavior' || relation.source.kind !== 'component') continue;
+    const source = relation.source;
+    const component = componentsById.get(source.componentId);
     if (component === undefined || !changedTypes.has(component.type)) continue;
     const entry = catalog.get(component.type);
-    if (entry === undefined || entry.manifest.events.includes(trigger.eventName)) continue;
+    if (entry === undefined || entry.manifest.events.includes(source.event.eventName)) continue;
     diagnostics.push({
       severity: 'error',
       code: 'PLUGIN_CORE_EVENT_PAYLOAD_INVALID',
-      path: ['blueprint', 'rules', ruleIndex, 'trigger', 'eventName'],
+      path: ['blueprint', 'relations', relationIndex, 'source', 'event', 'eventName'],
       message: 'Blueprint references an event that is no longer declared by the material.',
     });
   }

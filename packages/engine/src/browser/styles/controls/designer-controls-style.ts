@@ -6,6 +6,7 @@ import fieldsCss from './designer-controls-fields.css?inline';
 import inputsCss from './designer-controls-inputs.css?inline';
 import quickStyleCss from './designer-controls-quick-style.css?inline';
 import segmentedCss from './designer-controls-segmented.css?inline';
+import tabsCss from './designer-controls-tabs.css?inline';
 
 export const DESIGNER_CONTROLS_CSS = [
   fieldsCss,
@@ -15,5 +16,6 @@ export const DESIGNER_CONTROLS_CSS = [
   segmentedCss,
   quickStyleCss,
   actionsCss,
+  tabsCss,
   descriptorCss,
 ].join('\n');

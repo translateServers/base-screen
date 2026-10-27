@@ -14,13 +14,20 @@ import type {
 
 /** 一条迁移决策：旧文档中的位置、做了什么、以及（若有）新建实例的 id。 */
 export interface ScreenMigrationDecision {
-  readonly kind: 'component-value' | 'component-binding' | 'variable' | 'parameter';
+  readonly kind:
+    | 'component-value'
+    | 'component-binding'
+    | 'variable'
+    | 'parameter'
+    | 'blueprint-relation'
+    | 'blueprint-layout';
   /** 旧文档中的位置。 */
   readonly path: readonly (string | number)[];
   readonly action: 'mapped' | 'renamed' | 'rejected';
   /** 人类可读说明，不进诊断。 */
   readonly detail: string;
   readonly createdDataSourceId?: string;
+  readonly createdRelationIds?: readonly string[];
 }
 
 /**
@@ -60,9 +67,15 @@ interface MigrationContext {
  * @param input 待迁移的原始文档（未校验 JSON）。
  */
 export function migrateScreenDocument(input: unknown): ScreenMigrationResult {
-  const parsed = parseScreenDocument(input);
+  const preprocessed = preprocessLegacyBlueprint(input);
+  const parsed = parseScreenDocument(preprocessed.input);
   if (!parsed.ok) {
-    return { ok: false, document: undefined, decisions: [], diagnostics: parsed.diagnostics };
+    return {
+      ok: false,
+      document: undefined,
+      decisions: preprocessed.decisions,
+      diagnostics: parsed.diagnostics,
+    };
   }
   const context: MigrationContext = {
     dataSources: [...(parsed.value.dataSources ?? [])],
@@ -83,15 +96,277 @@ export function migrateScreenDocument(input: unknown): ScreenMigrationResult {
     variables,
     blueprint: parsed.value.blueprint,
   });
+  const decisions = [...preprocessed.decisions, ...context.decisions];
   if (!migrated.ok) {
     return {
       ok: false,
       document: undefined,
-      decisions: [...context.decisions],
+      decisions,
       diagnostics: migrated.diagnostics,
     };
   }
-  return { ok: true, document: migrated.value, decisions: context.decisions, diagnostics: [] };
+  return { ok: true, document: migrated.value, decisions, diagnostics: [] };
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+interface BlueprintPreprocessing {
+  readonly input: unknown;
+  readonly decisions: readonly ScreenMigrationDecision[];
+}
+
+/**
+ * 旧 `blueprint.rules` → 一等 relations 的唯一转换路径。
+ *
+ * 只处理结构完整可识别的旧文档；任何无法安全转换的形状都原样返回，让严格解析失败关闭，
+ * 不做部分迁移、不静默丢弃规则。
+ */
+function preprocessLegacyBlueprint(input: unknown): BlueprintPreprocessing {
+  if (!isPlainObject(input) || !isPlainObject(input.blueprint)) {
+    return { input, decisions: [] };
+  }
+  const blueprint = input.blueprint;
+  if ('relations' in blueprint || !('rules' in blueprint)) {
+    return { input, decisions: [] };
+  }
+  if (Object.keys(blueprint).some((key) => key !== 'rules' && key !== 'layout')) {
+    return { input, decisions: [] };
+  }
+  const rules = blueprint.rules;
+  if (
+    !Array.isArray(rules) ||
+    !Array.isArray(input.components) ||
+    !Array.isArray(input.variables)
+  ) {
+    return { input, decisions: [] };
+  }
+  const componentIds = new Set<string>();
+  for (const component of input.components) {
+    if (!isPlainObject(component) || typeof component.id !== 'string') {
+      return { input, decisions: [] };
+    }
+    componentIds.add(component.id);
+  }
+  const variableIds = new Set<string>();
+  for (const variable of input.variables) {
+    if (!isPlainObject(variable) || typeof variable.id !== 'string') {
+      return { input, decisions: [] };
+    }
+    variableIds.add(variable.id);
+  }
+  const decisions: ScreenMigrationDecision[] = [];
+  const relations: Record<string, unknown>[] = [];
+  let relationCounter = 0;
+  const allocateRelationId = (): string => {
+    for (;;) {
+      relationCounter += 1;
+      const candidate = `relation-${relationCounter}`;
+      if (!relations.some((relation) => relation.id === candidate)) return candidate;
+    }
+  };
+  for (let index = 0; index < rules.length; index++) {
+    const rule = rules[index];
+    if (!isPlainObject(rule)) return { input, decisions: [] };
+    const source = legacyTriggerSource(rule.trigger);
+    if (source === null) return { input, decisions: [] };
+    const actions = rule.actions;
+    if (!Array.isArray(actions)) return { input, decisions: [] };
+    const condition = rule.condition;
+    if (condition !== undefined && !isPlainObject(condition)) return { input, decisions: [] };
+    const requiredCapabilities = rule.requiredCapabilities;
+    if (requiredCapabilities !== undefined && !Array.isArray(requiredCapabilities)) {
+      return { input, decisions: [] };
+    }
+    const createdRelationIds: string[] = [];
+    for (const action of actions) {
+      const relationId = allocateRelationId();
+      const relation = legacyActionRelation(
+        action,
+        relationId,
+        source,
+        condition,
+        requiredCapabilities,
+      );
+      if (relation === null) return { input, decisions: [] };
+      relations.push(relation);
+      createdRelationIds.push(relationId);
+    }
+    decisions.push({
+      kind: 'blueprint-relation',
+      path: ['blueprint', 'rules', index],
+      action: createdRelationIds.length === 0 ? 'rejected' : 'mapped',
+      detail:
+        createdRelationIds.length === 0
+          ? 'Rule had no actions and was dropped; it had no runtime behavior.'
+          : `Rule was split into ${createdRelationIds.length} behavior relation(s).`,
+      ...(createdRelationIds.length === 0 ? {} : { createdRelationIds }),
+    });
+  }
+  const layout = blueprint.layout;
+  let migratedLayout: { nodes?: readonly unknown[]; viewport?: unknown } | undefined;
+  if (layout !== undefined) {
+    if (!isPlainObject(layout)) return { input, decisions: [] };
+    if (Object.keys(layout).some((key) => key !== 'nodes' && key !== 'viewport')) {
+      return { input, decisions: [] };
+    }
+    const nodes = layout.nodes;
+    if (nodes !== undefined && !Array.isArray(nodes)) return { input, decisions: [] };
+    if (layout.viewport !== undefined && !isPlainObject(layout.viewport)) {
+      return { input, decisions: [] };
+    }
+    const keptNodes: unknown[] = [];
+    let droppedCondition = 0;
+    let droppedAction = 0;
+    let droppedUnconnected = 0;
+    let droppedOther = 0;
+    for (const node of nodes ?? []) {
+      if (!isPlainObject(node) || typeof node.id !== 'string') return { input, decisions: [] };
+      const id = node.id;
+      if (id.startsWith('component:') && componentIds.has(id.slice('component:'.length))) {
+        keptNodes.push(node);
+      } else if (id.startsWith('variable:') && variableIds.has(id.slice('variable:'.length))) {
+        keptNodes.push(node);
+      } else if (id.startsWith('condition:')) {
+        droppedCondition += 1;
+      } else if (id.startsWith('action:')) {
+        droppedAction += 1;
+      } else if (id.startsWith('unconnected:')) {
+        droppedUnconnected += 1;
+      } else {
+        droppedOther += 1;
+      }
+    }
+    const droppedTotal = droppedCondition + droppedAction + droppedUnconnected + droppedOther;
+    if (droppedTotal > 0) {
+      decisions.push({
+        kind: 'blueprint-layout',
+        path: ['blueprint', 'layout', 'nodes'],
+        action: 'rejected',
+        detail: `Dropped ${droppedTotal} layout position(s) with no relation-model equivalent (${droppedCondition} condition, ${droppedAction} action, ${droppedUnconnected} unconnected, ${droppedOther} stale).`,
+      });
+    }
+    const hasViewport = layout.viewport !== undefined;
+    if (keptNodes.length > 0 || hasViewport) {
+      migratedLayout = {
+        ...(keptNodes.length === 0 ? {} : { nodes: keptNodes }),
+        ...(hasViewport ? { viewport: layout.viewport } : {}),
+      };
+    }
+  }
+  return {
+    input: {
+      ...input,
+      blueprint: {
+        relations,
+        ...(migratedLayout === undefined ? {} : { layout: migratedLayout }),
+      },
+    },
+    decisions,
+  };
+}
+
+function legacyTriggerSource(trigger: unknown): Record<string, unknown> | null {
+  if (!isPlainObject(trigger)) return null;
+  if (
+    trigger.type === 'material-event' &&
+    typeof trigger.componentId === 'string' &&
+    typeof trigger.eventName === 'string'
+  ) {
+    return {
+      kind: 'component',
+      componentId: trigger.componentId,
+      event: { type: 'material-event', eventName: trigger.eventName },
+    };
+  }
+  if (
+    trigger.type === 'variable-event' &&
+    typeof trigger.variableId === 'string' &&
+    (trigger.eventName === 'data-updated' || trigger.eventName === 'request-state')
+  ) {
+    return {
+      kind: 'variable',
+      variableId: trigger.variableId,
+      event: { type: 'variable-event', eventName: trigger.eventName },
+    };
+  }
+  return null;
+}
+
+function legacyActionRelation(
+  action: unknown,
+  id: string,
+  source: Record<string, unknown>,
+  condition: Record<string, unknown> | undefined,
+  requiredCapabilities: readonly unknown[] | undefined,
+): Record<string, unknown> | null {
+  if (!isPlainObject(action)) return null;
+  const base = {
+    type: 'behavior',
+    id,
+    source,
+    ...(condition === undefined ? {} : { condition }),
+    ...(requiredCapabilities === undefined ? {} : { requiredCapabilities }),
+  };
+  if (action.type === 'component-visibility') {
+    if (
+      typeof action.componentId !== 'string' ||
+      (action.operation !== 'show' && action.operation !== 'hide' && action.operation !== 'toggle')
+    ) {
+      return null;
+    }
+    return {
+      ...base,
+      target: { kind: 'component', componentId: action.componentId },
+      effect: {
+        type: 'component-visibility',
+        operation: action.operation,
+        ...(action.transition === undefined ? {} : { transition: action.transition }),
+      },
+    };
+  }
+  if (action.type === 'request-component-data') {
+    if (typeof action.componentId !== 'string') return null;
+    return {
+      ...base,
+      target: { kind: 'component', componentId: action.componentId },
+      effect: { type: 'request-component-data' },
+    };
+  }
+  if (action.type === 'set-variable') {
+    if (typeof action.variableId !== 'string' || action.value === undefined) return null;
+    return {
+      ...base,
+      target: { kind: 'variable', variableId: action.variableId },
+      effect: { type: 'set-variable', value: action.value },
+    };
+  }
+  if (action.type === 'request-variable') {
+    if (typeof action.variableId !== 'string') return null;
+    return {
+      ...base,
+      target: { kind: 'variable', variableId: action.variableId },
+      effect: { type: 'request-variable' },
+    };
+  }
+  if (action.type === 'emit-host-event') {
+    if (typeof action.eventName !== 'string' || action.payload === undefined) return null;
+    return {
+      ...base,
+      target: { kind: 'host' },
+      effect: { type: 'emit-host-event', eventName: action.eventName, payload: action.payload },
+    };
+  }
+  if (action.type === 'host-action') {
+    if (typeof action.actionId !== 'string' || action.payload === undefined) return null;
+    return {
+      ...base,
+      target: { kind: 'host' },
+      effect: { type: 'host-action', actionId: action.actionId, payload: action.payload },
+    };
+  }
+  return null;
 }
 
 /** `data-source-<n>`：按实例创建顺序自增、与文档内既有 id 去重、不含时间戳与随机数。 */

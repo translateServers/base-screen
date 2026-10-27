@@ -22,7 +22,7 @@ const document: ScreenDocument = {
   ],
   dataSources: [],
   variables: [],
-  blueprint: { rules: [] },
+  blueprint: { relations: [] },
 };
 
 class FakeElement {

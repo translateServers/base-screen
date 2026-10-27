@@ -55,6 +55,7 @@
     "verify:tarball": "node tooling/verification/verify-tarballs.mjs",
     "verify:fast": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:packages && pnpm check:api && pnpm check:engine-import",
     "verify:browser": "node tooling/verification/verify-browser-harness.mjs",
+    "verify:system": "node tooling/verification/browser-harness/system/run-system-assert.mjs",
     "verify:material-mcp": "node tooling/material-mcp-server/smoke.mjs",
     "pack:host-skill-kit": "node tooling/pack-host-skill-kit.mjs",
     "verify:nebula-import": "node tooling/verification/verify-nebula-import.mjs",

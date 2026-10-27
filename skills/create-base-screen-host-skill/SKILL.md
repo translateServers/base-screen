@@ -21,7 +21,7 @@ The child Skill must instruct the model to:
 
 - Read the host guidelines first, then selectively inspect matching materials, resource types, datasets, and samples.
 - Create a complete Screen Document for a new request or preserve existing component identities while revising an existing document.
-- Use only catalog identities and literal resource parameters. Keep `variables` and `blueprint.rules` empty in this scope.
+- Use only catalog identities and literal resource parameters. Keep `variables` and `blueprint.relations` empty in this scope.
 - Use samples only to infer layout, chart/table choice, value ranges, and text lengths; do not embed sample rows unless the user explicitly requests static content.
 - Run the generated validator until it reports no errors, then return the document path and a concise design summary.
 - Fail closed on unknown material types, resource identities, parameters, fields, unsupported data capabilities, invalid props/style, or invalid parent relationships.

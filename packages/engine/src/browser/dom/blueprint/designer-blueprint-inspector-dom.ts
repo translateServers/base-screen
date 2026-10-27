@@ -65,7 +65,7 @@ function inspectorPane(
 function problemsPane(diagnostics: readonly ScreenDiagnostic[]): string {
   const problems = diagnostics.slice(0, 8);
   if (problems.length === 0) {
-    return `<div class="blueprint-inspector-empty" data-state="healthy"><span aria-hidden="true">${designerIcon('check')}</span><strong>${DESIGNER_UI_TEXT.blueprint.problemsHealthy}</strong><p>${DESIGNER_UI_TEXT.blueprint.problemsHealthyHint}</p></div>`;
+    return `<div class="designer-empty" data-tone="success"><span class="designer-empty-icon" aria-hidden="true">${designerIcon('check')}</span><p class="designer-empty-title">${DESIGNER_UI_TEXT.blueprint.problemsHealthy}</p><p class="designer-empty-hint">${DESIGNER_UI_TEXT.blueprint.problemsHealthyHint}</p></div>`;
   }
   return `<section class="blueprint-inspector-status" data-blueprint-problems><ul>${problems
     .map(
@@ -77,7 +77,7 @@ function problemsPane(diagnostics: readonly ScreenDiagnostic[]): string {
 
 function tracePane(trace: BaseScreenBlueprintCanvasTrace | null): string {
   if (trace === null) {
-    return `<div class="blueprint-inspector-empty"><span aria-hidden="true">${designerIcon('terminal')}</span><strong>${DESIGNER_UI_TEXT.blueprint.noTrace}</strong><p>${DESIGNER_UI_TEXT.blueprint.noTraceHint}</p></div>`;
+    return `<div class="designer-empty"><span class="designer-empty-icon" aria-hidden="true">${designerIcon('terminal')}</span><p class="designer-empty-title">${DESIGNER_UI_TEXT.blueprint.noTrace}</p><p class="designer-empty-hint">${DESIGNER_UI_TEXT.blueprint.noTraceHint}</p></div>`;
   }
   return `<section class="blueprint-inspector-status" data-blueprint-trace>
     <div class="blueprint-trace-summary">${DESIGNER_UI_TEXT.blueprint.traceSummary(trace.executedEdgeIds.length, trace.failedRuleIds.length)}</div>
@@ -122,13 +122,10 @@ function inspectorHeading(
       detail: node.materialType ?? DESIGNER_UI_TEXT.blueprint.selectionType.component,
     };
   }
-  if (node?.kind === 'condition') {
+  if (node?.kind === 'host') {
     return {
-      title: DESIGNER_UI_TEXT.blueprint.condition,
-      detail:
-        node.unconnected === true
-          ? DESIGNER_UI_TEXT.blueprint.unconnectedNode
-          : '@base-screen/logic/condition',
+      title: DESIGNER_UI_TEXT.blueprint.hostNode,
+      detail: DESIGNER_UI_TEXT.blueprint.hostNodeHint,
     };
   }
   if (node?.kind === 'variable') {
@@ -140,23 +137,23 @@ function inspectorHeading(
           : DESIGNER_UI_TEXT.blueprint.variableKind[node.variableType],
     };
   }
-  if (node?.kind === 'action') {
-    return {
-      title:
-        node.summary?.primary === undefined || node.summary.primary.length === 0
-          ? DESIGNER_UI_TEXT.blueprint.interactionActions
-          : node.summary.primary,
-      detail:
-        node.unconnected === true
-          ? DESIGNER_UI_TEXT.blueprint.unconnectedNode
-          : (node.action?.type ?? ''),
-    };
-  }
   const edge = graph.edges.find((candidate) => candidate.id === selection.id);
-  const rule = document?.blueprint.rules.find((candidate) => candidate.id === edge?.ruleId);
+  const relation =
+    edge?.relationId === undefined
+      ? undefined
+      : document?.blueprint.relations.find((candidate) => candidate.id === edge.relationId);
   return {
-    title: rule?.id ?? DESIGNER_UI_TEXT.blueprint.selectionType.edge,
-    detail: DESIGNER_UI_TEXT.blueprint.selectionType.edge,
+    title: relation?.id ?? edge?.id ?? DESIGNER_UI_TEXT.blueprint.selectionType.edge,
+    detail:
+      edge?.kind === 'semantic'
+        ? DESIGNER_UI_TEXT.blueprint.semanticRoles[edge.semanticRole ?? 'related']
+        : edge?.kind === 'containment'
+          ? DESIGNER_UI_TEXT.blueprint.relationCategories.structure
+          : edge?.kind === 'dependency'
+            ? DESIGNER_UI_TEXT.blueprint.readLabel
+            : edge?.effectType === undefined
+              ? DESIGNER_UI_TEXT.blueprint.selectionType.edge
+              : DESIGNER_UI_TEXT.blueprint.relationEffects[edge.effectType],
   };
 }
 

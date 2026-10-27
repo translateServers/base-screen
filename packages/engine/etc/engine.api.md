@@ -155,19 +155,31 @@ export interface BaseScreenBlueprintCanvasCommandResult {
 // @public (undocumented)
 export interface BaseScreenBlueprintCanvasEdge {
     // (undocumented)
+    readonly actionId?: string;
+    // @deprecated (undocumented)
     readonly actionIndex?: number;
     // (undocumented)
     readonly deletable?: boolean;
     // (undocumented)
+    readonly effectType?: 'component-visibility' | 'request-component-data' | 'set-variable' | 'request-variable' | 'emit-host-event' | 'host-action';
+    // (undocumented)
+    readonly eventName?: string;
+    // (undocumented)
     readonly id: string;
     // (undocumented)
-    readonly kind: 'trigger' | 'action' | 'dependency';
+    readonly kind: BaseScreenBlueprintCanvasEdgeKind;
     // (undocumented)
     readonly locked?: boolean;
     // (undocumented)
     readonly operation?: 'show' | 'hide' | 'toggle';
     // (undocumented)
+    readonly relationId?: string;
+    // (undocumented)
+    readonly relationKind?: 'behavior' | 'semantic';
+    // @deprecated (undocumented)
     readonly ruleId?: string;
+    // (undocumented)
+    readonly semanticRole?: 'related' | 'detail' | 'group' | 'drill-down';
     // (undocumented)
     readonly source: string;
     // (undocumented)
@@ -176,7 +188,16 @@ export interface BaseScreenBlueprintCanvasEdge {
     readonly target: string;
     // (undocumented)
     readonly targetHandle: string;
+    // (undocumented)
+    readonly variableId?: string;
 }
+
+// @public (undocumented)
+type BaseScreenBlueprintCanvasEdgeKind = 'relation' | 'semantic' | 'containment' | 'dependency'
+/** @deprecated 旧事件图边；引擎不再产出。 */
+| 'trigger'
+/** @deprecated 旧事件图边；引擎不再产出。 */
+| 'action';
 
 // @public (undocumented)
 export interface BaseScreenBlueprintCanvasEventOption {
@@ -210,40 +231,55 @@ export type BaseScreenBlueprintCanvasInsertNode = {
     readonly variableId: string;
     readonly position?: BaseScreenBlueprintCanvasNodePosition;
 } | {
-    readonly kind: 'condition' | 'set-variable' | 'emit-host-event';
-    readonly variableId?: string;
+    readonly kind: 'host';
     readonly position?: BaseScreenBlueprintCanvasNodePosition;
 };
 
 // @public (undocumented)
 export interface BaseScreenBlueprintCanvasNode {
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly action?: ScreenBlueprintAction;
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly actionIndex?: number;
+    // (undocumented)
+    readonly childCount?: number;
     // (undocumented)
     readonly collapsed?: boolean;
     // (undocumented)
     readonly componentId?: string;
     // (undocumented)
     readonly componentName?: string;
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly condition?: ScreenBlueprintCondition;
     // (undocumented)
     readonly events?: readonly BaseScreenBlueprintCanvasEventOption[];
+    // (undocumented)
+    readonly exitCount?: number;
     // (undocumented)
     readonly hidden?: boolean;
     // (undocumented)
     readonly id: string;
     // (undocumented)
+    readonly inboundCount?: number;
+    // (undocumented)
+    readonly isContainer?: boolean;
+    // (undocumented)
     readonly kind: BaseScreenBlueprintCanvasNodeKind;
     // (undocumented)
     readonly materialType?: string;
     // (undocumented)
+    readonly outboundCount?: number;
+    // (undocumented)
+    readonly parentId?: string;
+    // (undocumented)
+    readonly readCount?: number;
+    // (undocumented)
+    readonly relationCount?: number;
+    // @deprecated (undocumented)
     readonly ruleId?: string;
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly summary?: BaseScreenBlueprintCanvasNodeSummary;
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly unconnected?: true;
     // (undocumented)
     readonly variableDescription?: string;
@@ -256,13 +292,19 @@ export interface BaseScreenBlueprintCanvasNode {
     // (undocumented)
     readonly variableType?: 'static' | 'data-source' | 'url-query';
     // (undocumented)
+    readonly writeCount?: number;
+    // (undocumented)
     readonly x: number;
     // (undocumented)
     readonly y: number;
 }
 
 // @public (undocumented)
-type BaseScreenBlueprintCanvasNodeKind = 'component' | 'variable' | 'condition' | 'action';
+type BaseScreenBlueprintCanvasNodeKind = 'component' | 'variable' | 'host'
+/** @deprecated 关系模型不再产出条件节点；保留字面量供旧宿主画布类型兼容。 */
+| 'condition'
+/** @deprecated 关系模型不再产出动作节点；保留字面量供旧宿主画布类型兼容。 */
+| 'action';
 
 // @public (undocumented)
 export interface BaseScreenBlueprintCanvasNodePosition {
@@ -332,6 +374,8 @@ export interface BaseScreenBlueprintCanvasStateEventDetail {
 export interface BaseScreenBlueprintCanvasTrace {
     // (undocumented)
     readonly executedEdgeIds: readonly string[];
+    // (undocumented)
+    readonly failedRelationIds?: readonly string[];
     // (undocumented)
     readonly failedRuleIds: readonly string[];
     // (undocumented)
@@ -649,7 +693,7 @@ export interface BaseScreenDesignerWorkbenchFocus {
     // (undocumented)
     readonly id: string;
     // (undocumented)
-    readonly kind: 'component' | 'variable' | 'rule' | 'action';
+    readonly kind: 'component' | 'variable' | 'relation' | 'rule' | 'action';
 }
 
 // @public (undocumented)

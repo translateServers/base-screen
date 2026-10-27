@@ -866,65 +866,69 @@ const screenDocument = {
     },
   ],
   blueprint: {
-    rules: [
+    relations: [
       {
+        type: 'behavior' as const,
         id: 'title-click',
-        trigger: { type: 'material-event' as const, componentId: 'title', eventName: 'valueClick' },
-        actions: [
-          {
-            type: 'emit-host-event' as const,
-            eventName: 'titleClick',
-            payload: { kind: 'literal' as const, value: { source: 'harness' } },
-          },
-        ],
+        source: {
+          kind: 'component' as const,
+          componentId: 'title',
+          event: { type: 'material-event' as const, eventName: 'valueClick' },
+        },
+        target: { kind: 'host' as const },
+        effect: {
+          type: 'emit-host-event' as const,
+          eventName: 'titleClick',
+          payload: { kind: 'literal' as const, value: { source: 'harness' } },
+        },
       },
       {
         // ADR-0076：引用插件声明的宿主动作。已声明即走宿主动作端口，未声明会被 manager
-        // 失败关闭；这条规则同时是端到端断言的入口（点标题 → 动作执行）。
+        // 失败关闭；这条关系同时是端到端断言的入口（点标题 → 动作执行）。
+        type: 'behavior' as const,
         id: 'plugin-action-demo',
-        trigger: {
-          type: 'material-event' as const,
+        source: {
+          kind: 'component' as const,
           componentId: 'subtitle',
-          eventName: 'valueClick',
+          event: { type: 'material-event' as const, eventName: 'valueClick' },
         },
-        actions: [
-          {
-            type: 'host-action' as const,
-            actionId: PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
-            payload: {
-              kind: 'object' as const,
-              properties: {
-                color: { kind: 'literal' as const, value: '#ffa940' },
-                strokeWidth: { kind: 'literal' as const, value: 3 },
-              },
+        target: { kind: 'host' as const },
+        effect: {
+          type: 'host-action' as const,
+          actionId: PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
+          payload: {
+            kind: 'object' as const,
+            properties: {
+              color: { kind: 'literal' as const, value: '#ffa940' },
+              strokeWidth: { kind: 'literal' as const, value: 3 },
             },
           },
-        ],
+        },
       },
       {
-        // 组合路径模板·计时器触发：宿主定时器/推送写变量 → 本规则触发 → 插件动作。
+        // 组合路径模板·计时器触发：宿主定时器/推送写变量 → 本关系触发 → 插件动作。
         // 成熟大屏产品上"计时器节点"承载的功能由此闭环，且**不需要** Base Screen 新增触发器节点：
-        // 缺的从来是作者面形态，不是功能。`harnessTick` 初值 0 时规则也会触发一次，
+        // 缺的从来是作者面形态，不是功能。`harnessTick` 初值 0 时关系也会触发一次，
         // 因此断言观察的是动作事件次数在启动定时器之后的增量。
+        type: 'behavior' as const,
         id: 'variable-trigger-demo',
-        trigger: {
-          type: 'variable-event' as const,
+        source: {
+          kind: 'variable' as const,
           variableId: 'harness-tick',
-          eventName: 'data-updated',
+          event: { type: 'variable-event' as const, eventName: 'data-updated' },
         },
-        actions: [
-          {
-            type: 'host-action' as const,
-            actionId: PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
-            payload: {
-              kind: 'object' as const,
-              properties: {
-                color: { kind: 'literal' as const, value: '#39c5bb' },
-                strokeWidth: { kind: 'literal' as const, value: 1 },
-              },
+        target: { kind: 'host' as const },
+        effect: {
+          type: 'host-action' as const,
+          actionId: PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
+          payload: {
+            kind: 'object' as const,
+            properties: {
+              color: { kind: 'literal' as const, value: '#39c5bb' },
+              strokeWidth: { kind: 'literal' as const, value: 1 },
             },
           },
-        ],
+        },
       },
     ],
   },
@@ -1723,7 +1727,7 @@ Object.assign(window, {
             controlled: true,
           },
         ],
-        blueprint: { rules: [] },
+        blueprint: { relations: [] },
       };
       document.body.appendChild(demo);
       return demo;
@@ -1757,7 +1761,7 @@ Object.assign(window, {
           },
         ],
         variables: [],
-        blueprint: { rules: [] },
+        blueprint: { relations: [] },
       };
       document.body.appendChild(draftDesigner);
       return draftDesigner;
@@ -1794,7 +1798,7 @@ Object.assign(window, {
           },
         ],
         variables: [],
-        blueprint: { rules: [] },
+        blueprint: { relations: [] },
       };
       document.body.appendChild(probe);
       return probe;
@@ -1822,7 +1826,7 @@ Object.assign(window, {
           },
         ],
         variables: [],
-        blueprint: { rules: [] },
+        blueprint: { relations: [] },
       };
       document.body.appendChild(demo);
       return demo;

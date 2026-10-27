@@ -40,19 +40,23 @@ const NODE_WIDTH = 208;
 const NODE_HEADER = 45;
 const PORT_ROW = 28;
 const SUBTITLE_HEIGHT = 21;
-const SUMMARY_LINE_HEIGHT = 16;
-const SUMMARY_PADDING = 8;
+const VARIABLE_VALUE_ROW = 40;
+const SUMMARY_ROW = 32;
 const NODE_BOTTOM_PADDING = 8;
+const HOST_NODE_HEIGHT = 96;
 const GRAPH_PADDING = 72;
-const COLUMN_STEP = 280;
+const COLUMN_STEP = 256;
 const SNAP = 8;
 const FIT_PADDING = 28;
 const SIMULATION_INSET = 150;
-const ZOOM_MIN = 0.4;
+const SIMULATION_BAR_INSET = 48;
+const ZOOM_MIN = 0.1;
 const ZOOM_MAX = 2;
-const ZOOM_STEPS = [0.4, 0.5, 0.6, 0.7, 0.84, 1, 1.25, 1.5, 2] as const;
+const ZOOM_STEPS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.84, 1, 1.25, 1.5, 2] as const;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const TRACE_LABEL_MIN_ZOOM = 0.62;
+// 图层固定按 2x 排版、再用 transform 缩放补偿：缩放只走合成，卡片/文字又不会按 1x 纹理拉伸。
+const LAYER_RASTER_ZOOM = 2;
 
 const text = DESIGNER_UI_TEXT.blueprint.canvasSurface;
 const blueprintText = DESIGNER_UI_TEXT.blueprint;
@@ -64,6 +68,8 @@ interface CanvasPort {
   readonly available: boolean;
   readonly requiredCapability?: string;
   readonly dependency?: true;
+  readonly semantic?: true;
+  readonly containment?: true;
 }
 
 interface NodeGeometry {
@@ -71,7 +77,7 @@ interface NodeGeometry {
   readonly height: number;
   readonly portStart: number;
   readonly inputY: number;
-  readonly inputHandle?: 'condition:in' | 'action:in';
+  readonly inputHandle?: 'relation:in' | 'condition:in' | 'action:in';
   readonly outputs: readonly CanvasPort[];
   readonly dependency: boolean;
 }
@@ -92,6 +98,15 @@ interface PanState {
   readonly startClientY: number;
   readonly startX: number;
   readonly startY: number;
+  moved: boolean;
+}
+
+interface MarqueeState {
+  readonly pointerId: number;
+  readonly startClientX: number;
+  readonly startClientY: number;
+  readonly startLeft: number;
+  readonly startTop: number;
   moved: boolean;
 }
 
@@ -158,11 +173,7 @@ export function createDesignerBlueprintDefaultCanvas(
   addMenu.setAttribute('role', 'menu');
   addMenu.setAttribute('aria-label', text.addNodeMenu);
   addMenu.hidden = true;
-  for (const [kind, label] of [
-    ['condition', text.insertCondition],
-    ['set-variable', text.insertSetVariable],
-    ['emit-host-event', text.insertEmitHostEvent],
-  ] as const) {
+  for (const [kind, label] of [['host', blueprintText.relationList.addHost]] as const) {
     const item = createDesignerButton(ownerDocument, {
       className: 'designer-blueprint-canvas-menu-item',
       text: label,
@@ -174,10 +185,9 @@ export function createDesignerBlueprintDefaultCanvas(
   addAnchor.append(addButton, addMenu);
 
   const layoutButton = textButton(ownerDocument, 'grid', blueprintText.autoLayout, 'auto-layout');
-  const problemsButton = ownerDocument.createElement('button');
-  problemsButton.type = 'button';
-  problemsButton.className =
-    'designer-control designer-button designer-blueprint-canvas-problems-button';
+  const problemsButton = createDesignerButton(ownerDocument, {
+    className: 'designer-blueprint-canvas-problems-button',
+  });
   problemsButton.dataset.canvasAction = 'problems';
   problemsButton.dataset.state = 'ok';
   problemsButton.setAttribute('aria-haspopup', 'dialog');
@@ -241,6 +251,7 @@ export function createDesignerBlueprintDefaultCanvas(
 
   const layers = ownerDocument.createElement('div');
   layers.className = 'designer-blueprint-canvas-layers';
+  layers.style.setProperty('zoom', String(LAYER_RASTER_ZOOM));
   const edges = ownerDocument.createElementNS(SVG_NS, 'svg');
   edges.classList.add('designer-blueprint-canvas-edges');
   const labels = ownerDocument.createElement('div');
@@ -253,6 +264,10 @@ export function createDesignerBlueprintDefaultCanvas(
   preview.classList.add('designer-blueprint-canvas-link-preview');
   preview.setAttribute('visibility', 'hidden');
   overlay.append(preview);
+
+  const marqueeBox = ownerDocument.createElement('div');
+  marqueeBox.className = 'designer-blueprint-canvas-marquee';
+  marqueeBox.hidden = true;
 
   const emptyCard = ownerDocument.createElement('section');
   emptyCard.className = 'designer-blueprint-canvas-empty';
@@ -272,10 +287,10 @@ export function createDesignerBlueprintDefaultCanvas(
   emptyActions.className = 'designer-blueprint-canvas-empty-actions';
   const emptyCreate = createDesignerButton(ownerDocument, {
     className: 'designer-blueprint-canvas-empty-primary',
-    text: text.emptyCreateCondition,
+    text: blueprintText.relationList.addHost,
     variant: 'primary',
   });
-  emptyCreate.dataset.canvasInsert = 'condition';
+  emptyCreate.dataset.canvasInsert = 'host';
   const emptyHint = ownerDocument.createElement('span');
   emptyHint.className = 'designer-blueprint-canvas-empty-hint';
   emptyHint.textContent = text.emptyLibraryHint;
@@ -393,6 +408,7 @@ export function createDesignerBlueprintDefaultCanvas(
   viewport.append(
     layers,
     overlay,
+    marqueeBox,
     emptyCard,
     noEvents,
     problems,
@@ -414,6 +430,8 @@ export function createDesignerBlueprintDefaultCanvas(
   let statusTimer: ReturnType<typeof setTimeout> | undefined;
   let drag: DragState | null = null;
   let pan: PanState | null = null;
+  let marquee: MarqueeState | null = null;
+  let spacePressed = false;
   let link: LinkState | null = null;
   let armed: ArmedSource | null = null;
   let commandSequence = 0;
@@ -494,13 +512,12 @@ export function createDesignerBlueprintDefaultCanvas(
   }
 
   function geometryOf(node: BaseScreenBlueprintCanvasNode): NodeGeometry {
-    const summary = node.summary?.secondary ?? '';
-    const summaryHeight = summary === '' ? 0 : SUMMARY_LINE_HEIGHT * 2 + SUMMARY_PADDING;
-    const portStart = NODE_HEADER + SUBTITLE_HEIGHT + summaryHeight;
+    const summaryHeight = nodeSummaryText(node) === '' ? 0 : SUMMARY_ROW;
     if (node.kind === 'component' || node.kind === 'variable') {
+      const valueHeight = node.kind === 'variable' ? VARIABLE_VALUE_ROW : 0;
+      const portStart = NODE_HEADER + SUBTITLE_HEIGHT + valueHeight;
       const events = node.events ?? [];
       const rows = Math.max(1, events.length);
-      const dependency = node.kind === 'variable';
       const outputs: CanvasPort[] = events.map((event, index) => ({
         handle: `event:${event.name}`,
         label: event.label === '' ? event.name : event.label,
@@ -510,49 +527,48 @@ export function createDesignerBlueprintDefaultCanvas(
           ? {}
           : { requiredCapability: event.requiredCapability }),
       }));
-      if (dependency) {
+      let rowCount = rows;
+      if (node.kind === 'component') {
         outputs.push({
-          handle: 'dependency:out',
-          label: text.dependencyPort,
-          y: portStart + rows * PORT_ROW + PORT_ROW / 2,
+          handle: 'semantic:out',
+          label: blueprintText.relationCategories.semantic,
+          y: portStart + rowCount * PORT_ROW + PORT_ROW / 2,
           available: true,
-          dependency: true,
+          semantic: true,
         });
+        rowCount += 1;
+        if (node.isContainer === true) {
+          outputs.push({
+            handle: 'containment:out',
+            label: blueprintText.relationList.containment,
+            y: portStart + rowCount * PORT_ROW + PORT_ROW / 2,
+            available: true,
+            containment: true,
+          });
+          rowCount += 1;
+        }
       }
-      const height = portStart + (rows + (dependency ? 1 : 0)) * PORT_ROW + NODE_BOTTOM_PADDING;
+      const height =
+        portStart +
+        rowCount * PORT_ROW +
+        (summaryHeight === 0 ? NODE_BOTTOM_PADDING : summaryHeight);
       return {
         width: NODE_WIDTH,
         height,
         portStart,
-        inputY: portStart + PORT_ROW / 2,
+        inputY: height / 2,
+        inputHandle: 'relation:in',
         outputs,
-        dependency,
+        dependency: node.kind === 'variable',
       };
     }
-    if (node.kind === 'condition') {
-      return {
-        width: NODE_WIDTH,
-        height: portStart + PORT_ROW * 2 + NODE_BOTTOM_PADDING,
-        portStart,
-        inputY: portStart + PORT_ROW / 2,
-        inputHandle: 'condition:in',
-        outputs: [
-          {
-            handle: 'condition:true',
-            label: 'true',
-            y: portStart + PORT_ROW + PORT_ROW / 2,
-            available: true,
-          },
-        ],
-        dependency: false,
-      };
-    }
+    const height = HOST_NODE_HEIGHT;
     return {
       width: NODE_WIDTH,
-      height: portStart + PORT_ROW + NODE_BOTTOM_PADDING,
-      portStart,
-      inputY: portStart + PORT_ROW / 2,
-      inputHandle: 'action:in',
+      height,
+      portStart: NODE_HEADER + SUBTITLE_HEIGHT,
+      inputY: height / 2,
+      inputHandle: 'relation:in',
       outputs: [],
       dependency: false,
     };
@@ -613,8 +629,9 @@ export function createDesignerBlueprintDefaultCanvas(
   }
 
   function applyTransform(): void {
-    layers.style.transform = `translate(${viewportValue.x}px, ${viewportValue.y}px) scale(${viewportValue.zoom})`;
-    viewport.style.backgroundPosition = `${viewportValue.x}px ${viewportValue.y}px`;
+    // 2x 排版 + 缩放补偿：屏幕位置 = 平移 + 图坐标 × zoom；translate 会被 CSS zoom 放大，故除以 2。
+    const scale = viewportValue.zoom / LAYER_RASTER_ZOOM;
+    layers.style.transform = `translate(${viewportValue.x / LAYER_RASTER_ZOOM}px, ${viewportValue.y / LAYER_RASTER_ZOOM}px) scale(${scale})`;
     viewport.dataset.zoomFar = String(viewportValue.zoom < TRACE_LABEL_MIN_ZOOM);
     const percent = Math.round(viewportValue.zoom * 100);
     zoomValue.textContent = text.zoomValue(percent);
@@ -635,15 +652,14 @@ export function createDesignerBlueprintDefaultCanvas(
     viewportCommitTimer = undefined;
     viewportsDirty = false;
     if (sessionLayout) return;
-    lastSentViewportKey = viewportKey(viewportValue);
-    sendCommand({
-      type: 'commit-viewport',
-      viewport: {
-        x: Math.round(viewportValue.x),
-        y: Math.round(viewportValue.y),
-        zoom: Math.round(viewportValue.zoom * 1000) / 1000,
-      },
-    });
+    const viewport = {
+      x: Math.round(viewportValue.x),
+      y: Math.round(viewportValue.y),
+      zoom: Math.round(viewportValue.zoom * 1000) / 1000,
+    };
+    // 记录实际发送的取整值；否则回传状态会被当成外部变更再采纳一次，产生回跳。
+    lastSentViewportKey = viewportKey(viewport);
+    sendCommand({ type: 'commit-viewport', viewport });
   }
 
   function adoptViewport(next: ViewportValue | undefined): void {
@@ -668,7 +684,15 @@ export function createDesignerBlueprintDefaultCanvas(
     };
   }
 
-  function edgePath(edge: BaseScreenBlueprintCanvasEdge): string | null {
+  interface EdgeRoute {
+    readonly path: string;
+    readonly start: Point;
+    readonly end: Point;
+    readonly beforeEnd: Point;
+    readonly label: Point;
+  }
+
+  function edgeRoute(edge: BaseScreenBlueprintCanvasEdge): EdgeRoute | null {
     const source = nodeById(edge.source);
     const target = nodeById(edge.target);
     if (source === undefined || target === undefined) return null;
@@ -679,14 +703,181 @@ export function createDesignerBlueprintDefaultCanvas(
     const y1 = sourcePosition.y + outputPortY(source, edge.sourceHandle);
     const x2 = targetPosition.x;
     const y2 = targetPosition.y + inputPortY(target);
-    const offset = Math.max(56, Math.abs(x2 - x1) * 0.4);
-    return `M ${x1} ${y1} C ${x1 + offset} ${y1}, ${x2 - offset} ${y2}, ${x2} ${y2}`;
+    const bottom = Math.max(
+      sourcePosition.y + sourceGeometry.height,
+      targetPosition.y + geometryOf(target).height,
+    );
+    const points = routePoints(edge.id, x1, y1, x2, y2, bottom);
+    return {
+      path: roundedPolylinePath(points, 12),
+      start: points[0] as Point,
+      end: points[points.length - 1] as Point,
+      beforeEnd: points[points.length - 2] as Point,
+      label: labelPointFor(points, edge.id),
+    };
+  }
+
+  function routePoints(
+    edgeId: string,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    bottom: number,
+  ): Point[] {
+    const gap = x2 - x1;
+    const hash = hashOf(edgeId);
+    if (gap >= 48) {
+      const laneOffset = (hash % 4) * 6;
+      const lane = Math.min(x2 - 16, x1 + Math.min(120, Math.max(28, gap * 0.42)) + laneOffset);
+      return [
+        { x: x1, y: y1 },
+        { x: lane, y: y1 },
+        { x: lane, y: y2 },
+        { x: x2, y: y2 },
+      ];
+    }
+    const detour = bottom + 28 + (hash % 4) * 14;
+    return [
+      { x: x1, y: y1 },
+      { x: x1 + 24, y: y1 },
+      { x: x1 + 24, y: detour },
+      { x: x2 - 24, y: detour },
+      { x: x2 - 24, y: y2 },
+      { x: x2, y: y2 },
+    ];
+  }
+
+  function roundedPolylinePath(points: readonly Point[], radius: number): string {
+    const first = points[0] as Point;
+    let path = `M ${first.x} ${first.y}`;
+    for (let index = 1; index < points.length - 1; index += 1) {
+      const previous = points[index - 1] as Point;
+      const current = points[index] as Point;
+      const next = points[index + 1] as Point;
+      const incoming = distance(previous, current);
+      const outgoing = distance(current, next);
+      const limit = Math.min(radius, incoming / 2, outgoing / 2);
+      const start =
+        limit === 0
+          ? current
+          : {
+              x: current.x - ((current.x - previous.x) / incoming) * limit,
+              y: current.y - ((current.y - previous.y) / incoming) * limit,
+            };
+      const end =
+        limit === 0
+          ? current
+          : {
+              x: current.x + ((next.x - current.x) / outgoing) * limit,
+              y: current.y + ((next.y - current.y) / outgoing) * limit,
+            };
+      path += ` L ${start.x} ${start.y} Q ${current.x} ${current.y} ${end.x} ${end.y}`;
+    }
+    const last = points[points.length - 1] as Point;
+    return `${path} L ${last.x} ${last.y}`;
+  }
+
+  function arrowPath(end: Point, previous: Point): string {
+    const angle = Math.atan2(end.y - previous.y, end.x - previous.x);
+    const size = 7;
+    const halfWidth = 3.4;
+    const left = {
+      x: end.x - size * Math.cos(angle) + halfWidth * Math.sin(angle),
+      y: end.y - size * Math.sin(angle) - halfWidth * Math.cos(angle),
+    };
+    const right = {
+      x: end.x - size * Math.cos(angle) - halfWidth * Math.sin(angle),
+      y: end.y - size * Math.sin(angle) + halfWidth * Math.cos(angle),
+    };
+    return `M ${end.x} ${end.y} L ${left.x} ${left.y} L ${right.x} ${right.y} Z`;
+  }
+
+  function distance(a: Point, b: Point): number {
+    return Math.hypot(b.x - a.x, b.y - a.y);
+  }
+
+  function hashOf(value: string): number {
+    let hash = 0;
+    for (let index = 0; index < value.length; index += 1) {
+      hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+    }
+    return hash;
+  }
+
+  function labelPointFor(points: readonly Point[], edgeId: string): Point {
+    const hash = hashOf(edgeId);
+    if (points.length < 3) {
+      const start = points[0] as Point;
+      const end = points[points.length - 1] as Point;
+      return {
+        x: (start.x + end.x) / 2,
+        y: (start.y + end.y) / 2 - 12 - (hash % 4) * 3,
+      };
+    }
+    if (points.length === 4) {
+      const start = points[0] as Point;
+      const lane = points[1] as Point;
+      const endLane = points[2] as Point;
+      const end = points[3] as Point;
+      const firstLength = Math.abs(lane.x - start.x);
+      const secondLength = Math.abs(end.x - endLane.x);
+      if (firstLength >= secondLength) {
+        return {
+          x: (start.x + lane.x) / 2,
+          y: start.y - 11 - (hash % 4) * 3,
+        };
+      }
+      return {
+        x: (endLane.x + end.x) / 2,
+        y: end.y - 11 - (hash % 4) * 3,
+      };
+    }
+    const start = points[0] as Point;
+    const bottom = points[2] as Point;
+    const end = points[points.length - 1] as Point;
+    return {
+      x: (start.x + end.x) / 2,
+      y: bottom.y + 12 + (hash % 3) * 3,
+    };
+  }
+
+  function edgeIcon(edge: BaseScreenBlueprintCanvasEdge): DesignerIconName {
+    if (edge.kind === 'dependency') return 'eye';
+    if (edge.kind === 'semantic') return 'link';
+    if (edge.kind === 'containment') return 'group';
+    return 'activity';
   }
 
   function edgeLabel(edge: BaseScreenBlueprintCanvasEdge): string {
     if (edge.kind === 'dependency') {
       const source = nodeById(edge.source);
       return text.edgeDependency(source?.variableName ?? source?.variableId ?? '');
+    }
+    if (edge.kind === 'containment') return blueprintText.relationList.containment;
+    if (edge.kind === 'semantic') {
+      return blueprintText.semanticRoles[edge.semanticRole ?? 'related'];
+    }
+    if (edge.kind === 'relation') {
+      if (edge.effectType === 'component-visibility') {
+        return `${edge.eventName ?? ''} · ${blueprintText.visibilityOperation[edge.operation ?? 'toggle']}`;
+      }
+      if (edge.effectType === 'set-variable') {
+        return blueprintText.setVariableAction(edge.variableId ?? '');
+      }
+      if (edge.effectType === 'request-variable') {
+        return `${blueprintText.relationEffects['request-variable']} ${edge.variableId ?? ''}`;
+      }
+      if (edge.effectType === 'request-component-data') {
+        return `${edge.eventName ?? ''} · ${blueprintText.relationEffects['request-component-data']}`;
+      }
+      if (edge.effectType === 'emit-host-event') {
+        return `${blueprintText.relationEffects['emit-host-event']} ${edge.eventName ?? ''}`;
+      }
+      if (edge.effectType === 'host-action') {
+        return `${blueprintText.relationEffects['host-action']} ${edge.actionId ?? ''}`;
+      }
+      return edge.eventName ?? '';
     }
     if (edge.kind === 'trigger') {
       return edge.sourceHandle.startsWith('event:')
@@ -698,41 +889,42 @@ export function createDesignerBlueprintDefaultCanvas(
     return 'true';
   }
 
-  function edgeMidpoint(path: string): Point | null {
-    const numbers = path.match(/-?\d+(?:\.\d+)?/g);
-    if (numbers === null || numbers.length < 8) return null;
-    const [x1 = 0, y1 = 0, cx1 = 0, cy1 = 0, cx2 = 0, cy2 = 0, x2 = 0, y2 = 0] = numbers
-      .slice(0, 8)
-      .map(Number);
-    return {
-      x: 0.125 * x1 + 0.375 * cx1 + 0.375 * cx2 + 0.125 * x2,
-      y: 0.125 * y1 + 0.375 * cy1 + 0.375 * cy2 + 0.125 * y2,
-    };
-  }
-
-  function labelOffset(edgeId: string): number {
-    let hash = 0;
-    for (let index = 0; index < edgeId.length; index += 1) {
-      hash = (hash * 31 + edgeId.charCodeAt(index)) % 10;
+  function labelWidth(label: string): number {
+    let width = 28;
+    for (const character of label) {
+      width += /[\x00-\x7f]/.test(character) ? 6 : 10;
     }
-    return 14 + hash;
+    return Math.min(168, width);
   }
 
-  function edgeLabelPoint(edge: BaseScreenBlueprintCanvasEdge): Point | null {
-    const source = nodeById(edge.source);
-    const target = nodeById(edge.target);
-    if (source === undefined || target === undefined) return null;
-    const sourceRight = positionOf(source).x + geometryOf(source).width;
-    const targetLeft = positionOf(target).x;
-    if (targetLeft - sourceRight < 64) return null;
-    const pathData = edgePath(edge);
-    if (pathData === null) return null;
-    const mid = edgeMidpoint(pathData);
-    if (mid === null) return null;
-    return {
-      x: (sourceRight + targetLeft) / 2,
-      y: mid.y + labelOffset(edge.id),
-    };
+  function clearLabelPoint(
+    preferred: Point,
+    label: string,
+    rects: readonly { left: number; top: number; right: number; bottom: number }[],
+  ): Point {
+    const width = labelWidth(label);
+    const halfWidth = width / 2;
+    const halfHeight = 11;
+    const isClear = (point: Point): boolean =>
+      !rects.some(
+        (rect) =>
+          point.x - halfWidth < rect.right + 2 &&
+          point.x + halfWidth > rect.left - 2 &&
+          point.y - halfHeight < rect.bottom + 2 &&
+          point.y + halfHeight > rect.top - 2,
+      );
+    const candidates: Point[] = [
+      preferred,
+      { x: preferred.x, y: preferred.y - 24 },
+      { x: preferred.x, y: preferred.y - 46 },
+      { x: preferred.x, y: preferred.y + 24 },
+      { x: preferred.x, y: preferred.y + 46 },
+      { x: preferred.x - 72, y: preferred.y },
+      { x: preferred.x + 72, y: preferred.y },
+      { x: preferred.x - 72, y: preferred.y - 24 },
+      { x: preferred.x + 72, y: preferred.y - 24 },
+    ];
+    return candidates.find(isClear) ?? preferred;
   }
 
   function renderEdgesAndLabels(): void {
@@ -742,23 +934,54 @@ export function createDesignerBlueprintDefaultCanvas(
     if (current === null) return;
 
     const traced = new Set(traceVisible ? (state?.trace?.executedEdgeIds ?? []) : []);
+    const failed = new Set(traceVisible ? (state?.trace?.failedRelationIds ?? []) : []);
     const traceActive = traced.size > 0;
+    const placedLabels: Point[] = [];
+    const nodeRects = current.nodes.map((node) => {
+      const geometry = geometryOf(node);
+      const position = positionOf(node);
+      return {
+        left: position.x,
+        top: position.y,
+        right: position.x + geometry.width,
+        bottom: position.y + geometry.height,
+      };
+    });
     for (const edge of current.edges) {
-      const pathData = edgePath(edge);
-      if (pathData === null) continue;
-      const path = ownerDocument.createElementNS(SVG_NS, 'path');
-      path.classList.add('designer-blueprint-canvas-edge');
-      path.setAttribute('d', pathData);
-      path.dataset.kind = edge.kind;
-      if (traceActive && traced.has(edge.id)) path.dataset.traced = 'true';
-      if (state?.selection?.kind === 'edge' && state.selection.id === edge.id) {
-        path.dataset.selected = 'true';
+      const route = edgeRoute(edge);
+      if (route === null) continue;
+      const selected = state?.selection?.kind === 'edge' && state.selection.id === edge.id;
+
+      const group = ownerDocument.createElementNS(SVG_NS, 'g');
+      group.classList.add('designer-blueprint-canvas-edge-group');
+      group.dataset.kind = edge.kind;
+      if (traceActive && traced.has(edge.id)) group.dataset.traced = 'true';
+      if (traceActive && edge.relationId !== undefined && failed.has(edge.relationId)) {
+        group.dataset.failed = 'true';
       }
-      edges.append(path);
+      if (selected) group.dataset.selected = 'true';
+
+      const path = ownerDocument.createElementNS(SVG_NS, 'path');
+      path.classList.add('designer-blueprint-canvas-edge-line');
+      path.setAttribute('d', route.path);
+      group.append(path);
+
+      const caps = ownerDocument.createElementNS(SVG_NS, 'g');
+      caps.classList.add('designer-blueprint-canvas-edge-caps');
+      if (edge.kind === 'semantic') {
+        caps.append(circleAt(route.start, 2.6), circleAt(route.end, 2.6));
+      } else if (edge.kind === 'dependency') {
+        caps.append(circleAt(route.end, 2.6));
+      } else if (edge.kind === 'relation') {
+        const arrow = ownerDocument.createElementNS(SVG_NS, 'path');
+        arrow.setAttribute('d', arrowPath(route.end, route.beforeEnd));
+        caps.append(arrow);
+      }
+      group.append(caps);
 
       const hit = ownerDocument.createElementNS(SVG_NS, 'path');
       hit.classList.add('designer-blueprint-canvas-edge-hit');
-      hit.setAttribute('d', pathData);
+      hit.setAttribute('d', route.path);
       hit.dataset.edgeId = edge.id;
       hit.setAttribute('tabindex', '0');
       hit.setAttribute('role', 'button');
@@ -766,44 +989,98 @@ export function createDesignerBlueprintDefaultCanvas(
       hit.setAttribute('aria-label', text.edgeAria(label));
       hit.addEventListener('pointerdown', (event) => {
         event.stopPropagation();
-        select({ kind: 'edge', id: edge.id });
+        selectFromPointer({ kind: 'edge', id: edge.id }, event);
       });
       hit.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          select({ kind: 'edge', id: edge.id });
+          selectFromPointer({ kind: 'edge', id: edge.id }, event);
         }
       });
-      edges.append(hit);
+      group.append(hit);
+      edges.append(group);
 
-      if (label !== '') {
-        const point = edgeLabelPoint(edge);
-        if (point !== null) {
-          const labelElement = ownerDocument.createElement('span');
-          labelElement.className = 'designer-blueprint-canvas-edge-label';
-          labelElement.dataset.edgeLabel = edge.id;
-          if (traceActive && traced.has(edge.id)) {
-            labelElement.dataset.traced = 'true';
-          }
-          if (state?.selection?.kind === 'edge' && state.selection.id === edge.id) {
-            labelElement.dataset.selected = 'true';
-          }
-          labelElement.style.left = `${point.x}px`;
-          labelElement.style.top = `${point.y}px`;
-          labelElement.textContent = label;
-          labels.append(labelElement);
+      const showLabel =
+        label !== '' &&
+        (edge.kind !== 'dependency' || selected || (traceActive && traced.has(edge.id)));
+      if (showLabel) {
+        const labelElement = ownerDocument.createElement('span');
+        labelElement.className = 'designer-blueprint-canvas-edge-label';
+        labelElement.dataset.edgeLabel = edge.id;
+        labelElement.dataset.kind = edge.kind;
+        labelElement.setAttribute('role', 'button');
+        labelElement.setAttribute('tabindex', '0');
+        labelElement.setAttribute('aria-label', text.edgeAria(label));
+        if (selected) {
+          labelElement.dataset.selected = 'true';
+          labelElement.setAttribute('aria-current', 'true');
         }
+        if (traceActive && traced.has(edge.id)) {
+          labelElement.dataset.traced = 'true';
+        }
+        const icon = ownerDocument.createElement('span');
+        icon.className = 'designer-blueprint-canvas-edge-label-icon';
+        icon.innerHTML = designerIcon(edgeIcon(edge));
+        const labelText = ownerDocument.createElement('span');
+        labelText.className = 'designer-blueprint-canvas-edge-label-text';
+        labelText.textContent = label;
+        labelElement.append(icon, labelText);
+        let labelPoint = clearLabelPoint(route.label, label, nodeRects);
+        while (
+          placedLabels.some(
+            (placed) =>
+              Math.abs(placed.x - labelPoint.x) < 96 && Math.abs(placed.y - labelPoint.y) < 16,
+          )
+        ) {
+          labelPoint = { x: labelPoint.x, y: labelPoint.y + 22 };
+        }
+        placedLabels.push(labelPoint);
+        labelElement.style.left = `${labelPoint.x}px`;
+        labelElement.style.top = `${labelPoint.y}px`;
+        labelElement.addEventListener('pointerdown', (event) => {
+          event.stopPropagation();
+          selectFromPointer({ kind: 'edge', id: edge.id }, event);
+        });
+        labelElement.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectFromPointer({ kind: 'edge', id: edge.id }, event);
+          }
+        });
+        labels.append(labelElement);
       }
     }
   }
 
+  function circleAt(point: Point, radius: number): SVGCircleElement {
+    const circle = ownerDocument.createElementNS(SVG_NS, 'circle');
+    circle.setAttribute('cx', String(point.x));
+    circle.setAttribute('cy', String(point.y));
+    circle.setAttribute('r', String(radius));
+    return circle;
+  }
   function renderGraph(): void {
     const current = graph();
     for (const node of layers.querySelectorAll('.designer-blueprint-canvas-node')) node.remove();
     renderEdgesAndLabels();
     if (current === null) return;
+    const trace = traceVisible ? state?.trace : null;
+    const tracedEdges = new Set(trace?.executedEdgeIds ?? []);
+    const tracedNodes = new Set<string>();
+    const failedNodes = new Set<string>();
+    for (const edge of current.edges) {
+      if (tracedEdges.has(edge.id)) {
+        tracedNodes.add(edge.source);
+        tracedNodes.add(edge.target);
+      }
+      if (
+        edge.relationId !== undefined &&
+        (trace?.failedRelationIds ?? []).includes(edge.relationId)
+      ) {
+        failedNodes.add(edge.target);
+      }
+    }
 
-    const failedRules = new Set(state?.trace?.failedRuleIds ?? []);
     for (const node of current.nodes) {
       const geometry = geometryOf(node);
       const position = positionOf(node);
@@ -811,7 +1088,6 @@ export function createDesignerBlueprintDefaultCanvas(
       card.className = 'designer-blueprint-canvas-node';
       card.dataset.nodeId = node.id;
       card.dataset.kind = node.kind;
-      if (node.unconnected === true) card.dataset.unconnected = 'true';
       card.style.left = `${position.x}px`;
       card.style.top = `${position.y}px`;
       card.style.width = `${geometry.width}px`;
@@ -824,57 +1100,77 @@ export function createDesignerBlueprintDefaultCanvas(
       if (state?.selection?.kind === 'node' && state.selection.id === node.id) {
         card.dataset.selected = 'true';
       }
-      if (node.ruleId !== undefined && failedRules.has(node.ruleId)) {
-        card.dataset.failed = 'true';
-      }
+      if (tracedEdges.size > 0 && tracedNodes.has(node.id)) card.dataset.traced = 'true';
+      if (failedNodes.has(node.id)) card.dataset.failed = 'true';
 
       const header = ownerDocument.createElement('div');
       header.className = 'designer-blueprint-canvas-node-header';
+      const kindBadge = ownerDocument.createElement('span');
+      kindBadge.className = 'designer-blueprint-canvas-node-icon';
+      kindBadge.innerHTML = designerIcon(nodeIconName(node));
       const copy = ownerDocument.createElement('div');
       copy.className = 'designer-blueprint-canvas-node-copy';
       const kindElement = ownerDocument.createElement('span');
       kindElement.className = 'designer-blueprint-canvas-node-kind';
-      kindElement.textContent = kindLabel;
+      kindElement.textContent = nodeKindLine(node);
       const titleElement = ownerDocument.createElement('span');
       titleElement.className = 'designer-blueprint-canvas-node-title';
       titleElement.textContent = title;
       copy.append(kindElement, titleElement);
-      const flow = ownerDocument.createElement('span');
-      flow.className = 'designer-blueprint-canvas-node-flow';
-      const outputCount = geometry.outputs.filter((port) => port.dependency !== true).length;
-      flow.textContent =
-        node.unconnected === true
-          ? blueprintText.unconnectedNode
-          : geometry.inputHandle === undefined
-            ? text.nodeFlowOutputs(outputCount)
-            : text.nodeFlow(outputCount);
-      header.append(copy, flow);
+      header.append(kindBadge, copy);
+      if (node.kind !== 'variable') {
+        const outbound = node.outboundCount ?? 0;
+        const inbound = node.inboundCount ?? 0;
+        const counts = ownerDocument.createElement('span');
+        counts.className = 'designer-blueprint-canvas-node-relcount';
+        counts.title = text.relationCountTitle(outbound, inbound);
+        const out = ownerDocument.createElement('span');
+        out.textContent = `${text.relationCounts.out} `;
+        const outValue = ownerDocument.createElement('b');
+        outValue.textContent = String(outbound);
+        const inboundLabel = ownerDocument.createElement('span');
+        inboundLabel.textContent = ` ${text.relationCounts.in} `;
+        const inboundValue = ownerDocument.createElement('b');
+        inboundValue.textContent = String(inbound);
+        counts.append(out, outValue, inboundLabel, inboundValue);
+        header.append(counts);
+      }
 
       const subtitle = ownerDocument.createElement('div');
       subtitle.className = 'designer-blueprint-canvas-node-subtitle';
       subtitle.textContent = nodeSubtitle(node);
-      const summary = node.summary?.secondary ?? '';
+      let valueElement: HTMLElement | undefined;
+      if (node.kind === 'variable') {
+        valueElement = ownerDocument.createElement('div');
+        valueElement.className = 'designer-blueprint-canvas-node-value';
+        const valueLabel = ownerDocument.createElement('span');
+        valueLabel.textContent = `${text.variableValueLabel} `;
+        const value = ownerDocument.createElement('b');
+        value.textContent =
+          node.variableInitialValue === undefined
+            ? text.variableValueEmpty
+            : shortJson(node.variableInitialValue);
+        const stats = ownerDocument.createElement('span');
+        stats.textContent = text.variableCounts(node.writeCount ?? 0, node.readCount ?? 0);
+        valueElement.append(valueLabel, value, stats);
+      }
+      const summary = nodeSummaryText(node);
       let summaryElement: HTMLElement | undefined;
       if (summary !== '') {
-        summaryElement = ownerDocument.createElement('p');
+        summaryElement = ownerDocument.createElement('div');
         summaryElement.className = 'designer-blueprint-canvas-node-summary';
         summaryElement.textContent = summary;
+        summaryElement.style.bottom = '0';
+        summaryElement.style.height = `${SUMMARY_ROW}px`;
       }
 
       const ports = ownerDocument.createElement('div');
       ports.className = 'designer-blueprint-canvas-ports';
       ports.style.top = `${geometry.portStart}px`;
-      if (node.kind === 'condition' || node.kind === 'action') {
-        const inputRow = ownerDocument.createElement('div');
-        inputRow.className =
-          'designer-blueprint-canvas-port-row designer-blueprint-canvas-port-row-in';
-        const inputLabel = ownerDocument.createElement('span');
-        inputLabel.textContent = text.inputRowLabel;
-        inputRow.append(inputLabel);
-        ports.append(inputRow);
-      }
       if (node.kind === 'component' || node.kind === 'variable') {
-        const eventPorts = geometry.outputs.filter((port) => port.dependency !== true);
+        const eventPorts = geometry.outputs.filter(
+          (port) => port.semantic !== true && port.containment !== true,
+        );
         if (eventPorts.length === 0) {
           const row = ownerDocument.createElement('div');
           row.className = 'designer-blueprint-canvas-port-row';
@@ -885,14 +1181,9 @@ export function createDesignerBlueprintDefaultCanvas(
         for (const port of eventPorts) {
           ports.append(portRow(port));
         }
-      }
-      for (const port of geometry.outputs.filter((port) => port.dependency === true)) {
-        const row = portRow(port);
-        row.dataset.dependency = 'true';
-        ports.append(row);
-      }
-      if (node.kind === 'condition') {
-        for (const port of geometry.outputs) {
+        for (const port of geometry.outputs.filter(
+          (port) => port.semantic === true || port.containment === true,
+        )) {
           ports.append(portRow(port));
         }
       }
@@ -916,7 +1207,7 @@ export function createDesignerBlueprintDefaultCanvas(
       });
 
       card.append(header, subtitle);
-      if (summaryElement !== undefined) card.append(summaryElement);
+      if (valueElement !== undefined) card.append(valueElement);
       card.append(ports);
       if (geometry.inputHandle !== undefined) {
         input.dataset.inputHandle = geometry.inputHandle;
@@ -929,6 +1220,8 @@ export function createDesignerBlueprintDefaultCanvas(
         output.dataset.nodeId = node.id;
         output.dataset.available = String(port.available);
         if (port.dependency === true) output.dataset.dependency = 'true';
+        if (port.semantic === true) output.dataset.semantic = 'true';
+        if (port.containment === true) output.dataset.containment = 'true';
         output.style.top = `${port.y}px`;
         output.setAttribute('role', 'button');
         output.setAttribute('tabindex', '0');
@@ -946,8 +1239,11 @@ export function createDesignerBlueprintDefaultCanvas(
               : text.portUnavailableCapability(port.requiredCapability),
           );
         }
-        if (port.dependency === true) {
+        if (port.dependency === true || port.containment === true) {
           output.setAttribute('aria-disabled', 'true');
+          if (port.containment === true) {
+            output.setAttribute('data-tip', blueprintText.relationList.containmentHint);
+          }
         } else {
           output.addEventListener('pointerdown', (event) => onPortPointerDown(event, node, port));
           output.addEventListener('keydown', (event) => {
@@ -964,6 +1260,7 @@ export function createDesignerBlueprintDefaultCanvas(
         }
         card.append(output);
       }
+      if (summaryElement !== undefined) card.append(summaryElement);
 
       card.addEventListener('pointerdown', (event) => onNodePointerDown(event, node));
       card.addEventListener('keydown', (event) => {
@@ -981,7 +1278,28 @@ export function createDesignerBlueprintDefaultCanvas(
     row.className = 'designer-blueprint-canvas-port-row';
     row.dataset.available = String(port.available);
     if (port.dependency === true) row.dataset.dependency = 'true';
-    row.textContent = port.label;
+    if (port.semantic === true) row.dataset.semantic = 'true';
+    if (port.containment === true) row.dataset.containment = 'true';
+    const name = ownerDocument.createElement('span');
+    name.className = 'designer-blueprint-canvas-port-name';
+    name.textContent = port.label;
+    const tag = ownerDocument.createElement('span');
+    tag.className = 'designer-blueprint-canvas-port-tag';
+    tag.textContent =
+      port.semantic === true
+        ? text.portTags.semantic
+        : port.containment === true
+          ? text.portTags.structure
+          : port.available
+            ? text.portTags.event
+            : text.portTags.unavailable;
+    row.append(name, tag);
+    if (port.available !== true) {
+      const lock = ownerDocument.createElement('span');
+      lock.className = 'designer-blueprint-canvas-port-lock';
+      lock.innerHTML = designerIcon('lock');
+      row.append(lock);
+    }
     return row;
   }
 
@@ -993,21 +1311,57 @@ export function createDesignerBlueprintDefaultCanvas(
   function nodeTitle(node: BaseScreenBlueprintCanvasNode): string {
     if (node.kind === 'component') return node.componentName ?? node.componentId ?? node.id;
     if (node.kind === 'variable') return node.variableName ?? node.variableId ?? node.id;
-    return node.summary?.primary ?? node.id;
+    if (node.kind === 'host') return blueprintText.hostNode;
+    return node.id;
+  }
+
+  function nodeKindLine(node: BaseScreenBlueprintCanvasNode): string {
+    if (node.kind === 'component') {
+      return text.nodeKindLine.component(node.materialType ?? text.nodeKind.component);
+    }
+    if (node.kind === 'variable') return text.nodeKindLine.variable;
+    if (node.kind === 'host') return text.nodeKindLine.host;
+    return text.nodeKind[node.kind];
+  }
+
+  function nodeIconName(node: BaseScreenBlueprintCanvasNode): DesignerIconName {
+    if (node.kind === 'variable') return 'variable';
+    if (node.kind === 'host') return 'terminal';
+    if (node.isContainer === true) return 'group';
+    const material = node.materialType ?? '';
+    if (material.includes('chart')) return 'chart-line';
+    if (material.includes('table') || material.includes('ranking')) return 'table';
+    if (material.includes('text') || material.includes('title')) return 'type';
+    if (material.includes('image')) return 'image';
+    return 'shapes';
   }
 
   function nodeSubtitle(node: BaseScreenBlueprintCanvasNode): string {
     if (node.kind === 'component') {
-      const events = node.events?.length ?? 0;
-      return text.nodeEventSummary(node.materialType ?? 'material', events);
+      return text.nodeSubtitle.component(
+        node.materialType ?? text.nodeKind.component,
+        node.componentId ?? node.id,
+      );
     }
     if (node.kind === 'variable') {
-      const value =
-        node.variableInitialValue === undefined ? '' : ` = ${shortJson(node.variableInitialValue)}`;
-      return `${node.variableType ?? 'variable'}${value}`;
+      return text.nodeSubtitle.variable(
+        node.variableType ?? text.nodeKind.variable,
+        node.variableId ?? node.id,
+      );
     }
-    if (node.kind === 'condition') return node.condition?.operator ?? 'condition';
-    return node.action?.type ?? node.summary?.kind ?? 'action';
+    if (node.kind === 'host') {
+      return text.nodeSubtitle.host(node.exitCount ?? 0);
+    }
+    return node.id;
+  }
+
+  function nodeSummaryText(node: BaseScreenBlueprintCanvasNode): string {
+    const provided = node.summary?.secondary ?? '';
+    if (provided !== '') return provided;
+    if (node.kind === 'component' && (node.childCount ?? 0) > 0) {
+      return `${blueprintText.structureTitle} · ${blueprintText.structure.children} ${node.childCount}`;
+    }
+    return '';
   }
 
   function shortJson(value: unknown): string {
@@ -1178,6 +1532,24 @@ export function createDesignerBlueprintDefaultCanvas(
     sendCommand({ type: 'select', selection });
   }
 
+  function selectFromPointer(
+    selection: NonNullable<BaseScreenBlueprintCanvasSelection>,
+    event: { readonly ctrlKey: boolean; readonly metaKey: boolean },
+  ): void {
+    const current = state?.selection;
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      current !== null &&
+      current !== undefined &&
+      current.kind === selection.kind &&
+      current.id === selection.id
+    ) {
+      select(null);
+      return;
+    }
+    select(selection);
+  }
+
   function onNodePointerDown(event: PointerEvent, node: BaseScreenBlueprintCanvasNode): void {
     if (event.button !== 0) return;
     const target = event.target instanceof Element ? event.target : null;
@@ -1225,7 +1597,7 @@ export function createDesignerBlueprintDefaultCanvas(
     view?.removeEventListener('pointerup', onNodePointerUp);
     view?.removeEventListener('pointercancel', onNodePointerUp);
     if (!finished.moved) {
-      select({ kind: 'node', id: finished.nodeId });
+      selectFromPointer({ kind: 'node', id: finished.nodeId }, event);
       return;
     }
     commitLayout();
@@ -1364,15 +1736,103 @@ export function createDesignerBlueprintDefaultCanvas(
   function onBackgroundPointerDown(event: PointerEvent): void {
     if (event.button !== 0) return;
     const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest('.designer-blueprint-canvas-node, [data-edge-id]') != null) return;
     if (
       target?.closest(
-        '[data-canvas-empty], [data-canvas-simulation], [data-canvas-simulation-bar], [data-canvas-problems], [data-canvas-no-events]',
+        '.designer-blueprint-canvas-node, [data-edge-id], [data-canvas-empty], [data-canvas-simulation], [data-canvas-simulation-bar], [data-canvas-problems], [data-canvas-no-events]',
       ) != null
     ) {
       return;
     }
     armed = null;
+    const rect = viewport.getBoundingClientRect();
+    marquee = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startLeft: event.clientX - rect.left,
+      startTop: event.clientY - rect.top,
+      moved: false,
+    };
+    viewport.setPointerCapture(event.pointerId);
+    view?.addEventListener('pointermove', onMarqueePointerMove);
+    view?.addEventListener('pointerup', onMarqueePointerUp);
+    view?.addEventListener('pointercancel', onMarqueePointerUp);
+  }
+
+  function onMarqueePointerMove(event: PointerEvent): void {
+    if (marquee === null || event.pointerId !== marquee.pointerId) return;
+    const rect = viewport.getBoundingClientRect();
+    const currentX = event.clientX - rect.left;
+    const currentY = event.clientY - rect.top;
+    const left = Math.min(marquee.startLeft, currentX);
+    const top = Math.min(marquee.startTop, currentY);
+    const width = Math.abs(currentX - marquee.startLeft);
+    const height = Math.abs(currentY - marquee.startTop);
+    if (!marquee.moved && width + height < 3) return;
+    marquee = { ...marquee, moved: true };
+    marqueeBox.hidden = false;
+    marqueeBox.style.left = `${left}px`;
+    marqueeBox.style.top = `${top}px`;
+    marqueeBox.style.width = `${width}px`;
+    marqueeBox.style.height = `${height}px`;
+  }
+
+  function onMarqueePointerUp(event: PointerEvent): void {
+    if (marquee === null || event.pointerId !== marquee.pointerId) return;
+    const finished = marquee;
+    marquee = null;
+    view?.removeEventListener('pointermove', onMarqueePointerMove);
+    view?.removeEventListener('pointerup', onMarqueePointerUp);
+    view?.removeEventListener('pointercancel', onMarqueePointerUp);
+    marqueeBox.hidden = true;
+    if (!finished.moved) {
+      select(null);
+      return;
+    }
+    const rect = viewport.getBoundingClientRect();
+    const left = Math.min(finished.startClientX, event.clientX) - rect.left;
+    const top = Math.min(finished.startClientY, event.clientY) - rect.top;
+    const right = Math.max(finished.startClientX, event.clientX) - rect.left;
+    const bottom = Math.max(finished.startClientY, event.clientY) - rect.top;
+    const nodeId = nodeWithLargestIntersection(left, top, right, bottom);
+    if (nodeId === undefined) {
+      select(null);
+      return;
+    }
+    selectFromPointer({ kind: 'node', id: nodeId }, event);
+  }
+
+  function nodeWithLargestIntersection(
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+  ): string | undefined {
+    let bestId: string | undefined;
+    let bestArea = 0;
+    const rect = viewport.getBoundingClientRect();
+    for (const card of layers.querySelectorAll<HTMLElement>('.designer-blueprint-canvas-node')) {
+      const cardRect = card.getBoundingClientRect();
+      const cardLeft = cardRect.left - rect.left;
+      const cardTop = cardRect.top - rect.top;
+      const width = Math.max(
+        0,
+        Math.min(cardLeft + cardRect.width, right) - Math.max(cardLeft, left),
+      );
+      const height = Math.max(
+        0,
+        Math.min(cardTop + cardRect.height, bottom) - Math.max(cardTop, top),
+      );
+      const area = width * height;
+      if (area > bestArea && card.dataset.nodeId !== undefined) {
+        bestArea = area;
+        bestId = card.dataset.nodeId;
+      }
+    }
+    return bestId;
+  }
+
+  function startPan(event: PointerEvent): void {
     pan = {
       pointerId: event.pointerId,
       startClientX: event.clientX,
@@ -1381,10 +1841,27 @@ export function createDesignerBlueprintDefaultCanvas(
       startY: viewportValue.y,
       moved: false,
     };
+    viewport.dataset.panning = 'true';
     viewport.setPointerCapture(event.pointerId);
     view?.addEventListener('pointermove', onPanPointerMove);
     view?.addEventListener('pointerup', onPanPointerUp);
     view?.addEventListener('pointercancel', onPanPointerUp);
+  }
+
+  function onViewportCapturePointerDown(event: PointerEvent): void {
+    if (event.button !== 0 || !spacePressed) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (
+      target?.closest(
+        '[data-canvas-empty], [data-canvas-simulation], [data-canvas-simulation-bar], [data-canvas-problems], [data-canvas-no-events], [data-canvas-menu], [data-canvas-status]',
+      ) != null
+    ) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    armed = null;
+    startPan(event);
   }
 
   function onPanPointerMove(event: PointerEvent): void {
@@ -1402,17 +1879,53 @@ export function createDesignerBlueprintDefaultCanvas(
     if (pan === null || event.pointerId !== pan.pointerId) return;
     const finished = pan;
     pan = null;
+    viewport.dataset.panning = 'false';
     view?.removeEventListener('pointermove', onPanPointerMove);
     view?.removeEventListener('pointerup', onPanPointerUp);
     view?.removeEventListener('pointercancel', onPanPointerUp);
     if (finished.moved) commitViewport();
-    else select(null);
+  }
+
+  function isEditableEventTarget(event: Event): boolean {
+    const target = event.composedPath()[0];
+    if (!(target instanceof HTMLElement)) return false;
+    return (
+      target.isContentEditable ||
+      target.closest('input, textarea, select, button, a, [contenteditable="true"]') !== null
+    );
+  }
+
+  function onWindowKeyDown(event: KeyboardEvent): void {
+    if (event.code !== 'Space' || isEditableEventTarget(event)) return;
+    if (state?.active !== true || root.getClientRects().length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    spacePressed = true;
+    viewport.dataset.hand = 'true';
+  }
+
+  function onWindowKeyUp(event: KeyboardEvent): void {
+    if (event.code !== 'Space' || !spacePressed) return;
+    spacePressed = false;
+    viewport.dataset.hand = 'false';
+  }
+
+  function onWindowBlur(): void {
+    spacePressed = false;
+    viewport.dataset.hand = 'false';
+    if (pan === null) return;
+    viewport.dataset.panning = 'false';
+    pan = null;
+    view?.removeEventListener('pointermove', onPanPointerMove);
+    view?.removeEventListener('pointerup', onPanPointerUp);
+    view?.removeEventListener('pointercancel', onPanPointerUp);
+    viewportsDirty = true;
   }
 
   function onWheel(event: WheelEvent): void {
     event.preventDefault();
     if (event.ctrlKey || event.metaKey) {
-      const factor = Math.exp(-event.deltaY * 0.0015);
+      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
       const next = clampZoom(viewportValue.zoom * factor);
       const point = screenToGraph(event.clientX, event.clientY);
       const rect = viewport.getBoundingClientRect();
@@ -1422,10 +1935,13 @@ export function createDesignerBlueprintDefaultCanvas(
         y: event.clientY - rect.top - point.y * next,
       };
     } else {
+      const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 512 : 1;
+      const dx = (event.shiftKey ? event.deltaY : event.deltaX) * scale;
+      const dy = (event.shiftKey ? event.deltaX : event.deltaY) * scale;
       viewportValue = {
         ...viewportValue,
-        x: viewportValue.x - event.deltaX,
-        y: viewportValue.y - event.deltaY,
+        x: viewportValue.x - dx,
+        y: viewportValue.y - dy,
       };
     }
     applyTransform();
@@ -1505,70 +2021,101 @@ export function createDesignerBlueprintDefaultCanvas(
     positions = computeAutoLayout(current.nodes);
     sessionLayout = false;
     renderGraph();
-    fitView(undefined, false, simulationOpen ? SIMULATION_INSET : 0);
+    fitView(undefined, false, simulationOpen ? SIMULATION_INSET : SIMULATION_BAR_INSET);
     commitLayout();
     setStatus(text.statusLayoutApplied);
   }
 
   function computeAutoLayout(nodes: readonly BaseScreenBlueprintCanvasNode[]): Map<string, Point> {
-    const current = graph();
-    if (current === null) return new Map();
-    const depths = new Map<string, number>();
-    const outgoing = new Map<string, string[]>();
-    for (const edge of current.edges) {
-      if (edge.kind === 'dependency') continue;
-      outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge.target]);
-    }
-    const visit = (id: string, depth: number, stack: Set<string>): void => {
-      if (stack.has(id)) return;
-      const known = depths.get(id);
-      if (known !== undefined && known >= depth) return;
-      depths.set(id, depth);
-      const nextStack = new Set(stack).add(id);
-      for (const target of outgoing.get(id) ?? []) visit(target, depth + 1, nextStack);
-    };
-    for (const node of nodes) {
-      if ((outgoing.get(node.id) ?? []).length > 0) visit(node.id, 0, new Set());
-    }
-    const columns = new Map<number, BaseScreenBlueprintCanvasNode[]>();
-    for (const node of nodes) {
-      const fallback =
-        node.kind === 'component' || node.kind === 'variable'
-          ? 0
-          : node.kind === 'condition'
-            ? 1
-            : 2;
-      const depth = depths.get(node.id) ?? fallback;
-      columns.set(depth, [...(columns.get(depth) ?? []), node]);
-    }
     const next = new Map<string, Point>();
-    for (const [depth, column] of [...columns.entries()].sort(
-      (left, right) => left[0] - right[0],
-    )) {
-      column.sort((left, right) => {
-        const leftPosition = positionOf(left);
-        const rightPosition = positionOf(right);
-        return leftPosition.y - rightPosition.y || left.id.localeCompare(right.id);
+    const components = nodes.filter((node) => node.kind === 'component');
+    const variables = nodes.filter((node) => node.kind === 'variable');
+    const hosts = nodes.filter((node) => node.kind === 'host');
+    const currentEdges = graph()?.edges ?? [];
+    const readOnlyVariables = variables.filter(
+      (node) => !currentEdges.some((edge) => edge.target === node.id && edge.kind === 'relation'),
+    );
+    // 只被读取的变量排到组件左侧，读取依赖全部变成左→右；有写入时留在右侧承接写回。
+    const variablesOnLeft = variables.length > 0 && readOnlyVariables.length === variables.length;
+    // 336/336 面板下画布更窄：宽画布排三列组件，窄画布两列，避免 fit 缩到不可读。
+    const desiredColumns = viewport.clientWidth >= 900 ? 3 : 2;
+    const columns = Math.max(1, Math.min(components.length, desiredColumns));
+    const componentRowStep = Math.max(0, ...components.map((node) => geometryOf(node).height)) + 28;
+    const depth = relationDepths(nodes);
+    const ordered = [...components].sort((left, right) => {
+      const delta = (depth.get(left.id) ?? 0) - (depth.get(right.id) ?? 0);
+      return delta === 0 ? 0 : delta;
+    });
+    const componentBaseX = GRAPH_PADDING + (variablesOnLeft ? COLUMN_STEP : 0);
+    const rows = Math.max(1, Math.ceil(ordered.length / columns));
+    ordered.forEach((node, index) => {
+      const column = Math.floor(index / rows);
+      const row = index % rows;
+      next.set(node.id, {
+        x: componentBaseX + column * COLUMN_STEP,
+        y: GRAPH_PADDING + row * componentRowStep,
       });
+    });
+    const rightmostColumnX = componentBaseX + Math.max(0, columns - 1) * COLUMN_STEP;
+    const componentBottom = (columnX: number): number =>
+      ordered.reduce((bottom, node) => {
+        const point = next.get(node.id);
+        return point !== undefined && point.x === columnX
+          ? Math.max(bottom, point.y + geometryOf(node).height)
+          : bottom;
+      }, GRAPH_PADDING);
+    let variableRightCursor = GRAPH_PADDING;
+    if (variablesOnLeft) {
       let cursor = GRAPH_PADDING;
-      for (const node of column) {
-        next.set(node.id, {
-          x: GRAPH_PADDING + depth * COLUMN_STEP,
-          y: cursor,
-        });
-        cursor += geometryOf(node).height + 36;
+      for (const node of readOnlyVariables) {
+        next.set(node.id, { x: GRAPH_PADDING, y: cursor });
+        cursor += geometryOf(node).height + 20;
       }
+    } else {
+      const variableX = componentBaseX + columns * COLUMN_STEP;
+      for (const node of variables) {
+        next.set(node.id, { x: variableX, y: variableRightCursor });
+        variableRightCursor += geometryOf(node).height + 20;
+      }
+    }
+    const hostX = componentBaseX + columns * COLUMN_STEP;
+    let hostY = variablesOnLeft ? GRAPH_PADDING : variableRightCursor;
+    if (variablesOnLeft && hosts.length > 0) {
+      hostY = Math.max(GRAPH_PADDING, componentBottom(rightmostColumnX));
+    }
+    for (const node of hosts) {
+      next.set(node.id, { x: hostX, y: hostY });
+      hostY += geometryOf(node).height + 24;
     }
     return next;
   }
 
+  function relationDepths(nodes: readonly BaseScreenBlueprintCanvasNode[]): Map<string, number> {
+    const depths = new Map<string, number>(nodes.map((node) => [node.id, 0] as const));
+    const relations = (graph()?.edges ?? []).filter(
+      (edge) => edge.kind === 'relation' || edge.kind === 'semantic',
+    );
+    const limit = Math.min(nodes.length, 8);
+    for (let pass = 0; pass < limit; pass += 1) {
+      let changed = false;
+      for (const edge of relations) {
+        const source = depths.get(edge.source);
+        const target = depths.get(edge.target);
+        if (source === undefined || target === undefined) continue;
+        const candidate = source + 1;
+        if (candidate > target && candidate < limit) {
+          depths.set(edge.target, candidate);
+          changed = true;
+        }
+      }
+      if (!changed) break;
+    }
+    return depths;
+  }
+
   function columnOf(node: BaseScreenBlueprintCanvasNode | undefined): number {
     if (node === undefined) return 0;
-    return node.kind === 'component' || node.kind === 'variable'
-      ? 0
-      : node.kind === 'condition'
-        ? 1
-        : 2;
+    return node.kind === 'host' ? 2 : 0;
   }
 
   function placeNewNode(node: BaseScreenBlueprintCanvasNode | undefined): Point {
@@ -1600,22 +2147,12 @@ export function createDesignerBlueprintDefaultCanvas(
       if (rect.width === 0 || rect.height === 0) return;
       pendingInitialFit = false;
       initialFitDone = true;
-      fitView(current.nodes, false, simulationOpen ? SIMULATION_INSET : 0);
+      fitView(current.nodes, false, simulationOpen ? SIMULATION_INSET : SIMULATION_BAR_INSET);
     });
   }
 
-  function onInsert(kind: 'condition' | 'set-variable' | 'emit-host-event'): void {
-    const point = placeNewNode({
-      id: '',
-      kind: kind === 'condition' ? 'condition' : 'action',
-      x: 0,
-      y: 0,
-    });
-    sendCommand({
-      type: 'insert-node',
-      kind,
-      position: { x: snap(point.x), y: snap(point.y) },
-    });
+  function onInsert(): void {
+    sendCommand({ type: 'insert-node', kind: 'host' });
     closeMenu();
   }
 
@@ -1698,7 +2235,7 @@ export function createDesignerBlueprintDefaultCanvas(
     }
     if (event.key === '0' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
-      fitView(undefined, true, simulationOpen ? SIMULATION_INSET : 0);
+      fitView(undefined, true, simulationOpen ? SIMULATION_INSET : SIMULATION_BAR_INSET);
       return;
     }
     if (event.key !== 'Delete' && event.key !== 'Backspace') return;
@@ -1802,7 +2339,7 @@ export function createDesignerBlueprintDefaultCanvas(
       x: rect.width / 2 - (position.x + geometry.width / 2) * viewportValue.zoom,
       y:
         rect.height / 2 -
-        (simulationOpen ? SIMULATION_INSET / 2 : 0) -
+        (simulationOpen ? SIMULATION_INSET : SIMULATION_BAR_INSET) / 2 -
         (position.y + geometry.height / 2) * viewportValue.zoom,
     };
     applyTransform();
@@ -1853,8 +2390,8 @@ export function createDesignerBlueprintDefaultCanvas(
     const target = event.target instanceof Element ? event.target : null;
     if (target === null) return;
     const insert = target.closest<HTMLElement>('[data-canvas-insert]')?.dataset.canvasInsert;
-    if (insert === 'condition' || insert === 'set-variable' || insert === 'emit-host-event') {
-      onInsert(insert);
+    if (insert === 'host') {
+      onInsert();
       return;
     }
     const action = target.closest<HTMLElement>('[data-canvas-action]')?.dataset.canvasAction;
@@ -1886,7 +2423,7 @@ export function createDesignerBlueprintDefaultCanvas(
       return;
     }
     if (action === 'fit') {
-      fitView(undefined, true, simulationOpen ? SIMULATION_INSET : 0);
+      fitView(undefined, true, simulationOpen ? SIMULATION_INSET : SIMULATION_BAR_INSET);
       return;
     }
     if (action === 'simulate') {
@@ -1896,10 +2433,8 @@ export function createDesignerBlueprintDefaultCanvas(
   });
   emptyCard.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
-    if (
-      target?.closest<HTMLElement>('[data-canvas-insert]')?.dataset.canvasInsert === 'condition'
-    ) {
-      onInsert('condition');
+    if (target?.closest<HTMLElement>('[data-canvas-insert]')?.dataset.canvasInsert === 'host') {
+      onInsert();
     }
   });
   problems.addEventListener('click', (event) => {
@@ -1942,6 +2477,7 @@ export function createDesignerBlueprintDefaultCanvas(
       renderProblems();
     }
   });
+  viewport.addEventListener('pointerdown', onViewportCapturePointerDown, true);
   viewport.addEventListener('pointerdown', onBackgroundPointerDown);
   viewport.addEventListener('wheel', onWheel, { passive: false });
   viewport.addEventListener('dragover', (event) => {
@@ -1955,6 +2491,9 @@ export function createDesignerBlueprintDefaultCanvas(
   viewport.addEventListener('drop', onDrop);
   root.addEventListener('keydown', onKeyDown);
   root.addEventListener(BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT, onCanvasState);
+  view?.addEventListener('keydown', onWindowKeyDown, true);
+  view?.addEventListener('keyup', onWindowKeyUp, true);
+  view?.addEventListener('blur', onWindowBlur);
 
   applyTransform();
   renderBar();
@@ -1975,6 +2514,12 @@ export function createDesignerBlueprintDefaultCanvas(
       view?.removeEventListener('pointermove', onPanPointerMove);
       view?.removeEventListener('pointerup', onPanPointerUp);
       view?.removeEventListener('pointercancel', onPanPointerUp);
+      view?.removeEventListener('pointermove', onMarqueePointerMove);
+      view?.removeEventListener('pointerup', onMarqueePointerUp);
+      view?.removeEventListener('pointercancel', onMarqueePointerUp);
+      view?.removeEventListener('keydown', onWindowKeyDown, true);
+      view?.removeEventListener('keyup', onWindowKeyUp, true);
+      view?.removeEventListener('blur', onWindowBlur);
     },
   };
 }

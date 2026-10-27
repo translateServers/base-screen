@@ -133,7 +133,7 @@ function sharedInstanceDocument(componentIds: readonly string[]): ScreenDocument
       },
     ],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 
@@ -142,7 +142,7 @@ function document(components: readonly ScreenComponentNode[]): ScreenDocument {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
     components,
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

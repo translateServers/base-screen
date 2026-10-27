@@ -11,12 +11,12 @@
 
 .designer-color::-webkit-color-swatch {
   border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
 }
 
 .designer-color::-moz-color-swatch {
   border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
 }
 
 /* 按钮基座对齐设计原型 .btn：30px 高、6px 圆角、无边框；描边由阴影承担。
@@ -32,7 +32,7 @@
   gap: var(--designer-space-3);
   padding: 0 var(--designer-space-5);
   border: 0;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   appearance: none;
   background: var(--designer-surface-control);
   box-shadow: var(--designer-elev-ring);
@@ -73,6 +73,11 @@
 
 .designer-button[aria-busy="true"] {
   cursor: progress;
+}
+
+.designer-button[data-size="compact"] {
+  min-height: var(--designer-control-height-compact);
+  padding: 0 var(--designer-space-4);
 }
 
 .designer-icon-button {
@@ -214,7 +219,7 @@
   min-width: 0;
   min-height: var(--designer-control-height-compact);
   border: 1px solid transparent;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: transparent;
   color: var(--designer-text-muted);
   cursor: pointer;
@@ -225,35 +230,8 @@
   white-space: nowrap;
 }
 
-.designer-status,
-.designer-badge {
-  box-sizing: border-box;
-  display: inline-flex;
-  max-width: 100%;
-  align-items: center;
-  min-height: 20px;
-  padding: 0 var(--designer-space-2);
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent);
-  font: var(--designer-font-small);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.designer-empty-state {
-  margin: 0;
-  padding: var(--designer-space-7) var(--designer-space-5);
-  border: 1px dashed var(--designer-border-default);
-  border-radius: var(--designer-radius-control);
-  color: var(--designer-text-muted);
-  text-align: center;
-  overflow-wrap: anywhere;
-}
+/* 徽标与空态属于面板件，外观只在 workbench 的 chrome 层（designer-workbench-chrome.css），
+   控件层不再提供第二套定义。 */
 
 /* 对话框与覆盖层族（命令面板 / 菜单 / 提示条）同一收边：阴影即描边，
    不用真实 1px border——真实描边在深色覆盖层上会读成一道灰线，与其余浮层不同源。 */
@@ -276,7 +254,6 @@
 }
 
 .designer-button[hidden],
-.designer-tab[hidden],
-.designer-empty-state[hidden] {
+.designer-tab[hidden] {
   display: none;
 }

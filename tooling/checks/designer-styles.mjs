@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { classTokens, scanCssBlocks } from './designer-style-scan.mjs';
 
 // 当前脚本位于 <root>/tooling/checks/，向上两级到达仓库根
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -21,6 +22,7 @@ const controlLayers = [
   'packages/engine/src/browser/styles/controls/designer-controls-segmented.css',
   'packages/engine/src/browser/styles/controls/designer-controls-quick-style.css',
   'packages/engine/src/browser/styles/controls/designer-controls-actions.css',
+  'packages/engine/src/browser/styles/controls/designer-controls-tabs.css',
   'packages/engine/src/browser/styles/controls/designer-controls-descriptor.css',
 ];
 const workbenchLayers = [
@@ -46,6 +48,7 @@ const workbenchLayers = [
   'packages/engine/src/browser/styles/workbench/designer-workbench-canvas.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-inspector.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-inspector-data.css',
+  'packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-selection.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-accessibility.css',
 ];
@@ -65,6 +68,7 @@ const controlBindings = [
   'segmentedCss',
   'quickStyleCss',
   'actionsCss',
+  'tabsCss',
   'descriptorCss',
 ];
 const workbenchBindings = [
@@ -90,6 +94,7 @@ const workbenchBindings = [
   'canvasCss',
   'inspectorCss',
   'inspectorDataCss',
+  'chromeCss',
   'selectionCss',
   'accessibilityCss',
 ];
@@ -208,6 +213,239 @@ if (!/^:host,\s*:host\(\[theme="dark"\]\)\s*\{/m.test(tokensCss)) {
 const stylesPrefix = 'packages/engine/src/browser/styles/';
 const nonTokenLayers = [...baseLayers, ...controlLayers, ...workbenchLayers];
 
+// Temporary debt for the consolidation pass. Every number is produced by
+// `node tooling/checks/designer-styles.mjs --report`; entries may only shrink and must be
+// deleted once all of their metrics reach zero (the stale guard below enforces that).
+const styleDebtBaseline = {
+  'base/designer-base-menus.css': { spacing: 3 },
+  'base/designer-base-tooltip.css': { spacing: 1 },
+  'base/designer-base-library.css': { control: 30, spacing: 5 },
+  'base/designer-base-material-groups.css': { control: 5 },
+  'base/designer-base-adaptivity.css': { control: 9 },
+  'controls/designer-controls-color-palette.css': { spacing: 21 },
+  'controls/designer-controls-inputs.css': { spacing: 1 },
+  'controls/designer-controls-date-field.css': { spacing: 13 },
+  'controls/designer-controls-segmented.css': { spacing: 1 },
+  'controls/designer-controls-quick-style.css': { spacing: 3 },
+  'controls/designer-controls-actions.css': { spacing: 1 },
+  'workbench/designer-workbench-topbar.css': { control: 4, spacing: 9 },
+  'workbench/designer-workbench-feedback.css': { control: 8, spacing: 2 },
+  'workbench/designer-workbench-panels.css': { control: 1, spacing: 8 },
+  'workbench/designer-workbench-blueprint-canvas.css': { control: 21, spacing: 14 },
+  'workbench/designer-workbench-blueprint-panels.css': { spacing: 1 },
+  'workbench/designer-workbench-blueprint-details.css': { spacing: 8 },
+  'workbench/designer-workbench-materials.css': { spacing: 1 },
+  'workbench/designer-workbench-data-catalog.css': { control: 6, spacing: 3 },
+  'workbench/designer-workbench-data-binding.css': { spacing: 7 },
+  'workbench/designer-workbench-data-editor.css': { control: 15, spacing: 8 },
+  'workbench/designer-workbench-layers.css': { spacing: 7 },
+  'workbench/designer-workbench-variables.css': { spacing: 12 },
+  'workbench/designer-workbench-variable-editor.css': { spacing: 15 },
+  'workbench/designer-workbench-variable-inspector.css': { control: 4, spacing: 25 },
+  'workbench/designer-workbench-canvas.css': { spacing: 4 },
+  'workbench/designer-workbench-inspector.css': { control: 49, spacing: 47 },
+  'workbench/designer-workbench-inspector-data.css': { control: 80, spacing: 60 },
+};
+
+const controlLayerSet = new Set(controlLayers);
+const chromeLayerFile = 'workbench/designer-workbench-chrome.css';
+const selectionFiles = new Set([
+  'workbench/designer-workbench-selection.css',
+  // forced-colors is an accessibility override of the same single paint recipe, not a second recipe.
+  'workbench/designer-workbench-accessibility.css',
+]);
+const styleMetricCodes = {
+  control: 'CONTROL_APPEARANCE',
+  chrome: 'CHROME_APPEARANCE',
+  fontSize: 'FONT_SIZE_FLOOR',
+  radius: 'RADIUS_LITERAL',
+  disabledOpacity: 'DISABLED_OPACITY',
+  spacing: 'SPACING_LITERAL',
+  selection: 'SELECTION_PAINT',
+};
+
+const sharedControlClasses = new Set([
+  'designer-control',
+  'designer-control-shell',
+  'designer-input',
+  'designer-number',
+  'designer-color',
+  'designer-range',
+  'designer-select',
+  'designer-select-control',
+  'designer-select-trigger',
+  'designer-select-value',
+  'designer-select-caret',
+  'designer-select-menu',
+  'designer-select-option',
+  'designer-select-check',
+  'designer-select-native',
+  'designer-textarea',
+  'designer-checkbox',
+  'designer-switch',
+  'designer-button',
+  'designer-icon-button',
+  'designer-tool-button',
+  'designer-segmented',
+  'designer-segmented-option',
+  'designer-segmented-native',
+  'designer-tab',
+  'designer-tablist',
+  'designer-stepper',
+  'designer-stepper-button',
+  'designer-stepper-value',
+  'designer-date-field',
+  'designer-field',
+  'designer-field-label',
+  'designer-field-label-text',
+  'designer-field-control',
+  'designer-field-stacked',
+  'designer-field-grid',
+  'designer-geo-field',
+]);
+const sharedControlPrefixes = [
+  'designer-select-',
+  'designer-segmented-',
+  'designer-stepper-',
+  'designer-field-',
+  'designer-calendar-',
+];
+
+const chromeClasses = new Set([
+  'designer-empty',
+  'designer-empty-state',
+  'designer-badge',
+  'designer-inspector-section',
+  'designer-inspector-section-title',
+  'designer-inspector-section-summary',
+  'designer-inspector-section-disclosure',
+  'designer-panel-section',
+  'designer-panel-section-title',
+  'designer-list-row',
+  'layer-row',
+  'blueprint-palette-item',
+  'inspector-search-result',
+  'panel-count',
+  'material-badge',
+  'inspector-search-result-badge',
+  'designer-value-ref-badge',
+  'blueprint-inspector-section',
+]);
+
+function isSharedControlClass(token) {
+  return (
+    sharedControlClasses.has(token) ||
+    sharedControlPrefixes.some((prefix) => token.startsWith(prefix))
+  );
+}
+
+function isChromeClass(token) {
+  return chromeClasses.has(token);
+}
+
+function isAppearanceProperty(property) {
+  return (
+    property === 'color' ||
+    property === 'box-shadow' ||
+    property === 'line-height' ||
+    property === 'height' ||
+    property === 'min-height' ||
+    property === 'max-height' ||
+    property === 'opacity' ||
+    property === 'letter-spacing' ||
+    property === 'text-transform' ||
+    property === 'appearance' ||
+    property === 'accent-color' ||
+    property === 'caret-color' ||
+    property === 'filter' ||
+    property === 'transform' ||
+    property.startsWith('background') ||
+    property.startsWith('border') ||
+    property.startsWith('font') ||
+    property.startsWith('padding') ||
+    property.startsWith('outline')
+  );
+}
+
+function isSpacingProperty(property) {
+  return /^(?:gap|row-gap|column-gap|padding(?:-[a-z]+)*|margin(?:-[a-z]+)*)$/.test(property);
+}
+
+function isSelectionProperty(property) {
+  return (
+    property.startsWith('background') ||
+    property.startsWith('border') ||
+    property === 'color' ||
+    property === 'box-shadow'
+  );
+}
+
+function firstPx(value) {
+  const match = value.match(/(\d+(?:\.\d+)?)px\b/);
+  return match === null ? undefined : Number(match[1]);
+}
+
+function hasNonHairlinePx(value) {
+  for (const match of value.matchAll(/(\d+(?:\.\d+)?)px\b/g)) {
+    if (Number(match[1]) > 1) return true;
+  }
+  return false;
+}
+
+function isListSelectionSelector(selector, tokens) {
+  const hasRow =
+    tokens.has('layer-row') ||
+    tokens.has('blueprint-palette-item') ||
+    tokens.has('designer-list-row');
+  return hasRow && /\[(?:aria-selected|data-selected)=(?:"true"|'true'|true)\]/.test(selector);
+}
+
+function computeStyleMetrics() {
+  const metrics = {};
+  for (const file of nonTokenLayers) {
+    const key = file.slice(stylesPrefix.length);
+    const isControls = controlLayerSet.has(file);
+    // Selection paint and its forced-colors override are their own single-source recipes, not chrome debt.
+    const isChrome = key === chromeLayerFile || selectionFiles.has(key);
+    const counts = {
+      control: 0,
+      chrome: 0,
+      fontSize: 0,
+      radius: 0,
+      disabledOpacity: 0,
+      spacing: 0,
+      selection: 0,
+    };
+    for (const block of scanCssBlocks(source(file), { file: key })) {
+      if (block.declarations.length === 0) continue;
+      const tokens = classTokens(block.fullSelector);
+      const controlTarget = [...tokens].some(isSharedControlClass);
+      const chromeTarget = [...tokens].some(isChromeClass);
+      // `:not(:disabled)` is a hover guard, not a disabled state; strip it before detecting.
+      const disabled = block.fullSelector
+        .replace(/:not\([^)]*:disabled[^)]*\)/g, '')
+        .includes(':disabled');
+      const selected = isListSelectionSelector(block.fullSelector, tokens);
+      for (const { property, value } of block.declarations) {
+        if (property.startsWith('--')) continue;
+        const px = firstPx(value);
+        if (property === 'font-size' && px !== undefined && px < 11) counts.fontSize += 1;
+        if (property === 'border-radius' && px !== undefined) counts.radius += 1;
+        if (property === 'opacity' && disabled) counts.disabledOpacity += 1;
+        if (isSpacingProperty(property) && hasNonHairlinePx(value)) counts.spacing += 1;
+        if (!isAppearanceProperty(property)) continue;
+        if (!isControls && controlTarget) counts.control += 1;
+        if (!isChrome && chromeTarget) counts.chrome += 1;
+        if (selected && !selectionFiles.has(key) && isSelectionProperty(property)) {
+          counts.selection += 1;
+        }
+      }
+    }
+    if (Object.values(counts).some((value) => value > 0)) metrics[key] = counts;
+  }
+  return metrics;
+}
+
 // Ratchets. Each entry is debt that still exists in that layer file; the number may only
 // be lowered alongside a cleanup. Raising one to admit newly written styling is forbidden,
 // and a file absent from the map must stay at zero.
@@ -301,6 +539,30 @@ if (
   !css.includes('scrollbar-color: var(--designer-scrollbar-thumb) var(--designer-scrollbar-track);')
 ) {
   throw new Error('DESIGNER_STYLE_SCROLLBAR_STANDARD_RULE_MISSING');
+}
+
+const styleMetrics = computeStyleMetrics();
+if (process.argv.includes('--report')) {
+  console.log(JSON.stringify(styleMetrics, null, 2));
+  process.exit(0);
+}
+for (const [key, counts] of Object.entries(styleMetrics)) {
+  const allowed = styleDebtBaseline[key] ?? {};
+  for (const [metric, code] of Object.entries(styleMetricCodes)) {
+    const current = counts[metric] ?? 0;
+    const maximum = allowed[metric] ?? 0;
+    if (current > maximum) {
+      throw new Error(`DESIGNER_STYLE_${code}_BASELINE_EXCEEDED:${key}:${current}>${maximum}`);
+    }
+  }
+}
+for (const key of Object.keys(styleDebtBaseline)) {
+  if (!nonTokenLayers.includes(`${stylesPrefix}${key}`)) {
+    throw new Error(`DESIGNER_STYLE_BASELINE_FILE_UNKNOWN:${key}`);
+  }
+  if (styleMetrics[key] === undefined) {
+    throw new Error(`DESIGNER_STYLE_BASELINE_STALE:${key} (全部指标已归零，请删除该条目)`);
+  }
 }
 
 // A `var(--designer-*)` reference without a fallback resolves to nothing when the token name

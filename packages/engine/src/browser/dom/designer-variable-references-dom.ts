@@ -18,7 +18,7 @@ export function createVariableReferenceCount(
   }
   const button = ownerDocument.createElement('button');
   button.type = 'button';
-  button.className = 'designer-control variable-reference-count';
+  button.className = 'variable-reference-count';
   button.textContent = DESIGNER_UI_TEXT.variables.references(count);
   button.dataset.variableAction = 'references';
   button.dataset.variableIndex = String(index);
@@ -58,7 +58,7 @@ function createReferenceLink(
 ): HTMLButtonElement {
   const button = row.ownerDocument.createElement('button');
   button.type = 'button';
-  button.className = 'designer-control variable-reference-link';
+  button.className = 'variable-reference-link';
   button.dataset.variableReferenceTarget = reference.kind;
   const glyph = row.ownerDocument.createElement('span');
   glyph.className = 'variable-reference-glyph';

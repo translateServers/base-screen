@@ -35,7 +35,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
     <aside class="rail" id="designer-left-panel" data-left-panel aria-labelledby="designer-left-panel-title">
       <header class="panel-heading">
         <span class="panel-title" id="designer-left-panel-title" data-left-panel-title>${DESIGNER_UI_TEXT.materials}</span>
-        <span class="panel-count" id="designer-left-panel-count" role="status" aria-label="${DESIGNER_UI_TEXT.leftPanelCount(DESIGNER_UI_TEXT.materials, visibleMaterialCount)}" aria-live="polite" aria-atomic="true" data-material-count data-left-panel-count data-material-total="${visibleMaterialCount}">${visibleMaterialCount}</span>
+        <span class="designer-badge panel-count" data-tone="neutral" id="designer-left-panel-count" role="status" aria-label="${DESIGNER_UI_TEXT.leftPanelCount(DESIGNER_UI_TEXT.materials, visibleMaterialCount)}" aria-live="polite" aria-atomic="true" data-material-count data-left-panel-count data-material-total="${visibleMaterialCount}">${visibleMaterialCount}</span>
         <span class="panel-scope" data-left-panel-scope>${DESIGNER_UI_TEXT.panelScope.builtin}</span>
       </header>
       <div class="rail-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.leftPanel}">
@@ -80,9 +80,12 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           </div>
           <div class="material-library-results">
             <div class="material-grid" data-material-grid></div>
-            <div class="designer-empty-state material-search-empty" data-material-search-empty hidden>
-              <span role="status">${DESIGNER_UI_TEXT.materialSearchEmpty}</span>
-              <button type="button" class="designer-control designer-button" data-material-library-reset>${DESIGNER_UI_TEXT.materialResetFilters}</button>
+            <div class="designer-empty material-search-empty" data-material-search-empty hidden>
+              <span class="designer-empty-icon" aria-hidden="true">${designerIcon('search')}</span>
+              <p class="designer-empty-title" role="status">${DESIGNER_UI_TEXT.materialSearchEmpty}</p>
+              <div class="designer-empty-actions">
+                <button type="button" class="designer-control designer-button designer-empty-action" data-material-library-reset>${DESIGNER_UI_TEXT.materialResetFilters}</button>
+              </div>
             </div>
           </div>
         </div>
@@ -277,9 +280,9 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <div class="inspector-context" data-inspector-context></div>
       <div class="inspector-toolbar">
         <button type="button" class="designer-control designer-button designer-icon-button inspector-search-launch" data-variant="ghost" data-inspector-search-launch data-tip="${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}" aria-label="${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}">${designerIcon('search')}</button>
-        <div class="inspector-density" role="group" aria-label="${DESIGNER_UI_TEXT.inspector}">
-          <button type="button" class="designer-tab" data-inspector-density="basic" aria-pressed="true">${DESIGNER_UI_TEXT.inspectorUi.basic}</button>
-          <button type="button" class="designer-tab" data-inspector-density="all" aria-pressed="false">${DESIGNER_UI_TEXT.inspectorUi.all}</button>
+        <div class="designer-segmented inspector-density" role="group" data-size="compact" aria-label="${DESIGNER_UI_TEXT.inspector}">
+          <button type="button" class="designer-segmented-option" data-inspector-density="basic" aria-pressed="true">${DESIGNER_UI_TEXT.inspectorUi.basic}</button>
+          <button type="button" class="designer-segmented-option" data-inspector-density="all" aria-pressed="false">${DESIGNER_UI_TEXT.inspectorUi.all}</button>
         </div>
       </div>
       <section class="inspector-search-workspace" data-inspector-search-workspace aria-label="${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}" hidden>

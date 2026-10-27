@@ -40,7 +40,7 @@ function document(components: readonly ScreenComponentNode[]): ScreenDocument {
     canvas: { width: 1000, height: 600, backgroundColor: '#000000' },
     components,
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

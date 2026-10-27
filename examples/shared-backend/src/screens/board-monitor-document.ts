@@ -841,53 +841,50 @@ export const BOARD_MONITOR_DOCUMENT = {
     },
   ],
   blueprint: {
-    // 三条规则的形态完全一致：选择器表格 rowClick → set-variable。
+    // 三条关系形态完全一致：选择器表格 rowClick → set-variable。
     // `event-payload` 的路径取自物料事件 payload：`{ rowIndex, row }`。
-    rules: [
+    relations: [
       {
+        type: 'behavior' as const,
         id: 'rule-line',
-        trigger: {
-          type: 'material-event' as const,
+        source: {
+          kind: 'component' as const,
           componentId: 'sel-line',
-          eventName: 'rowClick',
+          event: { type: 'material-event' as const, eventName: 'rowClick' },
         },
-        actions: [
-          {
-            type: 'set-variable' as const,
-            variableId: 'line',
-            value: { kind: 'event-payload' as const, path: ['row', 'line'] },
-          },
-        ],
+        target: { kind: 'variable' as const, variableId: 'line' },
+        effect: {
+          type: 'set-variable' as const,
+          value: { kind: 'event-payload' as const, path: ['row', 'line'] },
+        },
       },
       {
+        type: 'behavior' as const,
         id: 'rule-window',
-        trigger: {
-          type: 'material-event' as const,
+        source: {
+          kind: 'component' as const,
           componentId: 'sel-window',
-          eventName: 'rowClick',
+          event: { type: 'material-event' as const, eventName: 'rowClick' },
         },
-        actions: [
-          {
-            type: 'set-variable' as const,
-            variableId: 'window',
-            value: { kind: 'event-payload' as const, path: ['row', 'window'] },
-          },
-        ],
+        target: { kind: 'variable' as const, variableId: 'window' },
+        effect: {
+          type: 'set-variable' as const,
+          value: { kind: 'event-payload' as const, path: ['row', 'window'] },
+        },
       },
       {
+        type: 'behavior' as const,
         id: 'rule-severity',
-        trigger: {
-          type: 'material-event' as const,
+        source: {
+          kind: 'component' as const,
           componentId: 'sel-severity',
-          eventName: 'rowClick',
+          event: { type: 'material-event' as const, eventName: 'rowClick' },
         },
-        actions: [
-          {
-            type: 'set-variable' as const,
-            variableId: 'severity',
-            value: { kind: 'event-payload' as const, path: ['row', 'level'] },
-          },
-        ],
+        target: { kind: 'variable' as const, variableId: 'severity' },
+        effect: {
+          type: 'set-variable' as const,
+          value: { kind: 'event-payload' as const, path: ['row', 'level'] },
+        },
       },
     ],
   },

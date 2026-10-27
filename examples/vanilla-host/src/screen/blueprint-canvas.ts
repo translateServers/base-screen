@@ -24,25 +24,33 @@ import {
  * 三个前端宿主（vanilla / react / vue）共用本文件，修改时必须逐字同步。
  */
 
-const NODE_WIDTH = 216;
-const COMPACT_WIDTH = 200;
-const NODE_HEADER = 34;
-const PORT_ROW = 22;
-const PORT_START = 56;
+const NODE_WIDTH = 208;
+const NODE_HEADER = 45;
+const SUBTITLE_HEIGHT = 21;
+const VARIABLE_VALUE_ROW = 40;
+const PORT_ROW = 28;
+const SUMMARY_ROW = 32;
+const NODE_BOTTOM_PADDING = 8;
 const GRAPH_PADDING = 72;
-const COLUMN_STEP = 280;
-const ROW_STEP = 140;
+const COLUMN_STEP = 272;
+const ROW_STEP = 180;
+// 图层固定 2x 排版、transform 缩放补偿：缩放只改合成变换，卡片/文字保持清晰。
+const LAYER_RASTER_ZOOM = 2;
 
 interface CanvasPort {
   readonly handle: string;
   readonly label: string;
   readonly y: number;
   readonly available: boolean;
+  readonly semantic?: true;
+  readonly containment?: true;
 }
 
 interface NodeGeometry {
   readonly width: number;
   readonly height: number;
+  readonly portStart: number;
+  readonly inputY: number;
   readonly outputs: readonly CanvasPort[];
   readonly inputHandle: string;
 }
@@ -63,6 +71,15 @@ interface PanState {
   readonly startClientY: number;
   readonly startX: number;
   readonly startY: number;
+  moved: boolean;
+}
+
+interface MarqueeState {
+  readonly pointerId: number;
+  readonly startClientX: number;
+  readonly startClientY: number;
+  readonly startLeft: number;
+  readonly startTop: number;
   moved: boolean;
 }
 
@@ -102,321 +119,441 @@ const STYLE_TEXT = `
   height: 100%;
   min-width: 0;
   min-height: 0;
-  color: #d7e0f0;
-  background:
-    radial-gradient(circle at 18% 12%, rgba(56, 132, 255, 0.12), transparent 46%),
-    linear-gradient(180deg, #101624 0%, #0a0f18 100%);
-  font: 12px/1.4 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #b7b7b7;
+  background: #0f0f0f;
+  font: 12px/1.4 "Geist", "Geist Sans", -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   user-select: none;
   overflow: hidden;
 }
-.host-blueprint-canvas button {
-  font: inherit;
-  color: inherit;
-}
+.host-blueprint-canvas button { font: inherit; color: inherit; }
 .bp-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 8px 12px;
-  border-bottom: 1px solid rgba(120, 158, 220, 0.18);
-  background: rgba(9, 14, 24, 0.86);
+  gap: 4px;
+  flex: none;
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(245, 245, 245, 0.1);
+  background: #0f0f0f;
   z-index: 3;
+  overflow-x: auto;
 }
 .bp-toolbar-title {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-right: 6px;
+  margin-right: 8px;
+  color: #f5f5f5;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 .bp-toolbar-title small {
-  color: #7f90aa;
+  color: #aeaeae;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
   font-weight: 400;
 }
 .bp-toolbar-spacer { flex: 1 1 auto; }
 .bp-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid rgba(120, 158, 220, 0.24);
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
   border-radius: 6px;
-  background: rgba(32, 46, 68, 0.72);
+  background: transparent;
+  color: #b7b7b7;
+  font-size: 11px;
+  white-space: nowrap;
   cursor: pointer;
 }
-.bp-button:hover:not(:disabled) { border-color: rgba(88, 166, 255, 0.65); }
-.bp-button:disabled { opacity: 0.42; cursor: default; }
-.bp-button[data-tone="primary"] {
-  border-color: rgba(88, 166, 255, 0.55);
-  background: rgba(30, 96, 180, 0.42);
-}
+.bp-button:hover:not(:disabled) { background: #2a2a2a; color: #f5f5f5; }
+.bp-button:disabled { opacity: 0.4; cursor: default; }
 .bp-zoom {
-  min-width: 44px;
-  text-align: center;
-  color: #9fb0c8;
+  min-width: 40px;
+  color: #aeaeae;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 .bp-problem-chip {
-  border: 1px solid rgba(245, 176, 65, 0.5);
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid rgba(79, 203, 111, 0.42);
   border-radius: 999px;
-  padding: 3px 9px;
-  color: #f5b041;
-  background: rgba(80, 54, 12, 0.32);
+  background: rgba(79, 203, 111, 0.12);
+  color: #4fcb6f;
+  font-size: 10px;
   cursor: pointer;
 }
-.bp-problem-chip[data-empty="true"] {
-  border-color: rgba(94, 201, 138, 0.4);
-  color: #67d391;
-  background: rgba(16, 68, 42, 0.28);
+.bp-problem-chip[data-empty="false"] {
+  border-color: rgba(230, 178, 33, 0.5);
+  background: rgba(230, 178, 33, 0.12);
+  color: #e6b221;
 }
 .bp-viewport {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  cursor: grab;
+  cursor: default;
   touch-action: none;
+  background-color: #282828;
+  background-image: radial-gradient(circle, rgba(245, 245, 245, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
-.bp-viewport:active { cursor: grabbing; }
+.bp-viewport[data-hand="true"] { cursor: grab; }
+.bp-viewport[data-panning="true"] { cursor: grabbing; }
 .bp-viewport[data-linking="true"] { cursor: crosshair; }
-.bp-layers {
-  position: absolute;
-  inset: 0;
-  transform-origin: 0 0;
-  will-change: transform;
-}
-.bp-edges {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-.bp-edge {
+.bp-layers { position: absolute; inset: 0; transform-origin: 0 0; }
+.bp-edges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.bp-edge-line {
   fill: none;
-  stroke: rgba(125, 160, 210, 0.55);
+  stroke: #b7b7b7;
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 150ms cubic-bezier(0.2, 0, 0, 1), stroke-width 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+.bp-edge-group[data-kind="relation"] .bp-edge-line { stroke: #b7b7b7; stroke-width: 1.5; }
+.bp-edge-group[data-kind="dependency"] .bp-edge-line {
+  stroke: #7d7d7d;
   stroke-width: 1.6;
+  stroke-dasharray: 1 5;
+  stroke-linecap: round;
 }
-.bp-edge[data-kind="trigger"] { stroke: rgba(88, 166, 255, 0.9); }
-.bp-edge[data-kind="action"] { stroke: rgba(94, 201, 138, 0.85); }
-.bp-edge[data-kind="dependency"] {
-  stroke: rgba(125, 160, 210, 0.38);
-  stroke-dasharray: 5 5;
-}
-.bp-edge[data-traced="true"] { stroke: #f5b041; stroke-width: 2.4; }
-.bp-edge[data-selected="true"] { stroke: #ffd166; stroke-width: 2.6; }
+.bp-edge-group[data-kind="semantic"] .bp-edge-line { stroke: #b7b7b7; stroke-dasharray: 7 5; }
+.bp-edge-group[data-kind="containment"] .bp-edge-line { stroke: #7d7d7d; stroke-dasharray: 1 5; opacity: 0.55; }
+.bp-edge-group:hover .bp-edge-line { stroke: #f5f5f5; stroke-width: 2; }
+.bp-edge-group[data-selected="true"] .bp-edge-line { stroke: #5297fc; stroke-width: 2.4; }
+.bp-edge-group[data-traced="true"] .bp-edge-line { stroke: #5297fc; stroke-width: 2.2; }
+.bp-edge-caps { fill: #b7b7b7; stroke: none; pointer-events: none; }
+.bp-edge-group[data-kind="dependency"] .bp-edge-caps,
+.bp-edge-group[data-kind="semantic"] .bp-edge-caps { fill: #7d7d7d; }
+.bp-edge-group[data-selected="true"] .bp-edge-caps,
+.bp-edge-group[data-traced="true"] .bp-edge-caps { fill: #5297fc; }
 .bp-edge-hit {
   fill: none;
   stroke: transparent;
-  stroke-width: 14;
+  stroke-width: 16;
   pointer-events: stroke;
   cursor: pointer;
 }
+.bp-edge-labels { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .bp-edge-label {
-  fill: #8fa2bd;
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  max-width: 168px;
+  padding: 0 7px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #262626;
+  box-shadow: 0 0 0 1px rgba(245, 245, 245, 0.15), 0 6px 16px -8px rgba(0, 0, 0, 0.7);
+  color: #b7b7b7;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10px;
-  paint-order: stroke;
-  stroke: #0a0f18;
-  stroke-width: 3px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
 }
+.bp-edge-label svg { width: 10px; height: 10px; flex: none; color: #7d7d7d; }
+.bp-edge-label span { overflow: hidden; text-overflow: ellipsis; }
+.bp-edge-label:hover { color: #f5f5f5; box-shadow: 0 0 0 1px rgba(245, 245, 245, 0.28), 0 6px 16px -8px rgba(0, 0, 0, 0.7); }
+.bp-edge-label[data-selected="true"] { color: #f5f5f5; box-shadow: 0 0 0 1px #5297fc, 0 6px 16px -8px rgba(0, 0, 0, 0.7); }
+.bp-edge-label[data-selected="true"] svg { color: #5297fc; }
+.bp-edge-label[data-traced="true"] { color: #f5f5f5; box-shadow: 0 0 0 1px rgba(82, 151, 252, 0.55), 0 6px 16px -8px rgba(0, 0, 0, 0.7); }
 .bp-node {
   position: absolute;
   box-sizing: border-box;
-  border: 1px solid rgba(120, 158, 220, 0.3);
-  border-radius: 8px;
-  background: linear-gradient(180deg, rgba(30, 42, 62, 0.96), rgba(20, 29, 44, 0.96));
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
-  cursor: move;
+  border-radius: 6px;
+  background: #0f0f0f;
+  box-shadow:
+    0 0 0 1px rgba(245, 245, 245, 0.15),
+    0 2px 4px rgba(0, 0, 0, 0.6),
+    0 16px 32px -20px rgba(0, 0, 0, 0.75);
+  cursor: default;
+  transition: box-shadow 150ms cubic-bezier(0.2, 0, 0, 1), outline-color 150ms cubic-bezier(0.2, 0, 0, 1);
 }
-.bp-node:focus-visible {
-  outline: 2px solid rgba(88, 166, 255, 0.8);
-  outline-offset: 2px;
-}
+.bp-node:hover { box-shadow: 0 0 0 1px rgba(245, 245, 245, 0.28), 0 2px 4px rgba(0, 0, 0, 0.6), 0 16px 32px -20px rgba(0, 0, 0, 0.75); }
+.bp-node:focus-visible { outline: 2px solid #5297fc; outline-offset: 2px; }
 .bp-node[data-selected="true"] {
-  border-color: #58a6ff;
-  box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.55), 0 10px 26px rgba(0, 0, 0, 0.34);
+  outline: 1px solid rgba(82, 151, 252, 0.72);
+  outline-offset: 0;
+  box-shadow: 0 0 0 3px #161d27, 0 2px 4px rgba(0, 0, 0, 0.6), 0 16px 32px -20px rgba(0, 0, 0, 0.75);
 }
-.bp-node[data-failed="true"] { border-color: rgba(245, 176, 65, 0.8); }
+.bp-node[data-traced="true"] { outline: 1px solid rgba(82, 151, 252, 0.48); outline-offset: 0; }
+.bp-node[data-failed="true"] { outline: 1px solid #fc675c; outline-offset: 0; }
+.bp-node[data-kind="host"] { background: #131619; }
 .bp-node-full { cursor: not-allowed; }
 .bp-node-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
   height: ${NODE_HEADER}px;
-  padding: 0 10px;
-  border-bottom: 1px solid rgba(120, 158, 220, 0.16);
+  padding: 7px 10px;
   overflow: hidden;
+  border-radius: 6px 6px 0 0;
+}
+.bp-node[data-selected="true"] .bp-node-header { background: rgba(245, 245, 245, 0.03); }
+.bp-node-icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: #161616;
+  box-shadow: inset 0 0 0 1px rgba(245, 245, 245, 0.1);
+  color: #b7b7b7;
+  place-items: center;
+}
+.bp-node-icon svg { width: 12px; height: 12px; }
+.bp-node[data-kind="variable"] .bp-node-icon { background: #161d27; color: #609ffc; box-shadow: inset 0 0 0 1px rgba(82, 151, 252, 0.18); }
+.bp-node-head-copy { display: grid; gap: 1px; min-width: 0; }
+.bp-node-kind {
+  overflow: hidden;
+  color: #aeaeae;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.bp-node-badge {
-  flex: none;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: rgba(88, 166, 255, 0.16);
-  color: #7fc0ff;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-}
-.bp-node[data-kind="variable"] .bp-node-badge { background: rgba(160, 120, 255, 0.18); color: #c0a4ff; }
-.bp-node[data-kind="condition"] .bp-node-badge { background: rgba(245, 176, 65, 0.16); color: #f5c26b; }
-.bp-node[data-kind="action"] .bp-node-badge { background: rgba(94, 201, 138, 0.16); color: #74dfa2; }
 .bp-node-title {
   overflow: hidden;
-  text-overflow: ellipsis;
+  color: #f5f5f5;
+  font-size: 12.5px;
   font-weight: 600;
-}
-.bp-node-body {
-  padding: 8px 10px 10px;
-}
-.bp-node-sub {
-  color: #8b9cb6;
-  font-size: 11px;
-  overflow: hidden;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.bp-node-summary {
-  margin: 8px 0 0;
-  color: #c6d3e6;
-  font-size: 11px;
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.bp-node-relcount {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #161616;
+  box-shadow: inset 0 0 0 1px rgba(245, 245, 245, 0.1);
+  color: #aeaeae;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 8.5px;
+  white-space: nowrap;
+}
+.bp-node-relcount b { color: #b7b7b7; font-weight: 500; }
+.bp-node-sub {
+  box-sizing: border-box;
+  height: ${SUBTITLE_HEIGHT}px;
+  padding: 0 10px;
   overflow: hidden;
+  color: #aeaeae;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 9.5px;
+  line-height: ${SUBTITLE_HEIGHT}px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.bp-ports {
-  margin-top: 6px;
+.bp-node-value {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: ${VARIABLE_VALUE_ROW}px;
+  padding: 0 10px;
+  border-top: 1px solid rgba(245, 245, 245, 0.1);
+  color: #aeaeae;
+  font-size: 9.5px;
+  white-space: nowrap;
 }
+.bp-node-value b {
+  overflow: hidden;
+  color: #f5f5f5;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+}
+.bp-node-value span:last-child { flex: none; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.bp-node-summary {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  height: ${SUMMARY_ROW}px;
+  padding: 0 10px;
+  overflow: hidden;
+  border-top: 1px solid rgba(245, 245, 245, 0.1);
+  border-radius: 0 0 6px 6px;
+  color: #aeaeae;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-ports { position: absolute; right: 0; left: 0; }
 .bp-port-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
+  gap: 5px;
   height: ${PORT_ROW}px;
-  padding-right: 12px;
-  color: #9fb0c8;
-  font-size: 10px;
+  padding: 0 14px 0 10px;
   overflow: hidden;
+  border-top: 1px solid rgba(245, 245, 245, 0.1);
+  color: #b7b7b7;
+  font-size: 10.5px;
   white-space: nowrap;
 }
-.bp-port-row[data-available="false"] { opacity: 0.4; }
+.bp-port-row:hover { background: rgba(245, 245, 245, 0.04); color: #f5f5f5; }
+.bp-port-row[data-available="false"] { color: #7d7d7d; }
+.bp-port-row[data-semantic="true"] .bp-port-name,
+.bp-port-row[data-containment="true"] .bp-port-name { font-family: inherit; }
+.bp-port-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-port-tag {
+  flex: none;
+  color: #aeaeae;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+}
+.bp-port-row[data-semantic="true"] .bp-port-tag { color: #7ea6e8; }
+.bp-port-row[data-available="false"] .bp-port-tag { color: #7d7d7d; }
+.bp-port-lock { display: inline-flex; flex: none; width: 9px; height: 9px; color: #7d7d7d; }
+.bp-port-lock svg { width: 9px; height: 9px; }
 .bp-port {
   position: absolute;
   box-sizing: border-box;
-  width: 11px;
-  height: 11px;
-  margin: -5.5px 0 0 -5.5px;
-  border: 2px solid #0a0f18;
-  border-radius: 50%;
-  background: #58a6ff;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  transform: translateY(-50%);
+  place-items: center;
+  z-index: 4;
   cursor: crosshair;
-  pointer-events: auto;
 }
-.bp-port:hover { background: #8ac4ff; }
-.bp-port[data-available="false"] { background: #52627a; cursor: not-allowed; }
-.bp-port-in {
-  left: 0;
-  background: #94a3b8;
+.bp-port::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #aeaeae;
+  box-shadow: 0 0 0 2px #0f0f0f;
+  content: "";
 }
-.bp-port-out { right: -5.5px; }
-.bp-node[data-kind="condition"] .bp-port-out { background: #f5b041; }
-.bp-port-in[data-armed="true"] {
-  background: #67d391;
-  box-shadow: 0 0 0 3px rgba(103, 211, 145, 0.35);
+.bp-port:hover::before { background: #f5f5f5; box-shadow: 0 0 0 2px #0f0f0f, 0 0 0 3px rgba(245, 245, 245, 0.26); }
+.bp-port-in { left: -12px; }
+.bp-port-in::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #aeaeae, 0 0 0 2px #0f0f0f;
 }
-.bp-link-preview {
-  fill: none;
-  stroke: #58a6ff;
-  stroke-width: 2;
-  stroke-dasharray: 4 4;
-  pointer-events: none;
+.bp-port-out { right: -12px; }
+.bp-port[data-available="false"] { cursor: not-allowed; }
+.bp-port[data-available="false"]::before {
+  border: 1px dashed rgba(245, 245, 245, 0.26);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(245, 245, 245, 0.16);
 }
-.bp-overlay {
+.bp-port[data-semantic="true"]::before { border-radius: 1.5px; background: #b7b7b7; transform: rotate(45deg); }
+.bp-port[data-containment="true"] { cursor: default; }
+.bp-port[data-containment="true"]::before { border-radius: 1px; background: transparent; box-shadow: inset 0 0 0 1px #7d7d7d; }
+.bp-port-in[data-armed="true"]::before {
+  background: #5297fc;
+  box-shadow: 0 0 0 2px #0f0f0f, 0 0 0 4px #161d27;
+}
+.bp-link-preview { fill: none; stroke: #5297fc; stroke-width: 1.8; stroke-dasharray: 5 4; pointer-events: none; }
+.bp-overlay { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.bp-viewport[data-hand="true"] .bp-node,
+.bp-viewport[data-hand="true"] .bp-edge-label,
+.bp-viewport[data-hand="true"] .bp-port { cursor: grab; }
+.bp-viewport[data-panning="true"] .bp-node,
+.bp-viewport[data-panning="true"] .bp-edge-label,
+.bp-viewport[data-panning="true"] .bp-port { cursor: grabbing; }
+.bp-marquee {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  z-index: 6;
+  border: 1px solid #5297fc;
+  background: rgba(82, 151, 252, 0.14);
   pointer-events: none;
-  overflow: visible;
 }
 .bp-footer {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: none;
   flex-wrap: wrap;
   padding: 6px 12px;
-  border-top: 1px solid rgba(120, 158, 220, 0.18);
-  background: rgba(9, 14, 24, 0.9);
-  color: #8b9cb6;
+  border-top: 1px solid rgba(245, 245, 245, 0.1);
+  background: #0f0f0f;
+  color: #aeaeae;
   z-index: 3;
 }
 .bp-footer select,
 .bp-footer input {
   height: 24px;
   padding: 0 8px;
-  border: 1px solid rgba(120, 158, 220, 0.24);
-  border-radius: 5px;
-  background: rgba(20, 29, 44, 0.9);
-  color: #d7e0f0;
+  border: 1px solid rgba(245, 245, 245, 0.15);
+  border-radius: 6px;
+  background: #161616;
+  color: #f5f5f5;
   font: inherit;
 }
 .bp-footer input { width: 220px; }
 .bp-footer-status {
   flex: 1 1 180px;
   min-width: 120px;
-  color: #9fb0c8;
   overflow: hidden;
+  color: #aeaeae;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.bp-footer-status[data-tone="error"] { color: #ff8b8b; }
+.bp-footer-status[data-tone="error"] { color: #fd7469; }
 .bp-trace {
   flex-basis: 100%;
-  color: #f5b041;
-  font-size: 11px;
   overflow: hidden;
+  color: #5297fc;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .bp-problems {
   position: absolute;
-  top: 44px;
+  top: 52px;
   right: 12px;
   z-index: 5;
   width: min(360px, calc(100% - 24px));
   max-height: 46%;
   overflow: auto;
   padding: 10px 12px;
-  border: 1px solid rgba(245, 176, 65, 0.4);
   border-radius: 8px;
-  background: rgba(16, 21, 32, 0.98);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+  background: #262626;
+  box-shadow: 0 0 0 1px rgba(245, 245, 245, 0.15), 0 12px 32px -12px rgba(0, 0, 0, 0.78);
 }
 .bp-problems[hidden] { display: none; }
-.bp-problems h4 {
-  margin: 0 0 6px;
-  font-size: 11px;
-  color: #f5b041;
-}
-.bp-problems ul {
-  margin: 0;
-  padding-left: 16px;
-}
-.bp-problems li {
-  margin: 3px 0;
-  color: #c6d3e6;
-  font-size: 11px;
-}
-.bp-problems code {
-  color: #8b9cb6;
-  font-size: 10px;
-}
+.bp-problems h4 { margin: 0 0 6px; color: #e6b221; font-size: 11px; }
+.bp-problems ul { margin: 0; padding-left: 16px; }
+.bp-problems li { margin: 3px 0; color: #b7b7b7; font-size: 11px; }
+.bp-problems code { color: #aeaeae; font-size: 10px; }
 `;
 
 export function createBlueprintCanvas(): HTMLElement {
@@ -432,10 +569,8 @@ export function createBlueprintCanvas(): HTMLElement {
   const toolbar = document.createElement('div');
   toolbar.className = 'bp-toolbar';
   toolbar.innerHTML = `
-    <span class="bp-toolbar-title">事件编排 <small data-bp-counts></small></span>
-    <button type="button" class="bp-button" data-bp-insert="condition">条件</button>
-    <button type="button" class="bp-button" data-bp-insert="set-variable">设置变量</button>
-    <button type="button" class="bp-button" data-bp-insert="emit-host-event">触发业务事件</button>
+    <span class="bp-toolbar-title">关系视图 <small data-bp-counts></small></span>
+    <button type="button" class="bp-button" data-bp-insert="host">业务系统</button>
     <button type="button" class="bp-button" data-bp-undo disabled>撤销</button>
     <button type="button" class="bp-button" data-bp-redo disabled>重做</button>
     <button type="button" class="bp-button" data-bp-layout>自动布局</button>
@@ -453,9 +588,12 @@ export function createBlueprintCanvas(): HTMLElement {
 
   const layers = document.createElement('div');
   layers.className = 'bp-layers';
+  layers.style.setProperty('zoom', String(LAYER_RASTER_ZOOM));
   const edges = document.createElementNS(SVG_NS, 'svg');
   edges.classList.add('bp-edges');
-  layers.append(edges);
+  const labels = document.createElement('div');
+  labels.className = 'bp-edge-labels';
+  layers.append(edges, labels);
   viewport.append(layers);
 
   const overlay = document.createElementNS(SVG_NS, 'svg');
@@ -465,6 +603,11 @@ export function createBlueprintCanvas(): HTMLElement {
   preview.setAttribute('visibility', 'hidden');
   overlay.append(preview);
   viewport.append(overlay);
+
+  const marqueeBox = document.createElement('div');
+  marqueeBox.className = 'bp-marquee';
+  marqueeBox.hidden = true;
+  viewport.append(marqueeBox);
 
   const problems = document.createElement('div');
   problems.className = 'bp-problems';
@@ -497,6 +640,8 @@ export function createBlueprintCanvas(): HTMLElement {
   let viewportCommitTimer: number | undefined;
   let drag: DragState | null = null;
   let pan: PanState | null = null;
+  let marquee: MarqueeState | null = null;
+  let spacePressed = false;
   let link: LinkState | null = null;
   let armed: ArmedSource | null = null;
   let commandSequence = 0;
@@ -513,30 +658,60 @@ export function createBlueprintCanvas(): HTMLElement {
   }
 
   function geometryOf(node: BaseScreenBlueprintCanvasNode): NodeGeometry {
+    const summary = node.summary?.secondary ?? '';
+    const summaryHeight = summary === '' ? 0 : SUMMARY_ROW;
     if (node.kind === 'component' || node.kind === 'variable') {
+      const valueHeight = node.kind === 'variable' ? VARIABLE_VALUE_ROW : 0;
+      const portStart = NODE_HEADER + SUBTITLE_HEIGHT + valueHeight;
       const events = node.events ?? [];
       const rows = Math.max(1, events.length);
-      const height = PORT_START + rows * PORT_ROW + 8;
+      const outputs: CanvasPort[] = events.map((event, index) => ({
+        handle: `event:${event.name}`,
+        label: event.label === '' ? event.name : event.label,
+        y: portStart + index * PORT_ROW + PORT_ROW / 2,
+        available: event.available,
+      }));
+      let rowCount = rows;
+      if (node.kind === 'component') {
+        outputs.push({
+          handle: 'semantic:out',
+          label: '语义关联',
+          y: portStart + rowCount * PORT_ROW + PORT_ROW / 2,
+          available: true,
+          semantic: true,
+        });
+        rowCount += 1;
+        if (node.isContainer === true) {
+          outputs.push({
+            handle: 'containment:out',
+            label: '包含',
+            y: portStart + rowCount * PORT_ROW + PORT_ROW / 2,
+            available: true,
+            containment: true,
+          });
+          rowCount += 1;
+        }
+      }
+      const height =
+        portStart +
+        rowCount * PORT_ROW +
+        (summaryHeight === 0 ? NODE_BOTTOM_PADDING : summaryHeight);
       return {
         width: NODE_WIDTH,
         height,
-        outputs: events.map((event, index) => ({
-          handle: `event:${event.name}`,
-          label: event.label === '' ? event.name : event.label,
-          y: PORT_START + index * PORT_ROW + PORT_ROW / 2,
-          available: event.available,
-        })),
-        inputHandle: 'dependency:in',
+        portStart,
+        inputY: height / 2,
+        outputs,
+        inputHandle: 'relation:in',
       };
     }
     return {
-      width: COMPACT_WIDTH,
+      width: NODE_WIDTH,
       height: 96,
-      outputs:
-        node.kind === 'condition'
-          ? [{ handle: 'condition:true', label: 'true', y: 64, available: true }]
-          : [],
-      inputHandle: node.kind === 'condition' ? 'condition:in' : 'action:in',
+      portStart: NODE_HEADER + SUBTITLE_HEIGHT,
+      inputY: 48,
+      outputs: [],
+      inputHandle: 'relation:in',
     };
   }
 
@@ -582,7 +757,9 @@ export function createBlueprintCanvas(): HTMLElement {
   }
 
   function applyTransform(): void {
-    layers.style.transform = `translate(${viewportValue.x}px, ${viewportValue.y}px) scale(${viewportValue.zoom})`;
+    // 与引擎画布一致：固定 2x 排版，transform 负责实际缩放；translate 被 CSS zoom 放大，故除以 2。
+    const scale = viewportValue.zoom / LAYER_RASTER_ZOOM;
+    layers.style.transform = `translate(${viewportValue.x / LAYER_RASTER_ZOOM}px, ${viewportValue.y / LAYER_RASTER_ZOOM}px) scale(${scale})`;
     const zoom = toolbar.querySelector<HTMLElement>('[data-bp-zoom]');
     if (zoom !== null) zoom.textContent = `${Math.round(viewportValue.zoom * 100)}%`;
   }
@@ -600,15 +777,14 @@ export function createBlueprintCanvas(): HTMLElement {
     window.clearTimeout(viewportCommitTimer);
     viewportCommitTimer = undefined;
     viewportsDirty = false;
-    lastSentViewportKey = viewportKey(viewportValue);
-    sendCommand({
-      type: 'commit-viewport',
-      viewport: {
-        x: Math.round(viewportValue.x),
-        y: Math.round(viewportValue.y),
-        zoom: Math.round(viewportValue.zoom * 1000) / 1000,
-      },
-    });
+    const viewport = {
+      x: Math.round(viewportValue.x),
+      y: Math.round(viewportValue.y),
+      zoom: Math.round(viewportValue.zoom * 1000) / 1000,
+    };
+    // 记录实际发送的取整值；否则回传状态会被当成外部变更再采纳一次，产生回跳。
+    lastSentViewportKey = viewportKey(viewport);
+    sendCommand({ type: 'commit-viewport', viewport });
   }
 
   function adoptViewport(next: { x: number; y: number; zoom: number } | undefined): void {
@@ -633,7 +809,45 @@ export function createBlueprintCanvas(): HTMLElement {
     };
   }
 
-  function edgePath(edge: BaseScreenBlueprintCanvasEdge): string | null {
+  interface EdgeRoute {
+    readonly path: string;
+    readonly start: Point;
+    readonly end: Point;
+    readonly beforeEnd: Point;
+    readonly label: Point;
+  }
+
+  const NODE_ICONS: Readonly<Record<string, string>> = {
+    component: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 5v14"/>',
+    variable:
+      '<path d="M8 4c-2 0-3 1-3 3v2c0 1.5-1 2-2 2 1 0 2 .5 2 2v2c0 2 1 3 3 3"/><path d="M16 4c2 0 3 1 3 3v2c0 1.5 1 2 2 2-1 0-2 .5-2 2v2c0 2-1 3-3 3"/>',
+    host: '<path d="m5 7 4 4-4 4M11 15h8"/>',
+    container:
+      '<rect x="5" y="5" width="14" height="14" rx="2"/><path d="M2 7V2h5M17 2h5v5M22 17v5h-5M7 22H2v-5"/>',
+  };
+
+  const EDGE_ICONS: Readonly<Record<string, string>> = {
+    relation: '<path d="M3 12h4l3 8 4-16 3 8h4"/>',
+    dependency:
+      '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    semantic:
+      '<path d="M9.5 14.5 14.5 9.5"/><path d="M8 12 5.7 14.3a3.5 3.5 0 0 0 5 5L13 17"/><path d="M16 12l2.3-2.3a3.5 3.5 0 0 0-5-5L11 7"/>',
+    containment:
+      '<rect x="5" y="5" width="14" height="14" rx="2"/><path d="M2 7V2h5M17 2h5v5M22 17v5h-5M7 22H2v-5"/>',
+  };
+
+  function iconSvg(body: string): string {
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  }
+
+  function nodeIcon(node: BaseScreenBlueprintCanvasNode): string {
+    if (node.kind === 'variable') return NODE_ICONS.variable ?? '';
+    if (node.kind === 'host') return NODE_ICONS.host ?? '';
+    if (node.isContainer === true) return NODE_ICONS.container ?? '';
+    return NODE_ICONS.component ?? '';
+  }
+
+  function edgeRoute(edge: BaseScreenBlueprintCanvasEdge): EdgeRoute | null {
     const source = nodeById(edge.source);
     const target = nodeById(edge.target);
     if (source === undefined || target === undefined) return null;
@@ -644,72 +858,245 @@ export function createBlueprintCanvas(): HTMLElement {
     const x1 = sourcePosition.x + sourceGeometry.width;
     const y1 = sourcePosition.y + outputPortY(source, edge.sourceHandle);
     const x2 = targetPosition.x;
-    const y2 = targetPosition.y + targetGeometry.height / 2;
-    const offset = Math.max(56, Math.abs(x2 - x1) * 0.4);
-    return `M ${x1} ${y1} C ${x1 + offset} ${y1}, ${x2 - offset} ${y2}, ${x2} ${y2}`;
+    const y2 = targetPosition.y + targetGeometry.inputY;
+    const gap = x2 - x1;
+    const hash = hashOf(edge.id);
+    let points: Point[];
+    if (gap >= 48) {
+      const lane = Math.min(x2 - 16, x1 + Math.min(120, Math.max(28, gap * 0.42)) + (hash % 4) * 6);
+      points = [
+        { x: x1, y: y1 },
+        { x: lane, y: y1 },
+        { x: lane, y: y2 },
+        { x: x2, y: y2 },
+      ];
+    } else {
+      const bottom =
+        Math.max(
+          sourcePosition.y + sourceGeometry.height,
+          targetPosition.y + targetGeometry.height,
+        ) +
+        28 +
+        (hash % 4) * 14;
+      points = [
+        { x: x1, y: y1 },
+        { x: x1 + 24, y: y1 },
+        { x: x1 + 24, y: bottom },
+        { x: x2 - 24, y: bottom },
+        { x: x2 - 24, y: y2 },
+        { x: x2, y: y2 },
+      ];
+    }
+    return {
+      path: roundedPolylinePath(points, 12),
+      start: points[0] as Point,
+      end: points[points.length - 1] as Point,
+      beforeEnd: points[points.length - 2] as Point,
+      label: labelPointFor(points, edge.id),
+    };
+  }
+
+  function roundedPolylinePath(points: readonly Point[], radius: number): string {
+    const first = points[0] as Point;
+    let path = `M ${first.x} ${first.y}`;
+    for (let index = 1; index < points.length - 1; index += 1) {
+      const previous = points[index - 1] as Point;
+      const current = points[index] as Point;
+      const next = points[index + 1] as Point;
+      const incoming = Math.hypot(current.x - previous.x, current.y - previous.y);
+      const outgoing = Math.hypot(next.x - current.x, next.y - current.y);
+      const limit = Math.min(radius, incoming / 2, outgoing / 2);
+      const start =
+        limit === 0
+          ? current
+          : {
+              x: current.x - ((current.x - previous.x) / incoming) * limit,
+              y: current.y - ((current.y - previous.y) / incoming) * limit,
+            };
+      const end =
+        limit === 0
+          ? current
+          : {
+              x: current.x + ((next.x - current.x) / outgoing) * limit,
+              y: current.y + ((next.y - current.y) / outgoing) * limit,
+            };
+      path += ` L ${start.x} ${start.y} Q ${current.x} ${current.y} ${end.x} ${end.y}`;
+    }
+    const last = points[points.length - 1] as Point;
+    return `${path} L ${last.x} ${last.y}`;
+  }
+
+  function arrowPath(end: Point, previous: Point): string {
+    const angle = Math.atan2(end.y - previous.y, end.x - previous.x);
+    const size = 7;
+    const halfWidth = 3.4;
+    const left = {
+      x: end.x - size * Math.cos(angle) + halfWidth * Math.sin(angle),
+      y: end.y - size * Math.sin(angle) - halfWidth * Math.cos(angle),
+    };
+    const right = {
+      x: end.x - size * Math.cos(angle) - halfWidth * Math.sin(angle),
+      y: end.y - size * Math.sin(angle) + halfWidth * Math.cos(angle),
+    };
+    return `M ${end.x} ${end.y} L ${left.x} ${left.y} L ${right.x} ${right.y} Z`;
+  }
+
+  function hashOf(value: string): number {
+    let hash = 0;
+    for (let index = 0; index < value.length; index += 1) {
+      hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+    }
+    return hash;
+  }
+
+  function labelPointFor(points: readonly Point[], edgeId: string): Point {
+    const hash = hashOf(edgeId);
+    if (points.length === 4) {
+      const start = points[0] as Point;
+      const lane = points[1] as Point;
+      const endLane = points[2] as Point;
+      const end = points[3] as Point;
+      if (Math.abs(lane.x - start.x) >= Math.abs(end.x - endLane.x)) {
+        return { x: (start.x + lane.x) / 2, y: start.y - 11 - (hash % 4) * 3 };
+      }
+      return { x: (endLane.x + end.x) / 2, y: end.y - 11 - (hash % 4) * 3 };
+    }
+    if (points.length < 3) {
+      const start = points[0] as Point;
+      const end = points[points.length - 1] as Point;
+      return { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 12 };
+    }
+    const start = points[0] as Point;
+    const bottom = points[2] as Point;
+    const end = points[points.length - 1] as Point;
+    return { x: (start.x + end.x) / 2, y: bottom.y + 12 + (hash % 3) * 3 };
   }
 
   function edgeLabel(edge: BaseScreenBlueprintCanvasEdge): string {
-    if (edge.kind === 'dependency') return '';
-    if (edge.kind === 'trigger') {
-      return edge.sourceHandle.startsWith('event:') ? edge.sourceHandle.slice(6) : 'true';
+    if (edge.kind === 'dependency') {
+      const source = nodeById(edge.source);
+      const name = source?.variableName ?? source?.variableId ?? '';
+      return name === '' ? '读取变量' : `读取 ${name}`;
     }
-    return edge.operation ?? '';
+    if (edge.kind === 'containment') return '包含';
+    if (edge.kind === 'semantic') {
+      return ({ related: '关联', detail: '详情', group: '分组', 'drill-down': '下钻' } as const)[
+        edge.semanticRole ?? 'related'
+      ];
+    }
+    if (edge.kind === 'relation') {
+      if (edge.effectType === 'component-visibility') {
+        const operation = ({ show: '显示', hide: '隐藏', toggle: '切换' } as const)[
+          edge.operation ?? 'toggle'
+        ];
+        return `${edge.eventName ?? ''} · ${operation}`;
+      }
+      if (edge.effectType === 'set-variable') return `更新变量 ${edge.variableId ?? ''}`;
+      if (edge.effectType === 'request-variable') return `请求变量 ${edge.variableId ?? ''}`;
+      if (edge.effectType === 'request-component-data') {
+        return `${edge.eventName ?? ''} · 请求数据`;
+      }
+      if (edge.effectType === 'emit-host-event') return `业务事件 ${edge.eventName ?? ''}`;
+      if (edge.effectType === 'host-action') return `业务动作 ${edge.actionId ?? ''}`;
+      return edge.eventName ?? '';
+    }
+    if (edge.sourceHandle.startsWith('event:')) return edge.sourceHandle.slice(6);
+    return '';
   }
 
   function renderGraph(): void {
     const current = graph();
     edges.replaceChildren();
+    labels.replaceChildren();
     for (const node of layers.querySelectorAll('.bp-node')) node.remove();
     if (current === null) return;
 
-    const traced = new Set(state?.trace?.executedEdgeIds ?? []);
+    const trace = state?.trace;
+    const traced = new Set(trace?.executedEdgeIds ?? []);
+    const failedRelations = new Set(trace?.failedRelationIds ?? []);
+    const nodeRects = current.nodes.map((node) => {
+      const geometry = geometryOf(node);
+      const position = positionOf(node);
+      return {
+        left: position.x,
+        top: position.y,
+        right: position.x + geometry.width,
+        bottom: position.y + geometry.height,
+      };
+    });
+    const placedLabels: Point[] = [];
     for (const edge of current.edges) {
-      const pathData = edgePath(edge);
-      if (pathData === null) continue;
+      const route = edgeRoute(edge);
+      if (route === null) continue;
+      const selected = state?.selection?.kind === 'edge' && state.selection.id === edge.id;
+      const group = document.createElementNS(SVG_NS, 'g');
+      group.classList.add('bp-edge-group');
+      group.dataset.kind = edge.kind;
+      if (traced.has(edge.id)) group.dataset.traced = 'true';
+      if (selected) group.dataset.selected = 'true';
       const path = document.createElementNS(SVG_NS, 'path');
-      path.classList.add('bp-edge');
-      path.setAttribute('d', pathData);
-      path.dataset.kind = edge.kind;
-      if (traced.has(edge.id)) path.dataset.traced = 'true';
-      if (state?.selection?.kind === 'edge' && state.selection.id === edge.id) {
-        path.dataset.selected = 'true';
+      path.classList.add('bp-edge-line');
+      path.setAttribute('d', route.path);
+      group.append(path);
+      const caps = document.createElementNS(SVG_NS, 'g');
+      caps.classList.add('bp-edge-caps');
+      if (edge.kind === 'semantic') {
+        caps.append(circleAt(route.start, 2.6), circleAt(route.end, 2.6));
+      } else if (edge.kind === 'dependency') {
+        caps.append(circleAt(route.end, 2.6));
+      } else if (edge.kind === 'relation') {
+        const arrow = document.createElementNS(SVG_NS, 'path');
+        arrow.setAttribute('d', arrowPath(route.end, route.beforeEnd));
+        caps.append(arrow);
       }
-      edges.append(path);
-
+      group.append(caps);
       const hit = document.createElementNS(SVG_NS, 'path');
       hit.classList.add('bp-edge-hit');
-      hit.setAttribute('d', pathData);
+      hit.setAttribute('d', route.path);
       hit.dataset.edgeId = edge.id;
       hit.addEventListener('pointerdown', (event) => {
         event.stopPropagation();
-        select({ kind: 'edge', id: edge.id });
+        selectFromPointer({ kind: 'edge', id: edge.id }, event);
       });
-      edges.append(hit);
+      group.append(hit);
+      edges.append(group);
 
       const label = edgeLabel(edge);
-      if (label !== '') {
-        const text = document.createElementNS(SVG_NS, 'text');
-        text.classList.add('bp-edge-label');
-        const sourceNode = nodeById(edge.source);
-        const targetNode = nodeById(edge.target);
-        if (sourceNode !== undefined && targetNode !== undefined) {
-          const sourcePosition = positionOf(sourceNode);
-          const targetPosition = positionOf(targetNode);
-          const sourceGeometry = geometryOf(sourceNode);
-          text.setAttribute('x', String(sourcePosition.x + sourceGeometry.width + 16));
-          text.setAttribute(
-            'y',
-            String(sourcePosition.y + outputPortY(sourceNode, edge.sourceHandle) - 4),
-          );
-          if (targetPosition.x < sourcePosition.x) text.setAttribute('visibility', 'hidden');
-        }
-        text.textContent = label;
-        edges.append(text);
+      if (label === '') continue;
+      if (edge.kind === 'dependency' && !selected && !traced.has(edge.id)) continue;
+      let labelPoint = clearLabelPoint(route.label, label, nodeRects);
+      while (
+        placedLabels.some(
+          (placed) =>
+            Math.abs(placed.x - labelPoint.x) < 96 && Math.abs(placed.y - labelPoint.y) < 16,
+        )
+      ) {
+        labelPoint = { x: labelPoint.x, y: labelPoint.y + 22 };
       }
+      placedLabels.push(labelPoint);
+      const chip = document.createElement('span');
+      chip.className = 'bp-edge-label';
+      chip.dataset.kind = edge.kind;
+      chip.dataset.edgeLabel = edge.id;
+      chip.innerHTML = iconSvg(EDGE_ICONS[edge.kind] ?? EDGE_ICONS.relation ?? '');
+      const chipText = document.createElement('span');
+      chipText.textContent = label;
+      chip.append(chipText);
+      if (selected) {
+        chip.dataset.selected = 'true';
+      }
+      if (traced.has(edge.id)) {
+        chip.dataset.traced = 'true';
+      }
+      chip.style.left = `${labelPoint.x}px`;
+      chip.style.top = `${labelPoint.y}px`;
+      chip.addEventListener('pointerdown', (event) => {
+        event.stopPropagation();
+        selectFromPointer({ kind: 'edge', id: edge.id }, event);
+      });
+      labels.append(chip);
     }
 
-    const failedRules = new Set(state?.trace?.failedRuleIds ?? []);
     for (const node of current.nodes) {
       const geometry = geometryOf(node);
       const position = positionOf(node);
@@ -727,59 +1114,119 @@ export function createBlueprintCanvas(): HTMLElement {
       if (state?.selection?.kind === 'node' && state.selection.id === node.id) {
         card.dataset.selected = 'true';
       }
-      if (node.ruleId !== undefined && failedRules.has(node.ruleId)) {
+      if (traced.has(`relation:${node.id}`)) card.dataset.traced = 'true';
+      if (
+        current.edges.some(
+          (edge) =>
+            edge.target === node.id &&
+            edge.relationId !== undefined &&
+            failedRelations.has(edge.relationId),
+        )
+      ) {
         card.dataset.failed = 'true';
       }
+
       const header = document.createElement('div');
       header.className = 'bp-node-header';
-      const badge = document.createElement('span');
-      badge.className = 'bp-node-badge';
-      badge.textContent = nodeKindBadge(node);
+      const icon = document.createElement('span');
+      icon.className = 'bp-node-icon';
+      icon.innerHTML = iconSvg(nodeIcon(node));
+      const copy = document.createElement('span');
+      copy.className = 'bp-node-head-copy';
+      const kind = document.createElement('span');
+      kind.className = 'bp-node-kind';
+      kind.textContent = nodeKindLine(node);
       const title = document.createElement('span');
       title.className = 'bp-node-title';
       title.textContent = nodeTitle(node);
-      header.append(badge, title);
+      copy.append(kind, title);
+      header.append(icon, copy);
+      if (node.kind !== 'variable') {
+        const counts = document.createElement('span');
+        counts.className = 'bp-node-relcount';
+        const out = document.createElement('span');
+        out.textContent = '出 ';
+        const outValue = document.createElement('b');
+        outValue.textContent = String(node.outboundCount ?? 0);
+        const inbound = document.createElement('span');
+        inbound.textContent = ' 入 ';
+        const inboundValue = document.createElement('b');
+        inboundValue.textContent = String(node.inboundCount ?? 0);
+        counts.append(out, outValue, inbound, inboundValue);
+        header.append(counts);
+      }
+      card.append(header);
 
-      const body = document.createElement('div');
-      body.className = 'bp-node-body';
       const sub = document.createElement('div');
       sub.className = 'bp-node-sub';
       sub.textContent = nodeSubtitle(node);
-      body.append(sub);
-      if (node.summary?.secondary !== undefined && node.summary.secondary !== '') {
-        const summary = document.createElement('p');
-        summary.className = 'bp-node-summary';
-        summary.textContent = node.summary.secondary;
-        body.append(summary);
+      card.append(sub);
+
+      if (node.kind === 'variable') {
+        const value = document.createElement('div');
+        value.className = 'bp-node-value';
+        const valueLabel = document.createElement('span');
+        valueLabel.textContent = '初值 ';
+        const valueText = document.createElement('b');
+        valueText.textContent =
+          node.variableInitialValue === undefined ? '—' : shortJson(node.variableInitialValue);
+        const stats = document.createElement('span');
+        stats.textContent = `${node.writeCount ?? 0} 写 / ${node.readCount ?? 0} 读`;
+        value.append(valueLabel, valueText, stats);
+        card.append(value);
       }
+
       if (node.kind === 'component' || node.kind === 'variable') {
         const ports = document.createElement('div');
         ports.className = 'bp-ports';
-        const events = node.events ?? [];
-        if (events.length === 0) {
-          const row = document.createElement('div');
-          row.className = 'bp-port-row';
-          row.dataset.available = 'false';
-          row.textContent = '暂无可用事件';
-          ports.append(row);
-        }
+        ports.style.top = `${geometry.portStart}px`;
         for (const port of geometry.outputs) {
           const row = document.createElement('div');
           row.className = 'bp-port-row';
           row.dataset.available = String(port.available);
-          row.textContent = port.label;
+          if (port.semantic === true) row.dataset.semantic = 'true';
+          if (port.containment === true) row.dataset.containment = 'true';
+          const name = document.createElement('span');
+          name.className = 'bp-port-name';
+          name.textContent = port.label;
+          const tag = document.createElement('span');
+          tag.className = 'bp-port-tag';
+          tag.textContent =
+            port.semantic === true
+              ? '语义'
+              : port.containment === true
+                ? '结构'
+                : port.available
+                  ? '事件'
+                  : '不可用';
+          row.append(name, tag);
+          if (!port.available) {
+            const lock = document.createElement('span');
+            lock.className = 'bp-port-lock';
+            lock.innerHTML = iconSvg(
+              '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+            );
+            row.append(lock);
+          }
           ports.append(row);
         }
-        body.append(ports);
+        card.append(ports);
       }
-      card.append(header, body);
+
+      const summary = nodeSummaryText(node);
+      if (summary !== '') {
+        const summaryElement = document.createElement('div');
+        summaryElement.className = 'bp-node-summary';
+        summaryElement.textContent = summary;
+        card.append(summaryElement);
+      }
 
       const input = document.createElement('span');
       input.className = 'bp-port bp-port-in';
       input.dataset.inputHandle = geometry.inputHandle;
       input.dataset.nodeId = node.id;
       input.dataset.armed = String(armed !== null && typeCanReceive(armed, geometry.inputHandle));
-      input.style.top = `${geometry.height / 2}px`;
+      input.style.top = `${geometry.inputY}px`;
       input.setAttribute('aria-label', '输入端口');
       card.append(input);
 
@@ -788,7 +1235,9 @@ export function createBlueprintCanvas(): HTMLElement {
         output.className = 'bp-port bp-port-out';
         output.dataset.outputHandle = port.handle;
         output.dataset.nodeId = node.id;
-        output.dataset.available = String(port.available);
+        output.dataset.available = String(port.containment === true ? false : port.available);
+        if (port.semantic === true) output.dataset.semantic = 'true';
+        if (port.containment === true) output.dataset.containment = 'true';
         output.style.top = `${port.y}px`;
         output.setAttribute('aria-label', port.label);
         card.append(output);
@@ -802,6 +1251,7 @@ export function createBlueprintCanvas(): HTMLElement {
         }
       });
       card.querySelectorAll<HTMLElement>('[data-output-handle]').forEach((portElement) => {
+        if (portElement.dataset.containment === 'true') return;
         portElement.addEventListener('pointerdown', (event) => onPortPointerDown(event, node));
       });
       input.addEventListener('pointerdown', (event) =>
@@ -811,14 +1261,54 @@ export function createBlueprintCanvas(): HTMLElement {
     }
   }
 
+  function circleAt(point: Point, radius: number): SVGCircleElement {
+    const circle = document.createElementNS(SVG_NS, 'circle');
+    circle.setAttribute('cx', String(point.x));
+    circle.setAttribute('cy', String(point.y));
+    circle.setAttribute('r', String(radius));
+    return circle;
+  }
+
+  function labelWidth(label: string): number {
+    let width = 28;
+    for (const character of label) {
+      width += /[\x00-\x7f]/.test(character) ? 6 : 10;
+    }
+    return Math.min(168, width);
+  }
+
+  function clearLabelPoint(
+    preferred: Point,
+    label: string,
+    rects: readonly { left: number; top: number; right: number; bottom: number }[],
+  ): Point {
+    const halfWidth = labelWidth(label) / 2;
+    const halfHeight = 11;
+    const isClear = (point: Point): boolean =>
+      !rects.some(
+        (rect) =>
+          point.x - halfWidth < rect.right + 2 &&
+          point.x + halfWidth > rect.left - 2 &&
+          point.y - halfHeight < rect.bottom + 2 &&
+          point.y + halfHeight > rect.top - 2,
+      );
+    const candidates: Point[] = [
+      preferred,
+      { x: preferred.x, y: preferred.y - 24 },
+      { x: preferred.x, y: preferred.y - 46 },
+      { x: preferred.x, y: preferred.y + 24 },
+      { x: preferred.x, y: preferred.y + 46 },
+      { x: preferred.x - 72, y: preferred.y },
+      { x: preferred.x + 72, y: preferred.y },
+    ];
+    return candidates.find(isClear) ?? preferred;
+  }
+
   function typeCanReceive(source: ArmedSource, inputHandle: string): boolean {
     const sourceNode = nodeById(source.nodeId);
     if (sourceNode === undefined) return false;
-    if (sourceNode.kind === 'condition') return inputHandle === 'action:in';
-    if (sourceNode.kind === 'component' || sourceNode.kind === 'variable') {
-      return inputHandle === 'condition:in' || inputHandle === 'action:in';
-    }
-    return false;
+    if (inputHandle !== 'relation:in' && inputHandle !== 'dependency:in') return false;
+    return sourceNode.kind === 'component' || sourceNode.kind === 'variable';
   }
 
   function nodeKindLabel(node: BaseScreenBlueprintCanvasNode): string {
@@ -826,34 +1316,46 @@ export function createBlueprintCanvas(): HTMLElement {
       ? '组件'
       : node.kind === 'variable'
         ? '变量'
-        : node.kind === 'condition'
-          ? '条件'
-          : '动作';
+        : node.kind === 'host'
+          ? '业务系统'
+          : node.kind === 'condition'
+            ? '条件'
+            : '动作';
   }
 
-  function nodeKindBadge(node: BaseScreenBlueprintCanvasNode): string {
-    if (node.kind === 'action') return node.summary?.kind ?? 'action';
+  function nodeKindLine(node: BaseScreenBlueprintCanvasNode): string {
+    if (node.kind === 'component') return `组件 · ${node.materialType ?? 'material'}`;
+    if (node.kind === 'variable') return '变量 · 静态';
+    if (node.kind === 'host') return '平台 · 业务出口';
     return nodeKindLabel(node);
   }
 
   function nodeTitle(node: BaseScreenBlueprintCanvasNode): string {
     if (node.kind === 'component') return node.componentName ?? node.componentId ?? node.id;
     if (node.kind === 'variable') return node.variableName ?? node.variableId ?? node.id;
+    if (node.kind === 'host') return '业务系统';
     return node.summary?.primary ?? node.id;
   }
 
   function nodeSubtitle(node: BaseScreenBlueprintCanvasNode): string {
     if (node.kind === 'component') {
-      const events = node.events?.length ?? 0;
-      return `${node.materialType ?? 'material'} · ${events} 个事件`;
+      return `${node.materialType ?? 'material'} · ${node.componentId ?? node.id}`;
     }
     if (node.kind === 'variable') {
-      const value =
-        node.variableInitialValue === undefined ? '' : ` = ${shortJson(node.variableInitialValue)}`;
-      return `${node.variableType ?? 'variable'}${value}`;
+      return `${node.variableType ?? 'variable'} · ${node.variableId ?? node.id}`;
     }
+    if (node.kind === 'host') return `${node.exitCount ?? 0} 个业务出口`;
     if (node.kind === 'condition') return node.condition?.operator ?? 'condition';
     return node.action?.type ?? node.summary?.kind ?? 'action';
+  }
+
+  function nodeSummaryText(node: BaseScreenBlueprintCanvasNode): string {
+    const provided = node.summary?.secondary ?? '';
+    if (provided !== '') return provided;
+    if (node.kind === 'component' && (node.childCount ?? 0) > 0) {
+      return `结构 · 子组件 ${node.childCount}`;
+    }
+    return '';
   }
 
   function shortJson(value: unknown): string {
@@ -869,8 +1371,15 @@ export function createBlueprintCanvas(): HTMLElement {
     const current = graph();
     const counts = toolbar.querySelector<HTMLElement>('[data-bp-counts]');
     if (counts !== null) {
-      counts.textContent =
-        current === null ? '未连接' : `${current.nodes.length} 节点 · ${current.edges.length} 连线`;
+      if (current === null) {
+        counts.textContent = '未连接';
+      } else {
+        const components = current.nodes.filter((node) => node.kind === 'component').length;
+        const relations = current.edges.filter((edge) => edge.kind === 'relation').length;
+        const semantic = current.edges.filter((edge) => edge.kind === 'semantic').length;
+        const structural = current.edges.filter((edge) => edge.kind === 'containment').length;
+        counts.textContent = `${components} 组件 · ${relations} 关系 · ${semantic} 语义 · ${structural} 结构`;
+      }
     }
     const undo = toolbar.querySelector<HTMLButtonElement>('[data-bp-undo]');
     const redo = toolbar.querySelector<HTMLButtonElement>('[data-bp-redo]');
@@ -966,6 +1475,24 @@ export function createBlueprintCanvas(): HTMLElement {
     sendCommand({ type: 'select', selection });
   }
 
+  function selectFromPointer(
+    selection: NonNullable<BaseScreenBlueprintCanvasSelection>,
+    event: { readonly ctrlKey: boolean; readonly metaKey: boolean },
+  ): void {
+    const current = state?.selection;
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      current !== null &&
+      current !== undefined &&
+      current.kind === selection.kind &&
+      current.id === selection.id
+    ) {
+      select(null);
+      return;
+    }
+    select(selection);
+  }
+
   function onNodePointerDown(event: PointerEvent, node: BaseScreenBlueprintCanvasNode): void {
     if (event.button !== 0) return;
     const target = event.target instanceof Element ? event.target : null;
@@ -1013,7 +1540,7 @@ export function createBlueprintCanvas(): HTMLElement {
     window.removeEventListener('pointerup', onNodePointerUp);
     window.removeEventListener('pointercancel', onNodePointerUp);
     if (!finished.moved) {
-      select({ kind: 'node', id: finished.nodeId });
+      selectFromPointer({ kind: 'node', id: finished.nodeId }, event);
       return;
     }
     commitLayout();
@@ -1144,8 +1671,97 @@ export function createBlueprintCanvas(): HTMLElement {
   function onBackgroundPointerDown(event: PointerEvent): void {
     if (event.button !== 0) return;
     const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest('.bp-node, [data-edge-id]') != null) return;
+    if (target?.closest('.bp-node, [data-edge-id], .bp-problems') != null) return;
     armed = null;
+    const rect = viewport.getBoundingClientRect();
+    marquee = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startLeft: event.clientX - rect.left,
+      startTop: event.clientY - rect.top,
+      moved: false,
+    };
+    viewport.setPointerCapture(event.pointerId);
+    window.addEventListener('pointermove', onMarqueePointerMove);
+    window.addEventListener('pointerup', onMarqueePointerUp);
+    window.addEventListener('pointercancel', onMarqueePointerUp);
+  }
+
+  function onMarqueePointerMove(event: PointerEvent): void {
+    if (marquee === null || event.pointerId !== marquee.pointerId) return;
+    const rect = viewport.getBoundingClientRect();
+    const currentX = event.clientX - rect.left;
+    const currentY = event.clientY - rect.top;
+    const left = Math.min(marquee.startLeft, currentX);
+    const top = Math.min(marquee.startTop, currentY);
+    const width = Math.abs(currentX - marquee.startLeft);
+    const height = Math.abs(currentY - marquee.startTop);
+    if (!marquee.moved && width + height < 3) return;
+    marquee = { ...marquee, moved: true };
+    marqueeBox.hidden = false;
+    marqueeBox.style.left = `${left}px`;
+    marqueeBox.style.top = `${top}px`;
+    marqueeBox.style.width = `${width}px`;
+    marqueeBox.style.height = `${height}px`;
+  }
+
+  function onMarqueePointerUp(event: PointerEvent): void {
+    if (marquee === null || event.pointerId !== marquee.pointerId) return;
+    const finished = marquee;
+    marquee = null;
+    window.removeEventListener('pointermove', onMarqueePointerMove);
+    window.removeEventListener('pointerup', onMarqueePointerUp);
+    window.removeEventListener('pointercancel', onMarqueePointerUp);
+    marqueeBox.hidden = true;
+    if (!finished.moved) {
+      select(null);
+      return;
+    }
+    const rect = viewport.getBoundingClientRect();
+    const left = Math.min(finished.startClientX, event.clientX) - rect.left;
+    const top = Math.min(finished.startClientY, event.clientY) - rect.top;
+    const right = Math.max(finished.startClientX, event.clientX) - rect.left;
+    const bottom = Math.max(finished.startClientY, event.clientY) - rect.top;
+    const nodeId = nodeWithLargestIntersection(left, top, right, bottom);
+    if (nodeId === undefined) {
+      select(null);
+      return;
+    }
+    selectFromPointer({ kind: 'node', id: nodeId }, event);
+  }
+
+  function nodeWithLargestIntersection(
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+  ): string | undefined {
+    let bestId: string | undefined;
+    let bestArea = 0;
+    const rect = viewport.getBoundingClientRect();
+    for (const card of layers.querySelectorAll<HTMLElement>('.bp-node')) {
+      const cardRect = card.getBoundingClientRect();
+      const cardLeft = cardRect.left - rect.left;
+      const cardTop = cardRect.top - rect.top;
+      const width = Math.max(
+        0,
+        Math.min(cardLeft + cardRect.width, right) - Math.max(cardLeft, left),
+      );
+      const height = Math.max(
+        0,
+        Math.min(cardTop + cardRect.height, bottom) - Math.max(cardTop, top),
+      );
+      const area = width * height;
+      if (area > bestArea && card.dataset.nodeId !== undefined) {
+        bestArea = area;
+        bestId = card.dataset.nodeId;
+      }
+    }
+    return bestId;
+  }
+
+  function startPan(event: PointerEvent): void {
     pan = {
       pointerId: event.pointerId,
       startClientX: event.clientX,
@@ -1154,10 +1770,21 @@ export function createBlueprintCanvas(): HTMLElement {
       startY: viewportValue.y,
       moved: false,
     };
+    viewport.dataset.panning = 'true';
     viewport.setPointerCapture(event.pointerId);
     window.addEventListener('pointermove', onPanPointerMove);
     window.addEventListener('pointerup', onPanPointerUp);
     window.addEventListener('pointercancel', onPanPointerUp);
+  }
+
+  function onViewportCapturePointerDown(event: PointerEvent): void {
+    if (event.button !== 0 || !spacePressed) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest('.bp-problems, .bp-footer') != null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    armed = null;
+    startPan(event);
   }
 
   function onPanPointerMove(event: PointerEvent): void {
@@ -1175,17 +1802,44 @@ export function createBlueprintCanvas(): HTMLElement {
     if (pan === null || event.pointerId !== pan.pointerId) return;
     const finished = pan;
     pan = null;
+    viewport.dataset.panning = 'false';
     window.removeEventListener('pointermove', onPanPointerMove);
     window.removeEventListener('pointerup', onPanPointerUp);
     window.removeEventListener('pointercancel', onPanPointerUp);
     if (finished.moved) commitViewport();
-    else select(null);
+  }
+
+  function isEditableTarget(event: Event): boolean {
+    const target = event.composedPath()[0];
+    if (!(target instanceof HTMLElement)) return false;
+    return (
+      target.isContentEditable ||
+      target.closest('input, textarea, select, button, a, [contenteditable="true"]') !== null
+    );
+  }
+
+  function onRootKeyUp(event: KeyboardEvent): void {
+    if (event.code !== 'Space' || !spacePressed) return;
+    spacePressed = false;
+    viewport.dataset.hand = 'false';
+  }
+
+  function onRootBlur(): void {
+    spacePressed = false;
+    viewport.dataset.hand = 'false';
+    if (pan === null) return;
+    viewport.dataset.panning = 'false';
+    pan = null;
+    window.removeEventListener('pointermove', onPanPointerMove);
+    window.removeEventListener('pointerup', onPanPointerUp);
+    window.removeEventListener('pointercancel', onPanPointerUp);
+    viewportsDirty = true;
   }
 
   function onWheel(event: WheelEvent): void {
     event.preventDefault();
     if (event.ctrlKey || event.metaKey) {
-      const factor = Math.exp(-event.deltaY * 0.0015);
+      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
       const next = clampZoom(viewportValue.zoom * factor);
       const point = screenToGraph(event.clientX, event.clientY);
       const rect = viewport.getBoundingClientRect();
@@ -1195,10 +1849,13 @@ export function createBlueprintCanvas(): HTMLElement {
         y: event.clientY - rect.top - point.y * next,
       };
     } else {
+      const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 512 : 1;
+      const dx = (event.shiftKey ? event.deltaY : event.deltaX) * scale;
+      const dy = (event.shiftKey ? event.deltaX : event.deltaY) * scale;
       viewportValue = {
         ...viewportValue,
-        x: viewportValue.x - event.deltaX,
-        y: viewportValue.y - event.deltaY,
+        x: viewportValue.x - dx,
+        y: viewportValue.y - dy,
       };
     }
     applyTransform();
@@ -1206,7 +1863,7 @@ export function createBlueprintCanvas(): HTMLElement {
   }
 
   function clampZoom(value: number): number {
-    return Math.min(2, Math.max(0.2, Math.round(value * 1000) / 1000));
+    return Math.min(2, Math.max(0.1, Math.round(value * 1000) / 1000));
   }
 
   function zoomBy(factor: number): void {
@@ -1275,49 +1932,73 @@ export function createBlueprintCanvas(): HTMLElement {
   function computeAutoLayout(nodes: readonly BaseScreenBlueprintCanvasNode[]): Map<string, Point> {
     const current = graph();
     if (current === null) return new Map();
-    const depths = new Map<string, number>();
-    const outgoing = new Map<string, string[]>();
-    for (const edge of current.edges) {
-      if (edge.kind === 'dependency') continue;
-      outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge.target]);
+    const components = nodes.filter((node) => node.kind === 'component');
+    const variables = nodes.filter((node) => node.kind === 'variable');
+    const hosts = nodes.filter((node) => node.kind === 'host');
+    const columns = Math.max(1, Math.min(components.length, viewport.clientWidth >= 760 ? 3 : 2));
+    const depths = new Map<string, number>(nodes.map((node) => [node.id, 0] as const));
+    const relations = current.edges.filter(
+      (edge) => edge.kind === 'relation' || edge.kind === 'semantic',
+    );
+    for (let pass = 0; pass < Math.min(nodes.length, 8); pass += 1) {
+      let changed = false;
+      for (const edge of relations) {
+        const source = depths.get(edge.source);
+        const target = depths.get(edge.target);
+        if (source === undefined || target === undefined) continue;
+        if (source + 1 > target && source + 1 < 8) {
+          depths.set(edge.target, source + 1);
+          changed = true;
+        }
+      }
+      if (!changed) break;
     }
-    const visit = (id: string, depth: number, stack: Set<string>): void => {
-      if (stack.has(id)) return;
-      const known = depths.get(id);
-      if (known !== undefined && known >= depth) return;
-      depths.set(id, depth);
-      const nextStack = new Set(stack).add(id);
-      for (const target of outgoing.get(id) ?? []) visit(target, depth + 1, nextStack);
-    };
-    for (const node of nodes) {
-      if ((outgoing.get(node.id) ?? []).length > 0) visit(node.id, 0, new Set());
-    }
-    const columns = new Map<number, BaseScreenBlueprintCanvasNode[]>();
-    for (const node of nodes) {
-      const fallback =
-        node.kind === 'component' || node.kind === 'variable'
-          ? 0
-          : node.kind === 'condition'
-            ? 1
-            : 2;
-      const depth = depths.get(node.id) ?? fallback;
-      columns.set(depth, [...(columns.get(depth) ?? []), node]);
-    }
+    const readOnlyVariables = variables.filter(
+      (node) => !current.edges.some((edge) => edge.target === node.id && edge.kind === 'relation'),
+    );
+    const variablesOnLeft = variables.length > 0 && readOnlyVariables.length === variables.length;
+    const componentBaseX = GRAPH_PADDING + (variablesOnLeft ? COLUMN_STEP : 0);
+    const ordered = [...components].sort(
+      (left, right) => (depths.get(left.id) ?? 0) - (depths.get(right.id) ?? 0),
+    );
+    const rows = Math.max(1, Math.ceil(ordered.length / columns));
     const next = new Map<string, Point>();
-    for (const [depth, column] of [...columns.entries()].sort(
-      (left, right) => left[0] - right[0],
-    )) {
-      column.sort((left, right) => {
-        const leftPosition = positionOf(left);
-        const rightPosition = positionOf(right);
-        return leftPosition.y - rightPosition.y || left.id.localeCompare(right.id);
+    ordered.forEach((node, index) => {
+      const column = Math.floor(index / rows);
+      const row = index % rows;
+      next.set(node.id, {
+        x: componentBaseX + column * COLUMN_STEP,
+        y: GRAPH_PADDING + row * ROW_STEP,
       });
-      column.forEach((node, index) => {
-        next.set(node.id, {
-          x: GRAPH_PADDING + depth * COLUMN_STEP,
-          y: GRAPH_PADDING + index * ROW_STEP,
-        });
-      });
+    });
+    let cursor = GRAPH_PADDING;
+    if (variablesOnLeft) {
+      for (const node of readOnlyVariables) {
+        next.set(node.id, { x: GRAPH_PADDING, y: cursor });
+        cursor += geometryOf(node).height + 20;
+      }
+    } else {
+      const variableX = componentBaseX + columns * COLUMN_STEP;
+      cursor = GRAPH_PADDING;
+      for (const node of variables) {
+        next.set(node.id, { x: variableX, y: cursor });
+        cursor += geometryOf(node).height + 20;
+      }
+    }
+    const hostX = componentBaseX + columns * COLUMN_STEP;
+    let hostY = variablesOnLeft
+      ? GRAPH_PADDING +
+        Math.max(
+          0,
+          ...ordered.map(
+            (node) => (next.get(node.id)?.y ?? GRAPH_PADDING) + geometryOf(node).height,
+          ),
+        ) +
+        24
+      : cursor;
+    for (const node of hosts) {
+      next.set(node.id, { x: hostX, y: hostY });
+      hostY += geometryOf(node).height + 24;
     }
     return next;
   }
@@ -1364,7 +2045,7 @@ export function createBlueprintCanvas(): HTMLElement {
     });
   }
 
-  function onInsert(kind: 'condition' | 'set-variable' | 'emit-host-event'): void {
+  function onInsert(kind: 'host'): void {
     const rect = viewport.getBoundingClientRect();
     const point = screenToGraph(rect.left + rect.width / 2, rect.top + rect.height / 2);
     sendCommand({
@@ -1428,6 +2109,12 @@ export function createBlueprintCanvas(): HTMLElement {
   }
 
   function onKeyDown(event: KeyboardEvent): void {
+    if (event.code === 'Space' && !isEditableTarget(event)) {
+      event.preventDefault();
+      spacePressed = true;
+      viewport.dataset.hand = 'true';
+      return;
+    }
     if (event.key === 'Delete' || event.key === 'Backspace') {
       if (state?.selection === null || state?.selection === undefined) return;
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement)
@@ -1540,7 +2227,7 @@ export function createBlueprintCanvas(): HTMLElement {
     const target = event.target instanceof Element ? event.target : null;
     if (target === null) return;
     const insert = target.closest<HTMLElement>('[data-bp-insert]')?.dataset.bpInsert;
-    if (insert === 'condition' || insert === 'set-variable' || insert === 'emit-host-event') {
+    if (insert === 'host') {
       onInsert(insert);
       return;
     }
@@ -1578,6 +2265,16 @@ export function createBlueprintCanvas(): HTMLElement {
     if (target?.closest('[data-bp-sim-run]') !== null) runSimulation();
   });
 
+  viewport.addEventListener(
+    'pointerdown',
+    (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('input, textarea, select, button, a') !== null) return;
+      root.focus({ preventScroll: true });
+    },
+    true,
+  );
+  viewport.addEventListener('pointerdown', onViewportCapturePointerDown, true);
   viewport.addEventListener('pointerdown', onBackgroundPointerDown);
   viewport.addEventListener('wheel', onWheel, { passive: false });
   viewport.addEventListener('dragover', (event) => {
@@ -1590,6 +2287,8 @@ export function createBlueprintCanvas(): HTMLElement {
   });
   viewport.addEventListener('drop', onDrop);
   root.addEventListener('keydown', onKeyDown);
+  root.addEventListener('keyup', onRootKeyUp);
+  root.addEventListener('blur', onRootBlur, true);
   root.addEventListener(BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT, onCanvasState);
 
   // 设计器在隐藏的标签页里首次拿到状态时视口尺寸可能还是 0；尺寸就绪后补一次适应画布。

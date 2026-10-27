@@ -1,12 +1,13 @@
 import { z } from 'zod';
+import type { ScreenBlueprintRelationEffect } from '../types/document.js';
+import { screenBlueprintEffectTargetKind } from './blueprint-relations.js';
 import { SCREEN_MATERIAL_TYPE_PATTERN } from './identity.js';
 import {
   MAX_BACKGROUND_COLOR_CODE_POINTS,
   MAX_BACKGROUND_GRADIENT_STOPS,
-  MAX_BLUEPRINT_ACTIONS_PER_RULE,
   MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
   MAX_BLUEPRINT_LAYOUT_NODES,
-  MAX_BLUEPRINT_RULES,
+  MAX_BLUEPRINT_RELATIONS,
   MAX_COMPONENTS,
   MAX_DATA_SOURCE_NAME_CODE_POINTS,
   MAX_DATA_SOURCE_PARAMS,
@@ -333,19 +334,6 @@ export const urlQueryVariableSchema = z.strictObject({
   ...dynamicVariableFields,
 });
 
-const blueprintTriggerSchema = z.union([
-  z.strictObject({
-    type: z.literal('material-event'),
-    componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-    eventName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
-  }),
-  z.strictObject({
-    type: z.literal('variable-event'),
-    variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-    eventName: z.enum(['data-updated', 'request-state']),
-  }),
-]);
-
 const blueprintValueExpressionSchema: z.ZodTypeAny = z.lazy(() =>
   z.union([
     z.strictObject({ kind: z.literal('literal'), value: z.any() }),
@@ -387,65 +375,115 @@ const blueprintConditionSchema = z
     }
   });
 
-const setVariableActionSchema = z.strictObject({
-  type: z.literal('set-variable'),
-  variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-  value: blueprintValueExpressionSchema,
+const blueprintVisibilityTransitionSchema = z.strictObject({
+  effect: z.enum(['appear', 'fade', 'slide-up']),
+  durationMs: z.number().int().min(0).max(10_000),
+  easing: z.enum(['linear', 'ease-in-out-quad', 'ease-in-out-expo']),
 });
 
-const requestVariableActionSchema = z.strictObject({
-  type: z.literal('request-variable'),
-  variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-});
+const blueprintRelationSourceSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('component'),
+    componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+    event: z.strictObject({
+      type: z.literal('material-event'),
+      eventName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+    }),
+  }),
+  z.strictObject({
+    kind: z.literal('variable'),
+    variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+    event: z.strictObject({
+      type: z.literal('variable-event'),
+      eventName: z.enum(['data-updated', 'request-state']),
+    }),
+  }),
+]);
 
-const requestComponentDataActionSchema = z.strictObject({
-  type: z.literal('request-component-data'),
-  componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-});
+const blueprintRelationTargetSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('component'),
+    componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+  }),
+  z.strictObject({
+    kind: z.literal('variable'),
+    variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+  }),
+  z.strictObject({ kind: z.literal('host') }),
+]);
 
-const emitHostEventActionSchema = z.strictObject({
-  type: z.literal('emit-host-event'),
-  eventName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
-  payload: blueprintValueExpressionSchema,
-});
+const blueprintRelationEffectSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    type: z.literal('component-visibility'),
+    operation: z.enum(['show', 'hide', 'toggle']),
+    transition: blueprintVisibilityTransitionSchema.optional(),
+  }),
+  z.strictObject({ type: z.literal('request-component-data') }),
+  z.strictObject({
+    type: z.literal('set-variable'),
+    value: blueprintValueExpressionSchema,
+  }),
+  z.strictObject({ type: z.literal('request-variable') }),
+  z.strictObject({
+    type: z.literal('emit-host-event'),
+    eventName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+    payload: blueprintValueExpressionSchema,
+  }),
+  z.strictObject({
+    type: z.literal('host-action'),
+    actionId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+    payload: blueprintValueExpressionSchema,
+  }),
+]);
 
-const hostActionSchema = z.strictObject({
-  type: z.literal('host-action'),
-  actionId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-  payload: blueprintValueExpressionSchema,
-});
-
-const componentVisibilityActionSchema = z.strictObject({
-  type: z.literal('component-visibility'),
-  componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-  operation: z.enum(['show', 'hide', 'toggle']),
-  transition: z
-    .strictObject({
-      effect: z.enum(['appear', 'fade', 'slide-up']),
-      durationMs: z.number().int().min(0).max(10_000),
-      easing: z.enum(['linear', 'ease-in-out-quad', 'ease-in-out-expo']),
-    })
-    .optional(),
-});
-
-const blueprintRuleSchema = z.strictObject({
+const blueprintBehaviorRelationSchema = z.strictObject({
+  type: z.literal('behavior'),
   id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-  trigger: blueprintTriggerSchema,
-  requiredCapabilities: z.array(z.string().regex(new RegExp(COMPONENT_ID_PATTERN))).optional(),
+  source: blueprintRelationSourceSchema,
   condition: blueprintConditionSchema.optional(),
-  actions: z
-    .array(
-      z.union([
-        setVariableActionSchema,
-        requestVariableActionSchema,
-        requestComponentDataActionSchema,
-        emitHostEventActionSchema,
-        hostActionSchema,
-        componentVisibilityActionSchema,
-      ]),
-    )
-    .max(MAX_BLUEPRINT_ACTIONS_PER_RULE),
+  target: blueprintRelationTargetSchema,
+  effect: blueprintRelationEffectSchema,
+  requiredCapabilities: z.array(z.string().regex(new RegExp(COMPONENT_ID_PATTERN))).optional(),
 });
+
+const blueprintSemanticRelationSchema = z.strictObject({
+  type: z.literal('semantic'),
+  id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+  source: z.strictObject({
+    kind: z.literal('component'),
+    componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+  }),
+  target: z.strictObject({
+    kind: z.literal('component'),
+    componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+  }),
+  role: z.enum(['related', 'detail', 'group', 'drill-down']),
+});
+
+const blueprintRelationSchema = z
+  .discriminatedUnion('type', [blueprintBehaviorRelationSchema, blueprintSemanticRelationSchema])
+  .superRefine((relation, context) => {
+    if (relation.type === 'behavior') {
+      const expected = screenBlueprintEffectTargetKind(
+        relation.effect as ScreenBlueprintRelationEffect,
+      );
+      if (relation.target.kind !== expected) {
+        context.addIssue({
+          code: 'custom',
+          message: `Effect "${relation.effect.type}" requires a ${expected} target.`,
+          path: ['target', 'kind'],
+        });
+      }
+      return;
+    }
+    if (relation.source.componentId === relation.target.componentId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Semantic relation must not target the same component.',
+        path: ['target', 'componentId'],
+      });
+    }
+  });
 
 const blueprintLayoutSchema = z.strictObject({
   nodes: z
@@ -468,7 +506,7 @@ const blueprintLayoutSchema = z.strictObject({
 });
 
 export const blueprintSchema = z.strictObject({
-  rules: z.array(blueprintRuleSchema).max(MAX_BLUEPRINT_RULES),
+  relations: z.array(blueprintRelationSchema).max(MAX_BLUEPRINT_RELATIONS),
   layout: blueprintLayoutSchema.optional(),
 });
 

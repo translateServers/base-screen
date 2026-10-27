@@ -138,17 +138,17 @@ describe('parseScreenDocument', () => {
       ],
       variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
       blueprint: {
-        rules: [
+        relations: [
           {
+            type: 'behavior',
             id: 'refresh',
-            trigger: { type: 'material-event', componentId: 'button', eventName: 'valueClick' },
-            actions: [
-              {
-                type: 'set-variable',
-                variableId: 'count',
-                value: { kind: 'literal', value: 1 },
-              },
-            ],
+            source: {
+              kind: 'component',
+              componentId: 'button',
+              event: { type: 'material-event', eventName: 'valueClick' },
+            },
+            target: { kind: 'variable', variableId: 'count' },
+            effect: { type: 'set-variable', value: { kind: 'literal', value: 1 } },
           },
         ],
       },
@@ -158,11 +158,21 @@ describe('parseScreenDocument', () => {
       parse(
         document({
           blueprint: {
-            rules: [
+            relations: [
               {
+                type: 'behavior',
                 id: 'bad',
-                trigger: { type: 'material-event', componentId: 'missing', eventName: 'click' },
-                actions: [],
+                source: {
+                  kind: 'component',
+                  componentId: 'missing',
+                  event: { type: 'material-event', eventName: 'click' },
+                },
+                target: { kind: 'host' },
+                effect: {
+                  type: 'emit-host-event',
+                  eventName: 'notify',
+                  payload: { kind: 'literal', value: null },
+                },
               },
             ],
           },

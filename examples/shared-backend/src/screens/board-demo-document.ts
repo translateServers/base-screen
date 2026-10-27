@@ -544,7 +544,7 @@ export const BOARD_DEMO_DOCUMENT = {
   },
   components,
   variables: [],
-  blueprint: { rules: [] },
+  blueprint: { relations: [] },
 } as const;
 
 /** 序列化成品文档；启动期即校验，写错时立刻失败而不是等前端加载。 */

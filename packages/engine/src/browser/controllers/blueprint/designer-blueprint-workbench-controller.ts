@@ -1,6 +1,5 @@
 import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
 import {
-  actionBlueprintNodeId,
   buildDesignerBlueprintComponentLibrary,
   buildDesignerBlueprintGraph,
 } from '../../../common/operations/blueprint/designer-blueprint-model.js';
@@ -281,6 +280,10 @@ export class DesignerBlueprintWorkbenchController {
     const assigned = this.#slot?.assignedElements({ flatten: true })[0];
     const fallback = this.#defaultCanvas?.element;
     if (fallback !== undefined) fallback.hidden = assigned !== undefined;
+    // 容器本身绝对定位铺满槽位：只在没有宿主画布时参与命中，否则会盖住宿主画布的手势区域。
+    if (this.#defaultCanvasHost !== undefined) {
+      this.#defaultCanvasHost.hidden = assigned !== undefined;
+    }
     const next = assigned ?? fallback;
     const previous = this.#bridge.canvas;
     const changed = this.#bridge.setCanvas(next);
@@ -351,23 +354,19 @@ export class DesignerBlueprintWorkbenchController {
       const id = `variable:${focus.id}`;
       return graph.nodes.some((node) => node.id === id) ? id : undefined;
     }
-    if (focus.kind === 'rule') {
+    if (focus.kind === 'relation') {
       return (
-        graph.nodes.find((node) => node.ruleId === focus.id)?.id ??
-        graph.edges.find((edge) => edge.ruleId === focus.id)?.id
+        graph.edges.find((edge) => edge.relationId === focus.id)?.id ??
+        (this.graphHasEdge(focus.id) ? focus.id : undefined)
       );
+    }
+    if (focus.kind === 'rule') {
+      return graph.edges.find((edge) => edge.relationId === focus.id)?.id;
     }
     if (graph.nodes.some((node) => node.id === focus.id) || this.graphHasEdge(focus.id)) {
       return focus.id;
     }
-    const marker = focus.id.lastIndexOf(':');
-    const ruleId = marker < 1 ? '' : focus.id.slice(0, marker);
-    const actionIndex = Number(marker < 1 ? '' : focus.id.slice(marker + 1));
-    if (!Number.isInteger(actionIndex)) return undefined;
-    const nodeId = actionBlueprintNodeId(ruleId, actionIndex);
-    return graph.nodes.some((node) => node.id === nodeId)
-      ? nodeId
-      : graph.edges.find((edge) => edge.ruleId === ruleId && edge.actionIndex === actionIndex)?.id;
+    return undefined;
   }
 
   private graphHasEdge(id: string): boolean {
@@ -381,12 +380,13 @@ export class DesignerBlueprintWorkbenchController {
     const problems = this.#bridge
       .stateDiagnostics()
       .filter((item) => item.severity === 'error').length;
-    const actions =
-      document?.blueprint.rules.reduce((total, rule) => total + rule.actions.length, 0) ?? 0;
+    const relations = document?.blueprint.relations ?? [];
     renderDesignerBlueprintWorkbenchChrome(root, this.#mode, this.available, {
       nodes: this.componentLibrary.length,
-      rules: document?.blueprint.rules.length ?? 0,
-      actions,
+      relations: relations.length,
+      semantic: relations.filter((relation) => relation.type === 'semantic').length,
+      structural:
+        document?.components.filter((component) => component.parentId !== null).length ?? 0,
       problems,
     });
   }

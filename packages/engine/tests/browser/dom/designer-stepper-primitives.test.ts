@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDesignerStepper } from '../../../../src/browser/dom/descriptor/designer-descriptor-stepper-dom.js';
+import { createDesignerStepper } from '../../../src/browser/dom/designer-field-primitives.js';
 
 type Listener = (event: { type: string }) => void;
 

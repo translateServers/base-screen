@@ -25,7 +25,7 @@ const DOCUMENT_INPUT = {
   canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
   components: [],
   variables: [],
-  blueprint: { rules: [] },
+  blueprint: { relations: [] },
 };
 
 const DOCUMENT_TEXT = JSON.stringify(DOCUMENT_INPUT);
@@ -157,7 +157,7 @@ describe('ScreensService', () => {
         type: string;
         dataSource: { type: string; datasetId?: string; resourceId?: string } | null;
       }>;
-      blueprint: { rules: Array<{ id: string }> };
+      blueprint: { relations: Array<{ id: string }> };
     };
     expect(alarm.canvas).toMatchObject({ width: 1920, height: 1080 });
     expect(alarm.components.filter((item) => item.type === 'board.digital-flop')).toHaveLength(4);
@@ -172,7 +172,10 @@ describe('ScreensService', () => {
     // 这两个 id 是宿主 `alarm.open` 绑定的落点，改名等于让告警推送失去目标。
     expect(alarm.components.some((item) => item.id === 'kpi-alarm-value')).toBe(true);
     expect(alarm.components.some((item) => item.id === 'top-notice')).toBe(true);
-    expect(alarm.blueprint.rules.map((rule) => rule.id)).toEqual(['rule-line', 'rule-severity']);
+    expect(alarm.blueprint.relations.map((relation) => relation.id)).toEqual([
+      'rule-line',
+      'rule-severity',
+    ]);
     // 第五个种子是真实数据案例：三个共享 SQLite 实例 + 三处蓝图联动。
     const air = JSON.parse(seeded[4]!.document) as {
       canvas: { width: number; height: number };
@@ -187,7 +190,7 @@ describe('ScreensService', () => {
         params: Record<string, unknown>;
       }>;
       variables: Array<{ id: string }>;
-      blueprint: { rules: Array<{ trigger: { componentId: string } }> };
+      blueprint: { relations: Array<{ source: { componentId: string } }> };
     };
     expect(air.canvas).toMatchObject({ width: 1920, height: 1080 });
     expect(air.components.length).toBeGreaterThan(40);
@@ -218,7 +221,7 @@ describe('ScreensService', () => {
       air.components.filter((item) => item.dataValue?.kind === 'data-source-field').length,
     ).toBeGreaterThanOrEqual(15);
     expect(air.variables.map((item) => item.id)).toEqual(['city', 'hours']);
-    expect(air.blueprint.rules.map((rule) => rule.trigger.componentId)).toEqual([
+    expect(air.blueprint.relations.map((relation) => relation.source.componentId)).toEqual([
       'city-board',
       'window-24-text',
       'window-48-text',

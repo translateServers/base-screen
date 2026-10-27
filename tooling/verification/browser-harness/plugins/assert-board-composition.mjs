@@ -24,7 +24,7 @@ export async function assertHostTimerComposition(page) {
       const harness = window.baseScreenHarness;
       const designer = harness.designer;
       const index = harness.pluginManager.snapshot.contributions;
-      const rule = designer.document.blueprint.rules.find(
+      const relation = designer.document.blueprint.relations.find(
         (item) => item.id === 'variable-trigger-demo',
       );
       return {
@@ -32,10 +32,18 @@ export async function assertHostTimerComposition(page) {
         // 只断言变量写成功会漏掉"处理器从未被路由到"这类断线。
         pluginCatalogued: harness.pluginManager.snapshot.plugins.get(pluginId) !== undefined,
         processorIndexed: index.getDataProcessor?.(processorId) !== undefined,
-        ruleTrigger: rule?.trigger?.type ?? null,
-        ruleVariableId: rule?.trigger?.variableId ?? null,
+        ruleTrigger:
+          relation?.type === 'behavior' && relation.source.kind === 'variable'
+            ? 'variable-event'
+            : null,
+        ruleVariableId:
+          relation?.type === 'behavior' && relation.source.kind === 'variable'
+            ? relation.source.variableId
+            : null,
         ruleActionId:
-          rule?.actions.find((action) => action.type === 'host-action')?.actionId ?? null,
+          relation?.type === 'behavior' && relation.effect.type === 'host-action'
+            ? relation.effect.actionId
+            : null,
         variableDeclared: designer.document.variables.some(
           (variable) => variable.id === tickVariableId,
         ),

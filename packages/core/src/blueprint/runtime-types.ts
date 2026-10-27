@@ -1,7 +1,7 @@
 import type {
   ScreenBlueprintComponentVisibilityAction,
   ScreenBlueprintHostEvent,
-  ScreenDocument,
+  ScreenBlueprintRule,
   ScreenJsonObject,
   ScreenJsonValue,
 } from '@base-screen/contracts';
@@ -27,7 +27,7 @@ export interface ScreenBlueprintCapabilityIndex {
 }
 
 export interface ScreenBlueprintPlan {
-  readonly rules: ScreenDocument['blueprint']['rules'];
+  readonly rules: readonly ScreenBlueprintRule[];
   readonly initialVariables: ScreenJsonObject;
 }
 

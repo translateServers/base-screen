@@ -259,7 +259,7 @@ function analyzeDocument(source) {
         .filter((entry) => entry.kind === 'mapped')
         .map((entry) => entry.component),
       variables: source.variables,
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     },
   };
 }

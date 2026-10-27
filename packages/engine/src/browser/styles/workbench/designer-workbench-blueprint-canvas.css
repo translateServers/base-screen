@@ -161,19 +161,19 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  cursor: grab;
+  cursor: default;
   touch-action: none;
   background-color: var(--designer-surface-canvas);
-  background-image:
-    radial-gradient(circle, var(--designer-border-default) 1px, transparent 1px),
-    radial-gradient(circle, var(--designer-canvas-grid-line) 1px, transparent 1px);
-  background-size:
-    120px 120px,
-    24px 24px;
+  background-image: radial-gradient(circle, var(--designer-canvas-grid-line) 1px, transparent 1px);
+  background-size: 20px 20px;
   outline: none;
 }
 
-.designer-blueprint-canvas-viewport:active {
+.designer-blueprint-canvas-viewport[data-hand="true"] {
+  cursor: grab;
+}
+
+.designer-blueprint-canvas-viewport[data-panning="true"] {
   cursor: grabbing;
 }
 
@@ -190,7 +190,6 @@
   position: absolute;
   inset: 0;
   transform-origin: 0 0;
-  will-change: transform;
 }
 
 .designer-blueprint-canvas-edges {
@@ -202,32 +201,90 @@
   pointer-events: none;
 }
 
-.designer-blueprint-canvas-edge {
+.designer-blueprint-canvas-edge-line {
   fill: none;
-  stroke: color-mix(in srgb, var(--designer-text-muted) 62%, transparent);
+  stroke: color-mix(in srgb, var(--designer-text-muted) 82%, transparent);
   stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+  transition:
+    stroke var(--designer-motion),
+    stroke-width var(--designer-motion),
+    opacity var(--designer-motion);
+  pointer-events: none;
 }
 
-.designer-blueprint-canvas-edge[data-kind="dependency"] {
-  stroke-dasharray: 4 4;
+.designer-blueprint-canvas-edge-group[data-kind="dependency"] .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-text-disabled);
+  stroke-width: 1.6;
+  stroke-dasharray: 1 5;
+  stroke-linecap: round;
 }
 
-.designer-blueprint-canvas-edge[data-selected="true"] {
-  stroke: var(--designer-accent);
-  stroke-width: 1.8;
+.designer-blueprint-canvas-edge-group[data-kind="semantic"] .designer-blueprint-canvas-edge-line {
+  stroke-dasharray: 7 5;
 }
 
-.designer-blueprint-canvas-edge[data-traced="true"] {
-  stroke: var(--designer-accent);
+.designer-blueprint-canvas-edge-group[data-kind="containment"]
+  .designer-blueprint-canvas-edge-line {
+  opacity: 0.55;
+  stroke-dasharray: 1 5;
+}
+
+.designer-blueprint-canvas-edge-group[data-kind="relation"] .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-text-secondary);
+  stroke-width: 1.5;
+}
+
+.designer-blueprint-canvas-edge-group:hover .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-text-primary);
   stroke-width: 2;
+}
+
+.designer-blueprint-canvas-edge-group[data-selected="true"] .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-accent);
+  stroke-width: 2.4;
+}
+
+.designer-blueprint-canvas-edge-group[data-traced="true"] .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-accent);
+  stroke-width: 2.2;
+}
+
+.designer-blueprint-canvas-edge-group[data-failed="true"] .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-danger);
+  stroke-width: 2.2;
+}
+
+.designer-blueprint-canvas-edge-caps {
+  fill: var(--designer-text-muted);
+  stroke: none;
+  pointer-events: none;
+}
+
+.designer-blueprint-canvas-edge-group[data-kind="dependency"] .designer-blueprint-canvas-edge-caps,
+.designer-blueprint-canvas-edge-group[data-kind="semantic"] .designer-blueprint-canvas-edge-caps {
+  fill: var(--designer-text-disabled);
+}
+
+.designer-blueprint-canvas-edge-group[data-kind="relation"] .designer-blueprint-canvas-edge-caps {
+  fill: var(--designer-text-secondary);
+}
+
+.designer-blueprint-canvas-edge-group[data-selected="true"] .designer-blueprint-canvas-edge-caps,
+.designer-blueprint-canvas-edge-group[data-traced="true"] .designer-blueprint-canvas-edge-caps {
+  fill: var(--designer-accent);
 }
 
 .designer-blueprint-canvas-edge-hit {
   fill: none;
   stroke: transparent;
-  stroke-width: 20;
+  stroke-width: 16;
   pointer-events: stroke;
   cursor: pointer;
+}
+
+.designer-blueprint-canvas-edge-group[data-selected="true"] .designer-blueprint-canvas-edge-hit {
+  stroke: color-mix(in srgb, var(--designer-accent) 8%, transparent);
 }
 
 .designer-blueprint-canvas-edge-hit:focus-visible {
@@ -238,30 +295,90 @@
 .designer-blueprint-canvas-edge-labels {
   position: absolute;
   inset: 0;
+  z-index: 3;
   pointer-events: none;
 }
 
 .designer-blueprint-canvas-edge-label {
   position: absolute;
-  padding: 1px 6px;
-  border-radius: var(--designer-radius-2);
-  background: var(--designer-surface-panel);
-  box-shadow: 0 0 0 1px var(--designer-border-subtle);
-  color: var(--designer-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  max-width: 168px;
+  padding: 0 7px;
+  overflow: hidden;
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-surface-overlay);
+  box-shadow:
+    0 0 0 1px var(--designer-border-default),
+    var(--designer-shadow-float);
+  color: var(--designer-text-secondary);
   font-family: var(--designer-font-family-mono);
   font-size: var(--designer-font-size-xs);
-  line-height: 14px;
+  font-weight: 500;
+  line-height: 1;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
   transform: translate(-50%, -50%);
+  transition:
+    color var(--designer-motion),
+    box-shadow var(--designer-motion);
+}
+
+.designer-blueprint-canvas-edge-label-icon {
+  display: inline-flex;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  color: var(--designer-text-disabled);
+}
+
+.designer-blueprint-canvas-edge-label-icon svg {
+  width: 10px;
+  height: 10px;
+}
+
+.designer-blueprint-canvas-edge-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.designer-blueprint-canvas-edge-label:hover {
+  color: var(--designer-text-primary);
+  box-shadow:
+    0 0 0 1px var(--designer-border-strong),
+    var(--designer-shadow-float);
+}
+
+.designer-blueprint-canvas-edge-label:hover .designer-blueprint-canvas-edge-label-icon {
+  color: var(--designer-text-secondary);
+}
+
+.designer-blueprint-canvas-edge-label[data-kind="dependency"],
+.designer-blueprint-canvas-edge-label[data-kind="semantic"] {
+  color: var(--designer-text-muted);
 }
 
 .designer-blueprint-canvas-edge-label[data-selected="true"] {
+  color: var(--designer-text-primary);
+  box-shadow:
+    0 0 0 1px var(--designer-accent),
+    var(--designer-shadow-float);
+}
+
+.designer-blueprint-canvas-edge-label[data-selected="true"]
+  .designer-blueprint-canvas-edge-label-icon {
   color: var(--designer-accent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 45%, transparent);
 }
 
 .designer-blueprint-canvas-edge-label[data-traced="true"] {
-  color: var(--designer-accent);
+  color: var(--designer-text-primary);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--designer-accent) 55%, transparent),
+    var(--designer-shadow-float);
 }
 
 .designer-blueprint-canvas-viewport[data-zoom-far="true"]
@@ -290,13 +407,21 @@
 .designer-blueprint-canvas-node {
   position: absolute;
   box-sizing: border-box;
-  border-radius: var(--designer-radius-4);
-  background: var(--designer-surface-panel);
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-surface-raised);
   box-shadow: var(--designer-elev-card);
-  cursor: move;
+  cursor: default;
   transition:
     background-color var(--designer-motion),
-    box-shadow var(--designer-motion);
+    box-shadow var(--designer-motion),
+    outline-color var(--designer-motion);
+}
+
+.designer-blueprint-canvas-node:hover {
+  box-shadow:
+    var(--designer-elev-card),
+    0 0 0 1px var(--designer-border-strong),
+    var(--designer-shadow-float);
 }
 
 .designer-blueprint-canvas-node:focus-visible {
@@ -304,10 +429,23 @@
   outline-offset: 2px;
 }
 
-.designer-blueprint-canvas-node[data-selected="true"] {
-  background: color-mix(in srgb, var(--designer-text-primary) 6%, var(--designer-surface-panel));
-  outline: 1px solid var(--designer-border-active);
+.designer-blueprint-canvas-node[data-traced="true"] {
+  outline: 1px solid color-mix(in srgb, var(--designer-accent) 48%, transparent);
   outline-offset: 0;
+}
+
+.designer-blueprint-canvas-node[data-selected="true"] {
+  background: var(--designer-surface-raised);
+  outline: 1px solid color-mix(in srgb, var(--designer-accent) 72%, transparent);
+  outline-offset: 0;
+  box-shadow:
+    var(--designer-elev-card),
+    0 0 0 3px var(--designer-accent-surface),
+    var(--designer-shadow-float);
+}
+
+.designer-blueprint-canvas-node[data-kind="host"] {
+  background: color-mix(in srgb, var(--designer-accent) 4%, var(--designer-surface-raised));
 }
 
 .designer-blueprint-canvas-node[data-failed="true"] {
@@ -336,18 +474,49 @@
 }
 
 .designer-blueprint-canvas-node-header {
-  display: flex;
+  display: grid;
   box-sizing: border-box;
-  align-items: flex-start;
-  gap: var(--designer-space-3);
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
   height: 45px;
-  padding: 8px 10px 6px;
+  padding: 7px 10px;
   overflow: hidden;
+  border-radius: var(--designer-radius-3) var(--designer-radius-3) 0 0;
+}
+
+.designer-blueprint-canvas-node[data-selected="true"] .designer-blueprint-canvas-node-header {
+  background: color-mix(in srgb, var(--designer-text-primary) 3%, transparent);
+}
+
+.designer-blueprint-canvas-node-icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+  color: var(--designer-text-secondary);
+  place-items: center;
+}
+
+.designer-blueprint-canvas-node-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.designer-blueprint-canvas-node[data-kind="variable"] .designer-blueprint-canvas-node-icon {
+  background: var(--designer-accent-surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 18%, transparent);
+  color: var(--designer-accent-text);
+}
+
+.designer-blueprint-canvas-node[data-kind="host"] .designer-blueprint-canvas-node-icon {
+  color: var(--designer-text-secondary);
 }
 
 .designer-blueprint-canvas-node-copy {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
   gap: 1px;
@@ -360,7 +529,8 @@
   font-family: var(--designer-font-family-mono);
   font-size: var(--designer-font-size-xs);
   font-weight: 500;
-  line-height: 13.2px;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -368,50 +538,97 @@
 .designer-blueprint-canvas-node-title {
   overflow: hidden;
   color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-base);
+  font-size: 12.5px;
   font-weight: 600;
-  line-height: 16.9px;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.designer-blueprint-canvas-node-flow {
-  flex: none;
-  padding-top: 1px;
+.designer-blueprint-canvas-node-relcount {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
   color: var(--designer-text-muted);
   font-family: var(--designer-font-family-mono);
   font-size: var(--designer-font-size-xs);
   font-weight: 500;
-  line-height: 11px;
   white-space: nowrap;
+}
+
+.designer-blueprint-canvas-node-relcount b {
+  color: var(--designer-text-secondary);
+  font-weight: 500;
 }
 
 .designer-blueprint-canvas-node-subtitle {
   box-sizing: border-box;
   height: 21px;
-  padding: 0 10px 6px;
+  padding: 0 10px;
   overflow: hidden;
   color: var(--designer-text-muted);
   font-family: var(--designer-font-family-mono);
   font-size: var(--designer-font-size-xs);
   font-weight: 500;
-  line-height: 15.4px;
+  line-height: 21px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.designer-blueprint-canvas-node-summary {
-  display: -webkit-box;
+.designer-blueprint-canvas-node-value {
+  display: flex;
   box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   height: 40px;
-  margin: 0;
-  padding: 0 10px 8px;
-  overflow: hidden;
-  color: var(--designer-text-secondary);
+  padding: 0 10px;
+  border-top: 1px solid var(--designer-border-subtle);
+  color: var(--designer-text-muted);
   font-size: var(--designer-font-size-xs);
-  line-height: 15.95px;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  white-space: nowrap;
+}
+
+.designer-blueprint-canvas-node-value b {
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font-family: var(--designer-font-family-mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-blueprint-canvas-node-value span:last-child {
+  flex: none;
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+}
+
+.designer-blueprint-canvas-node-summary {
+  position: absolute;
+  right: 0;
+  left: 0;
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  padding: 0 10px;
+  overflow: hidden;
+  border-top: 1px solid var(--designer-border-subtle);
+  border-radius: 0 0 var(--designer-radius-3) var(--designer-radius-3);
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .designer-blueprint-canvas-ports {
@@ -423,28 +640,77 @@
 .designer-blueprint-canvas-port-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--designer-space-3);
+  gap: 5px;
   height: 28px;
-  padding: 0 10px;
+  padding: 0 14px 0 10px;
   overflow: hidden;
+  border-top: 1px solid var(--designer-border-subtle);
   color: var(--designer-text-secondary);
   font-size: var(--designer-font-size-xs);
   white-space: nowrap;
+  transition:
+    background-color var(--designer-motion),
+    color var(--designer-motion);
 }
 
-.designer-blueprint-canvas-port-row-in {
-  justify-content: flex-start;
+.designer-blueprint-canvas-port-row:hover {
+  background: color-mix(in srgb, var(--designer-text-primary) 4%, transparent);
+  color: var(--designer-text-primary);
+}
+
+.designer-blueprint-canvas-port-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-blueprint-canvas-port-tag {
+  flex: none;
   color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.designer-blueprint-canvas-port-row[data-semantic="true"] .designer-blueprint-canvas-port-name,
+.designer-blueprint-canvas-port-row[data-containment="true"] .designer-blueprint-canvas-port-name {
+  font-family: var(--designer-font-family);
+}
+
+.designer-blueprint-canvas-port-row[data-semantic="true"] .designer-blueprint-canvas-port-tag {
+  color: color-mix(in oklab, var(--designer-accent) 42%, var(--designer-text-muted));
 }
 
 .designer-blueprint-canvas-port-row[data-available="false"] {
-  opacity: 0.45;
+  color: var(--designer-text-disabled);
 }
 
-.designer-blueprint-canvas-port-row[data-dependency="true"] {
+.designer-blueprint-canvas-port-row[data-available="false"]:hover {
+  background: color-mix(in srgb, var(--designer-text-primary) 2%, transparent);
+  color: var(--designer-text-muted);
+}
+
+.designer-blueprint-canvas-port-row[data-available="false"] .designer-blueprint-canvas-port-tag {
   color: var(--designer-text-disabled);
-  font-family: var(--designer-font-family-mono);
+}
+
+.designer-blueprint-canvas-port-lock {
+  display: inline-flex;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  color: var(--designer-text-disabled);
+}
+
+.designer-blueprint-canvas-port-lock svg {
+  width: 9px;
+  height: 9px;
 }
 
 .designer-blueprint-canvas-port {
@@ -453,11 +719,12 @@
   display: grid;
   width: 24px;
   height: 24px;
-  margin-top: -12px;
-  border-radius: 50%;
+  border-radius: var(--designer-radius-3);
   cursor: crosshair;
   place-items: center;
   pointer-events: auto;
+  translate: 0 -50%;
+  z-index: 4;
 }
 
 .designer-blueprint-canvas-port::before {
@@ -465,7 +732,7 @@
   height: 8px;
   border-radius: 50%;
   background: var(--designer-text-muted);
-  box-shadow: 0 0 0 2px var(--designer-surface-panel);
+  box-shadow: 0 0 0 2px var(--designer-surface-raised);
   content: "";
   transition:
     background-color var(--designer-motion),
@@ -476,12 +743,22 @@
   left: -12px;
 }
 
+.designer-blueprint-canvas-port-in::before {
+  background: transparent;
+  box-shadow:
+    inset 0 0 0 1.5px var(--designer-text-muted),
+    0 0 0 2px var(--designer-surface-raised);
+}
+
 .designer-blueprint-canvas-port-out {
   right: -12px;
 }
 
 .designer-blueprint-canvas-port:hover::before {
-  background: var(--designer-text-secondary);
+  background: var(--designer-text-primary);
+  box-shadow:
+    0 0 0 2px var(--designer-surface-raised),
+    0 0 0 3px var(--designer-border-active);
 }
 
 .designer-blueprint-canvas-port:focus-visible {
@@ -494,8 +771,9 @@
 }
 
 .designer-blueprint-canvas-port[data-available="false"]::before {
+  border: 1px dashed var(--designer-border-active);
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--designer-text-disabled);
+  box-shadow: inset 0 0 0 1px var(--designer-border-strong);
 }
 
 .designer-blueprint-canvas-port[data-dependency="true"] {
@@ -503,19 +781,59 @@
 }
 
 .designer-blueprint-canvas-port[data-dependency="true"]::before {
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
   background: var(--designer-text-muted);
   transform: rotate(45deg);
 }
 
+.designer-blueprint-canvas-port[data-semantic="true"]::before {
+  border-radius: var(--designer-radius-1);
+  background: var(--designer-text-secondary);
+  transform: rotate(45deg);
+}
+
+.designer-blueprint-canvas-port[data-containment="true"] {
+  cursor: default;
+}
+
+.designer-blueprint-canvas-port[data-containment="true"]::before {
+  border-radius: var(--designer-radius-1);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--designer-text-disabled);
+}
+
 .designer-blueprint-canvas-port-in[data-armed="true"]::before {
   background: var(--designer-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--designer-accent) 25%, transparent);
+  box-shadow:
+    0 0 0 2px var(--designer-surface-raised),
+    0 0 0 4px var(--designer-accent-surface);
 }
 
 .designer-blueprint-canvas-port-in[data-hover="true"]::before {
   background: var(--designer-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--designer-accent) 25%, transparent);
+  box-shadow:
+    0 0 0 2px var(--designer-surface-raised),
+    0 0 0 4px var(--designer-accent-surface);
+}
+
+.designer-blueprint-canvas-viewport[data-hand="true"] .designer-blueprint-canvas-node,
+.designer-blueprint-canvas-viewport[data-hand="true"] .designer-blueprint-canvas-edge-label,
+.designer-blueprint-canvas-viewport[data-hand="true"] .designer-blueprint-canvas-port {
+  cursor: grab;
+}
+
+.designer-blueprint-canvas-viewport[data-panning="true"] .designer-blueprint-canvas-node,
+.designer-blueprint-canvas-viewport[data-panning="true"] .designer-blueprint-canvas-edge-label,
+.designer-blueprint-canvas-viewport[data-panning="true"] .designer-blueprint-canvas-port {
+  cursor: grabbing;
+}
+
+.designer-blueprint-canvas-marquee {
+  position: absolute;
+  z-index: var(--designer-z-workspace-overlay);
+  border: 1px solid var(--designer-accent);
+  background: color-mix(in srgb, var(--designer-accent) 14%, transparent);
+  pointer-events: none;
 }
 
 /* 空态与提示 */
@@ -574,7 +892,7 @@
   max-width: min(560px, calc(100% - 32px));
   gap: var(--designer-space-2);
   padding: 8px 12px;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-overlay);
   box-shadow: var(--designer-elev-ring);
   color: var(--designer-text-secondary);

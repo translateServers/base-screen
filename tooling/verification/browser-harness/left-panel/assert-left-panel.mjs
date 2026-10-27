@@ -308,7 +308,7 @@ export async function assertLeftPanelLayers(page, viewport) {
         },
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
     probe.style.cssText = 'position:fixed;inset:0;z-index:99;width:1024px;height:640px;';
     document.body.appendChild(probe);
@@ -1095,7 +1095,7 @@ export async function assertLeftPanelContextMenu(page) {
         },
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
     probe.style.cssText = 'position:fixed;inset:0;z-index:99;width:1024px;height:640px;';
     document.body.appendChild(probe);

@@ -146,9 +146,12 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
 
   it('expresses Blueprint condition and expression limits', () => {
     const blueprint = propertiesOf(schema).blueprint as Record<string, unknown>;
-    const rules = propertiesOf(blueprint).rules as { items: unknown };
-    const rule = propertiesOf(rules.items as Record<string, unknown>);
-    const condition = rule.condition as { allOf: unknown[] };
+    const relations = propertiesOf(blueprint).relations as { items: { oneOf: unknown[] } };
+    const behavior = relations.items.oneOf.find(
+      (branch) =>
+        (propertiesOf(branch).type as { const?: string } | undefined)?.const === 'behavior',
+    ) as Record<string, unknown>;
+    const condition = propertiesOf(behavior).condition as { allOf: unknown[] };
     expect(condition.allOf).toEqual([
       {
         if: { properties: { operator: { const: 'exists' } }, required: ['operator'] },

@@ -1,20 +1,27 @@
 /* 分段控件统一形态（设计原型 .segmented）：画布缩放、数据源、检查器密度、数据集编辑器
-   四处自制分段共用同一组几何与状态——轨道 = workspace 底 + elev-ring 描边，选中 = 悬停档底
+   共用同一组几何与状态——轨道 = workspace 底 + elev-ring 描边，选中 = 悬停档底
    + 强调文字（黑夜用更深一档的 active 底）。上下文只保留列数与尺寸差异，不再各写一套。 */
-.designer-canvas-scale-options,
-.designer-data-source-segmented,
-.designer-dataset-editor-modes,
-.inspector-density,
 .designer-segmented {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
+  box-sizing: border-box;
+  height: var(--designer-segmented-height);
   gap: 1px;
   padding: 2px;
   border: 0;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-workspace);
   box-shadow: var(--designer-elev-ring);
+}
+
+.designer-segmented[data-size="compact"] {
+  height: var(--designer-segmented-height-compact);
+}
+
+.designer-segmented[data-size="compact"] .designer-segmented-option {
+  height: var(--designer-segmented-option-height-compact);
+  min-height: 0;
 }
 
 /* 对齐分段：可见按钮只改值，原生 select 作为唯一值载体收进 1px。 */
@@ -34,13 +41,10 @@
   height: 14px;
 }
 
-.designer-canvas-scale-option,
-.designer-data-source-segmented .designer-button,
-.designer-dataset-editor-modes .designer-button,
-.inspector-density .designer-tab,
 .designer-segmented .designer-segmented-option {
   min-width: 0;
-  min-height: 26px;
+  height: var(--designer-segmented-option-height);
+  min-height: var(--designer-segmented-option-height);
   overflow: hidden;
   padding: 0 var(--designer-space-3);
   border: 0;
@@ -51,10 +55,6 @@
   text-overflow: ellipsis;
 }
 
-.designer-canvas-scale-option:hover:not(:disabled):not([aria-pressed="true"]),
-.designer-data-source-segmented .designer-button:hover:not(:disabled):not([aria-pressed="true"]),
-.designer-dataset-editor-modes .designer-button:hover:not(:disabled):not([aria-pressed="true"]),
-.inspector-density .designer-tab:hover:not(:disabled):not([aria-pressed="true"]),
 .designer-segmented
   .designer-segmented-option:hover:not(:disabled):not([aria-pressed="true"]):not(
     [aria-checked="true"]
@@ -63,10 +63,6 @@
   color: var(--designer-text-primary);
 }
 
-.designer-canvas-scale-option[aria-pressed="true"],
-.designer-data-source-segmented .designer-button[aria-pressed="true"],
-.designer-dataset-editor-modes .designer-button[aria-pressed="true"],
-.inspector-density .designer-tab[aria-pressed="true"],
 /* 语义是 radio 的分段（数据面板取值方式）用 aria-checked 表达选中：
    分段控件允许两种"选中"语汇，几何与状态档共用同一处定义。 */
 .designer-segmented .designer-segmented-option[aria-pressed="true"],
@@ -75,10 +71,6 @@
   color: var(--designer-accent-text);
 }
 
-:host(:not([theme="light"])) .designer-canvas-scale-option[aria-pressed="true"],
-:host(:not([theme="light"])) .designer-data-source-segmented .designer-button[aria-pressed="true"],
-:host(:not([theme="light"])) .designer-dataset-editor-modes .designer-button[aria-pressed="true"],
-:host(:not([theme="light"])) .inspector-density .designer-tab[aria-pressed="true"],
 :host(:not([theme="light"])) .designer-segmented .designer-segmented-option[aria-pressed="true"],
 :host(:not([theme="light"])) .designer-segmented .designer-segmented-option[aria-checked="true"] {
   background: var(--designer-surface-control-active);
@@ -95,7 +87,7 @@
 }
 
 /* 上下文差异：画布缩放方式有 6 档，按 3 列 2 行排布而不是单行等分。 */
-.designer-canvas-scale-options {
+.designer-canvas-scale-segmented {
   grid-auto-flow: row;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

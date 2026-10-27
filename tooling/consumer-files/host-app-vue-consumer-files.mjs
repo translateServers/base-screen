@@ -106,7 +106,7 @@ const seedDocument = {
     },
   ],
   variables: [],
-  blueprint: { rules: [] },
+  blueprint: { relations: [] },
 };
 
 function screenShape(revision) {

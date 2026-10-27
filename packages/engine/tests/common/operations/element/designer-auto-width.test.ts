@@ -41,7 +41,7 @@ function document(components = [component()]): ScreenDocument {
     components,
     dataSources: [],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

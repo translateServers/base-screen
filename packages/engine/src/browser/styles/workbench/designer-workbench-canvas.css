@@ -175,12 +175,12 @@
    组件越窄越明显，而这些顶部控件正是选中后的高频操作。 */
 .selection-tag {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + var(--designer-space-4));
   left: 0;
   max-width: 320px;
   overflow: hidden;
   padding: 2px 6px;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-accent);
   color: var(--designer-text-on-accent);
   font: var(--designer-font-numeric);
@@ -409,7 +409,7 @@
   position: absolute;
   color: var(--designer-measurement-label);
   font: var(--designer-font-numeric);
-  font-size: var(--designer-overlay-font-size, 10px);
+  font-size: var(--designer-overlay-font-size, var(--designer-font-size-xs));
   line-height: var(--designer-overlay-line-height, 14px);
   text-shadow: 0 var(--designer-overlay-pixel, 1px) var(--designer-overlay-glow-small, 2px)
     color-mix(in srgb, var(--designer-surface-workspace) 70%, transparent);

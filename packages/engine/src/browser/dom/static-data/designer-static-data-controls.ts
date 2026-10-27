@@ -1,12 +1,13 @@
 import type { ScreenTabularDataset } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../../ui/designer-icons.js';
 import {
   createDesignerFieldElement,
   createDesignerFieldRow,
 } from '../designer-field-primitives.js';
 import {
+  createDesignerButton,
   createDesignerCheckbox,
+  createDesignerIconButton,
   createDesignerInput,
   createDesignerTextarea,
 } from '../designer-ui-primitives.js';
@@ -85,12 +86,11 @@ export function action(
   label: string,
   variant?: 'primary',
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button';
+  const button = createDesignerButton(ownerDocument, {
+    text: label,
+    ...(variant === undefined ? {} : { variant }),
+  });
   button.dataset.staticAction = value;
-  if (variant !== undefined) button.dataset.variant = variant;
-  button.textContent = label;
   return button;
 }
 
@@ -100,11 +100,12 @@ export function paginationAction(
   label: string,
   icon: 'chevron-left' | 'chevron-right',
 ): HTMLButtonElement {
-  const button = action(ownerDocument, value, label);
-  button.classList.add('designer-icon-button', 'designer-static-page-button');
-  button.setAttribute('aria-label', label);
-  button.setAttribute('data-tip', label);
-  button.innerHTML = designerIcon(icon);
+  const button = createDesignerIconButton(ownerDocument, {
+    className: 'designer-static-page-button',
+    icon,
+    label,
+  });
+  button.dataset.staticAction = value;
   return button;
 }
 

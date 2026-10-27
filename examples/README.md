@@ -261,7 +261,7 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 `data/datasources/city-air.db` 并播种三条只读数据源，因此管理页的测试连接 / 预览 /
 被引用、设计器目录与查看页走的是与用户自建数据源**完全相同**的链路。
 
-交互只有两条：点城市榜任意行 → 蓝图 `rowClick` 写 `city`；点 24/48 小时按钮 →
+交互只有两条：点城市榜任意行 → 蓝图 `rowClick` 关系写 `city`；点 24/48 小时按钮 →
 `valueClick` 写 `hours`，两张趋势图同步切换。城市榜同时承担排名与城市选择，时间窗显式
 可见；默认城市为上海（AQI 36，优），北京仍固定排在榜单第 1 行，风险不被隐藏。
 等级/超标着色走 canonical `styleRules`（ADR-0058），不注入宿主 CSS。
@@ -427,16 +427,19 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 - 数据源资产仍归 `#/datasources` 管理页：编辑页右下角的「数据源」入口直接跳转（保存需用户
   先点顶栏「保存」）；数据源页顶部出现「返回大屏」，返回后设计器重新拉取数据集目录。
 
-### Blueprint 事件
+### Blueprint 关系
 
 - 编辑页的宿主编排画布是 `src/screen/blueprint-canvas.ts`（三端逐字一致）：消费
   `base-screen-blueprint-canvas-state`、发 `base-screen-blueprint-canvas-command`，只负责
-  中央图形、拖动、连线、缩放/平移与试运行；语义图、规则与历史仍归引擎。
+  中央图形、拖动、连线、缩放/平移与试运行；语义图、派生规则与历史仍归引擎。文档只持久化
+  `blueprint.relations`（behavior / semantic），运行时规则由关系派生，不写回文档。
+- 旧数据兼容：三端 `project-adapter.ts` 在 `load` 时调用 `migrateScreenDocument`，仍以
+  `blueprint.rules` 存储的大屏会按关系模型加载（幂等，保存后落新形态）。
 - 蓝图能力由宿主的 authoring 插件贡献（`host-runtime.ts` 的 `createHostAuthoringRuntime`），
   没有这份授权时物料事件会显示为不可用。
-- 典型操作：左侧「逻辑」插入设置变量 → 从组件的事件端口连到动作输入端 → 检查器选择变量和
-  赋值来源。事件字段可直接填写 `row.city`：声明过的 payload 字段只是建议，物料没声明
-  `payloadSchema` 也能用。
+- 典型操作：从组件的事件端口拖到另一组件、变量或业务系统节点；从组件底部「语义关联」端口
+  拖到另一组件表达详情/分组/下钻。检查器可改效果类型、条件与变量；事件字段可直接填写
+  `row.city`：声明过的 payload 字段只是建议，物料没声明 `payloadSchema` 也能用。
 
 ### 条件样式
 

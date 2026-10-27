@@ -20,10 +20,26 @@ export const BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT =
 
 export type BaseScreenDesignerWorkbenchMode = 'canvas' | 'blueprint';
 export type BaseScreenDesignerWorkbenchModeChangeReason = 'user' | 'api' | 'fallback';
-export type BaseScreenBlueprintCanvasNodeKind = 'component' | 'variable' | 'condition' | 'action';
+export type BaseScreenBlueprintCanvasNodeKind =
+  | 'component'
+  | 'variable'
+  | 'host'
+  /** @deprecated 关系模型不再产出条件节点；保留字面量供旧宿主画布类型兼容。 */
+  | 'condition'
+  /** @deprecated 关系模型不再产出动作节点；保留字面量供旧宿主画布类型兼容。 */
+  | 'action';
+export type BaseScreenBlueprintCanvasEdgeKind =
+  | 'relation'
+  | 'semantic'
+  | 'containment'
+  | 'dependency'
+  /** @deprecated 旧事件图边；引擎不再产出。 */
+  | 'trigger'
+  /** @deprecated 旧事件图边；引擎不再产出。 */
+  | 'action';
 
 export interface BaseScreenDesignerWorkbenchFocus {
-  readonly kind: 'component' | 'variable' | 'rule' | 'action';
+  readonly kind: 'component' | 'variable' | 'relation' | 'rule' | 'action';
   readonly id: string;
 }
 
@@ -67,17 +83,32 @@ export interface BaseScreenBlueprintCanvasNode {
   readonly componentName?: string;
   readonly materialType?: string;
   readonly hidden?: boolean;
+  readonly parentId?: string;
+  readonly childCount?: number;
+  readonly isContainer?: boolean;
   readonly events?: readonly BaseScreenBlueprintCanvasEventOption[];
   readonly variableId?: string;
   readonly variableName?: string;
   readonly variableType?: 'static' | 'data-source' | 'url-query';
   readonly variableDescription?: string;
   readonly variableInitialValue?: ScreenJsonValue;
+  readonly relationCount?: number;
+  readonly inboundCount?: number;
+  readonly outboundCount?: number;
+  readonly readCount?: number;
+  readonly writeCount?: number;
+  readonly exitCount?: number;
+  /** @deprecated 旧事件图字段；引擎不再产出。 */
   readonly ruleId?: string;
+  /** @deprecated 旧事件图字段；引擎不再产出。 */
   readonly actionIndex?: number;
+  /** @deprecated 旧事件图字段；引擎不再产出。 */
   readonly condition?: ScreenBlueprintCondition;
+  /** @deprecated 旧事件图字段；引擎不再产出。 */
   readonly action?: ScreenBlueprintAction;
+  /** @deprecated 旧事件图字段；引擎不再产出。 */
   readonly summary?: BaseScreenBlueprintCanvasNodeSummary;
+  /** @deprecated 旧事件图字段；引擎不再产出。 */
   readonly unconnected?: true;
 }
 
@@ -87,12 +118,27 @@ export interface BaseScreenBlueprintCanvasEdge {
   readonly target: string;
   readonly sourceHandle: string;
   readonly targetHandle: string;
-  readonly ruleId?: string;
-  readonly actionIndex?: number;
-  readonly kind: 'trigger' | 'action' | 'dependency';
+  readonly kind: BaseScreenBlueprintCanvasEdgeKind;
+  readonly relationId?: string;
+  readonly relationKind?: 'behavior' | 'semantic';
+  readonly effectType?:
+    | 'component-visibility'
+    | 'request-component-data'
+    | 'set-variable'
+    | 'request-variable'
+    | 'emit-host-event'
+    | 'host-action';
+  readonly semanticRole?: 'related' | 'detail' | 'group' | 'drill-down';
+  readonly eventName?: string;
+  readonly operation?: 'show' | 'hide' | 'toggle';
+  readonly actionId?: string;
+  readonly variableId?: string;
   readonly locked?: boolean;
   readonly deletable?: boolean;
-  readonly operation?: 'show' | 'hide' | 'toggle';
+  /** @deprecated 旧事件图字段；引擎不再产出。 */
+  readonly ruleId?: string;
+  /** @deprecated 旧事件图字段；引擎不再产出。 */
+  readonly actionIndex?: number;
 }
 
 export interface BaseScreenBlueprintCanvasGraph {
@@ -118,8 +164,7 @@ export type BaseScreenBlueprintCanvasInsertNode =
       readonly position?: BaseScreenBlueprintCanvasNodePosition;
     }
   | {
-      readonly kind: 'condition' | 'set-variable' | 'emit-host-event';
-      readonly variableId?: string;
+      readonly kind: 'host';
       readonly position?: BaseScreenBlueprintCanvasNodePosition;
     };
 
@@ -131,6 +176,7 @@ export type BaseScreenBlueprintCanvasSelection = {
 export interface BaseScreenBlueprintCanvasTrace {
   readonly executedEdgeIds: readonly string[];
   readonly failedRuleIds: readonly string[];
+  readonly failedRelationIds?: readonly string[];
   readonly lines: readonly string[];
 }
 

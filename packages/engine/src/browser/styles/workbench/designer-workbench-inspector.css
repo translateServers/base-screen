@@ -124,7 +124,7 @@
   height: 30px;
   flex: 0 0 30px;
   place-items: center;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-text-secondary);
   box-shadow: var(--designer-elev-ring);
@@ -181,16 +181,7 @@
   white-space: nowrap;
 }
 
-/* 锁定/隐藏徽标与原型 .badge 同档：胶囊 + 发丝收边，不占强调色。 */
-.properties .inspector-context-badge {
-  flex: none;
-  padding: 1px var(--designer-space-2);
-  border-radius: var(--designer-radius-pill);
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-numeric);
-  font-size: var(--designer-font-size-xs);
-  box-shadow: 0 0 0 1px var(--designer-border-default);
-}
+/* 锁定/隐藏徽标由 chrome 层的 .designer-badge 统一绘制。 */
 
 .properties .inspector-toolbar {
   width: max-content;
@@ -374,7 +365,7 @@
   min-height: 28px;
   padding: 0;
   border-color: transparent;
-  border-radius: 1px;
+  border-radius: var(--designer-radius-1);
   background: transparent;
   color: var(--designer-text-secondary);
 }
@@ -474,9 +465,7 @@
 }
 
 .properties .designer-inspector-batch-unified-style > .designer-inspector-section-title {
-  margin-bottom: 10px;
-  font-size: var(--designer-font-size-base);
-  text-transform: none;
+  margin-bottom: var(--designer-space-4);
 }
 
 .properties .designer-inspector-batch-unified-empty {
@@ -643,43 +632,6 @@
   width: 100%;
 }
 
-.properties .inspector-pane .designer-segmented .designer-segmented-option {
-  color: var(--designer-text-muted);
-}
-
-.properties .inspector-pane .designer-segmented .designer-segmented-option[aria-pressed="true"] {
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-accent-text);
-}
-
-.properties .designer-inspector-section {
-  padding: 13px 0;
-}
-
-.properties .designer-inspector-section + .designer-inspector-section {
-  border-top-color: var(--designer-border-subtle);
-}
-
-.properties .designer-inspector-section-title {
-  display: flex;
-  align-items: center;
-  gap: var(--designer-space-3);
-  margin-bottom: 10px;
-  color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-base);
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.properties .designer-inspector-section-title::after {
-  height: 1px;
-  min-width: var(--designer-space-6);
-  flex: 1;
-  background: var(--designer-border-subtle);
-  content: "";
-}
-
 .properties .quick-config-colors .designer-quick-config-button {
   border-color: color-mix(in srgb, var(--quick-color) 60%, var(--designer-border-default));
   background-color: var(--quick-color);
@@ -706,12 +658,6 @@
   color: var(--designer-text-secondary);
   font: var(--designer-font-small);
   line-height: 1.5;
-}
-
-.properties .designer-input,
-.properties .designer-select {
-  height: var(--designer-control-height);
-  font-size: var(--designer-font-size-base);
 }
 
 .properties .designer-inspector-geometry-section {
@@ -843,12 +789,6 @@
   border-top: 1px solid var(--designer-border-subtle);
 }
 
-.properties .designer-inspector-section-summary {
-  margin: 0 0 10px;
-  list-style: none;
-  cursor: pointer;
-}
-
 /* 描述符分段（插件 / 宿主物料）与内建分段同一条标题语言：发丝线 + 右侧折叠箭头。 */
 .properties .designer-descriptor-group {
   display: grid;
@@ -896,75 +836,6 @@
   margin-bottom: 0;
 }
 
-.properties
-  .designer-descriptor-group:not([open])
-  > .designer-descriptor-group-summary
-  .designer-inspector-section-disclosure {
-  transform: rotate(-90deg);
-}
-
-.properties .designer-inspector-section-summary::-webkit-details-marker,
-.properties .designer-inspector-section-summary::before {
-  display: none;
-}
-
-/* 标题行的拖动线（原型 .insp-section-title::after）：标题与箭头之间一条发丝，
-   让分节在长表单里读成段落而不是列表。 */
-.properties .designer-inspector-section-summary::after {
-  display: block;
-  height: 1px;
-  min-width: 16px;
-  flex: 1;
-  order: 1;
-  background: var(--designer-border-subtle);
-  content: "";
-}
-
-.properties .designer-inspector-section-disclosure {
-  display: inline-flex;
-  width: 14px;
-  height: 14px;
-  align-items: center;
-  justify-content: center;
-  margin-left: auto;
-  color: var(--designer-text-muted);
-  transform: rotate(0deg);
-  transition: transform var(--designer-motion);
-}
-
-.properties details:not([open]) > .designer-inspector-section-summary {
-  margin-bottom: 0;
-}
-
-.properties
-  details:not([open])
-  > .designer-inspector-section-summary
-  .designer-inspector-section-disclosure {
-  transform: rotate(-90deg);
-}
-
-.properties .designer-inspector-section-disclosure svg {
-  width: 12px;
-  height: 12px;
-}
-
-/* Collapsible inspector sections: hover/keyboard feedback only, no geometry
-   changes so the panel never jitters. */
-.properties summary.designer-inspector-section-title {
-  user-select: none;
-  transition: color var(--designer-motion);
-}
-
-.properties summary.designer-inspector-section-title:hover {
-  color: var(--designer-text-primary);
-}
-
-.properties summary.designer-inspector-section-title:focus-visible {
-  border-radius: var(--designer-radius-1);
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: 2px;
-}
-
 .properties .designer-quick-style-grid {
   gap: 7px;
   margin-bottom: 12px;
@@ -976,7 +847,7 @@
 
 .properties .designer-quick-style {
   min-height: 56px;
-  border-radius: 1px;
+  border-radius: var(--designer-radius-1);
   background: var(--designer-surface-workspace);
 }
 
@@ -1004,7 +875,7 @@
   gap: 6px;
   padding: 8px;
   border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
 }
 

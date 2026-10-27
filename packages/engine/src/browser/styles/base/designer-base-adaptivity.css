@@ -89,8 +89,7 @@
   .designer-control:focus-visible,
   .designer-tab:focus-visible,
   .designer-checkbox:focus-visible,
-  .designer-switch:focus-visible,
-  summary.designer-inspector-section-title:focus-visible {
+  .designer-switch:focus-visible {
     outline: 2px solid Highlight;
     outline-offset: 2px;
   }
@@ -113,10 +112,6 @@
     background: Highlight;
     color: HighlightText;
     box-shadow: none;
-  }
-
-  .material-badge {
-    border: 1px solid CanvasText;
   }
 
   .material-group-button[aria-pressed="true"] .material-group-glyph {

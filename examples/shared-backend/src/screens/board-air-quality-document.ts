@@ -776,51 +776,48 @@ export const BOARD_AIR_QUALITY_DOCUMENT = {
     },
   ],
   blueprint: {
-    rules: [
+    relations: [
       {
+        type: 'behavior' as const,
         id: 'rule-city',
-        trigger: {
-          type: 'material-event' as const,
+        source: {
+          kind: 'component' as const,
           componentId: 'city-board',
-          eventName: 'rowClick',
+          event: { type: 'material-event' as const, eventName: 'rowClick' },
         },
-        actions: [
-          {
-            type: 'set-variable' as const,
-            variableId: 'city',
-            value: { kind: 'event-payload' as const, path: ['row', 'city'] },
-          },
-        ],
+        target: { kind: 'variable' as const, variableId: 'city' },
+        effect: {
+          type: 'set-variable' as const,
+          value: { kind: 'event-payload' as const, path: ['row', 'city'] },
+        },
       },
       {
+        type: 'behavior' as const,
         id: 'rule-window-24',
-        trigger: {
-          type: 'material-event' as const,
+        source: {
+          kind: 'component' as const,
           componentId: 'window-24-text',
-          eventName: 'valueClick',
+          event: { type: 'material-event' as const, eventName: 'valueClick' },
         },
-        actions: [
-          {
-            type: 'set-variable' as const,
-            variableId: 'hours',
-            value: { kind: 'literal' as const, value: 24 },
-          },
-        ],
+        target: { kind: 'variable' as const, variableId: 'hours' },
+        effect: {
+          type: 'set-variable' as const,
+          value: { kind: 'literal' as const, value: 24 },
+        },
       },
       {
+        type: 'behavior' as const,
         id: 'rule-window-48',
-        trigger: {
-          type: 'material-event' as const,
+        source: {
+          kind: 'component' as const,
           componentId: 'window-48-text',
-          eventName: 'valueClick',
+          event: { type: 'material-event' as const, eventName: 'valueClick' },
         },
-        actions: [
-          {
-            type: 'set-variable' as const,
-            variableId: 'hours',
-            value: { kind: 'literal' as const, value: 48 },
-          },
-        ],
+        target: { kind: 'variable' as const, variableId: 'hours' },
+        effect: {
+          type: 'set-variable' as const,
+          value: { kind: 'literal' as const, value: 48 },
+        },
       },
     ],
   },

@@ -99,9 +99,9 @@ export function paletteColorControl(
   input.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.gradientStopColor);
   const control = ownerDocument.createElement('span');
   control.className = 'designer-color-palette-color-control';
-  const valueInput = ownerDocument.createElement('input');
-  valueInput.type = 'text';
-  valueInput.className = 'designer-color-palette-color-value';
+  const valueInput = createDesignerInput(ownerDocument, {
+    className: 'designer-color-palette-color-value',
+  });
   valueInput.dataset.colorPaletteField = field === 'solid' ? 'solid-value' : 'stop-value';
   valueInput.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.gradientStopHexValue);
   valueInput.setAttribute('autocomplete', 'off');

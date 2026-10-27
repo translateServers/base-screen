@@ -5,6 +5,7 @@ import type {
   ScreenProjectAdapter,
   ScreenProjectEnvelope,
 } from '@base-screen/contracts';
+import { migrateScreenDocument } from '@base-screen/contracts';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
 
@@ -26,7 +27,17 @@ export function createRestProjectAdapter(screenId: string): ScreenProjectAdapter
         logger.warn('load failed', { screenId, code: result.error.code });
         return failure('PROJECT_UNAVAILABLE', [], result.error.message);
       }
-      return { ok: true, value: toEnvelope(result.data.screen), diagnostics: [] };
+      // 宿主负责把已存储的旧形态文档迁到当前形态；迁移失败时整份拒绝，不做部分载入。
+      const migrated = migrateScreenDocument(result.data.screen.document);
+      if (!migrated.ok) {
+        logger.warn('load migration failed', { screenId, diagnostics: migrated.diagnostics });
+        return { ok: false, diagnostics: migrated.diagnostics };
+      }
+      return {
+        ok: true,
+        value: toEnvelope({ ...result.data.screen, document: migrated.document }),
+        diagnostics: [],
+      };
     },
     async save({ document, revision }): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
       const result = await api.updateScreen(screenId, document, Number(revision));

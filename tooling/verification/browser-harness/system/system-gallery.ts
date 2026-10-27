@@ -12,18 +12,25 @@
 
 import type { ScreenDocument } from '../../../../packages/contracts/src/index.ts';
 import {
-  createDesignerFieldElement,
   createDesignerFieldRow,
+  createDesignerToggleField,
 } from '../../../../packages/engine/src/browser/dom/designer-field-primitives.ts';
+import { enhanceDesignerSelect } from '../../../../packages/engine/src/browser/dom/designer-select-dom.ts';
 import {
   createDesignerButton,
-  createDesignerCheckbox,
+  createDesignerControlShell,
   createDesignerIconButton,
   createDesignerInput,
+  createDesignerSegmented,
   createDesignerSelect,
-  createDesignerSwitch,
+  createDesignerTabs,
   createDesignerTextarea,
 } from '../../../../packages/engine/src/browser/dom/designer-ui-primitives.ts';
+import {
+  appendDesignerEmptyState,
+  createDesignerBadge,
+  createDesignerSection,
+} from '../../../../packages/engine/src/browser/dom/panel/designer-chrome-primitives.ts';
 import {
   type DesignerIconName,
   designerIcon,
@@ -35,7 +42,7 @@ const EMPTY_DOCUMENT: ScreenDocument = {
   canvas: { width: 960, height: 540, backgroundColor: '#17212b' },
   components: [],
   variables: [],
-  blueprint: { rules: [] },
+  blueprint: { relations: [] },
 };
 
 /** 清单页自己的排版骨架。只做布局，不重画任何组件的外观；取值全部来自令牌。 */
@@ -66,12 +73,12 @@ const GALLERY_CSS = `
 .sg-h3 { margin: 0; color: var(--designer-text-muted); font: var(--designer-font-small); font-weight: 600; letter-spacing: normal; text-transform: uppercase; }
 .sg-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--designer-space-4); }
 .sg-columns { display: grid; gap: var(--designer-space-3); grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); }
-.sg-cell { display: grid; gap: var(--designer-space-2); padding: var(--designer-space-3); border-radius: var(--designer-radius-2); background: var(--designer-surface-panel); box-shadow: var(--designer-elev-card); }
-.sg-swatch { height: 52px; border: 1px solid var(--designer-border-subtle); border-radius: var(--designer-radius-2); }
-.sg-caption { overflow: hidden; color: var(--designer-text-muted); font: var(--designer-font-numeric); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.sg-cell { display: grid; gap: var(--designer-space-2); padding: var(--designer-space-3); border-radius: var(--designer-radius-3); background: var(--designer-surface-panel); box-shadow: var(--designer-elev-card); }
+.sg-swatch { height: 52px; border: 1px solid var(--designer-border-subtle); border-radius: var(--designer-radius-3); }
+.sg-caption { overflow: hidden; color: var(--designer-text-muted); font: var(--designer-font-numeric); font-size: var(--designer-font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
 .sg-sample { color: var(--designer-text-primary); }
 .sg-bar { height: 10px; border-radius: var(--designer-radius-1); background: var(--designer-accent); }
-.sg-tile { display: grid; place-items: center; height: 52px; border: 1px solid var(--designer-border-default); background: var(--designer-surface-control); color: var(--designer-text-muted); font: var(--designer-font-numeric); font-size: 10px; }
+.sg-tile { display: grid; place-items: center; height: 52px; border: 1px solid var(--designer-border-default); background: var(--designer-surface-control); color: var(--designer-text-muted); font: var(--designer-font-numeric); font-size: var(--designer-font-size-xs); }
 .sg-panel { width: 300px; overflow: hidden; border: 1px solid var(--designer-border-subtle); border-radius: var(--designer-radius-4); background: var(--designer-surface-panel); }
 .sg-panel-body { display: grid; gap: var(--designer-space-2); padding: var(--designer-space-4); }
 .sg-stack { display: grid; gap: var(--designer-space-2); }
@@ -302,7 +309,7 @@ const STATIC_HTML = `
 
 <section class="sg-section" id="geometry">
   <h2 class="sg-h2">间距、圆角与阴影</h2>
-  <p class="sg-note">间距 8 档（2/4/6/8/12/16/24/32）：前 7 档是面板内部的紧凑节奏，32 留给大区块。面板里出现的 13px、28px、9px 这类数值都还没有令牌 —— 见「缺口」。</p>
+  <p class="sg-note">间距 8 档（2/4/6/8/12/16/24/32）：前 7 档是面板内部的紧凑节奏，32 留给大区块。重复出现的几何值已进令牌，剩余字面量按门禁基线逐步清零。</p>
   <div class="sg-group"><h3 class="sg-h3">间距</h3>${spaceGrid()}</div>
   <div class="sg-group"><h3 class="sg-h3">圆角</h3>${radiusGrid()}</div>
   <div class="sg-group"><h3 class="sg-h3">阴影</h3>${shadowGrid()}</div>
@@ -310,7 +317,7 @@ const STATIC_HTML = `
 
 <section class="sg-section" id="components">
   <h2 class="sg-h2">组件</h2>
-  <p class="sg-note">表单控件与字段行来自原语（<code>designer-ui-primitives</code> / <code>designer-field-primitives</code>）；列表行、面板头、工具条、空状态目前还是各面板手拼，没有原语。</p>
+  <p class="sg-note">表单控件与字段行全部来自原语：default 30px / compact 28px 两档、模板控件经 adoption 原地归一、禁用态只用颜色与描边（不叠透明度）；列表行、空态、徽标与分区标题统一由 <code>designer-workbench-chrome.css</code> 提供外观。</p>
   <div class="sg-group"><h3 class="sg-h3">表单控件</h3><div class="sg-row" data-mount="form"></div></div>
   <div class="sg-group"><h3 class="sg-h3">面板件</h3><div class="sg-row" data-mount="panels"></div></div>
   <div class="sg-group"><h3 class="sg-h3">蓝图库行</h3><div class="sg-row" data-mount="blueprint"></div></div>
@@ -342,14 +349,13 @@ const STATIC_HTML = `
 
 <section class="sg-section" id="gaps">
   <h2 class="sg-h2">缺口：设计系统还没有覆盖到的地方</h2>
-  <p class="sg-note">这些数字是从样式表里数出来的，不是估计值。它们就是「每加一个面板就要重新发明一次状态」的来源。</p>
+  <p class="sg-note">基线条目由 <code>node tooling/checks/designer-styles.mjs --report</code> 生成，脚本只允许条目下降；本页不复制具体计数，避免两份数字互相漂移。</p>
   <table class="sg-table">
     <thead><tr><th>缺口</th><th>现状</th><th>唯一落点应在这</th></tr></thead>
     <tbody>
-      <tr><td>状态没有语义层</td><td>hover 137 条、选中 27 条、按下 51 条、禁用 121 条、焦点 70 条，各写各的底色</td><td><code>designer-workbench-states.css</code>（待建）</td></tr>
+      <tr><td>状态没有语义层</td><td>悬停 / 按下 / 禁用 / 焦点仍由各面板本地绘制</td><td><code>designer-workbench-states.css</code>（待建）</td></tr>
       <tr><td>选中画法曾有四版</td><td>淡底+竖条 → 实心 → 空心描边 → 中性块；现在只保留最后一版</td><td><code>designer-workbench-selection.css</code></td></tr>
-      <tr><td>几何没有令牌</td><td>约 700 处硬编码 px（2px 164、14px 95、28px 74、13px 27）</td><td><code>designer-tokens.css</code> 的 geometry 组（待建）</td></tr>
-      <tr><td>列表行/面板头/空状态没有原语</td><td><code>list-heading</code> 重复 12 处，空状态 2 套写法，列表行三套结构</td><td><code>designer-list-primitives.ts</code>（待建）</td></tr>
+      <tr><td>几何没有全部进令牌</td><td>gap / padding / margin 仍有字面量，按基线逐步清零</td><td><code>designer-tokens.css</code> 的几何组</td></tr>
     </tbody>
   </table>
 </section>
@@ -368,7 +374,8 @@ function layerRow(
   },
 ): HTMLElement {
   const row = ownerDocument.createElement('div');
-  row.className = 'layer-row';
+  row.className = 'designer-list-row layer-row';
+  row.dataset.density = 'default';
   row.setAttribute('role', 'treeitem');
   row.ariaSelected = String(state.selected === true);
   row.style.paddingInlineStart = '8px';
@@ -425,7 +432,8 @@ function blueprintRow(
   state: { readonly name: string; readonly selected?: boolean; readonly placed?: boolean },
 ): HTMLElement {
   const row = ownerDocument.createElement('div');
-  row.className = 'blueprint-palette-item';
+  row.className = 'designer-list-row blueprint-palette-item';
+  row.dataset.density = 'comfortable';
   row.dataset.placed = String(state.placed === true);
   row.dataset.selected = String(state.selected === true);
   const primary = ownerDocument.createElement('button');
@@ -526,16 +534,26 @@ function mountButtons(container: HTMLElement, ownerDocument: Document): void {
 }
 
 function mountSegmented(container: HTMLElement, ownerDocument: Document): void {
-  const segmented = ownerDocument.createElement('div');
-  segmented.className = 'designer-segmented';
-  segmented.setAttribute('role', 'group');
-  for (const [index, text] of ['像素', '百分比'].entries()) {
-    const option = createDesignerButton(ownerDocument, { text });
-    option.className += ' designer-segmented-option';
-    option.ariaPressed = String(index === 0);
-    segmented.appendChild(option);
-  }
-  container.appendChild(labeled(ownerDocument, '未选 / 按下（aria-pressed）', segmented));
+  const { element } = createDesignerSegmented(ownerDocument, {
+    ariaLabel: '单位',
+    selected: 'px',
+    options: [
+      { value: 'px', label: '像素' },
+      { value: 'percent', label: '百分比' },
+    ],
+  });
+  container.appendChild(labeled(ownerDocument, '分段：像素 / 百分比（aria-pressed）', element));
+
+  const compact = createDesignerSegmented(ownerDocument, {
+    ariaLabel: '密度',
+    selected: 'comfortable',
+    size: 'compact',
+    options: [
+      { value: 'compact', label: '紧凑' },
+      { value: 'comfortable', label: '舒适' },
+    ],
+  });
+  container.appendChild(labeled(ownerDocument, 'compact 分段（28 / 24）', compact.element));
 }
 
 function mountForm(container: HTMLElement, ownerDocument: Document): void {
@@ -553,14 +571,16 @@ function mountForm(container: HTMLElement, ownerDocument: Document): void {
 
   const selectRow = createDesignerFieldRow(ownerDocument, { label: '对齐' });
   selectRow.control.appendChild(
-    createDesignerSelect(ownerDocument, {
-      ariaLabel: '对齐',
-      options: [
-        { label: '左对齐', value: 'left', selected: true },
-        { label: '居中', value: 'center' },
-        { label: '右对齐', value: 'right' },
-      ],
-    }),
+    enhanceDesignerSelect(
+      createDesignerSelect(ownerDocument, {
+        ariaLabel: '对齐',
+        options: [
+          { label: '左对齐', value: 'left', selected: true },
+          { label: '居中', value: 'center' },
+          { label: '右对齐', value: 'right' },
+        ],
+      }),
+    ).element,
   );
   body.appendChild(selectRow.field);
 
@@ -570,15 +590,67 @@ function mountForm(container: HTMLElement, ownerDocument: Document): void {
   );
   body.appendChild(areaRow.field);
 
-  const switchRow = createDesignerFieldElement(ownerDocument, { label: '显示图例' });
-  switchRow.appendChild(
-    createDesignerSwitch(ownerDocument, { ariaLabel: '显示图例', checked: true }),
+  const compactRow = createDesignerFieldRow(ownerDocument, { label: '紧凑输入' });
+  compactRow.control.appendChild(
+    createDesignerInput(ownerDocument, { ariaLabel: '紧凑输入', size: 'compact', value: '28px' }),
   );
-  body.appendChild(switchRow);
+  body.appendChild(compactRow.field);
 
-  const checkRow = createDesignerFieldElement(ownerDocument, { label: '参与轮播' });
-  checkRow.appendChild(createDesignerCheckbox(ownerDocument, { ariaLabel: '参与轮播' }));
-  body.appendChild(checkRow);
+  const disabledRow = createDesignerFieldRow(ownerDocument, { label: '禁用输入' });
+  disabledRow.control.appendChild(
+    createDesignerInput(ownerDocument, {
+      ariaLabel: '禁用输入',
+      disabled: true,
+      value: '不可编辑',
+    }),
+  );
+  body.appendChild(disabledRow.field);
+
+  const tabsRow = createDesignerFieldRow(ownerDocument, { label: '页签' });
+  tabsRow.control.appendChild(
+    createDesignerTabs(ownerDocument, {
+      ariaLabel: '检查器页签',
+      items: [
+        { value: 'style', label: '样式' },
+        { value: 'data', label: '数据' },
+      ],
+      selected: 'style',
+    }).element,
+  );
+  body.appendChild(tabsRow.field);
+
+  const shellRow = createDesignerFieldRow(ownerDocument, { label: '参数' });
+  const shell = createDesignerControlShell(ownerDocument);
+  const shellInput = createDesignerInput(ownerDocument, { ariaLabel: '参数', value: 'value' });
+  shellInput.dataset.flush = 'true';
+  shell.appendChild(shellInput);
+  shellRow.control.appendChild(shell);
+  body.appendChild(shellRow.field);
+
+  body.appendChild(
+    createDesignerToggleField(ownerDocument, {
+      control: 'switch',
+      label: '显示图例',
+      hint: '随数据源刷新',
+      checked: true,
+    }).field,
+  );
+
+  body.appendChild(
+    createDesignerToggleField(ownerDocument, {
+      control: 'checkbox',
+      label: '参与轮播',
+    }).field,
+  );
+
+  body.appendChild(
+    createDesignerToggleField(ownerDocument, {
+      checked: true,
+      control: 'switch',
+      disabled: true,
+      label: '禁用开关',
+    }).field,
+  );
 
   panel.appendChild(body);
   container.appendChild(panel);
@@ -590,15 +662,15 @@ function mountPanels(container: HTMLElement, ownerDocument: Document): void {
   panel.innerHTML = `
     <header class="panel-heading">
       <p class="panel-title">画布图层</p>
-      <span class="panel-count">12</span>
+      <span class="designer-badge panel-count" data-tone="neutral">12</span>
     </header>
     <div class="sg-panel-body">
       <p class="list-heading">画布图层 · 从上到下</p>
       <div class="layer-toolbar" data-mount="toolbar"></div>
-      <div class="designer-empty-state layer-empty">
-        <span class="layer-empty-glyph" aria-hidden="true">${designerIcon('layers')}</span>
-        <p class="layer-empty-title">画布还没有图层</p>
-        <p class="layer-empty-hint">从素材面板添加组件后，这里会列出全部图层。</p>
+      <div class="designer-empty">
+        <span class="designer-empty-icon" aria-hidden="true">${designerIcon('layers')}</span>
+        <p class="designer-empty-title">画布还没有图层</p>
+        <p class="designer-empty-hint">从素材面板添加组件后，这里会列出全部图层。</p>
       </div>
     </div>`;
   const toolbar = panel.querySelector<HTMLElement>('[data-mount="toolbar"]');
@@ -638,6 +710,37 @@ function mountPanels(container: HTMLElement, ownerDocument: Document): void {
     }
   }
   container.appendChild(panel);
+
+  const chromePanel = ownerDocument.createElement('div');
+  chromePanel.className = 'sg-panel';
+  const chromeBody = ownerDocument.createElement('div');
+  chromeBody.className = 'sg-panel-body';
+  const section = createDesignerSection(chromeBody, { title: '分段标题' });
+  const sampleInput = createDesignerInput(ownerDocument, {
+    ariaLabel: '示例字段',
+    value: '示例',
+  });
+  section.element.appendChild(sampleInput);
+  const badgeRow = ownerDocument.createElement('div');
+  badgeRow.className = 'sg-row';
+  for (const [tone, label] of [
+    ['neutral', '中性'],
+    ['accent', '强调'],
+    ['success', '成功'],
+    ['warning', '警告'],
+    ['danger', '危险'],
+  ] as const) {
+    createDesignerBadge(badgeRow, { text: label, tone });
+  }
+  chromeBody.appendChild(badgeRow);
+  appendDesignerEmptyState(chromeBody, {
+    icon: 'search',
+    title: '没有匹配结果',
+    hint: '换个关键词或清除筛选条件。',
+    actions: [{ label: '清除搜索', dataset: { chromeSample: 'clear' } }],
+  });
+  chromePanel.appendChild(chromeBody);
+  container.appendChild(chromePanel);
 }
 
 function mountBlueprint(container: HTMLElement, ownerDocument: Document): void {

@@ -17,13 +17,13 @@ export type DesignerBlueprintSetVariableSource =
 
 const EVENT_FIELD_SEGMENT = new RegExp(VALUE_REF_PATH_SEGMENT_PATTERN);
 
-/** 触发事件能否提供事件字段：只要不是变量事件，字段路径就由用户自由填写。 */
+/** 触发事件能否提供事件字段：只有组件来源的物料事件可以填写字段路径。 */
 export function designerBlueprintTriggerSupportsEventField(
   document: ScreenDocument,
-  ruleId: string,
+  relationId: string,
 ): boolean {
-  const rule = document.blueprint.rules.find((candidate) => candidate.id === ruleId);
-  return rule?.trigger.type === 'material-event';
+  const relation = document.blueprint.relations.find((candidate) => candidate.id === relationId);
+  return relation?.type === 'behavior' && relation.source.kind === 'component';
 }
 
 /**
@@ -55,17 +55,17 @@ export function designerBlueprintSetVariableSource(
 
 export function designerBlueprintEventFieldPaths(
   document: ScreenDocument,
-  ruleId: string,
+  relationId: string,
   catalog: BaseScreenMaterialCatalog | undefined,
 ): readonly (readonly string[])[] {
-  const rule = document.blueprint.rules.find((candidate) => candidate.id === ruleId);
-  if (rule?.trigger.type !== 'material-event') return [];
-  const trigger = rule.trigger;
-  const component = document.components.find((candidate) => candidate.id === trigger.componentId);
+  const relation = document.blueprint.relations.find((candidate) => candidate.id === relationId);
+  if (relation?.type !== 'behavior' || relation.source.kind !== 'component') return [];
+  const source = relation.source;
+  const component = document.components.find((candidate) => candidate.id === source.componentId);
   const schema = catalog
     ?.get(component?.type ?? '')
     ?.manifest.editorDescriptor?.events?.find(
-      (event) => event.name === trigger.eventName,
+      (event) => event.name === source.event.eventName,
     )?.payloadSchema;
   return schema === undefined ? [] : collectObjectPaths(schema);
 }

@@ -99,7 +99,7 @@
   gap: 5px;
   padding: 0 var(--designer-space-5);
   border: 1px solid transparent;
-  border-radius: calc(var(--designer-radius-3) - 2px);
+  border-radius: var(--designer-radius-2);
   background: transparent;
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
@@ -140,7 +140,6 @@ button.topbar-mode-button:focus-visible {
 button.topbar-mode-button:disabled {
   color: var(--designer-text-disabled);
   cursor: default;
-  opacity: 0.62;
 }
 
 /* 工作区工具栏分组：分组只留 2px 组内间距（与 .rail-tabs 同值），选中态由按钮自己承担。 */
@@ -151,46 +150,12 @@ button.topbar-mode-button:disabled {
   flex: none;
 }
 
-.topbar-segment .designer-icon-button {
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
-  border-radius: var(--designer-radius-3);
-  border-color: transparent;
-  background: transparent;
-}
-
-.topbar-segment .designer-icon-button:hover:not(:disabled) {
-  border-color: transparent;
-  background: var(--designer-surface-control-hover);
-  box-shadow: none;
-}
-
-.topbar-segment .designer-icon-button:active:not(:disabled) {
-  transform: scale(0.94);
-}
-
 .topbar-segment kbd {
   display: none;
 }
 
 .designer-tool-cluster {
   flex: none;
-}
-
-.designer-tool-cluster .designer-tool-button {
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
-  border-radius: var(--designer-radius-3);
-  border-color: transparent;
-  background: transparent;
-}
-
-.designer-tool-cluster .designer-tool-button:hover:not(:disabled) {
-  border-color: transparent;
-  background: var(--designer-surface-control-hover);
-  box-shadow: none;
 }
 
 .designer-tool-cluster .designer-tool-button[aria-pressed="true"] {
@@ -270,7 +235,7 @@ button.topbar-mode-button:disabled {
   gap: var(--designer-space-2);
   padding: 0 var(--designer-space-3);
   border: 0;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
   cursor: pointer;
@@ -308,7 +273,7 @@ button.topbar-mode-button:disabled {
   flex: none;
   padding: 1px 5px;
   border: 1px solid var(--designer-border-default);
-  border-radius: 3px;
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-workspace);
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
@@ -345,8 +310,10 @@ button.topbar-mode-button:disabled {
 }
 
 .topbar-icon-button:disabled {
+  border-color: var(--designer-border-subtle);
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-disabled);
   cursor: not-allowed;
-  opacity: 0.4;
 }
 
 .topbar-icon-button[hidden] {
@@ -377,11 +344,11 @@ button.topbar-mode-button:disabled {
   min-width: 14px;
   height: 14px;
   padding: 0 3px;
-  border-radius: 7px;
+  border-radius: var(--designer-radius-4);
   background: var(--designer-danger);
   color: var(--designer-surface-panel);
   font: var(--designer-font-numeric);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
   line-height: 14px;
   text-align: center;
 }
@@ -495,7 +462,7 @@ button.topbar-mode-button:disabled {
   flex: none;
   padding: 1px var(--designer-space-3);
   border: 0;
-  border-radius: 3px;
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-workspace);
   box-shadow: inset 0 0 0 1px var(--designer-border-default);
   color: var(--designer-text-muted);
@@ -537,8 +504,9 @@ button.topbar-mode-button:disabled {
 }
 
 .designer-command-palette-result:disabled {
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-disabled);
   cursor: default;
-  opacity: 0.42;
 }
 
 .designer-command-palette-glyph {
@@ -546,7 +514,7 @@ button.topbar-mode-button:disabled {
   width: 28px;
   height: 28px;
   place-items: center;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-accent);
 }
@@ -690,7 +658,7 @@ button.topbar-mode-button:disabled {
   gap: 4px;
   padding: 0 8px;
   border: 1px solid transparent;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: transparent;
   color: var(--designer-text-primary);
   font: var(--designer-font-small);
@@ -746,8 +714,10 @@ button.topbar-mode-button:disabled {
 }
 
 .topbar-text-button:disabled {
+  border-color: var(--designer-border-subtle);
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-disabled);
   cursor: not-allowed;
-  opacity: 0.65;
 }
 
 .topbar-text-button[aria-busy="true"] {

@@ -79,7 +79,7 @@ const project: ScreenProjectEnvelope = {
     canvas: { width: 100, height: 100, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   },
   metadata: {},
 };

@@ -1,7 +1,6 @@
 import type {
-  ScreenBlueprintAction,
+  ScreenBlueprintBehaviorRelation,
   ScreenBlueprintCondition,
-  ScreenBlueprintRule,
   ScreenBlueprintValueExpression,
   ScreenDocument,
 } from '@base-screen/contracts';
@@ -46,9 +45,12 @@ export function renderDesignerEventsPanel(
   if (panel === undefined) return;
   panel.replaceChildren();
   const focused = interaction.focusedComponentId;
-  const rules =
-    document?.blueprint.rules.filter(
-      (rule) => rule.trigger.type === 'material-event' && rule.trigger.componentId === focused,
+  const relations =
+    document?.blueprint.relations.filter(
+      (relation): relation is ScreenBlueprintBehaviorRelation =>
+        relation.type === 'behavior' &&
+        relation.source.kind === 'component' &&
+        relation.source.componentId === focused,
     ) ?? [];
   const preferenceContext = document?.components.find((item) => item.id === focused)?.type;
   const events = getDesignerFocusedMaterialEvents(document, interaction, catalog);
@@ -59,7 +61,7 @@ export function renderDesignerEventsPanel(
   );
   appendInteractionEventGroup(
     panel,
-    rules,
+    relations,
     events,
     descriptors,
     runtimeContributions,
@@ -86,19 +88,22 @@ export function renderDesignerEventsPanel(
 
 function appendInteractionEventGroup(
   panel: HTMLElement,
-  rules: readonly ScreenBlueprintRule[],
+  relations: readonly ScreenBlueprintBehaviorRelation[],
   declaredEvents: readonly string[],
   descriptors: readonly BaseScreenMaterialEventDescriptor[],
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
   preferenceContext: string | undefined,
 ): void {
   const eventNames = [
-    ...new Set([...declaredEvents, ...rules.map((rule) => rule.trigger.eventName)]),
+    ...new Set([
+      ...declaredEvents,
+      ...relations.map((relation) => relation.source.event.eventName),
+    ]),
   ];
   const { body } = appendBlueprintGroup(
     panel,
     DESIGNER_UI_TEXT.blueprint.interactionEventsTitle,
-    rules.length,
+    relations.length,
     'blueprint-interaction-events',
     preferenceContext,
   );
@@ -108,7 +113,9 @@ function appendInteractionEventGroup(
   }
   for (const eventName of eventNames) {
     const descriptor = descriptors.find((candidate) => candidate.name === eventName);
-    const eventRules = rules.filter((rule) => rule.trigger.eventName === eventName);
+    const eventRelations = relations.filter(
+      (relation) => relation.source.event.eventName === eventName,
+    );
     const event = panel.ownerDocument.createElement('section');
     event.className = 'designer-blueprint-event';
     const header = panel.ownerDocument.createElement('header');
@@ -120,8 +127,8 @@ function appendInteractionEventGroup(
     identity.append(title, hint);
     const state = panel.ownerDocument.createElement('span');
     state.className = 'designer-blueprint-state';
-    state.dataset.state = eventRules.length === 0 ? 'pending' : 'ready';
-    state.textContent = DESIGNER_UI_TEXT.blueprint.eventConfigured(eventRules.length);
+    state.dataset.state = eventRelations.length === 0 ? 'pending' : 'ready';
+    state.textContent = DESIGNER_UI_TEXT.blueprint.eventConfigured(eventRelations.length);
     header.append(identity, state);
     event.appendChild(header);
     if (descriptor?.requiredCapability !== undefined) {
@@ -136,8 +143,8 @@ function appendInteractionEventGroup(
         : DESIGNER_UI_TEXT.blueprint.capabilityUnavailable;
       event.appendChild(status);
     }
-    eventRules.forEach((rule, index) =>
-      event.appendChild(renderRuleCard(panel, rule, index, runtimeContributions)),
+    eventRelations.forEach((relation, index) =>
+      event.appendChild(renderRelationCard(panel, relation, index, runtimeContributions)),
     );
     body.appendChild(event);
   }
@@ -154,18 +161,19 @@ function readDeclaredAction(
   }
 }
 
-function renderRuleCard(
+function renderRelationCard(
   panel: HTMLElement,
-  rule: ScreenBlueprintRule,
+  relation: ScreenBlueprintBehaviorRelation,
   index: number,
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
 ): HTMLElement {
   const card = panel.ownerDocument.createElement('article');
   card.className = 'designer-blueprint-rule-card';
-  card.dataset.blueprintSummaryRule = rule.id;
+  card.dataset.blueprintSummaryRule = relation.id;
+  card.dataset.blueprintSummaryRelation = relation.id;
   const header = panel.ownerDocument.createElement('header');
   const title = panel.ownerDocument.createElement('strong');
-  title.textContent = DESIGNER_UI_TEXT.blueprint.ruleTitle(index + 1);
+  title.textContent = DESIGNER_UI_TEXT.blueprint.relationSummary(index + 1);
   const status = panel.ownerDocument.createElement('span');
   status.className = 'designer-blueprint-state';
   status.dataset.state = 'ready';
@@ -173,63 +181,67 @@ function renderRuleCard(
   header.append(title, status);
   const facts = panel.ownerDocument.createElement('dl');
   facts.className = 'designer-blueprint-rule-facts';
-  appendDefinition(facts, DESIGNER_UI_TEXT.blueprint.eventType, rule.trigger.eventName);
+  appendDefinition(facts, DESIGNER_UI_TEXT.blueprint.eventType, relation.source.event.eventName);
   appendDefinition(
     facts,
     DESIGNER_UI_TEXT.blueprint.triggerCondition,
-    rule.condition === undefined
+    relation.condition === undefined
       ? DESIGNER_UI_TEXT.blueprint.noCondition
-      : conditionSummary(rule.condition),
+      : conditionSummary(relation.condition),
   );
-  const actions = panel.ownerDocument.createElement('div');
-  actions.className = 'designer-blueprint-actions';
+  appendDefinition(facts, DESIGNER_UI_TEXT.blueprint.relationNode.target, targetLabel(relation));
+  const effects = panel.ownerDocument.createElement('div');
+  effects.className = 'designer-blueprint-actions';
   const heading = panel.ownerDocument.createElement('strong');
   heading.textContent = DESIGNER_UI_TEXT.blueprint.interactionActions;
-  actions.appendChild(heading);
-  if (rule.actions.length === 0) {
-    actions.appendChild(blueprintEmpty(panel.ownerDocument, DESIGNER_UI_TEXT.blueprint.noActions));
-  } else {
-    for (const action of rule.actions) {
-      actions.appendChild(renderAction(panel, action, runtimeContributions));
-    }
-  }
-  card.append(header, facts, actions);
+  effects.appendChild(heading);
+  effects.appendChild(renderEffect(panel, relation, runtimeContributions));
+  card.append(header, facts, effects);
   return card;
 }
 
-function renderAction(
+function targetLabel(relation: ScreenBlueprintBehaviorRelation): string {
+  if (relation.target.kind === 'component') return relation.target.componentId;
+  if (relation.target.kind === 'variable') return relation.target.variableId;
+  return DESIGNER_UI_TEXT.blueprint.hostNode;
+}
+
+function renderEffect(
   panel: HTMLElement,
-  action: ScreenBlueprintAction,
+  relation: ScreenBlueprintBehaviorRelation,
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
 ): HTMLElement {
   const row = panel.ownerDocument.createElement('div');
   row.className = 'designer-blueprint-action-row';
   const title = panel.ownerDocument.createElement('strong');
   const value = panel.ownerDocument.createElement('small');
-  if (action.type === 'set-variable') {
-    title.textContent = DESIGNER_UI_TEXT.blueprint.setVariableAction(action.variableId);
-    value.textContent = expressionSummary(action.value);
-  } else if (action.type === 'emit-host-event') {
-    title.textContent = DESIGNER_UI_TEXT.blueprint.emitHostEventAction(action.eventName);
-    value.textContent = expressionSummary(action.payload);
-  } else if (action.type === 'component-visibility') {
-    title.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityAction} · ${action.componentId} · ${action.operation}`;
-    value.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityTransition} · ${action.transition?.effect ?? 'appear'}`;
-  } else if (action.type === 'request-variable') {
-    title.textContent = `request-variable · ${action.variableId}`;
+  const effect = relation.effect;
+  if (effect.type === 'set-variable') {
+    title.textContent = DESIGNER_UI_TEXT.blueprint.setVariableAction(
+      relation.target.kind === 'variable' ? relation.target.variableId : '',
+    );
+    value.textContent = expressionSummary(effect.value);
+  } else if (effect.type === 'emit-host-event') {
+    title.textContent = DESIGNER_UI_TEXT.blueprint.emitHostEventAction(effect.eventName);
+    value.textContent = expressionSummary(effect.payload);
+  } else if (effect.type === 'component-visibility') {
+    title.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityAction} · ${relation.target.kind === 'component' ? relation.target.componentId : ''} · ${effect.operation}`;
+    value.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityTransition} · ${effect.transition?.effect ?? 'appear'}`;
+  } else if (effect.type === 'request-variable') {
+    title.textContent = `request-variable · ${relation.target.kind === 'variable' ? relation.target.variableId : ''}`;
     value.textContent = DESIGNER_UI_TEXT.blueprint.globalVariables;
-  } else if (action.type === 'request-component-data') {
-    title.textContent = `request-component-data · ${action.componentId}`;
+  } else if (effect.type === 'request-component-data') {
+    title.textContent = `request-component-data · ${relation.target.kind === 'component' ? relation.target.componentId : ''}`;
     value.textContent = DESIGNER_UI_TEXT.blueprint.layers;
   } else {
     // ADR-0076：宿主动作由插件声明。已声明显示其清单名，未声明明确标出——
     // 执行侧同样会失败关闭，作者面提前把同一事实讲清楚。
-    const declared = readDeclaredAction(runtimeContributions, action.actionId);
+    const declared = readDeclaredAction(runtimeContributions, effect.actionId);
     title.textContent =
       declared === undefined
-        ? DESIGNER_UI_TEXT.blueprint.hostActionUndeclared(action.actionId)
-        : DESIGNER_UI_TEXT.blueprint.hostActionDeclared(declared.name, action.actionId);
-    value.textContent = expressionSummary(action.payload);
+        ? DESIGNER_UI_TEXT.blueprint.hostActionUndeclared(effect.actionId)
+        : DESIGNER_UI_TEXT.blueprint.hostActionDeclared(declared.name, effect.actionId);
+    value.textContent = expressionSummary(effect.payload);
   }
   row.append(title, value);
   return row;

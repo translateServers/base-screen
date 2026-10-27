@@ -85,7 +85,7 @@ function document(
     variables: [
       { id: 'city', name: 'city', description: '城市', type: 'static', initialValue: '上海' },
     ],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

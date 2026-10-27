@@ -30,7 +30,7 @@ function screenDocument(components = [imageComponent()]): ScreenDocument {
     canvas: { width: 120, height: 80, backgroundColor: '#000000' },
     components,
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

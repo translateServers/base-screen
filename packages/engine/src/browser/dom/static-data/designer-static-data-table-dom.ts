@@ -111,13 +111,13 @@ function staticBindingField(
   const isSelected = selected.includes(field.id);
   const button = ownerDocument.createElement('button');
   button.type = 'button';
-  button.className = 'designer-control designer-dataset-field-option';
+  button.className = 'designer-dataset-field-option';
   button.dataset.staticBindingRole = roleId;
   button.dataset.staticBindingField = field.id;
   button.setAttribute('aria-pressed', String(isSelected));
   button.disabled = !isSelected && selected.length >= maxFields;
   const label = ownerDocument.createElement('span');
-  label.className = 'designer-field-label';
+  label.className = 'designer-field-label-text';
   label.textContent = field.label;
   const type = ownerDocument.createElement('small');
   type.textContent = field.valueType;

@@ -72,7 +72,7 @@ function documentWith(
     components,
     variables,
     dataSources,
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 
@@ -228,25 +228,40 @@ describe('变量派生（T02c-2）', () => {
       [instance('derived-instance')],
     );
     const rule = (variableId: string) => ({
+      type: 'behavior' as const,
       id: `set-${variableId}`,
-      trigger: { type: 'material-event' as const, componentId: 'trigger', eventName: 'change' },
-      actions: [
-        {
-          type: 'set-variable' as const,
-          variableId,
-          value: { kind: 'literal' as const, value: 'written' },
-        },
-      ],
+      source: {
+        kind: 'component' as const,
+        componentId: 'trigger',
+        event: { type: 'material-event' as const, eventName: 'change' },
+      },
+      target: { kind: 'variable' as const, variableId },
+      effect: {
+        type: 'set-variable' as const,
+        value: { kind: 'literal' as const, value: 'written' },
+      },
     });
     const withRules: ScreenDocument = {
       ...screen,
-      blueprint: { rules: [rule('legacy'), rule('derived')] },
+      blueprint: { relations: [rule('legacy'), rule('derived')] },
     };
     const { viewer, mount } = await createViewerHarness({
       catalog: createHostResourceCatalog(['change'], ['variable']),
       document: withRules,
       resourcePort: createImmediateResourcePort().port,
       variablePort: createVariablePort({}).port,
+      runtimeContributions: {
+        getResourceType: (resourceType: string) =>
+          resourceType === 'dataset'
+            ? {
+                kind: 'dataResourceType' as const,
+                id: 'dataset',
+                name: 'Dataset',
+                configSchema: { kind: 'object' as const, properties: {}, required: [] },
+              }
+            : undefined,
+        hasBlueprintCapability: () => true,
+      },
     });
     await flush();
 

@@ -17,7 +17,7 @@ describe('Blueprint canvas command protocol', () => {
         targetHandle: 'visibility:show',
       },
       { ...base, type: 'delete-selection', selection: { kind: 'edge', id: 'edge:r:action:0' } },
-      { ...base, type: 'insert-node', kind: 'condition' },
+      { ...base, type: 'insert-node', kind: 'host' },
       { ...base, type: 'commit-layout', nodes: [{ id: 'component:a', x: 12.345, y: -6 }] },
       { ...base, type: 'commit-viewport', viewport: { x: 0, y: 0, zoom: 1 } },
       { ...base, type: 'history-undo' },

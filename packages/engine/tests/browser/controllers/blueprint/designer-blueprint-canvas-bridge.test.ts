@@ -33,7 +33,7 @@ function fixture(): ScreenDocument {
     })),
     variables: [],
     blueprint: {
-      rules: [],
+      relations: [],
       layout: {
         nodes: [
           { id: 'component:source', x: 0, y: 0 },
@@ -167,7 +167,7 @@ describe('Blueprint canvas state bridge', () => {
     };
     host.dispatchEvent(canvasCommandEvent(command, canvas, host));
     expect(executeCommand).toHaveBeenCalledTimes(1);
-    expect(document.blueprint.rules).toHaveLength(1);
+    expect(document.blueprint.relations).toHaveLength(1);
     expect(states.at(-1)?.lastCommand).toMatchObject({
       commandId: 'connect-1',
       status: 'accepted',

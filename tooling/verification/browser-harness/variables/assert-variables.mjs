@@ -863,42 +863,38 @@ export async function assertVariableBlueprintSource(designer, page) {
   const prepared = await page.evaluate(() => {
     const { designer } = window.baseScreenHarness;
     const original = structuredClone(designer.document.blueprint);
-    const ruleIndex = designer.document.blueprint.rules.findIndex(
-      (rule) =>
-        rule.trigger.componentId === 'semantic-chart-demo' &&
-        rule.trigger.eventName === 'seriesClick' &&
-        rule.actions.some((action) => action.type === 'component-visibility'),
+    const sourceRelation = designer.document.blueprint.relations.find(
+      (relation) =>
+        relation.type === 'behavior' &&
+        relation.source.kind === 'component' &&
+        relation.source.componentId === 'semantic-chart-demo' &&
+        relation.source.event.eventName === 'seriesClick',
     );
-    if (ruleIndex < 0) return { ok: false };
-    const rules = structuredClone(designer.document.blueprint.rules);
-    const rule = rules[ruleIndex];
-    rule.actions.push({
-      type: 'set-variable',
-      variableId: 'region',
-      value: { kind: 'literal', value: 'north' },
-    });
-    const actionIndex = rule.actions.length - 1;
-    const layout = designer.document.blueprint.layout;
+    if (sourceRelation === undefined) return { ok: false };
+    const relationId = 'variable-source-demo';
+    const relation = {
+      type: 'behavior',
+      id: relationId,
+      source: structuredClone(sourceRelation.source),
+      target: { kind: 'variable', variableId: 'region' },
+      effect: {
+        type: 'set-variable',
+        value: { kind: 'literal', value: 'north' },
+      },
+    };
     const result = designer.executeCommand({
       type: 'replace-blueprint',
       blueprint: {
         ...designer.document.blueprint,
-        rules,
-        layout: {
-          ...layout,
-          nodes: [
-            ...(layout?.nodes ?? []),
-            { id: `action:${rule.id}:${actionIndex}`, x: 940, y: 420 },
-          ],
-        },
+        relations: [
+          ...designer.document.blueprint.relations.filter(
+            (candidate) => candidate.id !== relationId,
+          ),
+          relation,
+        ],
       },
     });
-    return {
-      ok: result.ok,
-      original,
-      ruleId: rule.id,
-      actionIndex,
-    };
+    return { ok: result.ok, original, relationId };
   });
   if (!prepared.ok) throw new Error('BROWSER_HARNESS_VARIABLE_BLUEPRINT_PREPARE_FAILED');
 
@@ -907,19 +903,18 @@ export async function assertVariableBlueprintSource(designer, page) {
     () => window.baseScreenHarness.blueprintCanvasState()?.active === true,
   );
   const selected = await page.evaluate(
-    ({ ruleId, actionIndex }) =>
+    ({ relationId }) =>
       window.baseScreenHarness.sendBlueprintCanvasCommand({
         type: 'select',
-        selection: { kind: 'edge', id: `edge:${ruleId}:action:${actionIndex}` },
+        selection: { kind: 'edge', id: `relation:${relationId}` },
       }),
     prepared,
   );
   if (!selected) throw new Error('BROWSER_HARNESS_VARIABLE_BLUEPRINT_SELECT_FAILED');
   try {
     await page.waitForFunction(
-      ({ ruleId, actionIndex }) =>
-        window.baseScreenHarness.blueprintCanvasState()?.selection?.id ===
-        `edge:${ruleId}:action:${actionIndex}`,
+      ({ relationId }) =>
+        window.baseScreenHarness.blueprintCanvasState()?.selection?.id === `relation:${relationId}`,
       prepared,
       { timeout: 5_000 },
     );
@@ -934,7 +929,7 @@ export async function assertVariableBlueprintSource(designer, page) {
     });
     throw new Error(`BROWSER_HARNESS_VARIABLE_BLUEPRINT_SELECTION_FAILED:${JSON.stringify(state)}`);
   }
-  const source = designer.locator('[data-blueprint-action-value-source]');
+  const source = designer.locator('[data-blueprint-action-value-source]').first();
   await source.waitFor();
   const sourceControl = await source.evaluate((element) => ({
     tagName: element.tagName,
@@ -951,21 +946,16 @@ export async function assertVariableBlueprintSource(designer, page) {
   );
   await sourceField.locator('.designer-select-trigger').click();
   await sourceField.locator('.designer-select-option[data-value="event-field"]').click();
-  const eventField = designer.locator('[data-blueprint-action-event-path]');
+  const eventField = designer.locator('[data-blueprint-action-event-path]').first();
   await eventField.waitFor();
-  const eventFieldControl = designer.locator(
-    '.designer-select-control:has([data-blueprint-action-event-path])',
-  );
-  await eventFieldControl.locator('.designer-select-trigger').click();
-  await eventFieldControl
-    .locator('.designer-select-option')
-    .filter({ hasText: 'seriesName' })
-    .click();
-  await page.waitForFunction(({ ruleId, actionIndex }) => {
-    const rule = window.baseScreenHarness.designer.document.blueprint.rules.find(
-      (candidate) => candidate.id === ruleId,
+  await eventField.fill('seriesName');
+  await eventField.press('Enter');
+  await eventField.blur();
+  await page.waitForFunction(({ relationId }) => {
+    const relation = window.baseScreenHarness.designer.document.blueprint.relations.find(
+      (candidate) => candidate.id === relationId,
     );
-    const value = rule?.actions[actionIndex]?.value;
+    const value = relation?.type === 'behavior' ? relation.effect.value : undefined;
     return value?.kind === 'event-payload' && value.path.join('.') === 'seriesName';
   }, prepared);
 

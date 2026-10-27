@@ -1,8 +1,10 @@
-import type {
-  ScreenBlueprintValueExpression,
-  ScreenDocument,
-  ScreenParseResult,
-  ScreenVariableEntry,
+import {
+  readScreenComponentValueRef,
+  readScreenDocumentDataSources,
+  type ScreenBlueprintValueExpression,
+  type ScreenDocument,
+  type ScreenParseResult,
+  type ScreenVariableEntry,
 } from '@base-screen/contracts';
 import type { ScreenDocumentCommand } from '@base-screen/core';
 
@@ -74,20 +76,29 @@ export function collectVariableReferences(
 ): readonly DesignerVariableReference[] {
   const references: DesignerVariableReference[] = [];
   const include = (id: string): boolean => variableId === undefined || id === variableId;
+  const dataSources = new Map(
+    readScreenDocumentDataSources(document).map((source) => [source.id, source] as const),
+  );
   for (const component of document.components) {
-    const source = component.dataSource;
-    if (source?.type === 'variable' && include(source.variableId)) {
-      references.push({
-        kind: 'component-parameter',
-        variableId: source.variableId,
-        componentId: component.id,
-        componentName: component.name,
-        parameterName: '$data',
-      });
+    const ref = readScreenComponentValueRef(component);
+    if (ref === null) continue;
+    if (ref.kind === 'variable') {
+      if (include(ref.variableId)) {
+        references.push({
+          kind: 'component-parameter',
+          variableId: ref.variableId,
+          componentId: component.id,
+          componentName: component.name,
+          parameterName: '$data',
+        });
+      }
+      continue;
     }
-    if (source?.type !== 'host-resource' && source?.type !== 'dataset') continue;
+    if (ref.kind !== 'data-source-field') continue;
+    const source = dataSources.get(ref.dataSourceId);
+    if (source === undefined) continue;
     for (const [parameterName, parameter] of Object.entries(source.params)) {
-      if (parameter?.kind !== 'variable' || !include(parameter.variableId)) continue;
+      if (parameter.kind !== 'variable' || !include(parameter.variableId)) continue;
       references.push({
         kind: 'component-parameter',
         variableId: parameter.variableId,
@@ -97,89 +108,83 @@ export function collectVariableReferences(
       });
     }
   }
-  for (const rule of document.blueprint.rules) {
-    if (rule.trigger.type === 'variable-event' && include(rule.trigger.variableId)) {
+  for (const relation of document.blueprint.relations) {
+    if (relation.type === 'semantic') continue;
+    const blueprintTargetId = `relation:${relation.id}`;
+    if (relation.source.kind === 'variable' && include(relation.source.variableId)) {
       references.push({
         kind: 'blueprint-trigger',
-        variableId: rule.trigger.variableId,
-        ruleId: rule.id,
-        blueprintTargetId: `trigger:${rule.id}`,
+        variableId: relation.source.variableId,
+        ruleId: relation.id,
+        blueprintTargetId,
       });
     }
-    if (rule.condition !== undefined) {
-      collectExpressionVariableReferences(rule.condition.left, [], (name, expressionPath) => {
+    if (relation.condition !== undefined) {
+      collectExpressionVariableReferences(relation.condition.left, [], (name, expressionPath) => {
         if (!include(name)) return;
         references.push({
           kind: 'blueprint-condition',
           variableId: name,
-          ruleId: rule.id,
+          ruleId: relation.id,
           side: 'left',
           expressionPath,
-          blueprintTargetId: `condition:${rule.id}`,
+          blueprintTargetId,
         });
       });
-      if (rule.condition.right !== undefined) {
-        collectExpressionVariableReferences(rule.condition.right, [], (name, expressionPath) => {
-          if (!include(name)) return;
-          references.push({
-            kind: 'blueprint-condition',
-            variableId: name,
-            ruleId: rule.id,
-            side: 'right',
-            expressionPath,
-            blueprintTargetId: `condition:${rule.id}`,
-          });
-        });
+      if (relation.condition.right !== undefined) {
+        collectExpressionVariableReferences(
+          relation.condition.right,
+          [],
+          (name, expressionPath) => {
+            if (!include(name)) return;
+            references.push({
+              kind: 'blueprint-condition',
+              variableId: name,
+              ruleId: relation.id,
+              side: 'right',
+              expressionPath,
+              blueprintTargetId,
+            });
+          },
+        );
       }
     }
-    for (const [actionIndex, action] of rule.actions.entries()) {
-      const blueprintTargetId = `action:${rule.id}:${actionIndex}`;
-      if (action.type === 'set-variable') {
-        if (include(action.variableId)) {
-          references.push({
-            kind: 'blueprint-action-target',
-            variableId: action.variableId,
-            ruleId: rule.id,
-            actionIndex,
-            blueprintTargetId,
-          });
-        }
-        collectExpressionVariableReferences(action.value, [], (name, expressionPath) => {
-          if (!include(name)) return;
-          references.push({
-            kind: 'blueprint-action-expression',
-            variableId: name,
-            ruleId: rule.id,
-            actionIndex,
-            field: 'value',
-            expressionPath,
-            blueprintTargetId,
-          });
+    if (relation.target.kind === 'variable' && include(relation.target.variableId)) {
+      references.push({
+        kind: 'blueprint-action-target',
+        variableId: relation.target.variableId,
+        ruleId: relation.id,
+        actionIndex: 0,
+        blueprintTargetId,
+      });
+    }
+    const effect = relation.effect;
+    if (effect.type === 'set-variable') {
+      collectExpressionVariableReferences(effect.value, [], (name, expressionPath) => {
+        if (!include(name)) return;
+        references.push({
+          kind: 'blueprint-action-expression',
+          variableId: name,
+          ruleId: relation.id,
+          actionIndex: 0,
+          field: 'value',
+          expressionPath,
+          blueprintTargetId,
         });
-      } else if (action.type === 'request-variable') {
-        if (include(action.variableId)) {
-          references.push({
-            kind: 'blueprint-action-target',
-            variableId: action.variableId,
-            ruleId: rule.id,
-            actionIndex,
-            blueprintTargetId,
-          });
-        }
-      } else if (action.type === 'emit-host-event' || action.type === 'host-action') {
-        collectExpressionVariableReferences(action.payload, [], (name, expressionPath) => {
-          if (!include(name)) return;
-          references.push({
-            kind: 'blueprint-action-expression',
-            variableId: name,
-            ruleId: rule.id,
-            actionIndex,
-            field: 'payload',
-            expressionPath,
-            blueprintTargetId,
-          });
+      });
+    } else if (effect.type === 'emit-host-event' || effect.type === 'host-action') {
+      collectExpressionVariableReferences(effect.payload, [], (name, expressionPath) => {
+        if (!include(name)) return;
+        references.push({
+          kind: 'blueprint-action-expression',
+          variableId: name,
+          ruleId: relation.id,
+          actionIndex: 0,
+          field: 'payload',
+          expressionPath,
+          blueprintTargetId,
         });
-      }
+      });
     }
   }
   return references;

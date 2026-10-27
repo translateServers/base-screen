@@ -16,7 +16,7 @@ describe('parseScreenDocument validation', () => {
   it('rejects unknown fields on every strict object', () => {
     const cases: Array<{ input: Record<string, unknown>; path: (string | number)[] }> = [
       {
-        input: document({ blueprint: { rules: [], extra: true } }),
+        input: document({ blueprint: { relations: [], extra: true } }),
         path: ['blueprint', 'extra'],
       },
       {

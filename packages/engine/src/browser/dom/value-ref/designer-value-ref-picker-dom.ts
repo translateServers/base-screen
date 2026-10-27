@@ -1,5 +1,10 @@
 import type { ScreenValueRef } from '@base-screen/contracts';
-import { createDesignerInput } from '../designer-ui-primitives.js';
+import {
+  createDesignerButton,
+  createDesignerInput,
+  createDesignerTabs,
+} from '../designer-ui-primitives.js';
+import { appendDesignerEmptyState } from '../panel/designer-chrome-primitives.js';
 import { renderValueRefSummary, valueRefSummaryText } from './designer-value-ref-summary-dom.js';
 import {
   badgeOf,
@@ -30,14 +35,14 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
 } {
   const document = options.ownerDocument;
   const text = options.text;
-  const trigger = document.createElement('button');
-  trigger.type = 'button';
-  trigger.className = 'designer-control designer-value-ref-trigger';
+  const trigger = createDesignerButton(document, {
+    ariaLabel: options.ariaLabel,
+    className: 'designer-value-ref-trigger',
+  });
   trigger.dataset.valueRefTrigger = options.controlKey;
   trigger.dataset.dsControl = options.controlKey;
   trigger.setAttribute('aria-haspopup', 'dialog');
   trigger.setAttribute('aria-expanded', 'false');
-  trigger.setAttribute('aria-label', options.ariaLabel);
 
   const live = document.createElement('span');
   live.className = 'designer-visually-hidden';
@@ -156,25 +161,25 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
     // 只开一种形态时列表内不再重复徽标；`variable` 单形态改用原型里的 `{ }` 字形。
     dialog.dataset.valueRefKinds = kinds.join(' ');
     if (kinds.length > 1) {
-      const tabs = document.createElement('div');
-      tabs.className = 'designer-value-ref-tabs';
-      tabs.setAttribute('role', 'tablist');
-      for (const kind of kinds) {
-        const tab = document.createElement('button');
-        tab.type = 'button';
-        tab.setAttribute('role', 'tab');
-        tab.className = 'designer-value-ref-tab';
-        tab.dataset.valueRefTab = kind;
-        tab.setAttribute('aria-selected', String(kindOf(options.input.current) === kind));
-        tab.textContent = tabLabel(kind);
+      const tabs = createDesignerTabs(document, {
+        ariaLabel: text.placeholder,
+        className: 'designer-value-ref-tabs',
+        items: kinds.map((kind) => ({
+          className: 'designer-value-ref-tab',
+          dataset: { valueRefTab: kind },
+          label: tabLabel(kind),
+          value: kind,
+        })),
+        selected: kindOf(options.input.current),
+      });
+      for (const tab of tabs.buttons.values()) {
         tab.addEventListener('click', () => {
           query = '';
           if (search !== undefined) search.value = '';
           renderList();
         });
-        tabs.appendChild(tab);
       }
-      dialog.appendChild(tabs);
+      dialog.appendChild(tabs.element);
     }
 
     // 表单控件一律走共享原语（检查器/面板的形状与可访问性口径只在这里定义一次）。
@@ -203,11 +208,8 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
 
     const footer = document.createElement('div');
     footer.className = 'designer-value-ref-footer';
-    const manage = document.createElement('button');
-    manage.type = 'button';
-    manage.className = 'designer-control designer-button';
+    const manage = createDesignerButton(document, { text: text.manage });
     manage.dataset.valueRefManage = 'true';
-    manage.textContent = text.manage;
     manage.addEventListener('click', () => {
       options.onManage?.();
       close(true);
@@ -231,41 +233,32 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
     activeIndex = Math.min(activeIndex, Math.max(visible.length - 1, 0));
     list.replaceChildren();
     if (visible.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'designer-value-ref-empty';
-      if (query.trim().length > 0) {
-        empty.dataset.valueRefEmpty = 'search';
-        empty.textContent = text.emptySearch;
-        const clear = document.createElement('button');
-        clear.type = 'button';
-        clear.className = 'designer-control designer-button';
-        clear.dataset.valueRefClearSearch = 'true';
-        clear.textContent = text.clearSearch;
-        clear.addEventListener('click', () => {
-          query = '';
-          if (search !== undefined) search.value = '';
-          renderList();
-          search?.focus();
-        });
-        empty.appendChild(clear);
-      } else {
-        empty.dataset.valueRefEmpty = 'items';
-        empty.textContent = text.emptyVariables;
-        if (options.allowCreateVariable === true) {
-          const create = document.createElement('button');
-          create.type = 'button';
-          create.className = 'designer-control designer-button';
-          create.dataset.valueRefCreate = 'true';
-          create.textContent = text.createVariable;
-          create.title = text.emptyVariables;
-          create.addEventListener('click', () => {
+      const searching = query.trim().length > 0;
+      const actions = searching
+        ? [{ label: text.clearSearch, dataset: { valueRefClearSearch: 'true' } }]
+        : options.allowCreateVariable === true
+          ? [{ label: text.createVariable, dataset: { valueRefCreate: 'true' } }]
+          : [];
+      const { element: empty, actionButtons } = appendDesignerEmptyState(list, {
+        title: searching ? text.emptySearch : text.emptyVariables,
+        actions,
+      });
+      empty.dataset.valueRefEmpty = searching ? 'search' : 'items';
+      const action = actionButtons[0];
+      if (action !== undefined) {
+        action.title = searching ? text.emptySearch : text.emptyVariables;
+        action.addEventListener('click', () => {
+          if (searching) {
+            query = '';
+            if (search !== undefined) search.value = '';
+            renderList();
+            search?.focus();
+          } else {
             options.onCreateVariable?.();
             close(true);
-          });
-          empty.appendChild(create);
-        }
+          }
+        });
       }
-      list.appendChild(empty);
       list.removeAttribute('aria-activedescendant');
       return;
     }

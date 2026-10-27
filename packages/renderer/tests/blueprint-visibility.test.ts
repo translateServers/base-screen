@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createBaseScreenRenderer } from '../src/renderer/renderer.js';
+import { relationsFromRules } from './__fixtures__/blueprint-relations.js';
 import {
   component,
   createHostResourceCatalog,
@@ -64,7 +65,7 @@ describe('blueprint component visibility', () => {
       [component('trigger'), component('target'), component('unrelated')],
       [],
       {
-        rules: [
+        relations: relationsFromRules([
           {
             id: 'toggle-target',
             trigger: { type: 'material-event', componentId: 'trigger', eventName: 'click' },
@@ -74,7 +75,7 @@ describe('blueprint component visibility', () => {
             ],
             actions: [{ type: 'component-visibility', componentId: 'target', operation: 'toggle' }],
           },
-        ],
+        ]),
       },
     );
     const { mount } = await createViewerHarness({

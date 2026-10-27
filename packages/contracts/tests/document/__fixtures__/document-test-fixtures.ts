@@ -24,7 +24,7 @@ export function document(overrides: Record<string, unknown> = {}): Record<string
     components: [],
     dataSources: [],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
     ...overrides,
   };
 }

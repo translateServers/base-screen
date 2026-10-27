@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  appendDesignerFieldHint,
   appendDesignerRangeField,
   createDesignerFieldElement,
   createDesignerFieldRow,
+  createDesignerToggleField,
 } from '../../../src/browser/dom/designer-field-primitives.js';
 
 class FakeElement {
@@ -111,6 +113,48 @@ describe('designer field primitives', () => {
     // 没有控件列：开关必须直接挂在字段行上才能命中 `:has(> .designer-switch)`。
     expect(field.children).toHaveLength(1);
     expect(field.children[0]?.className).toBe('designer-field-label-text');
+  });
+
+  it('builds toggle fields with a copy block and direct switch/checkbox carrier', () => {
+    const document = ownerDocument();
+    const toggle = createDesignerToggleField(document, {
+      control: 'switch',
+      hint: 'Auto update on a timer',
+      label: 'Auto update',
+      checked: true,
+    });
+    const checkbox = createDesignerToggleField(document, {
+      control: 'checkbox',
+      label: 'Controlled',
+    });
+
+    expect(toggle.field.className).toBe(
+      'designer-field designer-field-label designer-field-toggle',
+    );
+    expect(toggle.field.children[0]?.className).toBe('designer-field-toggle-copy');
+    expect(toggle.field.children[0]?.children[0]?.textContent).toBe('Auto update');
+    expect(toggle.field.children[0]?.children[1]?.className).toBe('designer-field-hint');
+    expect(toggle.field.children[1]).toBe(toggle.input);
+    expect(toggle.input.className).toBe('designer-switch');
+    expect(toggle.input.checked).toBe(true);
+    expect(checkbox.input.className).toBe('designer-checkbox');
+  });
+
+  it('appends field hints and merges aria-describedby with existing hints', () => {
+    const document = ownerDocument();
+    const { field, control } = createDesignerFieldRow(document, { label: 'Interval' });
+    const input = document.createElement('input');
+    input.id = 'auto-update-interval';
+    input.setAttribute('aria-describedby', 'existing-hint');
+    control.appendChild(input);
+
+    const hint = appendDesignerFieldHint(field, input, 'Seconds between refreshes');
+
+    expect(hint.className).toBe('designer-field-hint');
+    expect(hint.id).toBe('auto-update-interval-hint');
+    expect(hint.textContent).toBe('Seconds between refreshes');
+    expect(input.getAttribute('aria-describedby')).toBe('existing-hint auto-update-interval-hint');
+    expect(field.children[2]).toBe(hint);
   });
 
   it('wires the range and number readouts into one value carrier', () => {

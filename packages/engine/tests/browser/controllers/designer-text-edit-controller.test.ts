@@ -102,7 +102,7 @@ function document(): ScreenDocument {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
     components: [component('title', { type: 'static', value: '旧标题' })],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

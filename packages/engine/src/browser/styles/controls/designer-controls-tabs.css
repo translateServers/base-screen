@@ -1,0 +1,116 @@
+/* 面板内导航 tab（role=tablist）：容器与选中态复用 .designer-tablist / .designer-tab，
+   这里补水平/垂直两种排布、按钮内距，以及左右栏两条 tab 条的变体。
+   按下型选项组仍走 .designer-segmented。 */
+.designer-tablist .designer-tab {
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-4);
+  text-align: center;
+}
+
+.designer-tablist[data-orientation="vertical"] {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.designer-tablist[data-orientation="vertical"] .designer-tab {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+/* 左栏图标轨：60px 竖排 tab（图标在上、文字在下）。 */
+.rail-tabs .designer-tab {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 44px;
+  min-height: 60px;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-4) var(--designer-space-1);
+  border-color: transparent;
+  border-radius: var(--designer-radius-3);
+  background: transparent;
+  color: var(--designer-text-secondary);
+  font-family: var(--designer-font-family);
+  font-size: var(--designer-font-size-sm);
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.rail-tabs .designer-tab:not([aria-selected="true"]):hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+  transform: none;
+}
+
+.rail-tabs .designer-tab[aria-selected="true"] {
+  border-color: transparent;
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
+}
+
+.rail-tabs .designer-tab[aria-selected="true"]:hover {
+  box-shadow: inset 0 0 0 1px var(--designer-border-active);
+}
+
+.rail-tabs .designer-tab[aria-selected="true"] .rail-tab-glyph {
+  color: var(--designer-accent);
+}
+
+/* 左栏分区：内建 → 宿主分组 → 插件面板，各段首项上缘一条发丝线标出分界。 */
+.rail-tabs .designer-tab[data-host-left-panel-group]::before,
+.rail-tabs
+  > .designer-tab:not([data-plugin-panel-tab])
+  + .designer-tab[data-plugin-panel-tab]::before {
+  position: absolute;
+  top: -10px;
+  right: 10px;
+  left: 10px;
+  height: 1px;
+  background: var(--designer-border-default);
+  content: "";
+  pointer-events: none;
+}
+
+/* 右栏浅胶囊 tab：选中 = 胶囊底 + 收边 + 加粗，悬停只给底色。 */
+.inspector-tabs .designer-tab {
+  min-height: 30px;
+  flex: 0 0 auto;
+  padding: 0 var(--designer-space-4);
+  border: 0;
+  border-radius: var(--designer-radius-3);
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-secondary);
+  font-weight: 500;
+}
+
+.inspector-tabs .designer-tab:hover:not([aria-selected="true"]) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+  box-shadow: none;
+}
+
+.inspector-tabs .designer-tab[aria-selected="true"] {
+  border-bottom-color: transparent;
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
+}
+
+.inspector-tabs .designer-tab[aria-selected="true"]:hover {
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  box-shadow: inset 0 0 0 1px var(--designer-border-active);
+}

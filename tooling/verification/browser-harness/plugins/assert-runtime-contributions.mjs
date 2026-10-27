@@ -89,11 +89,13 @@ export async function assertPluginBlueprintActionExecutes(page) {
     ([actionId, ruleId]) => {
       const designer = window.baseScreenHarness.designer;
       const index = window.baseScreenHarness.pluginManager.snapshot.contributions;
-      const rule = designer.document.blueprint.rules.find((item) => item.id === ruleId);
+      const relation = designer.document.blueprint.relations.find((item) => item.id === ruleId);
       return {
         declared: index.getBlueprintAction?.(actionId)?.name ?? null,
         ruleActionId:
-          rule?.actions.find((action) => action.type === 'host-action')?.actionId ?? null,
+          relation?.type === 'behavior' && relation.effect.type === 'host-action'
+            ? relation.effect.actionId
+            : null,
         requestsBefore: window.baseScreenHarness.pluginActionRequests.length,
       };
     },

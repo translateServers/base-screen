@@ -4,6 +4,18 @@ import { renderDesignerBlueprintInspector } from '../../../../src/browser/dom/bl
 import { renderDesignerBlueprintLibrary } from '../../../../src/browser/dom/blueprint/designer-blueprint-library-dom.js';
 import { renderDesignerBlueprintWorkbenchChrome } from '../../../../src/browser/dom/blueprint/designer-blueprint-workbench-dom.js';
 
+const relationship = {
+  type: 'behavior' as const,
+  id: 'relation-1',
+  source: {
+    kind: 'component' as const,
+    componentId: 'source',
+    event: { type: 'material-event' as const, eventName: 'click' },
+  },
+  target: { kind: 'component' as const, componentId: 'source' },
+  effect: { type: 'component-visibility' as const, operation: 'show' as const },
+};
+
 const graph = {
   nodes: [
     {
@@ -19,13 +31,18 @@ const graph = {
   ],
   edges: [
     {
-      id: 'edge:rule-1:trigger',
+      id: 'relation:relation-1',
       source: 'component:source',
       target: 'component:source',
       sourceHandle: 'event:click',
-      targetHandle: 'visibility:show',
-      ruleId: 'rule-1',
-      kind: 'trigger' as const,
+      targetHandle: 'relation:in',
+      relationId: 'relation-1',
+      relationKind: 'behavior' as const,
+      kind: 'relation' as const,
+      effectType: 'component-visibility' as const,
+      eventName: 'click',
+      operation: 'show' as const,
+      deletable: true,
     },
   ],
 };
@@ -52,15 +69,7 @@ const document: ScreenDocument = {
   variables: [
     { type: 'static', id: 'selected<script>', name: 'selected<script>', initialValue: null },
   ],
-  blueprint: {
-    rules: [
-      {
-        id: 'rule-1',
-        trigger: { type: 'material-event', componentId: 'source', eventName: 'click' },
-        actions: [],
-      },
-    ],
-  },
+  blueprint: { relations: [relationship] },
 };
 
 describe('Designer Blueprint panel DOM', () => {
@@ -100,8 +109,9 @@ describe('Designer Blueprint panel DOM', () => {
 
     renderDesignerBlueprintWorkbenchChrome(root, 'blueprint', true, {
       nodes: 7,
-      rules: 2,
-      actions: 3,
+      relations: 2,
+      semantic: 1,
+      structural: 1,
       problems: 0,
     });
     expect(library.hidden).toBe(false);
@@ -112,8 +122,9 @@ describe('Designer Blueprint panel DOM', () => {
 
     renderDesignerBlueprintWorkbenchChrome(root, 'canvas', true, {
       nodes: 7,
-      rules: 2,
-      actions: 3,
+      relations: 2,
+      semantic: 1,
+      structural: 1,
       problems: 0,
     });
     expect(library.hidden).toBe(true);
@@ -138,7 +149,7 @@ describe('Designer Blueprint panel DOM', () => {
     );
 
     expect(container.innerHTML).toContain('组件');
-    expect(container.innerHTML).toContain('逻辑');
+    expect(container.innerHTML).toContain('关系');
     expect(container.innerHTML).toContain('变量');
     expect(container.innerHTML).toContain('data-blueprint-add-variable="selected&lt;script&gt;"');
     expect(container.innerHTML).toContain('data-blueprint-drag-kind="variable"');
@@ -212,67 +223,73 @@ describe('Designer Blueprint panel DOM', () => {
     expect(container.innerHTML).toContain('rule-1 · 条件无 · 执行 1 个动作');
   });
 
-  it('shows saved unconnected nodes as configurable canvas members', () => {
+  it('renders component structure and relation lists', () => {
     const container = { innerHTML: '' } as HTMLElement;
-    const node = {
-      id: 'unconnected:condition:1',
-      kind: 'condition' as const,
-      x: 20,
-      y: 30,
-      condition: {
-        left: { kind: 'event-payload' as const, path: [] },
-        operator: 'exists' as const,
-      },
-      summary: { kind: 'condition' as const, primary: 'event.*', secondary: 'exists' },
-      unconnected: true as const,
-    };
 
     renderDesignerBlueprintInspector(
       container,
       document,
-      { nodes: [...graph.nodes, node], edges: graph.edges },
-      { kind: 'node', id: node.id },
+      graph,
+      { kind: 'node', id: 'component:source' },
       'configuration',
       [],
       null,
     );
 
-    expect(container.innerHTML).toContain('待连接节点');
-    expect(container.innerHTML).toContain('该节点已保存到当前文档');
+    expect(container.innerHTML).toContain('结构');
+    expect(container.innerHTML).toContain('data-blueprint-select-relation');
     expect(container.innerHTML).toContain('data-blueprint-delete');
   });
 
   it('renders keyboard-native set-variable source controls from declared event fields', () => {
     const container = { innerHTML: '' } as HTMLElement;
+    const setVariableRelation = {
+      type: 'behavior' as const,
+      id: 'relation-2',
+      source: relationship.source,
+      target: { kind: 'variable' as const, variableId: 'selected' },
+      effect: {
+        type: 'set-variable' as const,
+        value: { kind: 'event-payload' as const, path: ['row', 'id'] },
+      },
+    };
     const configuredDocument: ScreenDocument = {
       ...document,
       variables: [
         { type: 'static', id: 'selected', name: 'selected', initialValue: null },
         { type: 'static', id: 'fallback', name: 'fallback', initialValue: 1 },
       ],
-      blueprint: {
-        rules: [
-          {
-            ...document.blueprint.rules[0]!,
-            actions: [
-              {
-                type: 'set-variable',
-                variableId: 'selected',
-                value: { kind: 'event-payload', path: ['row', 'id'] },
-              },
-            ],
-          },
-        ],
-      },
+      blueprint: { relations: [setVariableRelation] },
     };
     const configuredGraph = {
-      ...graph,
+      nodes: [
+        ...graph.nodes,
+        {
+          id: 'variable:selected',
+          kind: 'variable' as const,
+          x: 300,
+          y: 0,
+          variableId: 'selected',
+          variableName: 'selected',
+          variableType: 'static' as const,
+          variableInitialValue: null,
+          events: [],
+        },
+      ],
       edges: [
         {
-          ...graph.edges[0]!,
-          id: 'edge:rule-1:action:0',
-          kind: 'action' as const,
-          actionIndex: 0,
+          id: 'relation:relation-2',
+          source: 'component:source',
+          target: 'variable:selected',
+          sourceHandle: 'event:click',
+          targetHandle: 'relation:in',
+          relationId: 'relation-2',
+          relationKind: 'behavior' as const,
+          kind: 'relation' as const,
+          effectType: 'set-variable' as const,
+          eventName: 'click',
+          variableId: 'selected',
+          deletable: true,
         },
       ],
     };
@@ -305,7 +322,7 @@ describe('Designer Blueprint panel DOM', () => {
       container,
       configuredDocument,
       configuredGraph,
-      { kind: 'edge', id: 'edge:rule-1:action:0' },
+      { kind: 'edge', id: 'relation:relation-2' },
       'configuration',
       [],
       null,

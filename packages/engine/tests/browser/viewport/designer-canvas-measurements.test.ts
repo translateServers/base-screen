@@ -15,7 +15,7 @@ describe('collectDesignerCanvasMeasurements', () => {
         component('lower-right', 100, 407, 100, 120),
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
 
     expect(
@@ -41,7 +41,7 @@ describe('collectDesignerCanvasMeasurements', () => {
         component('hidden', 0, 130, 100, 20, 0, true),
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
 
     expect(
@@ -56,7 +56,7 @@ describe('collectDesignerCanvasMeasurements', () => {
       canvas: { width: 800, height: 500, backgroundColor: '#000000' },
       components: [component('above-left', 115, 22, 242, 120)],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
 
     expect(

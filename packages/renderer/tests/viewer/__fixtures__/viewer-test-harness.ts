@@ -217,7 +217,7 @@ export function hostVariable(name: string, variableId: string): ScreenVariableEn
 export function document(
   components: readonly ScreenComponentNode[],
   variables: readonly ScreenVariableEntry[] = [],
-  blueprint: ScreenDocument['blueprint'] = { rules: [] },
+  blueprint: ScreenDocument['blueprint'] = { relations: [] },
 ): ScreenDocument {
   return {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
@@ -404,7 +404,6 @@ export async function createViewerHarness(options: {
     options.projectId !== undefined ||
     options.documentRevision !== undefined ||
     options.observer !== undefined ||
-    options.runtimeContributions !== undefined ||
     options.conditionalStylePort !== undefined
   ) {
     const configured = viewer.configure({
@@ -437,6 +436,9 @@ export async function createViewerHarness(options: {
     }
     if (options.resourceTimeoutMs !== undefined) {
       viewer.resourceTimeoutMs = options.resourceTimeoutMs;
+    }
+    if (options.runtimeContributions !== undefined) {
+      viewer.runtimeContributions = options.runtimeContributions;
     }
     viewer.catalog = options.catalog;
   }

@@ -7,8 +7,9 @@ export function renderDesignerBlueprintWorkbenchChrome(
   available: boolean,
   status: {
     readonly nodes: number;
-    readonly rules: number;
-    readonly actions: number;
+    readonly relations: number;
+    readonly semantic: number;
+    readonly structural: number;
     readonly problems: number;
   },
 ): void {
@@ -53,8 +54,10 @@ export function renderDesignerBlueprintWorkbenchChrome(
   const canvas = root.querySelector<HTMLElement>('[data-status-canvas]');
   if (canvas !== null) {
     canvas.textContent = DESIGNER_UI_TEXT.blueprint.status(
-      status.rules,
-      status.actions,
+      status.nodes,
+      status.relations,
+      status.semantic,
+      status.structural,
       status.problems,
     );
   }

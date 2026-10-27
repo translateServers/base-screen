@@ -99,7 +99,7 @@ describe('snapDesignerCanvasPoint', () => {
         component('hidden', 120, 40, false, true),
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
 
     const collected = collectDesignerSnapCandidates(document, { x: [15], y: [25] }, ['visible']);
@@ -145,7 +145,7 @@ describe('snapDesignerCanvasPoint', () => {
       canvas: { width: 200, height: 100, backgroundColor: '#000000' },
       components: [component('rotated', 50, 30, false, false, 90)],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
 
     const collected = collectDesignerSnapCandidates(document, { x: [], y: [] });
@@ -342,7 +342,7 @@ describe('snapDesignerCanvasPoint', () => {
       canvas: { width: 960, height: 540, backgroundColor: '#000000' },
       components: [component('above', 130, 126, false, false)],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
 
     expect(
@@ -365,7 +365,7 @@ describe('snapDesignerCanvasPoint', () => {
       canvas: { width: 400, height: 300, backgroundColor: '#000000' },
       components: [component('rotated', 80, 60, false, false, 37)],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
     const bounds = getScreenComponentBounds(document.components[0]!);
     const collected = collectDesignerSnapCandidates(document, { x: [], y: [] });

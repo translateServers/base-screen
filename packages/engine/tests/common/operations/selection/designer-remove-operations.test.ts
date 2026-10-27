@@ -3,6 +3,7 @@ import { applyScreenDocumentTransaction } from '@base-screen/core';
 import { describe, expect, it } from 'vitest';
 import { createUngroupTransaction } from '../../../../src/common/operations/element/designer-layout-operations.js';
 import { removeComponentCommands } from '../../../../src/common/operations/selection/designer-remove-operations.js';
+import { relationsFromRules } from '../../../__fixtures__/blueprint-relations.js';
 
 function component(id: string, parentId: string | null = null): ScreenComponentNode {
   return {
@@ -30,10 +31,20 @@ function document(
     components,
     variables: [],
     blueprint: {
-      rules: ruleComponentIds.map((componentId, index) => ({
+      relations: ruleComponentIds.map((componentId, index) => ({
+        type: 'behavior' as const,
         id: `rule-${index}`,
-        trigger: { type: 'material-event', componentId, eventName: 'valueClick' },
-        actions: [],
+        source: {
+          kind: 'component' as const,
+          componentId,
+          event: { type: 'material-event' as const, eventName: 'valueClick' },
+        },
+        target: { kind: 'host' as const },
+        effect: {
+          type: 'emit-host-event' as const,
+          eventName: 'notify',
+          payload: { kind: 'literal' as const, value: null },
+        },
       })),
     },
   };
@@ -45,7 +56,7 @@ describe('removeComponentCommands', () => {
     const commands = removeComponentCommands(source, ['title']);
 
     expect(commands).toEqual([
-      { type: 'replace-blueprint', blueprint: { rules: [] } },
+      { type: 'replace-blueprint', blueprint: { relations: [] } },
       { type: 'remove-components', componentIds: ['title'] },
     ]);
   });
@@ -55,7 +66,7 @@ describe('removeComponentCommands', () => {
     const commands = removeComponentCommands(source, ['group']);
 
     expect(commands).toHaveLength(2);
-    expect(commands[0]).toEqual({ type: 'replace-blueprint', blueprint: { rules: [] } });
+    expect(commands[0]).toEqual({ type: 'replace-blueprint', blueprint: { relations: [] } });
   });
 
   it('keeps rules that reference surviving components', () => {
@@ -65,7 +76,7 @@ describe('removeComponentCommands', () => {
     expect(commands).toEqual([
       {
         type: 'replace-blueprint',
-        blueprint: { rules: [source.blueprint.rules[0]] },
+        blueprint: { relations: [source.blueprint.relations[0]] },
       },
       { type: 'remove-components', componentIds: ['subtitle'] },
     ]);
@@ -82,7 +93,7 @@ describe('removeComponentCommands', () => {
     const source: ScreenDocument = {
       ...document([component('button'), component('panel'), component('other')], []),
       blueprint: {
-        rules: [
+        relations: relationsFromRules([
           {
             id: 'toggle-panel',
             trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
@@ -95,7 +106,7 @@ describe('removeComponentCommands', () => {
               },
             ],
           },
-        ],
+        ]),
         layout: {
           nodes: [
             { id: 'component:button', x: 0, y: 0 },
@@ -109,9 +120,15 @@ describe('removeComponentCommands', () => {
 
     const commands = removeComponentCommands(source, ['panel']);
     const blueprint = commands[0]?.type === 'replace-blueprint' ? commands[0].blueprint : undefined;
-    expect(blueprint?.rules[0]?.actions).toEqual([
-      { type: 'emit-host-event', eventName: 'kept', payload: { kind: 'literal', value: null } },
-    ]);
+    expect(blueprint?.relations).toHaveLength(1);
+    expect(blueprint?.relations[0]).toMatchObject({
+      type: 'behavior',
+      effect: {
+        type: 'emit-host-event',
+        eventName: 'kept',
+        payload: { kind: 'literal', value: null },
+      },
+    });
     expect(blueprint?.layout?.nodes).toEqual([
       { id: 'component:button', x: 0, y: 0 },
       { id: 'component:other', x: 600, y: 0 },
@@ -126,7 +143,7 @@ describe('removeComponentCommands', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.document.components.map((item) => item.id)).toEqual(['subtitle']);
-    expect(result.document.blueprint.rules).toEqual([]);
+    expect(result.document.blueprint.relations).toEqual([]);
   });
 
   it('ungroup prunes rules triggered by the removed group', () => {
@@ -137,6 +154,6 @@ describe('removeComponentCommands', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.document.components.map((item) => item.id)).toEqual(['child']);
-    expect(result.document.blueprint.rules).toEqual([]);
+    expect(result.document.blueprint.relations).toEqual([]);
   });
 });

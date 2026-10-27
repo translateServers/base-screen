@@ -96,7 +96,13 @@ function migrateComponent(component, reference, path) {
 }
 
 function migrateBlueprint(blueprint, reference) {
-  if (!isRecord(blueprint) || !Array.isArray(blueprint.rules)) return structuredClone(blueprint);
+  if (!isRecord(blueprint)) return structuredClone(blueprint);
+  if (Array.isArray(blueprint.relations)) {
+    throw new Error(
+      'VARIABLE_MIGRATION_BLUEPRINT_SHAPE_UNSUPPORTED: blueprint.relations is already relationship-based; run the contracts document migration instead.',
+    );
+  }
+  if (!Array.isArray(blueprint.rules)) return structuredClone(blueprint);
   return {
     ...structuredClone(blueprint),
     rules: blueprint.rules.map((rule, ruleIndex) => {

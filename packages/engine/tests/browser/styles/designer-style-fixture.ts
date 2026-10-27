@@ -26,6 +26,7 @@ const controlsCssFiles = [
   '../../../src/browser/styles/controls/designer-controls-inputs.css',
   '../../../src/browser/styles/controls/designer-controls-quick-style.css',
   '../../../src/browser/styles/controls/designer-controls-actions.css',
+  '../../../src/browser/styles/controls/designer-controls-tabs.css',
   '../../../src/browser/styles/controls/designer-controls-descriptor.css',
 ] as const;
 const workbenchCssFiles = [
@@ -48,6 +49,7 @@ const workbenchCssFiles = [
   '../../../src/browser/styles/workbench/designer-workbench-canvas.css',
   '../../../src/browser/styles/workbench/designer-workbench-inspector.css',
   '../../../src/browser/styles/workbench/designer-workbench-inspector-data.css',
+  '../../../src/browser/styles/workbench/designer-workbench-chrome.css',
   '../../../src/browser/styles/workbench/designer-workbench-selection.css',
   '../../../src/browser/styles/workbench/designer-workbench-accessibility.css',
 ] as const;

@@ -1,7 +1,7 @@
 import {
   parseScreenJsonValue,
   type ScreenBlueprintHostEvent,
-  type ScreenDocument,
+  type ScreenBlueprintRule,
   type ScreenJsonObject,
   type ScreenJsonValue,
   type ScreenParseResult,
@@ -195,7 +195,7 @@ function evaluateScreenBlueprintEvent(
 
 function createActionTrace(
   action: Extract<
-    ScreenDocument['blueprint']['rules'][number]['actions'][number],
+    ScreenBlueprintRule['actions'][number],
     { readonly type: 'set-variable' | 'emit-host-event' | 'host-action' }
   >,
   actionIndex: number,
@@ -229,7 +229,7 @@ function createActionTrace(
 }
 
 function triggerMatches(
-  trigger: ScreenDocument['blueprint']['rules'][number]['trigger'],
+  trigger: ScreenBlueprintRule['trigger'],
   event: ScreenBlueprintEvent,
 ): boolean {
   const eventType = event.type ?? 'material-event';

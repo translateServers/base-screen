@@ -75,7 +75,7 @@ function batchDocument(): ScreenDocument {
       },
     ],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

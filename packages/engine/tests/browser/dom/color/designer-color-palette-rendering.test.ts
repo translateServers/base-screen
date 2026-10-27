@@ -276,8 +276,8 @@ describe('compact palette layout', () => {
       '#ffffff',
       'title:style:color',
     ).element as unknown as FakeElement;
-    const firstHue = descendants(first).find(
-      (candidate) => candidate.className === 'designer-fill-color-hue',
+    const firstHue = descendants(first).find((candidate) =>
+      candidate.className.split(/\s+/).includes('designer-fill-color-hue'),
     )!;
     firstHue.value = '180';
     firstHue.dispatchEvent(new Event('input'));
@@ -288,8 +288,8 @@ describe('compact palette layout', () => {
       '#ffffff',
       'title:style:color',
     ).element as unknown as FakeElement;
-    const rerenderedHue = descendants(rerendered).find(
-      (candidate) => candidate.className === 'designer-fill-color-hue',
+    const rerenderedHue = descendants(rerendered).find((candidate) =>
+      candidate.className.split(/\s+/).includes('designer-fill-color-hue'),
     )!;
     expect(rerenderedHue.value).toBe('180');
   });
@@ -305,8 +305,8 @@ describe('compact palette layout', () => {
     const plane = descendants(palette).find(
       (candidate) => candidate.className === 'designer-fill-color-plane',
     )!;
-    const hue = descendants(palette).find(
-      (candidate) => candidate.className === 'designer-fill-color-hue',
+    const hue = descendants(palette).find((candidate) =>
+      candidate.className.split(/\s+/).includes('designer-fill-color-hue'),
     )!;
 
     expect(hue.value).toBe('221');
@@ -329,8 +329,8 @@ describe('compact palette layout', () => {
       committed,
       fieldKey,
     ).element as unknown as FakeElement;
-    const rerenderedHue = descendants(rerendered).find(
-      (candidate) => candidate.className === 'designer-fill-color-hue',
+    const rerenderedHue = descendants(rerendered).find((candidate) =>
+      candidate.className.split(/\s+/).includes('designer-fill-color-hue'),
     )!;
     expect(rerenderedHue.value).toBe('221');
   });
@@ -409,8 +409,8 @@ describe('compact palette layout', () => {
       const plane = descendants(palette).find(
         (candidate) => candidate.className === 'designer-fill-color-plane',
       )!;
-      const hue = descendants(palette).find(
-        (candidate) => candidate.className === 'designer-fill-color-hue',
+      const hue = descendants(palette).find((candidate) =>
+        candidate.className.split(/\s+/).includes('designer-fill-color-hue'),
       )!;
       const outside = { clientX: -100, clientY: -100 };
 

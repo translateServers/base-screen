@@ -89,6 +89,7 @@ import {
 import { assertRuntimeData } from './runtime/assert-runtime-data.mjs';
 import { screenshotDirectory } from './shared/constants.mjs';
 import { openViewport } from './shared/open-viewport.mjs';
+import { assertSystemGallery } from './system/assert-system-gallery.mjs';
 import { assertTextAutoWidth } from './text/assert-text-auto-width.mjs';
 import {
   assertAuthoringVariables,
@@ -112,6 +113,7 @@ export async function runBrowserHarness(serverPort) {
       // 断言的中途，表现为 `Execution context was destroyed` 或 `baseScreenHarness undefined`。
       // 先用一个一次性页面吃掉这次刷新，再进入正式断言。
       await warmUpHarness(browser, baseUrl);
+      await assertSystemGallery(browser, baseUrl);
       await assertInitialCanvasPointerFocus(browser, baseUrl);
       await assertMaterialGroupNavigation(browser, baseUrl);
       await assertCompositeInsertion(browser, baseUrl);

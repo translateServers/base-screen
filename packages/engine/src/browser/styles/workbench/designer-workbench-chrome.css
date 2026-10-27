@@ -1,0 +1,528 @@
+/* 面板件（section / empty / badge / list row）的唯一外观落点。
+   workbench 其余文件只负责布局（display、grid、margin、gap、width、定位），
+   不得重设这里的背景、文字、描边、字体、高度、内距与阴影。
+
+   尺寸契约：列表行只有 default 40 / comfortable 44 / compact 32 三档，
+   控件高度只有 30 / 28 两档；行选中底色只在 designer-workbench-selection.css。 */
+
+/* ── 分区 ─────────────────────────────────────────────────────────────────── */
+
+.designer-panel-section {
+  padding: var(--designer-space-5) 0;
+}
+
+.designer-panel-section + .designer-panel-section {
+  border-top: 1px solid var(--designer-border-subtle);
+}
+
+.designer-panel-section:first-child {
+  padding-top: 0;
+}
+
+.designer-panel-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-3);
+  margin: 0 0 var(--designer-space-4);
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-base);
+  font-weight: 600;
+  letter-spacing: var(--designer-tracking-base);
+  text-transform: none;
+}
+
+/* 标题与折叠箭头之间的发丝线：让分节在长表单里读成段落而不是列表。 */
+.designer-panel-section-title::after {
+  display: block;
+  height: 1px;
+  min-width: var(--designer-space-6);
+  flex: 1;
+  order: 1;
+  background: var(--designer-border-subtle);
+  content: "";
+}
+
+summary.designer-panel-section-title {
+  margin: 0 0 var(--designer-space-4);
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--designer-motion);
+}
+
+summary.designer-panel-section-title::-webkit-details-marker,
+summary.designer-panel-section-title::before {
+  display: none;
+}
+
+summary.designer-panel-section-title:hover {
+  color: var(--designer-text-primary);
+}
+
+summary.designer-panel-section-title:focus-visible {
+  border-radius: var(--designer-radius-1);
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
+}
+
+.designer-panel-section-disclosure {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  order: 2;
+  color: var(--designer-text-muted);
+  transform: rotate(0deg);
+  transition: transform var(--designer-motion);
+}
+
+.designer-panel-section-disclosure svg {
+  width: 12px;
+  height: 12px;
+}
+
+details:not([open]) > .designer-panel-section-title {
+  margin-bottom: 0;
+}
+
+details:not([open]) > .designer-panel-section-title .designer-panel-section-disclosure,
+details:not([open]) .designer-panel-section-disclosure {
+  transform: rotate(-90deg);
+}
+
+.designer-panel-section-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-1);
+}
+
+/* ── 空态 ─────────────────────────────────────────────────────────────────── */
+
+.designer-empty {
+  box-sizing: border-box;
+  display: grid;
+  justify-items: center;
+  gap: var(--designer-space-2);
+  margin: 0;
+  padding: var(--designer-space-6) var(--designer-space-5);
+  border: 1px dashed var(--designer-border-default);
+  border-radius: var(--designer-radius-control);
+  color: var(--designer-text-muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.designer-empty[hidden] {
+  display: none;
+}
+
+.designer-empty-icon {
+  display: grid;
+  width: var(--designer-empty-icon-size);
+  height: var(--designer-empty-icon-size);
+  place-items: center;
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+  color: var(--designer-text-disabled);
+}
+
+.designer-empty-icon svg {
+  width: var(--designer-icon-size-lg);
+  height: var(--designer-icon-size-lg);
+}
+
+.designer-empty[data-tone="success"] .designer-empty-icon {
+  background: var(--designer-success-surface);
+  color: var(--designer-success);
+}
+
+.designer-empty-title {
+  margin: 0;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+}
+
+.designer-empty-hint {
+  margin: 0;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  line-height: 1.45;
+}
+
+.designer-empty-actions {
+  display: grid;
+  justify-items: center;
+  gap: var(--designer-space-1);
+  margin-top: var(--designer-space-3);
+}
+
+.designer-empty-action {
+  max-width: 100%;
+}
+
+/* 单段文案空态：没有结构时也走同一套盒与文字档。 */
+.designer-empty-state {
+  margin: 0;
+  padding: var(--designer-space-7) var(--designer-space-5);
+  border: 1px dashed var(--designer-border-default);
+  border-radius: var(--designer-radius-control);
+  color: var(--designer-text-muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.designer-empty-state[hidden] {
+  display: none;
+}
+
+/* ── 徽标 ─────────────────────────────────────────────────────────────────── */
+
+.designer-badge {
+  box-sizing: border-box;
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 var(--designer-space-2);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-badge[data-tone="accent"] {
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+}
+
+.designer-badge[data-tone="success"] {
+  background: var(--designer-success-surface);
+  color: var(--designer-success);
+}
+
+.designer-badge[data-tone="warning"] {
+  background: var(--designer-warning-surface);
+  color: var(--designer-warning);
+}
+
+.designer-badge[data-tone="danger"] {
+  background: var(--designer-danger-surface);
+  color: var(--designer-danger);
+}
+
+/* ── 列表行 ───────────────────────────────────────────────────────────────── */
+
+.designer-list-row {
+  --designer-list-row-surface: transparent;
+
+  position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  border-radius: var(--designer-radius-control);
+  background-color: var(--designer-list-row-surface);
+  color: var(--designer-text-secondary);
+  transition:
+    background-color var(--designer-motion),
+    box-shadow var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.designer-list-row[data-density="default"] {
+  min-height: var(--designer-row-height);
+}
+
+.designer-list-row[data-density="comfortable"] {
+  min-height: var(--designer-row-height-comfortable);
+}
+
+.designer-list-row[data-density="compact"] {
+  min-height: var(--designer-row-height-compact);
+}
+
+.designer-list-row:hover {
+  --designer-list-row-surface: var(--designer-surface-control-hover);
+
+  color: var(--designer-text-primary);
+}
+
+/* ── 检查器 / 数据面板的分区变体 ──────────────────────────────────────────────
+   下面是同一套 section 标题在特定面板里的档位差异（字号、缩进），
+   仍是 chrome 外观的一部分——面板 CSS 不得再各自覆写。 */
+
+.properties .designer-inspector-data-flow-content .designer-inspector-section-title,
+.properties .designer-inspector-data-flow-content h4 {
+  color: var(--designer-text-secondary);
+  font-size: var(--designer-font-size-base);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.properties .designer-inspector-data-flow-content .designer-inspector-section-title {
+  font-size: var(--designer-font-size-sm);
+  letter-spacing: -0.01em;
+}
+
+.designer-data-workbench-shell .designer-inspector-section-title {
+  font-size: var(--designer-font-size-sm);
+  letter-spacing: -0.01em;
+}
+
+.properties .designer-inspector-data-flow-content > .designer-inspector-section,
+.properties .designer-inspector-data-flow-content > .designer-data-source-editor,
+.properties .designer-inspector-data-flow-content > .designer-data-source-variable {
+  padding-left: var(--designer-space-6);
+}
+
+.designer-data-workbench-shell .designer-inspector-data-flow-content > .designer-inspector-section,
+.designer-data-workbench-shell .designer-inspector-data-flow-content > .designer-data-source-editor,
+.designer-data-workbench-shell
+  .designer-inspector-data-flow-content
+  > .designer-data-source-variable {
+  padding-left: var(--designer-space-6);
+}
+
+/* ── 蓝图检查器分区（带底色抬头）────────────────────────────────────────────── */
+
+.designer-panel-section[data-variant="header"] {
+  padding: 0;
+  border-bottom: 1px solid var(--designer-border-subtle);
+}
+
+.designer-panel-section[data-variant="header"] > header {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--designer-space-3);
+  padding: 0 var(--designer-space-3);
+  background: color-mix(in srgb, var(--designer-surface-raised) 74%, var(--designer-surface-panel));
+}
+
+.designer-panel-section[data-variant="header"] .designer-panel-section-title {
+  margin: 0;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  font-weight: 600;
+}
+
+.designer-panel-section[data-variant="header"] .designer-panel-section-title::after {
+  display: none;
+}
+
+.designer-panel-section[data-variant="header"] .designer-panel-section-disclosure {
+  transform: none;
+}
+
+.blueprint-inspector-section p {
+  margin: var(--designer-space-2) 0 0;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  line-height: 1.5;
+}
+
+/* 蓝图库行：行几何与选中画法来自 .designer-list-row / selection 层，
+   这里只保留蓝图库自己的状态色与层级缩进。 */
+.blueprint-palette-item[data-disabled="true"] {
+  opacity: 0.52;
+}
+
+.blueprint-palette-item:has(.blueprint-palette-primary:focus-visible),
+.blueprint-palette-item:has(.blueprint-palette-action:focus-visible) {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -2px;
+}
+
+.blueprint-palette-item:hover .blueprint-palette-glyph {
+  color: var(--designer-text-secondary);
+}
+
+.blueprint-palette-item[data-placed="true"] .blueprint-palette-glyph {
+  color: var(--designer-accent);
+}
+
+.blueprint-palette-item[data-depth] .blueprint-palette-primary {
+  padding-left: calc(var(--designer-space-3) + var(--bp-indent, 0px));
+}
+
+/* ── 图层行 ───────────────────────────────────────────────────────────────── */
+
+.layer-row {
+  position: relative;
+  display: grid;
+  box-sizing: border-box;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 24px 24px;
+  align-items: center;
+  gap: var(--designer-space-1);
+  margin-bottom: 0;
+  padding-inline-end: var(--designer-space-2);
+  cursor: default;
+}
+
+/* 折叠箭头：绝对定位在本级折叠位的中心，不参与栅格 —— 这正是叶子行与分组行
+   图标能对齐的原因（若让它占一列，叶子行就会整体左移 16px）。 */
+.layer-row > .layer-collapse {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--layer-depth) * 16px + 2px);
+  display: grid;
+  width: 14px;
+  height: 22px;
+  min-width: 14px;
+  min-height: 22px;
+  place-items: center;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: var(--designer-radius-1);
+  background: transparent;
+  color: var(--designer-text-muted);
+  box-shadow: none;
+}
+
+.layer-row > .layer-collapse svg {
+  width: 12px;
+  height: 12px;
+}
+
+.layer-row > .layer-collapse:hover {
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+}
+
+.layer-row:hover > .layer-collapse {
+  color: var(--designer-text-secondary);
+}
+
+/* 行内所有微控件都不用控件基座的描边环：整行已经是命中面，环会在行里画出第二层盒子。 */
+.layer-row > .layer-select:hover:not(:disabled),
+.layer-row > .layer-select:focus,
+.layer-row > .layer-collapse:hover,
+.layer-row > .layer-collapse:focus-visible,
+.layer-row > .layer-lock:hover:not(:disabled),
+.layer-row > .layer-eye:hover:not(:disabled) {
+  outline: none;
+  box-shadow: none;
+}
+
+.layer-row:has(.layer-select:focus-visible) {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -2px;
+}
+
+.layer-row:hover .layer-glyph {
+  background: color-mix(in oklab, currentColor 16%, transparent);
+  color: oklch(0.5 0.14 var(--layer-hue, 258));
+}
+
+/* 行尾状态开关：常态收起，悬停 / 聚焦 / 已处于该状态时露出。 */
+.layer-row > .layer-lock,
+.layer-row > .layer-eye {
+  display: grid;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-3);
+  background: transparent;
+  color: var(--designer-text-muted);
+  opacity: 0;
+  box-shadow: none;
+  transition:
+    opacity var(--designer-motion),
+    background-color var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.layer-row:hover > .layer-lock,
+.layer-row:hover > .layer-eye,
+.layer-row:focus-within > .layer-lock,
+.layer-row:focus-within > .layer-eye,
+.layer-row[data-locked="true"] > .layer-lock,
+.layer-row[data-hidden="true"] > .layer-eye {
+  opacity: 1;
+}
+
+.layer-row > .layer-lock:hover:not(:disabled),
+.layer-row > .layer-eye:hover:not(:disabled) {
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+}
+
+.layer-row[data-locked="true"] > .layer-lock,
+.layer-row[data-hidden="true"] > .layer-eye {
+  color: var(--designer-warning);
+}
+
+.layer-row > .layer-lock svg,
+.layer-row > .layer-eye svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 隐藏/锁定靠色阶降档表达，不靠透明度堆叠：名称与副行同时退一档。 */
+.layer-row[data-hidden="true"] .layer-name,
+.layer-row[data-locked="true"] .layer-name {
+  color: var(--designer-text-muted);
+}
+
+.layer-row[data-hidden="true"] .layer-meta {
+  opacity: 0.7;
+}
+
+/* 键盘焦点（尚未选中）的竖条在 selection.css：它与选中态共享同一套行级绘制。 */
+
+/* 拖拽落点：插入到行前 / 行后画 2px 强调色指示线，落进容器行则整行画强调色内环。 */
+.layer-row[data-drop-target="before"]::after,
+.layer-row[data-drop-target="after"]::after {
+  position: absolute;
+  inset-inline: var(--designer-space-2);
+  z-index: 1;
+  height: 2px;
+  border-radius: var(--designer-radius-1);
+  background: var(--designer-accent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--designer-accent) 30%, transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.layer-row[data-drop-target="before"]::after {
+  top: -2px;
+}
+
+.layer-row[data-drop-target="after"]::after {
+  bottom: -1px;
+}
+
+.layer-row[data-drop-target="inside"] {
+  --designer-list-row-surface: var(--designer-accent-surface);
+
+  box-shadow: inset 0 0 0 2px var(--designer-accent);
+}
+
+.layer-row[data-dragging="true"] {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+/* ── 强制色模式 ───────────────────────────────────────────────────────────── */
+
+@media (forced-colors: active) {
+  summary.designer-panel-section-title:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

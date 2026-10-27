@@ -1,4 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { createDesignerButton } from '../designer-ui-primitives.js';
 
 export function datasetAction(
   ownerDocument: Document,
@@ -7,13 +8,9 @@ export function datasetAction(
   variant?: string,
   disabled = false,
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button';
+  const button = createDesignerButton(ownerDocument, { disabled, text: label });
   button.dataset.datasetAction = action;
   if (variant !== undefined) button.dataset.variant = variant;
-  button.textContent = label;
-  button.disabled = disabled;
   return button;
 }
 
@@ -48,20 +45,19 @@ export function renderInlineDataPanelActions(
   text.dataset.datasetStatusText = 'true';
   text.textContent = view.text;
   status.append(dot, text);
-  const undo = ownerDocument.createElement('button');
-  undo.type = 'button';
-  undo.className = 'designer-control designer-button designer-dataset-undo';
+  const undo = createDesignerButton(ownerDocument, {
+    className: 'designer-dataset-undo',
+    text: DESIGNER_UI_TEXT.dataSource.undo,
+  });
   undo.dataset.datasetAction = 'undo';
-  undo.textContent = DESIGNER_UI_TEXT.dataSource.undo;
   undo.hidden = !view.canUndo;
   undo.disabled = !view.canUndo;
-  const action = ownerDocument.createElement('button');
-  action.type = 'button';
-  action.className = 'designer-control designer-button';
+  const action = createDesignerButton(ownerDocument, {
+    disabled: view.actionDisabled,
+    text: view.actionLabel,
+  });
   action.dataset.datasetAction = view.action;
   action.dataset.variant = 'request';
-  action.textContent = view.actionLabel;
-  action.disabled = view.actionDisabled;
   actions.append(status, undo, action);
   return actions;
 }
@@ -167,14 +163,13 @@ function dirtyText(ownerDocument: Document): HTMLElement {
 }
 
 function applyButton(ownerDocument: Document, view: DataPanelActionView): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button';
+  const button = createDesignerButton(ownerDocument, {
+    disabled: view.disabled,
+    text: view.label,
+  });
   button.dataset.datasetAction = 'apply';
   button.dataset.variant = 'apply';
   button.dataset.state = view.dirty ? 'dirty' : 'applied';
-  button.textContent = view.label;
-  button.disabled = view.disabled;
   return button;
 }
 

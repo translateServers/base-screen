@@ -80,7 +80,7 @@ const document: ScreenDocument = {
       controlled: true,
     },
   ],
-  blueprint: { rules: [] },
+  blueprint: { relations: [] },
 };
 
 function datasetSource(params: Readonly<Record<string, ScreenHostResourceParameter>>) {

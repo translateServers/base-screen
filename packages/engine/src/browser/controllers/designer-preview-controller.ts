@@ -11,6 +11,7 @@ import type {
 } from '@base-screen/plugin-core';
 import type { BaseScreenViewerConfiguration } from '@base-screen/renderer';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { createDesignerButton } from '../dom/designer-ui-primitives.js';
 
 export interface DesignerPreviewCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
@@ -45,11 +46,10 @@ export class DesignerPreviewController {
     preview.className = 'direct-preview';
     preview.hidden = true;
     const header = shadow.ownerDocument.createElement('header');
-    const close = shadow.ownerDocument.createElement('button');
-    close.type = 'button';
-    close.className = 'designer-control designer-button';
+    const close = createDesignerButton(shadow.ownerDocument, {
+      text: DESIGNER_UI_TEXT.closePreview,
+    });
     close.dataset.action = 'preview';
-    close.textContent = DESIGNER_UI_TEXT.closePreview;
     header.appendChild(close);
     preview.append(header, shadow.ownerDocument.createElement('base-screen-viewer'));
     shadow.querySelector<HTMLElement>('.designer')?.appendChild(preview);

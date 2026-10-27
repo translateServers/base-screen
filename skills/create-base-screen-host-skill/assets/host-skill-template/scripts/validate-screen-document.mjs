@@ -95,12 +95,12 @@ export async function validateScreenDocumentFile(documentPath, options = {}) {
       message: 'This generated Skill does not author variables.',
     });
   }
-  if (canonical.blueprint.rules.length > 0) {
+  if (canonical.blueprint.relations.length > 0) {
     issues.push({
       severity: 'error',
       code: 'HOST_SKILL_BLUEPRINT_UNSUPPORTED',
-      path: ['blueprint', 'rules'],
-      message: 'This generated Skill does not author blueprint rules.',
+      path: ['blueprint', 'relations'],
+      message: 'This generated Skill does not author blueprint relations.',
     });
   }
 

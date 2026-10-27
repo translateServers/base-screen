@@ -56,8 +56,8 @@ export function validateScreenDocumentInput(input: unknown): DocumentValidation 
   }
 
   const blueprint = input.blueprint;
-  if (!isPlainObject(blueprint) || !Array.isArray(blueprint.rules)) {
-    return { ok: false, reason: 'document.blueprint.rules must be an array' };
+  if (!isPlainObject(blueprint) || !Array.isArray(blueprint.relations)) {
+    return { ok: false, reason: 'document.blueprint.relations must be an array' };
   }
 
   const serialized = JSON.stringify(input);

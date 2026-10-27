@@ -4,7 +4,12 @@ import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
 import { createDesignerFieldRow } from '../designer-field-primitives.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
-import { createDesignerSegmented, createDesignerSelect } from '../designer-ui-primitives.js';
+import {
+  createDesignerButton,
+  createDesignerIconButton,
+  createDesignerSegmented,
+  createDesignerSelect,
+} from '../designer-ui-primitives.js';
 import {
   datasetParameterPickerInput,
   mountValueRefPicker,
@@ -164,12 +169,12 @@ function autoMatchAction(
   ownerDocument: Document,
   options: DesignerDatasetConfigurationOptions,
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button designer-dataset-auto-match';
+  const button = createDesignerButton(ownerDocument, {
+    className: 'designer-dataset-auto-match',
+    disabled: options.roles.length === 0 || options.descriptor.fields.length === 0,
+    text: DESIGNER_UI_TEXT.dataset.autoMatch,
+  });
   button.dataset.datasetAutoMatch = 'true';
-  button.textContent = DESIGNER_UI_TEXT.dataset.autoMatch;
-  button.disabled = options.roles.length === 0 || options.descriptor.fields.length === 0;
   return button;
 }
 
@@ -208,11 +213,12 @@ function renderDatasetSummary(
   key.textContent = descriptor.datasetId;
   key.title = descriptor.datasetId;
   copy.append(nameLine, key);
-  const change = ownerDocument.createElement('button');
-  change.type = 'button';
-  change.className = 'designer-control designer-button';
+  const change = createDesignerButton(ownerDocument, {
+    size: 'compact',
+    text: DESIGNER_UI_TEXT.dataSource.sourceChange,
+    variant: 'ghost',
+  });
   change.dataset.datasetChange = 'true';
-  change.textContent = DESIGNER_UI_TEXT.dataSource.sourceChange;
   header.append(mark, copy, change);
   summary.appendChild(header);
   if (descriptor.description !== null && descriptor.description.length > 0) {
@@ -302,13 +308,13 @@ function renderParameters(
         ? DESIGNER_UI_TEXT.dataSource.parameterRequired(parameter.label)
         : '';
     const field = ownerDocument.createElement('div');
-    field.className = 'designer-field designer-dataset-parameter';
+    field.className = 'designer-dataset-parameter';
     field.dataset.datasetParameterRow = parameter.name;
 
     const head = ownerDocument.createElement('div');
     head.className = 'designer-dataset-parameter-head';
     const labelText = ownerDocument.createElement('span');
-    labelText.className = 'designer-field-label designer-dataset-parameter-label';
+    labelText.className = 'designer-dataset-parameter-label';
     labelText.textContent = parameter.label;
     if (parameter.required) {
       const required = ownerDocument.createElement('span');
@@ -374,15 +380,12 @@ function renderParameters(
     }
     control.appendChild(picker.element);
     if (mode === 'variable') {
-      const clear = ownerDocument.createElement('button');
-      clear.type = 'button';
-      clear.className = 'designer-dataset-parameter-clear';
+      const clear = createDesignerIconButton(ownerDocument, {
+        className: 'designer-dataset-parameter-clear',
+        icon: 'close',
+        label: DESIGNER_UI_TEXT.dataset.parameterClearVariable(parameter.label),
+      });
       clear.dataset.datasetParameterClear = parameter.name;
-      clear.setAttribute(
-        'aria-label',
-        DESIGNER_UI_TEXT.dataset.parameterClearVariable(parameter.label),
-      );
-      clear.innerHTML = designerIcon('close');
       clear.addEventListener('click', () => {
         options.onSelectParameter?.(parameter.name, { kind: 'inline', value: null });
       });
@@ -545,13 +548,13 @@ function bindingFieldSelect(
   const bound = fields.filter((field) => selected.includes(field.id));
   const wrapper = ownerDocument.createElement('div');
   wrapper.className = 'designer-bind-field';
-  const trigger = ownerDocument.createElement('button');
-  trigger.type = 'button';
-  trigger.className = 'designer-bind-trigger';
+  const trigger = createDesignerButton(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataset.bindingToggle(roleLabel),
+    className: 'designer-bind-trigger',
+  });
   trigger.dataset.datasetBindingTrigger = roleId;
   trigger.setAttribute('aria-haspopup', 'listbox');
   trigger.setAttribute('aria-expanded', String(open));
-  trigger.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.bindingToggle(roleLabel));
   const chips = ownerDocument.createElement('span');
   chips.className = 'designer-bind-chips';
   if (bound.length === 0) {
@@ -635,13 +638,13 @@ function bindingRoleAction(
   label: string,
   disabled = false,
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button designer-dataset-binding-role-action';
+  const button = createDesignerButton(ownerDocument, {
+    className: 'designer-dataset-binding-role-action',
+    disabled,
+    text: label,
+  });
   button.dataset.datasetBindingRoleAction = action;
   button.dataset.datasetBindingRoleId = roleId;
-  button.textContent = label;
-  button.disabled = disabled;
   return button;
 }
 

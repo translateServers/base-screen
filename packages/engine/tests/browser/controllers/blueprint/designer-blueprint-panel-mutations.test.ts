@@ -1,12 +1,23 @@
-import type { ScreenDocument } from '@base-screen/contracts';
+import type { ScreenBlueprintBehaviorRelation, ScreenDocument } from '@base-screen/contracts';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
-import { updateDesignerBlueprintActionFromTarget } from '../../../../src/browser/controllers/blueprint/designer-blueprint-panel-mutations.js';
+import { updateDesignerBlueprintEffectFromTarget } from '../../../../src/browser/controllers/blueprint/designer-blueprint-panel-mutations.js';
 
-const action = {
+const effect = {
   type: 'set-variable' as const,
-  variableId: 'selected',
   value: { kind: 'literal' as const, value: null },
+};
+
+const relation: ScreenBlueprintBehaviorRelation = {
+  type: 'behavior',
+  id: 'relation-1',
+  source: {
+    kind: 'component',
+    componentId: 'source',
+    event: { type: 'material-event', eventName: 'click' },
+  },
+  target: { kind: 'variable', variableId: 'selected' },
+  effect,
 };
 
 const document: ScreenDocument = {
@@ -31,15 +42,7 @@ const document: ScreenDocument = {
     { type: 'static', id: 'selected', name: 'selected', initialValue: null },
     { type: 'static', id: 'fallback', name: 'fallback', initialValue: 1 },
   ],
-  blueprint: {
-    rules: [
-      {
-        id: 'rule-1',
-        trigger: { type: 'material-event', componentId: 'source', eventName: 'click' },
-        actions: [action],
-      },
-    ],
-  },
+  blueprint: { relations: [relation] },
 };
 
 const catalog = {
@@ -73,22 +76,22 @@ describe('Designer Blueprint set-variable value sources', () => {
     expect(change('[data-blueprint-action-value-source]', 'event')).toEqual({
       ok: true,
       diagnostics: [],
-      value: { ...action, value: { kind: 'event-payload', path: [] } },
+      value: { ...effect, value: { kind: 'event-payload', path: [] } },
     });
     expect(change('[data-blueprint-action-value-source]', 'event-field')).toEqual({
       ok: true,
       diagnostics: [],
-      value: { ...action, value: { kind: 'event-payload', path: ['row'] } },
+      value: { ...effect, value: { kind: 'event-payload', path: ['row'] } },
     });
     expect(change('[data-blueprint-action-event-path]', 'row.id')).toEqual({
       ok: true,
       diagnostics: [],
-      value: { ...action, value: { kind: 'event-payload', path: ['row', 'id'] } },
+      value: { ...effect, value: { kind: 'event-payload', path: ['row', 'id'] } },
     });
     expect(change('[data-blueprint-action-value-source]', 'variable')).toEqual({
       ok: true,
       diagnostics: [],
-      value: { ...action, value: { kind: 'variable', variableId: 'fallback' } },
+      value: { ...effect, value: { kind: 'variable', variableId: 'fallback' } },
     });
   });
 
@@ -96,7 +99,7 @@ describe('Designer Blueprint set-variable value sources', () => {
     expect(change('[data-blueprint-action-event-path]', 'meta.city')).toEqual({
       ok: true,
       diagnostics: [],
-      value: { ...action, value: { kind: 'event-payload', path: ['meta', 'city'] } },
+      value: { ...effect, value: { kind: 'event-payload', path: ['meta', 'city'] } },
     });
     expect(change('[data-blueprint-action-event-path]', 'row.deep.city')).toMatchObject({
       ok: true,
@@ -107,12 +110,12 @@ describe('Designer Blueprint set-variable value sources', () => {
     expect(change('[data-blueprint-action-value-source]', 'event-field', undefined)).toEqual({
       ok: true,
       diagnostics: [],
-      value: { ...action, value: { kind: 'event-payload', path: ['row'] } },
+      value: { ...effect, value: { kind: 'event-payload', path: ['row'] } },
     });
     expect(change('[data-blueprint-action-event-path]', 'row.city', undefined)).toEqual({
       ok: true,
       diagnostics: [],
-      value: { ...action, value: { kind: 'event-payload', path: ['row', 'city'] } },
+      value: { ...effect, value: { kind: 'event-payload', path: ['row', 'city'] } },
     });
   });
 
@@ -137,10 +140,10 @@ function change(
 ) {
   const target = {
     value,
-    dataset: { ruleId: 'rule-1', actionIndex: '0' },
+    dataset: { relationId: 'relation-1' },
     matches(candidate: string) {
       return candidate === selector;
     },
   } as unknown as Element;
-  return updateDesignerBlueprintActionFromTarget(target, document, action, catalogOverride);
+  return updateDesignerBlueprintEffectFromTarget(target, document, relation, catalogOverride);
 }

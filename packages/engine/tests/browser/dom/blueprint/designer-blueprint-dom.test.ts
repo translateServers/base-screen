@@ -9,6 +9,7 @@ import {
   getDesignerFocusedMaterialEvents,
   renderDesignerEventsPanel,
 } from '../../../../src/browser/dom/blueprint/designer-blueprint-dom.js';
+import { relationsFromRules } from '../../../__fixtures__/blueprint-relations.js';
 
 class FakeElement {
   readonly children: FakeElement[] = [];
@@ -94,13 +95,13 @@ const document: ScreenDocument = {
   ],
   variables: [],
   blueprint: {
-    rules: [
+    relations: relationsFromRules([
       {
         id: 'r1',
         trigger: { type: 'material-event', componentId: 'chart-1', eventName: 'seriesClick' },
-        actions: [],
+        actions: [{ type: 'component-visibility', componentId: 'chart-1', operation: 'show' }],
       },
-    ],
+    ]),
   },
 };
 
@@ -215,7 +216,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
         { type: 'static', id: 'selectedAmount', name: 'selectedAmount', initialValue: 0 },
       ],
       blueprint: {
-        rules: [
+        relations: relationsFromRules([
           {
             id: 'configured-rule',
             trigger: {
@@ -246,7 +247,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
               },
             ],
           },
-        ],
+        ]),
       },
     };
     renderDesignerEventsPanel(
@@ -297,7 +298,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
       ],
       variables: [],
       blueprint: {
-        rules: [
+        relations: relationsFromRules([
           {
             id: 'declared-rule',
             trigger: {
@@ -318,7 +319,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
               },
             ],
           },
-        ],
+        ]),
       },
     };
     renderDesignerEventsPanel(

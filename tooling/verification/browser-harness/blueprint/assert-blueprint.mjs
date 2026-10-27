@@ -4,6 +4,14 @@ import { screenshotDirectory } from '../shared/constants.mjs';
 
 // ---- 源模块：assert-blueprint-workbench.mjs ----
 export async function assertBlueprintWorkbench(designer, page) {
+  // 先从组件检查器的「高级 → 事件」入口进入，验证组件侧到蓝图的定位链。
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    root
+      .querySelector('[data-layer-select="title"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await designer.getByRole('tab', { name: '高级' }).click();
   const requestButton = designer.locator('[data-events-panel] [data-action="locate-blueprint"]');
 
   // 组件入口直接切换 Blueprint，并把定位请求投影到常驻宿主画布。
@@ -33,7 +41,7 @@ export async function assertBlueprintWorkbench(designer, page) {
       documentComponentCount: designer.document.components.length,
       canAddSemanticChart:
         designer.shadowRoot.querySelector(
-          '[data-blueprint-add-component="semantic-chart-demo"]',
+          '[data-blueprint-select-node="component:semantic-chart-demo"]',
         ) !== null,
       frozen:
         Object.isFrozen(state) &&
@@ -116,7 +124,7 @@ export async function assertBlueprintWorkbench(designer, page) {
       `BROWSER_HARNESS_BLUEPRINT_COLLAPSED_RAIL_FAILED:${JSON.stringify(collapsedLibrary)}`,
     );
   }
-  await designer.locator('[data-blueprint-library-tab="logic"]').click();
+  await designer.locator('[data-blueprint-library-tab="relations"]').click();
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot.querySelector('.designer')?.dataset
@@ -127,7 +135,7 @@ export async function assertBlueprintWorkbench(designer, page) {
   // 未放置组件通过有界协议直接加入图中，不依赖已有规则上下文。
   const insertStarted = await page.evaluate(() => {
     const harness = window.baseScreenHarness;
-    const rules = harness.designer.document.blueprint.rules.length;
+    const rules = harness.designer.document.blueprint.relations.length;
     const sent = harness.sendBlueprintCanvasCommand(
       {
         type: 'insert-node',
@@ -182,7 +190,7 @@ export async function assertBlueprintWorkbench(designer, page) {
   const connectStarted = await page.evaluate(() => {
     const harness = window.baseScreenHarness;
     const state = harness.blueprintCanvasState();
-    const rules = harness.designer.document.blueprint.rules.length;
+    const rules = harness.designer.document.blueprint.relations.length;
     const sent = harness.sendBlueprintCanvasCommand(
       {
         type: 'connect',
@@ -206,24 +214,26 @@ export async function assertBlueprintWorkbench(designer, page) {
     );
   }
   await page.waitForFunction(
-    (rules) => window.baseScreenHarness.designer.document.blueprint.rules.length === rules + 1,
+    (rules) => window.baseScreenHarness.designer.document.blueprint.relations.length === rules + 1,
     connectStarted.rules,
   );
   const connected = await page.evaluate((beforeRevision) => {
     const harness = window.baseScreenHarness;
     const state = harness.blueprintCanvasState();
     const dirty = harness.designer.shadowRoot.querySelector('[data-topbar-save-status]');
-    const rule = harness.designer.document.blueprint.rules.find(
+    const relation = harness.designer.document.blueprint.relations.find(
       (item) =>
-        item.trigger.componentId === 'semantic-chart-demo' &&
-        item.trigger.eventName === 'seriesClick',
+        item.type === 'behavior' &&
+        item.source.kind === 'component' &&
+        item.source.componentId === 'semantic-chart-demo' &&
+        item.source.event.eventName === 'seriesClick',
     );
     return {
       revisionAdvanced: state.documentRevision > beforeRevision,
       lastStatus: state.lastCommand?.status,
       dirty: dirty?.dataset.state,
       selection: state.selection,
-      action: rule?.actions[0],
+      effect: relation?.type === 'behavior' ? relation.effect : undefined,
     };
   }, connectStarted.revision);
   if (
@@ -231,8 +241,8 @@ export async function assertBlueprintWorkbench(designer, page) {
     connected.lastStatus !== 'accepted' ||
     connected.dirty !== 'dirty' ||
     connected.selection?.kind !== 'edge' ||
-    connected.action?.type !== 'component-visibility' ||
-    connected.action?.operation !== 'toggle'
+    connected.effect?.type !== 'component-visibility' ||
+    connected.effect?.operation !== 'toggle'
   ) {
     throw new Error(`BROWSER_HARNESS_BLUEPRINT_CONNECT_FAILED:${JSON.stringify(connected)}`);
   }
@@ -243,12 +253,12 @@ export async function assertBlueprintWorkbench(designer, page) {
     const selected = harness.blueprintCanvasState().selection;
     const toCanvas = harness.designer.setWorkbenchMode('canvas');
     const inactive = harness.blueprintCanvasState().active;
-    const rulesInCanvas = harness.designer.document.blueprint.rules.length;
+    const relationsInCanvas = harness.designer.document.blueprint.relations.length;
     const toBlueprint = harness.designer.setWorkbenchMode('blueprint');
     return {
       toCanvas: toCanvas.ok,
       inactive,
-      rulesInCanvas,
+      relationsInCanvas,
       toBlueprint: toBlueprint.ok,
       active: harness.blueprintCanvasState().active,
       selected,
@@ -258,7 +268,7 @@ export async function assertBlueprintWorkbench(designer, page) {
   if (
     !modeContinuity.toCanvas ||
     modeContinuity.inactive ||
-    modeContinuity.rulesInCanvas !== connectStarted.rules + 1 ||
+    modeContinuity.relationsInCanvas !== connectStarted.rules + 1 ||
     !modeContinuity.toBlueprint ||
     !modeContinuity.active ||
     JSON.stringify(modeContinuity.selected) !== JSON.stringify(modeContinuity.restoredSelection)
@@ -273,14 +283,14 @@ export async function assertBlueprintWorkbench(designer, page) {
     window.baseScreenHarness.sendBlueprintCanvasCommand({ type: 'history-undo' }),
   );
   await page.waitForFunction(
-    (rules) => window.baseScreenHarness.designer.document.blueprint.rules.length === rules,
+    (rules) => window.baseScreenHarness.designer.document.blueprint.relations.length === rules,
     connectStarted.rules,
   );
   await page.evaluate(() =>
     window.baseScreenHarness.sendBlueprintCanvasCommand({ type: 'history-redo' }),
   );
   await page.waitForFunction(
-    (rules) => window.baseScreenHarness.designer.document.blueprint.rules.length === rules + 1,
+    (rules) => window.baseScreenHarness.designer.document.blueprint.relations.length === rules + 1,
     connectStarted.rules,
   );
 
@@ -294,7 +304,7 @@ export async function assertBlueprintWorkbench(designer, page) {
     });
     const state = harness.blueprintCanvasState();
     return {
-      rules: harness.designer.document.blueprint.rules.length,
+      rules: harness.designer.document.blueprint.relations.length,
       status: state.lastCommand?.status,
       lines: state.trace?.lines ?? [],
       executed: state.trace?.executedEdgeIds ?? [],
@@ -331,7 +341,7 @@ export async function assertBlueprintWorkbench(designer, page) {
     return {
       status: result?.status,
       code: result?.diagnostics?.[0]?.code,
-      rules: harness.designer.document.blueprint.rules.length,
+      rules: harness.designer.document.blueprint.relations.length,
     };
   });
   if (
@@ -399,7 +409,12 @@ export async function assertBlueprintWorkbench(designer, page) {
       .click();
   }
 
-  await designer.locator('[data-base-screen-component-id=title]').click();
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    root
+      .querySelector('[data-layer-select="title"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
 }
 
 // ---- 源模块：assert-component-text-authoring.mjs ----

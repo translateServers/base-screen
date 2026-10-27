@@ -40,5 +40,5 @@
     }
   ],
   "variables": [],
-  "blueprint": { "rules": [] }
+  "blueprint": { "relations": [] }
 }

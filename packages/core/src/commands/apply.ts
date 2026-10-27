@@ -178,7 +178,7 @@ function applyVariables(document: ScreenDocument, variables: unknown): ScreenCom
 }
 
 function applyBlueprint(document: ScreenDocument, blueprint: unknown): ScreenCommandResult {
-  if (!isRecord(blueprint) || !Array.isArray(blueprint.rules)) {
+  if (!isRecord(blueprint) || !Array.isArray(blueprint.relations)) {
     return screenCommandFailure(
       document,
       invalidScreenCommand('Blueprint must be a canonical object.', ['blueprint']),

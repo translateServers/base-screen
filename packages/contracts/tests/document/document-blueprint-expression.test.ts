@@ -6,6 +6,44 @@ import {
 } from '../../src/document/limits.js';
 import { component, document, parse } from './__fixtures__/document-test-fixtures.js';
 
+interface RelationOptions {
+  readonly condition?: unknown;
+  readonly requiredCapabilities?: readonly string[];
+  readonly targetKind?: 'component' | 'variable' | 'host';
+  readonly targetId?: string;
+}
+
+function relation(id: string, effect: Record<string, unknown>, options: RelationOptions = {}) {
+  const targetKind =
+    options.targetKind ??
+    (effect.type === 'set-variable' || effect.type === 'request-variable'
+      ? 'variable'
+      : effect.type === 'emit-host-event' || effect.type === 'host-action'
+        ? 'host'
+        : 'component');
+  const target =
+    targetKind === 'host'
+      ? { kind: 'host' }
+      : targetKind === 'variable'
+        ? { kind: 'variable', variableId: options.targetId ?? 'count' }
+        : { kind: 'component', componentId: options.targetId ?? 'button' };
+  return {
+    type: 'behavior',
+    id,
+    source: {
+      kind: 'component',
+      componentId: 'button',
+      event: { type: 'material-event', eventName: 'click' },
+    },
+    ...(options.condition === undefined ? {} : { condition: options.condition }),
+    target,
+    effect,
+    ...(options.requiredCapabilities === undefined
+      ? {}
+      : { requiredCapabilities: options.requiredCapabilities }),
+  };
+}
+
 describe('parseScreenDocument blueprint expressions', () => {
   it('R6 accepts host variables and authorized host actions without transport details', () => {
     const result = parse(
@@ -22,18 +60,12 @@ describe('parseScreenDocument blueprint expressions', () => {
           },
         ],
         blueprint: {
-          rules: [
-            {
-              id: 'notify',
-              trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-              actions: [
-                {
-                  type: 'host-action',
-                  actionId: 'project.notify',
-                  payload: { kind: 'variable', variableId: 'tenant' },
-                },
-              ],
-            },
+          relations: [
+            relation('notify', {
+              type: 'host-action',
+              actionId: 'project.notify',
+              payload: { kind: 'variable', variableId: 'tenant' },
+            }),
           ],
         },
       }),
@@ -66,29 +98,24 @@ describe('parseScreenDocument blueprint expressions', () => {
       components: [component({ id: 'button' })],
       variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
       blueprint: {
-        rules: [
-          {
-            id: 'raw',
-            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-            actions: [{ type: 'set-variable', variableId: 'count', value: 1 }],
-          },
-        ],
+        relations: [relation('raw', { type: 'set-variable', value: 1 })],
       },
     });
     const existsWithRight = document({
       components: [component({ id: 'button' })],
       blueprint: {
-        rules: [
-          {
-            id: 'exists',
-            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-            condition: {
-              left: { kind: 'literal', value: true },
-              operator: 'exists',
-              right: { kind: 'literal', value: true },
+        relations: [
+          relation(
+            'exists',
+            { type: 'request-component-data' },
+            {
+              condition: {
+                left: { kind: 'literal', value: true },
+                operator: 'exists',
+                right: { kind: 'literal', value: true },
+              },
             },
-            actions: [],
-          },
+          ),
         ],
       },
     });
@@ -100,13 +127,12 @@ describe('parseScreenDocument blueprint expressions', () => {
     const input = document({
       components: [component({ id: 'button' })],
       blueprint: {
-        rules: [
-          {
-            id: 'capability',
-            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-            requiredCapabilities: ['blueprint.value.variable'],
-            actions: [],
-          },
+        relations: [
+          relation(
+            'capability',
+            { type: 'request-component-data' },
+            { requiredCapabilities: ['blueprint.value.variable'] },
+          ),
         ],
       },
     });
@@ -119,18 +145,11 @@ describe('parseScreenDocument blueprint expressions', () => {
       components: [component({ id: 'button' })],
       variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
       blueprint: {
-        rules: [
-          {
-            id: 'extra',
-            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-            actions: [
-              {
-                type: 'set-variable',
-                variableId: 'count',
-                value: { kind: 'literal', value: 1, extra: true },
-              },
-            ],
-          },
+        relations: [
+          relation('extra', {
+            type: 'set-variable',
+            value: { kind: 'literal', value: 1, extra: true },
+          }),
         ],
       },
     });
@@ -138,18 +157,11 @@ describe('parseScreenDocument blueprint expressions', () => {
       components: [component({ id: 'button' })],
       variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
       blueprint: {
-        rules: [
-          {
-            id: 'path',
-            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-            actions: [
-              {
-                type: 'set-variable',
-                variableId: 'count',
-                value: { kind: 'event-payload', path: ['constructor'] },
-              },
-            ],
-          },
+        relations: [
+          relation('path', {
+            type: 'set-variable',
+            value: { kind: 'event-payload', path: ['constructor'] },
+          }),
         ],
       },
     });
@@ -168,18 +180,11 @@ describe('parseScreenDocument blueprint expressions', () => {
         components: [component({ id: 'button' })],
         variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
         blueprint: {
-          rules: [
-            {
-              id: 'key',
-              trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-              actions: [
-                {
-                  type: 'set-variable',
-                  variableId: 'count',
-                  value: { kind: 'object', properties },
-                },
-              ],
-            },
+          relations: [
+            relation('key', {
+              type: 'set-variable',
+              value: { kind: 'object', properties },
+            }),
           ],
         },
       }),
@@ -190,10 +195,9 @@ describe('parseScreenDocument blueprint expressions', () => {
       expect(result.diagnostics[0]?.code).toBe('JSON_DANGEROUS_KEY');
       expect(result.diagnostics[0]?.path).toEqual([
         'blueprint',
-        'rules',
+        'relations',
         0,
-        'actions',
-        0,
+        'effect',
         'value',
         'properties',
         '__proto__',
@@ -218,44 +222,25 @@ describe('parseScreenDocument blueprint expressions', () => {
         components: [component({ id: 'button' })],
         variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
         blueprint: {
-          rules: [
-            {
-              id: 'deep',
-              trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-              actions: [{ type: 'set-variable', variableId: 'count', value: deep }],
-            },
-          ],
+          relations: [relation('deep', { type: 'set-variable', value: deep })],
         },
       }),
       document({
         components: [component({ id: 'button' })],
         variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
         blueprint: {
-          rules: [
-            {
-              id: 'containers',
-              trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-              actions: [{ type: 'set-variable', variableId: 'count', value: containers }],
-            },
-          ],
+          relations: [relation('containers', { type: 'set-variable', value: containers })],
         },
       }),
       document({
         components: [component({ id: 'button' })],
         variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
         blueprint: {
-          rules: [
-            {
-              id: 'bytes',
-              trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-              actions: [
-                {
-                  type: 'set-variable',
-                  variableId: 'count',
-                  value: { kind: 'literal', value: 'x'.repeat(MAX_BLUEPRINT_EXPRESSION_BYTES) },
-                },
-              ],
-            },
+          relations: [
+            relation('bytes', {
+              type: 'set-variable',
+              value: { kind: 'literal', value: 'x'.repeat(MAX_BLUEPRINT_EXPRESSION_BYTES) },
+            }),
           ],
         },
       }),

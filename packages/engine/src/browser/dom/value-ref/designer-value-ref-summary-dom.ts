@@ -1,4 +1,5 @@
 import type { ScreenValueRef } from '@base-screen/contracts';
+import { createDesignerBadge } from '../panel/designer-chrome-primitives.js';
 import {
   type DesignerValueRefPickerInput,
   type DesignerValueRefText,
@@ -20,11 +21,12 @@ export function renderValueRefSummary(
   const row = ownerDocument.createElement('span');
   row.className = 'designer-value-ref-summary';
   if (summary.badge.length > 0) {
-    const badge = ownerDocument.createElement('span');
-    badge.className = 'designer-value-ref-badge';
-    badge.dataset.valueRefBadge = ref?.kind ?? 'none';
-    badge.textContent = summary.badge;
-    row.appendChild(badge);
+    createDesignerBadge(row, {
+      text: summary.badge,
+      tone: 'neutral',
+      className: 'designer-value-ref-badge',
+      dataset: { valueRefBadge: ref?.kind ?? 'none' },
+    });
   }
   const label = ownerDocument.createElement('span');
   label.className = 'designer-value-ref-label';

@@ -1,7 +1,11 @@
 import type { ScreenDatasetDefinition, ScreenValueRef } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { attachDesignerDateField } from '../designer-date-field-dom.js';
-import { createDesignerInput, createDesignerSwitch } from '../designer-ui-primitives.js';
+import {
+  createDesignerButton,
+  createDesignerInput,
+  createDesignerSwitch,
+} from '../designer-ui-primitives.js';
 
 /**
  * 参数位的内联值编辑器。
@@ -90,13 +94,9 @@ function actionButton(
   disabled: boolean,
   variant: 'primary' | 'ghost',
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button';
+  const button = createDesignerButton(ownerDocument, { disabled, text });
   button.dataset.datasetAction = action;
   button.dataset.variant = variant;
-  button.textContent = text;
-  button.disabled = disabled;
   return button;
 }
 

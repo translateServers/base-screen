@@ -17,7 +17,7 @@ export function createMinimalScreenDocument(): ScreenDocument {
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 
@@ -43,6 +43,6 @@ export function createSingleComponentDocument(
       },
     ],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }

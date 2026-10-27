@@ -1,4 +1,5 @@
 import {
+  deriveScreenBlueprintRules,
   readScreenVariableRecord,
   SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY,
   type ScreenDocument,
@@ -15,7 +16,8 @@ export function compileScreenBlueprint(
   document: ScreenDocument,
   capabilities: ScreenBlueprintCapabilityIndex = { hasBlueprintCapability: () => true },
 ): ScreenParseResult<ScreenBlueprintPlan> {
-  for (const rule of document.blueprint.rules) {
+  const rules = deriveScreenBlueprintRules(document.blueprint);
+  for (const rule of rules) {
     for (const capability of rule.requiredCapabilities ?? []) {
       if (!capabilities.hasBlueprintCapability(capability)) {
         return failure('BLUEPRINT_CAPABILITY_UNAVAILABLE', 'Blueprint capability is unavailable.');
@@ -39,7 +41,7 @@ export function compileScreenBlueprint(
   return {
     ok: true,
     value: {
-      rules: document.blueprint.rules.map((rule) => ({
+      rules: rules.map((rule) => ({
         ...rule,
         trigger: { ...rule.trigger },
         ...(rule.condition ? { condition: cloneCondition(rule.condition) } : {}),

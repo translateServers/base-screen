@@ -71,7 +71,7 @@ function document(type: string, resourceType: string, resourceId: string): Scree
       },
     ],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

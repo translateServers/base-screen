@@ -4,8 +4,9 @@ import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { commonStyleFields } from '../../../common/operations/selection/designer-multi-selection-operations.js';
 import type { DesignerInspectorContext } from '../../../common/operations/style/designer-inspector.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { createDesignerFieldElement } from '../designer-field-primitives.js';
 import { appendDesignerQuickStyle } from '../designer-quick-style-dom.js';
-import { createDesignerInput } from '../designer-ui-primitives.js';
+import { createDesignerButton, createDesignerInput } from '../designer-ui-primitives.js';
 import {
   appendActionButton,
   appendBatchArrangeButton,
@@ -241,9 +242,10 @@ function appendBatchFieldRow(parent: HTMLElement, labelText: string): HTMLElemen
 }
 
 function appendBatchReadOnlyInput(parent: HTMLElement, labelText: string): void {
-  const label = parent.ownerDocument.createElement('label');
-  label.className = 'designer-field designer-field-label designer-inspector-batch-readonly';
-  label.textContent = labelText;
+  const label = createDesignerFieldElement(parent.ownerDocument, {
+    className: 'designer-inspector-batch-readonly',
+    label: labelText,
+  });
   const input = createDesignerInput(parent.ownerDocument, {
     placeholder: DESIGNER_UI_TEXT.propertiesPanel.multipleValues,
     ariaLabel: `${labelText}：${DESIGNER_UI_TEXT.propertiesPanel.multipleValues}`,
@@ -311,10 +313,10 @@ function appendBatchStyleControls(
 function appendBatchUnifiedStyleEmpty(properties: HTMLElement): void {
   const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.unifiedStyle);
   section.className += ' designer-inspector-batch-unified-style';
-  const empty = properties.ownerDocument.createElement('button');
-  empty.type = 'button';
-  empty.className = 'designer-control designer-button designer-inspector-batch-unified-empty';
-  empty.disabled = true;
-  empty.textContent = DESIGNER_UI_TEXT.propertiesPanel.noUnifiedStyle;
+  const empty = createDesignerButton(properties.ownerDocument, {
+    className: 'designer-inspector-batch-unified-empty',
+    disabled: true,
+    text: DESIGNER_UI_TEXT.propertiesPanel.noUnifiedStyle,
+  });
   section.appendChild(empty);
 }

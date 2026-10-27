@@ -595,26 +595,32 @@ async function assertNativeEventsToggle(designer, page) {
       ],
       variables: [],
       blueprint: {
-        rules: [
+        relations: [
           {
+            type: 'behavior',
             id: 'probe-native-events-blueprint',
-            trigger: {
-              type: 'material-event',
+            source: {
+              kind: 'component',
               componentId: 'probe-text',
-              eventName: 'valueClick',
+              event: { type: 'material-event', eventName: 'valueClick' },
             },
-            actions: [
-              {
-                type: 'component-visibility',
-                componentId: 'probe-chart',
-                operation: 'toggle',
-              },
-              {
-                type: 'emit-host-event',
-                eventName: 'probe_blueprint_ran',
-                payload: { kind: 'literal', value: true },
-              },
-            ],
+            target: { kind: 'component', componentId: 'probe-chart' },
+            effect: { type: 'component-visibility', operation: 'toggle' },
+          },
+          {
+            type: 'behavior',
+            id: 'probe-native-events-blueprint-host',
+            source: {
+              kind: 'component',
+              componentId: 'probe-text',
+              event: { type: 'material-event', eventName: 'valueClick' },
+            },
+            target: { kind: 'host' },
+            effect: {
+              type: 'emit-host-event',
+              eventName: 'probe_blueprint_ran',
+              payload: { kind: 'literal', value: true },
+            },
           },
         ],
       },

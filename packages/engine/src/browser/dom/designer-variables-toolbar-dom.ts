@@ -2,6 +2,7 @@ import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
 import { createDesignerButton, createDesignerInput } from './designer-ui-primitives.js';
 import { appendIconLabel } from './designer-variables-editor-dom.js';
+import { appendDesignerEmptyState } from './panel/designer-chrome-primitives.js';
 
 interface DesignerVariablesToolbarState {
   readonly creating: boolean;
@@ -51,7 +52,7 @@ export function appendVariablesToolbar(
     className: 'variable-add-button',
     disabled: state.creating,
     tip: DESIGNER_UI_TEXT.variables.add,
-    variant: 'ghost',
+    variant: 'neutral',
   });
   add.dataset.variableAction = 'add';
   appendIconLabel(add, 'plus', DESIGNER_UI_TEXT.variables.newShort);
@@ -64,54 +65,44 @@ export function appendVariablesEmptyState(
   noVariables: boolean,
   query = '',
 ): void {
-  const empty = content.ownerDocument.createElement('section');
-  empty.className = 'designer-empty-state variable-empty-state';
-  const glyph = content.ownerDocument.createElement('span');
-  glyph.className = 'variable-empty-glyph';
-  glyph.innerHTML = designerIcon(noVariables ? 'variable' : 'search');
-  empty.appendChild(glyph);
-  const title = content.ownerDocument.createElement('strong');
-  title.textContent = noVariables
-    ? DESIGNER_UI_TEXT.variables.emptyTitle
-    : DESIGNER_UI_TEXT.variables.noResults;
-  empty.appendChild(title);
-  if (!noVariables) {
-    const description = content.ownerDocument.createElement('span');
-    description.textContent =
-      query.trim() === ''
+  const trimmed = query.trim();
+  appendDesignerEmptyState(content, {
+    icon: noVariables ? 'variable' : 'search',
+    title: noVariables
+      ? DESIGNER_UI_TEXT.variables.emptyTitle
+      : trimmed === ''
         ? DESIGNER_UI_TEXT.variables.noResults
-        : DESIGNER_UI_TEXT.variables.noResultsFor(query.trim());
-    empty.appendChild(description);
-  }
-  if (noVariables) {
-    const description = content.ownerDocument.createElement('span');
-    description.textContent = DESIGNER_UI_TEXT.variables.emptyDescription;
-    empty.appendChild(description);
-    const actions = content.ownerDocument.createElement('div');
-    actions.className = 'variable-empty-actions';
-    for (const [action, label, variant] of [
-      ['add', DESIGNER_UI_TEXT.variables.addShort, 'primary'],
-      ['create-data-source', DESIGNER_UI_TEXT.variables.createFromDataSource, 'ghost'],
-      ['create-url-query', DESIGNER_UI_TEXT.variables.createFromUrlQuery, 'ghost'],
-    ] as const) {
-      const button = createDesignerButton(content.ownerDocument, {
-        className: 'variable-empty-action',
-        text: label,
-        variant,
-      });
-      button.dataset.variableAction = action;
-      actions.appendChild(button);
-    }
-    empty.appendChild(actions);
-  } else {
-    const clear = createDesignerButton(content.ownerDocument, {
-      ariaLabel: DESIGNER_UI_TEXT.variables.clearSearch,
-      className: 'variable-empty-clear',
-      text: DESIGNER_UI_TEXT.variables.clearSearch,
-      variant: 'ghost',
-    });
-    clear.dataset.variableAction = 'clear-search';
-    empty.appendChild(clear);
-  }
-  content.appendChild(empty);
+        : DESIGNER_UI_TEXT.variables.noResultsFor(trimmed),
+    ...(noVariables
+      ? {
+          hint: DESIGNER_UI_TEXT.variables.emptyDescription,
+          actions: [
+            {
+              label: DESIGNER_UI_TEXT.variables.addShort,
+              variant: 'primary' as const,
+              dataset: { variableAction: 'add' },
+            },
+            {
+              label: DESIGNER_UI_TEXT.variables.createFromDataSource,
+              variant: 'ghost' as const,
+              dataset: { variableAction: 'create-data-source' },
+            },
+            {
+              label: DESIGNER_UI_TEXT.variables.createFromUrlQuery,
+              variant: 'ghost' as const,
+              dataset: { variableAction: 'create-url-query' },
+            },
+          ],
+        }
+      : {
+          actions: [
+            {
+              label: DESIGNER_UI_TEXT.variables.clearSearch,
+              ariaLabel: DESIGNER_UI_TEXT.variables.clearSearch,
+              variant: 'ghost' as const,
+              dataset: { variableAction: 'clear-search' },
+            },
+          ],
+        }),
+  });
 }

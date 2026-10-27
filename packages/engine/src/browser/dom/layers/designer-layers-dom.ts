@@ -1,6 +1,7 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
 import { createDesignerButton, createDesignerInput } from '../designer-ui-primitives.js';
+import { appendDesignerEmptyState } from '../panel/designer-chrome-primitives.js';
 import {
   type DesignerLayerItem,
   type DesignerLayersRenderOptions,
@@ -149,39 +150,31 @@ function createTreeRoot(ownerDocument: Document): HTMLElement {
 
 function createLayerEmptyState(ownerDocument: Document, search: string): HTMLElement {
   const query = search.trim();
-  const empty = ownerDocument.createElement('div');
-  empty.className = 'designer-empty-state layer-empty';
-  empty.setAttribute('role', 'status');
-  const glyph = ownerDocument.createElement('span');
-  glyph.className = 'layer-empty-glyph';
-  glyph.setAttribute('aria-hidden', 'true');
-  glyph.innerHTML = designerIcon(query === '' ? 'layers' : 'search');
-  const title = ownerDocument.createElement('p');
-  title.className = 'layer-empty-title';
-  title.textContent =
-    query === ''
-      ? DESIGNER_UI_TEXT.layersPanel.empty
-      : DESIGNER_UI_TEXT.layersPanel.emptySearch(query);
-  const hint = ownerDocument.createElement('p');
-  hint.className = 'layer-empty-hint';
-  hint.textContent =
-    query === ''
-      ? DESIGNER_UI_TEXT.layersPanel.emptyHint
-      : DESIGNER_UI_TEXT.layersPanel.emptySearchHint;
-  empty.appendChild(glyph);
-  empty.appendChild(title);
-  empty.appendChild(hint);
-  if (query !== '') {
-    const reset = button(
-      ownerDocument,
-      DESIGNER_UI_TEXT.layersPanel.clearSearch,
-      DESIGNER_UI_TEXT.layersPanel.clearSearch,
-    );
-    reset.className += ' layer-empty-reset';
-    reset.dataset.layerSearchClear = 'true';
-    empty.appendChild(reset);
-  }
-  return empty;
+  const host = ownerDocument.createElement('div');
+  const { element } = appendDesignerEmptyState(host, {
+    icon: query === '' ? 'layers' : 'search',
+    title:
+      query === ''
+        ? DESIGNER_UI_TEXT.layersPanel.empty
+        : DESIGNER_UI_TEXT.layersPanel.emptySearch(query),
+    hint:
+      query === ''
+        ? DESIGNER_UI_TEXT.layersPanel.emptyHint
+        : DESIGNER_UI_TEXT.layersPanel.emptySearchHint,
+    role: 'status',
+    ...(query === ''
+      ? {}
+      : {
+          actions: [
+            {
+              label: DESIGNER_UI_TEXT.layersPanel.clearSearch,
+              ariaLabel: DESIGNER_UI_TEXT.layersPanel.clearSearch,
+              dataset: { layerSearchClear: 'true' },
+            },
+          ],
+        }),
+  });
+  return element;
 }
 
 interface DesignerLayerNodeState {
@@ -228,7 +221,8 @@ function createLayerNode(
     search,
   } = state;
   const row = ownerDocument.createElement('div');
-  row.className = 'layer-row';
+  row.className = 'designer-list-row layer-row';
+  row.dataset.density = 'default';
   // 缩进模型：所有行都留出 18px 折叠位（叶子行留空），此后每级 16px。
   // 这样同一级的图标永远落在同一条竖线上，分组行不会比同级叶子行右移一格。
   row.style.paddingInlineStart = `${18 + item.depth * 16}px`;
@@ -284,7 +278,7 @@ function createLayerNode(
   select.dataset.layerSelect = item.id;
   // 保留按钮基础类：字体/颜色/光标/焦点环由 .designer-control/.designer-button 提供，
   // .layer-select 只覆盖几何与绘制，否则名称会退化为 UA 默认字体与颜色。
-  select.className = 'designer-control designer-button layer-select';
+  select.className += ' layer-select';
   select.disabled = !selectable;
   // 行首类型图标：与物料库同一派生规则，并沿用素材表色相，库与图层同色。
   const glyph = ownerDocument.createElement('span');
@@ -329,6 +323,7 @@ function createLayerNode(
       value: renameDraft ?? item.name,
       ariaLabel: DESIGNER_UI_TEXT.layersPanel.rename(item.name),
       disabled: item.locked,
+      size: 'compact',
     });
     rename.dataset.layerRename = item.id;
     row.appendChild(rename);

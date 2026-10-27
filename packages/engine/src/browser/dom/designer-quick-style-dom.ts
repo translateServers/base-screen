@@ -7,6 +7,7 @@ import {
 } from '../../common/operations/style/designer-quick-style.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
+import { createDesignerButton } from './designer-ui-primitives.js';
 
 interface DesignerQuickConfigRow {
   readonly label: string;
@@ -90,7 +91,7 @@ function appendPresetGrid(
     });
     const button = parent.ownerDocument.createElement('button');
     button.type = 'button';
-    button.className = 'designer-control designer-quick-style';
+    button.className = 'designer-quick-style';
     button.dataset.quickStyle = String(index);
     button.disabled = !supported;
     button.setAttribute('data-tip', DESIGNER_UI_TEXT.propertiesPanel.quickStylePreset(index));
@@ -171,16 +172,15 @@ function appendQuickConfigRow(
         : row.kind === 'info'
           ? ({ kind: 'info', value: item.value as 'simple' | 'common' | 'detailed' } as const)
           : ({ kind: 'colors', value: item.value } as const);
-    const button = parent.ownerDocument.createElement('button');
-    button.type = 'button';
-    button.className = 'designer-control designer-button designer-quick-config-button';
+    const button = createDesignerButton(parent.ownerDocument, {
+      className: 'designer-quick-config-button',
+      disabled: !designerQuickStyleActionSupported(manifest, value),
+      pressed:
+        designerQuickStyleActionSupported(manifest, value) &&
+        quickStyleAppliedToAll(components, manifest, value),
+    });
     button.dataset.quickConfig = row.kind;
     button.dataset.quickConfigValue = item.value;
-    button.disabled = !designerQuickStyleActionSupported(manifest, value);
-    button.setAttribute(
-      'aria-pressed',
-      String(!button.disabled && quickStyleAppliedToAll(components, manifest, value)),
-    );
     if (row.kind === 'colors') {
       const accessibleLabel = `${row.label} ${item.value.toUpperCase()}`;
       button.style.setProperty('--quick-color', item.value);

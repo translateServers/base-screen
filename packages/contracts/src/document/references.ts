@@ -165,109 +165,119 @@ export function validateReferences(
       clean = false;
     }
   });
-  const ruleIds = new Set<string>();
-  document.blueprint.rules.forEach((rule, index) => {
-    if (ruleIds.has(rule.id)) {
+  const relationIds = new Set<string>();
+  document.blueprint.relations.forEach((relation, index) => {
+    const base: DiagnosticSegment[] = ['blueprint', 'relations', index];
+    if (relationIds.has(relation.id)) {
       collector.add(
         'DOCUMENT_FIELD_INVALID',
-        at(['blueprint', 'rules', index, 'id']),
+        at([...base, 'id']),
         phase,
-        `Duplicate blueprint rule id "${truncateKey(rule.id)}".`,
+        `Duplicate blueprint relation id "${truncateKey(relation.id)}".`,
       );
       clean = false;
     } else {
-      ruleIds.add(rule.id);
+      relationIds.add(relation.id);
     }
-    if (rule.trigger.type === 'material-event' && !idToIndex.has(rule.trigger.componentId)) {
-      collector.add(
-        'COMPONENT_PARENT_MISSING',
-        at(['blueprint', 'rules', index, 'trigger', 'componentId']),
-        phase,
-        `Blueprint trigger references unknown component id "${truncateKey(rule.trigger.componentId)}".`,
-      );
-      clean = false;
+    if (relation.type === 'semantic') {
+      if (!idToIndex.has(relation.source.componentId)) {
+        collector.add(
+          'COMPONENT_PARENT_MISSING',
+          at([...base, 'source', 'componentId']),
+          phase,
+          `Blueprint semantic relation references unknown source component id "${truncateKey(relation.source.componentId)}".`,
+        );
+        clean = false;
+      }
+      if (!idToIndex.has(relation.target.componentId)) {
+        collector.add(
+          'COMPONENT_PARENT_MISSING',
+          at([...base, 'target', 'componentId']),
+          phase,
+          `Blueprint semantic relation references unknown target component id "${truncateKey(relation.target.componentId)}".`,
+        );
+        clean = false;
+      }
+      return;
     }
-    if (rule.trigger.type === 'variable-event' && !variableIds.has(rule.trigger.variableId)) {
+    if (relation.source.kind === 'component') {
+      if (!idToIndex.has(relation.source.componentId)) {
+        collector.add(
+          'COMPONENT_PARENT_MISSING',
+          at([...base, 'source', 'componentId']),
+          phase,
+          `Blueprint relation references unknown source component id "${truncateKey(relation.source.componentId)}".`,
+        );
+        clean = false;
+      }
+    } else if (!variableIds.has(relation.source.variableId)) {
       collector.add(
         'VARIABLE_NAME_INVALID',
-        at(['blueprint', 'rules', index, 'trigger', 'variableId']),
+        at([...base, 'source', 'variableId']),
         phase,
-        `Blueprint trigger references unknown variable id "${truncateKey(rule.trigger.variableId)}".`,
+        `Blueprint relation references unknown source variable id "${truncateKey(relation.source.variableId)}".`,
       );
       clean = false;
     }
-    if (rule.condition !== undefined) {
+    const target = relation.target;
+    if (target.kind === 'component' && !idToIndex.has(target.componentId)) {
+      collector.add(
+        'COMPONENT_PARENT_MISSING',
+        at([...base, 'target', 'componentId']),
+        phase,
+        `Blueprint relation references unknown target component id "${truncateKey(target.componentId)}".`,
+      );
+      clean = false;
+    }
+    if (target.kind === 'variable' && !variableIds.has(target.variableId)) {
+      collector.add(
+        'VARIABLE_NAME_INVALID',
+        at([...base, 'target', 'variableId']),
+        phase,
+        `Blueprint relation references unknown target variable id "${truncateKey(target.variableId)}".`,
+      );
+      clean = false;
+    }
+    if (relation.condition !== undefined) {
       clean =
         validateExpressionVariables(
-          rule.condition.left,
+          relation.condition.left,
           variableIds,
-          ['blueprint', 'rules', index, 'condition', 'left'],
+          [...base, 'condition', 'left'],
           at,
           collector,
           phase,
         ) && clean;
-      if (rule.condition.right !== undefined) {
+      if (relation.condition.right !== undefined) {
         clean =
           validateExpressionVariables(
-            rule.condition.right,
+            relation.condition.right,
             variableIds,
-            ['blueprint', 'rules', index, 'condition', 'right'],
+            [...base, 'condition', 'right'],
             at,
             collector,
             phase,
           ) && clean;
       }
     }
-    rule.actions.forEach((action, actionIndex) => {
-      if (
-        (action.type === 'set-variable' || action.type === 'request-variable') &&
-        !variableIds.has(action.variableId)
-      ) {
-        collector.add(
-          'VARIABLE_NAME_INVALID',
-          at(['blueprint', 'rules', index, 'actions', actionIndex, 'variableId']),
+    const effect = relation.effect;
+    const expression =
+      effect.type === 'set-variable'
+        ? effect.value
+        : effect.type === 'emit-host-event' || effect.type === 'host-action'
+          ? effect.payload
+          : undefined;
+    if (expression !== undefined) {
+      clean =
+        validateExpressionVariables(
+          expression,
+          variableIds,
+          [...base, 'effect', effect.type === 'set-variable' ? 'value' : 'payload'],
+          at,
+          collector,
           phase,
-          `Blueprint action references unknown variable id "${truncateKey(action.variableId)}".`,
-        );
-        clean = false;
-      }
-      if (
-        (action.type === 'component-visibility' || action.type === 'request-component-data') &&
-        !idToIndex.has(action.componentId)
-      ) {
-        collector.add(
-          'COMPONENT_PARENT_MISSING',
-          at(['blueprint', 'rules', index, 'actions', actionIndex, 'componentId']),
-          phase,
-          `Blueprint visibility action references unknown component id "${truncateKey(action.componentId)}".`,
-        );
-        clean = false;
-      }
-      const expression =
-        action.type === 'set-variable'
-          ? action.value
-          : action.type === 'emit-host-event' || action.type === 'host-action'
-            ? action.payload
-            : undefined;
-      if (expression !== undefined) {
-        clean =
-          validateExpressionVariables(
-            expression,
-            variableIds,
-            [
-              'blueprint',
-              'rules',
-              index,
-              'actions',
-              actionIndex,
-              action.type === 'set-variable' ? 'value' : 'payload',
-            ],
-            at,
-            collector,
-            phase,
-          ) && clean;
-      }
-    });
+        ) && clean;
+    }
   });
   return clean;
 }

@@ -284,7 +284,7 @@ const parsed = parseScreenDocument({
     },
   ],
   variables: [],
-  blueprint: { rules: [] },
+  blueprint: { relations: [] },
 });
 if (!parsed.ok) {
   throw new Error(\`Screen Document invalid: \${formatDiagnostics(parsed.diagnostics)}\`);

@@ -85,7 +85,7 @@ describe('DesignerSnapIndex Moveable equivalence', () => {
         component('selected-b', 620, 20),
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
     const candidates = collectDesignerSnapCandidates(document, { x: [75], y: [35] }, [
       'selected-a',

@@ -235,51 +235,66 @@ describe('air quality document', () => {
     const components = new Map(document.components.map((component) => [component.id, component]));
 
     expect([...variables.keys()]).toEqual(['city', 'hours']);
-    expect(document.blueprint.rules).toHaveLength(3);
+    expect(document.blueprint.relations).toHaveLength(3);
 
-    const cityRule = document.blueprint.rules.find((rule) => rule.id === 'rule-city');
-    const hours24Rule = document.blueprint.rules.find((rule) => rule.id === 'rule-window-24');
-    const hours48Rule = document.blueprint.rules.find((rule) => rule.id === 'rule-window-48');
-    expect(cityRule?.trigger).toMatchObject({
-      type: 'material-event',
-      componentId: 'city-board',
-      eventName: 'rowClick',
-    });
-    expect(hours24Rule?.trigger).toMatchObject({
-      type: 'material-event',
-      componentId: 'window-24-text',
-      eventName: 'valueClick',
-    });
-    expect(hours48Rule?.trigger).toMatchObject({
-      type: 'material-event',
-      componentId: 'window-48-text',
-      eventName: 'valueClick',
-    });
-
-    const cityAction = cityRule?.actions[0];
-    if (cityAction?.type !== 'set-variable' || cityAction.value.kind !== 'event-payload') {
-      throw new Error('city rule must write a variable from the row payload');
+    const cityRelation = document.blueprint.relations.find(
+      (relation) => relation.id === 'rule-city',
+    );
+    const hours24Relation = document.blueprint.relations.find(
+      (relation) => relation.id === 'rule-window-24',
+    );
+    const hours48Relation = document.blueprint.relations.find(
+      (relation) => relation.id === 'rule-window-48',
+    );
+    if (cityRelation?.type !== 'behavior' || cityRelation.source.kind !== 'component') {
+      throw new Error('city relation must be a component behavior relation');
     }
-    expect(cityAction.variableId).toBe('city');
-    expect(cityAction.value.path).toEqual(['row', 'city']);
+    expect(cityRelation.source).toMatchObject({
+      kind: 'component',
+      componentId: 'city-board',
+      event: { type: 'material-event', eventName: 'rowClick' },
+    });
+    const cityEffect = cityRelation.effect;
+    if (cityEffect.type !== 'set-variable' || cityEffect.value.kind !== 'event-payload') {
+      throw new Error('city relation must write a variable from the row payload');
+    }
+    expect(cityRelation.target).toEqual({ kind: 'variable', variableId: 'city' });
+    expect(cityEffect.value.path).toEqual(['row', 'city']);
     // 榜单数据源必须真的返回 city 字段，且每个路径段都能通过同一标识符规则。
     expect(DATASET_FIELDS['custom.air-rank']?.some((field) => field.id === 'city')).toBe(true);
-    for (const segment of cityAction.value.path) {
+    for (const segment of cityEffect.value.path) {
       expect(COLUMN_ID_PATTERN.test(segment), `path segment ${segment}`).toBe(true);
     }
 
-    const hours24Action = hours24Rule?.actions[0];
-    if (hours24Action?.type !== 'set-variable' || hours24Action.value.kind !== 'literal') {
-      throw new Error('24h rule must write a literal variable value');
+    if (hours24Relation?.type !== 'behavior' || hours24Relation.source.kind !== 'component') {
+      throw new Error('24h relation must be a component behavior relation');
     }
-    expect(hours24Action.variableId).toBe('hours');
-    expect(hours24Action.value.value).toBe(24);
-    const hours48Action = hours48Rule?.actions[0];
-    if (hours48Action?.type !== 'set-variable' || hours48Action.value.kind !== 'literal') {
-      throw new Error('48h rule must write a literal variable value');
+    expect(hours24Relation.source).toMatchObject({
+      kind: 'component',
+      componentId: 'window-24-text',
+      event: { type: 'material-event', eventName: 'valueClick' },
+    });
+    const hours24Effect = hours24Relation.effect;
+    if (hours24Effect.type !== 'set-variable' || hours24Effect.value.kind !== 'literal') {
+      throw new Error('24h relation must write a literal variable value');
     }
-    expect(hours48Action.variableId).toBe('hours');
-    expect(hours48Action.value.value).toBe(48);
+    expect(hours24Relation.target).toEqual({ kind: 'variable', variableId: 'hours' });
+    expect(hours24Effect.value.value).toBe(24);
+
+    if (hours48Relation?.type !== 'behavior' || hours48Relation.source.kind !== 'component') {
+      throw new Error('48h relation must be a component behavior relation');
+    }
+    expect(hours48Relation.source).toMatchObject({
+      kind: 'component',
+      componentId: 'window-48-text',
+      event: { type: 'material-event', eventName: 'valueClick' },
+    });
+    const hours48Effect = hours48Relation.effect;
+    if (hours48Effect.type !== 'set-variable' || hours48Effect.value.kind !== 'literal') {
+      throw new Error('48h relation must write a literal variable value');
+    }
+    expect(hours48Relation.target).toEqual({ kind: 'variable', variableId: 'hours' });
+    expect(hours48Effect.value.value).toBe(48);
     expect(components.has('window-24-text')).toBe(true);
     expect(components.has('window-48-text')).toBe(true);
   });

@@ -36,7 +36,7 @@ function document(components: readonly Partial<ScreenDocument['components'][numb
     canvas: { width: 640, height: 480, backgroundColor: '#000000' },
     components: components as ScreenDocument['components'],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   } as ScreenDocument;
 }
 

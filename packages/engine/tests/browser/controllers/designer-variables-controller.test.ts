@@ -113,7 +113,7 @@ function document(variables: ScreenDocument['variables']): ScreenDocument {
       },
     ],
     variables,
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 
@@ -646,9 +646,9 @@ describe('designer variables rendering', () => {
         previewSummary: undefined,
       },
     });
-    expect(
-      descendants(panel).some((child) => child.className.includes('designer-empty-state')),
-    ).toBe(true);
+    expect(descendants(panel).some((child) => child.className.includes('designer-empty'))).toBe(
+      true,
+    );
   });
 
   it('renders the add button and labeled create editor on demand', () => {
@@ -659,7 +659,7 @@ describe('designer variables rendering', () => {
     expect(panel.querySelector('[data-variable-create-name]')).not.toBeNull();
     expect(panel.querySelector('[data-variable-create-value]')).not.toBeNull();
     expect(
-      descendants(panel).filter((child) => child.className === 'variable-field-label'),
+      descendants(panel).filter((child) => child.className === 'designer-field-label-text'),
     ).toHaveLength(4);
     expect(
       descendants(panel).some((child) => child.dataset.variableAction === 'add' && child.disabled),

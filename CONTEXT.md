@@ -161,12 +161,24 @@
 - **控件原语（Control Primitives）**  
   单个控件（按钮/输入/勾选/开关/下拉/文本域/图标按钮）的唯一落点是
   `packages/engine/src/browser/dom/designer-ui-primitives.ts`；字段行骨架（标签列 + 控件列、堆叠变体）
-  的唯一落点是 `designer-field-primitives.ts`。裸 `createElement('input'|'select'|'textarea')` 与手拼
-  `designer-field designer-field-label` 由 `tooling/checks/designer-ui.mjs` 拒绝（存量按名字登记为债务）。
+  的唯一落点是 `designer-field-primitives.ts`。模板字符串里的控件由 `adoptDesignerFormControls`
+  在渲染后原地归一（含 checkbox / switch / button，保留已绑监听）；新面板不得手写
+  `designer-control` / `designer-button` / `designer-checkbox` / `designer-switch` / `designer-segmented` /
+  `designer-tab` 等共享类，`tooling/checks/designer-ui.mjs` 会拒绝未登记的裸控件与手拼字段行。
+  控件尺寸只有 default 30px / compact 28px 两档（`data-size`）；workbench 只做布局，不得重设
+  共享控件的背景/文字/描边/字体/高度/内距，`tooling/checks/designer-styles.mjs` 以外观覆写基线
+  锁住存量并只减不增。色板三态模式组是唯一保留的原生 radio 值载体例外（可见形态完全由色板自绘）。
+  设计系统清单的聚焦断言 `pnpm verify:system` 覆盖尺寸、禁用态几何与自绘下拉弹层对齐。
 
 - **面板件（Panel Chrome）**  
-  面板头、分区标签、工具条、空状态、状态芯片目前仍是各面板手拼（`list-heading` 在 12 处重复），
-  这是已知债务，收敛方向是列表原语。新增面板先复用现有类名，不得再造一套结构。
+  分区（`.designer-panel-section`）、空态（`.designer-empty`）、徽标（`.designer-badge`）、列表行
+  （`.designer-list-row`）的结构原语在 `dom/panel/designer-chrome-primitives.ts`，外观唯一落点是
+  `styles/workbench/designer-workbench-chrome.css`；workbench 其余文件只做布局（display / grid /
+  margin / gap / width / 定位），不得重设面板件的背景、文字、描边、字体、高度、内距。
+  列表行只有 default 40 / comfortable 44 / compact 32 三档（`data-density`）；选中底色只在
+  `designer-workbench-selection.css` 一处绘制（图层行、蓝图库行与 `.designer-list-row` 共用同一条规则）。
+  面板内导航用 `.designer-tablist` / `.designer-tab`（变体在 `controls/designer-controls-tabs.css`），
+  按下型选项组统一走 `.designer-segmented`。新增面板从这里取结构，不得再手拼 header / 徽标 / 空态骨架。
 
 - **设计系统清单（Design System Inventory）**  
   唯一落点是 `tooling/verification/browser-harness/system.html`：令牌、状态矩阵与组件铺在一页，

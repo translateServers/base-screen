@@ -118,7 +118,7 @@
   min-width: 20px;
   padding: 2px 4px;
   border: 0;
-  border-radius: 3px;
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-text-secondary);
   font: var(--designer-font-numeric);
@@ -284,7 +284,6 @@
   --material-library-status-color: var(--designer-danger);
 }
 
-.error-console-section-title,
 .error-console-history-heading h3 {
   margin: 0;
   color: var(--designer-text-secondary);
@@ -359,21 +358,11 @@
   scrollbar-color: var(--designer-scrollbar-thumb) var(--designer-scrollbar-track);
 }
 
-.error-console-entry,
-.error-console-empty {
+.error-console-entry {
   margin: 0;
   padding: var(--designer-space-3) var(--designer-space-4);
-}
-
-.error-console-entry {
   border-bottom: 1px solid var(--designer-border-subtle);
   box-shadow: inset 2px 0 0 var(--designer-danger);
-}
-
-.error-console-empty {
-  border: 1px dashed var(--designer-border-subtle);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-control);
 }
 
 .error-console-entry-copy {
@@ -401,8 +390,7 @@
   font: var(--designer-font-numeric);
 }
 
-.error-console-entry-copy span,
-.error-console-empty {
+.error-console-entry-copy span {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
   overflow-wrap: anywhere;

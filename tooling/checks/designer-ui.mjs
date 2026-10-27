@@ -96,45 +96,168 @@ for (const relative of userFacingTextModules) {
 //
 // 下面的名单是存量债务，不是许可：自绘控件（取色器 / 色标 / 渐变条 / 步进器 / 表格单元格）
 // 或仍持有独立表单语汇的模块，逐个列名而不用通配。新文件默认不允许，每迁移完一个删一行，只减不增。
-const formPrimitiveDebt = new Set([
-  // 自绘控件：类名与结构都不走设计体系控件。
-  'controllers/project/designer-project-workspace-controller.ts',
+const controlDomDebt = new Set([
+  // 自绘三态模式组：原生 radio 只是值载体，可见形态完全由色板自己的图标/选中环绘制。
+  // 其余表单控件已全部走共享原语；这条保留为唯一例外，新增原生控件仍会被门禁拒绝。
   'dom/color/designer-color-palette-dom.ts',
-  'dom/color/designer-color-palette-value-dom.ts',
-  'dom/color/designer-fill-color-picker-dom.ts',
-  'dom/descriptor/designer-descriptor-stepper-dom.ts',
-  // 独立表单语汇（`variable-field`）或尚未迁移行结构的绑定面板。
-  'dom/blueprint/designer-blueprint-library-dom.ts',
-  'dom/panel/designer-multi-selection-dom.ts',
 ]);
 
-// 两个来源模块本身是唯一合法的产出点。
+// 两个来源模块本身是唯一合法的产出点；select / date 在各自迁移进原语前先视为实现点。
 const formPrimitiveOrigins = new Set([
   'dom/designer-field-primitives.ts',
   'dom/designer-ui-primitives.ts',
+  'dom/designer-form-controls-dom.ts',
+  'dom/designer-select-dom.ts',
+  'dom/designer-date-field-dom.ts',
+  'dom/panel/designer-panel-primitives.ts',
 ]);
+
+// 模板字符串里的控件由渲染完成后的 adoption 接管；这里登记“谁负责接管”。
+const templateAdoptionOwners = new Map([
+  ['dom/workspace/designer-workspace-markup.ts', 'dom/workspace/designer-workspace.ts'],
+  ['dom/workspace/designer-workspace-template.ts', 'dom/workspace/designer-workspace.ts'],
+  [
+    'dom/blueprint/designer-blueprint-inspector-configuration.ts',
+    'controllers/blueprint/designer-blueprint-panels-controller.ts',
+  ],
+  [
+    'dom/blueprint/designer-blueprint-library-dom.ts',
+    'controllers/blueprint/designer-blueprint-panels-controller.ts',
+  ],
+]);
+
+const sharedControlDomClasses = new Set([
+  'designer-control',
+  'designer-control-shell',
+  'designer-input',
+  'designer-textarea',
+  'designer-select',
+  'designer-select-control',
+  'designer-select-trigger',
+  'designer-select-option',
+  'designer-select-native',
+  'designer-checkbox',
+  'designer-switch',
+  'designer-button',
+  'designer-icon-button',
+  'designer-segmented',
+  'designer-segmented-option',
+  'designer-tab',
+  'designer-tablist',
+  'designer-stepper',
+  'designer-date-field',
+  'designer-field',
+  'designer-field-label',
+]);
+const sharedControlDomPrefixes = [
+  'designer-select-',
+  'designer-segmented-',
+  'designer-stepper-',
+  'designer-calendar-',
+  'designer-date-field',
+];
+
+function isSharedControlDomClass(token) {
+  return (
+    sharedControlDomClasses.has(token) ||
+    sharedControlDomPrefixes.some((prefix) => token.startsWith(prefix))
+  );
+}
+
+function classStringsInAssignments(source) {
+  const text = stripComments(source);
+  const strings = [];
+  for (const match of text.matchAll(
+    /(?:className\s*\+?=|classList\.(?:add|toggle|remove)\s*\()/g,
+  )) {
+    const start = match.index ?? 0;
+    const semicolon = text.indexOf(';', start);
+    const end = semicolon === -1 ? Math.min(text.length, start + 500) : semicolon;
+    for (const stringMatch of text.slice(start, end).matchAll(/(['"`])([\s\S]*?)\1/g)) {
+      strings.push(stringMatch[2]);
+    }
+  }
+  return strings;
+}
+
+function hasHandBuiltControlClass(source) {
+  return classStringsInAssignments(source).some((className) =>
+    className.split(/\s+/).some((token) => token !== '' && isSharedControlDomClass(token)),
+  );
+}
+
+function hasTemplateControl(source) {
+  const text = stripComments(source);
+  for (const match of text.matchAll(/class\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
+    const className = match[1] ?? match[2] ?? '';
+    if (className.split(/\s+/).some((token) => token !== '' && isSharedControlDomClass(token))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+for (const [relative, owner] of templateAdoptionOwners) {
+  const ownerFile = join(browserRoot, owner);
+  if (
+    !existsSync(ownerFile) ||
+    !readFileSync(ownerFile, 'utf8').includes('adoptDesignerFormControls')
+  ) {
+    throw new Error(`DESIGNER_UI_TEMPLATE_OWNER_INVALID:${relative} -> ${owner}`);
+  }
+}
 
 const formPrimitiveRules = [
   {
     id: 'RAW_FORM_CONTROL',
-    pattern: /createElement\(\s*(['"])(?:input|select|textarea)\1\s*\)/,
+    test: (source) => /createElement\(\s*(['"])(?:input|select|textarea)\1\s*\)/.test(source),
     hint: 'use designer-ui-primitives',
   },
   {
     id: 'HAND_BUILT_FIELD_ROW',
-    pattern: /['"]designer-field designer-field-label/,
+    test: (source) =>
+      /(?:['"`]designer-field designer-field-label|['"`]variable-field(?:\s|['"`]))/.test(source),
     hint: 'use createDesignerFieldRow / createDesignerFieldElement',
+  },
+  {
+    id: 'HAND_BUILT_CONTROL_CLASS',
+    test: hasHandBuiltControlClass,
+    hint: 'use createDesignerButton / createDesignerInput / createDesignerSegmented / createDesignerTabs',
+  },
+  {
+    id: 'CONTROL_TEMPLATE_NOT_ADOPTED',
+    test: hasTemplateControl,
+    hint: 'call adoptDesignerFormControls after rendering, or register the owner in templateAdoptionOwners',
   },
 ];
 
+function isAdoptedTemplateOwner(relative, source) {
+  return templateAdoptionOwners.has(relative) || source.includes('adoptDesignerFormControls');
+}
+
+const violationsByRule = new Map(formPrimitiveRules.map((rule) => [rule.id, []]));
+for (const file of browserFiles) {
+  const relative = relativeFromBrowser(file);
+  if (formPrimitiveOrigins.has(relative)) continue;
+  const source = readFileSync(file, 'utf8');
+  for (const rule of formPrimitiveRules) {
+    if (!rule.test(source)) continue;
+    if (rule.id === 'CONTROL_TEMPLATE_NOT_ADOPTED' && isAdoptedTemplateOwner(relative, source)) {
+      continue;
+    }
+    violationsByRule.get(rule.id)?.push(relative);
+  }
+}
+
+if (process.argv.includes('--report')) {
+  console.log(JSON.stringify(Object.fromEntries(violationsByRule), null, 2));
+  process.exit(0);
+}
+
 for (const rule of formPrimitiveRules) {
-  const violations = browserFiles
-    .filter((file) => {
-      const relative = relativeFromBrowser(file);
-      return !formPrimitiveOrigins.has(relative) && !formPrimitiveDebt.has(relative);
-    })
-    .filter((file) => rule.pattern.test(readFileSync(file, 'utf8')))
-    .map(relativeFromBrowser);
+  const violations = (violationsByRule.get(rule.id) ?? []).filter(
+    (relative) => !controlDomDebt.has(relative),
+  );
   if (violations.length > 0) {
     throw new Error(`DESIGNER_UI_${rule.id}_FORBIDDEN: ${violations.join(', ')} (${rule.hint})`);
   }
@@ -143,17 +266,21 @@ for (const rule of formPrimitiveRules) {
 // 债务清单本身必须跟着收缩：某条已不再命中任何规则（或文件已删除）却继续留着，
 // 这道门禁就对「新增」失去敏感度——它只会证明历史，不再约束现在。条目只在迁移
 // 完成时删除，不允许长期挂空。
-const staleFormPrimitiveDebt = [...formPrimitiveDebt].filter((relative) => {
+const staleControlDomDebt = [...controlDomDebt].filter((relative) => {
   const file = join(browserRoot, relative);
-  if (!existsSync(file)) {
-    return true;
-  }
+  if (!existsSync(file)) return true;
   const source = readFileSync(file, 'utf8');
-  return !formPrimitiveRules.some((rule) => rule.pattern.test(source));
+  return !formPrimitiveRules.some((rule) => {
+    if (!rule.test(source)) return false;
+    if (rule.id === 'CONTROL_TEMPLATE_NOT_ADOPTED' && isAdoptedTemplateOwner(relative, source)) {
+      return false;
+    }
+    return true;
+  });
 });
 
-if (staleFormPrimitiveDebt.length > 0) {
+if (staleControlDomDebt.length > 0) {
   throw new Error(
-    `DESIGNER_UI_FORM_PRIMITIVE_DEBT_STALE: ${staleFormPrimitiveDebt.join(', ')} (迁移完成后请从 formPrimitiveDebt 删除对应行)`,
+    `DESIGNER_UI_CONTROL_DOM_DEBT_STALE: ${staleControlDomDebt.join(', ')} (迁移完成后请从 controlDomDebt 删除对应行)`,
   );
 }

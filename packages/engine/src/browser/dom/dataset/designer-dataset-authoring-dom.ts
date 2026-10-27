@@ -1,9 +1,11 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../../ui/designer-icons.js';
+import { createDesignerToggleField } from '../designer-field-primitives.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
-  createDesignerCheckbox,
+  createDesignerButton,
+  createDesignerIconButton,
   createDesignerInput,
+  createDesignerSegmented,
   createDesignerSelect,
 } from '../designer-ui-primitives.js';
 import { createDataGroup } from './designer-data-group-dom.js';
@@ -11,7 +13,6 @@ import type {
   DesignerDataSourcePanelOptions,
   DesignerDatasetAuthoringAction,
   DesignerDatasetAuthoringView,
-  DesignerDatasetEditorMode,
   DesignerDatasetRefreshStrategy,
 } from './designer-dataset-types.js';
 
@@ -29,19 +30,25 @@ export function renderDatasetAuthoring(
   heading.className = 'designer-inspector-section-title';
   heading.textContent = DESIGNER_UI_TEXT.dataSource.authoringTitle;
 
-  const editor = options.panel.ownerDocument.createElement('div');
-  editor.className = 'designer-dataset-editor-modes';
-  editor.setAttribute('role', 'group');
-  editor.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.authoringTitle);
-  editor.append(
-    authoringModeButton(options, 'visual', DESIGNER_UI_TEXT.dataSource.visualEditor),
-    authoringModeButton(
-      options,
-      'code',
-      DESIGNER_UI_TEXT.dataSource.codeEditor,
-      'open-code-editor',
-    ),
-  );
+  const editor = createDesignerSegmented(options.panel.ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataSource.authoringTitle,
+    selected: options.authoring.editorMode,
+    options: [
+      {
+        value: 'visual',
+        label: DESIGNER_UI_TEXT.dataSource.visualEditor,
+        dataset: { datasetEditorMode: 'visual' },
+      },
+      {
+        value: 'code',
+        label: DESIGNER_UI_TEXT.dataSource.codeEditor,
+        dataset: {
+          datasetAuthoringAction: 'open-code-editor',
+          datasetEditorMode: 'code',
+        },
+      },
+    ],
+  }).element;
 
   const filter = options.panel.ownerDocument.createElement('div');
   filter.className = 'designer-dataset-authoring-row';
@@ -209,9 +216,7 @@ function readonlyInstanceFacts(options: DesignerDataSourcePanelOptions): HTMLEle
     row.append(name, text);
     wrap.appendChild(row);
   }
-  const jump = ownerDocument.createElement('button');
-  jump.type = 'button';
-  jump.className = 'designer-control designer-button';
+  const jump = createDesignerButton(ownerDocument);
   // 动作名不能叫 `apply`：空态「apply 计数为 0」是硬判据。
   jump.dataset.datasetAction = 'open-instance';
   jump.dataset.editInWorkbench = 'true';
@@ -248,22 +253,6 @@ export function refreshPolicyText(options: DesignerDataSourcePanelOptions): stri
   return DESIGNER_UI_TEXT.data.groups.refreshManual;
 }
 
-function authoringModeButton(
-  options: DesignerDataSourcePanelOptions,
-  mode: DesignerDatasetEditorMode,
-  label: string,
-  action?: DesignerDatasetAuthoringAction,
-): HTMLButtonElement {
-  const button = options.panel.ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button';
-  button.dataset.datasetEditorMode = mode;
-  if (action !== undefined) button.dataset.datasetAuthoringAction = action;
-  button.setAttribute('aria-pressed', String(options.authoring.editorMode === mode));
-  button.textContent = label;
-  return button;
-}
-
 function authoringAction(
   ownerDocument: Document,
   action: DesignerDatasetAuthoringAction,
@@ -271,29 +260,27 @@ function authoringAction(
   disabled = false,
   disabledHint?: string,
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button';
-  button.dataset.datasetAuthoringAction = action;
-  button.disabled = disabled;
   if (action === 'copy-data' || action === 'fullscreen-edit') {
-    button.classList.add('designer-icon-button', 'designer-dataset-authoring-icon-action');
-    button.dataset.variant = 'ghost';
-    button.setAttribute('data-tip', disabled && disabledHint !== undefined ? disabledHint : label);
-    button.setAttribute(
-      'aria-label',
-      disabled && disabledHint !== undefined ? `${label} · ${disabledHint}` : label,
-    );
-    button.innerHTML = designerIcon(action === 'copy-data' ? 'copy' : 'fit');
-  } else {
-    button.textContent = label;
+    const button = createDesignerIconButton(ownerDocument, {
+      ariaLabel: disabled && disabledHint !== undefined ? `${label} · ${disabledHint}` : label,
+      className: 'designer-dataset-authoring-icon-action',
+      disabled,
+      icon: action === 'copy-data' ? 'copy' : 'fit',
+      label,
+      tip: disabled && disabledHint !== undefined ? disabledHint : label,
+      variant: 'ghost',
+    });
+    button.dataset.datasetAuthoringAction = action;
+    return button;
   }
+  const button = createDesignerButton(ownerDocument, { disabled, text: label });
+  button.dataset.datasetAuthoringAction = action;
   return button;
 }
 
 function authoringLabel(ownerDocument: Document, titleText: string, hint: string): HTMLElement {
   const label = ownerDocument.createElement('span');
-  label.className = 'designer-dataset-authoring-label designer-field-label';
+  label.className = 'designer-dataset-authoring-label';
   label.textContent = titleText;
   label.setAttribute('data-tip', hint);
   return label;
@@ -304,20 +291,18 @@ function authoringCheckbox(
   setting: 'loadingDisabled' | 'controlled',
   labelText: string,
   checked: boolean,
-): HTMLLabelElement {
-  const label = options.panel.ownerDocument.createElement('label');
-  label.className = 'designer-dataset-authoring-checkbox';
-  const input = createDesignerCheckbox(options.panel.ownerDocument, {
+): HTMLElement {
+  const { field, input } = createDesignerToggleField(options.panel.ownerDocument, {
     ariaLabel: labelText,
     checked,
-    value: String(checked),
+    className: 'designer-dataset-authoring-checkbox',
+    control: 'checkbox',
+    label: labelText,
+    labelClassName: 'designer-dataset-authoring-setting-label',
   });
   input.dataset.datasetAuthoringSetting = setting;
-  const text = options.panel.ownerDocument.createElement('span');
-  text.className = 'designer-dataset-authoring-setting-label';
-  text.textContent = labelText;
-  label.append(input, text);
-  return label;
+  input.value = String(checked);
+  return field;
 }
 
 function authoringRefreshControls(options: DesignerDataSourcePanelOptions): HTMLElement {

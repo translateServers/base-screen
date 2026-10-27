@@ -34,7 +34,9 @@
 
 .designer-color-palette-trigger:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-disabled);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
 }
 
 .designer-fill-color-checkerboard {
@@ -112,7 +114,7 @@
   overflow-y: auto;
   padding: 8px;
   border: 1px solid var(--designer-border-strong);
-  border-radius: calc(var(--designer-radius-control) + 2px);
+  border-radius: var(--designer-radius-4);
   background: var(--designer-surface-overlay);
   box-shadow: var(--designer-shadow-overlay);
 }
@@ -459,7 +461,8 @@
 }
 
 .designer-color-palette-action:disabled {
-  opacity: 0.45;
+  color: var(--designer-text-disabled);
+  cursor: not-allowed;
 }
 
 /* 线性参数占一列，径向中心 X/Y 在同一列内二等分。 */

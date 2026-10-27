@@ -70,7 +70,7 @@ describe('renderDesignerSelection', () => {
         },
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
     const catalog = {
       get: () =>
@@ -151,7 +151,7 @@ describe('renderDesignerSelection', () => {
         },
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
     const catalog = {
       get: () =>

@@ -3,6 +3,7 @@ import type {
   BaseScreenMaterialLibraryState,
 } from '../../common/operations/material-library/material-library-state.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { createDesignerButton } from '../dom/designer-ui-primitives.js';
 import { materialLibraryActions } from '../dom/material-library/designer-material-library-dom.js';
 
 const MAX_ERROR_ENTRIES = 50;
@@ -168,7 +169,7 @@ export class DesignerErrorConsoleController {
     surface.setAttribute('role', error ? 'alert' : 'status');
     surface.setAttribute('aria-live', error ? 'assertive' : 'polite');
     const sectionTitle = surface.ownerDocument.createElement('h3');
-    sectionTitle.className = 'error-console-section-title';
+    sectionTitle.className = 'designer-panel-section-title';
     sectionTitle.textContent = DESIGNER_UI_TEXT.errorConsole.currentStatus;
     const copy = surface.ownerDocument.createElement('div');
     copy.className = 'material-library-status-copy';
@@ -196,7 +197,7 @@ export class DesignerErrorConsoleController {
     list.replaceChildren();
     if (this.#entries.length === 0) {
       const empty = list.ownerDocument.createElement('p');
-      empty.className = 'error-console-empty';
+      empty.className = 'designer-empty-state';
       empty.textContent = isActionableState(this.#currentState)
         ? DESIGNER_UI_TEXT.errorConsole.emptyWithCurrent
         : DESIGNER_UI_TEXT.errorConsole.empty;
@@ -277,11 +278,10 @@ function createMaterialLibraryAction(
   ownerDocument: Document,
   action: BaseScreenMaterialLibraryAction,
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button';
+  const button = createDesignerButton(ownerDocument, {
+    text: DESIGNER_UI_TEXT.materialLibrary.actions[action],
+  });
   button.dataset.materialLibraryAction = action;
-  button.textContent = DESIGNER_UI_TEXT.materialLibrary.actions[action];
   return button;
 }
 

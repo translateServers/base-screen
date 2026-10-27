@@ -5,6 +5,7 @@ import {
   type ScreenParseResult,
 } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { createDesignerButton } from '../dom/designer-ui-primitives.js';
 
 export interface DesignerImportCallbacks {
   readonly replaceDocument: (document: ScreenDocument) => ScreenParseResult<ScreenDocument>;
@@ -170,12 +171,8 @@ export class DesignerImportController {
     variant: 'neutral' | 'danger',
     label: string,
   ): HTMLButtonElement {
-    const button = ownerDocument.createElement('button');
-    button.type = 'button';
-    button.className = 'designer-control designer-button';
-    button.dataset.variant = variant;
+    const button = createDesignerButton(ownerDocument, { text: label, variant });
     button.dataset.action = action;
-    button.textContent = label;
     return button;
   }
 }

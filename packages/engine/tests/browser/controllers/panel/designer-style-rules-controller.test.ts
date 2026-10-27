@@ -59,7 +59,7 @@ function documentWith(rules: readonly ScreenComponentStyleRule[] = []): ScreenDo
       },
     ],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

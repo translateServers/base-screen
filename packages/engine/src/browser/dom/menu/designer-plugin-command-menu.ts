@@ -48,7 +48,7 @@ export function pluginCommandMenuButton(item: DesignerPluginCommandItem): string
   const id = escapeHtml(item.id);
   const name = escapeHtml(item.name);
   return (
-    `<button type="button" class="designer-control designer-button designer-menu-item"` +
+    `<button type="button" class="designer-menu-item"` +
     ` data-plugin-command="${id}" role="menuitem"${disabled}>` +
     `<span class="menu-item-icon" aria-hidden="true"><span class="menu-item-glyph">${designerIcon(
       'sparkle',

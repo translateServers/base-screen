@@ -4,15 +4,16 @@ import type {
   DiagnosticSegment,
 } from '../diagnostics/collector.js';
 import { canonicalByteLength } from '../json/canonical.js';
-import type { ScreenBlueprintValueExpression } from '../types/document.js';
+import type { ScreenBlueprintRelation, ScreenBlueprintValueExpression } from '../types/document.js';
 import type { ScreenJsonValue } from '../types/json.js';
+import { deriveScreenBlueprintRules } from './blueprint-relations.js';
 import { validateBlueprintStrictKeys } from './blueprint-strict.js';
 import {
-  MAX_BLUEPRINT_ACTIONS_PER_RULE,
   MAX_BLUEPRINT_EXPRESSION_BYTES,
   MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
   MAX_BLUEPRINT_EXPRESSION_DEPTH,
-  MAX_BLUEPRINT_RULES,
+  MAX_BLUEPRINT_RELATION_GROUPS,
+  MAX_BLUEPRINT_RELATIONS_PER_GROUP,
 } from './limits.js';
 import { blueprintSchema } from './schema.js';
 import { isJsonObject } from './strict-object.js';
@@ -46,63 +47,62 @@ export function validateBlueprint(
     );
     return false;
   }
-  const rules = blueprint.rules as readonly unknown[];
-  if (rules.length > MAX_BLUEPRINT_RULES) {
+  const relations = result.data.relations as readonly ScreenBlueprintRelation[];
+  const derived = deriveScreenBlueprintRules({ relations });
+  if (derived.length > MAX_BLUEPRINT_RELATION_GROUPS) {
     collector.add(
       'DOCUMENT_LIMIT_EXCEEDED',
-      at(['blueprint', 'rules']),
+      at(['blueprint', 'relations']),
       phase,
-      'Blueprint has too many rules.',
+      'Blueprint has too many relation groups.',
     );
     return false;
   }
-  for (let index = 0; index < rules.length; index++) {
-    const rule = rules[index] as {
-      readonly actions: readonly unknown[];
-      readonly condition?: {
-        readonly left: ScreenBlueprintValueExpression;
-        readonly right?: ScreenBlueprintValueExpression;
-      };
-    };
-    if (rule.actions.length > MAX_BLUEPRINT_ACTIONS_PER_RULE) {
-      collector.add(
-        'DOCUMENT_LIMIT_EXCEEDED',
-        at(['blueprint', 'rules', index, 'actions']),
-        phase,
-        'Blueprint rule has too many actions.',
-      );
-    }
-    if (rule.condition) {
+  for (const rule of derived) {
+    if (rule.relationIds.length <= MAX_BLUEPRINT_RELATIONS_PER_GROUP) continue;
+    const relationIndex = relations.findIndex((relation) => relation.id === rule.id);
+    collector.add(
+      'DOCUMENT_LIMIT_EXCEEDED',
+      at(['blueprint', 'relations', Math.max(0, relationIndex), 'id']),
+      phase,
+      'Blueprint relation group has too many relations.',
+    );
+    return false;
+  }
+  for (let index = 0; index < relations.length; index++) {
+    const relation = relations[index]!;
+    if (relation.type === 'semantic') continue;
+    if (relation.condition !== undefined) {
       validateBlueprintExpression(
-        rule.condition.left,
-        ['blueprint', 'rules', index, 'condition', 'left'],
+        relation.condition.left,
+        ['blueprint', 'relations', index, 'condition', 'left'],
         at,
         collector,
         phase,
       );
-      if (rule.condition.right !== undefined) {
+      if (relation.condition.right !== undefined) {
         validateBlueprintExpression(
-          rule.condition.right,
-          ['blueprint', 'rules', index, 'condition', 'right'],
+          relation.condition.right,
+          ['blueprint', 'relations', index, 'condition', 'right'],
           at,
           collector,
           phase,
         );
       }
     }
-    for (let actionIndex = 0; actionIndex < rule.actions.length; actionIndex++) {
-      const action = rule.actions[actionIndex] as Record<string, unknown>;
-      if (
-        action.type === 'component-visibility' ||
-        action.type === 'request-variable' ||
-        action.type === 'request-component-data'
-      ) {
-        continue;
-      }
-      const field = action.type === 'set-variable' ? 'value' : 'payload';
+    const effect = relation.effect;
+    if (effect.type === 'set-variable') {
       validateBlueprintExpression(
-        action[field] as ScreenBlueprintValueExpression,
-        ['blueprint', 'rules', index, 'actions', actionIndex, field],
+        effect.value,
+        ['blueprint', 'relations', index, 'effect', 'value'],
+        at,
+        collector,
+        phase,
+      );
+    } else if (effect.type === 'emit-host-event' || effect.type === 'host-action') {
+      validateBlueprintExpression(
+        effect.payload,
+        ['blueprint', 'relations', index, 'effect', 'payload'],
         at,
         collector,
         phase,

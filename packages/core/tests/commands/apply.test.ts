@@ -218,18 +218,24 @@ describe('applyScreenDocumentCommand', () => {
     const result = applyScreenDocumentCommand(document, {
       type: 'replace-blueprint',
       blueprint: {
-        rules: [
+        relations: [
           {
-            id: 'rule-1',
-            trigger: { type: 'material-event', componentId: 'group', eventName: 'valueClick' },
-            actions: [],
+            type: 'behavior',
+            id: 'relation-1',
+            source: {
+              kind: 'component',
+              componentId: 'group',
+              event: { type: 'material-event', eventName: 'valueClick' },
+            },
+            target: { kind: 'component', componentId: 'other' },
+            effect: { type: 'request-component-data' },
           },
         ],
       },
     });
 
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.document.blueprint.rules[0]?.id).toBe('rule-1');
+    if (result.ok) expect(result.document.blueprint.relations[0]?.id).toBe('relation-1');
   });
 
   it('does not retain mutable command JSON references', () => {

@@ -1,4 +1,5 @@
 import {
+  deriveScreenBlueprintRules,
   parseScreenDocument,
   type ScreenBlueprint,
   type ScreenDiagnostic,
@@ -22,7 +23,9 @@ import {
   commitDesignerBlueprintViewport,
   componentBlueprintNodeId,
   deleteDesignerBlueprintSelection,
+  HOST_BLUEPRINT_NODE_ID,
   insertDesignerBlueprintComponentNode,
+  insertDesignerBlueprintHostNode,
   insertDesignerBlueprintVariableNode,
   variableBlueprintNodeId,
 } from '../../../common/operations/blueprint/designer-blueprint-model.js';
@@ -39,7 +42,6 @@ import {
   type BaseScreenDesignerWorkbenchMode,
   parseBaseScreenBlueprintCanvasCommand,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
-import { insertDesignerBlueprintLibraryNode } from '../../../common/operations/blueprint/designer-blueprint-unconnected-nodes.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import {
   blueprintCapabilityReader,
@@ -255,34 +257,21 @@ export class DesignerBlueprintCanvasBridge {
         if (result.ok) this.callbacks.select(null, false);
         break;
       case 'insert-node': {
-        const insertion =
+        const nodeId =
           command.kind === 'component'
-            ? {
-                nodeId: componentBlueprintNodeId(command.componentId),
-                blueprint: insertDesignerBlueprintComponentNode(
-                  document,
-                  command.componentId,
-                  command.position,
-                ),
-              }
+            ? componentBlueprintNodeId(command.componentId)
             : command.kind === 'variable'
-              ? {
-                  nodeId: variableBlueprintNodeId(command.variableId),
-                  blueprint: insertDesignerBlueprintVariableNode(
-                    document,
-                    command.variableId,
-                    command.position,
-                  ),
-                }
-              : insertDesignerBlueprintLibraryNode(
-                  document,
-                  command.kind,
-                  command.variableId,
-                  command.position,
-                );
-        result = this.commitBlueprint(insertion === null ? null : insertion.blueprint);
-        if (result.ok && insertion !== null) {
-          result = this.callbacks.select({ kind: 'node', id: insertion.nodeId }, false);
+              ? variableBlueprintNodeId(command.variableId)
+              : HOST_BLUEPRINT_NODE_ID;
+        const blueprint =
+          command.kind === 'component'
+            ? insertDesignerBlueprintComponentNode(document, command.componentId, command.position)
+            : command.kind === 'variable'
+              ? insertDesignerBlueprintVariableNode(document, command.variableId, command.position)
+              : insertDesignerBlueprintHostNode(document.blueprint, command.position);
+        result = this.commitBlueprint(blueprint);
+        if (result.ok) {
+          result = this.callbacks.select({ kind: 'node', id: nodeId }, false);
         }
         break;
       }
@@ -337,14 +326,20 @@ export class DesignerBlueprintCanvasBridge {
     if (!traced.ok) return traced;
     const executedEdgeIds: string[] = [];
     const failedRuleIds: string[] = [];
+    const failedRelationIds: string[] = [];
     const lines: string[] = [];
+    const rules = deriveScreenBlueprintRules(document.blueprint);
     for (const ruleTrace of traced.value.ruleTraces) {
       if (!ruleTrace.triggerMatched) continue;
-      const rule = document.blueprint.rules.find((item) => item.id === ruleTrace.ruleId);
-      if (rule?.condition !== undefined) executedEdgeIds.push(`edge:${ruleTrace.ruleId}:trigger`);
-      if (ruleTrace.condition === 'failed') failedRuleIds.push(ruleTrace.ruleId);
-      for (const action of ruleTrace.actions) {
-        executedEdgeIds.push(`edge:${ruleTrace.ruleId}:action:${action.actionIndex}`);
+      const rule = rules.find((item) => item.id === ruleTrace.ruleId);
+      if (ruleTrace.condition === 'failed') {
+        failedRuleIds.push(ruleTrace.ruleId);
+        if (rule !== undefined) failedRelationIds.push(...rule.relationIds);
+      } else if (rule !== undefined) {
+        for (const action of ruleTrace.actions) {
+          const relationId = rule.relationIds[action.actionIndex];
+          if (relationId !== undefined) executedEdgeIds.push(`relation:${relationId}`);
+        }
       }
       const condition =
         ruleTrace.condition === 'failed'
@@ -361,7 +356,7 @@ export class DesignerBlueprintCanvasBridge {
       );
     }
     if (lines.length === 0) lines.push(DESIGNER_UI_TEXT.blueprint.simulationEmpty);
-    this.#trace = { executedEdgeIds, failedRuleIds, lines };
+    this.#trace = { executedEdgeIds, failedRuleIds, failedRelationIds, lines };
     return { ok: true, value: null, diagnostics: [] };
   }
 

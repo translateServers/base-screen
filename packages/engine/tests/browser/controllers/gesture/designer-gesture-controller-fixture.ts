@@ -41,7 +41,7 @@ export function document(): ScreenDocument {
       },
     ],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

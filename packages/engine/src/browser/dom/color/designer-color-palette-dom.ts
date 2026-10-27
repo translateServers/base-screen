@@ -1,5 +1,6 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
+import { createDesignerButton, createDesignerIconButton } from '../designer-ui-primitives.js';
 import { renderPaletteBody } from './designer-color-palette-body-dom.js';
 import {
   addColorPaletteStop,
@@ -62,9 +63,9 @@ export {
 } from './designer-color-palette-model.js';
 
 function createColorPaletteTrigger(ownerDocument: Document, popoverId: string): HTMLButtonElement {
-  const trigger = ownerDocument.createElement('button');
-  trigger.type = 'button';
-  trigger.className = 'designer-control designer-color-palette-trigger';
+  const trigger = createDesignerButton(ownerDocument, {
+    className: 'designer-color-palette-trigger',
+  });
   trigger.dataset.colorPaletteAction = 'toggle';
   trigger.setAttribute('aria-haspopup', 'dialog');
   trigger.setAttribute('aria-controls', popoverId);
@@ -137,12 +138,12 @@ export function createDesignerColorPalette(
   popover.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.colorPickerTitle);
   const toolbar = ownerDocument.createElement('div');
   toolbar.className = 'designer-color-popover-toolbar';
-  const close = ownerDocument.createElement('button');
-  close.type = 'button';
-  close.className = 'designer-color-popover-close';
+  const close = createDesignerIconButton(ownerDocument, {
+    className: 'designer-color-popover-close',
+    icon: 'close',
+    label: DESIGNER_UI_TEXT.propertiesPanel.colorPickerClose,
+  });
   close.dataset.colorPaletteAction = 'close';
-  close.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.colorPickerClose);
-  close.innerHTML = designerIcon('close');
 
   const modes = ownerDocument.createElement('div');
   modes.className = 'designer-color-palette-modes';

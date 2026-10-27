@@ -8,6 +8,7 @@ import { SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY } from '@base-screen/c
 import type { ScreenBlueprint } from '@base-screen/contracts';
 import type { ScreenBlueprintComponentVisibilityAction } from '@base-screen/contracts';
 import type { ScreenBlueprintHostEvent } from '@base-screen/contracts';
+import type { ScreenBlueprintRule } from '@base-screen/contracts';
 import { ScreenCanvas } from '@base-screen/contracts';
 import type { ScreenCanvasBackground } from '@base-screen/contracts';
 import type { ScreenCanvasBackgroundImageFit } from '@base-screen/contracts';
@@ -260,7 +261,7 @@ export interface ScreenBlueprintPlan {
     // (undocumented)
     readonly initialVariables: ScreenJsonObject;
     // (undocumented)
-    readonly rules: ScreenDocument['blueprint']['rules'];
+    readonly rules: readonly ScreenBlueprintRule[];
 }
 
 // @public (undocumented)

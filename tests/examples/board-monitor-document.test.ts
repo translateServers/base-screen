@@ -278,28 +278,33 @@ describe('production monitor document', () => {
       parsed.value.components.map((component) => [component.id, component]),
     );
     const variableIds = new Set(parsed.value.variables.map((variable) => variable.id));
-    const rules = parsed.value.blueprint.rules;
-    expect(rules.map((rule) => rule.id)).toEqual(['rule-line', 'rule-window', 'rule-severity']);
+    const relations = parsed.value.blueprint.relations;
+    expect(relations.map((relation) => relation.id)).toEqual([
+      'rule-line',
+      'rule-window',
+      'rule-severity',
+    ]);
 
-    for (const rule of rules) {
-      expect(rule.trigger.type).toBe('material-event');
-      if (rule.trigger.type !== 'material-event') continue;
-      const component = componentById.get(rule.trigger.componentId);
-      expect(component, `${rule.id} → ${rule.trigger.componentId}`).toBeDefined();
+    for (const relation of relations) {
+      expect(relation.type).toBe('behavior');
+      if (relation.type !== 'behavior') continue;
+      expect(relation.source.kind).toBe('component');
+      if (relation.source.kind !== 'component') continue;
+      const component = componentById.get(relation.source.componentId);
+      expect(component, `${relation.id} → ${relation.source.componentId}`).toBeDefined();
       if (component === undefined) continue;
       const manifest = MANIFESTS.find((item) => item.type === component.type);
-      // eventName 必须是该物料真实声明的事件，否则规则永远不会触发。
-      expect(manifest?.events).toContain(rule.trigger.eventName);
-      expect(rule.actions).toHaveLength(1);
-      for (const action of rule.actions) {
-        expect(action.type).toBe('set-variable');
-        if (action.type !== 'set-variable') continue;
-        expect(variableIds.has(action.variableId)).toBe(true);
-        expect(action.value.kind).toBe('event-payload');
-        if (action.value.kind !== 'event-payload') continue;
-        // 取值路径从物料事件 payload（`{ rowIndex, row }`）里取。
-        expect(action.value.path).toEqual(['row', expect.any(String)]);
-      }
+      // eventName 必须是该物料真实声明的事件，否则关系永远不会触发。
+      expect(manifest?.events).toContain(relation.source.event.eventName);
+      expect(relation.target.kind).toBe('variable');
+      if (relation.target.kind !== 'variable') continue;
+      expect(variableIds.has(relation.target.variableId)).toBe(true);
+      expect(relation.effect.type).toBe('set-variable');
+      if (relation.effect.type !== 'set-variable') continue;
+      expect(relation.effect.value.kind).toBe('event-payload');
+      if (relation.effect.value.kind !== 'event-payload') continue;
+      // 取值路径从物料事件 payload（`{ rowIndex, row }`）里取。
+      expect(relation.effect.value.path).toEqual(['row', expect.any(String)]);
     }
   });
 

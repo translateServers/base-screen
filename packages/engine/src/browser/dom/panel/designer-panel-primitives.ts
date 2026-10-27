@@ -2,7 +2,7 @@ import type { ScreenJsonValue } from '@base-screen/contracts';
 import type { BaseScreenMaterialPropSchema } from '@base-screen/plugin-core';
 import type { DesignerInspectorContext } from '../../../common/operations/style/designer-inspector.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { type DesignerIconName, designerIcon } from '../../ui/designer-icons.js';
+import type { DesignerIconName } from '../../ui/designer-icons.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
 import {
   appendDesignerRangeField,
@@ -13,6 +13,7 @@ import {
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
   appendDesignerFieldMessage,
+  createDesignerButton,
   createDesignerCheckbox,
   createDesignerIconButton,
   createDesignerInput,
@@ -21,6 +22,7 @@ import {
   createDesignerSwitch,
   createDesignerTextarea,
 } from '../designer-ui-primitives.js';
+import { createDesignerSection } from './designer-chrome-primitives.js';
 
 function isSelectLike(
   input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
@@ -358,8 +360,7 @@ function appendStyleSegmentedControl(
       label: optionValue,
       ariaLabel: optionValue,
       icon: icons[optionValue] ?? 'align-left',
-      className: 'designer-control designer-button',
-      dataset: { variant: 'ghost', segmentedValue: optionValue },
+      dataset: { segmentedValue: optionValue },
     })),
   });
   for (const [optionValue, option] of buttons) {
@@ -378,20 +379,7 @@ export function appendSection(parent: HTMLElement, title: string, advanced = fal
   // Sections render as native disclosures so every region can be collapsed with
   // pointer or keyboard; open state is persisted by the inspector group
   // preferences machinery in DesignerPanelController.
-  const section = parent.ownerDocument.createElement('details');
-  section.className = 'designer-inspector-section designer-inspector-disclosure';
-  section.open = true;
-  if (advanced) section.dataset.inspectorAdvanced = 'true';
-  const summary = parent.ownerDocument.createElement('summary');
-  summary.className = 'designer-inspector-section-title designer-inspector-section-summary';
-  summary.textContent = title;
-  const disclosure = parent.ownerDocument.createElement('span');
-  disclosure.className = 'designer-inspector-section-disclosure';
-  disclosure.innerHTML = designerIcon('chevron-down');
-  summary.appendChild(disclosure);
-  section.appendChild(summary);
-  parent.appendChild(section);
-  return section;
+  return createDesignerSection(parent, { advanced, title }).element;
 }
 
 export function appendFieldGrid(parent: HTMLElement): HTMLElement {
@@ -414,16 +402,12 @@ export function appendActionButton(
   disabled: boolean,
   unavailableReason: string,
 ): void {
-  const button = parent.ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-button';
+  const button = createDesignerButton(parent.ownerDocument, {
+    disabled,
+    text: label,
+    ...(disabled ? { ariaLabel: `${label}：${unavailableReason}`, tip: unavailableReason } : {}),
+  });
   button.dataset.action = action;
-  button.textContent = label;
-  button.disabled = disabled;
-  if (disabled) {
-    button.setAttribute('data-tip', unavailableReason);
-    button.ariaLabel = `${label}：${unavailableReason}`;
-  }
   parent.appendChild(button);
 }
 

@@ -50,7 +50,7 @@ const documentWith = (
     components: [component(overrides)],
     variables: [],
     dataSources,
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   }) as unknown as ScreenDocument;
 
 describe('effective value：文档优先，草稿只补空缺', () => {

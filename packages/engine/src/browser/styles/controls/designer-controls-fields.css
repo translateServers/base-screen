@@ -12,6 +12,25 @@
   white-space: nowrap;
 }
 
+.designer-field-toggle-copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--designer-space-1);
+}
+
+.designer-field-toggle .designer-field-label-text {
+  color: var(--designer-text-primary);
+}
+
+.designer-field-hint {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.designer-field-hint:empty {
+  display: none;
+}
+
 /* 画布背景图片行（ADR-0089）：URL 输入占满剩余宽度，宿主选择按钮固定右侧；
    行的外边距承接 field 间距，避免行高超过输入框导致按钮与输入垂直错位。 */
 .designer-canvas-background-row {

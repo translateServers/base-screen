@@ -178,6 +178,6 @@ function documentWithTarget(x: number, y = 0): ScreenDocument {
       measurementComponent('selected', 100, 146, 100, 34),
     ],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }

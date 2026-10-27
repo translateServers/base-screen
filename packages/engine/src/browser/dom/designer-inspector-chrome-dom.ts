@@ -11,6 +11,7 @@ import {
   designerInspectorSectionDisclosure,
   renderDesignerInspectorSearchResults,
 } from './designer-inspector-search-dom.js';
+import { createDesignerBadge } from './panel/designer-chrome-primitives.js';
 
 export type DesignerInspectorDensity = 'basic' | 'all';
 
@@ -149,8 +150,5 @@ export function applyDesignerInspectorFilters(
 
 function appendBadge(parent: HTMLElement, visible: boolean, label: string): void {
   if (!visible) return;
-  const badge = parent.ownerDocument.createElement('span');
-  badge.className = 'inspector-context-badge';
-  badge.textContent = label;
-  parent.appendChild(badge);
+  createDesignerBadge(parent, { text: label, tone: 'neutral' });
 }

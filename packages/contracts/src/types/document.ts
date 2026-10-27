@@ -329,12 +329,83 @@ export type ScreenBlueprintAction =
   | ScreenBlueprintHostAction
   | ScreenBlueprintComponentVisibilityAction;
 
+export type ScreenBlueprintSemanticRelationRole = 'related' | 'detail' | 'group' | 'drill-down';
+
+export type ScreenBlueprintRelationTarget =
+  | { readonly kind: 'component'; readonly componentId: string }
+  | { readonly kind: 'variable'; readonly variableId: string }
+  | { readonly kind: 'host' };
+
+export type ScreenBlueprintRelationSource =
+  | {
+      readonly kind: 'component';
+      readonly componentId: string;
+      readonly event: { readonly type: 'material-event'; readonly eventName: string };
+    }
+  | {
+      readonly kind: 'variable';
+      readonly variableId: string;
+      readonly event: {
+        readonly type: 'variable-event';
+        readonly eventName: 'data-updated' | 'request-state';
+      };
+    };
+
+export type ScreenBlueprintRelationEffect =
+  | {
+      readonly type: 'component-visibility';
+      readonly operation: ScreenBlueprintVisibilityOperation;
+      readonly transition?: ScreenBlueprintVisibilityTransition;
+    }
+  | { readonly type: 'request-component-data' }
+  | { readonly type: 'set-variable'; readonly value: ScreenBlueprintValueExpression }
+  | { readonly type: 'request-variable' }
+  | {
+      readonly type: 'emit-host-event';
+      readonly eventName: string;
+      readonly payload: ScreenBlueprintValueExpression;
+    }
+  | {
+      readonly type: 'host-action';
+      readonly actionId: string;
+      readonly payload: ScreenBlueprintValueExpression;
+    };
+
+/** 一条行为关系恰好产生一个既有 action；目标身份只在 `target` 出现一次。 */
+export interface ScreenBlueprintBehaviorRelation {
+  readonly type: 'behavior';
+  readonly id: string;
+  readonly source: ScreenBlueprintRelationSource;
+  readonly condition?: ScreenBlueprintCondition;
+  readonly target: ScreenBlueprintRelationTarget;
+  readonly effect: ScreenBlueprintRelationEffect;
+  readonly requiredCapabilities?: readonly string[];
+}
+
+/** 只描述组件之间的业务含义，不参与运行时。 */
+export interface ScreenBlueprintSemanticRelation {
+  readonly type: 'semantic';
+  readonly id: string;
+  readonly source: { readonly kind: 'component'; readonly componentId: string };
+  readonly target: { readonly kind: 'component'; readonly componentId: string };
+  readonly role: ScreenBlueprintSemanticRelationRole;
+}
+
+export type ScreenBlueprintRelation =
+  | ScreenBlueprintBehaviorRelation
+  | ScreenBlueprintSemanticRelation;
+
+/**
+ * 派生运行时形态：不属于文档、不得持久化。
+ * `relationIds[i]` 与 `actions[i]` 一一对应；`id` 是组内首条关系的 id。
+ */
 export interface ScreenBlueprintRule {
   readonly id: string;
   readonly trigger: ScreenBlueprintTrigger;
   readonly requiredCapabilities?: readonly string[];
   readonly condition?: ScreenBlueprintCondition;
   readonly actions: readonly ScreenBlueprintAction[];
+  readonly relationIds: readonly string[];
 }
 
 export interface ScreenBlueprintLayoutNode {
@@ -356,7 +427,7 @@ export interface ScreenBlueprintLayout {
 }
 
 export interface ScreenBlueprint {
-  readonly rules: readonly ScreenBlueprintRule[];
+  readonly relations: readonly ScreenBlueprintRelation[];
   readonly layout?: ScreenBlueprintLayout;
 }
 

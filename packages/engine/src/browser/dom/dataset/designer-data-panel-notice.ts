@@ -1,5 +1,6 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../../ui/designer-icons.js';
+import { createDesignerButton } from '../designer-ui-primitives.js';
 import type { DesignerDataStateView } from './designer-data-state.js';
 
 /**
@@ -101,11 +102,11 @@ function writeNotice(
   text.textContent = notice.text;
   bar.appendChild(text);
   if (notice.retry) {
-    const retry = ownerDocument.createElement('button');
-    retry.type = 'button';
-    retry.className = 'designer-control designer-button designer-data-notice-retry';
+    const retry = createDesignerButton(ownerDocument, {
+      className: 'designer-data-notice-retry',
+      text: DESIGNER_UI_TEXT.data.notice.retry,
+    });
     retry.dataset.datasetAction = 'retry-link';
-    retry.textContent = DESIGNER_UI_TEXT.data.notice.retry;
     bar.appendChild(retry);
   }
   slot.appendChild(bar);

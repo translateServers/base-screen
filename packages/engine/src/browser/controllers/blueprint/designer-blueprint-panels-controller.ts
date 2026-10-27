@@ -1,5 +1,6 @@
 import {
   type ScreenBlueprint,
+  type ScreenBlueprintRelationEffect,
   type ScreenDocument,
   type ScreenParseResult,
 } from '@base-screen/contracts';
@@ -7,10 +8,15 @@ import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import {
   componentBlueprintNodeId,
   deleteDesignerBlueprintSelection,
+  HOST_BLUEPRINT_NODE_ID,
   insertDesignerBlueprintComponentNode,
+  insertDesignerBlueprintHostNode,
   insertDesignerBlueprintVariableNode,
-  updateDesignerBlueprintAction,
+  removeDesignerBlueprintCondition,
   updateDesignerBlueprintCondition,
+  updateDesignerBlueprintEffect,
+  updateDesignerBlueprintSemanticRole,
+  updateDesignerBlueprintSourceEvent,
   variableBlueprintNodeId,
 } from '../../../common/operations/blueprint/designer-blueprint-model.js';
 import type {
@@ -22,7 +28,6 @@ import type {
   BaseScreenDesignerWorkbenchMode,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
-import { insertDesignerBlueprintLibraryNode } from '../../../common/operations/blueprint/designer-blueprint-unconnected-nodes.js';
 import {
   type BaseScreenDesignerLeftPanelGroup,
   baseScreenDesignerLeftPanelGroupSupportsMode,
@@ -43,7 +48,7 @@ import {
 } from '../../dom/designer-left-panel-groups-dom.js';
 import {
   isDesignerBlueprintConditionOperator,
-  updateDesignerBlueprintActionFromTarget,
+  updateDesignerBlueprintEffectFromTarget,
 } from './designer-blueprint-panel-mutations.js';
 import { isInspectorTab, isLibraryTab } from './designer-blueprint-panel-tabs.js';
 
@@ -214,21 +219,95 @@ export class DesignerBlueprintPanelsController {
       this.report(result);
       return true;
     }
-    const insert = target.closest<HTMLButtonElement>('[data-blueprint-insert]');
-    if (insert !== null) {
-      const kind = insert.dataset.blueprintInsert;
-      if (kind === 'condition' || kind === 'set-variable' || kind === 'emit-host-event') {
-        const document = this.callbacks.getDocument();
-        const insertion =
-          document === undefined
-            ? null
-            : insertDesignerBlueprintLibraryNode(document, kind, insert.dataset.variableId);
-        const result = this.callbacks.commitBlueprint(insertion?.blueprint ?? null);
-        if (result.ok && insertion !== null) {
-          this.callbacks.select({ kind: 'node', id: insertion.nodeId }, true);
+    const insertHost = target.closest<HTMLButtonElement>('[data-blueprint-insert-host]');
+    if (insertHost !== null) {
+      const document = this.callbacks.getDocument();
+      if (document !== undefined) {
+        const result = this.callbacks.commitBlueprint(
+          insertDesignerBlueprintHostNode(document.blueprint),
+        );
+        if (result.ok) {
+          this.callbacks.select({ kind: 'node', id: HOST_BLUEPRINT_NODE_ID }, true);
         }
         this.report(result);
       }
+      return true;
+    }
+    const effectButton = target.closest<HTMLButtonElement>('[data-blueprint-effect-type]');
+    if (effectButton !== null) {
+      const relationId = effectButton.dataset.relationId;
+      const document = this.callbacks.getDocument();
+      if (relationId !== undefined && document !== undefined) {
+        const relation = document.blueprint.relations.find(
+          (candidate) => candidate.id === relationId,
+        );
+        if (relation?.type === 'behavior') {
+          const effect = blueprintEffectForType(
+            effectButton.dataset.blueprintEffectType,
+            relation.target.kind,
+          );
+          if (effect !== null) {
+            this.report(
+              this.callbacks.commitBlueprint(
+                updateDesignerBlueprintEffect(document.blueprint, relationId, effect),
+              ),
+            );
+          }
+        }
+      }
+      return true;
+    }
+    const roleButton = target.closest<HTMLButtonElement>('[data-blueprint-semantic-role]');
+    if (roleButton !== null) {
+      const relationId = roleButton.dataset.relationId;
+      const role = roleButton.dataset.blueprintSemanticRole;
+      const document = this.callbacks.getDocument();
+      if (
+        relationId !== undefined &&
+        document !== undefined &&
+        (role === 'related' || role === 'detail' || role === 'group' || role === 'drill-down')
+      ) {
+        this.report(
+          this.callbacks.commitBlueprint(
+            updateDesignerBlueprintSemanticRole(document.blueprint, relationId, role),
+          ),
+        );
+      }
+      return true;
+    }
+    const addCondition = target.closest<HTMLElement>('[data-blueprint-add-condition]');
+    if (addCondition !== null) {
+      const relationId = addCondition.dataset.relationId;
+      const document = this.callbacks.getDocument();
+      if (relationId !== undefined && document !== undefined) {
+        this.report(
+          this.callbacks.commitBlueprint(
+            updateDesignerBlueprintCondition(document.blueprint, relationId, {
+              left: { kind: 'event-payload', path: [] },
+              operator: 'exists',
+            }),
+          ),
+        );
+      }
+      return true;
+    }
+    const removeCondition = target.closest<HTMLElement>('[data-blueprint-remove-condition]');
+    if (removeCondition !== null) {
+      const relationId = removeCondition.dataset.relationId;
+      const document = this.callbacks.getDocument();
+      if (relationId !== undefined && document !== undefined) {
+        this.report(
+          this.callbacks.commitBlueprint(
+            removeDesignerBlueprintCondition(document.blueprint, relationId),
+          ),
+        );
+      }
+      return true;
+    }
+    const selectRelation = target.closest<HTMLElement>('[data-blueprint-select-relation]');
+    if (selectRelation !== null) {
+      const id = selectRelation.dataset.blueprintSelectRelation;
+      if (id !== undefined) this.callbacks.select({ kind: 'edge', id }, true);
       return true;
     }
     if (target.closest('[data-blueprint-delete]') !== null) {
@@ -257,13 +336,6 @@ export class DesignerBlueprintPanelsController {
       payload = { kind, componentId: source.dataset.componentId };
     } else if (kind === 'variable' && source.dataset.variableId !== undefined) {
       payload = { kind, variableId: source.dataset.variableId };
-    } else if (kind === 'condition' || kind === 'set-variable' || kind === 'emit-host-event') {
-      payload = {
-        kind,
-        ...(source.dataset.variableId === undefined
-          ? {}
-          : { variableId: source.dataset.variableId }),
-      };
     }
     if (payload === undefined) return false;
     transfer.effectAllowed = 'copy';
@@ -319,34 +391,45 @@ export class DesignerBlueprintPanelsController {
   }
 
   onChange(target: Element): boolean {
-    const ruleId = (target as HTMLElement).dataset.ruleId;
-    if (ruleId === undefined) return false;
+    const relationId = (target as HTMLElement).dataset.relationId;
+    if (relationId === undefined) return false;
     const document = this.callbacks.getDocument();
     if (document === undefined) return true;
-    if (target.matches('[data-blueprint-condition-operator]')) {
-      const value = (target as HTMLSelectElement).value;
-      const rule = document.blueprint.rules.find((item) => item.id === ruleId);
+    const relation = document.blueprint.relations.find((item) => item.id === relationId);
+    if (relation === undefined) return true;
+    if ((target as HTMLElement).dataset.blueprintSourceEvent !== undefined) {
       this.report(
         this.callbacks.commitBlueprint(
-          rule?.condition === undefined || !isDesignerBlueprintConditionOperator(value)
+          updateDesignerBlueprintSourceEvent(
+            document.blueprint,
+            relationId,
+            (target as HTMLSelectElement).value,
+          ),
+        ),
+      );
+      return true;
+    }
+    if (target.matches('[data-blueprint-condition-operator]')) {
+      const value = (target as HTMLSelectElement).value;
+      this.report(
+        this.callbacks.commitBlueprint(
+          relation.type !== 'behavior' ||
+            relation.condition === undefined ||
+            !isDesignerBlueprintConditionOperator(value)
             ? null
-            : updateDesignerBlueprintCondition(document.blueprint, ruleId, {
-                ...rule.condition,
+            : updateDesignerBlueprintCondition(document.blueprint, relationId, {
+                ...relation.condition,
                 operator: value,
               }),
         ),
       );
       return true;
     }
-    const actionIndex = Number((target as HTMLElement).dataset.actionIndex);
-    const action = document.blueprint.rules.find((item) => item.id === ruleId)?.actions[
-      actionIndex
-    ];
-    if (!Number.isInteger(actionIndex) || action === undefined) return true;
-    const updated = updateDesignerBlueprintActionFromTarget(
+    if (relation.type !== 'behavior') return true;
+    const updated = updateDesignerBlueprintEffectFromTarget(
       target,
       document,
-      action,
+      relation,
       this.callbacks.getCatalog(),
     );
     if (!updated.ok) {
@@ -356,7 +439,7 @@ export class DesignerBlueprintPanelsController {
     if (updated.value !== null) {
       this.report(
         this.callbacks.commitBlueprint(
-          updateDesignerBlueprintAction(document.blueprint, ruleId, actionIndex, updated.value),
+          updateDesignerBlueprintEffect(document.blueprint, relationId, updated.value),
         ),
       );
     }
@@ -391,4 +474,37 @@ export class DesignerBlueprintPanelsController {
           group.id === groupId && baseScreenDesignerLeftPanelGroupSupportsMode(group, 'blueprint'),
       );
   }
+}
+
+function blueprintEffectForType(
+  value: string | undefined,
+  targetKind: 'component' | 'variable' | 'host',
+): ScreenBlueprintRelationEffect | null {
+  if (value === undefined) return null;
+  if (targetKind === 'component') {
+    if (value === 'component-visibility') {
+      return {
+        type: 'component-visibility',
+        operation: 'show',
+        transition: { effect: 'fade', durationMs: 200, easing: 'ease-in-out-quad' },
+      };
+    }
+    if (value === 'request-component-data') return { type: 'request-component-data' };
+    return null;
+  }
+  if (targetKind === 'variable') {
+    if (value === 'set-variable') {
+      return { type: 'set-variable', value: { kind: 'literal', value: null } };
+    }
+    if (value === 'request-variable') return { type: 'request-variable' };
+    return null;
+  }
+  if (value === 'emit-host-event') {
+    return {
+      type: 'emit-host-event',
+      eventName: 'host_event',
+      payload: { kind: 'event-payload', path: [] },
+    };
+  }
+  return null;
 }

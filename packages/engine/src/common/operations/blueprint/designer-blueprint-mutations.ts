@@ -1,34 +1,30 @@
 import type {
   ScreenBlueprint,
-  ScreenBlueprintAction,
-  ScreenBlueprintComponentVisibilityAction,
   ScreenBlueprintCondition,
   ScreenBlueprintLayoutNode,
   ScreenBlueprintLayoutViewport,
-  ScreenBlueprintRule,
+  ScreenBlueprintRelationEffect,
+  ScreenBlueprintSemanticRelationRole,
   ScreenDocument,
 } from '@base-screen/contracts';
-import { normalizeDesignerBlueprintRuleCapabilities } from './designer-blueprint-capabilities.js';
-import type { DesignerBlueprintEventOption } from './designer-blueprint-model-types.js';
 import {
-  appendDesignerBlueprintLayoutNode,
-  createDesignerBlueprintAction,
-  createDesignerVisibilityAction,
-  nextRuleId,
-  parseActionNodeId,
-  parseEdgeId,
-  removeAction,
+  insertLayoutNode,
+  parseRelationEdgeId,
+  relationReferencesComponent,
+  relationReferencesHost,
+  relationReferencesVariable,
   removeLayoutNodes,
-  removeRule,
-  updateRule,
+  removeRelation,
+  removeRelationCondition,
+  updateRelationCondition,
+  updateRelationEffect,
+  updateRelationSourceEvent,
+  updateSemanticRole,
 } from './designer-blueprint-mutation-helpers.js';
 import {
-  actionBlueprintNodeId,
   componentBlueprintNodeId,
-  conditionBlueprintNodeId,
   type DesignerBlueprintNodePosition,
-  materializeDesignerBlueprintLayoutNodes,
-  parseDesignerBlueprintUnconnectedNodeId,
+  HOST_BLUEPRINT_NODE_ID,
   variableBlueprintNodeId,
 } from './designer-blueprint-node-ids.js';
 import type { BaseScreenBlueprintCanvasSelection } from './designer-blueprint-protocol.js';
@@ -39,10 +35,7 @@ export function insertDesignerBlueprintComponentNode(
   position?: DesignerBlueprintNodePosition,
 ): ScreenBlueprint | null {
   if (!document.components.some((component) => component.id === componentId)) return null;
-  const id = componentBlueprintNodeId(componentId);
-  const nodes = materializeDesignerBlueprintLayoutNodes(document);
-  if (nodes.some((node) => node.id === id)) return null;
-  return appendDesignerBlueprintLayoutNode(document.blueprint, nodes, id, position);
+  return insertLayoutNode(document.blueprint, componentBlueprintNodeId(componentId), position);
 }
 
 export function insertDesignerBlueprintVariableNode(
@@ -51,92 +44,14 @@ export function insertDesignerBlueprintVariableNode(
   position?: DesignerBlueprintNodePosition,
 ): ScreenBlueprint | null {
   if (!document.variables.some((variable) => variable.id === variableId)) return null;
-  const id = variableBlueprintNodeId(variableId);
-  const nodes = materializeDesignerBlueprintLayoutNodes(document);
-  if (nodes.some((node) => node.id === id)) return null;
-  return appendDesignerBlueprintLayoutNode(document.blueprint, nodes, id, position);
+  return insertLayoutNode(document.blueprint, variableBlueprintNodeId(variableId), position);
 }
 
-export function createDesignerVisibilityRule(
-  document: ScreenDocument,
-  sourceComponentId: string,
-  eventName: string,
-  targetComponentId: string,
-  operation: ScreenBlueprintComponentVisibilityAction['operation'],
-  events: readonly DesignerBlueprintEventOption[],
-): ScreenBlueprintRule | null {
-  const option = events.find(
-    (event) => event.componentId === sourceComponentId && event.name === eventName,
-  );
-  if (
-    option?.available !== true ||
-    !document.components.some((component) => component.id === targetComponentId) ||
-    document.blueprint.rules.some(
-      (rule) =>
-        rule.trigger.type === 'material-event' &&
-        rule.trigger.componentId === sourceComponentId &&
-        rule.trigger.eventName === eventName &&
-        rule.actions.some(
-          (action) =>
-            action.type === 'component-visibility' &&
-            action.componentId === targetComponentId &&
-            action.operation === operation,
-        ),
-    )
-  ) {
-    return null;
-  }
-  const id = nextRuleId(document.blueprint, `${sourceComponentId}-${eventName}-${operation}`);
-  return normalizeDesignerBlueprintRuleCapabilities({
-    id,
-    trigger: { type: 'material-event', componentId: sourceComponentId, eventName },
-    actions: [createDesignerVisibilityAction(targetComponentId, operation)],
-  });
-}
-
-export function insertDesignerBlueprintNode(
-  document: ScreenDocument,
-  kind: 'condition' | 'set-variable' | 'emit-host-event',
-  ruleId: string,
-  variableId?: string,
+export function insertDesignerBlueprintHostNode(
+  blueprint: ScreenBlueprint,
   position?: DesignerBlueprintNodePosition,
-): ScreenBlueprint | null {
-  const rule = document.blueprint.rules.find((candidate) => candidate.id === ruleId);
-  if (rule === undefined) return null;
-  const layoutNodes = materializeDesignerBlueprintLayoutNodes(document);
-  if (kind === 'condition') {
-    if (rule.condition !== undefined) return null;
-    const updated = updateRule(document.blueprint, ruleId, (candidate) => ({
-      ...candidate,
-      condition: {
-        left: { kind: 'event-payload', path: [] },
-        operator: 'exists',
-      },
-    }));
-    return updated === null
-      ? null
-      : appendDesignerBlueprintLayoutNode(
-          updated,
-          layoutNodes,
-          conditionBlueprintNodeId(ruleId),
-          position,
-        );
-  }
-  const action = createDesignerBlueprintAction(kind, document, variableId);
-  if (action === null) return null;
-  const actionIndex = rule.actions.length;
-  const updated = updateRule(document.blueprint, ruleId, (candidate) => ({
-    ...candidate,
-    actions: [...candidate.actions, action],
-  }));
-  return updated === null
-    ? null
-    : appendDesignerBlueprintLayoutNode(
-        updated,
-        layoutNodes,
-        actionBlueprintNodeId(ruleId, actionIndex),
-        position,
-      );
+): ScreenBlueprint {
+  return insertLayoutNode(blueprint, HOST_BLUEPRINT_NODE_ID, position);
 }
 
 export function deleteDesignerBlueprintSelection(
@@ -144,46 +59,22 @@ export function deleteDesignerBlueprintSelection(
   selection: Exclude<BaseScreenBlueprintCanvasSelection, null>,
 ): ScreenBlueprint | null {
   if (selection.kind === 'edge') {
-    if (selection.id.startsWith('dependency:')) return null;
-    const edge = parseEdgeId(selection.id);
-    if (edge === null) return null;
-    if (edge.actionIndex === undefined) {
-      return removeRule(blueprint, edge.ruleId);
+    const relation = parseRelationEdgeId(selection.id);
+    return relation === null ? null : removeRelation(blueprint, relation.relationId);
+  }
+  if (selection.id === HOST_BLUEPRINT_NODE_ID) {
+    let updated: ScreenBlueprint = blueprint;
+    for (const relation of blueprint.relations) {
+      if (relationReferencesHost(relation)) updated = removeRelation(updated, relation.id);
     }
-    return removeAction(blueprint, edge.ruleId, edge.actionIndex);
-  }
-  if (parseDesignerBlueprintUnconnectedNodeId(selection.id) !== null) {
-    return removeLayoutNodes(blueprint, new Set([selection.id]));
-  }
-  if (selection.id.startsWith('condition:')) {
-    const ruleId = selection.id.slice('condition:'.length);
-    const rule = blueprint.rules.find((candidate) => candidate.id === ruleId);
-    if (rule?.actions.length === 0) return removeRule(blueprint, ruleId);
-    const updated = updateRule(blueprint, ruleId, ({ condition: _condition, ...rule }) => rule);
-    return updated === null ? null : removeLayoutNodes(updated, new Set([selection.id]));
-  }
-  if (selection.id.startsWith('action:')) {
-    const parsed = parseActionNodeId(selection.id);
-    return parsed === null ? null : removeAction(blueprint, parsed.ruleId, parsed.actionIndex);
+    return removeLayoutNodes(updated, new Set([HOST_BLUEPRINT_NODE_ID]));
   }
   if (selection.id.startsWith('component:')) {
     const componentId = selection.id.slice('component:'.length);
     let updated: ScreenBlueprint = blueprint;
-    for (const rule of blueprint.rules) {
-      if (rule.trigger.type === 'material-event' && rule.trigger.componentId === componentId) {
-        updated = removeRule(updated, rule.id);
-        continue;
-      }
-      const actionIndexes = rule.actions
-        .map((action, index) => ({ action, index }))
-        .filter(
-          ({ action }) =>
-            action.type === 'component-visibility' && action.componentId === componentId,
-        )
-        .map(({ index }) => index)
-        .reverse();
-      for (const actionIndex of actionIndexes) {
-        updated = removeAction(updated, rule.id, actionIndex) ?? updated;
+    for (const relation of blueprint.relations) {
+      if (relationReferencesComponent(relation, componentId)) {
+        updated = removeRelation(updated, relation.id);
       }
     }
     return removeLayoutNodes(updated, new Set([selection.id]));
@@ -191,9 +82,9 @@ export function deleteDesignerBlueprintSelection(
   if (selection.id.startsWith('variable:')) {
     const variableId = selection.id.slice('variable:'.length);
     let updated: ScreenBlueprint = blueprint;
-    for (const rule of blueprint.rules) {
-      if (rule.trigger.type === 'variable-event' && rule.trigger.variableId === variableId) {
-        updated = removeRule(updated, rule.id);
+    for (const relation of blueprint.relations) {
+      if (relationReferencesVariable(relation, variableId)) {
+        updated = removeRelation(updated, relation.id);
       }
     }
     return removeLayoutNodes(updated, new Set([selection.id]));
@@ -220,31 +111,49 @@ export function commitDesignerBlueprintViewport(
   blueprint: ScreenBlueprint,
   viewport: ScreenBlueprintLayoutViewport,
 ): ScreenBlueprint {
+  // 没有保存过节点布局时，视口不是权威：写 nodes: [] 会让图构建器把节点全部隐藏。
+  if (blueprint.layout === undefined || blueprint.layout.nodes.length === 0) return blueprint;
   return {
     ...blueprint,
-    layout: { nodes: blueprint.layout?.nodes ?? [], viewport },
+    layout: { nodes: blueprint.layout.nodes, viewport },
   };
 }
 
 export function updateDesignerBlueprintCondition(
   blueprint: ScreenBlueprint,
-  ruleId: string,
+  relationId: string,
   condition: ScreenBlueprintCondition,
 ): ScreenBlueprint | null {
-  return updateRule(blueprint, ruleId, (rule) => ({ ...rule, condition }));
+  return updateRelationCondition(blueprint, relationId, condition);
 }
 
-export function updateDesignerBlueprintAction(
+export function removeDesignerBlueprintCondition(
   blueprint: ScreenBlueprint,
-  ruleId: string,
-  actionIndex: number,
-  action: ScreenBlueprintAction,
+  relationId: string,
 ): ScreenBlueprint | null {
-  return updateRule(blueprint, ruleId, (rule) => {
-    if (actionIndex < 0 || actionIndex >= rule.actions.length) return rule;
-    return {
-      ...rule,
-      actions: rule.actions.map((candidate, index) => (index === actionIndex ? action : candidate)),
-    };
-  });
+  return removeRelationCondition(blueprint, relationId);
+}
+
+export function updateDesignerBlueprintEffect(
+  blueprint: ScreenBlueprint,
+  relationId: string,
+  effect: ScreenBlueprintRelationEffect,
+): ScreenBlueprint | null {
+  return updateRelationEffect(blueprint, relationId, effect);
+}
+
+export function updateDesignerBlueprintSourceEvent(
+  blueprint: ScreenBlueprint,
+  relationId: string,
+  eventName: string,
+): ScreenBlueprint | null {
+  return updateRelationSourceEvent(blueprint, relationId, eventName);
+}
+
+export function updateDesignerBlueprintSemanticRole(
+  blueprint: ScreenBlueprint,
+  relationId: string,
+  role: ScreenBlueprintSemanticRelationRole,
+): ScreenBlueprint | null {
+  return updateSemanticRole(blueprint, relationId, role);
 }

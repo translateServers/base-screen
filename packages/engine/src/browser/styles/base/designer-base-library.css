@@ -5,7 +5,7 @@
   width: 100%;
   padding-left: calc(var(--designer-space-3) + var(--designer-control-height));
   border-color: var(--designer-border-subtle);
-  border-radius: 9px;
+  border-radius: var(--designer-radius-4);
   background: color-mix(
     in srgb,
     var(--designer-surface-workspace) 66%,
@@ -95,7 +95,7 @@
   padding: 2px;
   overflow: hidden;
   border: 0;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-workspace);
   box-shadow: var(--designer-elev-ring);
 }
@@ -263,34 +263,20 @@
   height: 13px;
 }
 
-/* 状态徽章：叠加在缩略图内下角（定位上下文为 .material-thumb），不占用卡片文档流。 */
+/* 状态徽章：叠加在缩略图内下角（定位上下文为 .material-thumb），不占用卡片文档流。
+   形态与配色由 chrome 层的 .designer-badge[data-tone] 提供。 */
 .material-badge {
   position: absolute;
   bottom: var(--designer-space-2);
   left: var(--designer-space-2);
   z-index: 1;
-  display: inline-flex;
-  min-height: 16px;
   max-width: calc(100% - var(--designer-space-6));
-  align-items: center;
-  padding: 0 var(--designer-space-2);
-  overflow: hidden;
-  color: var(--designer-warning);
-  font: var(--designer-font-small);
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  border: 0;
-  border-radius: var(--designer-radius-2);
-  background: var(--designer-warning-surface);
   pointer-events: none;
 }
 
 .material-badge[data-material-badge="unavailable"] {
   right: var(--designer-space-2);
   left: auto;
-  color: var(--designer-danger);
-  background: var(--designer-danger-surface);
 }
 
 .material-card-wrap[data-material-draft][data-material-unavailable] .material-badge {
@@ -302,5 +288,5 @@
 }
 
 .material-search-empty {
-  margin-top: 8px;
+  margin-top: var(--designer-space-4);
 }

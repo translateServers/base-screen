@@ -12,6 +12,7 @@ import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-cor
 import type { BaseScreenRenderer } from '@base-screen/renderer';
 import { describe, expect, it, vi } from 'vitest';
 import { DesignerCanvasRuntimeController } from '../../../src/browser/controllers/designer-canvas-runtime-controller.js';
+import { relationsFromRules } from '../../__fixtures__/blueprint-relations.js';
 
 class FakeRenderer implements BaseScreenRenderer {
   readonly calls: string[] = [];
@@ -97,7 +98,7 @@ function documentWith(
     canvas: { width: 960, height: 540, backgroundColor },
     components: [],
     variables,
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 
@@ -506,7 +507,7 @@ describe('DesignerCanvasRuntimeController', () => {
     const document: ScreenDocument = {
       ...documentWith([{ type: 'static', id: 'status', name: 'status', initialValue: 'idle' }]),
       blueprint: {
-        rules: [
+        relations: relationsFromRules([
           {
             id: 'run-on-click',
             trigger: { type: 'material-event', componentId: 'button', eventName: 'valueClick' },
@@ -533,7 +534,7 @@ describe('DesignerCanvasRuntimeController', () => {
               },
             ],
           },
-        ],
+        ]),
       },
     };
 
@@ -554,14 +555,19 @@ describe('DesignerCanvasRuntimeController', () => {
   });
 
   it('exposes stable variable handles and dispatches data-updated rules', () => {
-    const { controller, diagnostics } = createHarness();
+    const { controller, diagnostics } = createHarness(undefined, {
+      runtimeContributions: {
+        getResourceType: () => undefined,
+        hasBlueprintCapability: () => true,
+      },
+    });
     const document: ScreenDocument = {
       ...documentWith([
         { type: 'static', id: 'status-id', name: 'status', initialValue: 'idle' },
         { type: 'static', id: 'mirror-id', name: 'mirror', initialValue: 'idle' },
       ]),
       blueprint: {
-        rules: [
+        relations: relationsFromRules([
           {
             id: 'mirror-status',
             trigger: {
@@ -577,7 +583,7 @@ describe('DesignerCanvasRuntimeController', () => {
               },
             ],
           },
-        ],
+        ]),
       },
     };
     expect(controller.render(document).ok).toBe(true);
@@ -605,7 +611,7 @@ describe('DesignerCanvasRuntimeController', () => {
     const document: ScreenDocument = {
       ...documentWith([]),
       blueprint: {
-        rules: [
+        relations: relationsFromRules([
           {
             id: 'unsupported-visibility',
             trigger: { type: 'material-event', componentId: 'button', eventName: 'valueClick' },
@@ -617,7 +623,7 @@ describe('DesignerCanvasRuntimeController', () => {
               },
             ],
           },
-        ],
+        ]),
       },
     };
 

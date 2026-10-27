@@ -1,7 +1,7 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerFieldRow } from '../designer-field-primitives.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
-import { createDesignerSelect } from '../designer-ui-primitives.js';
+import { createDesignerButton, createDesignerSelect } from '../designer-ui-primitives.js';
 import {
   type DesignerStaticDataView,
   renderDesignerStaticData,
@@ -117,11 +117,13 @@ function renderSourceKindRow(
   const value = ownerDocument.createElement('span');
   value.className = 'designer-dataset-source-binding-value';
   value.textContent = DESIGNER_UI_TEXT.dataSource.sourceKind(options.mode);
-  const change = ownerDocument.createElement('button');
-  change.type = 'button';
-  change.className = 'designer-control designer-button designer-dataset-source-change';
+  const change = createDesignerButton(ownerDocument, {
+    className: 'designer-dataset-source-change',
+    size: 'compact',
+    text: DESIGNER_UI_TEXT.dataSource.sourceKindChange,
+    variant: 'ghost',
+  });
   change.dataset.sourceKindChange = 'true';
-  change.textContent = DESIGNER_UI_TEXT.dataSource.sourceKindChange;
   row.append(label, value, change);
   return row;
 }
@@ -151,11 +153,10 @@ function renderHostResourceSelectionAction(
   options: DesignerDataSourcePanelOptions,
 ): HTMLElement | undefined {
   if (options.hostResourceSelectionAvailable !== true) return undefined;
-  const button = options.panel.ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button';
+  const button = createDesignerButton(options.panel.ownerDocument, {
+    text: DESIGNER_UI_TEXT.dataSource.hostResourceSelect,
+  });
   button.dataset.datasetAction = 'select-host-resource';
-  button.textContent = DESIGNER_UI_TEXT.dataSource.hostResourceSelect;
   return button;
 }
 
@@ -226,7 +227,7 @@ export function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): H
     content.className = 'designer-inspector-data-flow-content';
     content.dataset.designerScrollScope = `data-source:${options.scrollScope}`;
     const summary = ownerDocument.createElement('p');
-    summary.className = 'designer-data-source-empty';
+    summary.className = 'designer-host-resource-summary';
     summary.dataset.hostResourceSummary = 'true';
     summary.textContent =
       options.hostResource === undefined

@@ -6,6 +6,7 @@ import type {
   ScreenProjectSummary,
 } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { createDesignerButton, createDesignerInput } from '../../dom/designer-ui-primitives.js';
 
 export interface DesignerProjectWorkspaceCapabilities {
   readonly directory: boolean;
@@ -179,11 +180,11 @@ export class DesignerProjectWorkspaceController {
 
   private renderDirectory(workspace: HTMLElement): void {
     const section = this.section(DESIGNER_UI_TEXT.projectWorkspace.directory);
-    const name = workspace.ownerDocument.createElement('input');
-    name.className = 'designer-control designer-input';
+    const name = createDesignerInput(workspace.ownerDocument, {
+      ariaLabel: DESIGNER_UI_TEXT.projectWorkspace.newName,
+      placeholder: DESIGNER_UI_TEXT.projectWorkspace.name,
+    });
     name.dataset.projectName = 'true';
-    name.placeholder = DESIGNER_UI_TEXT.projectWorkspace.name;
-    name.setAttribute('aria-label', DESIGNER_UI_TEXT.projectWorkspace.newName);
     section.append(
       name,
       this.button(DESIGNER_UI_TEXT.projectWorkspace.create, 'create'),
@@ -262,12 +263,11 @@ export class DesignerProjectWorkspaceController {
   }
 
   private button(label: string, action: string): HTMLButtonElement {
-    const button = this.#workspace!.ownerDocument.createElement('button');
-    button.type = 'button';
-    button.className = 'designer-control designer-button';
+    const button = createDesignerButton(this.#workspace!.ownerDocument, {
+      ariaLabel: label,
+      text: label,
+    });
     button.dataset.projectWorkspaceAction = action;
-    button.textContent = label;
-    button.setAttribute('aria-label', label);
     return button;
   }
 

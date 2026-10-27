@@ -280,7 +280,7 @@
   overflow: hidden;
   padding: 0 var(--designer-space-4);
   border: 0;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: transparent;
   color: var(--designer-text-secondary);
   cursor: pointer;

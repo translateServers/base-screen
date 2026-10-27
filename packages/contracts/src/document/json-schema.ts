@@ -42,10 +42,8 @@ export function generateScreenDocumentJsonSchema(): ScreenJsonObject {
       else: { not: { required: ['intervalSeconds'] } },
     },
   ];
-  const blueprint = getObject(properties.blueprint);
-  const rules = getObject(getObject(blueprint.properties).rules);
-  const rule = getObject(rules.items);
-  const condition = getObject(getObject(rule.properties).condition);
+  const behaviorRelation = findObjectWithTypeConst(generated, 'behavior');
+  const condition = getObject(getObject(behaviorRelation.properties).condition);
   condition.allOf = [
     {
       if: { properties: { operator: { const: 'exists' } }, required: ['operator'] },
@@ -53,14 +51,79 @@ export function generateScreenDocumentJsonSchema(): ScreenJsonObject {
       else: { required: ['right'] },
     },
   ];
-  const definitions = getObject(generated.$defs);
-  const expression = getObject(definitions.__schema0);
+  const expression = findExpressionDefinition(generated);
   const objectExpression = (expression.anyOf as unknown[]).find(
     (branch) => getObject(getObject(getObject(branch).properties).kind).const === 'object',
   );
   const objectProperties = getObject(getObject(objectExpression).properties).properties;
   getObject(objectProperties).maxProperties = MAX_BLUEPRINT_EXPRESSION_CONTAINERS;
   return generated as ScreenJsonObject;
+}
+
+function findExpressionDefinition(generated: Record<string, unknown>): Record<string, unknown> {
+  const definitions = getObject(generated.$defs);
+  for (const value of Object.values(definitions)) {
+    if (isExpressionSchema(value)) return getObject(value);
+  }
+  throw new Error('Blueprint expression definition is missing from the screen document schema.');
+}
+
+function isExpressionSchema(value: unknown): boolean {
+  if (value === null || typeof value !== 'object') return false;
+  const anyOf = (value as { anyOf?: unknown }).anyOf;
+  if (!Array.isArray(anyOf)) return false;
+  return anyOf.some((branch) => {
+    if (branch === null || typeof branch !== 'object') return false;
+    const properties = (branch as { properties?: unknown }).properties;
+    if (properties === null || typeof properties !== 'object') return false;
+    const kind = (properties as { kind?: unknown }).kind;
+    return (
+      kind !== null && typeof kind === 'object' && (kind as { const?: unknown }).const === 'object'
+    );
+  });
+}
+
+function findObjectWithTypeConst(root: unknown, constant: string): Record<string, unknown> {
+  const found = searchObjectWithTypeConst(root, constant);
+  if (found === undefined) {
+    throw new Error(`Schema branch with type "${constant}" is missing.`);
+  }
+  return found;
+}
+
+function searchObjectWithTypeConst(
+  value: unknown,
+  constant: string,
+): Record<string, unknown> | undefined {
+  if (value === null || typeof value !== 'object') return undefined;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = searchObjectWithTypeConst(item, constant);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  }
+  const direct = tryFindObjectWithTypeConst(value, constant);
+  if (direct !== undefined) return direct;
+  for (const child of Object.values(value)) {
+    const found = searchObjectWithTypeConst(child, constant);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+function tryFindObjectWithTypeConst(
+  value: unknown,
+  constant: string,
+): Record<string, unknown> | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const properties = (value as { properties?: unknown }).properties;
+  if (properties === null || typeof properties !== 'object') return undefined;
+  const type = (properties as { type?: unknown }).type;
+  if (type === null || typeof type !== 'object') return undefined;
+  return (type as { const?: unknown }).const === constant
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 function getObject(value: unknown): Record<string, unknown> {

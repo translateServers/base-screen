@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseCss, tokensCss, workbenchCss } from './designer-style-fixture.js';
+import { baseCss, controlsCss, tokensCss, workbenchCss } from './designer-style-fixture.js';
 
 describe('designer workbench structure and layout', () => {
   it('R8 reserves stable tracks for workbench geometry and dynamic status content', () => {
@@ -65,7 +65,7 @@ describe('designer workbench structure and layout', () => {
     const tagRule = workbenchCss.match(/\.selection-tag\s*\{([^}]*)\}/s);
     expect(tagRule).not.toBeNull();
     // 上沿是旋转手柄与其引脚的排布区：标签改到下沿外侧，并与南侧手柄留出净空。
-    expect(tagRule?.[1]).toContain('top: calc(100% + 8px);');
+    expect(tagRule?.[1]).toContain('top: calc(100% + var(--designer-space-4));');
     expect(tagRule?.[1]).not.toContain('bottom: 100%');
   });
 
@@ -93,7 +93,7 @@ describe('designer workbench structure and layout', () => {
     expect(workbenchCss).toMatch(
       /\.rail-tabs\s*>\s*\.designer-tab:not\(\[data-plugin-panel-tab\]\)\s*\+\s*\.designer-tab\[data-plugin-panel-tab\]\s*\{[^}]*margin-top: var\(--designer-space-6\);/s,
     );
-    expect(workbenchCss).toMatch(
+    expect(controlsCss).toMatch(
       /\.rail-tabs\s*>\s*\.designer-tab:not\(\[data-plugin-panel-tab\]\)\s*\+\s*\.designer-tab\[data-plugin-panel-tab\]::before\s*\{[^}]*height: 1px;[^}]*background: var\(--designer-border-default\);/s,
     );
   });
@@ -185,7 +185,12 @@ describe('designer workbench structure and layout', () => {
     expect(workbenchCss).toContain('.topbar-actions {');
     expect(workbenchCss).toContain('.designer-menu-triggers {');
     expect(workbenchCss).toContain('.designer-tool-cluster {');
-    expect(workbenchCss).toContain('.topbar-segment .designer-icon-button {');
+    // 顶栏不再重写图标按钮外观：28px/描边/悬停由共享控件提供，顶栏只保留中性选中态。
+    expect(workbenchCss).not.toContain('.topbar-segment .designer-icon-button {');
+    expect(workbenchCss).not.toContain('.designer-tool-cluster .designer-tool-button {');
+    expect(workbenchCss).toContain(
+      '.designer-tool-cluster .designer-tool-button[aria-pressed="true"] {',
+    );
     expect(workbenchCss).toContain('border-right: 1px solid var(--designer-border-default);');
     expect(workbenchCss).toContain('.topbar-save-status {');
     expect(workbenchCss).toContain('.topbar-save-status[data-state="dirty"] {');

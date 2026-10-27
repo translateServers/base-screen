@@ -4,13 +4,13 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
+import { connectDesignerBlueprintNodes } from '../../../../src/common/operations/blueprint/designer-blueprint-connection.js';
 import {
   buildDesignerBlueprintEventOptions,
   buildDesignerBlueprintGraph,
   commitDesignerBlueprintLayout,
-  createDesignerVisibilityRule,
   deleteDesignerBlueprintSelection,
-  insertDesignerBlueprintNode,
+  updateDesignerBlueprintCondition,
 } from '../../../../src/common/operations/blueprint/designer-blueprint-model.js';
 
 const document: ScreenDocument = {
@@ -30,7 +30,7 @@ const document: ScreenDocument = {
     dataSource: null,
   })),
   variables: [{ type: 'static', id: 'selected', name: 'selected', initialValue: null }],
-  blueprint: { rules: [] },
+  blueprint: { relations: [] },
 };
 
 const catalog = {
@@ -48,12 +48,12 @@ const runtime: BaseScreenRuntimeContributionIndex = {
 };
 
 describe('shared Blueprint model', () => {
-  it('projects catalog events and canonical saved layout without Vue Flow dependencies', () => {
+  it('projects catalog events and canonical saved layout', () => {
     const graph = buildDesignerBlueprintGraph(
       {
         ...document,
         blueprint: {
-          rules: [],
+          relations: [],
           layout: { nodes: [{ id: 'component:source', x: 17, y: 29 }] },
         },
       },
@@ -65,58 +65,50 @@ describe('shared Blueprint model', () => {
       y: 29,
       events: [{ name: 'click', label: 'Click', available: true }],
     });
+    expect(graph.nodes.some((node) => node.id === 'variable:selected')).toBe(false);
   });
 
-  it('constructs, extends and deletes one canonical visibility rule', () => {
+  it('creates one component relation, adds a condition, and deletes the relation', () => {
     const events = buildDesignerBlueprintEventOptions(document, catalog, runtime);
-    const rule = createDesignerVisibilityRule(
+    const connection = connectDesignerBlueprintNodes(
       document,
-      'source',
-      'click',
-      'target',
-      'show',
+      'component:source',
+      'event:click',
+      'component:target',
+      'relation:in',
       events,
     );
-    expect(rule).not.toBeNull();
-    const withRule = { ...document, blueprint: { rules: [rule!] } };
-    const withCondition = insertDesignerBlueprintNode(withRule, 'condition', rule!.id);
-    expect(withCondition?.rules[0]?.condition?.operator).toBe('exists');
-    const withNamedVariable = insertDesignerBlueprintNode(
-      {
-        ...withRule,
-        variables: [
-          ...withRule.variables,
-          { type: 'static' as const, id: 'alternate', name: 'alternate', initialValue: 1 },
-        ],
-      },
-      'set-variable',
-      rule!.id,
-      'alternate',
-    );
-    expect(withNamedVariable?.rules[0]?.actions.at(-1)).toMatchObject({
-      type: 'set-variable',
-      variableId: 'alternate',
+    expect(connection.ok).toBe(true);
+    if (!connection.ok) return;
+    const relation = connection.blueprint.relations[0]!;
+    expect(relation.type).toBe('behavior');
+
+    const withCondition = updateDesignerBlueprintCondition(connection.blueprint, relation.id, {
+      left: { kind: 'event-payload', path: [] },
+      operator: 'exists',
     });
+    expect(withCondition).not.toBeNull();
     const projection = buildDesignerBlueprintGraph(
       { ...document, blueprint: withCondition! },
       catalog,
       runtime,
     );
-    expect(projection.nodes.find((node) => node.kind === 'condition')?.summary).toEqual({
-      kind: 'condition',
-      primary: 'event.*',
-      secondary: 'exists',
+    const edge = projection.edges.find((candidate) => candidate.relationId === relation.id);
+    expect(edge).toMatchObject({
+      kind: 'relation',
+      effectType: 'component-visibility',
+      eventName: 'click',
     });
     const removed = deleteDesignerBlueprintSelection(withCondition!, {
       kind: 'edge',
-      id: `edge:${rule!.id}:action:0`,
+      id: `relation:${relation.id}`,
     });
-    expect(removed?.rules).toEqual([]);
+    expect(removed?.relations).toEqual([]);
   });
 
   it('commits layout atomically while retaining an existing viewport', () => {
     const blueprint = commitDesignerBlueprintLayout(
-      { rules: [], layout: { nodes: [], viewport: { x: 4, y: 8, zoom: 1.2 } } },
+      { relations: [], layout: { nodes: [], viewport: { x: 4, y: 8, zoom: 1.2 } } },
       [{ id: 'component:source', x: 20, y: 30 }],
     );
     expect(blueprint.layout).toEqual({

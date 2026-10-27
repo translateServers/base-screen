@@ -71,7 +71,7 @@ function document(): ScreenDocument {
     canvas: { width: 100, height: 100, backgroundColor: '#000000' },
     components: [component()],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

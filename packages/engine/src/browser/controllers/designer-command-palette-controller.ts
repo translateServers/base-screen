@@ -296,42 +296,35 @@ export class DesignerCommandPaletteController {
         blueprintTargetId: `component:${component.id}`,
       }),
     );
-    const rules = document.blueprint.rules.flatMap((rule): DesignerCommandPaletteEntry[] => {
-      const triggerId =
-        rule.trigger.type === 'material-event' ? rule.trigger.componentId : rule.trigger.variableId;
-      const triggerNode =
-        rule.trigger.type === 'material-event'
-          ? `component:${rule.trigger.componentId}`
-          : `variable:${rule.trigger.variableId}`;
-      const ruleEntry: DesignerCommandPaletteEntry = {
-        kind: 'blueprint',
-        label: DESIGNER_UI_TEXT.blueprint.ruleSummary(rule.id),
-        detail: `${triggerId}.${rule.trigger.eventName}`,
-        searchText: `${rule.id} ${triggerId} ${rule.trigger.eventName}`.toLocaleLowerCase(),
-        blueprintTargetId:
-          rule.condition !== undefined
-            ? `condition:${rule.id}`
-            : rule.actions.length === 0
-              ? triggerNode
-              : `edge:${rule.id}:action:0`,
-      };
-      return [
-        ruleEntry,
-        ...rule.actions.map(
-          (action, actionIndex): DesignerCommandPaletteEntry => ({
-            kind: 'blueprint',
-            label: DESIGNER_UI_TEXT.blueprint.actionSummary(actionIndex),
-            detail: `${rule.id} · ${action.type}`,
-            searchText: `${rule.id} ${action.type} ${actionIndex}`.toLocaleLowerCase(),
-            blueprintTargetId:
-              action.type === 'component-visibility'
-                ? `edge:${rule.id}:action:${actionIndex}`
-                : `action:${rule.id}:${actionIndex}`,
-          }),
-        ),
-      ];
-    });
-    return [...components, ...rules];
+    const relations = document.blueprint.relations.map(
+      (relation, index): DesignerCommandPaletteEntry => {
+        const source =
+          relation.type === 'semantic'
+            ? relation.source.componentId
+            : relation.source.kind === 'component'
+              ? relation.source.componentId
+              : relation.source.variableId;
+        const target =
+          relation.type === 'semantic'
+            ? relation.target.componentId
+            : relation.target.kind === 'component'
+              ? relation.target.componentId
+              : relation.target.kind === 'variable'
+                ? relation.target.variableId
+                : 'host';
+        const label = DESIGNER_UI_TEXT.blueprint.relationSummary(index + 1);
+        return {
+          kind: 'blueprint',
+          label,
+          detail: `${source} → ${target}`,
+          searchText:
+            `${label} ${source} ${target} ${relation.type === 'behavior' ? relation.effect.type : relation.role}`.toLocaleLowerCase(),
+          blueprintTargetId:
+            relation.type === 'semantic' ? `semantic:${relation.id}` : `relation:${relation.id}`,
+        };
+      },
+    );
+    return [...components, ...relations];
   }
 
   private result(entry: DesignerCommandPaletteEntry, index: number): HTMLButtonElement {

@@ -1,5 +1,6 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../../ui/designer-icons.js';
+import { createDesignerButton, createDesignerIconButton } from '../designer-ui-primitives.js';
 
 export interface DesignerMaterialGroupView {
   readonly navigation: HTMLElement;
@@ -35,12 +36,12 @@ export function getMaterialGroupView(navigation: HTMLElement): DesignerMaterialG
   roots.setAttribute('aria-label', DESIGNER_UI_TEXT.materialGroupRoots);
   const secondary = document.createElement('div');
   secondary.className = 'material-group-secondary';
-  const back = document.createElement('button');
-  back.type = 'button';
-  back.className = 'designer-control designer-button material-group-back';
+  const back = createDesignerIconButton(document, {
+    className: 'material-group-back',
+    icon: 'chevron-left',
+    label: DESIGNER_UI_TEXT.materialGroupBack,
+  });
   back.dataset.materialGroupAction = 'back';
-  back.setAttribute('aria-label', DESIGNER_UI_TEXT.materialGroupBack);
-  back.innerHTML = designerIcon('chevron-left');
   const heading = document.createElement('span');
   heading.className = 'material-group-heading-label';
   const children = document.createElement('div');
@@ -120,9 +121,7 @@ export function renderMaterialGroupButtons(
 }
 
 function createGroupButton(document: Document): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button material-group-button';
+  const button = createDesignerButton(document, { className: 'material-group-button' });
   const glyph = document.createElement('span');
   glyph.className = 'material-group-glyph';
   glyph.setAttribute('aria-hidden', 'true');

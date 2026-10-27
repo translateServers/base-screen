@@ -2,63 +2,46 @@ import type { ScreenDocument } from '@base-screen/contracts';
 import { buildComponentIndex, type ScreenDocumentCommand } from '@base-screen/core';
 
 // 删除组件时的级联清理：目标及其全部 descendants 一并纳入移除集合；
-// 若蓝图规则以被移除组件为触发器，则同步剪除对应规则，保证文档在
-// fail-closed 校验下依然合法（否则删除会因悬空 trigger 而整体失败）。
+// 若蓝图关系以被移除组件为来源或目标，则同步剪除对应关系，保证文档在
+// fail-closed 校验下依然合法（否则删除会因悬空引用而整体失败）。
 // 剪除命令必须排在 remove-components 之前：该命令自身会对候选文档做
-// fail-closed 校验，先删组件会先产生悬空 trigger。
+// fail-closed 校验，先删组件会先产生悬空引用。
 export function removeComponentCommands(
   document: ScreenDocument,
   componentIds: readonly string[],
 ): readonly ScreenDocumentCommand[] {
   const removed = removedComponentIds(document, componentIds);
-  const survivingRules: ScreenDocument['blueprint']['rules'][number][] = [];
-  const changedRuleIds = new Set<string>();
-  let rulesChanged = false;
-  for (const rule of document.blueprint.rules) {
-    if (rule.trigger.type === 'material-event' && removed.has(rule.trigger.componentId)) {
-      rulesChanged = true;
-      changedRuleIds.add(rule.id);
-      continue;
+  const survivingRelations = document.blueprint.relations.filter((relation) => {
+    if (relation.type === 'semantic') {
+      return !removed.has(relation.source.componentId) && !removed.has(relation.target.componentId);
     }
-    const actions = rule.actions.filter(
-      (action) => action.type !== 'component-visibility' || !removed.has(action.componentId),
-    );
-    if (actions.length !== rule.actions.length) {
-      rulesChanged = true;
-      changedRuleIds.add(rule.id);
-      if (actions.length === 0) continue;
-      survivingRules.push({ ...rule, actions });
-    } else {
-      survivingRules.push(rule);
+    if (relation.source.kind === 'component' && removed.has(relation.source.componentId)) {
+      return false;
     }
-  }
-  const validLayoutNodeIds = new Set<string>();
-  for (const component of document.components) {
-    if (!removed.has(component.id)) validLayoutNodeIds.add(`component:${component.id}`);
-  }
-  for (const variable of document.variables) validLayoutNodeIds.add(`variable:${variable.id}`);
-  for (const rule of survivingRules) {
-    if (rule.condition !== undefined) validLayoutNodeIds.add(`condition:${rule.id}`);
-    rule.actions.forEach((_action, index) => validLayoutNodeIds.add(`action:${rule.id}:${index}`));
-  }
-  const survivingLayoutNodes = document.blueprint.layout?.nodes.filter((node) => {
-    if (node.id.startsWith('action:')) {
-      return (
-        ![...changedRuleIds].some((ruleId) => node.id.startsWith(`action:${ruleId}:`)) &&
-        validLayoutNodeIds.has(node.id)
-      );
-    }
-    if (node.id.startsWith('component:') || node.id.startsWith('condition:')) {
-      return validLayoutNodeIds.has(node.id);
+    if (relation.target.kind === 'component' && removed.has(relation.target.componentId)) {
+      return false;
     }
     return true;
   });
+  const survivingLayoutNodes = document.blueprint.layout?.nodes.filter((node) => {
+    if (node.id.startsWith('component:')) {
+      return !removed.has(node.id.slice('component:'.length));
+    }
+    if (node.id.startsWith('variable:') || node.id === 'host') return true;
+    // 旧事件图的 condition/action/unconnected 位置没有关系模型等价物，随删除一并修剪。
+    return false;
+  });
+  const relationsChanged = survivingRelations.length !== document.blueprint.relations.length;
+  const layoutChanged =
+    document.blueprint.layout !== undefined &&
+    survivingLayoutNodes !== undefined &&
+    survivingLayoutNodes.length !== document.blueprint.layout.nodes.length;
   const commands: ScreenDocumentCommand[] = [];
-  if (rulesChanged || survivingLayoutNodes?.length !== document.blueprint.layout?.nodes.length) {
+  if (relationsChanged || layoutChanged) {
     commands.push({
       type: 'replace-blueprint',
       blueprint: {
-        rules: survivingRules,
+        relations: survivingRelations,
         ...(document.blueprint.layout === undefined
           ? {}
           : {

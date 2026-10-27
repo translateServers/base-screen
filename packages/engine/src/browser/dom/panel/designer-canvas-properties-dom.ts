@@ -178,13 +178,12 @@ function appendCanvasScaleField(
   ];
   const { element: options } = createDesignerSegmented(ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.canvasScaleMode,
-    className: 'designer-canvas-scale-options',
+    className: 'designer-canvas-scale-segmented',
     selected: settings.scaleMode,
     options: scaleOptions.map(([value, label]) => ({
       value,
       label,
       tip: label,
-      className: 'designer-control designer-button designer-canvas-scale-option',
       dataset: { canvasSetting: 'scaleMode', canvasSettingValue: value },
     })),
   });

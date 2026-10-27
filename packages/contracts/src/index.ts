@@ -35,6 +35,13 @@ export {
   type ScreenBlueprintCapabilityId,
 } from './document/blueprint-capabilities.js';
 export {
+  deriveScreenBlueprintRules,
+  readScreenBlueprintRelationCategory,
+  relationCapabilities,
+  type ScreenBlueprintRelationCategory,
+  screenBlueprintEffectTargetKind,
+} from './document/blueprint-relations.js';
+export {
   diagnoseDataSourceCycles,
   screenDataSourceOrder,
 } from './document/data-source-order.js';
@@ -134,6 +141,7 @@ export type {
 export type {
   ScreenBlueprint,
   ScreenBlueprintAction,
+  ScreenBlueprintBehaviorRelation,
   ScreenBlueprintComponentVisibilityAction,
   ScreenBlueprintCondition,
   ScreenBlueprintEmitHostEventAction,
@@ -142,9 +150,15 @@ export type {
   ScreenBlueprintLayoutNode,
   ScreenBlueprintLayoutViewport,
   ScreenBlueprintMaterialEventTrigger,
+  ScreenBlueprintRelation,
+  ScreenBlueprintRelationEffect,
+  ScreenBlueprintRelationSource,
+  ScreenBlueprintRelationTarget,
   ScreenBlueprintRequestComponentDataAction,
   ScreenBlueprintRequestVariableAction,
   ScreenBlueprintRule,
+  ScreenBlueprintSemanticRelation,
+  ScreenBlueprintSemanticRelationRole,
   ScreenBlueprintSetVariableAction,
   ScreenBlueprintTrigger,
   ScreenBlueprintValueExpression,

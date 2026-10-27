@@ -30,7 +30,7 @@ function document(components: readonly Record<string, unknown>[]): Record<string
     canvas,
     components: [...components],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

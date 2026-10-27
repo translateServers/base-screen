@@ -38,7 +38,7 @@ const baseDocument: ScreenDocument = {
     },
   ],
   variables: [],
-  blueprint: { rules: [] },
+  blueprint: { relations: [] },
 };
 
 const descriptor: ScreenDatasetDefinition = {

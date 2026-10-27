@@ -8,7 +8,7 @@
   top: 0;
   max-width: min(240px, calc(100vw - 20px));
   padding: 5px 9px;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-text-primary);
   color: var(--designer-surface-raised);
   font: 500 var(--designer-font-size-sm) / 1.45 var(--designer-font-family);
@@ -43,7 +43,7 @@
   position: absolute;
   width: 8px;
   height: 8px;
-  border-radius: 1px;
+  border-radius: var(--designer-radius-1);
   background: inherit;
   transform: rotate(45deg);
 }

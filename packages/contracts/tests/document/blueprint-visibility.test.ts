@@ -24,18 +24,21 @@ function visibilityDocument(): Record<string, unknown> {
     components: [component('button'), component('panel')],
     variables: [],
     blueprint: {
-      rules: [
+      relations: [
         {
+          type: 'behavior',
           id: 'toggle-panel',
-          trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-          actions: [
-            {
-              type: 'component-visibility',
-              componentId: 'panel',
-              operation: 'toggle',
-              transition: { effect: 'fade', durationMs: 240, easing: 'ease-in-out-quad' },
-            },
-          ],
+          source: {
+            kind: 'component',
+            componentId: 'button',
+            event: { type: 'material-event', eventName: 'click' },
+          },
+          target: { kind: 'component', componentId: 'panel' },
+          effect: {
+            type: 'component-visibility',
+            operation: 'toggle',
+            transition: { effect: 'fade', durationMs: 240, easing: 'ease-in-out-quad' },
+          },
         },
       ],
       layout: {
@@ -51,29 +54,38 @@ function visibilityDocument(): Record<string, unknown> {
 
 type MutableVisibilityDocument = {
   blueprint: {
-    rules: Array<{
-      actions: Array<{
-        componentId: string;
+    relations: Array<{
+      target: { componentId: string };
+      effect: {
         transition: { extra?: boolean };
-      }>;
+      };
     }>;
   };
 };
 
 describe('component visibility blueprint document', () => {
-  it('parses visibility actions and persisted layout strictly', () => {
+  it('parses visibility relations and persisted layout strictly', () => {
     const input = visibilityDocument();
     expect(parseScreenDocument(input)).toMatchObject({ ok: true });
 
     const missingTarget = structuredClone(input) as unknown as MutableVisibilityDocument;
-    missingTarget.blueprint.rules[0]!.actions[0]!.componentId = 'missing';
+    missingTarget.blueprint.relations[0]!.target.componentId = 'missing';
     expect(parseScreenDocument(missingTarget)).toMatchObject({
       ok: false,
-      diagnostics: [{ path: ['blueprint', 'rules', 0, 'actions', 0, 'componentId'] }],
+      diagnostics: [{ path: ['blueprint', 'relations', 0, 'target', 'componentId'] }],
     });
 
     const unknownTransitionField = structuredClone(input) as unknown as MutableVisibilityDocument;
-    unknownTransitionField.blueprint.rules[0]!.actions[0]!.transition.extra = true;
-    expect(parseScreenDocument(unknownTransitionField)).toMatchObject({ ok: false });
+    unknownTransitionField.blueprint.relations[0]!.effect.transition.extra = true;
+    const unknownResult = parseScreenDocument(unknownTransitionField);
+    expect(unknownResult.ok).toBe(false);
+    if (!unknownResult.ok) {
+      expect(
+        unknownResult.diagnostics.some(
+          (diagnostic) =>
+            diagnostic.path.join('.') === 'blueprint.relations.0.effect.transition.extra',
+        ),
+      ).toBe(true);
+    }
   });
 });

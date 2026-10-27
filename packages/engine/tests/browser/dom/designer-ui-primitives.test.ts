@@ -3,11 +3,13 @@ import {
   appendDesignerFieldMessage,
   createDesignerButton,
   createDesignerCheckbox,
+  createDesignerControlShell,
   createDesignerIconButton,
   createDesignerInput,
   createDesignerSegmented,
   createDesignerSelect,
   createDesignerSwitch,
+  createDesignerTabs,
   createDesignerTextarea,
 } from '../../../src/browser/dom/designer-ui-primitives.js';
 
@@ -44,6 +46,11 @@ class FakeElement {
   appendChild(child: FakeElement): FakeElement {
     this.children.push(child);
     return child;
+  }
+
+  replaceChildren(...children: FakeElement[]): void {
+    this.children.length = 0;
+    this.children.push(...children);
   }
 
   addEventListener(_type: string, _listener: () => void): void {}
@@ -185,6 +192,86 @@ describe('private designer UI primitives', () => {
     expect(buttons.get('left')?.className).toBe(
       'designer-segmented-option designer-control designer-button',
     );
+  });
+
+  it('refreshes segmented options and selection without losing the button map', () => {
+    const document = ownerDocument();
+    const handle = createDesignerSegmented(document, {
+      ariaLabel: '数据来源',
+      selected: 'inline',
+      options: [
+        { value: 'inline', label: '固定值' },
+        { value: 'variable', label: '变量' },
+      ],
+    });
+
+    handle.refresh({ selected: 'variable' });
+    expect(handle.buttons.get('inline')?.getAttribute('aria-pressed')).toBe('false');
+    expect(handle.buttons.get('variable')?.getAttribute('aria-pressed')).toBe('true');
+
+    handle.refresh({
+      options: [
+        { value: 'inline', label: '固定值' },
+        { value: 'source', label: '数据源' },
+      ],
+      selected: 'source',
+    });
+    expect(handle.buttons.size).toBe(2);
+    expect(handle.buttons.get('variable')).toBeUndefined();
+    expect(handle.buttons.get('source')?.getAttribute('aria-pressed')).toBe('true');
+    expect(handle.buttons.get('source')?.textContent).toBe('数据源');
+  });
+
+  it('projects compact size through data-size on controls and segmented tracks', () => {
+    const document = ownerDocument();
+    const button = createDesignerButton(document, { size: 'compact', text: '应用' });
+    const input = createDesignerInput(document, { size: 'compact' });
+    const select = createDesignerSelect(document, { size: 'compact' });
+    const segmented = createDesignerSegmented(document, {
+      ariaLabel: '密度',
+      options: [{ value: 'a', label: 'A' }],
+      selected: 'a',
+      size: 'compact',
+    });
+    const shell = createDesignerControlShell(document, { size: 'compact' });
+
+    expect(button.dataset.size).toBe('compact');
+    expect(input.dataset.size).toBe('compact');
+    expect(select.dataset.size).toBe('compact');
+    expect(segmented.element.dataset.size).toBe('compact');
+    expect(shell.className).toBe('designer-control-shell');
+    expect(shell.dataset.size).toBe('compact');
+  });
+
+  it('builds tablists with roving focus and refreshable items', () => {
+    const document = ownerDocument();
+    const handle = createDesignerTabs(document, {
+      ariaLabel: '检查器分区',
+      items: [
+        { value: 'style', label: '样式' },
+        { value: 'data', label: '数据' },
+        { value: 'events', label: '事件', disabled: true },
+      ],
+      orientation: 'vertical',
+      selected: 'data',
+    });
+
+    expect(handle.element.className).toBe('designer-tablist');
+    expect(handle.element.getAttribute('role')).toBe('tablist');
+    expect(handle.element.getAttribute('aria-orientation')).toBe('vertical');
+    expect(handle.buttons.get('data')?.getAttribute('aria-selected')).toBe('true');
+    expect(handle.buttons.get('data')?.tabIndex).toBe(0);
+    expect(handle.buttons.get('style')?.tabIndex).toBe(-1);
+    expect(handle.buttons.get('events')?.disabled).toBe(true);
+    expect(handle.buttons.get('style')?.dataset.tabValue).toBe('style');
+
+    handle.refresh({ selected: 'style' });
+    expect(handle.buttons.get('data')?.getAttribute('aria-selected')).toBe('false');
+    expect(handle.buttons.get('style')?.tabIndex).toBe(0);
+
+    handle.refresh({ items: [{ value: 'style', label: '样式' }], selected: 'style' });
+    expect(handle.buttons.size).toBe(1);
+    expect(handle.buttons.get('data')).toBeUndefined();
   });
 
   it('builds radio segmented groups with one roving tab stop', () => {

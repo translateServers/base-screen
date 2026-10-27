@@ -25,6 +25,7 @@ import {
   appendVariablesEmptyState,
   appendVariablesToolbar,
 } from './designer-variables-toolbar-dom.js';
+import { createDesignerSection } from './panel/designer-chrome-primitives.js';
 
 export interface DesignerVariablesDraft {
   readonly creating: boolean;
@@ -453,6 +454,7 @@ function appendCompactActions(
   const edit = createDesignerButton(header.ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.variables.editConfiguration(variable.name),
     className: 'variable-row-edit',
+    size: 'compact',
     tip: DESIGNER_UI_TEXT.variables.editConfiguration(variable.name),
     variant: 'ghost',
   });
@@ -463,6 +465,7 @@ function appendCompactActions(
   const more = createDesignerButton(header.ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.variables.moreMenu,
     className: 'variable-row-more',
+    size: 'compact',
     tip: DESIGNER_UI_TEXT.variables.moreMenu,
     variant: 'ghost',
   });
@@ -524,13 +527,12 @@ function valueTypeName(value: ScreenJsonValue): string {
 }
 
 function createDetailSection(ownerDocument: Document, title: string): HTMLElement {
-  const section = ownerDocument.createElement('section');
-  section.className = 'variable-detail-section';
-  const heading = ownerDocument.createElement('span');
-  heading.className = 'variable-detail-section-title';
-  heading.textContent = title;
-  section.appendChild(heading);
-  return section;
+  const host = ownerDocument.createElement('div');
+  return createDesignerSection(host, {
+    collapsible: false,
+    title,
+    className: 'variable-detail-section',
+  }).element;
 }
 
 function createDetailLine(ownerDocument: Document, label: string, value: string): HTMLElement {

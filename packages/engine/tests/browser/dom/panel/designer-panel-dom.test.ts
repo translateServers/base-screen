@@ -121,7 +121,7 @@ describe('designer panel property parsing', () => {
         },
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     } as ScreenDocument;
     const catalog = {
       get: () => ({ manifest }),
@@ -204,7 +204,7 @@ describe('designer panel property parsing', () => {
         },
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     } as ScreenDocument;
     const catalog = {
       get: () => ({ manifest }),
@@ -277,7 +277,7 @@ describe('designer panel property parsing', () => {
         },
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     } as ScreenDocument;
     const catalog = {
       get: (type: string) => ({
@@ -357,7 +357,7 @@ describe('designer panel property parsing', () => {
         },
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     } as ScreenDocument;
     const interaction = { focusedComponentId: 'text-1', selectedComponentIds: ['text-1'] };
 
@@ -437,6 +437,6 @@ function dataDocument(): ScreenDocument {
       },
     ],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }

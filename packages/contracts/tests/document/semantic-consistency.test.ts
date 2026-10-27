@@ -32,7 +32,7 @@ function document(overrides: Record<string, unknown> = {}): Record<string, unkno
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
     ...overrides,
   };
 }
@@ -126,35 +126,47 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
     }
   });
 
-  it('rejects duplicate blueprint rule ids', () => {
-    const rule = {
+  it('rejects duplicate blueprint relation ids', () => {
+    const relation = {
+      type: 'behavior',
       id: 'on-click',
-      trigger: { type: 'material-event', componentId: 'card-a', eventName: 'click' },
-      actions: [],
+      source: {
+        kind: 'component',
+        componentId: 'card-a',
+        event: { type: 'material-event', eventName: 'click' },
+      },
+      target: { kind: 'component', componentId: 'card-a' },
+      effect: { type: 'request-component-data' },
     };
     const result = parseScreenDocument(
       document({
         components: [component({ id: 'card-a' })],
-        blueprint: { rules: [rule, { ...rule }] },
+        blueprint: { relations: [relation, { ...relation }] },
       }),
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.diagnostics[0]?.code).toBe('DOCUMENT_FIELD_INVALID');
-      expect(result.diagnostics[0]?.path).toEqual(['blueprint', 'rules', 1, 'id']);
+      expect(result.diagnostics[0]?.path).toEqual(['blueprint', 'relations', 1, 'id']);
     }
   });
 
-  it('rejects a material-event trigger referencing an unknown component', () => {
+  it('rejects a material-event source referencing an unknown component', () => {
     const result = parseScreenDocument(
       document({
         components: [component({ id: 'card-a' })],
         blueprint: {
-          rules: [
+          relations: [
             {
+              type: 'behavior',
               id: 'on-click',
-              trigger: { type: 'material-event', componentId: 'ghost', eventName: 'click' },
-              actions: [],
+              source: {
+                kind: 'component',
+                componentId: 'ghost',
+                event: { type: 'material-event', eventName: 'click' },
+              },
+              target: { kind: 'component', componentId: 'card-a' },
+              effect: { type: 'request-component-data' },
             },
           ],
         },
@@ -165,30 +177,30 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
       expect(result.diagnostics[0]?.code).toBe('COMPONENT_PARENT_MISSING');
       expect(result.diagnostics[0]?.path).toEqual([
         'blueprint',
-        'rules',
+        'relations',
         0,
-        'trigger',
+        'source',
         'componentId',
       ]);
     }
   });
 
-  it('rejects a set-variable action referencing an unknown variable', () => {
+  it('rejects a set-variable effect referencing an unknown variable', () => {
     const result = parseScreenDocument(
       document({
         components: [component({ id: 'card-a' })],
         blueprint: {
-          rules: [
+          relations: [
             {
+              type: 'behavior',
               id: 'on-click',
-              trigger: { type: 'material-event', componentId: 'card-a', eventName: 'click' },
-              actions: [
-                {
-                  type: 'set-variable',
-                  variableId: 'ghost',
-                  value: { kind: 'literal', value: 1 },
-                },
-              ],
+              source: {
+                kind: 'component',
+                componentId: 'card-a',
+                event: { type: 'material-event', eventName: 'click' },
+              },
+              target: { kind: 'variable', variableId: 'ghost' },
+              effect: { type: 'set-variable', value: { kind: 'literal', value: 1 } },
             },
           ],
         },
@@ -199,10 +211,9 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
       expect(result.diagnostics[0]?.code).toBe('VARIABLE_NAME_INVALID');
       expect(result.diagnostics[0]?.path).toEqual([
         'blueprint',
-        'rules',
+        'relations',
         0,
-        'actions',
-        0,
+        'target',
         'variableId',
       ]);
     }
@@ -214,17 +225,17 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
         components: [component({ id: 'child', parentId: 'parent' }), component({ id: 'parent' })],
         variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
         blueprint: {
-          rules: [
+          relations: [
             {
+              type: 'behavior',
               id: 'on-click',
-              trigger: { type: 'material-event', componentId: 'child', eventName: 'click' },
-              actions: [
-                {
-                  type: 'set-variable',
-                  variableId: 'count',
-                  value: { kind: 'literal', value: 1 },
-                },
-              ],
+              source: {
+                kind: 'component',
+                componentId: 'child',
+                event: { type: 'material-event', eventName: 'click' },
+              },
+              target: { kind: 'variable', variableId: 'count' },
+              effect: { type: 'set-variable', value: { kind: 'literal', value: 1 } },
             },
           ],
         },
@@ -251,17 +262,21 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
           },
         ],
         blueprint: {
-          rules: [
+          relations: [
             {
+              type: 'behavior',
               id: 'notify',
-              trigger: { type: 'material-event', componentId: 'card-a', eventName: 'click' },
-              actions: [
-                {
-                  type: 'host-action',
-                  actionId: 'project.notify',
-                  payload: { kind: 'variable', variableId: 'tenant' },
-                },
-              ],
+              source: {
+                kind: 'component',
+                componentId: 'card-a',
+                event: { type: 'material-event', eventName: 'click' },
+              },
+              target: { kind: 'host' },
+              effect: {
+                type: 'host-action',
+                actionId: 'project.notify',
+                payload: { kind: 'variable', variableId: 'tenant' },
+              },
             },
           ],
         },

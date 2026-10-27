@@ -1077,236 +1077,340 @@
     "blueprint": {
       "type": "object",
       "properties": {
-        "rules": {
-          "maxItems": 1000,
+        "relations": {
+          "maxItems": 128000,
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-              },
-              "trigger": {
-                "anyOf": [
-                  {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "behavior"
+                  },
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                  },
+                  "source": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "component"
+                          },
+                          "componentId": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                          },
+                          "event": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "material-event"
+                              },
+                              "eventName": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+                              }
+                            },
+                            "required": ["type", "eventName"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["kind", "componentId", "event"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "variable"
+                          },
+                          "variableId": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                          },
+                          "event": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "variable-event"
+                              },
+                              "eventName": {
+                                "type": "string",
+                                "enum": ["data-updated", "request-state"]
+                              }
+                            },
+                            "required": ["type", "eventName"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["kind", "variableId", "event"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "condition": {
                     "type": "object",
                     "properties": {
-                      "type": {
+                      "left": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "operator": {
                         "type": "string",
-                        "const": "material-event"
+                        "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "exists"]
+                      },
+                      "right": {
+                        "$ref": "#/$defs/__schema0"
+                      }
+                    },
+                    "required": ["left", "operator"],
+                    "additionalProperties": false,
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "operator": {
+                              "const": "exists"
+                            }
+                          },
+                          "required": ["operator"]
+                        },
+                        "then": {
+                          "not": {
+                            "required": ["right"]
+                          }
+                        },
+                        "else": {
+                          "required": ["right"]
+                        }
+                      }
+                    ]
+                  },
+                  "target": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "component"
+                          },
+                          "componentId": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                          }
+                        },
+                        "required": ["kind", "componentId"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "variable"
+                          },
+                          "variableId": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                          }
+                        },
+                        "required": ["kind", "variableId"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "host"
+                          }
+                        },
+                        "required": ["kind"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "effect": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "component-visibility"
+                          },
+                          "operation": {
+                            "type": "string",
+                            "enum": ["show", "hide", "toggle"]
+                          },
+                          "transition": {
+                            "type": "object",
+                            "properties": {
+                              "effect": {
+                                "type": "string",
+                                "enum": ["appear", "fade", "slide-up"]
+                              },
+                              "durationMs": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
+                              },
+                              "easing": {
+                                "type": "string",
+                                "enum": ["linear", "ease-in-out-quad", "ease-in-out-expo"]
+                              }
+                            },
+                            "required": ["effect", "durationMs", "easing"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["type", "operation"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "request-component-data"
+                          }
+                        },
+                        "required": ["type"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "set-variable"
+                          },
+                          "value": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        "required": ["type", "value"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "request-variable"
+                          }
+                        },
+                        "required": ["type"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "emit-host-event"
+                          },
+                          "eventName": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+                          },
+                          "payload": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        "required": ["type", "eventName", "payload"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "host-action"
+                          },
+                          "actionId": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                          },
+                          "payload": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        "required": ["type", "actionId", "payload"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "requiredCapabilities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                    }
+                  }
+                },
+                "required": ["type", "id", "source", "target", "effect"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "semantic"
+                  },
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                  },
+                  "source": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "component"
                       },
                       "componentId": {
                         "type": "string",
                         "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-                      },
-                      "eventName": {
-                        "type": "string",
-                        "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
                       }
                     },
-                    "required": ["type", "componentId", "eventName"],
+                    "required": ["kind", "componentId"],
                     "additionalProperties": false
                   },
-                  {
+                  "target": {
                     "type": "object",
                     "properties": {
-                      "type": {
+                      "kind": {
                         "type": "string",
-                        "const": "variable-event"
+                        "const": "component"
                       },
-                      "variableId": {
+                      "componentId": {
                         "type": "string",
                         "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-                      },
-                      "eventName": {
-                        "type": "string",
-                        "enum": ["data-updated", "request-state"]
                       }
                     },
-                    "required": ["type", "variableId", "eventName"],
+                    "required": ["kind", "componentId"],
                     "additionalProperties": false
-                  }
-                ]
-              },
-              "requiredCapabilities": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-                }
-              },
-              "condition": {
-                "type": "object",
-                "properties": {
-                  "left": {
-                    "$ref": "#/$defs/__schema0"
                   },
-                  "operator": {
+                  "role": {
                     "type": "string",
-                    "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "exists"]
-                  },
-                  "right": {
-                    "$ref": "#/$defs/__schema0"
+                    "enum": ["related", "detail", "group", "drill-down"]
                   }
                 },
-                "required": ["left", "operator"],
-                "additionalProperties": false,
-                "allOf": [
-                  {
-                    "if": {
-                      "properties": {
-                        "operator": {
-                          "const": "exists"
-                        }
-                      },
-                      "required": ["operator"]
-                    },
-                    "then": {
-                      "not": {
-                        "required": ["right"]
-                      }
-                    },
-                    "else": {
-                      "required": ["right"]
-                    }
-                  }
-                ]
-              },
-              "actions": {
-                "maxItems": 128,
-                "type": "array",
-                "items": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "const": "set-variable"
-                        },
-                        "variableId": {
-                          "type": "string",
-                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-                        },
-                        "value": {
-                          "$ref": "#/$defs/__schema0"
-                        }
-                      },
-                      "required": ["type", "variableId", "value"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "const": "request-variable"
-                        },
-                        "variableId": {
-                          "type": "string",
-                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-                        }
-                      },
-                      "required": ["type", "variableId"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "const": "request-component-data"
-                        },
-                        "componentId": {
-                          "type": "string",
-                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-                        }
-                      },
-                      "required": ["type", "componentId"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "const": "emit-host-event"
-                        },
-                        "eventName": {
-                          "type": "string",
-                          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
-                        },
-                        "payload": {
-                          "$ref": "#/$defs/__schema0"
-                        }
-                      },
-                      "required": ["type", "eventName", "payload"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "const": "host-action"
-                        },
-                        "actionId": {
-                          "type": "string",
-                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-                        },
-                        "payload": {
-                          "$ref": "#/$defs/__schema0"
-                        }
-                      },
-                      "required": ["type", "actionId", "payload"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "const": "component-visibility"
-                        },
-                        "componentId": {
-                          "type": "string",
-                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-                        },
-                        "operation": {
-                          "type": "string",
-                          "enum": ["show", "hide", "toggle"]
-                        },
-                        "transition": {
-                          "type": "object",
-                          "properties": {
-                            "effect": {
-                              "type": "string",
-                              "enum": ["appear", "fade", "slide-up"]
-                            },
-                            "durationMs": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 10000
-                            },
-                            "easing": {
-                              "type": "string",
-                              "enum": ["linear", "ease-in-out-quad", "ease-in-out-expo"]
-                            }
-                          },
-                          "required": ["effect", "durationMs", "easing"],
-                          "additionalProperties": false
-                        }
-                      },
-                      "required": ["type", "componentId", "operation"],
-                      "additionalProperties": false
-                    }
-                  ]
-                }
+                "required": ["type", "id", "source", "target", "role"],
+                "additionalProperties": false
               }
-            },
-            "required": ["id", "trigger", "actions"],
-            "additionalProperties": false
+            ]
           }
         },
         "layout": {
@@ -1359,7 +1463,7 @@
           "additionalProperties": false
         }
       },
-      "required": ["rules"],
+      "required": ["relations"],
       "additionalProperties": false
     }
   },

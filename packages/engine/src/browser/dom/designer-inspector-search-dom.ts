@@ -1,5 +1,7 @@
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
+import { createDesignerButton } from './designer-ui-primitives.js';
+import { createDesignerBadge } from './panel/designer-chrome-primitives.js';
 
 export const DESIGNER_INSPECTOR_SEARCH_SECTION_SELECTOR =
   '.designer-inspector-section, [data-inspector-search-section]';
@@ -149,7 +151,7 @@ function appendSearchResult(
       )
       ?.textContent?.trim() ?? '';
   const card = results.ownerDocument.createElement('article');
-  card.className = 'inspector-search-result';
+  card.className = 'designer-list-row inspector-search-result';
   card.dataset.inspectorSearchResult = key;
 
   const pathButton = results.ownerDocument.createElement('button');
@@ -174,10 +176,11 @@ function appendSearchResult(
   copy.append(path, label);
   pathButton.append(locateIcon, copy);
   if (target.closest('[data-inspector-advanced]') !== null) {
-    const badge = results.ownerDocument.createElement('span');
-    badge.className = 'inspector-search-result-badge';
-    badge.textContent = DESIGNER_UI_TEXT.inspectorUi.advanced;
-    pathButton.appendChild(badge);
+    createDesignerBadge(pathButton, {
+      text: DESIGNER_UI_TEXT.inspectorUi.advanced,
+      tone: 'accent',
+      className: 'inspector-search-result-badge',
+    });
   }
   card.appendChild(pathButton);
 
@@ -233,13 +236,14 @@ function createSearchContextMenu(ownerDocument: Document, key: string): HTMLElem
     ['copy', DESIGNER_UI_TEXT.inspectorUi.copyStyle],
     ['paste', DESIGNER_UI_TEXT.inspectorUi.pasteStyle],
   ] as const) {
-    const button = ownerDocument.createElement('button');
-    button.type = 'button';
-    button.className = 'designer-control designer-button';
+    const button = createDesignerButton(ownerDocument, {
+      size: 'compact',
+      text: label,
+      variant: 'ghost',
+    });
     button.dataset[action === 'copy' ? 'inspectorSearchCopyTarget' : 'inspectorSearchPasteTarget'] =
       key;
     button.setAttribute('role', 'menuitem');
-    button.textContent = label;
     menu.appendChild(button);
   }
   return menu;

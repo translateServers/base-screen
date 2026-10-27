@@ -1394,7 +1394,7 @@ export async function assertImageDensitySize(browser, baseUrl) {
             },
           ],
           variables: [],
-          blueprint: { rules: [] },
+          blueprint: { relations: [] },
         }).ok;
       }),
     ).toBe(true);

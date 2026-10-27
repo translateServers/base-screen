@@ -150,7 +150,7 @@ function renderVariableList(options: DesignerDataSourcePanelOptions): HTMLElemen
   );
   // 空态**总是渲染**、按可见行数显隐：搜索是就地过滤（不重建列表），没有空态就无从切换。
   const empty = ownerDocument.createElement('p');
-  empty.className = 'designer-source-sheet-empty';
+  empty.className = 'designer-empty-state';
   empty.dataset.sourceSheetVariableEmpty = 'true';
   empty.textContent =
     options.variables.length === 0

@@ -27,6 +27,7 @@ export function enhanceDesignerSelect(select: HTMLSelectElement): DesignerSelect
   const trigger = ownerDocument.createElement('button');
   trigger.type = 'button';
   trigger.className = 'designer-select-trigger';
+  if (select.dataset.size !== undefined) trigger.dataset.size = select.dataset.size;
   trigger.setAttribute('aria-haspopup', 'listbox');
   trigger.setAttribute('aria-expanded', 'false');
   // 原生 select 被视觉收进 1px，用户看到的是这个触发器：禁用状态必须一起传导，

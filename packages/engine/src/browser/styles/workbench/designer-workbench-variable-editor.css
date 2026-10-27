@@ -45,35 +45,6 @@
   gap: var(--designer-space-2);
 }
 
-.designer-button.variable-source-option {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  min-height: 54px;
-  justify-items: start;
-  gap: var(--designer-space-1);
-  padding: var(--designer-space-3);
-  text-align: left;
-}
-
-.variable-source-option strong {
-  color: inherit;
-  font: var(--designer-font-small);
-  font-weight: 600;
-}
-
-.variable-source-option small {
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  font-size: var(--designer-font-size-xs);
-  line-height: 15px;
-  overflow-wrap: anywhere;
-}
-
-.variable-source-option[aria-pressed="true"] small {
-  color: color-mix(in srgb, currentColor 78%, var(--designer-text-muted));
-}
-
 .variable-host-catalog {
   display: grid;
   min-width: 0;
@@ -184,62 +155,27 @@
   box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
 }
 
-.variable-editor-section-title {
+.variable-editor-step-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.variable-field {
-  display: grid;
-  min-width: 0;
-  gap: var(--designer-space-2);
-}
-
-.variable-field-label {
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  font-weight: 600;
-}
-
-.variable-edit-input {
-  height: 30px;
-  font: var(--designer-font-small);
-}
-
-/* 自绘下拉：原生 select 已收成 1px，高度与字号落在触发器上。 */
-.variable-source-select .designer-select-trigger {
-  height: 30px;
-  font: var(--designer-font-small);
-}
-
-.variable-edit-input[data-variable-create-value],
-.variable-edit-input[data-variable-value] {
+.variable-input-wrap [data-variable-create-value],
+.variable-input-wrap [data-variable-value] {
   font: var(--designer-font-numeric);
   font-weight: 500;
 }
 
-.variable-field-hint {
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  font-size: var(--designer-font-size-xs);
-  line-height: 15px;
-  overflow-wrap: anywhere;
-}
-
 .variable-field-error {
   margin: 0;
-  color: var(--designer-danger-text);
-  font: var(--designer-font-small);
-  font-size: var(--designer-font-size-xs);
-  line-height: 15px;
   overflow-wrap: anywhere;
 }
 
 .variable-error-summary {
   padding: var(--designer-space-2) var(--designer-space-3);
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: color-mix(in srgb, var(--designer-danger-surface) 36%, transparent);
   color: var(--designer-danger-text);
   font: var(--designer-font-small);
@@ -247,74 +183,11 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--designer-danger) 28%, transparent);
 }
 
-.variable-field-checks {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--designer-space-2);
-  min-height: 14px;
-}
-
 .variable-field-count,
 .variable-field-type {
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
   font-size: var(--designer-font-size-xs);
-}
-
-.variable-field-check {
-  display: inline-grid;
-  width: 14px;
-  height: 14px;
-  place-items: center;
-  color: var(--designer-success);
-}
-
-.variable-field-check svg {
-  width: 12px;
-  height: 12px;
-}
-
-.variable-field-check[hidden] {
-  display: none;
-}
-
-.variable-checkbox-field {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 15px minmax(0, 1fr);
-  align-items: start;
-  gap: var(--designer-space-3);
-  padding: var(--designer-space-3);
-  border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-workspace);
-  cursor: pointer;
-}
-
-/* 勾选框本体由共享原语绘制（15px 自绘方框）；这里只负责与首行文字对齐。 */
-.variable-checkbox-field > .designer-checkbox {
-  margin-top: 1px;
-}
-
-.variable-checkbox-field > span {
-  display: grid;
-  min-width: 0;
-  gap: var(--designer-space-1);
-}
-
-.variable-checkbox-field strong {
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  font-weight: 600;
-}
-
-.variable-checkbox-field small {
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  font-size: var(--designer-font-size-xs);
-  line-height: 15px;
-  overflow-wrap: anywhere;
 }
 
 .variable-response-field {
@@ -333,11 +206,6 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--designer-space-2);
-}
-
-.variable-response-field .designer-button {
-  min-height: 24px;
-  padding: 0 var(--designer-space-2);
 }
 
 .variable-response-field p,
@@ -379,12 +247,6 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--designer-space-3);
-}
-
-.variable-editor-actions .designer-button {
-  display: inline-flex;
-  min-height: 28px;
-  box-shadow: none;
 }
 
 .variable-row[data-variable-editor="delete"] {
@@ -479,14 +341,14 @@
   height: 16px;
   flex: none;
   place-items: center;
-  border-radius: 4px;
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
-  font: 500 9px / 1 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-numeric);
   box-shadow: var(--designer-elev-ring);
 }
 
-.variable-editor-section-title {
+.variable-editor-step-title {
   flex: none;
   color: var(--designer-text-primary);
   font-size: 11px;
@@ -497,75 +359,18 @@
 .variable-editor-section-hint {
   margin-left: auto;
   color: var(--designer-text-disabled);
-  font: 500 9px / 1.4 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-numeric);
   white-space: nowrap;
 }
 
-.variable-field {
-  gap: 5px;
-  margin-top: 10px;
-}
-
-.variable-field-label {
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.5;
-}
-
 .variable-required {
-  margin-left: 3px;
+  margin-left: var(--designer-space-1);
   color: var(--designer-danger-text);
 }
 
 .variable-input-wrap {
   position: relative;
   min-width: 0;
-}
-
-.variable-edit-input,
-.variable-input-wrap .variable-edit-input {
-  width: 100%;
-  min-width: 0;
-  height: 32px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: var(--designer-radius-2);
-  background: var(--designer-surface-control);
-  color: var(--designer-text-primary);
-  box-shadow: var(--designer-elev-ring);
-  font: var(--designer-font-small);
-  font-size: 12px;
-}
-
-.variable-edit-input.variable-textarea,
-textarea.variable-edit-input {
-  min-height: 62px;
-  padding: 6px 9px;
-  line-height: 1.55;
-  resize: vertical;
-}
-
-.variable-edit-input:hover:not(:disabled):not(:focus) {
-  box-shadow: 0 0 0 1px var(--designer-border-strong);
-}
-
-.variable-edit-input:focus {
-  outline: none;
-  box-shadow: var(--designer-focus-ring);
-}
-
-.variable-edit-input[aria-invalid="true"] {
-  box-shadow: 0 0 0 1px var(--designer-danger);
-}
-
-.variable-edit-input[aria-invalid="true"]:focus {
-  box-shadow: 0 0 0 2px var(--designer-danger);
-}
-
-.variable-input-wrap:has(.variable-input-check:not([hidden])) .variable-edit-input {
-  padding-right: 28px;
 }
 
 .variable-input-check {
@@ -590,12 +395,6 @@ textarea.variable-edit-input {
   height: 13px;
 }
 
-.variable-field-error {
-  color: var(--designer-danger-text);
-  font-size: 10px;
-  line-height: 1.5;
-}
-
 .variable-field-error[hidden] {
   display: none;
 }
@@ -604,7 +403,7 @@ textarea.variable-edit-input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px 8px;
+  gap: var(--designer-space-3) var(--designer-space-4);
   min-width: 0;
   flex-wrap: wrap;
 }
@@ -612,9 +411,6 @@ textarea.variable-edit-input {
 .variable-field-hint {
   flex: 1;
   min-width: 0;
-  color: var(--designer-text-muted);
-  font-size: 10px;
-  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
@@ -622,113 +418,21 @@ textarea.variable-edit-input {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 4px;
+  gap: var(--designer-space-2);
   min-height: 0;
 }
 
-.variable-field-count,
 .variable-field-type {
-  color: var(--designer-text-muted);
-  font: 500 9px / 1.5 var(--designer-font-numeric);
-}
-
-.variable-field-type {
-  padding: 1px 6px;
+  padding: 1px var(--designer-space-3);
   border-radius: var(--designer-radius-pill);
   background: var(--designer-surface-control);
   color: var(--designer-text-secondary);
   box-shadow: var(--designer-elev-ring);
 }
 
-.variable-field-check {
-  position: absolute;
-  right: 8px;
-}
-
-.variable-error-summary {
-  color: var(--designer-danger-text);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.variable-checkbox-field {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  padding: 4px 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.variable-checkbox-field > .designer-checkbox {
-  margin-top: 1px;
-}
-
-.variable-checkbox-field > span {
-  display: grid;
-  gap: 1px;
-}
-
-.variable-checkbox-field strong {
-  color: var(--designer-text-primary);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.5;
-}
-
-.variable-checkbox-field small {
-  color: var(--designer-text-muted);
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-.variable-source-field {
-  gap: 5px;
-}
-
-.variable-source-segmented {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  padding: 2px;
-  border-radius: var(--designer-radius-3);
-  background: var(--designer-surface-workspace);
-  box-shadow: var(--designer-elev-ring);
-}
-
-.variable-source-segmented-option {
-  min-width: 0;
-  height: 28px;
-  padding: 0 4px;
-  overflow: hidden;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  font-size: 10px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.variable-source-segmented-option:hover {
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-text-primary);
-}
-
-.variable-source-segmented-option[aria-pressed="true"] {
-  background: var(--designer-surface-raised);
-  color: var(--designer-text-primary);
-  box-shadow:
-    0 1px 2px color-mix(in srgb, var(--designer-text-primary) 8%, transparent),
-    inset 0 0 0 1px var(--designer-border-default);
-}
-
 .variable-host-catalog {
   display: block;
-  margin-top: 10px;
+  margin-top: var(--designer-space-5);
 }
 
 .variable-catalog-summary {
@@ -738,7 +442,7 @@ textarea.variable-edit-input {
   width: 100%;
   min-height: 38px;
   padding: 6px 8px;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-text-secondary);
   box-shadow: var(--designer-elev-ring);
@@ -788,7 +492,7 @@ textarea.variable-edit-input {
 .variable-catalog-sub {
   overflow: hidden;
   color: var(--designer-text-muted);
-  font: 500 9px / 1.45 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.45 var(--designer-font-numeric);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -812,24 +516,19 @@ textarea.variable-edit-input {
 
 .variable-catalog-content {
   display: grid;
-  gap: 6px;
-  margin-top: 6px;
+  gap: var(--designer-space-3);
+  margin-top: var(--designer-space-3);
 }
 
 .variable-host-catalog:not([open]) > .variable-catalog-content {
   display: none;
 }
 
-.variable-host-catalog input {
-  height: 30px;
-  font-size: 11px;
-}
-
 .variable-host-catalog-list {
   max-height: 178px;
   gap: 1px;
   padding: 3px;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   scrollbar-gutter: stable;
 }
@@ -840,7 +539,7 @@ textarea.variable-edit-input {
   gap: 6px;
   padding: 6px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--designer-radius-3);
   background: transparent;
   box-shadow: none;
   color: var(--designer-text-secondary);
@@ -864,20 +563,20 @@ textarea.variable-edit-input {
 
 .variable-host-catalog-item span {
   color: var(--designer-text-muted);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   line-height: 1.5;
 }
 
 .variable-selected-host-id {
   display: block;
   color: var(--designer-text-muted);
-  font: 500 9px / 1.5 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.5 var(--designer-font-numeric);
   overflow-wrap: anywhere;
 }
 
 .variable-catalog-feedback {
   color: var(--designer-text-muted);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   line-height: 1.5;
 }
 
@@ -886,7 +585,7 @@ textarea.variable-edit-input {
   margin-top: 10px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   box-shadow: var(--designer-elev-ring);
   overflow: hidden;
@@ -902,14 +601,7 @@ textarea.variable-edit-input {
   max-height: 104px;
   padding: 7px 8px;
   color: var(--designer-text-secondary);
-  font: 500 10px / 1.65 var(--designer-font-numeric);
-}
-
-.variable-response-field .designer-button {
-  height: 22px;
-  min-height: 22px;
-  padding: 0 6px;
-  font-size: 10px;
+  font: 500 var(--designer-font-size-xs) / 1.65 var(--designer-font-numeric);
 }
 
 .variable-run-section {
@@ -944,7 +636,7 @@ textarea.variable-edit-input {
   min-width: 0;
   overflow: hidden;
   color: var(--designer-text-muted);
-  font: 500 9px / 1.5 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.5 var(--designer-font-numeric);
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -967,18 +659,10 @@ textarea.variable-edit-input {
   transform: rotate(90deg);
 }
 
-.variable-run-section > .variable-checkbox-field,
-.variable-run-section > .variable-field {
-  margin-top: 9px;
+.variable-run-section > .designer-field {
+  margin-top: var(--designer-space-4);
 }
 
 .variable-editor-actions {
-  gap: 6px;
-}
-
-.variable-editor-actions .designer-button {
-  min-height: 28px;
-  padding: 0 9px;
-  font-size: 11px;
-  box-shadow: none;
+  gap: var(--designer-space-3);
 }

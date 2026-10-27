@@ -1,5 +1,5 @@
 /* 变量列表的共享排版：行几何与状态由 designer-workbench-variables.css 负责，
-   本文件只保留变量名/值/宿主 ID 的等宽排版与类型徽标（变量选择器等处复用）。 */
+   本文件只保留变量名/值/宿主 ID 的等宽排版；类型徽标走 chrome 层的 .designer-badge。 */
 .variable-name,
 .variable-value,
 .variable-host-id,
@@ -12,61 +12,7 @@
   white-space: nowrap;
 }
 
-.variable-badge {
-  box-sizing: border-box;
-  flex: 0 0 auto;
-  min-height: 18px;
-  padding: 0 var(--designer-space-2);
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-pill);
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  font-size: var(--designer-font-size-xs);
-  line-height: 16px;
-  white-space: nowrap;
-}
-
-.variable-badge[data-variable-type="static"] {
-  border-color: var(--designer-border-default);
-  background: var(--designer-surface-workspace);
-  color: var(--designer-text-secondary);
-}
-
-.variable-badge[data-variable-type="data-source"] {
-  border-color: color-mix(in srgb, var(--designer-accent) 52%, var(--designer-border-default));
-  background: color-mix(in srgb, var(--designer-accent) 10%, transparent);
-  color: color-mix(in srgb, var(--designer-accent) 62%, var(--designer-text-primary));
-}
-
-.variable-badge[data-variable-type="url-query"] {
-  border-color: color-mix(in srgb, var(--designer-success) 48%, var(--designer-border-default));
-  background: color-mix(in srgb, var(--designer-success) 9%, transparent);
-  color: color-mix(in srgb, var(--designer-success) 58%, var(--designer-text-primary));
-}
-
 /* 行内图标动作：变量行操作簇（variables.css 会覆盖尺寸，这里保留按钮底形与危险态）。 */
-.designer-button.variable-icon-action {
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border-color: transparent;
-  background: transparent;
-  color: var(--designer-text-muted);
-  box-shadow: none;
-}
-
-.designer-button.variable-icon-action:hover:not(:disabled),
-.designer-button.variable-icon-action:focus-visible {
-  border-color: transparent;
-  color: var(--designer-text-primary);
-}
-
-.designer-button.variable-icon-action[data-variant="danger"]:hover:not(:disabled),
-.designer-button.variable-icon-action[data-variant="danger"]:focus-visible {
-  background: var(--designer-danger-surface);
-  color: var(--designer-danger);
-}
-
 .variable-icon-action .variable-button-label {
   display: none;
 }

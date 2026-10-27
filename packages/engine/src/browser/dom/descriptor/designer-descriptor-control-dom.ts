@@ -5,6 +5,7 @@ import {
   resolveSchema,
 } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { createDesignerStepper } from '../designer-field-primitives.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
   createDesignerInput,
@@ -16,7 +17,6 @@ import type {
   DesignerDescriptorContext,
   DesignerDescriptorDatasetFields,
 } from './designer-descriptor-model.js';
-import { createDesignerStepper } from './designer-descriptor-stepper-dom.js';
 
 export interface DescriptorControlHandle {
   /** 挂到字段行里的元素（复合控件时是外壳）。 */

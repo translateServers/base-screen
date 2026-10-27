@@ -6,6 +6,7 @@ import {
 } from '../../common/operations/workbench/designer-left-panel-groups.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
+import { createDesignerTabButton } from './designer-ui-primitives.js';
 
 const HOST_TAB_PREFIX = 'host:';
 
@@ -26,19 +27,18 @@ export function renderDesignerLeftPanelGroups(
     const tabId = hostLeftPanelTabId(group.id);
     const panelId = hostLeftPanelPanelId(group.id);
     if (baseScreenDesignerLeftPanelGroupSupportsMode(group, 'canvas')) {
-      const tab = root.ownerDocument.createElement('button');
-      tab.type = 'button';
-      tab.className = 'designer-tab';
+      const tab = createDesignerTabButton(root.ownerDocument, {
+        label: '',
+        tip: group.label,
+        value: group.id,
+      });
       tab.id = tabId;
-      tab.setAttribute('role', 'tab');
       tab.setAttribute('aria-controls', panelId);
-      tab.setAttribute('aria-selected', 'false');
       tab.dataset.panelTab = `${HOST_TAB_PREFIX}${group.id}`;
       tab.dataset.panelLabel = group.label;
       tab.dataset.hostLeftPanelGroup = group.id;
       tab.dataset.hostLeftPanelMode = 'canvas';
       tab.dataset.hostLeftPanelRendered = '';
-      tab.setAttribute('data-tip', group.label);
 
       const glyph = root.ownerDocument.createElement('span');
       glyph.className = 'rail-tab-glyph';
@@ -71,7 +71,7 @@ export function renderDesignerLeftPanelGroups(
     slot.name = baseScreenDesignerLeftPanelSlotName(group.id);
     slot.dataset.hostLeftPanelSlot = group.id;
     const fallback = root.ownerDocument.createElement('p');
-    fallback.className = 'designer-empty-state host-left-panel-empty';
+    fallback.className = 'designer-empty-state';
     fallback.textContent = DESIGNER_UI_TEXT.hostLeftPanelEmpty;
     slot.append(fallback);
     content.append(slot);

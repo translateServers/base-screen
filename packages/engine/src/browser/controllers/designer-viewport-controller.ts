@@ -196,7 +196,7 @@ export class DesignerViewportController {
           canvas: { width: size.width, height: size.height, backgroundColor: '#000000' },
           components: [],
           variables: [],
-          blueprint: { rules: [] },
+          blueprint: { relations: [] },
         },
         { width: viewport.clientWidth, height: viewport.clientHeight },
       ),

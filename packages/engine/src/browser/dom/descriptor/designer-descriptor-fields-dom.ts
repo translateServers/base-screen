@@ -45,7 +45,7 @@ export function appendDescriptorSection(
   // 与内建分段共用同一条“标题 + 发丝线 + 折叠箭头”的段落标题语言。
   summary.textContent = section.label;
   const disclosure = ownerDocument.createElement('span');
-  disclosure.className = 'designer-inspector-section-disclosure';
+  disclosure.className = 'designer-panel-section-disclosure designer-inspector-section-disclosure';
   disclosure.innerHTML = designerIcon('chevron-down');
   summary.appendChild(disclosure);
   details.appendChild(summary);

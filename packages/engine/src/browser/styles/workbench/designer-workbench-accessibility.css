@@ -79,8 +79,7 @@
   }
 
   .error-console-current,
-  .error-console-entry,
-  .error-console-empty {
+  .error-console-entry {
     border-color: CanvasText;
     background: Canvas;
     box-shadow: none;

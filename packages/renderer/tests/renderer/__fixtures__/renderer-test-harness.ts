@@ -321,7 +321,7 @@ export function document(
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
     components,
     variables,
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   };
 }
 

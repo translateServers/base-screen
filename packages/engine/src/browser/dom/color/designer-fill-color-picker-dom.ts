@@ -192,12 +192,13 @@ function colorRange(
   maximum: number,
   label: string,
 ): HTMLInputElement {
-  const input = ownerDocument.createElement('input');
-  input.type = 'range';
-  input.className = className;
-  input.min = String(minimum);
-  input.max = String(maximum);
-  input.step = '1';
+  const input = createDesignerInput(ownerDocument, {
+    appearance: 'range',
+    className,
+    max: maximum,
+    min: minimum,
+    step: 1,
+  });
   input.setAttribute('aria-label', label);
   return input;
 }

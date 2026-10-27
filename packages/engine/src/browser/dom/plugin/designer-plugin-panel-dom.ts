@@ -5,6 +5,7 @@ import type {
 } from '@base-screen/plugin-core';
 import { BASE_SCREEN_PLUGIN_PANEL_ACTION_EVENT } from '@base-screen/plugin-core';
 import { designerIcon } from '../../ui/designer-icons.js';
+import { createDesignerTabButton } from '../designer-ui-primitives.js';
 
 const PLUGIN_TAB_PREFIX = 'plugin:';
 
@@ -116,16 +117,15 @@ function createPanelTab(
   entry: BaseScreenPluginPanelCatalogEntry,
 ): HTMLButtonElement {
   const panelId = entry.contribution.id;
-  const tab = root.ownerDocument.createElement('button');
-  tab.type = 'button';
-  tab.className = 'designer-tab';
+  const tab = createDesignerTabButton(root.ownerDocument, {
+    label: '',
+    tip: entry.contribution.name,
+    value: panelId,
+  });
   tab.id = pluginPanelTabId(panelId);
-  tab.setAttribute('role', 'tab');
-  tab.setAttribute('aria-selected', 'false');
   tab.dataset.panelTab = pluginPanelTab(panelId);
   tab.dataset.panelLabel = entry.contribution.name;
   tab.dataset.pluginPanelTab = panelId;
-  tab.setAttribute('data-tip', entry.contribution.name);
   return tab;
 }
 

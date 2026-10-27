@@ -129,7 +129,7 @@ const STARTER_DOCUMENT = {
     },
   ],
   variables: [],
-  blueprint: { rules: [] },
+  blueprint: { relations: [] },
 } as const;
 
 /**

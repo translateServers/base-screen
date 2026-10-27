@@ -30,7 +30,7 @@ function lockedBackdrop(): { readonly document: ScreenDocument; readonly backgro
       },
     ],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   } as unknown as ScreenDocument;
   const background = new FakeElement();
   background.dataset.baseScreenComponentId = 'stage-bg';
@@ -153,7 +153,7 @@ function thinRuleDocument(): ScreenDocument {
       },
     ],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   } as unknown as ScreenDocument;
 }
 

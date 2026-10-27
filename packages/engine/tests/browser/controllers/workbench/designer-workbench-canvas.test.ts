@@ -246,7 +246,7 @@ describe('DesignerWorkbenchController snap session', () => {
       canvas: { width: 800, height: 600, backgroundColor: '#000000' },
       components: [componentNode('a', left), componentNode('b', 300)],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: { relations: [] },
     };
   }
 

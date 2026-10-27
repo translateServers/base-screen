@@ -66,17 +66,36 @@
   --designer-space-7: 24px;
   --designer-space-8: 32px;
   --designer-radius-1: 2px;
-  --designer-radius-2: 6px;
+  --designer-radius-2: 4px;
   --designer-radius-3: 6px;
   --designer-radius-4: 8px;
   --designer-radius-5: 12px;
   --designer-radius-pill: 999px;
-  --designer-radius-control: var(--designer-radius-2);
+  --designer-radius-control: var(--designer-radius-3);
   --designer-radius-overlay: var(--designer-radius-4);
   --designer-control-height: 30px;
   --designer-control-height-compact: 28px;
   --designer-control-padding-inline: 9px;
+  --designer-control-affix-inset: 28px;
   --designer-icon-size: 16px;
+  --designer-icon-size-xs: 12px;
+  --designer-icon-size-sm: 14px;
+  --designer-icon-size-lg: 18px;
+  /* 表单控件的内部几何：开关/勾选/分段轨道只在控制层引用这些值，面板不再各写一套。 */
+  --designer-switch-width: 36px;
+  --designer-switch-height: 20px;
+  --designer-switch-knob: 14px;
+  --designer-checkbox-size: 15px;
+  --designer-segmented-height: var(--designer-control-height);
+  --designer-segmented-option-height: 26px;
+  --designer-segmented-height-compact: var(--designer-control-height-compact);
+  --designer-segmented-option-height-compact: 24px;
+  /* 列表行与开关行的行高是布局节奏，不是控件高度。 */
+  --designer-row-height: 40px;
+  --designer-row-height-comfortable: 44px;
+  --designer-row-height-compact: 32px;
+  --designer-toggle-row-height: 34px;
+  --designer-empty-icon-size: 32px;
   /* 工具栏与左右两条 tab 条共用同一列头高度：同底色、同起点，视觉上是一条连续头部带。 */
   --designer-column-header-height: 40px;
   --designer-ruler-size: 22px;

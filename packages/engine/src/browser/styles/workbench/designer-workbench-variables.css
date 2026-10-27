@@ -84,51 +84,6 @@
   height: 12px;
 }
 
-.variable-empty-clear {
-  justify-self: center;
-}
-
-.variable-empty-actions {
-  display: grid;
-  gap: var(--designer-space-1);
-  margin-top: var(--designer-space-3);
-}
-
-.variable-empty-action {
-  justify-content: center;
-  width: 100%;
-}
-
-.designer-button.variable-add-button {
-  display: inline-flex;
-  width: auto;
-  min-height: 30px;
-  align-items: center;
-  gap: 5px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--designer-radius-2);
-  background: var(--designer-surface-raised);
-  color: var(--designer-text-primary);
-  box-shadow: var(--designer-elev-ring);
-  font: var(--designer-font-small);
-  font-size: var(--designer-font-size-sm);
-  font-weight: 500;
-}
-
-.designer-button.variable-add-button:not(:disabled):hover {
-  border-color: transparent;
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-text-primary);
-  box-shadow: 0 0 0 1px var(--designer-border-strong);
-}
-
-.designer-button.variable-add-button:disabled {
-  color: var(--designer-text-disabled);
-  background: var(--designer-surface-raised);
-  box-shadow: none;
-}
-
 .variable-button-glyph {
   display: inline-grid;
   width: 16px;
@@ -165,7 +120,7 @@
   margin: 0;
   padding: 6px 6px 3px 8px;
   color: var(--designer-text-muted);
-  font: 500 10px / 1.4 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-numeric);
   letter-spacing: 0.05em;
   text-transform: none;
 }
@@ -194,7 +149,7 @@
 .variable-group-count {
   margin-left: auto;
   color: var(--designer-text-muted);
-  font: 500 10px / 1 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-numeric);
 }
 
 .variable-group-add {
@@ -204,7 +159,7 @@
   min-height: 20px;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--designer-radius-3);
   background: transparent;
   color: var(--designer-text-muted);
   box-shadow: none;
@@ -237,7 +192,7 @@
 .variable-row {
   min-width: 0;
   border: 1px solid transparent;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   transition:
     background-color var(--designer-motion),
     border-color var(--designer-motion);
@@ -257,7 +212,7 @@
   align-items: center;
   gap: 8px;
   padding: 0 8px;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   color: var(--designer-text-secondary);
   transition: background-color var(--designer-motion);
 }
@@ -309,7 +264,7 @@
   width: 16px;
   height: 16px;
   place-items: center;
-  border-radius: 4px;
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
   box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
@@ -324,7 +279,7 @@
   display: inline-block;
   width: 14px;
   height: 14px;
-  border-radius: 3px;
+  border-radius: var(--designer-radius-3);
   box-shadow:
     0 0 0 1px var(--designer-border-default),
     inset 0 0 0 1px color-mix(in srgb, var(--designer-surface-panel) 30%, transparent);
@@ -388,7 +343,7 @@
   max-width: 104px;
   overflow: hidden;
   color: var(--designer-text-muted);
-  font: 500 10px / 1.4 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-numeric);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -403,7 +358,7 @@
   align-items: center;
   gap: 1px;
   padding: 2px;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control-hover);
   box-shadow: -10px 0 12px -5px var(--designer-surface-control-hover);
   opacity: 0;
@@ -424,44 +379,14 @@
   opacity: 0;
 }
 
-.variable-row-actions .designer-button {
-  width: auto;
-  height: 24px;
-  min-width: 0;
-  min-height: 24px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  box-shadow: none;
-  color: var(--designer-text-secondary);
-  gap: 3px;
-}
-
 .variable-row-actions .variable-button-label,
 .variable-row-actions .variable-row-edit .variable-button-label {
   display: inline;
   color: inherit;
-  font-size: 11px;
+  font-size: var(--designer-font-size-xs);
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
-}
-
-.variable-row-actions .designer-button:hover:not(:disabled) {
-  border-color: transparent;
-  background: var(--designer-surface-control-active);
-  color: var(--designer-text-primary);
-}
-
-.variable-row-actions .designer-button[data-variant="danger"]:hover:not(:disabled) {
-  background: var(--designer-danger-surface);
-  color: var(--designer-danger);
-}
-
-.variable-row-actions .designer-button svg {
-  width: 13px;
-  height: 13px;
 }
 
 /* 展开详情：作为行内的次级块，左缩进对齐名称，不回到卡片形态。 */
@@ -600,46 +525,6 @@ button.variable-reference-count:focus-visible {
   outline-offset: 1px;
 }
 
-.variable-empty-state {
-  display: grid;
-  min-height: 160px;
-  place-items: center;
-  align-content: center;
-  gap: var(--designer-space-2);
-  margin: 0;
-  padding: var(--designer-space-6) var(--designer-space-4);
-  text-align: center;
-}
-
-.variable-empty-state > strong {
-  color: var(--designer-text-primary);
-  font: var(--designer-font-small);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.variable-empty-state > span:not(.variable-empty-glyph) {
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  font-size: 11px;
-  line-height: 1.6;
-}
-
-.variable-empty-glyph {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-control);
-  color: var(--designer-text-muted);
-}
-
-.variable-empty-glyph svg {
-  width: 17px;
-  height: 17px;
-}
-
 .variable-readonly {
   display: inline-flex;
   align-items: center;
@@ -664,12 +549,6 @@ button.variable-reference-count:focus-visible {
 @container variables (max-width: 180px) {
   .variable-row-actions .variable-button-label {
     display: none;
-  }
-
-  .variable-row-actions .designer-button {
-    width: 24px;
-    padding: 0;
-    justify-content: center;
   }
 
   .variable-row-context-value {

@@ -1,5 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { designerNotificationGlyph } from '../dom/designer-ui-primitives.js';
+import { createDesignerButton, designerNotificationGlyph } from '../dom/designer-ui-primitives.js';
 
 export type DesignerNotificationTone = 'error' | 'success';
 
@@ -21,12 +21,12 @@ export class DesignerNotificationController {
     notification.innerHTML = designerNotificationGlyph(tone);
     const text = container.ownerDocument.createElement('span');
     text.textContent = message;
-    const close = container.ownerDocument.createElement('button');
-    close.type = 'button';
-    close.className = 'designer-control designer-button designer-notification-close';
+    const close = createDesignerButton(container.ownerDocument, {
+      className: 'designer-notification-close',
+      text: DESIGNER_UI_TEXT.notification.close,
+    });
     close.dataset.notificationDismiss = 'true';
     close.setAttribute('aria-label', DESIGNER_UI_TEXT.notification.closeAria);
-    close.textContent = DESIGNER_UI_TEXT.notification.close;
     notification.append(text, close);
     container.appendChild(notification);
   }

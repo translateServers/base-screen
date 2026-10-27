@@ -6,7 +6,7 @@ import {
 } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerFieldElement } from '../designer-field-primitives.js';
-import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';
+import { appendDesignerFieldMessage, createDesignerButton } from '../designer-ui-primitives.js';
 import {
   createDescriptorControl,
   descriptorFieldSchema,
@@ -202,11 +202,7 @@ function arrayActionButton(
   index: number,
   disabled: boolean,
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-button';
-  button.textContent = label;
-  button.disabled = disabled;
+  const button = createDesignerButton(ownerDocument, { disabled, text: label });
   button.dataset.descriptorArrayPath = JSON.stringify(field.path);
   button.dataset.descriptorArrayAction = action;
   button.dataset.descriptorArrayIndex = String(index);

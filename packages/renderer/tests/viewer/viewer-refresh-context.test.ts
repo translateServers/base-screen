@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { relationsFromRules } from '../__fixtures__/blueprint-relations.js';
 import {
   component,
   createDeferredResourcePort,
@@ -38,7 +39,7 @@ describe('BaseScreenViewerElement refresh execution context', () => {
         },
       ],
       {
-        rules: [
+        relations: relationsFromRules([
           {
             id: 'set-region',
             trigger: { type: 'material-event', componentId: 'trigger', eventName: 'change' },
@@ -50,13 +51,29 @@ describe('BaseScreenViewerElement refresh execution context', () => {
               },
             ],
           },
-        ],
+        ]),
       },
     );
     const { viewer, mount } = await createViewerHarness({
       catalog,
       document: initial,
       resourcePort: resources.port,
+      runtimeContributions: {
+        getResourceType: (resourceType: string) =>
+          resourceType === 'dataset'
+            ? {
+                kind: 'dataResourceType' as const,
+                id: 'dataset',
+                name: 'Dataset',
+                configSchema: {
+                  kind: 'object' as const,
+                  properties: { region: { kind: 'string' as const } },
+                  required: [],
+                },
+              }
+            : undefined,
+        hasBlueprintCapability: () => true,
+      },
     });
     await flush();
 
@@ -83,7 +100,7 @@ describe('BaseScreenViewerElement refresh execution context', () => {
         },
       ],
       {
-        rules: [
+        relations: relationsFromRules([
           {
             id: 'set-region',
             trigger: { type: 'material-event', componentId: 'trigger', eventName: 'change' },
@@ -95,7 +112,7 @@ describe('BaseScreenViewerElement refresh execution context', () => {
               },
             ],
           },
-        ],
+        ]),
       },
     );
     viewer.document = replacement;

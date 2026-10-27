@@ -31,7 +31,7 @@ const datasetDocument: ScreenDocument = {
     },
   ],
   variables: [],
-  blueprint: { rules: [] },
+  blueprint: { relations: [] },
 };
 
 function catalog(): BaseScreenMaterialCatalog {

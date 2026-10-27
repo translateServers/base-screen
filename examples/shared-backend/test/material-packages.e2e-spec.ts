@@ -159,7 +159,7 @@ describe('online material packages (e2e)', () => {
           canvas: { width: 100, height: 100, backgroundColor: '#000000' },
           components: [{ id: 'online-1', type: TYPE }],
           variables: [],
-          blueprint: { rules: [] },
+          blueprint: { relations: [] },
         }),
       },
     });

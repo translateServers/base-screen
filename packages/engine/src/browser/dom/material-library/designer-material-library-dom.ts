@@ -10,6 +10,8 @@ import {
 } from '../../../common/operations/material-library/material-library-state.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../../ui/designer-icons.js';
+import { createDesignerButton, createDesignerIconButton } from '../designer-ui-primitives.js';
+import { createDesignerBadge } from '../panel/designer-chrome-primitives.js';
 
 // 物料目录中未显式声明 libraryVisible 的条目默认可见（ADR-0021 语义）。
 type MaterialLibraryRenderable =
@@ -139,11 +141,11 @@ export function populateMaterialLibrary(
     categoryRail.replaceChildren();
     if (materialLibraryGrouping === undefined) {
       for (const category of categories) {
-        const button = categoryRail.ownerDocument.createElement('button');
-        button.type = 'button';
-        button.className = 'designer-control designer-button material-category-chip';
+        const button = createDesignerButton(categoryRail.ownerDocument, {
+          className: 'material-category-chip',
+          pressed: false,
+        });
         button.dataset.materialCategoryFilter = category;
-        button.ariaPressed = 'false';
         // 图标 + 文字分段：图标装饰性 aria-hidden，可访问名称仍由文字标签提供。
         const glyph = categoryRail.ownerDocument.createElement('span');
         glyph.className = 'material-category-glyph';
@@ -213,14 +215,13 @@ function createMaterialCard(
   wrap.dataset.materialCard = entry.id;
   wrap.dataset.materialType = entry.materialType;
   wrap.dataset.materialCategory = entry.manifest.category;
-  const card = ownerDocument.createElement('button');
-  card.type = 'button';
-  card.className = 'designer-control designer-button material-card';
+  const card = createDesignerButton(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.addMaterial(entry.manifest.name),
+    className: 'material-card',
+  });
   card.dataset.materialType = entry.materialType;
   card.dataset.materialItemId = entry.id;
   card.draggable = true;
-  // 可访问名称用 aria-label（名称与 type 已可见，不重复加 title，避免与工具按钮的 title 命中冲突）。
-  card.ariaLabel = DESIGNER_UI_TEXT.addMaterial(entry.manifest.name);
   const thumb = ownerDocument.createElement('span');
   thumb.className = 'material-thumb';
   thumb.setAttribute('aria-hidden', 'true');
@@ -244,13 +245,13 @@ function createMaterialCard(
   type.setAttribute('data-tip', entry.materialType);
   meta.append(name, type);
   card.append(thumb, meta);
-  const favorite = ownerDocument.createElement('button');
-  favorite.type = 'button';
-  favorite.className = 'designer-control designer-button material-favorite';
+  const favorite = createDesignerIconButton(ownerDocument, {
+    className: 'material-favorite',
+    icon: 'star',
+    label: DESIGNER_UI_TEXT.favoriteMaterial(entry.manifest.name),
+    pressed: false,
+  });
   favorite.dataset.materialFavorite = entry.id;
-  favorite.ariaLabel = DESIGNER_UI_TEXT.favoriteMaterial(entry.manifest.name);
-  favorite.ariaPressed = 'false';
-  favorite.innerHTML = designerIcon('star');
   wrap.append(card, favorite);
   return wrap;
 }
@@ -349,11 +350,12 @@ function renderMaterialBadge(
     return;
   }
   if (existing !== null) return;
-  const badge = card.ownerDocument.createElement('span');
-  badge.className = 'material-badge';
-  badge.dataset.materialBadge = kind;
-  badge.textContent = label;
   // 徽章叠加在缩略图内下角（thumb 为定位上下文且视觉隔离），卡片无需为状态预留空白。
   const thumb = card.querySelector<HTMLElement>('.material-thumb');
-  (thumb ?? card).appendChild(badge);
+  createDesignerBadge(thumb ?? card, {
+    text: label,
+    tone: kind === 'unavailable' ? 'danger' : 'warning',
+    className: 'material-badge',
+    dataset: { materialBadge: kind },
+  });
 }

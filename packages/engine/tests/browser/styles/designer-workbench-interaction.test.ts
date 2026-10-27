@@ -75,9 +75,9 @@ describe('designer workbench interaction and accessibility', () => {
     expect(workbenchCss).toContain('[data-layer-root] {');
     expect(workbenchCss).toContain('scrollbar-gutter: stable;');
     expect(workbenchCss).toContain('grid-template-columns: 24px minmax(0, 1fr);');
-    expect(workbenchCss).toContain('.layer-row[data-layer-selectable="true"] {');
+    expect(workbenchCss).toContain('[data-layer-selectable="true"] {');
     expect(workbenchCss).toContain('.layer-row:has(.layer-select:focus-visible) {');
-    expect(workbenchCss).toContain('--layer-row-surface:');
+    expect(workbenchCss).toContain('--designer-list-row-surface:');
     expect(workbenchCss).toContain('position: absolute;');
     expect(workbenchCss).not.toContain('.layer-select small {');
   });
@@ -86,7 +86,7 @@ describe('designer workbench interaction and accessibility', () => {
     // 选中是跨面板的同一件事：图层树与蓝图库必须命中同一条规则，而不是各画一份。
     // 画法是 Vercel 式中性块：一档比 hover 更深的灰底 + 1px 中性收边，不用强调色。
     expect(workbenchCss).toMatch(
-      /\.layer-row\[aria-selected="true"\],\s*\.blueprint-palette-item\[data-selected="true"\]\s*\{[^}]*background-color: color-mix\(\s*in oklab,\s*var\(--designer-surface-control-active\),\s*var\(--designer-text-primary\) 7%\s*\);[^}]*color: var\(--designer-text-primary\);[^}]*box-shadow: inset 0 0 0 1px var\(--designer-border-default\);/s,
+      /\.layer-row\[aria-selected="true"\],\s*\.blueprint-palette-item\[data-selected="true"\],\s*\.designer-list-row\[aria-selected="true"\]\s*\{[^}]*background-color: color-mix\(\s*in oklab,\s*var\(--designer-surface-control-active\),\s*var\(--designer-text-primary\) 7%\s*\);[^}]*color: var\(--designer-text-primary\);[^}]*box-shadow: inset 0 0 0 1px var\(--designer-border-default\);/s,
     );
     // 面板文件不再自己画选中：淡底 + 左侧竖条、实心块、空心蓝描边三版语言都已移除。
     expect(workbenchCss).not.toMatch(

@@ -14,6 +14,9 @@ export const COMPONENT_ID_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$";
 export function derivedDataSourceId(ownerId: string): string;
 
 // @public
+export function deriveScreenBlueprintRules(blueprint: ScreenBlueprint): readonly ScreenBlueprintRule[];
+
+// @public
 export function diagnoseDataSourceCycles(document: ScreenDocument): readonly ScreenDiagnostic[];
 
 // @public
@@ -172,6 +175,9 @@ export function parseScreenProjectEnvelope(input: unknown): ScreenParseResult<Sc
 export function parseScreenTabularDataset(input: unknown): ScreenParseResult<ScreenTabularDataset>;
 
 // @public
+export function readScreenBlueprintRelationCategory(relation: ScreenBlueprintRelation): ScreenBlueprintRelationCategory;
+
+// @public
 export function readScreenComponentDataBinding(component: ScreenComponentNode): ScreenDataBinding | null;
 
 // @public
@@ -182,6 +188,9 @@ export function readScreenDocumentDataSources(document: ScreenDocument): readonl
 
 // @public
 export function readScreenVariableRecord(entry: ScreenVariableEntry): ScreenVariableRecord;
+
+// @public
+export function relationCapabilities(relation: ScreenBlueprintBehaviorRelation): readonly string[];
 
 // @public (undocumented)
 export const SCREEN_AUTHORING_REQUEST_EVENT: 'base-screen-authoring-request';
@@ -286,11 +295,29 @@ export interface ScreenBlueprint {
     // (undocumented)
     readonly layout?: ScreenBlueprintLayout;
     // (undocumented)
-    readonly rules: readonly ScreenBlueprintRule[];
+    readonly relations: readonly ScreenBlueprintRelation[];
 }
 
 // @public (undocumented)
 export type ScreenBlueprintAction = ScreenBlueprintSetVariableAction | ScreenBlueprintRequestVariableAction | ScreenBlueprintRequestComponentDataAction | ScreenBlueprintEmitHostEventAction | ScreenBlueprintHostAction | ScreenBlueprintComponentVisibilityAction;
+
+// @public
+export interface ScreenBlueprintBehaviorRelation {
+    // (undocumented)
+    readonly condition?: ScreenBlueprintCondition;
+    // (undocumented)
+    readonly effect: ScreenBlueprintRelationEffect;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly requiredCapabilities?: readonly string[];
+    // (undocumented)
+    readonly source: ScreenBlueprintRelationSource;
+    // (undocumented)
+    readonly target: ScreenBlueprintRelationTarget;
+    // (undocumented)
+    readonly type: 'behavior';
+}
 
 // @public (undocumented)
 export type ScreenBlueprintCapabilityId = (typeof SCREEN_BLUEPRINT_CAPABILITY_IDS)[number];
@@ -316,6 +343,9 @@ export interface ScreenBlueprintCondition {
     // (undocumented)
     readonly right?: ScreenBlueprintValueExpression;
 }
+
+// @public
+export function screenBlueprintEffectTargetKind(effect: ScreenBlueprintRelationEffect): ScreenBlueprintRelationTarget['kind'];
 
 // @public (undocumented)
 export interface ScreenBlueprintEmitHostEventAction {
@@ -392,6 +422,62 @@ export interface ScreenBlueprintMaterialEventTrigger {
 }
 
 // @public (undocumented)
+export type ScreenBlueprintRelation = ScreenBlueprintBehaviorRelation | ScreenBlueprintSemanticRelation;
+
+// @public (undocumented)
+export type ScreenBlueprintRelationCategory = 'interaction' | 'data' | 'exit' | 'semantic';
+
+// @public (undocumented)
+export type ScreenBlueprintRelationEffect = {
+    readonly type: 'component-visibility';
+    readonly operation: ScreenBlueprintVisibilityOperation;
+    readonly transition?: ScreenBlueprintVisibilityTransition;
+} | {
+    readonly type: 'request-component-data';
+} | {
+    readonly type: 'set-variable';
+    readonly value: ScreenBlueprintValueExpression;
+} | {
+    readonly type: 'request-variable';
+} | {
+    readonly type: 'emit-host-event';
+    readonly eventName: string;
+    readonly payload: ScreenBlueprintValueExpression;
+} | {
+    readonly type: 'host-action';
+    readonly actionId: string;
+    readonly payload: ScreenBlueprintValueExpression;
+};
+
+// @public (undocumented)
+export type ScreenBlueprintRelationSource = {
+    readonly kind: 'component';
+    readonly componentId: string;
+    readonly event: {
+        readonly type: 'material-event';
+        readonly eventName: string;
+    };
+} | {
+    readonly kind: 'variable';
+    readonly variableId: string;
+    readonly event: {
+        readonly type: 'variable-event';
+        readonly eventName: 'data-updated' | 'request-state';
+    };
+};
+
+// @public (undocumented)
+export type ScreenBlueprintRelationTarget = {
+    readonly kind: 'component';
+    readonly componentId: string;
+} | {
+    readonly kind: 'variable';
+    readonly variableId: string;
+} | {
+    readonly kind: 'host';
+};
+
+// @public (undocumented)
 export interface ScreenBlueprintRequestComponentDataAction {
     // (undocumented)
     readonly componentId: string;
@@ -407,7 +493,7 @@ export interface ScreenBlueprintRequestVariableAction {
     readonly variableId: string;
 }
 
-// @public (undocumented)
+// @public
 export interface ScreenBlueprintRule {
     // (undocumented)
     readonly actions: readonly ScreenBlueprintAction[];
@@ -415,6 +501,8 @@ export interface ScreenBlueprintRule {
     readonly condition?: ScreenBlueprintCondition;
     // (undocumented)
     readonly id: string;
+    // (undocumented)
+    readonly relationIds: readonly string[];
     // (undocumented)
     readonly requiredCapabilities?: readonly string[];
     // (undocumented)
@@ -426,6 +514,29 @@ export interface ScreenBlueprintRuntimePort {
     // (undocumented)
     emit(event: ScreenBlueprintHostEvent): void | Promise<void>;
 }
+
+// @public
+export interface ScreenBlueprintSemanticRelation {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly role: ScreenBlueprintSemanticRelationRole;
+    // (undocumented)
+    readonly source: {
+        readonly kind: 'component';
+        readonly componentId: string;
+    };
+    // (undocumented)
+    readonly target: {
+        readonly kind: 'component';
+        readonly componentId: string;
+    };
+    // (undocumented)
+    readonly type: 'semantic';
+}
+
+// @public (undocumented)
+export type ScreenBlueprintSemanticRelationRole = 'related' | 'detail' | 'group' | 'drill-down';
 
 // @public (undocumented)
 export interface ScreenBlueprintSetVariableAction {
@@ -1044,9 +1155,11 @@ export interface ScreenMigrationDecision {
     readonly action: 'mapped' | 'renamed' | 'rejected';
     // (undocumented)
     readonly createdDataSourceId?: string;
+    // (undocumented)
+    readonly createdRelationIds?: readonly string[];
     readonly detail: string;
     // (undocumented)
-    readonly kind: 'component-value' | 'component-binding' | 'variable' | 'parameter';
+    readonly kind: 'component-value' | 'component-binding' | 'variable' | 'parameter' | 'blueprint-relation' | 'blueprint-layout';
     readonly path: readonly (string | number)[];
 }
 

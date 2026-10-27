@@ -170,7 +170,7 @@ function validateHost(input, apis, errors) {
     canvas: input.defaultCanvas,
     components: [],
     variables: [],
-    blueprint: { rules: [] },
+    blueprint: { relations: [] },
   });
   if (!parsed.ok) addDiagnostics(errors, 'host.json.defaultCanvas', parsed.diagnostics);
   const safeHostId =

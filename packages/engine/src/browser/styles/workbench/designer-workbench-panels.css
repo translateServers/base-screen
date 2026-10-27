@@ -46,14 +46,7 @@
   font: var(--designer-font-small);
 }
 
-.inspector-context-badge {
-  flex: none;
-  padding: 1px var(--designer-space-2);
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-pill);
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-}
+/* 徽标外观由 chrome 层统一提供。 */
 
 .inspector-context-actions {
   display: flex;
@@ -69,7 +62,7 @@
   gap: var(--designer-space-1);
   padding: 0 var(--designer-space-2);
   border: 1px solid transparent;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   color: var(--designer-text-secondary);
   cursor: pointer;
   font: var(--designer-font-small);
@@ -86,11 +79,6 @@
   outline-offset: 1px;
 }
 
-.inspector-context-toggle .designer-checkbox {
-  width: 14px;
-  height: 14px;
-}
-
 .inspector-geometry-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -105,7 +93,7 @@
   gap: var(--designer-space-2);
   min-width: 0;
   padding: var(--designer-space-2);
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-workspace);
 }
 
@@ -164,26 +152,6 @@
   padding-left: 30px;
 }
 
-.inspector-density {
-  display: flex;
-  align-items: center;
-  padding: 2px;
-  border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-workspace);
-}
-
-.inspector-density .designer-tab {
-  min-height: 26px;
-  padding: 0 var(--designer-space-3);
-}
-
-.inspector-density .designer-tab[aria-pressed="true"] {
-  border-color: var(--designer-border-default);
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-text-primary);
-}
-
 .inspector-search-results {
   min-height: 0;
   overflow: hidden auto;
@@ -195,8 +163,6 @@
   position: relative;
   display: block;
   min-width: 0;
-  border-bottom: 1px solid var(--designer-border-subtle);
-  background: var(--designer-surface-panel);
 }
 
 .inspector-search-result-path {
@@ -259,11 +225,6 @@
 
 .inspector-search-result-badge {
   align-self: center;
-  padding: 1px var(--designer-space-2);
-  border-radius: var(--designer-radius-pill);
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent);
-  font: var(--designer-font-small);
 }
 
 .inspector-search-result-editor {
@@ -296,10 +257,7 @@
 }
 
 .inspector-search-context-menu .designer-button {
-  min-height: 28px;
   justify-content: flex-start;
-  border-color: transparent;
-  background: transparent;
 }
 
 [data-inspector-filtered] {
@@ -384,9 +342,7 @@
   grid-area: 1 / 1;
   align-self: start;
   justify-items: center;
-  gap: var(--designer-space-4);
   margin: var(--designer-space-4);
-  padding: var(--designer-space-5) var(--designer-space-2);
 }
 
 .rail-view[data-materials] .material-search-empty[hidden],

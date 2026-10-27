@@ -92,12 +92,29 @@
   gap: var(--designer-space-2);
 }
 
+/* 预设卡是自定义色板 tile，不是标准按钮：只借用控件的描边环/圆角语言，
+   不接入 .designer-button 的按下强调底。 */
 .designer-quick-style {
+  box-sizing: border-box;
   min-width: 0;
   min-height: 54px;
   padding: var(--designer-space-1);
-  border-color: var(--designer-border-subtle);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
+  box-shadow: var(--designer-elev-ring);
+  color: var(--designer-text-primary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.designer-quick-style:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+}
+
+.designer-quick-style:disabled {
+  cursor: not-allowed;
+  color: var(--designer-text-disabled);
 }
 
 .designer-quick-style[aria-pressed="true"] {
@@ -125,7 +142,7 @@
   display: block;
   width: 7px;
   height: calc(10px + var(--quick-bar-index) * 5px);
-  border-radius: 1px 1px 0 0;
+  border-radius: var(--designer-radius-1) var(--designer-radius-1) 0 0;
   background: hsl(calc(190 + var(--quick-bar-index) * 30) 75% 58%);
 }
 

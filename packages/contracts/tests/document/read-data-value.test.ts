@@ -37,7 +37,7 @@ function component(overrides: Partial<ScreenComponentNode> = {}): ScreenComponen
 }
 
 function document(overrides: Partial<ScreenDocument> = {}): ScreenDocument {
-  return { canvas, components: [], variables: [], blueprint: { rules: [] }, ...overrides };
+  return { canvas, components: [], variables: [], blueprint: { relations: [] }, ...overrides };
 }
 
 describe('readScreenComponentValueRef', () => {

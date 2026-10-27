@@ -148,10 +148,10 @@
   flex: 0 0 20px;
   display: grid;
   place-items: center;
-  border-radius: var(--designer-radius-2);
+  border-radius: var(--designer-radius-3);
   color: var(--designer-surface-workspace);
   font: var(--designer-font-numeric);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
   visibility: hidden;
 }
 
@@ -319,19 +319,10 @@
   transition: opacity var(--designer-motion);
 }
 
-/* 数量徽标：等宽数字药丸，安静呈现规模信息。 */
+/* 数量徽标：与 chrome 层的 .designer-badge 同源，只保留列头的最小宽度。 */
 .panel-count {
-  display: inline-grid;
   min-width: 22px;
-  height: auto;
-  align-items: center;
   justify-content: center;
-  padding: 1px var(--designer-space-2);
-  border-radius: var(--designer-radius-pill);
-  background: var(--designer-surface-control-active);
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-numeric);
-  font-size: var(--designer-font-size-xs);
   transition: opacity var(--designer-motion);
 }
 
@@ -393,69 +384,12 @@
   overscroll-behavior: contain;
 }
 
-.rail-tabs .designer-tab {
-  position: relative;
-  display: flex;
-  width: 100%;
-  min-width: 44px;
-  min-height: 60px;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--designer-space-3);
-  padding: var(--designer-space-4) var(--designer-space-1);
-  border-color: transparent;
-  border-radius: var(--designer-radius-2);
-  background: transparent;
-  color: var(--designer-text-secondary);
-  font-family: var(--designer-font-family);
-  font-size: var(--designer-font-size-sm);
-  font-weight: 500;
-  line-height: 16px;
-}
+/* 图标轨 tab 的尺寸与状态外观在 controls-tabs.css（tab 控件的变体）。 */
 
-.rail-tabs .designer-tab:not([aria-selected="true"]):hover {
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-text-primary);
-  transform: none;
-}
-
-.rail-tabs .designer-tab[aria-selected="true"] {
-  border-color: transparent;
-  background: var(--designer-surface-control-active);
-  color: var(--designer-text-primary);
-  font-weight: 600;
-  box-shadow: inset 0 0 0 1px var(--designer-border-default);
-}
-
-.rail-tabs .designer-tab[aria-selected="true"]:hover {
-  box-shadow: inset 0 0 0 1px var(--designer-border-active);
-}
-
-.rail-tabs .designer-tab[aria-selected="true"] .rail-tab-glyph {
-  color: var(--designer-accent);
-}
-
-/* 左栏分区：内建 → 宿主分组 → 插件面板。各段首项上缘留白 + 一条发丝线标出分界；
-   插件面板只标首项，同一插件的后续面板跟随在前一项下面，不重复画线。 */
+/* 左栏分区：内建 → 宿主分组 → 插件面板。各段首项上缘留白；分隔发丝线在控件层。 */
 .rail-tabs .designer-tab[data-host-left-panel-group],
 .rail-tabs > .designer-tab:not([data-plugin-panel-tab]) + .designer-tab[data-plugin-panel-tab] {
   margin-top: var(--designer-space-6);
-}
-
-.rail-tabs .designer-tab[data-host-left-panel-group]::before,
-.rail-tabs
-  > .designer-tab:not([data-plugin-panel-tab])
-  + .designer-tab[data-plugin-panel-tab]::before {
-  position: absolute;
-  top: -10px;
-  right: 10px;
-  left: 10px;
-  height: 1px;
-  background: var(--designer-border-default);
-  content: "";
-  pointer-events: none;
 }
 
 .rail-tab-glyph {
@@ -485,8 +419,8 @@
   grid-row: 1;
 }
 
-/* 右栏标签页（原型 .inspector-tabs 的浅胶囊版）：左对齐浅胶囊——选中 = 胶囊底 + 收边 + 加粗，
-   悬停只给底色；列头带与左栏同色，只留一条发丝分隔线。 */
+/* 右栏标签页容器：列头带与左栏同色，只留一条发丝分隔线；
+   tab 按钮的胶囊状态在 controls-tabs.css。 */
 .inspector-tabs {
   z-index: 1;
   display: flex;
@@ -497,38 +431,6 @@
   padding: var(--designer-space-2) var(--designer-space-3);
   background: var(--designer-surface-panel);
   box-shadow: 0 1px 0 var(--designer-border-subtle);
-}
-
-.inspector-tabs .designer-tab {
-  min-height: 30px;
-  flex: 0 0 auto;
-  padding: 0 var(--designer-space-4);
-  border: 0;
-  border-radius: var(--designer-radius-2);
-  background: transparent;
-  box-shadow: none;
-  color: var(--designer-text-secondary);
-  font-weight: 500;
-}
-
-.inspector-tabs .designer-tab:hover:not([aria-selected="true"]) {
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-text-primary);
-  box-shadow: none;
-}
-
-.inspector-tabs .designer-tab[aria-selected="true"] {
-  border-bottom-color: transparent;
-  background: var(--designer-surface-control-active);
-  color: var(--designer-text-primary);
-  font-weight: 600;
-  box-shadow: inset 0 0 0 1px var(--designer-border-default);
-}
-
-.inspector-tabs .designer-tab[aria-selected="true"]:hover {
-  background: var(--designer-surface-control-active);
-  color: var(--designer-text-primary);
-  box-shadow: inset 0 0 0 1px var(--designer-border-active);
 }
 
 .rail-view,
@@ -581,8 +483,4 @@
   display: block;
   min-width: 0;
   max-width: 100%;
-}
-
-.host-left-panel-empty {
-  margin: 0;
 }

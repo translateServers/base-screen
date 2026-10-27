@@ -44,7 +44,7 @@ describe('parseScreenDocument with a shared base document', () => {
     );
     expect(badCanvas.ok).toBe(false);
 
-    const badBlueprint = parse({ ...base.value, blueprint: { rules: 'none' } }, base.value);
+    const badBlueprint = parse({ ...base.value, blueprint: { relations: 'none' } }, base.value);
     expect(badBlueprint.ok).toBe(false);
   });
 

@@ -42,34 +42,7 @@
   margin-top: 0;
 }
 
-.blueprint-panel-empty {
-  display: grid;
-  justify-items: center;
-  gap: var(--designer-space-3);
-  padding: var(--designer-space-7) var(--designer-space-4);
-  color: var(--designer-text-muted);
-  text-align: center;
-}
-
-.blueprint-panel-empty > span {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border-radius: 10px;
-  background: var(--designer-surface-raised);
-}
-
-.blueprint-panel-empty svg {
-  width: 17px;
-  height: 17px;
-}
-
-.blueprint-panel-empty p {
-  margin: 0;
-  font: var(--designer-font-small);
-  line-height: 1.5;
-}
+/* 空态外观由 chrome 层提供（designer-workbench-chrome.css）。 */
 
 .blueprint-rule-context {
   display: grid;
@@ -87,7 +60,7 @@
   width: 28px;
   height: 28px;
   place-items: center;
-  border-radius: 7px;
+  border-radius: var(--designer-radius-4);
   background: var(--designer-accent-surface);
   color: var(--designer-accent);
 }
@@ -110,8 +83,7 @@
   overflow-wrap: anywhere;
 }
 
-.blueprint-library-hint,
-.blueprint-inspector-section p {
+.blueprint-library-hint {
   margin: var(--designer-space-2) 0 0;
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
@@ -120,13 +92,6 @@
 
 .blueprint-inspector-section {
   margin-top: var(--designer-space-5);
-}
-
-.blueprint-inspector-section h3 {
-  margin: 0 0 var(--designer-space-3);
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  font-weight: 600;
 }
 
 .blueprint-expression-grid {
@@ -192,7 +157,7 @@
 .blueprint-inspector-status li small {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
 }
 
 .blueprint-trace-summary {
@@ -232,41 +197,4 @@
 .blueprint-delete-button {
   width: 100%;
   margin-top: var(--designer-space-6);
-}
-
-.blueprint-inspector-empty {
-  display: grid;
-  justify-items: center;
-  gap: var(--designer-space-3);
-  padding: var(--designer-space-7) var(--designer-space-4);
-  color: var(--designer-text-muted);
-  text-align: center;
-}
-
-.blueprint-inspector-empty > span {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  border-radius: var(--designer-radius-5);
-  background: var(--designer-surface-raised);
-}
-
-.blueprint-inspector-empty svg {
-  width: 20px;
-  height: 20px;
-}
-
-.blueprint-inspector-empty strong {
-  color: var(--designer-text-primary);
-}
-
-.blueprint-inspector-empty[data-state="healthy"] > span {
-  background: color-mix(in srgb, var(--designer-success) 14%, transparent);
-  color: var(--designer-success);
-}
-
-.blueprint-inspector-empty p {
-  margin: 0;
-  font: var(--designer-font-small);
 }
