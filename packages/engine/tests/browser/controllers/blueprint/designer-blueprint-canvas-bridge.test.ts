@@ -183,6 +183,63 @@ describe('Blueprint canvas state bridge', () => {
     expect(executeCommand).toHaveBeenCalledTimes(1);
     bridge.disconnect();
   });
+
+  it('ignores viewport-only commits before a layout exists', () => {
+    const base = fixture();
+    const { layout: _layout, ...blueprintWithoutLayout } = base.blueprint;
+    const document: ScreenDocument = { ...base, blueprint: blueprintWithoutLayout };
+    const host = new EventTarget();
+    const canvas = new EventTarget();
+    const states: BaseScreenBlueprintCanvasState[] = [];
+    canvas.addEventListener(BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT, (event) => {
+      states.push((event as CustomEvent<{ state: BaseScreenBlueprintCanvasState }>).detail.state);
+    });
+    const executeCommand = vi.fn();
+    let bridge: DesignerBlueprintCanvasBridge;
+    bridge = new DesignerBlueprintCanvasBridge({
+      getDocument: () => document,
+      getGraph: () => buildDesignerBlueprintGraph(document, catalog, runtime),
+      getMode: () => 'blueprint',
+      getSelection: () => null,
+      getViewRequest: () => undefined,
+      getCatalog: () => catalog,
+      getRuntimeContributions: () => runtime,
+      getDocumentRevision: () => 0,
+      getProjectRevision: () => null,
+      canUndo: () => false,
+      canRedo: () => false,
+      select: () => ({ ok: true, value: null, diagnostics: [] }),
+      executeCommand,
+      undo: () => ({ ok: true, value: document, diagnostics: [] }),
+      redo: () => ({ ok: true, value: document, diagnostics: [] }),
+      render: () => bridge.dispatchState(),
+      emitDiagnostics: () => {},
+    });
+    bridge.connect(host as unknown as HTMLElement);
+    bridge.setCanvas(canvas as unknown as Element);
+
+    host.dispatchEvent(
+      canvasCommandEvent(
+        {
+          type: 'commit-viewport',
+          commandId: 'viewport-without-layout',
+          generation: 1,
+          documentRevision: 0,
+          viewport: { x: 12, y: 24, zoom: 1 },
+        },
+        canvas,
+        host,
+      ),
+    );
+
+    expect(executeCommand).not.toHaveBeenCalled();
+    expect(document.blueprint.layout).toBeUndefined();
+    expect(states.at(-1)?.lastCommand).toMatchObject({
+      commandId: 'viewport-without-layout',
+      status: 'accepted',
+    });
+    bridge.disconnect();
+  });
 });
 
 function canvasCommandEvent(

@@ -632,6 +632,7 @@ export function createDesignerBlueprintDefaultCanvas(
     if (viewportCommitTimer !== undefined) clearTimeout(viewportCommitTimer);
     viewportCommitTimer = undefined;
     viewportsDirty = false;
+    if (sessionLayout) return;
     lastSentViewportKey = viewportKey(viewportValue);
     sendCommand({
       type: 'commit-viewport',

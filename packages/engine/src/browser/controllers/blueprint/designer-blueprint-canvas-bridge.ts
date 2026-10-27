@@ -299,6 +299,9 @@ export class DesignerBlueprintCanvasBridge {
         break;
       }
       case 'commit-viewport':
+        // 尚无物化布局时，viewport-only 提交会写入 layout.nodes: []，随后图节点被当作空布局隐藏。
+        // 视口只属会话，等首次拖动/自动布局写入完整 layout 后再持久化。
+        if ((document.blueprint.layout?.nodes.length ?? 0) === 0) break;
         result = this.commitBlueprint(
           commitDesignerBlueprintViewport(document.blueprint, command.viewport),
         );
