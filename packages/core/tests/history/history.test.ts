@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   commitScreenHistory,
   createScreenHistory,
+  readScreenHistoryNodes,
   redoScreenHistory,
+  revertScreenHistory,
   type ScreenHistoryState,
   undoScreenHistory,
 } from '../../src/history/history.js';
@@ -54,6 +56,22 @@ describe('screen history', () => {
     expect(() => commitScreenHistory(corrupted, documentWithColor('#222222'))).toThrow(TypeError);
   });
 
+  it('carries transaction provenance onto the committed entry', () => {
+    const first = documentWithColor('#111111');
+    const second = documentWithColor('#222222');
+    const withProvenance = commitScreenHistory(createScreenHistory(first), second, 100, {
+      source: 'agent',
+      label: '经营会 · 整屏编排',
+    });
+    const withoutProvenance = commitScreenHistory(createScreenHistory(first), second);
+
+    expect(withProvenance.past[0]?.provenance).toEqual({
+      source: 'agent',
+      label: '经营会 · 整屏编排',
+    });
+    expect(withoutProvenance.past[0]).not.toHaveProperty('provenance');
+  });
+
   it('trims the oldest entries at the configured limit', () => {
     const first = documentWithColor('#111111');
     const second = documentWithColor('#222222');
@@ -67,5 +85,56 @@ describe('screen history', () => {
     expect(limited.past).toHaveLength(1);
     expect(limited.past[0]?.before).toBe(second);
     expect(() => commitScreenHistory(limited, first, 0)).toThrow(RangeError);
+  });
+});
+
+describe('screen history revert', () => {
+  const first = documentWithColor('#111111');
+  const second = documentWithColor('#222222');
+  const third = documentWithColor('#333333');
+
+  function threeStepHistory() {
+    return commitScreenHistory(commitScreenHistory(createScreenHistory(first), second), third);
+  }
+
+  it('moves the pointer to any node without deleting it', () => {
+    const history = threeStepHistory();
+    const reverted = revertScreenHistory(history, 1);
+
+    expect(reverted.present).toBe(second);
+    expect(reverted.past).toHaveLength(1);
+    expect(reverted.future).toHaveLength(1);
+  });
+
+  it('can walk forward again after a revert', () => {
+    const reverted = revertScreenHistory(threeStepHistory(), 0);
+    expect(reverted.present).toBe(first);
+
+    const forward = redoScreenHistory(reverted);
+    expect(forward.present).toBe(second);
+    expect(redoScreenHistory(forward).present).toBe(third);
+  });
+
+  it('returns the same state when the target is the present node', () => {
+    const history = threeStepHistory();
+    expect(revertScreenHistory(history, history.past.length)).toBe(history);
+  });
+
+  it('rejects out-of-range targets', () => {
+    const history = threeStepHistory();
+    expect(() => revertScreenHistory(history, -1)).toThrow(RangeError);
+    expect(() => revertScreenHistory(history, 4)).toThrow(RangeError);
+    expect(() => revertScreenHistory(history, 1.5)).toThrow(RangeError);
+  });
+
+  it('lists nodes with their provenance', () => {
+    const history = commitScreenHistory(createScreenHistory(first), second, 100, {
+      source: 'agent',
+      label: '经营会 · 整屏编排',
+    });
+    expect(readScreenHistoryNodes(history)).toEqual([
+      { index: 0 },
+      { index: 1, provenance: { source: 'agent', label: '经营会 · 整屏编排' } },
+    ]);
   });
 });

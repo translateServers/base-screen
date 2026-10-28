@@ -38,7 +38,9 @@ export type {
   ScreenDocumentCommand,
   ScreenDocumentTransaction,
   ScreenTransactionFailure,
+  ScreenTransactionProvenance,
   ScreenTransactionResult,
+  ScreenTransactionSource,
   ScreenTransactionSuccess,
 } from './commands/types.js';
 export { componentsReferencingDataSources } from './data/data-source-dependents.js';
@@ -101,11 +103,17 @@ export {
   isScreenComponentEffectivelyHidden,
   isScreenComponentEffectivelyLocked,
 } from './hierarchy/query.js';
-export type { ScreenHistoryEntry, ScreenHistoryState } from './history/history.js';
+export type {
+  ScreenHistoryEntry,
+  ScreenHistoryNode,
+  ScreenHistoryState,
+} from './history/history.js';
 export {
   commitScreenHistory,
   createScreenHistory,
+  readScreenHistoryNodes,
   redoScreenHistory,
+  revertScreenHistory,
   undoScreenHistory,
 } from './history/history.js';
 export {

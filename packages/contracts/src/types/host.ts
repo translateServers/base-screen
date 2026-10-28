@@ -187,6 +187,37 @@ export interface ScreenHostResourcePort {
   ): Promise<ScreenParseResult<ScreenJsonValue>>;
 }
 
+/** 意图通道的作用域：整屏，或画布上选中的组件集合。 */
+export type ScreenIntentScope =
+  | { readonly kind: 'screen' }
+  | { readonly kind: 'components'; readonly componentIds: readonly string[] };
+
+/**
+ * 一次意图提交：引擎只负责把「一句话 + 作用域」结构化后交给宿主。
+ * 不含模型、凭证或传输配置——这些都在宿主侧。
+ */
+export interface ScreenIntentRequest {
+  readonly instanceId: string;
+  readonly text: string;
+  readonly scope: ScreenIntentScope;
+  readonly startsFrom?: 'metrics' | 'template' | 'prompt';
+}
+
+/**
+ * 目标屏的物理呈现参数：由宿主（现场校准或平台资产库）提供，引擎只据此叠加标尺。
+ * 它不写入 Screen Document——分辨率与拼接是渲染/校验输入，不是画布内容。
+ */
+export interface ScreenTargetDisplayProfile {
+  readonly columns: number;
+  readonly rows: number;
+  /** 拼接缝宽（逻辑像素），只用于叠加显示。 */
+  readonly seamPx?: number;
+  /** 安全区内缩（逻辑像素）。 */
+  readonly safeAreaPx?: number;
+  /** 观距（米），用于 3m 视角的标注。 */
+  readonly viewingDistanceM?: number;
+}
+
 export interface ScreenHostCatalogListRequest {
   readonly query: string;
   readonly cursor?: string;

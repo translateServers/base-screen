@@ -89,6 +89,19 @@ export type ScreenCommandResult =
 
 export interface ScreenDocumentTransaction {
   readonly commands: readonly ScreenDocumentCommand[];
+  /** 变更来源标注（可选）：只记录触发方与不透明标签，不建模身份、角色或权限。 */
+  readonly provenance?: ScreenTransactionProvenance;
+}
+
+/**
+ * 引擎侧的变更来源。`host` 覆盖宿主代用户发起的变更；`agent` 只表示「经宿主提交的
+ * 自动提案已被人采纳」，引擎不关心提案由哪个模型产生。
+ */
+export type ScreenTransactionSource = 'manual' | 'host' | 'agent';
+
+export interface ScreenTransactionProvenance {
+  readonly source: ScreenTransactionSource;
+  readonly label?: string;
 }
 
 export interface ScreenTransactionSuccess {

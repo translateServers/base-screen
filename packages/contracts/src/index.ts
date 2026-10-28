@@ -228,6 +228,8 @@ export type {
   ScreenHostResourcePort,
   ScreenHostResourceRequest,
   ScreenHostResourceResolveOptions,
+  ScreenIntentRequest,
+  ScreenIntentScope,
   ScreenProjectAdapter,
   ScreenProjectCatalogPort,
   ScreenProjectCatalogRequest,
@@ -246,6 +248,7 @@ export type {
   ScreenProjectSnapshotCreateRequest,
   ScreenProjectSnapshotPort,
   ScreenProjectSummary,
+  ScreenTargetDisplayProfile,
 } from './types/host.js';
 export { validateScreenDesignerHostAdapter } from './types/host.js';
 export type { ScreenJsonObject, ScreenJsonValue } from './types/json.js';

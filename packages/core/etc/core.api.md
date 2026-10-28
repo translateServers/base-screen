@@ -59,7 +59,7 @@ export function chooseScreenSnapCandidate(candidates: readonly ScreenSnapCandida
 export function collectScreenValueRefDependencies(refs: ScreenValueRef | null | undefined | Readonly<Record<string, ScreenValueRef>>): ScreenValueRefDependencies;
 
 // @public (undocumented)
-export function commitScreenHistory(history: ScreenHistoryState, document: ScreenDocument, limit?: number): ScreenHistoryState;
+export function commitScreenHistory(history: ScreenHistoryState, document: ScreenDocument, limit?: number, provenance?: ScreenTransactionProvenance): ScreenHistoryState;
 
 // @public (undocumented)
 export function compileScreenBlueprint(document: ScreenDocument, capabilities?: ScreenBlueprintCapabilityIndex): ScreenParseResult<ScreenBlueprintPlan>;
@@ -144,6 +144,9 @@ export function parseScreenDocumentCommand(input: unknown): ScreenParseResult<Sc
 // @public (undocumented)
 export function queryScreenComponentsInRect(document: ScreenDocument, rect: ScreenRect, mode: 'intersect' | 'contain'): readonly string[];
 
+// @public
+export function readScreenHistoryNodes(history: ScreenHistoryState): readonly ScreenHistoryNode[];
+
 // @public (undocumented)
 export function redoScreenHistory(history: ScreenHistoryState): ScreenHistoryState;
 
@@ -155,6 +158,9 @@ export function reduceScreenViewport(state: ScreenViewportState, action: ScreenV
 
 // @public (undocumented)
 export function removeScreenJsonArrayItem(root: ScreenJsonObject, path: readonly (string | number)[], index: number): ScreenJsonObject | undefined;
+
+// @public
+export function revertScreenHistory(history: ScreenHistoryState, targetIndex: number): ScreenHistoryState;
 
 export { SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY }
 
@@ -481,6 +487,7 @@ export type ScreenDocumentCommand = {
 export interface ScreenDocumentTransaction {
     // (undocumented)
     readonly commands: readonly ScreenDocumentCommand[];
+    readonly provenance?: ScreenTransactionProvenance;
 }
 
 // @public (undocumented)
@@ -489,6 +496,15 @@ export interface ScreenHistoryEntry {
     readonly after: ScreenDocument;
     // (undocumented)
     readonly before: ScreenDocument;
+    readonly provenance?: ScreenTransactionProvenance;
+}
+
+// @public (undocumented)
+export interface ScreenHistoryNode {
+    // (undocumented)
+    readonly index: number;
+    // (undocumented)
+    readonly provenance?: ScreenTransactionProvenance;
 }
 
 // @public (undocumented)
@@ -593,7 +609,18 @@ export interface ScreenTransactionFailure {
 }
 
 // @public (undocumented)
+export interface ScreenTransactionProvenance {
+    // (undocumented)
+    readonly label?: string;
+    // (undocumented)
+    readonly source: ScreenTransactionSource;
+}
+
+// @public (undocumented)
 export type ScreenTransactionResult = ScreenTransactionSuccess | ScreenTransactionFailure;
+
+// @public
+export type ScreenTransactionSource = 'manual' | 'host' | 'agent';
 
 // @public (undocumented)
 export interface ScreenTransactionSuccess {

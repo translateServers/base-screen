@@ -1122,6 +1122,26 @@ export interface ScreenHostResourceResolveOptions {
 }
 
 // @public
+export interface ScreenIntentRequest {
+    // (undocumented)
+    readonly instanceId: string;
+    // (undocumented)
+    readonly scope: ScreenIntentScope;
+    // (undocumented)
+    readonly startsFrom?: 'metrics' | 'template' | 'prompt';
+    // (undocumented)
+    readonly text: string;
+}
+
+// @public
+export type ScreenIntentScope = {
+    readonly kind: 'screen';
+} | {
+    readonly kind: 'components';
+    readonly componentIds: readonly string[];
+};
+
+// @public
 export function screenJsonEquals(left: unknown, right: unknown): boolean;
 
 // @public (undocumented)
@@ -1499,6 +1519,17 @@ export interface ScreenTabularDataset {
     readonly rows: readonly ScreenJsonObject[];
     // (undocumented)
     readonly totalRowCount?: number;
+}
+
+// @public
+export interface ScreenTargetDisplayProfile {
+    // (undocumented)
+    readonly columns: number;
+    // (undocumented)
+    readonly rows: number;
+    readonly safeAreaPx?: number;
+    readonly seamPx?: number;
+    readonly viewingDistanceM?: number;
 }
 
 // @public
