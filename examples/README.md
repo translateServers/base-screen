@@ -141,6 +141,32 @@ screenName, expiresAt, createdAt }`。`temporary=true` 是设计器临时上传�
 导出字段（`resourceId: 'cpu_usage'` 的演示指标）由 `GET /api/metrics/series` 提供，
 三端通过宿主数据通道（resourcePort）消费，见下方"数据绑定"。
 
+## 让 Agent 读取当前大屏（可选）
+
+`tooling/screen-mcp-server` 以只读快照方式把一张大屏暴露给 Agent，不连接宿主端口、不落盘命令：
+
+```bash
+# 终端 1：后端已启动
+pnpm dev:shared-backend
+
+# 终端 2：按名称或 id 导出任一张屏 → .base-screen/local/screen-snapshot.json
+pnpm export:example-screen -- --screen "默认销售大屏"
+
+# 启动 MCP（stdio）；工具：get_screen / validate_screen / apply_screen_commands /
+# diff_screens / propose_layout / audit_screen / export_screen / import_screen
+node tooling/screen-mcp-server/server.mjs --screen .base-screen/local/screen-snapshot.json
+```
+
+`apply_screen_commands` 与 `propose_layout` 只返回候选文档，保存仍由宿主按 revision 乐观锁决定；`audit_screen` 只做快照可判定项（契约诊断、几何越界、目标分辨率等比投影与最小像素、复杂度计数），文本对比度需要真实渲染，不在此列。
+
+真实渲染的性能与文本可读性用同一个宿主页面测（需前端 dev server）：
+
+```bash
+pnpm probe:example-screen -- --url "http://127.0.0.1:5173/#/screens/<id>/view" --out .base-screen/local/screen-probe/report.json
+```
+
+报告包含首屏到组件挂载的耗时、长任务、DOM 规模，以及基于截图像素采样的文本对比度与字号（渐变/图片背景也能覆盖）；存在对比度或字号违规时退出码为 1。
+
 ## 运行
 
 ```bash
@@ -433,8 +459,8 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
   `base-screen-blueprint-canvas-state`、发 `base-screen-blueprint-canvas-command`，只负责
   中央图形、拖动、连线、缩放/平移与试运行；语义图、派生规则与历史仍归引擎。文档只持久化
   `blueprint.relations`（behavior / semantic），运行时规则由关系派生，不写回文档。
-- 旧数据兼容：三端 `project-adapter.ts` 在 `load` 时调用 `migrateScreenDocument`，仍以
-  `blueprint.rules` 存储的大屏会按关系模型加载（幂等，保存后落新形态）。
+- 旧数据兼容：三端 `project-adapter.ts`（编辑）与查看页在读取时都调用 `migrateScreenDocument`，
+  仍以 `blueprint.rules` 存储的大屏会按关系模型加载（幂等，保存后落新形态）。
 - 蓝图能力由宿主的 authoring 插件贡献（`host-runtime.ts` 的 `createHostAuthoringRuntime`），
   没有这份授权时物料事件会显示为不可用。
 - 典型操作：从组件的事件端口拖到另一组件、变量或业务系统节点；从组件底部「语义关联」端口

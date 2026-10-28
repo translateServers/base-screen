@@ -19,7 +19,7 @@
 - `pnpm check:api` 需要构建好的 `dist/index.d.ts`。`pnpm verify:tarball` 会打包每个包，并把每个 tarball 安装到一个临时消费者工程中跑 publint/ATTW；ATTW 的 Node10/CJS 诊断属于预期噪音，除非命令本身失败。
 - 手动验证的基座特性矩阵在 `tooling/verification/browser-harness`：`pnpm dev:browser-harness` 起 Vite dev server，`pnpm verify:browser` 是对应的 Playwright 验证脚本。改完功能后先打开它的 [`/cases.html`](tooling/verification/browser-harness/cases.html) 导航页（按改动面 / 关键词筛选专项案例），再进 `?designer&case=` 场景；不要为此引入 Storybook。只改样式时先看 [`/system.html`](tooling/verification/browser-harness/system.html) 设计系统清单（令牌 / 状态矩阵 / 组件一页铺开，浅深主题可切换）。默认 `/` 与 `?designer` 保持 Playwright 路径。
 - 全栈示例是「一个共享后端 + 三个对等前端」：`examples/shared-backend`（NestJS + Prisma/SQLite，`pnpm dev:shared-backend` 起在 3000），以及 `examples/{vanilla,react,vue}-host`（`pnpm dev:*-host`，分别占 5173/5174/5175，经 Vite proxy 联调同一后端）。它们演示宿主侧接入——文档 CRUD、`<base-screen-designer>` / `<base-screen-viewer>` 嵌入、宿主 project adapter 与数据通道、宿主自有物料，以及外围插件物料与成品大屏种子的消费（`plugin-board-materials` / `plugin-echarts` 经宿主自有 manager 合并进 catalog，三个前端对等）；总览见 `examples/README.md`。示例只声明 `dev`/`build`/`typecheck`（shared-backend 另有 `test`，进 CI），构建与浏览器级验证不进 `verify:m0`：`pnpm verify:examples` 是手动冒烟且需先各自 build，其中 Vue 前端还随 `verify:tarball` 复制到仓库外、替换为同批次真实 tarball 后验证。
-- `tooling/material-mcp-server` 是面向上层工具链的物料模板 MCP provider，由根级测试与 `verify:material-mcp` 验证。
+- `tooling/material-mcp-server` 是面向上层工具链的物料模板 MCP provider，由根级测试与 `verify:material-mcp` 验证；`tooling/screen-mcp-server` 是 Screen Document 的只读工具面（快照文件输入、命令试算不落盘），由根级测试与 `verify:screen-mcp` 验证，案例宿主的文档用 `pnpm export:example-screen -- --screen <名称或 id>` 从 shared-backend 导出后交给它；真实渲染的性能与文本对比度/字号探针为 `pnpm probe:example-screen -- --url <查看页>`（Playwright，存在对比度/字号违规时退出码 1）。
 
 ## 包边界
 

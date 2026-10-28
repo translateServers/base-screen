@@ -1,0 +1,29 @@
+{
+  "canvas": { "width": 1920, "height": 1080, "backgroundColor": "#05070d" },
+  "components": [
+    {
+      "id": "title",
+      "type": "base.text",
+      "name": "Title",
+      "parentId": null,
+      "position": { "x": 64, "y": 48 },
+      "size": { "width": 640, "height": 72 },
+      "rotation": 0,
+      "zIndex": 1,
+      "status": { "locked": false, "hidden": false },
+      "props": { "text": "Demo Screen" },
+      "style": {},
+      "dataSource": null
+    }
+  ],
+  "dataSources": [
+    {
+      "id": "orders",
+      "name": "Orders",
+      "source": { "kind": "dataset", "datasetId": "orders" },
+      "params": {}
+    }
+  ],
+  "variables": [],
+  "blueprint": { "relations": [] }
+}
