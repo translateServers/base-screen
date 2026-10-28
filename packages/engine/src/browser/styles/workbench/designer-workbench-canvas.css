@@ -756,3 +756,129 @@
 .designer-project-section h3 {
   margin: 0;
 }
+
+/* 幽灵草案层：与内容层同尺寸叠加，只做展示，不接收指针事件。 */
+.canvas-ghost {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  border-radius: inherit;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.canvas-ghost-root {
+  width: 100%;
+  height: 100%;
+}
+
+/* 草案条与场景预览条：声明「未写入」，采纳/放弃与对比旧版都从这里进出。 */
+.designer-draft-bar,
+.designer-scene-bar {
+  position: absolute;
+  top: var(--designer-space-4);
+  left: 50%;
+  z-index: var(--designer-z-workspace-overlay);
+  display: inline-flex;
+  max-width: min(90%, 720px);
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-1) var(--designer-space-2) var(--designer-space-1)
+    var(--designer-space-4);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
+  font: var(--designer-font-small);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.draft-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-warning);
+}
+
+.draft-label {
+  color: var(--designer-warning);
+  font-weight: 600;
+}
+
+.draft-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  text-overflow: ellipsis;
+}
+
+.draft-meta {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+}
+
+.designer-draft-bar[hidden],
+.designer-scene-bar[hidden] {
+  display: none;
+}
+
+.draft-actions,
+.scene-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-1);
+}
+
+.scene-bar-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-warning);
+}
+
+.scene-bar-label {
+  color: var(--designer-warning);
+  font-weight: 600;
+}
+
+.scene-bar-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  text-overflow: ellipsis;
+}
+
+/* 目标屏叠加：安全区 / 拼接缝 / 3m 标注。只做显示，不参与布局、不接收指针事件。 */
+.canvas-display-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.display-safe-area {
+  position: absolute;
+  border: 1px dashed var(--designer-warning);
+  border-radius: var(--designer-radius-2);
+}
+
+.display-seam {
+  position: absolute;
+  background: var(--designer-warning);
+  opacity: 0.45;
+}
+
+.display-distance {
+  position: absolute;
+  top: var(--designer-space-3);
+  left: var(--designer-space-3);
+  padding: 0 var(--designer-space-2);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-surface-overlay);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+}

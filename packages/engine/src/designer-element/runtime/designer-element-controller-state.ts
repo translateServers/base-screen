@@ -26,6 +26,10 @@ import {
   type BaseScreenCanvasPresentationChangeEventDetail,
 } from '../../common/operations/canvas/canvas-presentation.js';
 import {
+  BASE_SCREEN_SCENE_CHANGE_EVENT,
+  type BaseScreenSceneChangeDetail,
+} from '../../common/operations/scene/designer-scene.js';
+import {
   BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT,
   type BaseScreenDesignerBackRequestEventDetail,
 } from '../../common/operations/workbench/designer-navigation.js';
@@ -454,5 +458,50 @@ export function initializeDesignerElementControllers(
       state.runtime.executeDesignerTransaction(element, transaction),
     report: (result) => state.runtime.report(element, result),
     focusViewport: () => state.viewportController.focus(),
+  });
+  // 守卫修复走一次 update-components 事务：与手动改色同一条路径，因此可撤销。
+  state.guardController.setApplyHandler((componentId, color) => {
+    const document = state.session.document;
+    const component = document?.components.find((item) => item.id === componentId);
+    if (document === undefined || component === undefined) return false;
+    const result = state.runtime.executeDesignerTransaction(element, {
+      commands: [
+        {
+          type: 'update-components',
+          componentIds: [componentId],
+          patch: { style: { ...component.style, color } },
+        },
+      ],
+    });
+    state.runtime.report(element, result);
+    return result.ok;
+  });
+  // 采纳提案 = 一次普通事务（带 provenance）：必须与手动编辑共享历史与修订号。
+  state.changeController.setDocumentReader(() => state.session.document);
+  state.changeController.setStartIntentHandler(() => state.intentController.focus());
+  state.changeController.setAdoptHandler((commands, provenance) => {
+    const result = state.runtime.executeDesignerTransaction(element, { commands, provenance });
+    state.runtime.report(element, result);
+    return { ok: result.ok };
+  });
+  // 场景切换 = 宿主提供命令 + 引擎预览，应用时仍走一次普通事务（可撤销、可回退）。
+  state.sceneController.setContext({
+    getDocument: () => state.session.document,
+    canPreview: () => state.changeController.pending === undefined,
+    notify: (message, tone) => state.notificationController.notify(message, tone),
+    apply: (commands, provenance) => {
+      const result = state.runtime.executeDesignerTransaction(element, { commands, provenance });
+      state.runtime.report(element, result);
+      return result.ok;
+    },
+    applied: (sceneId, label) => {
+      element.dispatchEvent(
+        new CustomEvent<BaseScreenSceneChangeDetail>(BASE_SCREEN_SCENE_CHANGE_EVENT, {
+          bubbles: true,
+          composed: true,
+          detail: { sceneId, label },
+        }),
+      );
+    },
   });
 }

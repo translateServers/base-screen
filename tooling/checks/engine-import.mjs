@@ -255,6 +255,7 @@ const COMMON_SUBLAYERS = [
   ['tools', []],
   ['project', []],
   ['events', []],
+  ['validation', []],
   ['operations', ['project', 'tools']],
   ['session', ['project', 'operations']],
 ];

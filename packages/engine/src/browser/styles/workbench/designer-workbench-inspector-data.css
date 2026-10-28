@@ -455,7 +455,24 @@
 /* Page configuration uses compact label/control rows and intentionally omits component
    context, search and tab chrome. */
 .designer:not([data-right-collapsed="true"]) .properties[data-inspector-context-kind="canvas"] {
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: 44px auto minmax(0, 1fr) auto;
+}
+
+/* 右栏新增一级页签与意图输入区后，画布配置上下文也要留出它们的位置。 */
+.properties[data-inspector-context-kind="canvas"] > .right-pane-switch {
+  grid-row: 2;
+}
+
+.properties[data-inspector-context-kind="canvas"] > .right-pane-changes {
+  grid-row: 2 / 4;
+}
+
+.properties[data-inspector-context-kind="canvas"] > .designer-intent {
+  grid-row: 4;
+}
+
+.designer .properties[data-inspector-context-kind="canvas"][data-right-pane="changes"] {
+  grid-template-rows: 0 auto minmax(0, 1fr) auto;
 }
 
 .properties[data-inspector-context-kind="canvas"] > .panel-heading {
@@ -482,7 +499,7 @@
 }
 
 .properties[data-inspector-context-kind="canvas"] > .inspector-pane {
-  grid-row: 2;
+  grid-row: 3;
   padding: 0 calc(var(--designer-space-6) + var(--designer-space-2)) var(--designer-space-7);
 }
 

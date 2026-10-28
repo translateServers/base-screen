@@ -7,6 +7,7 @@ import type {
 import {
   type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
+  type ScreenHistoryNode,
   type ScreenInteractionState,
 } from '@base-screen/core';
 import { withDerivedDesignerGroupBounds } from '../../common/operations/selection/designer-group.js';
@@ -97,4 +98,17 @@ export function readInstanceId(element: DesignerElementHost): string {
   const elementState = getDesignerElementState(element);
 
   return elementState.instanceId;
+}
+
+/** 回到任意历史节点：不删除节点，被跳过的部分保留在 future 里可再前进。 */
+export function revertToHistoryState(
+  element: DesignerElementHost,
+  targetIndex: number,
+): ScreenParseResult<ScreenDocument> {
+  return getDesignerElementState(element).session.revertTo(targetIndex);
+}
+
+/** 历史节点列表（0 = 初始状态），携带事务来源标注。 */
+export function readHistory(element: DesignerElementHost): readonly ScreenHistoryNode[] {
+  return getDesignerElementState(element).session.readHistory();
 }

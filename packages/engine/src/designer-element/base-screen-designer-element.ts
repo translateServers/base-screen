@@ -17,12 +17,14 @@ import type {
   ScreenProjectSnapshot,
   ScreenProjectSnapshotPort,
   ScreenProjectSummary,
+  ScreenTargetDisplayProfile,
   ScreenVariableHandle,
   ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
 import {
   type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
+  type ScreenHistoryNode,
   type ScreenInteractionState,
 } from '@base-screen/core';
 import type {
@@ -40,6 +42,9 @@ import type {
   BaseScreenDesignerWorkbenchMode,
 } from '../common/operations/blueprint/designer-blueprint-protocol.js';
 import type { BaseScreenMaterialCatalogRefreshResult } from '../common/operations/catalog/designer-catalog-refresh.js';
+import type { DesignerChangeProposalInput } from '../common/operations/change/designer-change-proposal.js';
+import type { DesignerReviewMeta } from '../common/operations/change/designer-review.js';
+import type { DesignerDisplayOverlayKind } from '../common/operations/display/designer-target-display.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
@@ -49,13 +54,19 @@ import type {
   BaseScreenHostResourceSelectionCommit,
   BaseScreenHostResourceSelectionTarget,
 } from '../common/operations/host-resource/host-resource-selection.js';
+import type { DesignerIntentHandler } from '../common/operations/intent/designer-intent.js';
 import type { BaseScreenComponentInsertionIntent } from '../common/operations/material-component/material-component.js';
 import type { BaseScreenComponentFragmentInsertionIntent } from '../common/operations/material-component/material-component-fragment.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../common/operations/material-library/material-library-grouping.js';
 import { type BaseScreenMaterialLibraryItem } from '../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../common/operations/material-library/material-library-state.js';
+import type {
+  DesignerSceneDescriptor,
+  DesignerSceneHandler,
+} from '../common/operations/scene/designer-scene.js';
 import { type BaseScreenDesignerLeftPanelGroup } from '../common/operations/workbench/designer-left-panel-groups.js';
 import { type DesignerToolMaterialTypes } from '../common/tools/designer-tools.js';
+import { type BaseScreenDesignerChangeProposalSummary } from './api/designer-element-change.js';
 import type { BaseScreenDesignerConfiguration } from './api/designer-element-configuration-types.js';
 import { designerElementRuntime } from './runtime/designer-element-runtime.js';
 import { createDesignerElementState } from './runtime/designer-element-state.js';
@@ -74,7 +85,12 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   attributeChangedCallback(name: string, previousValue: string | null, value: string | null): void {
-    if (name === 'theme' && previousValue !== value) this.#designerState.topbarController.render();
+    if (name === 'theme' && previousValue !== value) {
+      this.#designerState.topbarController.render();
+      // 主题切换只改 CSS 变量，画布颜色随之变化：重新测量守卫结果。
+      const document = this.#designerState.session.document;
+      if (document !== undefined) this.#designerState.guardController.schedule(document);
+    }
   }
 
   get catalog(): BaseScreenMaterialCatalog | undefined {
@@ -344,6 +360,21 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   /**
+   * 提交变更提案：候选文档以幽灵草案呈现，不写入文档；采纳另走一次事务。
+   * 宿主负责产出提案（含命令与理由），引擎不调用模型。
+   */
+  submitChangeProposal(
+    input: DesignerChangeProposalInput,
+  ): ScreenParseResult<BaseScreenDesignerChangeProposalSummary> {
+    return this.#designerState.runtime.submitChangeProposal(this, input);
+  }
+
+  /** 撤回未采纳的提案。 */
+  discardPendingChange(): void {
+    this.#designerState.runtime.discardPendingChange(this);
+  }
+
+  /**
    * 按物料类型插入组件实例，使用 manifest 默认值。省略 `position` 时放在可见画布中心。
    * 一次事务提交（可撤销），成功后新组件成为唯一选中项。需要自定义 props/style 时，
    * 插入后再 `executeCommand({type:'update-components'})`。
@@ -468,6 +499,106 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   redo(): ScreenParseResult<ScreenDocument> {
     return this.#designerState.runtime.redo(this);
+  }
+
+  /**
+   * 回到任意历史节点（0 = 初始状态）：不删除节点，被跳过的部分保留在前进栈里，
+   * 因此「回退」本身可以再走回来。
+   */
+  revertToHistoryState(index: number): ScreenParseResult<ScreenDocument> {
+    return this.#designerState.runtime.revertToHistoryState(this, index);
+  }
+
+  /** 历史节点列表，携带事务来源标注，供宿主呈现变更来源与回退入口。 */
+  readHistory(): readonly ScreenHistoryNode[] {
+    return this.#designerState.runtime.readHistory(this);
+  }
+
+  /** 进入演示锁：只留画布。有待决草案时返回 false。 */
+  enterPresentationLock(): boolean {
+    return this.#designerState.runtime.enterPresentationLock(this);
+  }
+
+  /** 退出演示锁（调用方负责二次确认，界面与 Esc 已内置确认）。 */
+  exitPresentationLock(): void {
+    this.#designerState.runtime.exitPresentationLock(this);
+  }
+
+  get presentationLocked(): boolean {
+    return this.#designerState.runtime.readPresentationLocked(this);
+  }
+
+  /**
+   * 绑定意图处理器：宿主在这里接入自己的智能体，产出提案后调用 submitChangeProposal。
+   * 传 undefined 解绑，输入区回到「未接入」停用态。
+   */
+  setIntentHandler(handler: DesignerIntentHandler | undefined): void {
+    this.#designerState.runtime.setIntentHandler(this, handler);
+  }
+
+  get intentAvailable(): boolean {
+    return this.#designerState.runtime.readIntentAvailable(this);
+  }
+
+  /**
+   * 宿主提供的场景目录（左栏顶部）：只包含身份与展示名，内容由 `setSceneHandler` 产出。
+   * 传 `undefined` 清除目录；`activeSceneId` 用于标记当前场景。
+   */
+  setSceneCatalog(
+    scenes: readonly DesignerSceneDescriptor[] | undefined,
+    activeSceneId?: string,
+  ): ScreenParseResult<null> {
+    return this.#designerState.runtime.setSceneCatalog(this, scenes, activeSceneId);
+  }
+
+  setActiveScene(sceneId: string | undefined): void {
+    this.#designerState.runtime.setActiveScene(this, sceneId);
+  }
+
+  get activeSceneId(): string | undefined {
+    return this.#designerState.runtime.readActiveSceneId(this);
+  }
+
+  get sceneAvailable(): boolean {
+    return this.#designerState.runtime.readSceneAvailable(this);
+  }
+
+  /**
+   * 绑定场景处理器：宿主把目标场景翻译成一批文档命令。引擎在副本上试算后只挂预览，
+   * 用户点「应用」才走一次事务；不调用模型、不按场景名推断内容。
+   */
+  setSceneHandler(handler: DesignerSceneHandler | undefined): void {
+    this.#designerState.runtime.setSceneHandler(this, handler);
+  }
+
+  /** 进入评审态：画布只读、右栏固定为变更页签，逐条批准/驳回。 */
+  enterReviewMode(meta: DesignerReviewMeta = {}): void {
+    this.#designerState.runtime.enterReviewMode(this, meta);
+  }
+
+  exitReviewMode(): void {
+    this.#designerState.runtime.exitReviewMode(this);
+  }
+
+  get reviewing(): boolean {
+    return this.#designerState.runtime.readReviewing(this);
+  }
+
+  /** 目标屏物理参数由宿主提供；只影响画布叠加，不写入文档。 */
+  setTargetDisplayProfile(profile: ScreenTargetDisplayProfile | undefined): void {
+    this.#designerState.runtime.setTargetDisplayProfile(this, profile);
+  }
+
+  get targetDisplayProfile(): ScreenTargetDisplayProfile | undefined {
+    return this.#designerState.runtime.readTargetDisplayProfile(this);
+  }
+
+  setTargetDisplayOverlay(kind: DesignerDisplayOverlayKind, enabled: boolean): void {
+    this.#designerState.runtime.setTargetDisplayOverlay(this, kind, enabled);
+  }
+
+  isTargetDisplayOverlayEnabled(kind: DesignerDisplayOverlayKind): boolean {
+    return this.#designerState.runtime.readTargetDisplayOverlay(this, kind);
   }
 
   exportDocument(): ScreenParseResult<string> {

@@ -574,9 +574,10 @@ export async function assertSemanticChartAuthoring(designer, page) {
   if (
     boardChrome.searchWidth !== 28 ||
     !boardChrome.toolbarInsideContext ||
-    // 「几何」标题按原型恢复可见后，首个字段整体下移一个标题行（约 +30px）。
-    boardChrome.geometryTopOffset < 157 ||
-    boardChrome.geometryTopOffset > 166 ||
+    // 「几何」标题按原型恢复可见后，首个字段整体下移一个标题行（约 +30px）；
+    // 右栏新增一级页签条后再下移一行（33px），两段偏移都计入。
+    boardChrome.geometryTopOffset < 190 ||
+    boardChrome.geometryTopOffset > 199 ||
     boardChrome.geometryControlHeight !== 28 ||
     boardChrome.geometryColumnGap !== 14 ||
     boardChrome.zHiddenInBasic !== true ||

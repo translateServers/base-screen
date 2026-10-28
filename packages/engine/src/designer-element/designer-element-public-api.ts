@@ -74,6 +74,17 @@ export {
   parseBaseScreenMaterialLibraryState,
 } from '../common/operations/material-library/material-library-state.js';
 export {
+  BASE_SCREEN_SCENE_CHANGE_EVENT,
+  type BaseScreenSceneChangeDetail,
+  type DesignerSceneDescriptor,
+  type DesignerSceneHandler,
+  type DesignerScenePlan,
+  type DesignerScenePrepareResult,
+  type DesignerScenePreview,
+  type DesignerSceneRequest,
+  prepareDesignerScenePreview,
+} from '../common/operations/scene/designer-scene.js';
+export {
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS,
   BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX,

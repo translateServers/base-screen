@@ -45,7 +45,7 @@ describe('designer workbench interaction and accessibility', () => {
       /\.designer-color-palette-stop-bar \.designer-color-palette-action\s*\{[^}]*width: var\(--designer-control-height-compact\);[^}]*height: var\(--designer-control-height-compact\);/s,
     );
     expect(controlsCss).toMatch(
-      /\.designer-fill-color-hue-track,[^{]*\.designer-fill-color-alpha-track\s*\{[^}]*height: 16px;[^}]*overflow: visible;[^}]*padding-block: 3px;[^}]*background-clip: content-box;/s,
+      /\.designer-fill-color-hue-track,[^{]*\.designer-fill-color-alpha-track\s*\{[^}]*height: 16px;[^}]*overflow: visible;[^}]*padding-block: calc\(var\(--designer-space-1\) \+ 1px\);[^}]*background-clip: content-box;/s,
     );
     expect(controlsCss).toMatch(
       /\.designer-fill-color-hue,[^{]*\.designer-fill-color-alpha\s*\{[^}]*position: absolute;[^}]*height: 16px;[^}]*outline: 0;[^}]*cursor: ew-resize;[^}]*touch-action: none;/s,
@@ -121,7 +121,10 @@ describe('designer workbench interaction and accessibility', () => {
     expect(baseCss).toContain('@media (prefers-reduced-motion: reduce)');
     expect(baseCss).toContain('.canvas-guide-preview');
     expect(baseCss).toContain('@media (forced-colors: active)');
-    expect(baseCss).toContain('.designer-control[aria-invalid="true"]');
+    // 无效态的高对比配色随控件层走（designer-controls-adaptivity.css），仍是 forced-colors 分支内。
+    expect(controlsCss).toMatch(
+      /@media \(forced-colors: active\)[\s\S]*\.designer-control\[aria-invalid="true"\]/,
+    );
     expect(workbenchCss).toContain('@media (forced-colors: active)');
     expect(workbenchCss).toContain('.canvas-guide-snap');
     expect(workbenchCss).toContain('background: Highlight;');
@@ -206,7 +209,7 @@ describe('designer workbench interaction and accessibility', () => {
       /\.designer-coordinate-entry-input input\s*\{[^}]*height: 26px;[^}]*min-height: 26px;/s,
     );
     expect(coordinateCss).toMatch(
-      /\.designer-coordinate-entry-input input\s*\{[^}]*padding-left: 22px;/s,
+      /\.designer-coordinate-entry-input input\s*\{[^}]*padding-left: calc\(var\(--designer-space-6\) \+ var\(--designer-space-3\)\);/s,
     );
     expect(coordinateCss).toMatch(
       /\.designer-coordinate-entry-axis,[^{]*\.designer-coordinate-entry-unit\s*\{[^}]*z-index: 1;/s,

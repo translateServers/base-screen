@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { h } from 'vue';
 import type { ScreenJsonObject, ScreenJsonValue } from '../../../packages/contracts/src/index.ts';
 import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '../../../packages/contracts/src/index.ts';
+import type { ScreenDocumentCommand } from '../../../packages/core/src/index.ts';
 import {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
   BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
@@ -1409,6 +1410,55 @@ designer.toolMaterialTypes = {
 };
 // 编组使用显式配置的容器物料（children=true），缺失时 Group 命令按 ADR-0012 保持禁用。
 designer.groupMaterialType = 'base.container';
+// 场景切换：目录与内容都归宿主；引擎只负责预览、应用与历史。这里用画布底色与首段文本
+// 演示「整套替换」，不写入任何场景语义到 Screen Document。
+const SCENE_BACKGROUNDS: Record<string, string> = {
+  daily: '#111827',
+  emergency: '#1f1212',
+  report: '#101a17',
+};
+const SCENE_OFFSETS: Record<string, number> = {
+  daily: 0,
+  emergency: 24,
+  report: 48,
+};
+const sceneRequests: string[] = [];
+const sceneEvents: Array<{ readonly sceneId: string; readonly label: string }> = [];
+designer.addEventListener('base-screen-scene-change', (event) => {
+  sceneEvents.push((event as CustomEvent<{ sceneId: string; label: string }>).detail);
+});
+const sceneCatalogReady = designer.setSceneCatalog(
+  [
+    { id: 'daily', label: '日常监控' },
+    { id: 'emergency', label: '应急指挥' },
+    { id: 'report', label: '汇报展示' },
+  ],
+  'daily',
+);
+if (!sceneCatalogReady.ok) throw new Error('Scene catalog configuration failed.');
+designer.setSceneHandler(async ({ sceneId, document }) => {
+  sceneRequests.push(sceneId);
+  const commands: ScreenDocumentCommand[] = [
+    {
+      type: 'update-canvas',
+      patch: { backgroundColor: SCENE_BACKGROUNDS[sceneId] ?? '#111827' },
+    },
+  ];
+  const target = document.components[0];
+  if (target !== undefined) {
+    commands.push({
+      type: 'update-components',
+      componentIds: [target.id],
+      patch: {
+        position: {
+          x: target.position.x + (SCENE_OFFSETS[sceneId] ?? 0),
+          y: target.position.y,
+        },
+      },
+    });
+  }
+  return { ok: true, value: { commands }, diagnostics: [] };
+});
 const viewerConfigured = viewer.configure({
   catalog: designerCatalog,
   resourcePort,
@@ -1579,6 +1629,8 @@ Object.assign(window, {
     catalog: designerCatalog,
     designer,
     pluginManager,
+    sceneRequests,
+    sceneEvents,
     // ADR-0076：运行期贡献的观察点。
     pluginActionRequests,
     applyPluginDataProcessor: (request) => pluginManager.applyDataProcessor(request),

@@ -28,6 +28,7 @@ const controlsCssFiles = [
   '../../../src/browser/styles/controls/designer-controls-actions.css',
   '../../../src/browser/styles/controls/designer-controls-tabs.css',
   '../../../src/browser/styles/controls/designer-controls-descriptor.css',
+  '../../../src/browser/styles/controls/designer-controls-adaptivity.css',
 ] as const;
 const workbenchCssFiles = [
   '../../../src/browser/styles/workbench/designer-workbench-topbar.css',

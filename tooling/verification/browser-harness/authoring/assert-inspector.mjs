@@ -923,6 +923,7 @@ export async function assertAuthoringPaletteLayout(page, designer) {
       fieldHeight: field.getBoundingClientRect().height,
       fieldOverflow: getComputedStyle(field).overflow,
       paletteHeight: palette.getBoundingClientRect().height,
+      paneWidth: Math.round(paneBox.width),
       popoverPosition: getComputedStyle(popover).position,
       popoverPlacement: popover.dataset.colorPalettePlacement,
       popoverWidth: popoverBox.width,
@@ -951,7 +952,7 @@ export async function assertAuthoringPaletteLayout(page, designer) {
     compactPaletteOpen.fieldOverflow !== 'visible' ||
     compactPaletteOpen.popoverPosition !== 'fixed' ||
     !['top', 'bottom'].includes(compactPaletteOpen.popoverPlacement) ||
-    compactPaletteOpen.popoverWidth !== 280 ||
+    compactPaletteOpen.popoverWidth !== Math.min(280, compactPaletteOpen.paneWidth) ||
     compactPaletteOpen.headingCount !== 0 ||
     compactPaletteOpen.modeAccessibleLabels.join('|') !==
       '\u5355\u8272|\u7ebf\u6027\u6e10\u53d8|\u5f84\u5411\u6e10\u53d8' ||

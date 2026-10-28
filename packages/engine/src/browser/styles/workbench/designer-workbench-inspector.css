@@ -12,7 +12,47 @@
 
 .designer:not([data-right-collapsed="true"])
   .properties:not([data-inspector-context-kind="canvas"]) {
-  grid-template-rows: 38px minmax(58px, auto) minmax(0, 1fr);
+  /* 检查器页签 / 一级页签 / 对象上下文 / 内容 / 意图输入：五段各自可折叠。 */
+  grid-template-rows: 38px auto minmax(58px, auto) minmax(0, 1fr) auto;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])
+  > .right-pane-switch {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])
+  > .right-pane-changes {
+  grid-column: 1;
+  grid-row: 3 / 5;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])
+  > .designer-intent {
+  grid-column: 1;
+  grid-row: 5;
+}
+
+/* 变更页签下检查器内容整体收掉：只留一级页签 / 变更列表 / 意图输入。 */
+.designer:not([data-right-collapsed="true"])
+.properties:not([data-inspector-context-kind="canvas"])[data-right-pane="changes"] {
+  grid-template-rows: 0 auto minmax(0, 1fr) auto;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])[data-right-pane="changes"]
+  > .right-pane-changes {
+  grid-row: 3;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])[data-right-pane="changes"]
+  > .designer-intent {
+  grid-row: 4;
 }
 
 .designer:not([data-right-collapsed="true"])
@@ -48,21 +88,21 @@
   .properties:not([data-inspector-context-kind="canvas"])
   > .inspector-context {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
 }
 
 .designer:not([data-right-collapsed="true"])
   .properties:not([data-inspector-context-kind="canvas"])
   > .inspector-toolbar {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
 }
 
 .designer:not([data-right-collapsed="true"])
   .properties:not([data-inspector-context-kind="canvas"])
   > .inspector-pane {
   grid-column: 1;
-  grid-row: 3;
+  grid-row: 4;
 }
 
 .properties .inspector-tabs {
@@ -196,7 +236,9 @@
 
 .properties[data-inspector-search-open] > .inspector-context,
 .properties[data-inspector-search-open] > .inspector-toolbar,
-.properties[data-inspector-search-open] > .inspector-pane {
+.properties[data-inspector-search-open] > .inspector-pane,
+.properties[data-inspector-search-open] > .right-pane-switch,
+.properties[data-inspector-search-open] > .designer-intent {
   display: none;
 }
 
@@ -286,7 +328,36 @@
 /* Multi-selection switches the inspector into the compact batch configuration surface. */
 .designer:not([data-right-collapsed="true"])
 .properties[data-inspector-context-kind="multi-selection"] {
-  grid-template-rows: 42px minmax(0, 1fr) !important;
+  grid-template-rows: 44px auto minmax(0, 1fr) auto;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties[data-inspector-context-kind="multi-selection"]
+  > .right-pane-switch {
+  grid-row: 2;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties[data-inspector-context-kind="multi-selection"]
+  > .designer-intent {
+  grid-row: 4;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties[data-inspector-context-kind="multi-selection"][data-right-pane="changes"] {
+  grid-template-rows: 0 auto minmax(0, 1fr) auto;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties[data-inspector-context-kind="multi-selection"][data-right-pane="changes"]
+  > .right-pane-changes {
+  grid-row: 3;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties[data-inspector-context-kind="multi-selection"][data-right-pane="changes"]
+  > .designer-intent {
+  grid-row: 4;
 }
 
 .designer:not([data-right-collapsed="true"])
@@ -321,7 +392,7 @@
 }
 
 .properties[data-inspector-context-kind="multi-selection"] > .inspector-pane {
-  grid-row: 2 !important;
+  grid-row: 3 !important;
   padding: 0 calc(var(--designer-space-5) + 1px) var(--designer-space-7);
 }
 

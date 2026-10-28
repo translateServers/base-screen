@@ -9,10 +9,13 @@ import {
   applyScreenDocumentTransaction,
   commitScreenHistory,
   createScreenHistory,
+  readScreenHistoryNodes,
   redoScreenHistory,
   reduceScreenInteraction,
+  revertScreenHistory,
   type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
+  type ScreenHistoryNode,
   type ScreenHistoryState,
   type ScreenInteractionAction,
   type ScreenInteractionState,
@@ -109,7 +112,7 @@ export class DesignerSession {
       return { ok: false, diagnostics: rendered.diagnostics };
     }
     this.#document = result.document;
-    this.#history = commitScreenHistory(this.#history, result.document, 50);
+    this.#history = commitScreenHistory(this.#history, result.document, 50, transaction.provenance);
     this.reconcileInteraction(true);
     this.#projectController.notifyDocumentChanged();
     this.callbacks.emitChange(this.#document);
@@ -148,6 +151,32 @@ export class DesignerSession {
     this.#projectController.notifyDocumentChanged();
     this.callbacks.emitChange(this.#document);
     return { ok: true, value: next.present, diagnostics: [] };
+  }
+
+  /** 回到任意历史节点：不删除节点，被跳过的部分保留在 future 里可再前进。 */
+  revertTo(targetIndex: number): ScreenParseResult<ScreenDocument> {
+    if (this.#history === undefined) {
+      return failure('Designer has no loaded history.');
+    }
+    const next = revertScreenHistory(this.#history, targetIndex);
+    if (next === this.#history) {
+      return { ok: true, value: next.present, diagnostics: [] };
+    }
+    const rendered = this.callbacks.renderDocument(next.present);
+    if (!rendered.ok) {
+      return { ok: false, diagnostics: rendered.diagnostics };
+    }
+    this.#history = next;
+    this.#document = next.present;
+    this.reconcileInteraction(true);
+    this.#projectController.notifyDocumentChanged();
+    this.callbacks.emitChange(this.#document);
+    return { ok: true, value: next.present, diagnostics: [] };
+  }
+
+  /** 历史节点列表（0 = 初始状态），供宿主呈现变更来源与回退入口。 */
+  readHistory(): readonly ScreenHistoryNode[] {
+    return this.#history === undefined ? [] : readScreenHistoryNodes(this.#history);
   }
 
   reduceSelection(action: ScreenInteractionAction): void {

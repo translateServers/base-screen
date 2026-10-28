@@ -26,11 +26,13 @@ import type { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
 import { ScreenDocumentCommand } from '@base-screen/core';
 import { ScreenDocumentTransaction } from '@base-screen/core';
+import { ScreenHistoryNode } from '@base-screen/core';
 import type { ScreenHostCatalogPort } from '@base-screen/contracts';
 import type { ScreenHostDatasetPort } from '@base-screen/contracts';
 import { ScreenHostResourceDataSource } from '@base-screen/contracts';
 import { ScreenHostResourceParameter } from '@base-screen/contracts';
 import type { ScreenHostResourcePort } from '@base-screen/contracts';
+import type { ScreenIntentRequest } from '@base-screen/contracts';
 import { ScreenInteractionState } from '@base-screen/core';
 import { ScreenJsonObject } from '@base-screen/contracts';
 import { ScreenJsonValue } from '@base-screen/contracts';
@@ -44,6 +46,8 @@ import type { ScreenProjectSnapshot } from '@base-screen/contracts';
 import type { ScreenProjectSnapshotPort } from '@base-screen/contracts';
 import type { ScreenProjectSummary } from '@base-screen/contracts';
 import { ScreenSize } from '@base-screen/contracts';
+import type { ScreenTargetDisplayProfile } from '@base-screen/contracts';
+import { ScreenTransactionProvenance } from '@base-screen/core';
 import type { ScreenVariableHandle } from '@base-screen/contracts';
 import type { ScreenVariableRefreshOptions } from '@base-screen/contracts';
 
@@ -85,6 +89,9 @@ export const BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT = "base-screen-ho
 
 // @public (undocumented)
 export const BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT: 'base-screen-material-library-action';
+
+// @public
+export const BASE_SCREEN_SCENE_CHANGE_EVENT = "base-screen-scene-change";
 
 // @public (undocumented)
 type BaseScreenAlignment = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
@@ -381,6 +388,14 @@ export interface BaseScreenDesignerBackRequestEventDetail {
 }
 
 // @public (undocumented)
+interface BaseScreenDesignerChangeProposalSummary {
+    // (undocumented)
+    readonly affectedComponentIds: readonly string[];
+    // (undocumented)
+    readonly id: string;
+}
+
+// @public (undocumented)
 export interface BaseScreenDesignerConfiguration {
     readonly backButton?: boolean;
     // (undocumented)
@@ -433,6 +448,8 @@ export interface BaseScreenDesignerConfiguration {
 // @public (undocumented)
 export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
+    get activeSceneId(): string | undefined;
+    // (undocumented)
     align(alignment: BaseScreenAlignment): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     attributeChangedCallback(name: string, previousValue: string | null, value: string | null): void;
@@ -472,6 +489,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     get designerHostAdapter(): ScreenDesignerHostAdapter | undefined;
     set designerHostAdapter(value: ScreenDesignerHostAdapter | undefined);
+    discardPendingChange(): void;
     // (undocumented)
     disconnectedCallback(): void;
     // (undocumented)
@@ -479,10 +497,15 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     get document(): ScreenDocument | undefined;
     set document(value: ScreenDocument | undefined);
+    enterPresentationLock(): boolean;
+    enterReviewMode(meta?: DesignerReviewMeta): void;
     // (undocumented)
     executeCommand(command: ScreenDocumentCommand): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     executeTransaction(transaction: ScreenDocumentTransaction): ScreenParseResult<ScreenDocument>;
+    exitPresentationLock(): void;
+    // (undocumented)
+    exitReviewMode(): void;
     // (undocumented)
     exportDocument(): ScreenParseResult<string>;
     // (undocumented)
@@ -520,6 +543,10 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     get instanceId(): string;
     // (undocumented)
+    get intentAvailable(): boolean;
+    // (undocumented)
+    isTargetDisplayOverlayEnabled(kind: DesignerDisplayOverlayKind): boolean;
+    // (undocumented)
     get leftPanelGroups(): readonly BaseScreenDesignerLeftPanelGroup[] | undefined;
     set leftPanelGroups(value: readonly BaseScreenDesignerLeftPanelGroup[] | undefined);
     // (undocumented)
@@ -551,6 +578,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     get pluginPanels(): BaseScreenPluginPanelCatalog | undefined;
     set pluginPanels(value: BaseScreenPluginPanelCatalog | undefined);
     // (undocumented)
+    get presentationLocked(): boolean;
+    // (undocumented)
     get previewHandler(): ((document: ScreenDocument) => boolean) | undefined;
     // (undocumented)
     previewProject(published: boolean): Promise<ScreenParseResult<ScreenDocument>>;
@@ -568,6 +597,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     set projectSnapshotPort(value: ScreenProjectSnapshotPort | undefined);
     // (undocumented)
     publish(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
+    readHistory(): readonly ScreenHistoryNode[];
     // (undocumented)
     redo(): ScreenParseResult<ScreenDocument>;
     refreshCatalog(catalog: BaseScreenMaterialCatalog): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult>;
@@ -595,18 +625,34 @@ export class BaseScreenDesignerElement extends ElementBase {
     restoreSnapshot(snapshotId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
     // (undocumented)
     retryLastProjectOperation(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
+    revertToHistoryState(index: number): ScreenParseResult<ScreenDocument>;
+    // (undocumented)
+    get reviewing(): boolean;
     // (undocumented)
     get runtimeContributions(): BaseScreenRuntimeContributionIndex | undefined;
     set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined);
     // (undocumented)
     save(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
     // (undocumented)
+    get sceneAvailable(): boolean;
+    // (undocumented)
     get selection(): ScreenInteractionState;
     selectLeftPanelGroup(groupId: string): boolean;
+    // (undocumented)
+    setActiveScene(sceneId: string | undefined): void;
     setCanvasBackground(background: ScreenCanvasBackground | null): ScreenParseResult<ScreenDocument>;
     setCanvasBackgroundImage(backgroundImage: string | null, fit?: ScreenCanvasBackgroundImageFit): ScreenParseResult<ScreenDocument>;
+    setIntentHandler(handler: DesignerIntentHandler | undefined): void;
+    setSceneCatalog(scenes: readonly DesignerSceneDescriptor[] | undefined, activeSceneId?: string): ScreenParseResult<null>;
+    setSceneHandler(handler: DesignerSceneHandler | undefined): void;
+    // (undocumented)
+    setTargetDisplayOverlay(kind: DesignerDisplayOverlayKind, enabled: boolean): void;
+    setTargetDisplayProfile(profile: ScreenTargetDisplayProfile | undefined): void;
     // (undocumented)
     setWorkbenchMode(mode: BaseScreenDesignerWorkbenchMode, options?: BaseScreenDesignerSetWorkbenchModeOptions): ScreenParseResult<null>;
+    submitChangeProposal(input: DesignerChangeProposalInput): ScreenParseResult<BaseScreenDesignerChangeProposalSummary>;
+    // (undocumented)
+    get targetDisplayProfile(): ScreenTargetDisplayProfile | undefined;
     // (undocumented)
     togglePreview(): ScreenParseResult<void>;
     // (undocumented)
@@ -858,6 +904,14 @@ export interface BaseScreenMaterialLibraryState {
 export type BaseScreenMaterialLibraryStatus = 'loading' | 'ready' | 'offline' | 'partial' | 'error' | 'update-available';
 
 // @public (undocumented)
+export interface BaseScreenSceneChangeDetail {
+    // (undocumented)
+    readonly label: string;
+    // (undocumented)
+    readonly sceneId: string;
+}
+
+// @public (undocumented)
 export function createBaseScreenCorePluginCommandPort(options: CreateBaseScreenCorePluginCommandPortOptions): PluginCommandPort;
 
 // @public (undocumented)
@@ -909,6 +963,81 @@ const DESIGNER_TOOLS: readonly [{
 }];
 
 // @public (undocumented)
+interface DesignerChangeProposalInput {
+    // (undocumented)
+    readonly commands: readonly ScreenDocumentCommand[];
+    readonly rationale: string;
+    // (undocumented)
+    readonly scope: string;
+    // (undocumented)
+    readonly title: string;
+}
+
+// @public (undocumented)
+type DesignerDisplayOverlayKind = 'safe-area' | 'seam' | 'distance';
+
+// @public
+type DesignerIntentHandler = (request: ScreenIntentRequest) => Promise<ScreenParseResult<null>>;
+
+// @public
+interface DesignerReviewMeta {
+    // (undocumented)
+    readonly approver?: string;
+    // (undocumented)
+    readonly reviewer?: string;
+}
+
+// @public
+export interface DesignerSceneDescriptor {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly label: string;
+}
+
+// @public
+export type DesignerSceneHandler = (request: DesignerSceneRequest) => Promise<ScreenParseResult<DesignerScenePlan>>;
+
+// @public
+export interface DesignerScenePlan {
+    // (undocumented)
+    readonly commands: readonly ScreenDocumentCommand[];
+}
+
+// @public (undocumented)
+export type DesignerScenePrepareResult = {
+    readonly ok: true;
+    readonly value: DesignerScenePreview;
+} | {
+    readonly ok: false;
+    readonly diagnostics: readonly ScreenDiagnostic[];
+};
+
+// @public (undocumented)
+export interface DesignerScenePreview {
+    // (undocumented)
+    readonly candidate: ScreenDocument;
+    // (undocumented)
+    readonly commands: readonly ScreenDocumentCommand[];
+    // (undocumented)
+    readonly label: string;
+    // (undocumented)
+    readonly provenance: ScreenTransactionProvenance;
+    // (undocumented)
+    readonly sceneId: string;
+}
+
+// @public
+export interface DesignerSceneRequest {
+    // (undocumented)
+    readonly document: ScreenDocument;
+    // (undocumented)
+    readonly instanceId: string;
+    // (undocumented)
+    readonly sceneId: string;
+}
+
+// @public (undocumented)
 type DesignerToolId = (typeof DESIGNER_TOOLS)[number]['id'];
 
 // @public (undocumented)
@@ -943,6 +1072,9 @@ export function parseBaseScreenMaterialLibraryItems(input: unknown): ScreenParse
 
 // @public (undocumented)
 export function parseBaseScreenMaterialLibraryState(input: unknown): ScreenParseResult<BaseScreenMaterialLibraryState>;
+
+// @public
+export function prepareDesignerScenePreview(document: ScreenDocument, scene: DesignerSceneDescriptor, plan: DesignerScenePlan): DesignerScenePrepareResult;
 
 // @public (undocumented)
 export class ScreenProjectController {

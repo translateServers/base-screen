@@ -14,6 +14,11 @@ export function initializeDesignerElementSurfaceBindings(
     click: [
       (target) => state.notificationController.dismiss(target as Element),
       (target) => state.errorConsoleController.onClick(target as Element),
+      (target) => state.guardController.onClick(target as Element),
+      (target) => state.changeController.onClick(target as Element),
+      (target) => state.sceneController.onClick(target as Element),
+      (target) => state.presentationLockController.onClick(target as Element),
+      (target) => state.intentController.onClick(target as Element),
       (target) => state.commandPaletteController.onClick(target as Element),
       (target) => state.blueprintWorkbenchController.onClick(target as Element),
       (target) => state.topbarController.onClick(target as Element),
@@ -131,6 +136,13 @@ export function initializeDesignerElementSurfaceBindings(
       (target) => state.commandPaletteController.onInput(target as Element),
       (target) => state.datasetController.onInput(target),
       (target) => state.variablesController.onInput(target),
+      (target) => {
+        if (target !== null && (target as Element).closest('[data-intent-input]') === null) {
+          return false;
+        }
+        state.intentController.onInput();
+        return true;
+      },
       (_target, event) => state.panelController.onInput(event),
       (_target, event) => {
         state.layersController.onInput(event);
@@ -232,6 +244,11 @@ export function initializeDesignerElementSurfaceBindings(
       (_target, event) => state.sizeEntryController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.commandPaletteController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.errorConsoleController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => state.guardController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => state.changeController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => state.sceneController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => state.presentationLockController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => state.intentController.onKeyDown(event as KeyboardEvent),
       (_target, event) => {
         const keyboardEvent = event as KeyboardEvent;
         if (keyboardEvent.key !== 'Escape' || !state.menuController.closeHelpPanel()) return false;

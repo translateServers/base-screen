@@ -28,6 +28,8 @@ export async function assertLeftPanelMaterials(designer, page) {
     return {
       railChildren,
       railWidth: Math.round(rail.getBoundingClientRect().width),
+      // 场景区是宿主可选的一等区块：有则必须紧贴列头，其后的索引整体后移一位。
+      sceneIndex: railChildren.indexOf('scenes'),
       tabIndex: railChildren.indexOf('rail-tabs'),
       blueprintIndex: railChildren.indexOf('blueprint-library'),
       viewIndex: railChildren.indexOf('rail-view'),
@@ -51,10 +53,12 @@ export async function assertLeftPanelMaterials(designer, page) {
       sameCategoryHue,
     };
   });
+  const sceneOffset = ia.sceneIndex === 1 ? 1 : 0;
   if (
-    ia.tabIndex !== 1 ||
-    ia.blueprintIndex !== 2 ||
-    ia.viewIndex !== 3 ||
+    (ia.sceneIndex !== 1 && ia.sceneIndex !== -1) ||
+    ia.tabIndex !== 1 + sceneOffset ||
+    ia.blueprintIndex !== 2 + sceneOffset ||
+    ia.viewIndex !== 3 + sceneOffset ||
     ia.viewCount !== 3 ||
     !ia.materialsToolsInsideView ||
     ia.materialsPanelInlineGutter !== 0 ||

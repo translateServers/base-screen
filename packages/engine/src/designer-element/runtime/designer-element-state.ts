@@ -24,14 +24,20 @@ import { DesignerBlueprintWorkbenchController } from '../../browser/controllers/
 import { DesignerDatasetController } from '../../browser/controllers/dataset/designer-dataset-controller.js';
 import type { DesignerAutoWidthController } from '../../browser/controllers/designer-auto-width-controller.js';
 import { DesignerCanvasRuntimeController } from '../../browser/controllers/designer-canvas-runtime-controller.js';
+import { DesignerChangeController } from '../../browser/controllers/designer-change-controller.js';
 import { DesignerCommandPaletteController } from '../../browser/controllers/designer-command-palette-controller.js';
 import { DesignerErrorConsoleController } from '../../browser/controllers/designer-error-console-controller.js';
+import { DesignerGuardController } from '../../browser/controllers/designer-guard-controller.js';
 import { DesignerImportController } from '../../browser/controllers/designer-import-controller.js';
 import { DesignerIntegrationController } from '../../browser/controllers/designer-integration-controller.js';
+import { DesignerIntentController } from '../../browser/controllers/designer-intent-controller.js';
 import { DesignerLeftPanelGroupEventController } from '../../browser/controllers/designer-left-panel-group-events.js';
 import { DesignerNotificationController } from '../../browser/controllers/designer-notification-controller.js';
+import { DesignerPresentationLockController } from '../../browser/controllers/designer-presentation-lock-controller.js';
 import { DesignerPreviewController } from '../../browser/controllers/designer-preview-controller.js';
+import { DesignerSceneController } from '../../browser/controllers/designer-scene-controller.js';
 import { DesignerScrollContinuityController } from '../../browser/controllers/designer-scroll-continuity-controller.js';
+import { DesignerTargetDisplayController } from '../../browser/controllers/designer-target-display-controller.js';
 import { DesignerTextEditController } from '../../browser/controllers/designer-text-edit-controller.js';
 import { DesignerTooltipController } from '../../browser/controllers/designer-tooltip-controller.js';
 import { DesignerTopbarController } from '../../browser/controllers/designer-topbar-controller.js';
@@ -64,6 +70,7 @@ import {
   type BaseScreenResolvedMaterialLibraryItem,
 } from '../../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../../common/operations/material-library/material-library-state.js';
+import type { DesignerSceneDescriptor } from '../../common/operations/scene/designer-scene.js';
 import { DesignerSelectionActions } from '../../common/operations/selection/designer-selection-actions.js';
 import { type BaseScreenDesignerLeftPanelGroup } from '../../common/operations/workbench/designer-left-panel-groups.js';
 import { DesignerProjectGateway } from '../../common/project/designer-project-gateway.js';
@@ -106,6 +113,8 @@ export interface DesignerElementState {
   backButton: boolean;
   hostResourceSelectionButton: boolean;
   renderer: BaseScreenRenderer | undefined;
+  /** 幽灵草案渲染器：同一物料目录、只读挂载到叠加层，与主画布互不影响。 */
+  ghostRenderer: BaseScreenRenderer | undefined;
   canvas: HTMLDivElement | undefined;
   viewportElement: HTMLDivElement | undefined;
   selection: HTMLDivElement | undefined;
@@ -129,12 +138,21 @@ export interface DesignerElementState {
   >;
   authoringGeneration: number;
   documentGeneration: number;
+  changeGeneration: number;
   leftPanelGroupEvents: DesignerLeftPanelGroupEventController;
   tooltipController: DesignerTooltipController;
   blueprintWorkbenchController: DesignerBlueprintWorkbenchController;
   notificationController: DesignerNotificationController;
   topbarController: DesignerTopbarController;
   errorConsoleController: DesignerErrorConsoleController;
+  guardController: DesignerGuardController;
+  changeController: DesignerChangeController;
+  sceneController: DesignerSceneController;
+  /** 宿主定义的场景目录：引擎不保存场景内容，只保留身份与展示名。 */
+  sceneCatalog: readonly DesignerSceneDescriptor[] | undefined;
+  intentController: DesignerIntentController;
+  targetDisplayController: DesignerTargetDisplayController;
+  presentationLockController: DesignerPresentationLockController;
   scrollContinuityController: DesignerScrollContinuityController;
   canvasRuntimeController: DesignerCanvasRuntimeController;
   autoWidthController: DesignerAutoWidthController;
@@ -191,10 +209,17 @@ export function createDesignerElementState(
   >();
   state.authoringGeneration = 0;
   state.documentGeneration = 0;
+  state.changeGeneration = 0;
   state.leftPanelGroupEvents = new DesignerLeftPanelGroupEventController(element);
   state.tooltipController = new DesignerTooltipController();
   state.notificationController = new DesignerNotificationController();
   state.errorConsoleController = new DesignerErrorConsoleController();
+  state.guardController = new DesignerGuardController();
+  state.changeController = new DesignerChangeController();
+  state.sceneController = new DesignerSceneController();
+  state.intentController = new DesignerIntentController();
+  state.targetDisplayController = new DesignerTargetDisplayController();
+  state.presentationLockController = new DesignerPresentationLockController();
   state.scrollContinuityController = new DesignerScrollContinuityController();
   state.autoWidthController = createDesignerAutoWidthController(element, state);
   initializeDesignerElementControllers(element, state);

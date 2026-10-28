@@ -1,3 +1,4 @@
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { type DesignerElementHost, getDesignerElementState } from './designer-element-state.js';
 
 export function connectedCallback(element: DesignerElementHost): void {
@@ -31,6 +32,7 @@ export function disconnectedCallback(element: DesignerElementHost): void {
   elementState.session.cancelProjectOperation();
   elementState.canvasRuntimeController.clear();
   elementState.renderer?.clear();
+  elementState.ghostRenderer?.clear();
 }
 
 export function disconnectSurfaces(element: DesignerElementHost): void {
@@ -68,6 +70,12 @@ export function releaseSurfaces(element: DesignerElementHost): void {
   elementState.layers = undefined;
   elementState.notificationController.release();
   elementState.errorConsoleController.release();
+  elementState.guardController.release();
+  elementState.changeController.release();
+  elementState.sceneController.release();
+  elementState.presentationLockController.release();
+  elementState.intentController.release();
+  elementState.targetDisplayController.release();
   elementState.integrationController.release();
   elementState.importController.release();
   elementState.projectWorkspaceController.release();
@@ -112,6 +120,84 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
   const consoleTrigger = shadow.querySelector<HTMLButtonElement>('[data-error-console-toggle]');
   if (consoleDialog !== null && consoleTrigger !== null) {
     elementState.errorConsoleController.connect(consoleDialog, consoleTrigger);
+  }
+  const guardStrip = shadow.querySelector<HTMLButtonElement>('[data-guard-toggle]');
+  const guardPopover = shadow.querySelector<HTMLElement>('[data-guard-popover]');
+  const guardContent = shadow.querySelector<HTMLElement>('[data-canvas-content]');
+  if (guardStrip !== null && guardPopover !== null && canvas !== null && guardContent !== null) {
+    elementState.guardController.connect(guardStrip, guardPopover, canvas, guardContent);
+  }
+  const draftBar = shadow.querySelector<HTMLElement>('[data-draft-bar]');
+  const changePane = shadow.querySelector<HTMLElement>('[data-change-pane]');
+  const ghostLayer = shadow.querySelector<HTMLElement>('[data-canvas-ghost]');
+  const rightPanel = shadow.querySelector<HTMLElement>('[data-right-panel]');
+  if (draftBar !== null && changePane !== null && ghostLayer !== null && rightPanel !== null) {
+    elementState.changeController.connect(draftBar, changePane, ghostLayer, rightPanel);
+  }
+  const sceneBlock = shadow.querySelector<HTMLElement>('[data-scene-block]');
+  const sceneList = shadow.querySelector<HTMLElement>('[data-scene-list]');
+  const sceneCount = shadow.querySelector<HTMLElement>('[data-scene-count]');
+  const sceneNote = shadow.querySelector<HTMLElement>('[data-scene-note]');
+  const sceneBar = shadow.querySelector<HTMLElement>('[data-scene-preview-bar]');
+  const sceneBarName = shadow.querySelector<HTMLElement>('[data-scene-preview-name]');
+  if (
+    sceneBlock !== null &&
+    sceneList !== null &&
+    sceneCount !== null &&
+    sceneNote !== null &&
+    sceneBar !== null &&
+    sceneBarName !== null
+  ) {
+    elementState.sceneController.connect(
+      sceneBlock,
+      sceneList,
+      sceneCount,
+      sceneNote,
+      sceneBar,
+      sceneBarName,
+    );
+    elementState.sceneController.setInstanceId(elementState.instanceId);
+  }
+  const intentInput = shadow.querySelector<HTMLTextAreaElement>('[data-intent-input]');
+  const intentSubmit = shadow.querySelector<HTMLButtonElement>('[data-intent-submit]');
+  const intentScope = shadow.querySelector<HTMLElement>('[data-intent-scope]');
+  const intentScopeClear = shadow.querySelector<HTMLButtonElement>('[data-intent-scope-clear]');
+  const intentStatus = shadow.querySelector<HTMLElement>('[data-intent-status]');
+  const intentConfirm = shadow.querySelector<HTMLElement>('[data-intent-confirm]');
+  if (
+    intentInput !== null &&
+    intentSubmit !== null &&
+    intentScope !== null &&
+    intentScopeClear !== null &&
+    intentStatus !== null &&
+    intentConfirm !== null
+  ) {
+    elementState.intentController.connect(
+      elementState.instanceId,
+      intentInput,
+      intentSubmit,
+      intentScope,
+      intentScopeClear,
+      intentStatus,
+      intentConfirm,
+    );
+  }
+  const displayLayer = shadow.querySelector<HTMLElement>('[data-display-overlay-layer]');
+  if (displayLayer !== null) elementState.targetDisplayController.connect(displayLayer);
+  const designerRoot = shadow.querySelector<HTMLElement>('.designer');
+  const presentationHint = shadow.querySelector<HTMLElement>('[data-presentation-lock-hint]');
+  if (designerRoot !== null && presentationHint !== null) {
+    elementState.presentationLockController.connect(designerRoot, presentationHint, {
+      canEnter: () =>
+        elementState.changeController.pending === undefined &&
+        !elementState.sceneController.previewing,
+      notifyBlocked: () =>
+        elementState.notificationController.notify(
+          DESIGNER_UI_TEXT.presentationLock.blocked,
+          'error',
+        ),
+      refit: () => elementState.viewportController.fit(),
+    });
   }
   const eventsPanel = shadow.querySelector<HTMLDivElement>('[data-events-panel]');
   if (eventsPanel !== null) elementState.integrationController.connect(eventsPanel);

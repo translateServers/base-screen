@@ -18,8 +18,13 @@ import {
   type BaseScreenMaterialLibraryAction,
   type BaseScreenMaterialLibraryActionEventDetail,
 } from '../../common/operations/material-library/material-library-state.js';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { getDesignerGeometryDocument } from './designer-element-geometry.js';
-import { type DesignerElementHost, getDesignerElementState } from './designer-element-state.js';
+import {
+  type DesignerElementHost,
+  type DesignerElementState,
+  getDesignerElementState,
+} from './designer-element-state.js';
 
 export function initialize(element: DesignerElementHost): void {
   const elementState = getDesignerElementState(element);
@@ -72,6 +77,83 @@ export function initialize(element: DesignerElementHost): void {
     shadow.querySelector<HTMLElement>('[data-error-console]')!,
     shadow.querySelector<HTMLButtonElement>('[data-error-console-toggle]')!,
   );
+  elementState.guardController.connect(
+    shadow.querySelector<HTMLButtonElement>('[data-guard-toggle]')!,
+    shadow.querySelector<HTMLElement>('[data-guard-popover]')!,
+    elementState.canvas,
+    shadow.querySelector<HTMLElement>('[data-canvas-content]')!,
+  );
+  elementState.changeController.connect(
+    shadow.querySelector<HTMLElement>('[data-draft-bar]')!,
+    shadow.querySelector<HTMLElement>('[data-change-pane]')!,
+    shadow.querySelector<HTMLElement>('[data-canvas-ghost]')!,
+    shadow.querySelector<HTMLElement>('[data-right-panel]')!,
+  );
+  const intentInput = shadow.querySelector<HTMLTextAreaElement>('[data-intent-input]');
+  const intentSubmit = shadow.querySelector<HTMLButtonElement>('[data-intent-submit]');
+  const intentScope = shadow.querySelector<HTMLElement>('[data-intent-scope]');
+  const intentScopeClear = shadow.querySelector<HTMLButtonElement>('[data-intent-scope-clear]');
+  const intentStatus = shadow.querySelector<HTMLElement>('[data-intent-status]');
+  const intentConfirm = shadow.querySelector<HTMLElement>('[data-intent-confirm]');
+  if (
+    intentInput !== null &&
+    intentSubmit !== null &&
+    intentScope !== null &&
+    intentScopeClear !== null &&
+    intentStatus !== null &&
+    intentConfirm !== null
+  ) {
+    elementState.intentController.connect(
+      elementState.instanceId,
+      intentInput,
+      intentSubmit,
+      intentScope,
+      intentScopeClear,
+      intentStatus,
+      intentConfirm,
+    );
+  }
+  const sceneBlock = shadow.querySelector<HTMLElement>('[data-scene-block]');
+  const sceneList = shadow.querySelector<HTMLElement>('[data-scene-list]');
+  const sceneCount = shadow.querySelector<HTMLElement>('[data-scene-count]');
+  const sceneNote = shadow.querySelector<HTMLElement>('[data-scene-note]');
+  const sceneBar = shadow.querySelector<HTMLElement>('[data-scene-preview-bar]');
+  const sceneBarName = shadow.querySelector<HTMLElement>('[data-scene-preview-name]');
+  if (
+    sceneBlock !== null &&
+    sceneList !== null &&
+    sceneCount !== null &&
+    sceneNote !== null &&
+    sceneBar !== null &&
+    sceneBarName !== null
+  ) {
+    elementState.sceneController.connect(
+      sceneBlock,
+      sceneList,
+      sceneCount,
+      sceneNote,
+      sceneBar,
+      sceneBarName,
+    );
+    elementState.sceneController.setInstanceId(elementState.instanceId);
+  }
+  const displayLayer = shadow.querySelector<HTMLElement>('[data-display-overlay-layer]');
+  if (displayLayer !== null) elementState.targetDisplayController.connect(displayLayer);
+  const designerRoot = shadow.querySelector<HTMLElement>('.designer');
+  const presentationHint = shadow.querySelector<HTMLElement>('[data-presentation-lock-hint]');
+  if (designerRoot !== null && presentationHint !== null) {
+    elementState.presentationLockController.connect(designerRoot, presentationHint, {
+      canEnter: () =>
+        elementState.changeController.pending === undefined &&
+        !elementState.sceneController.previewing,
+      notifyBlocked: () =>
+        elementState.notificationController.notify(
+          DESIGNER_UI_TEXT.presentationLock.blocked,
+          'error',
+        ),
+      refit: () => elementState.viewportController.fit(),
+    });
+  }
   elementState.runtime.renderDesignerElementMaterialLibraryState(element);
   const eventsPanel = shadow.querySelector<HTMLDivElement>('[data-events-panel]');
   if (eventsPanel !== null) elementState.integrationController.connect(eventsPanel);
@@ -125,6 +207,8 @@ export function renderDocument(
     elementState.workbenchController.invalidateGeometry();
     elementState.runtime.syncCanvasFrameSize(element, document);
     elementState.previewController.sync(document);
+    elementState.guardController.schedule(document);
+    elementState.targetDisplayController.setDocument(document);
   }
   return rendered.ok
     ? { ok: true, value: undefined, diagnostics: rendered.diagnostics }
@@ -154,6 +238,10 @@ export function renderInteraction(element: DesignerElementHost): void {
   elementState.runtime.renderLayers(element);
   elementState.runtime.renderControls(element);
   elementState.runtime.syncDesignerPluginPanels(element);
+  elementState.intentController.syncScope(
+    elementState.session.interaction.selectedComponentIds,
+    (id) => elementState.session.document?.components.find((c) => c.id === id)?.name,
+  );
   elementState.integrationController.render();
   elementState.workbenchController.renderInspectorTabs();
 }
@@ -304,6 +392,43 @@ export function createRenderer(element: DesignerElementHost): void {
       ? {}
       : { contributionIndex: elementState.runtimeContributions }),
   });
+  createGhostRenderer(elementState);
+}
+
+/**
+ * 幽灵草案渲染器：同一份目录与端口，只读挂载到 `[data-canvas-ghost]`。
+ *
+ * 它与主渲染器完全隔离——草案的物料实例、数据请求和条件样式都不会影响画布上的
+ * 真实文档；宿主丢弃草案时只需 `clear()`，不产生任何文档侧副作用。
+ */
+function createGhostRenderer(elementState: DesignerElementState): void {
+  // 渲染器会把挂载根写成 `position: relative`，所以叠加层的定位放在外层，
+  // 内层只作为渲染器根节点，避免两套定位互相覆盖。
+  const ghost = elementState.canvas?.querySelector<HTMLDivElement>('[data-canvas-ghost-root]');
+  if (ghost === null || ghost === undefined || elementState.catalog === undefined) return;
+  elementState.ghostRenderer = createBaseScreenRenderer({
+    root: ghost,
+    catalog: elementState.catalog,
+    mode: 'design',
+    // 草案层不参与交互：原生事件关闭，也不会转发回宿主。
+    interactive: false,
+    onMaterialEvent: () => {},
+    resourcePort: elementState.resourcePort,
+    ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
+    ...(elementState.conditionalStylePort === undefined
+      ? {}
+      : { conditionalStylePort: elementState.conditionalStylePort }),
+    executionMode: 'design',
+    ...(elementState.runtimeContributions === undefined
+      ? {}
+      : { contributionIndex: elementState.runtimeContributions }),
+  });
+  const ghostHandlers = {
+    render: (document: ScreenDocument) => elementState.ghostRenderer?.render(document).ok ?? false,
+    clear: () => elementState.ghostRenderer?.clear(),
+  };
+  elementState.changeController.setGhostHandlers(ghostHandlers);
+  elementState.sceneController.setGhostHandlers(ghostHandlers);
 }
 
 export function applyNativeEvents(element: DesignerElementHost, enabled: boolean): void {

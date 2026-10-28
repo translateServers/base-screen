@@ -104,6 +104,11 @@
   display: grid;
 }
 
+.designer[data-authoring-mode="blueprint"] .rail {
+  grid-template-rows: 44px minmax(0, 1fr);
+}
+
+.designer[data-authoring-mode="blueprint"] .rail > .scenes,
 .designer[data-authoring-mode="blueprint"] .rail > .rail-tabs,
 .designer[data-authoring-mode="blueprint"] .rail > .rail-view:not(.host-left-panel-view),
 .designer[data-authoring-mode="blueprint"] .inspector-tabs,

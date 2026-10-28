@@ -38,6 +38,14 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <span class="designer-badge panel-count" data-tone="neutral" id="designer-left-panel-count" role="status" aria-label="${DESIGNER_UI_TEXT.leftPanelCount(DESIGNER_UI_TEXT.materials, visibleMaterialCount)}" aria-live="polite" aria-atomic="true" data-material-count data-left-panel-count data-material-total="${visibleMaterialCount}">${visibleMaterialCount}</span>
         <span class="panel-scope" data-left-panel-scope>${DESIGNER_UI_TEXT.panelScope.builtin}</span>
       </header>
+      <section class="scenes" data-scene-block aria-label="${DESIGNER_UI_TEXT.scene.label}" hidden>
+        <header class="scene-heading">
+          <span class="scene-label">${DESIGNER_UI_TEXT.scene.label}</span>
+          <span class="scene-count" data-scene-count></span>
+        </header>
+        <div class="scene-list" data-scene-list role="group" aria-label="${DESIGNER_UI_TEXT.scene.label}"></div>
+        <p class="scene-note" data-scene-note role="status" aria-live="polite" hidden></p>
+      </section>
       <div class="rail-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.leftPanel}">
         <button type="button" class="designer-tab" id="designer-materials-tab" role="tab" aria-controls="designer-materials-panel" aria-selected="true" data-panel-tab="materials" data-tip="${DESIGNER_UI_TEXT.materials}">
           <span class="rail-tab-glyph" aria-hidden="true">${designerIcon('grid')}</span>
@@ -134,6 +142,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <div class="topbar-actions">
           <button type="button" class="topbar-icon-button" data-panel-collapse="right" aria-controls="designer-right-panel" aria-expanded="true" data-tip="${DESIGNER_UI_TEXT.rightPanel}" aria-label="${DESIGNER_UI_TEXT.rightPanel}">${designerIcon('sliders')}</button>
           <button type="button" class="topbar-icon-button" data-topbar-snapshot data-tip="${DESIGNER_UI_TEXT.createSnapshot}" aria-label="${DESIGNER_UI_TEXT.createSnapshot}" disabled>${designerIcon('copy')}</button>
+          <button type="button" class="topbar-icon-button" data-presentation-lock-toggle data-tip="${DESIGNER_UI_TEXT.presentationLock.enterAria}" aria-label="${DESIGNER_UI_TEXT.presentationLock.enterAria}">${designerIcon('play')}</button>
           <button type="button" class="topbar-icon-button" data-error-console-toggle aria-controls="designer-error-console" aria-haspopup="dialog" aria-expanded="false" data-tip="${DESIGNER_UI_TEXT.errorConsole.openAria}" aria-label="${DESIGNER_UI_TEXT.errorConsole.openAria}">${designerIcon('activity')}<span class="topbar-count" data-error-console-count></span></button>
           <button type="button" class="topbar-icon-button" data-topbar-theme-toggle data-tip="${DESIGNER_UI_TEXT.toggleTheme}" aria-label="${DESIGNER_UI_TEXT.toggleTheme}" aria-pressed="false"><span class="topbar-theme-moon" aria-hidden="true">${designerIcon('moon')}</span><span class="topbar-theme-sun" aria-hidden="true">${designerIcon('sun')}</span></button>
           <button type="button" class="topbar-search-trigger" data-command-palette-toggle aria-expanded="false" aria-controls="designer-command-palette-input" aria-label="${DESIGNER_UI_TEXT.commandPalette.trigger}" data-tip="${DESIGNER_UI_TEXT.commandPalette.trigger}">
@@ -176,9 +185,21 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <div class="ruler ruler-horizontal" aria-hidden="true"><canvas class="ruler-canvas" data-ruler-canvas></canvas></div>
       <div class="canvas-stage">
         <div class="ruler ruler-vertical" aria-hidden="true"><canvas class="ruler-canvas" data-ruler-canvas></canvas></div>
+        <div class="designer-draft-bar" data-draft-bar hidden></div>
+        <div class="designer-scene-bar" data-scene-preview-bar role="status" aria-live="polite" hidden>
+          <span class="scene-bar-dot" aria-hidden="true"></span>
+          <span class="scene-bar-label">${DESIGNER_UI_TEXT.scene.previewLabel}</span>
+          <span class="scene-bar-name" data-scene-preview-name></span>
+          <span class="scene-bar-actions">
+            <button type="button" class="designer-control designer-button" data-scene-action="cancel">${DESIGNER_UI_TEXT.scene.cancel}</button>
+            <button type="button" class="designer-control designer-button" data-variant="primary" data-scene-action="apply">${DESIGNER_UI_TEXT.scene.apply}</button>
+          </span>
+        </div>
         <div class="viewport" data-viewport>
           <div class="canvas" data-canvas>
             <div class="canvas-content" data-canvas-content></div>
+            <div class="canvas-ghost" data-canvas-ghost hidden aria-hidden="true"><div class="canvas-ghost-root" data-canvas-ghost-root></div></div>
+            <div class="canvas-display-overlay" data-display-overlay-layer hidden aria-hidden="true"></div>
             <div class="selection" data-selection></div>
             <div class="marquee" data-marquee></div>
             <div class="canvas-guides" data-canvas-guides></div>
@@ -220,6 +241,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           <span class="status-revision" data-project-revision></span>
           <span class="status-feedback" data-status-feedback role="status" aria-live="polite"></span>
         </div>
+        <button type="button" class="statusbar-guard" data-guard-toggle data-state="pass" aria-haspopup="dialog" aria-expanded="false" aria-controls="designer-guard-popover" aria-label="${DESIGNER_UI_TEXT.guard.stripAria(0)}"></button>
         <div class="statusbar-group statusbar-end">
           <span class="status-components" data-status-components></span>
           <span class="status-divider" aria-hidden="true"></span>
@@ -238,6 +260,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             ${DESIGNER_ZOOM_PRESETS.map((percent) => `<button type="button" class="designer-control designer-button designer-menu-item" data-status-zoom-preset="${percent}" role="menuitem"><span class="menu-item-label">${percent}%</span></button>`).join('')}
           </div>
         </div>
+        <section class="designer-guard-popover" id="designer-guard-popover" data-guard-popover role="dialog" aria-label="${DESIGNER_UI_TEXT.guard.dialogTitle}" hidden></section>
       </footer>
       <div class="designer-notifications" data-notifications aria-label="${DESIGNER_UI_TEXT.notifications}"></div>
       <div class="designer-tooltip" id="designer-tooltip" data-tooltip role="tooltip" data-side="top"></div>
@@ -271,6 +294,12 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <header class="panel-heading">
         <span class="panel-title" id="designer-right-panel-title" data-right-panel-title>${DESIGNER_UI_TEXT.inspectorUi.canvasConfiguration}</span>
       </header>
+      <div class="right-pane-switch" role="tablist" aria-label="${DESIGNER_UI_TEXT.rightPane.label}">
+        <button type="button" class="right-pane-tab" data-right-pane-tab="inspector" role="tab" aria-selected="true">${DESIGNER_UI_TEXT.rightPane.inspector}</button>
+        <button type="button" class="right-pane-tab" data-right-pane-tab="changes" role="tab" aria-selected="false">${DESIGNER_UI_TEXT.rightPane.changes}<span class="right-pane-count" data-change-count data-empty="true"></span></button>
+        <span class="right-pane-spacer"></span>
+        <button type="button" class="designer-control designer-button designer-icon-button right-pane-review" data-review-toggle aria-pressed="false" data-tip="${DESIGNER_UI_TEXT.review.title}" aria-label="${DESIGNER_UI_TEXT.review.title}">${designerIcon('eye')}</button>
+      </div>
       <div class="inspector-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.inspector}">
         <button type="button" class="designer-tab" id="designer-appearance-tab" role="tab" aria-controls="designer-appearance-panel" aria-selected="true" data-inspector-tab="appearance"><span>${DESIGNER_UI_TEXT.appearance}</span></button>
         <button type="button" class="designer-tab" id="designer-data-tab" role="tab" aria-controls="designer-data-panel" aria-selected="false" data-inspector-tab="data"><span>${DESIGNER_UI_TEXT.inspectorUi.dataSource}</span></button>
@@ -310,6 +339,24 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <div class="inspector-pane" id="designer-interaction-panel" role="tabpanel" aria-labelledby="designer-interaction-tab" data-inspector-pane="interaction" hidden>
         <p class="designer-empty-state">${DESIGNER_UI_TEXT.interactionPanelEmpty}</p>
       </div>
+      <div class="right-pane-changes" data-change-pane hidden></div>
+      <section class="designer-intent" data-intent-composer aria-label="${DESIGNER_UI_TEXT.intent.title}">
+        <div class="intent-top">
+          <span class="intent-label">${DESIGNER_UI_TEXT.intent.label}</span>
+          <span class="intent-scope-chip" data-intent-scope-chip>
+            <span class="intent-scope-label" data-intent-scope>${DESIGNER_UI_TEXT.intent.scopeScreen}</span>
+            <button type="button" class="intent-scope-clear" data-intent-scope-clear aria-label="${DESIGNER_UI_TEXT.intent.scopeClear}" hidden>${designerIcon('close')}</button>
+          </span>
+          <span class="intent-spacer"></span>
+        </div>
+        <p class="intent-capability" data-intent-capability>${DESIGNER_UI_TEXT.intent.capability}</p>
+        <div class="intent-box">
+          <textarea class="intent-input" data-intent-input rows="2" placeholder="${DESIGNER_UI_TEXT.intent.placeholder}" aria-label="${DESIGNER_UI_TEXT.intent.placeholder}"></textarea>
+          <button type="button" class="intent-submit" data-intent-submit aria-label="${DESIGNER_UI_TEXT.intent.submit}" data-tip="${DESIGNER_UI_TEXT.intent.submit}">${designerIcon('arrow-up')}</button>
+        </div>
+        <p class="intent-status" data-intent-status role="status" aria-live="polite"></p>
+        <div class="intent-confirm" data-intent-confirm role="alertdialog" aria-modal="false" hidden></div>
+      </section>
     </aside>
 
     <section class="designer-dialog-surface project-conflict" data-project-conflict hidden role="alertdialog" aria-label="${DESIGNER_UI_TEXT.projectConflict}">
@@ -323,6 +370,8 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <button type="button" class="designer-control designer-button" data-variant="danger" data-action="reload-remote">${DESIGNER_UI_TEXT.reloadRemote}</button>
       </div>
     </section>
+
+    <div class="designer-presentation-hint" data-presentation-lock-hint hidden></div>
 
     <!-- Context menu: lives on the .designer root, not inside .workspace, so the layers panel and the
          canvas share one layer; .workspace overflow:hidden would otherwise clip panel-spawned menus. -->

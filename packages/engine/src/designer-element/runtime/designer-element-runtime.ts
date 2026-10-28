@@ -8,6 +8,7 @@ import {
   requestComponentTextEdit,
 } from '../api/designer-element-authoring.js';
 import { refreshCatalog } from '../api/designer-element-catalog.js';
+import { discardPendingChange, submitChangeProposal } from '../api/designer-element-change.js';
 import {
   configure,
   readCatalog,
@@ -16,12 +17,20 @@ import {
   writeLeftPanelGroups,
 } from '../api/designer-element-configuration.js';
 import {
+  readTargetDisplayOverlay,
+  readTargetDisplayProfile,
+  setTargetDisplayOverlay,
+  setTargetDisplayProfile,
+} from '../api/designer-element-display.js';
+import {
   executeCommand,
   executeTransaction,
   getDocument,
   getSelection,
+  readHistory,
   readInstanceId,
   replaceDocument,
+  revertToHistoryState,
   setCanvasBackground,
   setCanvasBackgroundImage,
 } from '../api/designer-element-document.js';
@@ -73,6 +82,7 @@ import {
 } from '../api/designer-element-host-resource-selection.js';
 import { insertComponent, parseInsertionIntent } from '../api/designer-element-insert-component.js';
 import { insertComponentFragment } from '../api/designer-element-insert-component-fragment.js';
+import { readIntentAvailable, setIntentHandler } from '../api/designer-element-intent.js';
 import {
   readBackButton,
   readGroupMaterialType,
@@ -102,6 +112,11 @@ import {
   writeToolMaterialTypes,
 } from '../api/designer-element-options.js';
 import {
+  enterPresentationLock,
+  exitPresentationLock,
+  readPresentationLocked,
+} from '../api/designer-element-presentation.js';
+import {
   cancelProjectOperation,
   cloneProject,
   continueEditing,
@@ -124,6 +139,14 @@ import {
   save,
   unload,
 } from '../api/designer-element-project.js';
+import { enterReviewMode, exitReviewMode, readReviewing } from '../api/designer-element-review.js';
+import {
+  readActiveSceneId,
+  readSceneAvailable,
+  setActiveScene,
+  setSceneCatalog,
+  setSceneHandler,
+} from '../api/designer-element-scene.js';
 import { readWorkbenchMode, setWorkbenchMode } from '../api/designer-element-workbench.js';
 import {
   executeDesignerCommand,
@@ -252,9 +275,30 @@ export const designerElementRuntime = {
   connectWindowGuards,
   getDocument,
   getSelection,
+  readHistory,
   replaceDocument,
+  revertToHistoryState,
   executeCommand,
   executeTransaction,
+  submitChangeProposal,
+  discardPendingChange,
+  enterPresentationLock,
+  exitPresentationLock,
+  readPresentationLocked,
+  setIntentHandler,
+  readIntentAvailable,
+  setSceneCatalog,
+  setSceneHandler,
+  setActiveScene,
+  readActiveSceneId,
+  readSceneAvailable,
+  enterReviewMode,
+  exitReviewMode,
+  readReviewing,
+  setTargetDisplayProfile,
+  setTargetDisplayOverlay,
+  readTargetDisplayProfile,
+  readTargetDisplayOverlay,
   insertComponent,
   insertComponentFragment,
   parseInsertionIntent,
