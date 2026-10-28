@@ -1,4 +1,5 @@
 import {
+  migrateScreenDocument,
   readScreenVariableRecord,
   type ScreenDocument,
   type ScreenJsonValue,
@@ -314,7 +315,16 @@ export function ScreenViewerPage(): React.ReactElement {
         return;
       }
 
-      element.document = applyUrlSeeds(result.data.screen.document, params);
+      // 宿主负责把已存储的旧形态文档迁到当前形态；迁移失败时整份拒绝，不做部分渲染。
+      const migrated = migrateScreenDocument(result.data.screen.document);
+      if (!migrated.ok) {
+        logger.warn('viewer migration failed', { screenId, diagnostics: migrated.diagnostics });
+        useScreenSessionStore.getState().failedToLoad('大屏文档迁移失败，请查看控制台日志。');
+        element.remove();
+        return;
+      }
+
+      element.document = applyUrlSeeds(migrated.document, params);
       useScreenSessionStore
         .getState()
         .loaded(result.data.screen.name, String(result.data.screen.revision));
