@@ -89,6 +89,7 @@ export class DesignerIntentController {
     this.#status = status;
     this.#confirm = confirm;
     this.syncScope([], () => undefined);
+    this.autoGrow();
   }
 
   release(): void {
@@ -151,6 +152,7 @@ export class DesignerIntentController {
     if (input.value.trim() === '' && this.#pendingScope !== undefined) {
       this.applyPendingScope();
     }
+    this.autoGrow();
     this.renderStatus();
   }
 
@@ -243,6 +245,18 @@ export class DesignerIntentController {
 
   #startsFrom: 'metrics' | 'template' | 'prompt' | undefined;
 
+  /**
+   * 输入框随内容长高，上限交给 CSS 的 max-height 兜住。
+   * 固定 `rows=2` 时，长指令只在 36px 里内部滚动：用户读不回顾已写的内容，
+   * 也看不出下面还有字。
+   */
+  private autoGrow(): void {
+    const input = this.#input;
+    if (input === undefined) return;
+    input.style.height = 'auto';
+    input.style.height = `${input.scrollHeight}px`;
+  }
+
   private composing(): boolean {
     const input = this.#input;
     return input !== undefined && input.value.trim() !== '';
@@ -286,6 +300,7 @@ export class DesignerIntentController {
       this.setStatus(DESIGNER_UI_TEXT.intent.cancelled, 'info');
     } else if (result.ok) {
       input.value = '';
+      this.autoGrow();
       this.setStatus(DESIGNER_UI_TEXT.intent.pending, 'info');
       // 生成期间选区变化过：输入已清空，把挂起的选区并入作用域，保持 chip 与画布一致。
       if (this.#pendingScope !== undefined) this.applyPendingScope();

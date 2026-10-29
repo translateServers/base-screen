@@ -351,6 +351,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             <button type="button" class="intent-scope-clear" data-intent-scope-clear aria-label="${DESIGNER_UI_TEXT.intent.scopeClear}" hidden>${designerIcon('close')}</button>
           </span>
           <span class="intent-spacer"></span>
+          <span class="intent-hint">${DESIGNER_UI_TEXT.intent.keyHint}</span>
         </div>
         <p class="intent-capability" data-intent-capability>${DESIGNER_UI_TEXT.intent.capability.screen}</p>
         <div class="intent-box">

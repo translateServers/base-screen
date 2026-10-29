@@ -1202,6 +1202,21 @@
   flex: 1 1 auto;
 }
 
+/* 键位提示平时不占注意力，聚焦输入区才出现：Enter 提交、Shift + Enter 换行。
+   这行字存在的理由是输入框支持多行，而默认焦点行为是提交——不说清楚没人敢换行。 */
+.intent-hint {
+  flex: 0 0 auto;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--designer-motion);
+}
+
+.designer-intent:focus-within .intent-hint {
+  opacity: 1;
+}
+
 .intent-scope-chip {
   display: inline-flex;
   min-width: 0;
@@ -1285,7 +1300,10 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 36px;
-  max-height: 96px;
+  /* 内容长高由 JS 写入 height，这里只兜上限：约 8 行后转为内部滚动，
+     再高高就会把画布挤没。 */
+  max-height: 148px;
+  overflow-y: auto;
   padding: 0;
   border: 0;
   background: transparent;

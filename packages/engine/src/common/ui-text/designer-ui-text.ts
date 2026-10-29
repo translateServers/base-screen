@@ -256,6 +256,7 @@ export const DESIGNER_UI_TEXT = {
     label: '意图',
     scopeClear: '解除作用域',
     placeholder: '描述要改什么',
+    keyHint: 'Enter 提交 · Shift + Enter 换行',
     submit: '提交',
     scopeScreen: '整屏',
     scopeComponents: (count: number) => `${count} 个组件`,
