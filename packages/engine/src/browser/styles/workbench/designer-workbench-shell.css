@@ -1015,6 +1015,12 @@
   transform: translateX(-50%);
 }
 
+/* 同 `.intent-scope-clear`：声明过 display 的元素必须自己让 `hidden` 赢，
+   否则「未锁定」时这颗空的提示胶囊也会留在画布底部。 */
+.designer-presentation-hint[hidden] {
+  display: none;
+}
+
 .presentation-hint-text {
   white-space: nowrap;
 }
@@ -1184,6 +1190,12 @@
   background: var(--designer-surface-panel);
 }
 
+/* 生成中焦点托管在这里（见 focusIntentArea）：整块区不是控件，所以不画焦点环；
+   可聚焦只是为了 Esc 还能到达影子根里的取消，不然焦点会掉出影子根，键盘就再也管不到它。 */
+.designer-intent:focus {
+  outline: none;
+}
+
 .intent-top {
   display: flex;
   min-width: 0;
@@ -1252,6 +1264,13 @@
   background: transparent;
   color: var(--designer-text-muted);
   cursor: pointer;
+}
+
+/* `hidden` 是行为属性，不是装饰：上面那句 `display: grid` 与 UA 的 `[hidden]` 同特异性，
+   作者样式一律胜出，于是整屏作用域下这颗 ✕ 依旧可见、可点、可聚焦，点了什么也不做。
+   凡是自己声明过 display 的元素，都得显式让 `hidden` 赢。 */
+.intent-scope-clear[hidden] {
+  display: none;
 }
 
 .intent-scope-clear:hover {

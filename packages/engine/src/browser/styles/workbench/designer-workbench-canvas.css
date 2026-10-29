@@ -899,6 +899,12 @@
   gap: var(--designer-space-2);
 }
 
+/* 面板靠 `hidden` 开关；上面那句 `display: flex` 与 UA 的 `[hidden]` 同特异性，
+   作者样式一律胜出——不显式让位，关闭状态也会在画布右上角留一块空面板。 */
+.designer-display-panel[hidden] {
+  display: none;
+}
+
 .display-panel-head {
   display: flex;
   align-items: center;

@@ -251,11 +251,14 @@ export function initializeDesignerElementSurfaceBindings(
       (_target, event) => state.commandPaletteController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.errorConsoleController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.guardController.onKeyDown(event as KeyboardEvent),
+      // 意图区必须排在「面板级 Esc」之前：变更页签、场景预览、演示锁都会把 Esc 当成
+      // 「退回去」，而生成中的 Esc 是「停手」。被它们先吃掉时，用户按下 Esc 只会看到
+      // 右栏切回检查器，请求照样跑完——取消按钮此时反而成了唯一的出口。
+      (_target, event) => state.intentController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.changeController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.sceneController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.presentationLockController.onKeyDown(event as KeyboardEvent),
-      (_target, event) => state.intentController.onKeyDown(event as KeyboardEvent),
-      // 意图区自己的确认层与生成取消排在前面：Esc 先关掉它们，再轮到点选会话。
+      // 意图区自己的问句（点选会话）排在生成取消之后：先停手，再收拾画布上的候选。
       (_target, event) => state.intentChoiceController.onKeyDown(event as KeyboardEvent),
       (_target, event) => {
         const keyboardEvent = event as KeyboardEvent;

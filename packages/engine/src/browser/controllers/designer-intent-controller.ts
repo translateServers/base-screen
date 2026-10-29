@@ -317,6 +317,9 @@ export class DesignerIntentController {
       'cancel-intent',
     );
     this.render();
+    // 提交后焦点必须先落回影子根里：输入框在生成中会被禁用，焦点留在它上面会掉到
+    // <body>，而 Esc 与快捷键都挂在影子根上——按下去什么也不会发生，取消按钮也点不到。
+    this.focusIntentArea();
     let result: DesignerIntentOutcome;
     try {
       result = await handler(
@@ -349,6 +352,7 @@ export class DesignerIntentController {
       this.setFailure(result.reason, result.remedy);
     }
     this.render();
+    this.restoreInputFocus();
   }
 
   /**
@@ -554,6 +558,29 @@ export class DesignerIntentController {
     status.innerHTML = `<span>${escapeHtml(reason ?? text.failed)}</span>
       <span class="intent-status-actions">${remedyButton}<button type="button" class="intent-status-action designer-control designer-button" data-variant="ghost" data-intent-action="retry-intent">${escapeHtml(text.retry)}</button></span>`;
     adoptDesignerFormControls(status);
+  }
+
+  private composer(): HTMLElement | null {
+    return this.#input?.closest<HTMLElement>('.designer-intent') ?? null;
+  }
+
+  /**
+   * 生成一开始就把焦点交给意图区：输入框此刻是禁用的，焦点留在它上面会掉到 `<body>`，
+   * 而 Esc 与取消按钮都在影子根里监听——焦点出去之后，取消就再也按不到了。
+   */
+  private focusIntentArea(): void {
+    this.composer()?.focus();
+  }
+
+  /** 生成结束后把焦点交还输入框；用户已经点到别处就不抢。 */
+  private restoreInputFocus(): void {
+    const input = this.#input;
+    if (input === undefined || input.disabled) return;
+    const root = input.getRootNode() as { activeElement?: Element | null };
+    const active = root.activeElement ?? null;
+    // 焦点为 null 说明刚才那个节点（取消按钮）已被本次重渲染拆掉，不是用户自己移开的。
+    if (active !== null && active !== this.composer()) return;
+    input.focus();
   }
 
   private render(): void {

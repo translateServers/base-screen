@@ -343,7 +343,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <p class="designer-empty-state">${DESIGNER_UI_TEXT.interactionPanelEmpty}</p>
       </div>
       <div class="right-pane-changes" data-change-pane hidden></div>
-      <section class="designer-intent" data-intent-composer aria-label="${DESIGNER_UI_TEXT.intent.title}">
+      <section class="designer-intent" data-intent-composer tabindex="-1" aria-label="${DESIGNER_UI_TEXT.intent.title}">
         <div class="intent-top">
           <span class="intent-label">${DESIGNER_UI_TEXT.intent.label}</span>
           <span class="intent-scope-chip" data-intent-scope-chip>
