@@ -110,7 +110,11 @@ export type {
   DesignerChangeProposalOrigin,
 } from '../common/operations/change/designer-change-proposal.js';
 export type { DesignerReviewMeta } from '../common/operations/change/designer-review.js';
-export type { DesignerIntentHandler } from '../common/operations/intent/designer-intent.js';
+export type {
+  DesignerIntentHandler,
+  DesignerIntentOutcome,
+  DesignerIntentRemedy,
+} from '../common/operations/intent/designer-intent.js';
 export {
   type DesignerDisplayAngularSize,
   type DesignerDisplayMetrics,

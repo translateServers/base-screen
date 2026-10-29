@@ -288,6 +288,9 @@ export const DESIGNER_UI_TEXT = {
     choiceCancel: '取消选择',
     pending: '已交给平台，结果会出现在「变更」。',
     failed: '提交失败，输入已保留。',
+    // 失败/被拒的常驻出口：原因由宿主给，这里只提供动作。重试不重问整屏确认。
+    retry: '重试',
+    retryWholeScreen: '改用整屏并提交',
     empty: '先描述要改什么。',
     scopePending: '选区已变化 · 作用域尚未更新。',
     updateScope: '更新作用域',

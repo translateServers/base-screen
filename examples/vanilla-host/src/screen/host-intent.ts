@@ -2,7 +2,6 @@ import type { ScreenDocument } from '@base-screen/contracts';
 import { parseScreenDocument } from '@base-screen/contracts';
 import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
 import type { DesignerChangeProposalInput, DesignerIntentHandler } from '@base-screen/sdk/engine';
-import { showToast } from '../components/toast';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
 
@@ -32,10 +31,15 @@ export interface HostIntentOptions {
 export function createHostIntentHandler(options: HostIntentOptions): DesignerIntentHandler {
   return async (request, signal) => {
     // 示例后端只按主题生成整屏，不理解「改选中组件」这件事。作用域是组件时不猜、
-    // 也不偷偷扩成整屏——直接说明原因，让用户先解除作用域。
+    // 也不偷偷扩成整屏——把原因和出口一起交回引擎，由书写面的常驻状态行统一说这一次；
+    // 宿主再弹一条 toast 只会和行内提示各说一套（颜色、措辞还互相矛盾）。
     if (request.scope.kind !== 'screen') {
-      showToast('示例智能体只支持整屏生成，请先解除作用域再提交。', 'info');
-      return { ok: false, diagnostics: [] };
+      return {
+        ok: false,
+        diagnostics: [],
+        reason: '示例智能体只支持整屏生成，这一轮不改选中组件。',
+        remedy: 'whole-screen',
+      };
     }
 
     // 只记长度与实例，不记输入正文：日志不该成为指令内容的第二份存储。
@@ -43,22 +47,23 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
     const generated = await api.generateScreen(request.text, signal);
     if (!generated.ok) {
       logger.warn('agent generate failed', generated.error);
-      showToast(describeFailure(generated.error.message), 'error');
-      return { ok: false, diagnostics: [] };
+      return { ok: false, diagnostics: [], reason: describeFailure(generated.error.message) };
     }
 
     // 后端把 document 当不透明 JSON 存，前端才是权威校验点：结构不合法的候选永不进草案。
     const parsed = parseScreenDocument(generated.data.screen.document);
     if (!parsed.ok) {
       logger.warn('agent document rejected', parsed.diagnostics);
-      showToast('智能体返回的大屏文档结构不合法，未生成变更。', 'error');
-      return { ok: false, diagnostics: parsed.diagnostics };
+      return {
+        ok: false,
+        diagnostics: parsed.diagnostics,
+        reason: '智能体返回的大屏文档结构不合法，未生成变更。',
+      };
     }
 
     const current = options.designer.getDocument();
     if (current === undefined) {
-      showToast('设计器尚未加载文档，稍后重试。', 'error');
-      return { ok: false, diagnostics: [] };
+      return { ok: false, diagnostics: [], reason: '设计器尚未加载文档，稍后重试。' };
     }
 
     const commands = compileWholeScreenCommands(current, parsed.value);
@@ -75,15 +80,16 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
       // 拒绝原因的两种来源：命令事务不成立（诊断非空），或幽灵草案渲染失败（引擎内部
       // 不把渲染诊断透出来，这里只能给出笼统结论并在控制台留日志）。
       logger.warn('change proposal rejected', submitted.diagnostics);
-      showToast('提案被引擎拒绝（命令或渲染校验未通过），未生成变更。', 'error');
-      return { ok: false, diagnostics: submitted.diagnostics };
+      return {
+        ok: false,
+        diagnostics: submitted.diagnostics,
+        reason: '提案被引擎拒绝（命令或渲染校验未通过），未生成变更。',
+      };
     }
 
-    // 结果进入变更而非直接生效：这里只报告「生成了什么」，不假装已经改完。
-    showToast(
-      `已生成整屏提案（${describeMode(generated.data.mode)}），结果在「变更」里逐条采纳。`,
-      'success',
-    );
+    // 结果进入变更而非直接生效：成功不再弹 toast——书写面的状态行已经把「已交给平台」说清楚，
+    // 走的是模型还是确定性兜底写在变更卡的理由里。同一条意图只留一个出口，
+    // 否则连着提交两次时会出现「绿 toast 说成了、红行内说没成」这种自相矛盾的画面。
     return { ok: true, value: null, diagnostics: [] };
   };
 }

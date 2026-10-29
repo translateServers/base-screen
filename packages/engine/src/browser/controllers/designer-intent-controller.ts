@@ -1,5 +1,9 @@
-import type { ScreenIntentScope, ScreenParseResult } from '@base-screen/contracts';
-import type { DesignerIntentHandler } from '../../common/operations/intent/designer-intent.js';
+import type { ScreenIntentScope } from '@base-screen/contracts';
+import type {
+  DesignerIntentHandler,
+  DesignerIntentOutcome,
+  DesignerIntentRemedy,
+} from '../../common/operations/intent/designer-intent.js';
 import {
   type DesignerIntentCapabilityComponent,
   describeIntentCapability,
@@ -218,6 +222,8 @@ export class DesignerIntentController {
       if (action === 'update-scope') this.applyPendingScope();
       else if (action === 'cancel-intent') this.cancelPending();
       else if (action === 'exit-draft') this.exitDraft();
+      else if (action === 'retry-intent') this.retry();
+      else if (action === 'submit-whole-screen') this.submitAsWholeScreen();
       return true;
     }
     if (target.closest('[data-intent-submit]') === null) return false;
@@ -293,7 +299,7 @@ export class DesignerIntentController {
       'cancel-intent',
     );
     this.render();
-    let result: ScreenParseResult<null>;
+    let result: DesignerIntentOutcome;
     try {
       result = await handler(
         {
@@ -321,9 +327,45 @@ export class DesignerIntentController {
       // 生成期间选区变化过：输入已清空，把挂起的选区并入作用域，保持 chip 与画布一致。
       if (this.#pendingScope !== undefined) this.applyPendingScope();
     } else {
-      this.setStatus(DESIGNER_UI_TEXT.intent.failed, 'error');
+      // 失败/被拒都留在这一行里：原因（宿主给）+ 继续走的动作，不再只在 4 秒 toast 里说。
+      this.setFailure(result.reason, result.remedy);
     }
     this.render();
+  }
+
+  /**
+   * 重试上一轮失败/被拒的意图：同一句话、当前作用域，**不再重复整屏二次确认**——
+   * 用户刚刚已经就这句话确认过整屏了，再问一次只是把失败当成了重新开始。
+   */
+  retry(): void {
+    const input = this.#input;
+    if (input === undefined || this.#pending) return;
+    const text = input.value.trim();
+    if (text === '') {
+      this.setStatus(DESIGNER_UI_TEXT.intent.empty, 'info');
+      return;
+    }
+    void this.dispatch(text, this.#scopeValue);
+  }
+
+  /**
+   * 组件作用域被拒时的出口：解除作用域并按整屏重发同一句话。
+   * 「改用整屏」是用户的决定，所以这里直接发，不再问一遍「确认整屏作用域」。
+   */
+  submitAsWholeScreen(): void {
+    const input = this.#input;
+    if (input === undefined || this.#pending) return;
+    const text = input.value.trim();
+    if (text === '') {
+      this.setStatus(DESIGNER_UI_TEXT.intent.empty, 'info');
+      return;
+    }
+    this.#scopeOverride = true;
+    this.#pendingScope = undefined;
+    this.#scopeValue = { kind: 'screen' };
+    if (this.#scope !== undefined) this.#scope.textContent = DESIGNER_UI_TEXT.intent.scopeScreen;
+    this.render();
+    void this.dispatch(text, { kind: 'screen' });
   }
 
   /** 取消进行中的生成：只中断等待，输入与选区都保留，不留半成品。 */
@@ -447,6 +489,7 @@ export class DesignerIntentController {
     const status = this.#status;
     if (status === undefined) return;
     status.dataset.tone = tone;
+    status.removeAttribute('data-variant');
     if (text === '') {
       status.replaceChildren();
       return;
@@ -456,6 +499,28 @@ export class DesignerIntentController {
         ? ''
         : `<button type="button" class="intent-status-action designer-control designer-button" data-variant="ghost" data-intent-action="${escapeHtml(actionId)}">${escapeHtml(action)}</button>`
     }`;
+    adoptDesignerFormControls(status);
+  }
+
+  /**
+   * 失败/被拒是一条**常驻**结论：一句原因 + 至少一个能继续走的动作。
+   *
+   * 原因由宿主给（`reason`），引擎只在宿主没给时兜一句「提交失败」，绝不替宿主编原因——
+   * 只有宿主知道是模型报错、文档结构不合法，还是它根本不理解这个作用域。宿主给出补救
+   * 动作（`remedy`）时，主按钮就是那个动作，不需要用户自己去改作用域重来。
+   */
+  private setFailure(reason: string | undefined, remedy: DesignerIntentRemedy | undefined): void {
+    const status = this.#status;
+    if (status === undefined) return;
+    const text = DESIGNER_UI_TEXT.intent;
+    const remedyButton =
+      remedy === 'whole-screen'
+        ? `<button type="button" class="intent-status-action designer-control designer-button" data-variant="primary" data-intent-action="submit-whole-screen">${escapeHtml(text.retryWholeScreen)}</button>`
+        : '';
+    status.dataset.tone = 'error';
+    status.dataset.variant = 'failure';
+    status.innerHTML = `<span>${escapeHtml(reason ?? text.failed)}</span>
+      <span class="intent-status-actions">${remedyButton}<button type="button" class="intent-status-action designer-control designer-button" data-variant="ghost" data-intent-action="retry-intent">${escapeHtml(text.retry)}</button></span>`;
     adoptDesignerFormControls(status);
   }
 
