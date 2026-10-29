@@ -351,13 +351,18 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             <button type="button" class="intent-scope-clear" data-intent-scope-clear aria-label="${DESIGNER_UI_TEXT.intent.scopeClear}" hidden>${designerIcon('close')}</button>
           </span>
           <span class="intent-spacer"></span>
+          <button type="button" class="intent-back" data-intent-action="exit-draft">${DESIGNER_UI_TEXT.intent.backToInspector}</button>
           <span class="intent-hint">${DESIGNER_UI_TEXT.intent.keyHint}</span>
         </div>
-        <p class="intent-capability" data-intent-capability>${DESIGNER_UI_TEXT.intent.capability.screen}</p>
         <div class="intent-box">
           <textarea class="intent-input" data-intent-input rows="2" placeholder="${DESIGNER_UI_TEXT.intent.placeholder}" aria-label="${DESIGNER_UI_TEXT.intent.placeholder}"></textarea>
           <button type="button" class="intent-submit" data-intent-submit aria-label="${DESIGNER_UI_TEXT.intent.submit}" data-tip="${DESIGNER_UI_TEXT.intent.submit}">${designerIcon('arrow-up')}</button>
         </div>
+        <dl class="intent-capability" data-intent-capability>
+          <div><dt>${DESIGNER_UI_TEXT.intent.capability.allowsLabel}</dt><dd data-intent-allows>${DESIGNER_UI_TEXT.intent.capability.screenAllows}</dd></div>
+          <div><dt data-capability-block>${DESIGNER_UI_TEXT.intent.capability.blocksLabel}</dt><dd data-intent-blocks>${DESIGNER_UI_TEXT.intent.capability.screenBlocks}</dd></div>
+        </dl>
+        <p class="intent-sheet-hint">${DESIGNER_UI_TEXT.intent.sheetHint}</p>
         <p class="intent-status" data-intent-status role="status" aria-live="polite"></p>
         <div class="intent-confirm" data-intent-confirm role="alertdialog" aria-modal="false" hidden></div>
       </section>

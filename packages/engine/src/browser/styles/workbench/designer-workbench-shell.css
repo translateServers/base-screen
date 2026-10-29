@@ -1264,14 +1264,99 @@
   height: 10px;
 }
 
+/* 能力边界分两栏：可改 / 不可改。合成一句「可改 A；不可改 B」读起来像免责声明，
+   用户只记住「有限制」，记不住能改什么。 */
 .intent-capability {
+  display: grid;
+  min-width: 0;
+  gap: var(--designer-space-1);
+  margin: 0;
+  font: var(--designer-font-small);
+}
+
+.intent-capability > div {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--designer-space-2);
+}
+
+.intent-capability dt {
+  color: var(--designer-text-muted);
+  white-space: nowrap;
+}
+
+.intent-capability dd {
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
+  color: var(--designer-text-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 「不可改」用警示色而不是正文色：这一栏是唯一需要用户记住的硬边界。 */
+.intent-capability dt[data-capability-block] {
+  color: var(--designer-warning);
+}
+
+/* 未接入时能力边界没有意义：一条都改不了，写「可改」反而像在承诺。
+   隐藏后输入条也回到原来的高度，不白占画布。 */
+.intent-box:has(.intent-input:disabled) ~ .intent-capability {
+  display: none;
+}
+
+/* 返回检查器与结果去向都只在会话态出现：紧凑态下面板本来就是检查器。 */
+.intent-back {
+  display: none;
+  flex: 0 0 auto;
+  height: var(--designer-control-height-compact);
+  padding: 0 var(--designer-space-2);
+  border: 0;
+  background: transparent;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  cursor: pointer;
+}
+
+.intent-back:hover {
+  color: var(--designer-text-primary);
+}
+
+.intent-sheet-hint {
+  display: none;
+  margin: 0;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.designer-intent[data-draft] .intent-back {
+  display: block;
+}
+
+.designer-intent[data-draft] .intent-sheet-hint {
+  display: block;
+}
+
+/* 会话态整体放大一档：书写面里 11px 正文太小，行距也要放开。 */
+.designer-intent[data-draft] {
+  padding: var(--designer-space-4);
+  gap: var(--designer-space-3);
+}
+
+.designer-intent[data-draft] .intent-hint {
+  display: none;
+}
+
+.designer-intent[data-draft] .intent-box {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.designer-intent[data-draft] .intent-input {
+  font: var(--designer-font-size-md) / 1.7 var(--designer-font-family);
 }
 
 .intent-box {

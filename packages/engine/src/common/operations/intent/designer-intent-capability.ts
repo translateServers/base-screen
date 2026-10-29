@@ -12,22 +12,33 @@ export interface DesignerIntentCapabilityComponent {
 }
 
 /**
- * 能力提示随作用域变化。
+ * 能力边界拆成「能改什么 / 不能改什么」两栏。
  *
- * 任何作用域都只承诺引擎确实能改的三类：样式、布局、数据绑定。指标口径不在引擎可见
- * 范围内（归平台治理），因此无论选中什么都明说「不可改」。多选只承诺共有属性，逐项
- * 绑定交回检查器——一次意图请求不该被读成「批量改绑定」。
+ * 合成一句话（「可改：A / B；不可改：C」）读起来像免责声明：用户扫过去只记住「有限制」，
+ * 记不住到底能改什么。分栏之后，「不可改」那一栏才能被单独强调——尤其指标口径，它不在
+ * 引擎可见范围内，任何作用域都不该被读成可以改。
+ *
+ * 任何作用域都只承诺引擎确实能改的三类：样式、布局、数据绑定；多选只承诺共有属性。
  */
+export interface DesignerIntentCapability {
+  readonly allows: string;
+  readonly blocks: string;
+}
+
 export function describeIntentCapability(
   components: readonly DesignerIntentCapabilityComponent[],
-): string {
+): DesignerIntentCapability {
   const text = DESIGNER_UI_TEXT.intent.capability;
-  if (components.length === 0) return text.screen;
+  if (components.length === 0) return { allows: text.screenAllows, blocks: text.screenBlocks };
   if (components.length === 1) {
     const only = components[0];
-    if (only === undefined) return text.screen;
-    return only.bound ? text.component(only.name) : text.componentUnbound(only.name);
+    if (only === undefined) return { allows: text.screenAllows, blocks: text.screenBlocks };
+    return only.bound
+      ? { allows: text.componentAllows, blocks: text.componentBlocks }
+      : { allows: text.componentUnboundAllows, blocks: text.componentUnboundBlocks };
   }
   const unbound = components.some((component) => !component.bound);
-  return unbound ? text.mixedUnbound(components.length) : text.mixed(components.length);
+  return unbound
+    ? { allows: text.mixedAllows, blocks: text.mixedUnboundBlocks }
+    : { allows: text.mixedAllows, blocks: text.mixedBlocks };
 }

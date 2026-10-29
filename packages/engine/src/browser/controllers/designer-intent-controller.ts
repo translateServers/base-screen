@@ -28,7 +28,8 @@ export class DesignerIntentController {
   #input: HTMLTextAreaElement | undefined;
   #submit: HTMLButtonElement | undefined;
   #scope: HTMLElement | undefined;
-  #capability: HTMLElement | undefined;
+  #capabilityAllows: HTMLElement | undefined;
+  #capabilityBlocks: HTMLElement | undefined;
   #capabilityComponents: readonly DesignerIntentCapabilityComponent[] = [];
   #scopeClear: HTMLButtonElement | undefined;
   #status: HTMLElement | undefined;
@@ -84,7 +85,10 @@ export class DesignerIntentController {
     this.#input = input;
     this.#submit = submit;
     this.#scope = scope;
-    this.#capability = capability;
+    this.#capabilityAllows =
+      capability.querySelector<HTMLElement>('[data-intent-allows]') ?? undefined;
+    this.#capabilityBlocks =
+      capability.querySelector<HTMLElement>('[data-intent-blocks]') ?? undefined;
     this.#scopeClear = scopeClear;
     this.#status = status;
     this.#confirm = confirm;
@@ -96,7 +100,8 @@ export class DesignerIntentController {
     this.#input = undefined;
     this.#submit = undefined;
     this.#scope = undefined;
-    this.#capability = undefined;
+    this.#capabilityAllows = undefined;
+    this.#capabilityBlocks = undefined;
     this.#capabilityComponents = [];
     this.#scopeClear = undefined;
     this.#status = undefined;
@@ -212,6 +217,7 @@ export class DesignerIntentController {
       const action = statusAction.dataset.intentAction;
       if (action === 'update-scope') this.applyPendingScope();
       else if (action === 'cancel-intent') this.cancelPending();
+      else if (action === 'exit-draft') this.exitDraft();
       return true;
     }
     if (target.closest('[data-intent-submit]') === null) return false;
@@ -326,6 +332,17 @@ export class DesignerIntentController {
     if (abort === undefined) return false;
     abort.abort();
     return true;
+  }
+
+  /**
+   * 会话态退场：清掉草稿，书写面收回成两行，右栏自动交还检查器。
+   * 需要显式入口是因为「写了一半但决定不写」不该强迫用户逐字删空。
+   */
+  exitDraft(): void {
+    const input = this.#input;
+    if (input !== undefined) input.value = '';
+    this.syncDraftState();
+    this.setStatus('', 'info');
   }
 
   private handleConfirm(action: string | undefined): void {
@@ -451,13 +468,18 @@ export class DesignerIntentController {
         : DESIGNER_UI_TEXT.intent.unavailable;
     }
     if (this.#submit !== undefined) this.#submit.disabled = !available || this.#pending;
-    if (this.#capability !== undefined) {
+    if (this.#capabilityAllows !== undefined && this.#capabilityBlocks !== undefined) {
       // 作用域已解除时提示回到整屏：用户清掉 chip 之后，选区还在画布上，
       // 但这一轮意图的对象已经变成整屏，提示不能继续按旧选区说。
-      this.#capability.textContent =
+      const capability =
         this.#scopeValue.kind === 'screen'
-          ? DESIGNER_UI_TEXT.intent.capability.screen
+          ? {
+              allows: DESIGNER_UI_TEXT.intent.capability.screenAllows,
+              blocks: DESIGNER_UI_TEXT.intent.capability.screenBlocks,
+            }
           : describeIntentCapability(this.#capabilityComponents);
+      this.#capabilityAllows.textContent = capability.allows;
+      this.#capabilityBlocks.textContent = capability.blocks;
     }
     if (this.#scopeClear !== undefined) {
       this.#scopeClear.hidden = this.#scopeValue.kind === 'screen';

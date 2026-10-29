@@ -56,6 +56,9 @@
    写空（提交成功或手动清掉）就退回检查器，不需要额外状态机。 */
 .designer:not([data-right-collapsed="true"])
   .properties:has(> .designer-intent[data-draft])
+  > .right-pane-switch,
+.designer:not([data-right-collapsed="true"])
+  .properties:has(> .designer-intent[data-draft])
   > .panel-heading,
 .designer:not([data-right-collapsed="true"])
   .properties:has(> .designer-intent[data-draft])
@@ -82,7 +85,7 @@
   .properties:has(> .designer-intent[data-draft])
   > .designer-intent {
   grid-column: 1;
-  grid-row: 2 / -1;
+  grid-row: 1 / -1;
   border-top: 0;
 }
 
