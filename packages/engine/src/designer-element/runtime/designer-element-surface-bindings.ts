@@ -19,6 +19,8 @@ export function initializeDesignerElementSurfaceBindings(
       (target) => state.changeController.onClick(target as Element),
       (target) => state.sceneController.onClick(target as Element),
       (target) => state.presentationLockController.onClick(target as Element),
+      // 选择会话的取消按钮在自己的问句里：先于意图区的动作分发，避免被当成意图动作吞掉。
+      (target) => state.intentChoiceController.onClick(target as Element),
       (target) => state.intentController.onClick(target as Element),
       (target) => state.commandPaletteController.onClick(target as Element),
       (target) => state.blueprintWorkbenchController.onClick(target as Element),
@@ -166,6 +168,9 @@ export function initializeDesignerElementSurfaceBindings(
       state.layersController.clearDrag();
       return true;
     },
+    // 点选会话要先于画布手势拿到指针：候选此时已在多选里，画布会按「拖动整组」处理它。
+    pointerDownCapture: (target, event) =>
+      state.intentChoiceController.onPointerDown(target, event),
     pointerDown: (_target, event) => {
       state.panelController.onPointerDown(event as PointerEvent);
       state.workbenchController.onPointerDown(event as PointerEvent);
@@ -250,6 +255,8 @@ export function initializeDesignerElementSurfaceBindings(
       (_target, event) => state.sceneController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.presentationLockController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.intentController.onKeyDown(event as KeyboardEvent),
+      // 意图区自己的确认层与生成取消排在前面：Esc 先关掉它们，再轮到点选会话。
+      (_target, event) => state.intentChoiceController.onKeyDown(event as KeyboardEvent),
       (_target, event) => {
         const keyboardEvent = event as KeyboardEvent;
         if (keyboardEvent.key !== 'Escape' || !state.menuController.closeHelpPanel()) return false;

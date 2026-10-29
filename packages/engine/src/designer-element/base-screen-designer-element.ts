@@ -564,6 +564,15 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   /**
+   * 指代歧义时把候选摆到画布上请用户点选：候选一起进选区（多选即一起高亮），
+   * 用户点选其中一个即返回它的 id。取消或 Esc 返回 null，并把选区还原到提问前。
+   * `prompt` 为空时用引擎的默认问句。歧义由平台判定，引擎不猜用户指的是哪一个。
+   */
+  requestComponentChoice(candidateIds: readonly string[], prompt = ''): Promise<string | null> {
+    return this.#designerState.runtime.requestComponentChoice(this, candidateIds, prompt);
+  }
+
+  /**
    * 宿主提供的场景目录（左栏顶部）：只包含身份与展示名，内容由 `setSceneHandler` 产出。
    * 传 `undefined` 清除目录；`activeSceneId` 用于标记当前场景。
    */

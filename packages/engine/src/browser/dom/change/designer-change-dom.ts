@@ -39,8 +39,13 @@ export function changePaneMarkup(
 ): string {
   const text = DESIGNER_UI_TEXT.change;
   if (proposal === undefined && review?.reviewing === true) {
+    // 评审态没有提案分两种：进来时就没有待审条目，和逐条处理完之后的收尾。
+    // 两者都显示「评审完成」会让空评审读起来像「审完了」，把没审过说成审过。
+    const empty = review.total === 0;
     return `<div class="change-empty">
-      <p class="change-empty-title">${DESIGNER_UI_TEXT.review.done}</p>
+      <p class="change-empty-title">${
+        empty ? DESIGNER_UI_TEXT.review.empty : DESIGNER_UI_TEXT.review.done
+      }</p>
       <button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>
     </div>`;
   }

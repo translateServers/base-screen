@@ -30,6 +30,7 @@ import { DesignerErrorConsoleController } from '../../browser/controllers/design
 import { DesignerGuardController } from '../../browser/controllers/designer-guard-controller.js';
 import { DesignerImportController } from '../../browser/controllers/designer-import-controller.js';
 import { DesignerIntegrationController } from '../../browser/controllers/designer-integration-controller.js';
+import { DesignerIntentChoiceController } from '../../browser/controllers/designer-intent-choice-controller.js';
 import { DesignerIntentController } from '../../browser/controllers/designer-intent-controller.js';
 import { DesignerLeftPanelGroupEventController } from '../../browser/controllers/designer-left-panel-group-events.js';
 import { DesignerNotificationController } from '../../browser/controllers/designer-notification-controller.js';
@@ -151,6 +152,8 @@ export interface DesignerElementState {
   /** 宿主定义的场景目录：引擎不保存场景内容，只保留身份与展示名。 */
   sceneCatalog: readonly DesignerSceneDescriptor[] | undefined;
   intentController: DesignerIntentController;
+  /** 指代歧义的点选会话：候选进画布多选，用户点选后把选择交回平台。 */
+  intentChoiceController: DesignerIntentChoiceController;
   targetDisplayController: DesignerTargetDisplayController;
   presentationLockController: DesignerPresentationLockController;
   scrollContinuityController: DesignerScrollContinuityController;

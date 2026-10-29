@@ -259,9 +259,25 @@ export const DESIGNER_UI_TEXT = {
     submit: '提交',
     scopeScreen: '整屏',
     scopeComponents: (count: number) => `${count} 个组件`,
-    capability: '可改：样式 / 布局 / 数据绑定；不可改：指标口径',
+    capability: {
+      screen: '可改：布局 / 配色 / 数据绑定；不可改：指标口径',
+      component: (name: string) => `${name}：可改样式 / 布局 / 数据绑定；不可改指标口径`,
+      componentUnbound: (name: string) => `${name}：可改样式 / 布局；未接数据，数据绑定不可改`,
+      mixed: (count: number) => `${count} 个组件：可改共有的样式 / 布局；不可改指标口径`,
+      mixedUnbound: (count: number) =>
+        `${count} 个组件：可改共有的样式 / 布局；不可改指标口径，其中存在未接数据的组件`,
+    },
     unavailable: '当前环境未接入智能体，输入区不可用。',
     generating: '已提交 · 正在生成，结果会进入「变更」。',
+    cancelPending: '取消',
+    cancelled: '已取消，输入与选区都保留。',
+    // 指代歧义：候选已在画布上全部选中，请用户点选其中一个来收敛，并给出取消出口。
+    // 只陈述可观测的事实（几个候选、画布上已高亮），不承诺引擎替用户判断是哪一个。
+    choicePrompt: (count: number) =>
+      count <= 9
+        ? `${count} 个候选 · 你说的是哪一个？点选画布上的候选，或按 1-${count}。`
+        : `${count} 个候选 · 你说的是哪一个？点选画布上的候选。`,
+    choiceCancel: '取消选择',
     pending: '已交给平台，结果会出现在「变更」。',
     failed: '提交失败，输入已保留。',
     empty: '先描述要改什么。',

@@ -352,7 +352,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           </span>
           <span class="intent-spacer"></span>
         </div>
-        <p class="intent-capability" data-intent-capability>${DESIGNER_UI_TEXT.intent.capability}</p>
+        <p class="intent-capability" data-intent-capability>${DESIGNER_UI_TEXT.intent.capability.screen}</p>
         <div class="intent-box">
           <textarea class="intent-input" data-intent-input rows="2" placeholder="${DESIGNER_UI_TEXT.intent.placeholder}" aria-label="${DESIGNER_UI_TEXT.intent.placeholder}"></textarea>
           <button type="button" class="intent-submit" data-intent-submit aria-label="${DESIGNER_UI_TEXT.intent.submit}" data-tip="${DESIGNER_UI_TEXT.intent.submit}">${designerIcon('arrow-up')}</button>

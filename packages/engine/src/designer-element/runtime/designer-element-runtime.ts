@@ -90,7 +90,11 @@ import {
 } from '../api/designer-element-host-resource-selection.js';
 import { insertComponent, parseInsertionIntent } from '../api/designer-element-insert-component.js';
 import { insertComponentFragment } from '../api/designer-element-insert-component-fragment.js';
-import { readIntentAvailable, setIntentHandler } from '../api/designer-element-intent.js';
+import {
+  readIntentAvailable,
+  requestComponentChoice,
+  setIntentHandler,
+} from '../api/designer-element-intent.js';
 import {
   readBackButton,
   readGroupMaterialType,
@@ -299,6 +303,7 @@ export const designerElementRuntime = {
   readPresentationLocked,
   setIntentHandler,
   readIntentAvailable,
+  requestComponentChoice,
   setSceneCatalog,
   setSceneHandler,
   setActiveScene,

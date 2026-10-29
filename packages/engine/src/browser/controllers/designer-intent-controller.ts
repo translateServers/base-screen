@@ -1,6 +1,10 @@
 import type { ScreenIntentScope, ScreenParseResult } from '@base-screen/contracts';
 import type { DesignerIntentHandler } from '../../common/operations/intent/designer-intent.js';
 import {
+  type DesignerIntentCapabilityComponent,
+  describeIntentCapability,
+} from '../../common/operations/intent/designer-intent-capability.js';
+import {
   type DesignerParameterPatch,
   matchDesignerParameterIntent,
 } from '../../common/operations/intent/designer-parameter-intent.js';
@@ -24,6 +28,8 @@ export class DesignerIntentController {
   #input: HTMLTextAreaElement | undefined;
   #submit: HTMLButtonElement | undefined;
   #scope: HTMLElement | undefined;
+  #capability: HTMLElement | undefined;
+  #capabilityComponents: readonly DesignerIntentCapabilityComponent[] = [];
   #scopeClear: HTMLButtonElement | undefined;
   #status: HTMLElement | undefined;
   #confirm: HTMLElement | undefined;
@@ -34,6 +40,8 @@ export class DesignerIntentController {
   #lastSelectionKey = '';
   #scopeOverride = false;
   #pending = false;
+  /** 进行中的生成；点取消或按 Esc 时 abort，宿主据此停手。 */
+  #abort: AbortController | undefined;
   #confirmKind: IntentConfirmKind | undefined;
   #parameterHandler: ((patch: DesignerParameterPatch) => boolean) | undefined;
   #metricHandler: ((name: DesignerMetricName) => void) | undefined;
@@ -66,6 +74,8 @@ export class DesignerIntentController {
     input: HTMLTextAreaElement,
     submit: HTMLButtonElement,
     scope: HTMLElement,
+    /** 能力提示：随作用域说明这一轮能改什么，由 render 统一刷新。 */
+    capability: HTMLElement,
     scopeClear: HTMLButtonElement,
     status: HTMLElement,
     confirm: HTMLElement,
@@ -74,6 +84,7 @@ export class DesignerIntentController {
     this.#input = input;
     this.#submit = submit;
     this.#scope = scope;
+    this.#capability = capability;
     this.#scopeClear = scopeClear;
     this.#status = status;
     this.#confirm = confirm;
@@ -84,11 +95,14 @@ export class DesignerIntentController {
     this.#input = undefined;
     this.#submit = undefined;
     this.#scope = undefined;
+    this.#capability = undefined;
+    this.#capabilityComponents = [];
     this.#scopeClear = undefined;
     this.#status = undefined;
     this.#confirm = undefined;
     this.#handler = undefined;
     this.#pending = false;
+    this.#abort = undefined;
     this.#pendingScope = undefined;
     this.#confirmKind = undefined;
   }
@@ -102,9 +116,11 @@ export class DesignerIntentController {
   syncScope(
     selectedComponentIds: readonly string[],
     componentName: (id: string) => string | undefined,
+    components: readonly DesignerIntentCapabilityComponent[] = [],
   ): void {
     const ids = [...selectedComponentIds];
     this.#componentName = componentName;
+    this.#capabilityComponents = components;
     const key = ids.join(',');
     if (key !== this.#lastSelectionKey) {
       this.#lastSelectionKey = key;
@@ -191,7 +207,9 @@ export class DesignerIntentController {
     }
     const statusAction = target.closest<HTMLElement>('[data-intent-action]');
     if (statusAction !== null) {
-      if (statusAction.dataset.intentAction === 'update-scope') this.applyPendingScope();
+      const action = statusAction.dataset.intentAction;
+      if (action === 'update-scope') this.applyPendingScope();
+      else if (action === 'cancel-intent') this.cancelPending();
       return true;
     }
     if (target.closest('[data-intent-submit]') === null) return false;
@@ -203,6 +221,12 @@ export class DesignerIntentController {
     if (event.key === 'Escape' && this.#confirmKind !== undefined) {
       event.preventDefault();
       this.closeConfirm();
+      return true;
+    }
+    // 确认层在生成之上：先关弹窗，再取消生成，顺序反了会让用户以为弹窗自己消失了。
+    if (event.key === 'Escape' && this.#pending) {
+      event.preventDefault();
+      this.cancelPending();
       return true;
     }
     if (event.key !== 'Enter' || event.shiftKey || event.target !== this.#input) return false;
@@ -230,22 +254,37 @@ export class DesignerIntentController {
     if (handler === undefined || input === undefined) return;
     this.#pending = true;
     this.#metricHandler?.('intent_submit');
-    this.setStatus(DESIGNER_UI_TEXT.intent.generating, 'info');
+    const abort = new AbortController();
+    this.#abort = abort;
+    this.setStatus(
+      DESIGNER_UI_TEXT.intent.generating,
+      'info',
+      DESIGNER_UI_TEXT.intent.cancelPending,
+      'cancel-intent',
+    );
     this.render();
     let result: ScreenParseResult<null>;
     try {
-      result = await handler({
-        instanceId: this.#instanceId,
-        text,
-        scope,
-        ...(this.#startsFrom === undefined ? {} : { startsFrom: this.#startsFrom }),
-      });
+      result = await handler(
+        {
+          instanceId: this.#instanceId,
+          text,
+          scope,
+          ...(this.#startsFrom === undefined ? {} : { startsFrom: this.#startsFrom }),
+        },
+        abort.signal,
+      );
     } catch {
       result = { ok: false, diagnostics: [] };
     }
+    // 取消以用户动作为准：宿主即使已经返回成功，也不再落成提案。
+    const cancelled = abort.signal.aborted;
+    if (this.#abort === abort) this.#abort = undefined;
     this.#pending = false;
     this.#startsFrom = undefined;
-    if (result.ok) {
+    if (cancelled) {
+      this.setStatus(DESIGNER_UI_TEXT.intent.cancelled, 'info');
+    } else if (result.ok) {
       input.value = '';
       this.setStatus(DESIGNER_UI_TEXT.intent.pending, 'info');
       // 生成期间选区变化过：输入已清空，把挂起的选区并入作用域，保持 chip 与画布一致。
@@ -254,6 +293,14 @@ export class DesignerIntentController {
       this.setStatus(DESIGNER_UI_TEXT.intent.failed, 'error');
     }
     this.render();
+  }
+
+  /** 取消进行中的生成：只中断等待，输入与选区都保留，不留半成品。 */
+  cancelPending(): boolean {
+    const abort = this.#abort;
+    if (abort === undefined) return false;
+    abort.abort();
+    return true;
   }
 
   private handleConfirm(action: string | undefined): void {
@@ -349,7 +396,12 @@ export class DesignerIntentController {
     );
   }
 
-  private setStatus(text: string, tone: 'info' | 'error', action?: string): void {
+  private setStatus(
+    text: string,
+    tone: 'info' | 'error',
+    action?: string,
+    actionId = 'update-scope',
+  ): void {
     const status = this.#status;
     if (status === undefined) return;
     status.dataset.tone = tone;
@@ -360,7 +412,7 @@ export class DesignerIntentController {
     status.innerHTML = `<span>${escapeHtml(text)}</span>${
       action === undefined
         ? ''
-        : `<button type="button" class="intent-status-action designer-control designer-button" data-variant="ghost" data-intent-action="update-scope">${escapeHtml(action)}</button>`
+        : `<button type="button" class="intent-status-action designer-control designer-button" data-variant="ghost" data-intent-action="${escapeHtml(actionId)}">${escapeHtml(action)}</button>`
     }`;
     adoptDesignerFormControls(status);
   }
@@ -374,6 +426,14 @@ export class DesignerIntentController {
         : DESIGNER_UI_TEXT.intent.unavailable;
     }
     if (this.#submit !== undefined) this.#submit.disabled = !available || this.#pending;
+    if (this.#capability !== undefined) {
+      // 作用域已解除时提示回到整屏：用户清掉 chip 之后，选区还在画布上，
+      // 但这一轮意图的对象已经变成整屏，提示不能继续按旧选区说。
+      this.#capability.textContent =
+        this.#scopeValue.kind === 'screen'
+          ? DESIGNER_UI_TEXT.intent.capability.screen
+          : describeIntentCapability(this.#capabilityComponents);
+    }
     if (this.#scopeClear !== undefined) {
       this.#scopeClear.hidden = this.#scopeValue.kind === 'screen';
     }

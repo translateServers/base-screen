@@ -4,6 +4,7 @@ import { DesignerCanvasRuntimeController } from '../../browser/controllers/desig
 import { DesignerCommandPaletteController } from '../../browser/controllers/designer-command-palette-controller.js';
 import { DesignerImportController } from '../../browser/controllers/designer-import-controller.js';
 import { DesignerIntegrationController } from '../../browser/controllers/designer-integration-controller.js';
+import { DesignerIntentChoiceController } from '../../browser/controllers/designer-intent-choice-controller.js';
 import { DesignerPreviewController } from '../../browser/controllers/designer-preview-controller.js';
 import { DesignerTextEditController } from '../../browser/controllers/designer-text-edit-controller.js';
 import { DesignerTopbarController } from '../../browser/controllers/designer-topbar-controller.js';
@@ -518,6 +519,17 @@ export function initializeDesignerElementControllers(
   };
   state.changeController.setMetricHandler(emitMetric);
   state.guardController.setMetricHandler(emitMetric);
+  // 指代歧义的点选会话：选区是画布高亮的唯一来源，把候选放进选区就等于一起高亮；
+  // 收敛后的选区原样留在画布上，取消时才放回提问前的那一份。
+  state.intentChoiceController = new DesignerIntentChoiceController({
+    getSelectedComponentIds: () => state.session.interaction.selectedComponentIds,
+    replaceSelection: (componentIds) =>
+      state.session.reduceSelection({
+        type: 'replace-selection',
+        componentIds,
+        focusedComponentId: componentIds[0] ?? null,
+      }),
+  });
   state.intentController.setMetricHandler(emitMetric);
   state.intentController.setParameterHandler((patch: DesignerParameterPatch) => {
     const document = state.session.document;

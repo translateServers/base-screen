@@ -51,6 +51,7 @@ function bindings(overrides: Partial<DesignerSurfaceBindings> = {}): DesignerSur
     drop: vi.fn(() => false),
     dragEnd: vi.fn(() => false),
     pointerDown: vi.fn(() => false),
+    pointerDownCapture: vi.fn(() => false),
     pointerMove: vi.fn(() => false),
     pointerUp: vi.fn(() => false),
     pointerCancel: vi.fn(() => false),

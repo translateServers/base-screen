@@ -75,6 +75,7 @@ export function releaseSurfaces(element: DesignerElementHost): void {
   elementState.sceneController.release();
   elementState.presentationLockController.release();
   elementState.intentController.release();
+  elementState.intentChoiceController.release();
   elementState.targetDisplayController.release();
   elementState.integrationController.release();
   elementState.importController.release();
@@ -161,6 +162,7 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
   const intentInput = shadow.querySelector<HTMLTextAreaElement>('[data-intent-input]');
   const intentSubmit = shadow.querySelector<HTMLButtonElement>('[data-intent-submit]');
   const intentScope = shadow.querySelector<HTMLElement>('[data-intent-scope]');
+  const intentCapability = shadow.querySelector<HTMLElement>('[data-intent-capability]');
   const intentScopeClear = shadow.querySelector<HTMLButtonElement>('[data-intent-scope-clear]');
   const intentStatus = shadow.querySelector<HTMLElement>('[data-intent-status]');
   const intentConfirm = shadow.querySelector<HTMLElement>('[data-intent-confirm]');
@@ -168,6 +170,7 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
     intentInput !== null &&
     intentSubmit !== null &&
     intentScope !== null &&
+    intentCapability !== null &&
     intentScopeClear !== null &&
     intentStatus !== null &&
     intentConfirm !== null
@@ -177,10 +180,12 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
       intentInput,
       intentSubmit,
       intentScope,
+      intentCapability,
       intentScopeClear,
       intentStatus,
       intentConfirm,
     );
+    elementState.intentChoiceController.connect(intentStatus);
   }
   const displayLayer = shadow.querySelector<HTMLElement>('[data-display-overlay-layer]');
   if (displayLayer !== null) elementState.targetDisplayController.connect(displayLayer);

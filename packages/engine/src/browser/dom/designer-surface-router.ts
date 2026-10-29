@@ -16,6 +16,9 @@ export interface DesignerSurfaceBindings {
   readonly drop: DesignerSurfaceHandler;
   readonly dragEnd: DesignerSurfaceHandler;
   readonly pointerDown: DesignerSurfaceHandler;
+  // capture 阶段的指针通道：需要抢在画布手势之前认领这次指针的会话（如点选候选）走这里，
+  // 否则画布先按既有语义开始拖拽，再想改判就已经动过文档了。
+  readonly pointerDownCapture: DesignerSurfaceHandler;
   readonly pointerMove: DesignerSurfaceHandler;
   readonly pointerUp: DesignerSurfaceHandler;
   readonly pointerCancel: DesignerSurfaceHandler;
@@ -72,6 +75,9 @@ export class DesignerSurfaceRouter {
     add('dragover', (event) => bindings.dragOver(event.target, event));
     add('drop', (event) => bindings.drop(event.target, event));
     add('dragend', (event) => bindings.dragEnd(event.target, event));
+    add('pointerdown', (event) => bindings.pointerDownCapture(event.target, event), {
+      capture: true,
+    });
     add('pointerdown', (event) => bindings.pointerDown(event.target, event));
     add('pointermove', (event) => bindings.pointerMove(event.target, event));
     add('pointerup', (event) => bindings.pointerUp(event.target, event));

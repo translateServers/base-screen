@@ -92,6 +92,7 @@ export function initialize(element: DesignerElementHost): void {
   const intentInput = shadow.querySelector<HTMLTextAreaElement>('[data-intent-input]');
   const intentSubmit = shadow.querySelector<HTMLButtonElement>('[data-intent-submit]');
   const intentScope = shadow.querySelector<HTMLElement>('[data-intent-scope]');
+  const intentCapability = shadow.querySelector<HTMLElement>('[data-intent-capability]');
   const intentScopeClear = shadow.querySelector<HTMLButtonElement>('[data-intent-scope-clear]');
   const intentStatus = shadow.querySelector<HTMLElement>('[data-intent-status]');
   const intentConfirm = shadow.querySelector<HTMLElement>('[data-intent-confirm]');
@@ -99,6 +100,7 @@ export function initialize(element: DesignerElementHost): void {
     intentInput !== null &&
     intentSubmit !== null &&
     intentScope !== null &&
+    intentCapability !== null &&
     intentScopeClear !== null &&
     intentStatus !== null &&
     intentConfirm !== null
@@ -108,10 +110,13 @@ export function initialize(element: DesignerElementHost): void {
       intentInput,
       intentSubmit,
       intentScope,
+      intentCapability,
       intentScopeClear,
       intentStatus,
       intentConfirm,
     );
+    // 问句与取消出口就在意图状态行上：不新建浮层，也不再占一块界面。
+    elementState.intentChoiceController.connect(intentStatus);
   }
   const sceneBlock = shadow.querySelector<HTMLElement>('[data-scene-block]');
   const sceneList = shadow.querySelector<HTMLElement>('[data-scene-list]');
@@ -243,10 +248,30 @@ export function renderInteraction(element: DesignerElementHost): void {
   elementState.runtime.renderLayers(element);
   elementState.runtime.renderControls(element);
   elementState.runtime.syncDesignerPluginPanels(element);
-  elementState.intentController.syncScope(
-    elementState.session.interaction.selectedComponentIds,
-    (id) => elementState.session.document?.components.find((c) => c.id === id)?.name,
+  const selectedIds = elementState.session.interaction.selectedComponentIds;
+  const componentsById = new Map(
+    (elementState.session.document?.components ?? []).map(
+      (component) => [component.id, component] as const,
+    ),
   );
+  elementState.intentController.syncScope(
+    selectedIds,
+    (id) => componentsById.get(id)?.name,
+    selectedIds.flatMap((id) => {
+      const component = componentsById.get(id);
+      if (component === undefined) return [];
+      return [
+        {
+          name: component.name,
+          // 「接了数据」指真的绑了数据源字段：legacy `dataSource` 或新的 `dataBinding`。
+          // 只挂静态值或变量不算——否则提示会说能改绑定，而实际没有绑定可改。
+          bound: component.dataSource !== null || (component.dataBinding ?? null) !== null,
+        },
+      ];
+    }),
+  );
+  // 选区是「点选候选」的唯一信号：收敛到一个候选时，选择会话在这里收束。
+  elementState.intentChoiceController.onSelectionChange(selectedIds);
   elementState.integrationController.render();
   elementState.workbenchController.renderInspectorTabs();
 }
