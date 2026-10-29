@@ -5,7 +5,7 @@ import {
 } from '../../../../src/common/operations/intent/designer-intent-capability.js';
 import { DESIGNER_UI_TEXT } from '../../../../src/common/ui-text/designer-ui-text.js';
 
-const { intent } = DESIGNER_UI_TEXT;
+const { capability } = DESIGNER_UI_TEXT.intent;
 
 function bound(name: string): DesignerIntentCapabilityComponent {
   return { name, bound: true };
@@ -16,39 +16,52 @@ function unbound(name: string): DesignerIntentCapabilityComponent {
 }
 
 describe('describeIntentCapability', () => {
-  it('无选区时退回整屏口径，只说引擎能改的三类', () => {
-    expect(describeIntentCapability([])).toBe(intent.capability.screen);
+  it('无选区时退回整屏口径', () => {
+    expect(describeIntentCapability([])).toEqual({
+      allows: capability.screenAllows,
+      blocks: capability.screenBlocks,
+    });
   });
 
-  it('单组件已接数据：带上组件名，并允诺数据绑定', () => {
-    const text = describeIntentCapability([bound('GMV 卡片')]);
-    expect(text).toBe(intent.capability.component('GMV 卡片'));
-    expect(text).toContain('数据绑定');
+  it('单组件已接数据：允许数据绑定', () => {
+    const result = describeIntentCapability([bound('GMV 卡片')]);
+    expect(result.allows).toBe(capability.componentAllows);
+    expect(result.allows).toContain('数据绑定');
+    expect(result.blocks).toBe(capability.componentBlocks);
   });
 
-  it('单组件未接数据：明说数据绑定不可改，不承诺做不到的事', () => {
-    const text = describeIntentCapability([unbound('分割线')]);
-    expect(text).toBe(intent.capability.componentUnbound('分割线'));
-    expect(text).not.toContain('数据绑定；');
+  it('单组件未接数据：数据绑定进「不可改」，不承诺做不到的事', () => {
+    const result = describeIntentCapability([unbound('分割线')]);
+    expect(result.allows).toBe(capability.componentUnboundAllows);
+    expect(result.allows).not.toContain('数据绑定');
+    expect(result.blocks).toBe(capability.componentUnboundBlocks);
   });
 
-  it('多选全部接数据：只承诺共有属性，逐项绑定交回检查器', () => {
-    const text = describeIntentCapability([bound('A'), bound('B')]);
-    expect(text).toBe(intent.capability.mixed(2));
+  it('多选全部接数据：只承诺共有属性', () => {
+    expect(describeIntentCapability([bound('A'), bound('B')])).toEqual({
+      allows: capability.mixedAllows,
+      blocks: capability.mixedBlocks,
+    });
   });
 
-  it('多选中存在未接数据的组件：提示要说出这件事', () => {
-    const text = describeIntentCapability([bound('A'), unbound('B'), bound('C')]);
-    expect(text).toBe(intent.capability.mixedUnbound(3));
+  it('多选含未接数据的组件：不可改那栏要说出来', () => {
+    const result = describeIntentCapability([bound('A'), unbound('B'), bound('C')]);
+    expect(result.blocks).toBe(capability.mixedUnboundBlocks);
   });
 
-  it('任何作用域都不承诺指标口径', () => {
+  it('任何作用域的「不可改」都包含指标口径——它不在引擎可见范围内', () => {
     const all = [
       describeIntentCapability([]),
       describeIntentCapability([bound('A')]),
       describeIntentCapability([unbound('A')]),
       describeIntentCapability([bound('A'), unbound('B')]),
     ];
-    for (const text of all) expect(text).toContain('不可改');
+    for (const result of all) expect(result.blocks).toContain('指标口径');
+  });
+
+  it('「可改」与「不可改」不重叠：同一项不会同时出现在两栏', () => {
+    const result = describeIntentCapability([bound('A')]);
+    expect(result.allows).not.toBe(result.blocks);
+    expect(result.blocks).not.toContain('样式');
   });
 });
