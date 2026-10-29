@@ -35,6 +35,93 @@ function component(overrides: Record<string, unknown> = {}): Record<string, unkn
   };
 }
 
+describe('check_a11y', () => {
+  it('reports failures with a suggested color that clears the threshold', async () => {
+    const provider = await createScreenProvider(FIXTURE);
+    const result = provider.checkA11y({
+      samples: [
+        { componentId: 'note', textColor: '#5c6675', backgroundColor: '#0d1117', fontSizePx: 14 },
+        { componentId: 'ok', textColor: '#e9eef5', backgroundColor: '#0d1117', fontSizePx: 14 },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.value.checked).toBe(2);
+    expect(result.value.failed).toBe(1);
+    expect(result.value.issues[0]?.componentId).toBe('note');
+    expect(result.value.issues[0]?.requiredRatio).toBe(4.5);
+    expect(result.value.issues[0]?.ratio).toBeLessThan(4.5);
+    expect(result.value.issues[0]?.suggestedColor).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('applies the 3:1 threshold to large text instead of 4.5:1', async () => {
+    const provider = await createScreenProvider(FIXTURE);
+    const small = provider.checkA11y({
+      samples: [{ textColor: '#5c6675', backgroundColor: '#0d1117', fontSizePx: 14 }],
+    });
+    const large = provider.checkA11y({
+      samples: [{ textColor: '#5c6675', backgroundColor: '#0d1117', fontSizePx: 28 }],
+    });
+    expect(small.value.failed).toBe(1);
+    expect(large.value.failed).toBe(0);
+  });
+
+  it('flags unparseable colors instead of guessing', async () => {
+    const provider = await createScreenProvider(FIXTURE);
+    const result = provider.checkA11y({
+      samples: [{ textColor: 'rgba(0,0,0,0.5)', backgroundColor: '#ffffff' }],
+    });
+    expect(result.value.issues[0]?.code).toBe('A11Y_COLOR_UNPARSEABLE');
+  });
+});
+
+describe('estimate_perf and fit_resolution', () => {
+  it('counts structural cost and compares it with a budget', async () => {
+    const provider = await createScreenProvider(FIXTURE);
+    const result = provider.estimatePerf({});
+    expect(result.ok).toBe(true);
+    expect(result.value.metrics.components).toBe(1);
+    expect(result.value.metrics.dataBindings).toBeGreaterThanOrEqual(0);
+    expect(result.value.budget.ok === undefined).toBe(true);
+    expect(Array.isArray(result.value.budget.violations)).toBe(true);
+  });
+
+  it('returns fit commands without touching the snapshot', async () => {
+    const provider = await createScreenProvider(FIXTURE);
+    const before = provider.getScreen({ view: 'summary' }).value.data.canvas;
+    const result = provider.fitResolution({ target: { width: 960, height: 540 } });
+    expect(result.ok).toBe(true);
+    expect(result.value.commands[0]).toEqual({
+      type: 'update-canvas',
+      patch: { width: 960, height: 540 },
+    });
+    const after = provider.getScreen({ view: 'summary' }).value.data.canvas;
+    expect(after).toEqual(before);
+    expect(result.value.commands.length).toBeGreaterThan(1);
+  });
+});
+
+describe('diff_against_baseline', () => {
+  it('reports field-level rows against a baseline snapshot', async () => {
+    const provider = await createScreenProvider(FIXTURE);
+    const baseline = provider.getScreen({ view: 'full' }).value.data;
+    const candidate = JSON.parse(JSON.stringify(baseline)) as typeof baseline;
+    candidate.components[0]!.name = 'Renamed';
+    const result = provider.diffAgainstBaseline({ baseline, document: candidate });
+    expect(result.ok).toBe(true);
+    expect(result.value.equal).toBe(false);
+    expect(result.value.rows[0]?.componentId).toBe(baseline.components[0]!.id);
+    expect(result.value.rows[0]?.entries[0]?.path).toBe('name');
+  });
+
+  it('reports equality for the same document', async () => {
+    const provider = await createScreenProvider(FIXTURE);
+    const baseline = provider.getScreen({ view: 'full' }).value.data;
+    const result = provider.diffAgainstBaseline({ baseline });
+    expect(result.value.equal).toBe(true);
+    expect(result.value.rows).toEqual([]);
+  });
+});
+
 describe('screen MCP provider', () => {
   it('reads the snapshot as a derived summary or the canonical document', async () => {
     const provider = await createScreenProvider(FIXTURE);

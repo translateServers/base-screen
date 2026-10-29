@@ -20,6 +20,12 @@ const CORE_EXPORTS = [
   'getAncestorIds',
   'getScreenComponentBounds',
   'validateScreenDocumentSemantics',
+  'parseCssColor',
+  'contrastRatio',
+  'minimumContrastRatio',
+  'suggestReadableColor',
+  'formatCssColor',
+  'diffScreenDocuments',
 ];
 
 export async function loadScreenApis() {

@@ -36,6 +36,27 @@ export function createScreenMcpServer(provider) {
   );
   registerTool(
     server,
+    'check_a11y',
+    {
+      samples: z
+        .array(
+          z.object({
+            componentId: z.string().min(1).max(128).optional(),
+            textColor: z.string().min(1).max(64),
+            backgroundColor: z.string().min(1).max(64),
+            fontSizePx: z.number().positive().max(1000).optional(),
+            fontWeight: z.number().min(100).max(900).optional(),
+          }),
+        )
+        .min(1)
+        .max(2000),
+      minRatio: z.number().positive().max(21).optional(),
+    },
+    'Check text contrast from rendered samples. Each sample carries the resolved text color, the effective background behind it, font size and weight; colors must be opaque hex or rgb. Returns per-component ratio, required ratio and a minimal suggested color. This is deterministic WCAG math, not a model judgement — text contrast cannot be checked from declared styles alone.',
+    (input) => provider.checkA11y(input),
+  );
+  registerTool(
+    server,
     'apply_screen_commands',
     { commands: z.array(z.unknown()).min(1).max(1000) },
     'Validate and apply a batch of Screen Document commands to the loaded snapshot without persisting. Returns the candidate document plus changedComponentIds and diagnostics; on failure the batch is rejected at failedCommandIndex. Command types: update-canvas, add-component, update-components, remove-components, reparent-components, replace-blueprint, replace-data-sources, replace-variables, rename-variable.',
@@ -81,6 +102,47 @@ export function createScreenMcpServer(provider) {
     },
     'Audit a Screen Document without rendering: contract diagnostics plus geometry (components whose rotated bounds exceed the canvas) and, when target is given, uniform fit/fill projection (scale, letterbox, crop, aspect delta, target megapixels) with an optional minComponentPx policy listing components that would render below that many target pixels. Complexity counts (components, canvas megapixels, depth, material types, style rules) are proxies, not measured render cost. Text contrast needs rendered output: use the screen probe.',
     (input) => provider.auditScreen(input),
+  );
+  registerTool(
+    server,
+    'estimate_perf',
+    {
+      document: z.unknown().optional(),
+      budget: z
+        .object({
+          maxComponents: z.number().int().positive().optional(),
+          maxDepth: z.number().int().positive().optional(),
+          maxBindings: z.number().int().positive().optional(),
+          maxStyleRules: z.number().int().positive().optional(),
+        })
+        .optional(),
+    },
+    'Count structural cost (components, nesting depth, data bindings, style rules) and compare it with a budget. Thresholds have defaults and can be overridden per call. These are counts, not measured render time — use the screen probe for real timing.',
+    (input) => provider.estimatePerf(input),
+  );
+  registerTool(
+    server,
+    'fit_resolution',
+    {
+      document: z.unknown().optional(),
+      target: z.object({
+        width: z.number().int().positive().max(20000),
+        height: z.number().int().positive().max(20000),
+      }),
+      minComponentPx: z.number().positive().optional(),
+    },
+    'Compute a proportional fit to a target resolution and return the commands that apply it: canvas resize plus integer-rounded component positions and sizes, centred with letterbox offset. The snapshot is not modified — pass the commands to apply_screen_commands. Optionally lists components that fall below minComponentPx after scaling.',
+    (input) => provider.fitResolution(input),
+  );
+  registerTool(
+    server,
+    'diff_against_baseline',
+    {
+      baseline: z.unknown(),
+      document: z.unknown().optional(),
+    },
+    'Attribute-level diff between a baseline snapshot and a candidate. Answers "what exactly changed" with per-component rows: added/removed, or changed fields with before/after values. Uses the same diff implementation as the designer change cards. Omit document to compare the loaded snapshot against the baseline.',
+    (input) => provider.diffAgainstBaseline(input),
   );
   registerTool(
     server,

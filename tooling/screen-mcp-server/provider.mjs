@@ -77,6 +77,49 @@ export async function createScreenProvider(screenFile) {
         data: view === 'full' ? document : summarizeScreenDocument(apis, document),
       });
     },
+    /**
+     * 对比度校验：输入是**渲染采样**（文本色、有效背景、字号、字重），不是声明样式。
+     * 复用 core 的 WCAG 纯函数，判定与设计器内的守卫同源。
+     */
+    checkA11y({ samples, minRatio } = {}) {
+      const issues = [];
+      for (const sample of samples) {
+        const componentId =
+          typeof sample?.componentId === 'string' ? sample.componentId : 'unknown';
+        const text = apis.parseCssColor(String(sample?.textColor ?? ''));
+        const background = apis.parseCssColor(String(sample?.backgroundColor ?? ''));
+        if (text === undefined || background === undefined) {
+          issues.push({
+            componentId,
+            code: 'A11Y_COLOR_UNPARSEABLE',
+            message: 'textColor and backgroundColor must be opaque hex or rgb colors.',
+          });
+          continue;
+        }
+        const fontSizePx = Number(sample?.fontSizePx ?? 16);
+        const fontWeight = Number(sample?.fontWeight ?? 400);
+        const requiredRatio =
+          typeof minRatio === 'number' && minRatio > 0
+            ? minRatio
+            : apis.minimumContrastRatio(fontSizePx, fontWeight);
+        const ratio = apis.contrastRatio(text, background);
+        if (ratio >= requiredRatio) continue;
+        const suggested = apis.suggestReadableColor(text, background, requiredRatio);
+        issues.push({
+          componentId,
+          ratio: Math.round(ratio * 100) / 100,
+          requiredRatio,
+          textColor: apis.formatCssColor(text),
+          backgroundColor: apis.formatCssColor(background),
+          suggestedColor: suggested === null || suggested === undefined ? null : apis.formatCssColor(suggested),
+        });
+      }
+      return ok({
+        checked: samples.length,
+        failed: issues.length,
+        issues,
+      });
+    },
     getScreenSchema() {
       return ok(apis.SCREEN_DOCUMENT_JSON_SCHEMA);
     },
@@ -212,6 +255,109 @@ export async function createScreenProvider(screenFile) {
         geometry: auditGeometry(apis, audited.document),
         fit: target === undefined ? null : auditFit(audited.document, target, minComponentPx),
         complexity: auditComplexity(apis, audited.document),
+      });
+    },
+    /**
+     * 复杂度预算：只做计数与阈值比较，不声称是渲染耗时。
+     * 阈值可被调用方覆盖，默认值集中在这里，避免散落在文档里。
+     */
+    estimatePerf({ document: candidate, budget } = {}) {
+      const target =
+        candidate === undefined
+          ? snapshotTarget(document)
+          : normalizeScreenDocument(apis, candidate);
+      if (!target.ok)
+        return failure({ valid: false, diagnostics: target.diagnostics, metrics: null, budget: null });
+      const doc = target.document;
+      const index = apis.buildComponentIndex(doc);
+      let maxDepth = 0;
+      let bindings = 0;
+      let styleRules = 0;
+      for (const component of doc.components) {
+        maxDepth = Math.max(maxDepth, apis.getAncestorIds(index, component.id).length);
+        if (component.dataSource !== null && component.dataSource !== undefined) bindings += 1;
+        styleRules += (component.styleRules ?? []).length;
+      }
+      const limits = {
+        maxComponents: 160,
+        maxDepth: 6,
+        maxBindings: 120,
+        maxStyleRules: 400,
+        ...(budget ?? {}),
+      };
+      const metrics = {
+        components: doc.components.length,
+        maxDepth,
+        dataBindings: bindings,
+        styleRules,
+        blueprintRelations: doc.blueprint.relations.length,
+      };
+      const violations = [];
+      if (metrics.components > limits.maxComponents)
+        violations.push({ code: 'PERF_COMPONENTS', actual: metrics.components, limit: limits.maxComponents });
+      if (metrics.maxDepth > limits.maxDepth)
+        violations.push({ code: 'PERF_DEPTH', actual: metrics.maxDepth, limit: limits.maxDepth });
+      if (metrics.dataBindings > limits.maxBindings)
+        violations.push({ code: 'PERF_BINDINGS', actual: metrics.dataBindings, limit: limits.maxBindings });
+      if (metrics.styleRules > limits.maxStyleRules)
+        violations.push({ code: 'PERF_STYLE_RULES', actual: metrics.styleRules, limit: limits.maxStyleRules });
+      return ok({ valid: violations.length === 0, metrics, budget: { limits, violations } });
+    },
+    /**
+     * 分辨率适配：等比缩放 + 居中，画布与组件一起换算成命令。
+     * 返回的是命令而不是已改文档——调用方仍需走 apply_screen_commands 才生效。
+     */
+    fitResolution({ document: candidate, target, minComponentPx } = {}) {
+      const normalized =
+        candidate === undefined
+          ? snapshotTarget(document)
+          : normalizeScreenDocument(apis, candidate);
+      if (!normalized.ok) return failure({ fit: null, commands: [], diagnostics: normalized.diagnostics });
+      const doc = normalized.document;
+      const scale = Math.min(target.width / doc.canvas.width, target.height / doc.canvas.height);
+      const dx = (target.width - doc.canvas.width * scale) / 2;
+      const dy = (target.height - doc.canvas.height * scale) / 2;
+      const commands = [{ type: 'update-canvas', patch: { width: target.width, height: target.height } }];
+      const below = [];
+      for (const component of doc.components) {
+        const width = Math.max(1, Math.round(component.size.width * scale));
+        const height = Math.max(1, Math.round(component.size.height * scale));
+        commands.push({
+          type: 'update-components',
+          componentIds: [component.id],
+          patch: {
+            position: {
+              x: Math.round(component.position.x * scale + dx),
+              y: Math.round(component.position.y * scale + dy),
+            },
+            size: { width, height },
+          },
+        });
+        if (minComponentPx !== undefined && (width < minComponentPx || height < minComponentPx))
+          below.push({ id: component.id, effective: { width, height } });
+      }
+      return ok({
+        fit: { scale: round2(scale), offset: { x: round2(dx), y: round2(dy) }, below },
+        commands,
+      });
+    },
+    /**
+     * 与基线快照做属性级 diff：回答「这份候选到底改了哪些字段」。
+     * 与设计器内的变更卡共用 core 的同一份 diff 实现。
+     */
+    diffAgainstBaseline({ baseline, document: candidate } = {}) {
+      const before = normalizeScreenDocument(apis, baseline);
+      if (!before.ok) return failure({ equal: null, rows: [], diagnostics: before.diagnostics });
+      const after =
+        candidate === undefined
+          ? snapshotTarget(document)
+          : normalizeScreenDocument(apis, candidate);
+      if (!after.ok) return failure({ equal: null, rows: [], diagnostics: after.diagnostics });
+      const rows = apis.diffScreenDocuments(before.document, after.document);
+      return ok({
+        equal: rows.length === 0,
+        rows,
+        changedComponentIds: rows.map((row) => row.componentId),
       });
     },
     exportScreen({ document: candidate } = {}) {

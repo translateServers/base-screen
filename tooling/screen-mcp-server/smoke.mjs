@@ -20,7 +20,7 @@ try {
     client.listResourceTemplates(),
   ]);
   if (
-    tools.tools.length !== 8 ||
+    tools.tools.length !== 12 ||
     resources.resources.length !== 3 ||
     templates.resourceTemplates.length !== 0
   )
@@ -53,6 +53,16 @@ try {
       ],
     },
   });
+  const a11y = await client.callTool({
+    name: 'check_a11y',
+    arguments: {
+      samples: [
+        { componentId: 'note', textColor: '#5c6675', backgroundColor: '#0d1117', fontSizePx: 14 },
+      ],
+    },
+  });
+  if (a11y.structuredContent?.failed !== 1)
+    throw new Error('check_a11y did not report the failing sample.');
   const diffed = await client.callTool({
     name: 'diff_screens',
     arguments: { after: applied.structuredContent?.document },
@@ -86,7 +96,7 @@ try {
     validated.structuredContent?.valid !== true
   )
     throw new Error('Screen MCP read/validate/apply/diff/propose/audit smoke check failed.');
-  console.log('Screen MCP smoke check passed: 3 resources, 8 tools.');
+  console.log('Screen MCP smoke check passed: 3 resources, 12 tools.');
 } finally {
   await client.close();
 }

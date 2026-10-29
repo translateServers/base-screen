@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from '@playwright/test';
@@ -354,7 +354,15 @@ function parseArgs(argv) {
     const name = token.startsWith('--') ? token.slice(2) : undefined;
     if (
       name === undefined ||
-      !['url', 'out', 'min-contrast', 'min-font-px', 'timeout'].includes(name)
+      ![
+        'url',
+        'out',
+        'min-contrast',
+        'min-font-px',
+        'timeout',
+        'max-ttv',
+        'baseline',
+      ].includes(name)
     )
       throw new Error(`Unknown argument: ${token}`);
     const value = argv[index + 1];
@@ -365,6 +373,31 @@ function parseArgs(argv) {
   return args;
 }
 
+/**
+ * 首屏预算：`--max-ttv` 直接给毫秒；`--baseline` 读上一次报告，按其 timeToViewerMs
+ * 上浮 10% 作为回归阈值。两者都给时取更严的那个，避免同时写两份口径。
+ */
+async function resolveTimeBudget(args) {
+  const limits = [];
+  if (args['max-ttv'] !== undefined) {
+    const value = Number(args['max-ttv']);
+    if (!Number.isFinite(value) || value <= 0) throw new Error('--max-ttv must be a positive number.');
+    limits.push({ limitMs: value, source: 'max-ttv' });
+  }
+  if (args.baseline !== undefined) {
+    const baseline = JSON.parse(await readFile(resolve(args.baseline), 'utf8'));
+    const previous = Number(baseline?.perf?.timeToViewerMs ?? baseline?.timeToViewerMs);
+    if (!Number.isFinite(previous) || previous <= 0) {
+      throw new Error('--baseline must point to a probe report with perf.timeToViewerMs.');
+    }
+    limits.push({ limitMs: Math.round(previous * 1.1), source: 'baseline' });
+  }
+  if (limits.length === 0) return { limitMs: undefined, source: 'none' };
+  return limits.reduce((strictest, item) =>
+    item.limitMs < strictest.limitMs ? item : strictest,
+  );
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const report = await probeScreenPage({
@@ -373,6 +406,19 @@ async function main() {
     minFontPx: args['min-font-px'] === undefined ? undefined : Number(args['min-font-px']),
     timeoutMs: args.timeout === undefined ? undefined : Number(args.timeout),
   });
+  const budget = await resolveTimeBudget(args);
+  const exceeded =
+    budget.limitMs !== undefined && report.perf.timeToViewerMs > budget.limitMs
+      ? budget.limitMs
+      : undefined;
+  report.perf = {
+    ...report.perf,
+    budget: {
+      limitMs: budget.limitMs ?? null,
+      source: budget.source,
+      exceeded,
+    },
+  };
   const text = `${JSON.stringify(report, null, 2)}\n`;
   if (args.out !== undefined) {
     const file = resolve(args.out);
@@ -384,7 +430,7 @@ async function main() {
   }
   const violations = report.a11y.violations?.length ?? 0;
   const fontViolations = report.a11y.fontViolations?.length ?? 0;
-  if (violations > 0 || fontViolations > 0) process.exitCode = 1;
+  if (violations > 0 || fontViolations > 0 || exceeded !== undefined) process.exitCode = 1;
 }
 
 if (
