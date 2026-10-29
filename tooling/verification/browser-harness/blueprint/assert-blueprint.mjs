@@ -539,17 +539,17 @@ export async function assertSemanticChartAuthoring(designer, page) {
     const zField = panel.querySelector('[data-property-symbol="Z"]');
     const subtitle = panel.querySelector('.inspector-context-subtitle');
     const panelRect = panel.getBoundingClientRect();
-    const contextRect = panel.querySelector('.inspector-context')?.getBoundingClientRect();
+    const tabsRect = panel.querySelector('.inspector-tabs')?.getBoundingClientRect();
     const toolbarRect = panel.querySelector('.inspector-toolbar')?.getBoundingClientRect();
     const xRect = xField?.getBoundingClientRect();
     const yRect = yField?.getBoundingClientRect();
     return {
       searchWidth: search?.getBoundingClientRect().width,
-      toolbarInsideContext:
-        contextRect !== undefined &&
+      toolbarInsideTabs:
+        tabsRect !== undefined &&
         toolbarRect !== undefined &&
-        toolbarRect.top >= contextRect.top &&
-        toolbarRect.bottom <= contextRect.bottom,
+        toolbarRect.top >= tabsRect.top - 1 &&
+        toolbarRect.bottom <= tabsRect.bottom + 1,
       geometryTopOffset: xRect === undefined ? undefined : xRect.top - panelRect.top,
       geometryControlHeight: xRect?.height,
       geometryColumnGap:
@@ -572,12 +572,11 @@ export async function assertSemanticChartAuthoring(designer, page) {
     };
   });
   if (
-    boardChrome.searchWidth !== 28 ||
-    !boardChrome.toolbarInsideContext ||
-    // 「几何」标题按原型恢复可见后，首个字段整体下移一个标题行（约 +30px）；
-    // 右栏新增一级页签条后再下移一行（33px），两段偏移都计入。
-    boardChrome.geometryTopOffset < 190 ||
-    boardChrome.geometryTopOffset > 199 ||
+    boardChrome.searchWidth !== 26 ||
+    !boardChrome.toolbarInsideTabs ||
+    // 「几何」标题可见 + 一级切换 / 身份 / 属性页签三行依次压在上方。
+    boardChrome.geometryTopOffset < 152 ||
+    boardChrome.geometryTopOffset > 161 ||
     boardChrome.geometryControlHeight !== 28 ||
     boardChrome.geometryColumnGap !== 14 ||
     boardChrome.zHiddenInBasic !== true ||

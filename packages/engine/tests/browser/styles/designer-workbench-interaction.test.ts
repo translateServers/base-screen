@@ -12,7 +12,7 @@ import {
 describe('designer workbench interaction and accessibility', () => {
   it('keeps the fill color picker compact and its popover out of form layout flow', () => {
     expect(controlsCss).toMatch(
-      /\.designer-color-palette-trigger\s*\{[^}]*width: 100%;[^}]*height: 34px;/s,
+      /\.designer-color-palette-trigger\s*\{[^}]*width: 100%;[^}]*height: var\(--designer-control-height\);/s,
     );
     expect(controlsCss).toMatch(
       /\.designer-color-popover\s*\{[^}]*position: fixed;[^}]*box-sizing: border-box;[^}]*width: 280px;[^}]*max-height: 560px;/s,

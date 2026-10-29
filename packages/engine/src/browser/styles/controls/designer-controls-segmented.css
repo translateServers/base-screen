@@ -76,6 +76,16 @@
   background: var(--designer-surface-control-active);
 }
 
+/* 右栏密集表单的选中档：提升一档的中性底 + 主文字色。
+   检查器里同时出现三四个分段控件，强调色文字会把“已选中”读成可点击链接。 */
+.designer .properties .inspector-pane .designer-segmented-option[aria-pressed="true"],
+.designer .properties .inspector-pane .designer-segmented-option[aria-checked="true"],
+.designer .properties .inspector-toolbar .designer-segmented-option[aria-pressed="true"] {
+  background: var(--designer-surface-raised);
+  color: var(--designer-text-primary);
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
+}
+
 /* 分段项禁用：换色不换透明度（R2 对比度契约）。 */
 .designer-segmented .designer-segmented-option:disabled {
   color: var(--designer-text-disabled);

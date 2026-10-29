@@ -8,107 +8,87 @@
     var(--designer-border-strong)
   );
   background: var(--designer-surface-panel);
+  /* 一级切换 / 对象身份 / 属性页签 / 内容 / 意图：五行顺序在所有状态间固定，
+     切检查器与变更只换内容，不再对调顶部两条导航，避免整栏跳动。 */
+  grid-template-rows: 38px 44px 38px minmax(0, 1fr) auto;
 }
 
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"]) {
-  /* 检查器页签 / 一级页签 / 对象上下文 / 内容 / 意图输入：五段各自可折叠。 */
-  grid-template-rows: 38px auto minmax(58px, auto) minmax(0, 1fr) auto;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])
-  > .right-pane-switch {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])
-  > .right-pane-changes {
-  grid-column: 1;
-  grid-row: 3 / 5;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])
-  > .designer-intent {
-  grid-column: 1;
-  grid-row: 5;
-}
-
-/* 变更页签下检查器内容整体收掉：只留一级页签 / 变更列表 / 意图输入。 */
-.designer:not([data-right-collapsed="true"])
-.properties:not([data-inspector-context-kind="canvas"])[data-right-pane="changes"] {
-  grid-template-rows: 0 auto minmax(0, 1fr) auto;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])[data-right-pane="changes"]
-  > .right-pane-changes {
-  grid-row: 3;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])[data-right-pane="changes"]
-  > .designer-intent {
-  grid-row: 4;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])
-  > .panel-heading {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 4;
-  width: 38px;
-  height: 38px;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])
-  > .panel-heading
-  .panel-title {
-  display: none;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])
-  > .inspector-tabs {
+.designer:not([data-right-collapsed="true"]) .properties > .right-pane-switch {
   grid-column: 1;
   grid-row: 1;
 }
 
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])
-  > .inspector-context {
+.designer:not([data-right-collapsed="true"]) .properties > .inspector-context {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.designer:not([data-right-collapsed="true"]) .properties > .inspector-tabs {
   grid-column: 1;
   grid-row: 3;
 }
 
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])
-  > .inspector-toolbar {
+.designer:not([data-right-collapsed="true"]) .properties > .inspector-toolbar {
   grid-column: 1;
   grid-row: 3;
 }
 
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])
-  > .inspector-pane {
+.designer:not([data-right-collapsed="true"]) .properties > .inspector-pane {
   grid-column: 1;
   grid-row: 4;
 }
 
+.designer:not([data-right-collapsed="true"]) .properties > .right-pane-changes {
+  grid-column: 1;
+  grid-row: 4;
+}
+
+.designer:not([data-right-collapsed="true"]) .properties > .designer-intent {
+  grid-column: 1;
+  grid-row: 5;
+}
+
+/* 画布与多选没有属性页签行：面板标题占用身份行，内容直接落到第 4 行。 */
+.designer:not([data-right-collapsed="true"]) .properties[data-inspector-context-kind="canvas"],
+.designer:not([data-right-collapsed="true"])
+  .properties[data-inspector-context-kind="multi-selection"] {
+  grid-template-rows: 38px 44px 0 minmax(0, 1fr) auto;
+}
+
+.properties[data-inspector-context-kind="canvas"] > .panel-heading,
+.properties[data-inspector-context-kind="multi-selection"] > .panel-heading {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+/* 组件身份由 inspector-context 承担；列头标题不参与，避免与眼睛/页签争一条边。 */
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"]):not(
+    [data-inspector-context-kind="multi-selection"]
+  )
+  > .panel-heading {
+  display: none;
+}
+
+/* 变更页签：一级切换不动，检查器各段整行收为 0。 */
+.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="changes"] {
+  grid-template-rows: 38px 0 0 minmax(0, 1fr) auto;
+}
+
+/* 画布与多选的列头标题在变更页签下也必须退场，否则会落进 0 高的行里压住卡片。 */
+.designer:not([data-right-collapsed="true"])
+  .properties[data-right-pane="changes"][data-inspector-context-kind]
+  > .panel-heading {
+  display: none;
+}
+
 .properties .inspector-tabs {
-  padding: 0 calc(var(--designer-space-8) + var(--designer-space-3)) 0 0;
-  border-bottom-color: var(--designer-border-subtle);
-  background: var(--designer-surface-workspace);
+  /* 右侧给搜索与密度留固定 144px，页签不会在工具出现时被挤换行。 */
+  height: 38px;
+  padding: 0 calc(var(--designer-space-7) * 6) 0 var(--designer-space-3);
+  border-bottom-color: transparent;
+  background: var(--designer-surface-panel);
+  box-shadow: 0 1px 0 var(--designer-border-subtle);
 }
 
 .properties .inspector-tabs .designer-tab {
@@ -125,11 +105,11 @@
 
 .properties .inspector-context {
   display: flex;
-  min-height: 58px;
+  height: 44px;
+  min-height: 0;
+  align-items: center;
   gap: var(--designer-space-1);
-  padding: var(--designer-space-5) calc(var(--designer-space-7) * 5 + var(--designer-space-5))
-    calc(var(--designer-space-4) + var(--designer-space-1))
-    calc(var(--designer-space-6) + var(--designer-space-2));
+  padding: 0 calc(var(--designer-space-6) + var(--designer-space-2));
   border-bottom: 0;
   background: var(--designer-surface-panel);
 }
@@ -141,12 +121,12 @@
   gap: var(--designer-space-3);
 }
 
-/* 身份图标（原型 .identity-icon）：30px 中性底块，只承载对象类型，不抢强调色预算。 */
+/* 身份图标（原型 .identity-icon）：26px 中性底块，只承载对象类型，不抢强调色预算。 */
 .properties .inspector-context-icon {
   display: inline-grid;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
   place-items: center;
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
@@ -155,8 +135,8 @@
 }
 
 .properties .inspector-context-icon svg {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
 }
 
 .properties .inspector-context-identity {
@@ -190,7 +170,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-lg);
+  font-size: var(--designer-font-size-base);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -200,51 +180,63 @@
   min-width: 0;
   overflow: hidden;
   color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-sm);
+  font-size: var(--designer-font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 /* 锁定/隐藏徽标由 chrome 层的 .designer-badge 统一绘制。 */
 
+/* 搜索与密度落在属性页签同一行的右端；页签行已预留 144px，互不重叠。 */
 .properties .inspector-toolbar {
-  width: max-content;
-  min-height: 28px;
-  grid-template-columns: 28px auto;
-  align-self: start;
-  gap: calc(var(--designer-space-3) + 1px);
+  position: relative;
+  z-index: 2;
+  width: auto;
+  min-height: 0;
+  grid-template-columns: 26px auto;
+  align-self: center;
+  gap: var(--designer-space-2);
   justify-self: end;
-  justify-content: end;
-  margin-top: calc(var(--designer-space-5) + var(--designer-space-1));
-  padding: 0 calc(var(--designer-space-6) + var(--designer-space-1)) 0 0;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 0 calc(var(--designer-space-5) + var(--designer-space-1)) 0 0;
   border-bottom: 0;
   background: transparent;
 }
 
 .properties .inspector-search-launch {
-  width: 28px;
-  height: 28px;
-  border-color: var(--designer-border-default);
-  border-radius: var(--designer-radius-1);
-  background: var(--designer-inspector-control-surface);
-  color: var(--designer-text-secondary);
+  width: 26px;
+  height: 26px;
+  border-color: transparent;
+  border-radius: var(--designer-radius-3);
+  background: transparent;
+  color: var(--designer-text-muted);
 }
 
-.properties[data-inspector-search-open] {
-  grid-template-rows: 38px minmax(0, 1fr) !important;
+.properties .inspector-search-launch:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
 }
 
+/* 搜索工作区独占右栏：返回入口在工作区头部，一级切换与检查器各行整体退场。 */
+.designer:not([data-right-collapsed="true"]) .properties[data-inspector-search-open] {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.properties[data-inspector-search-open] > .right-pane-switch,
+.properties[data-inspector-search-open] > .inspector-tabs,
 .properties[data-inspector-search-open] > .inspector-context,
 .properties[data-inspector-search-open] > .inspector-toolbar,
 .properties[data-inspector-search-open] > .inspector-pane,
-.properties[data-inspector-search-open] > .right-pane-switch,
-.properties[data-inspector-search-open] > .designer-intent {
+.properties[data-inspector-search-open] > .right-pane-changes,
+.properties[data-inspector-search-open] > .designer-intent,
+.properties[data-inspector-search-open] > .panel-heading {
   display: none;
 }
 
 .properties > .inspector-search-workspace {
   min-height: 0;
-  grid-row: 2 / -1;
+  grid-row: 1 / -1;
 }
 
 .properties > .inspector-search-workspace:not([hidden]) {
@@ -327,59 +319,21 @@
 
 /* Multi-selection switches the inspector into the compact batch configuration surface. */
 .designer:not([data-right-collapsed="true"])
-.properties[data-inspector-context-kind="multi-selection"] {
-  grid-template-rows: 44px auto minmax(0, 1fr) auto;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties[data-inspector-context-kind="multi-selection"]
-  > .right-pane-switch {
-  grid-row: 2;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties[data-inspector-context-kind="multi-selection"]
-  > .designer-intent {
-  grid-row: 4;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties[data-inspector-context-kind="multi-selection"][data-right-pane="changes"] {
-  grid-template-rows: 0 auto minmax(0, 1fr) auto;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties[data-inspector-context-kind="multi-selection"][data-right-pane="changes"]
-  > .right-pane-changes {
-  grid-row: 3;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties[data-inspector-context-kind="multi-selection"][data-right-pane="changes"]
-  > .designer-intent {
-  grid-row: 4;
-}
-
-.designer:not([data-right-collapsed="true"])
   .properties[data-inspector-context-kind="multi-selection"]
   > .panel-heading {
-  position: relative !important;
-  top: auto;
-  right: auto;
   display: flex;
-  width: auto !important;
   height: 44px;
-  grid-row: 1 !important;
+  grid-row: 2;
   justify-content: flex-start;
   padding: 0 calc(var(--designer-space-6) + var(--designer-space-2));
-  border-bottom: 1px solid var(--designer-border-subtle);
+  border-bottom: 0;
   background: var(--designer-surface-panel);
 }
 
 .properties[data-inspector-context-kind="multi-selection"] > .panel-heading .panel-title {
-  display: block !important;
+  display: block;
   color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-lg);
+  font-size: var(--designer-font-size-base);
   font-weight: 600;
   text-align: left;
 }
@@ -392,7 +346,7 @@
 }
 
 .properties[data-inspector-context-kind="multi-selection"] > .inspector-pane {
-  grid-row: 3 !important;
+  grid-row: 4;
   padding: 0 calc(var(--designer-space-5) + 1px) var(--designer-space-7);
 }
 
@@ -544,6 +498,39 @@
   gap: var(--designer-space-2);
   margin-bottom: var(--designer-space-2);
   white-space: normal;
+}
+
+/* 右栏分区标题与能力摘要的外观归 chrome 层统一维护；
+   本层只保留检查器内容的排布与密度。 */
+
+/* 交互事件分组沿用同一档小标题；descriptor 摘要的右侧发丝线在这里是多余的，
+   它会把“交互事件 + 计数”读成一条带下划线的分隔标题。 */
+.properties .inspector-pane .designer-blueprint-group {
+  border-bottom: 0;
+}
+
+.properties .inspector-pane .designer-blueprint-group-summary {
+  min-height: 28px;
+  margin-bottom: var(--designer-space-2);
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 600;
+}
+
+.properties .inspector-pane .designer-blueprint-group-summary::after {
+  content: none;
+}
+
+/* 事件卡只保留一层可见边界：外层是事件行，内层规则卡负责卡片感。 */
+.properties .inspector-pane .designer-blueprint-event {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.properties .inspector-pane .designer-blueprint-event > header {
+  min-height: 28px;
+  padding-bottom: var(--designer-space-2);
 }
 
 /* 字段附加行横跨两列由控件骨架负责，这里只收紧它与控件列的间距。 */

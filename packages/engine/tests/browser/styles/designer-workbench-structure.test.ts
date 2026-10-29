@@ -24,12 +24,10 @@ describe('designer workbench structure and layout', () => {
     expect(workbenchCss).toContain('.properties[data-inspector-density="basic"]');
     expect(workbenchCss).toContain(':not([data-inspector-searching])');
     expect(workbenchCss).toContain('[data-inspector-advanced]');
-    expect(workbenchCss).toContain(
-      'grid-template-rows: 38px auto minmax(58px, auto) minmax(0, 1fr) auto;',
-    );
-    expect(workbenchCss).toContain('grid-template-columns: 28px auto;');
+    expect(workbenchCss).toContain('grid-template-rows: 38px 44px 38px minmax(0, 1fr) auto;');
+    expect(workbenchCss).toContain('grid-template-columns: 26px auto;');
     expect(workbenchCss).toMatch(/> \.inspector-toolbar\s*\{[^}]*grid-row: 3;/s);
-    expect(workbenchCss).toMatch(/> \.right-pane-switch\s*\{[^}]*grid-row: 2;/s);
+    expect(workbenchCss).toMatch(/> \.right-pane-switch\s*\{[^}]*grid-row: 1;/s);
     expect(workbenchCss).toContain('.properties[data-inspector-search-open]');
     expect(workbenchCss).toContain('.inspector-search-workspace-header');
     expect(workbenchCss).toContain('grid-template-rows: 40px auto auto minmax(0, 1fr);');

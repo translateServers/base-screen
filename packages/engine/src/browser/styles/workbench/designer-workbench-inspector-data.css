@@ -453,41 +453,21 @@
 }
 
 /* Page configuration uses compact label/control rows and intentionally omits component
-   context, search and tab chrome. */
-.designer:not([data-right-collapsed="true"]) .properties[data-inspector-context-kind="canvas"] {
-  grid-template-rows: 44px auto minmax(0, 1fr) auto;
-}
-
-/* 右栏新增一级页签与意图输入区后，画布配置上下文也要留出它们的位置。 */
-.properties[data-inspector-context-kind="canvas"] > .right-pane-switch {
-  grid-row: 2;
-}
-
-.properties[data-inspector-context-kind="canvas"] > .right-pane-changes {
-  grid-row: 2 / 4;
-}
-
-.properties[data-inspector-context-kind="canvas"] > .designer-intent {
-  grid-row: 4;
-}
-
-.designer .properties[data-inspector-context-kind="canvas"][data-right-pane="changes"] {
-  grid-template-rows: 0 auto minmax(0, 1fr) auto;
-}
+   context, search and tab chrome. 行高与顺序由 inspector 层统一：一级切换固定第一行，
+   标题占身份行，内容落在第 4 行。 */
 
 .properties[data-inspector-context-kind="canvas"] > .panel-heading {
-  grid-row: 1;
   height: 44px;
   justify-content: flex-start;
   padding: 0 calc(var(--designer-space-6) + var(--designer-space-2));
-  border-bottom-color: var(--designer-border-subtle);
+  border-bottom-color: transparent;
   background: var(--designer-surface-panel);
 }
 
 .properties[data-inspector-context-kind="canvas"] > .panel-heading .panel-title {
   margin-left: 0;
   color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-lg);
+  font-size: var(--designer-font-size-base);
   font-weight: 600;
 }
 
@@ -499,7 +479,6 @@
 }
 
 .properties[data-inspector-context-kind="canvas"] > .inspector-pane {
-  grid-row: 3;
   padding: 0 calc(var(--designer-space-6) + var(--designer-space-2)) var(--designer-space-7);
 }
 
@@ -1278,7 +1257,7 @@
 /* 与设计稿面板主体一致：外层只留 2px，首个分块自己带 11px（合起来 13px 到组头），
    左右 14px，底部 0——状态条在流内 sticky，多给 padding 会让它悬空。 */
 .properties .designer-inspector-data-flow-content {
-  padding: var(--designer-space-1) calc(var(--designer-space-5) + 1px) 0;
+  padding: calc(var(--designer-space-5) + 1px) calc(var(--designer-space-5) + 1px) 0;
 }
 
 /* 绑定行与「当前来源」之间只留一条发丝线。 */
@@ -1554,10 +1533,14 @@
   display: none;
 }
 
-/* 固定值/变量与物料数据表单：分节间距与标题外观由 chrome 层统一提供。 */
+/* 固定值/变量与物料数据表单：独立成一张 workspace 底的卡片，
+   与绑定行和底部状态条拉开层次，长表单不再直接铺在面板底色上。 */
 .properties .designer-inspector-data-flow-content .designer-data-source-editor {
-  padding-top: 0;
+  gap: var(--designer-space-4);
+  padding: var(--designer-space-4) var(--designer-space-4) var(--designer-space-5);
   border-top: 0;
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-surface-workspace);
 }
 
 .properties .designer-inspector-data-flow-content .designer-inspector-section-title {

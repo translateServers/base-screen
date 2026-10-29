@@ -946,7 +946,7 @@ export async function assertAuthoringPaletteLayout(page, designer) {
     };
   });
   if (
-    compactPaletteBefore.paletteHeight !== 34 ||
+    compactPaletteBefore.paletteHeight !== 30 ||
     Math.abs(compactPaletteBefore.fieldHeight - compactPaletteOpen.fieldHeight) > 0.1 ||
     compactPaletteOpen.paletteHeight !== compactPaletteBefore.paletteHeight ||
     compactPaletteOpen.fieldOverflow !== 'visible' ||

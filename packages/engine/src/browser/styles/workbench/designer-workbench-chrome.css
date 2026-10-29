@@ -296,6 +296,66 @@ details:not([open]) .designer-panel-section-disclosure {
   padding-left: var(--designer-space-6);
 }
 
+/* 右栏检查器：分区标题、能力摘要与高级面板的节奏集中在这里。
+   标题小号、次级色、不画发丝线——层级由留白与字重承担，长表单不再被一排横线
+   切成分段控件清单。 */
+.properties .inspector-pane .designer-panel-section-title {
+  margin-bottom: var(--designer-space-3);
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.properties .inspector-pane .designer-panel-section-title::after {
+  display: none;
+}
+
+.properties .inspector-pane .designer-panel-section + .designer-panel-section {
+  border-top: 0;
+}
+
+/* 高级/事件面板同一套标题。这些标题是 h3/h4；若不压掉 UA margin，
+   每个标题都会留出 1.33em 的大洞。 */
+.properties .inspector-pane .designer-inspector-section-title {
+  margin: 0 0 var(--designer-space-3);
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* 能力摘要（可调整大小 / 可旋转 / 可预览事件）是并列标签，不是条目清单：
+   两列中性 chip，避免一列裸文本被读成未完成的表单。 */
+.properties .inspector-pane .designer-inspector-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--designer-space-2);
+}
+
+.properties .inspector-pane .designer-inspector-summary li {
+  display: flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 0 var(--designer-space-3);
+  border-radius: var(--designer-radius-1);
+  background: var(--designer-surface-control);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+}
+
+/* 高级面板的分区（无 designer-panel-section）自带上下留白与分隔线；
+   样式面板的 details 分区不在此列。 */
+.properties .inspector-pane .designer-inspector-section:not(.designer-panel-section) {
+  padding: var(--designer-space-5) 0;
+}
+
+.properties
+  .inspector-pane
+  .designer-inspector-section:not(.designer-panel-section)
+  + .designer-inspector-section:not(.designer-panel-section) {
+  border-top: 1px solid var(--designer-border-subtle);
+}
+
 /* ── 蓝图检查器分区（带底色抬头）────────────────────────────────────────────── */
 
 .designer-panel-section[data-variant="header"] {

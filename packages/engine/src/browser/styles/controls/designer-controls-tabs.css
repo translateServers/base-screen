@@ -84,15 +84,15 @@
 
 /* 右栏浅胶囊 tab：选中 = 胶囊底 + 收边 + 加粗，悬停只给底色。 */
 .inspector-tabs .designer-tab {
-  min-height: 30px;
+  min-height: 26px;
   flex: 0 0 auto;
-  padding: 0 var(--designer-space-4);
+  padding: 0 var(--designer-space-3);
   border: 0;
   border-radius: var(--designer-radius-3);
   background: transparent;
   box-shadow: none;
   color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-base);
+  font-size: var(--designer-font-size-sm);
   font-weight: 500;
 }
 
@@ -102,16 +102,18 @@
   box-shadow: none;
 }
 
+/* 属性页签比一级切换轻一档：有底无边。两级导航叠在一起时，
+   检查器/变更 是位置锚点，样式/数据源/高级 只是内容分类。 */
 .inspector-tabs .designer-tab[aria-selected="true"] {
   border-bottom-color: transparent;
-  background: var(--designer-surface-control-active);
+  background: var(--designer-surface-control);
   color: var(--designer-text-primary);
   font-weight: 600;
-  box-shadow: inset 0 0 0 1px var(--designer-border-default);
+  box-shadow: none;
 }
 
 .inspector-tabs .designer-tab[aria-selected="true"]:hover {
-  background: var(--designer-surface-control-active);
+  background: var(--designer-surface-control-hover);
   color: var(--designer-text-primary);
-  box-shadow: inset 0 0 0 1px var(--designer-border-active);
+  box-shadow: none;
 }

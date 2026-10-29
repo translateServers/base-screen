@@ -14,11 +14,11 @@
 
 .designer-color-palette-trigger {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 16px;
+  grid-template-columns: 20px minmax(0, 1fr) 12px;
   align-items: center;
   gap: var(--designer-space-2);
   width: 100%;
-  height: 34px;
+  height: var(--designer-control-height);
   padding: 0 var(--designer-space-2);
   border-color: var(--designer-border-default);
   background: var(--designer-surface-control);
@@ -95,14 +95,19 @@
   padding-left: var(--designer-space-2);
 }
 
+/* 触发器右端只留一个中性 chevron 表示“可展开调色板”。
+   此前用 conic 彩虹环冒充调色板图标，在低饱和的检查器里是最抢眼的一块彩色，
+   与“颜色值本身才是内容”的层级相反。 */
 .designer-color-palette-trigger-icon {
-  width: 14px;
-  height: 14px;
-  border: 2px solid transparent;
-  border-radius: 50%;
-  background:
-    linear-gradient(var(--designer-surface-control), var(--designer-surface-control)) padding-box,
-    conic-gradient(#ff5f57, #ffbd2e, #28c840, #32ade6, #7c6cff, #ff5f57) border-box;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--designer-space-2);
+  border: 0;
+  border-right: 1.5px solid var(--designer-text-muted);
+  border-bottom: 1.5px solid var(--designer-text-muted);
+  border-radius: 0;
+  background: none;
+  transform: rotate(45deg) translateY(-1px);
 }
 
 .designer-color-popover {
