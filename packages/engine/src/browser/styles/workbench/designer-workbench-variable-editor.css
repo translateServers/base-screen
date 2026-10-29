@@ -603,11 +603,20 @@
   border-bottom: 1px solid var(--designer-border-subtle);
 }
 
+/* 盒子样式共用，字体分开：pre 是求值输出（等宽有意义），p 是加载中/失败的状态文案，
+   用等宽只降低可读性。原先两者合写一条 font，等于让状态文案跟着输出走。 */
 .variable-response-field p,
 .variable-response-field pre {
   max-height: 104px;
   padding: calc(var(--designer-space-3) + 1px) var(--designer-space-4);
   color: var(--designer-text-secondary);
+}
+
+.variable-response-field p {
+  font: 500 var(--designer-font-size-xs) / 1.65 var(--designer-font-family);
+}
+
+.variable-response-field pre {
   font: 500 var(--designer-font-size-xs) / 1.65 var(--designer-font-family-mono);
 }
 
