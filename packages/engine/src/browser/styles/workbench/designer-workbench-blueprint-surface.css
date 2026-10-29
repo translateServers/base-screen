@@ -148,6 +148,22 @@
   display: none;
 }
 
+/* 变更页签与蓝图检查器互斥：两者都占右栏内容区。蓝图检查器跨 2–5 行，变更页签在 4 行，
+   同时可见就会整块叠印（实测两个包围盒完全重合）。切到变更时让检查器退场，页签接管
+   检查器腾出的整段高度。 */
+.designer[data-authoring-mode="blueprint"]
+  .properties[data-right-pane="changes"]
+  > .blueprint-inspector {
+  display: none;
+}
+
+.designer[data-authoring-mode="blueprint"]
+  .properties[data-right-pane="changes"]
+  > .right-pane-changes {
+  grid-column: 1;
+  grid-row: 2 / 5;
+}
+
 .designer[data-authoring-mode="blueprint"] .statusbar-end {
   visibility: hidden;
 }
