@@ -130,31 +130,10 @@
   font-size: var(--designer-font-size-xs);
 }
 
-.variable-editor-section {
-  display: flex;
-  align-items: center;
-  gap: var(--designer-space-2);
-  min-width: 0;
-  margin: var(--designer-space-2) 0 0;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  font-size: var(--designer-font-size-xs);
-  font-weight: 600;
-}
-
-.variable-editor-section-key {
-  display: inline-grid;
-  width: 18px;
-  height: 18px;
-  flex: none;
-  place-items: center;
-  border-radius: var(--designer-radius-1);
-  background: var(--designer-surface-control);
-  color: var(--designer-text-muted);
-  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-family-mono);
-  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
-}
-
+/* 这里曾有一版 .variable-editor-section / .variable-editor-section-key，被本文件下方的
+   同名规则整块覆盖（后者属性集是前者的超集），19 条声明从未生效。已删除，生效版本见
+   「变量编辑步骤」一节；两处差异是那次迭代的真实意图：section 从居中改基线对齐并加分隔线，
+   key 从 18px/2px 圆角改 16px/6px 收边。 */
 .variable-editor-step-title {
   min-width: 0;
   overflow: hidden;
