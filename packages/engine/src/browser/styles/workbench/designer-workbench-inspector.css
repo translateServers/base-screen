@@ -9,7 +9,10 @@
   );
   background: var(--designer-surface-panel);
   /* 一级切换 / 对象身份 / 属性页签 / 内容 / 意图：五行顺序在所有状态间固定，
-     切检查器与变更只换内容，不再对调顶部两条导航，避免整栏跳动。 */
+     切检查器与变更只换内容，不再对调顶部两条导航，避免整栏跳动。
+     列只有一列且显式声明：任何一个子项若漏写 grid-column，自动布局就会另开一列，
+     整块内容被挤成竖条（蓝图检查器就这么塌过一次）。新增子项务必同时写列与行。 */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 38px 44px 38px minmax(0, 1fr) auto;
 }
 

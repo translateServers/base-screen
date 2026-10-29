@@ -135,7 +135,17 @@
 
 .designer[data-authoring-mode="blueprint"] .blueprint-inspector {
   display: grid;
-  grid-row: 2 / -1;
+  /* 与右栏五行契约对齐：列必须显式写 1，行从身份行（2）起到意图区（5）前止。
+     只写 grid-row 而让列保持 auto，会在「标题已占 2/1」时被自动布局甩进隐式第二列，
+     整块面板塌成一条 60px 竖条。 */
+  grid-column: 1;
+  grid-row: 2 / 5;
+}
+
+/* 蓝图检查器自带标题栏（.blueprint-inspector-topbar），面板列头再写一遍就是同一个标题
+   出现两次。蓝图模式没有「当前组件身份」，身份行由检查器自己接管。 */
+.designer[data-authoring-mode="blueprint"] .properties > .panel-heading {
+  display: none;
 }
 
 .designer[data-authoring-mode="blueprint"] .statusbar-end {
