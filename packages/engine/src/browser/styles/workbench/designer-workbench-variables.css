@@ -323,7 +323,9 @@
   min-width: 0;
   overflow: hidden;
   color: var(--designer-text-primary);
-  font: 500 12px / 1.4 var(--designer-font-numeric);
+  /* 家族槽只接受 family-only 令牌：--designer-font-numeric 是整条 font 简写，
+     嵌进另一条简写的家族位置同样非法，整条声明会作废。 */
+  font: 500 var(--designer-font-size-sm) / 1.4 var(--designer-font-family-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

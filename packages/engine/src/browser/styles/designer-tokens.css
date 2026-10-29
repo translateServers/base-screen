@@ -9,7 +9,14 @@
    - 浅色 warning #eab308 亮黄在浅底上即便纯白也只有 1.87，收到 30% → #a48025（3.15）。
 
    两套主题共享的排版/间距/圆角/几何/动效/层级令牌放在裸 `:host` 里：它们与配色无关，
-   若留在某个主题块内，另一个主题就会缺这些令牌（自定义属性无继承源时整条声明失效）。 */
+   若留在某个主题块内，另一个主题就会缺这些令牌（自定义属性无继承源时整条声明失效）。
+
+   覆盖位的边界：只覆盖配色类令牌——表面、文本、边框、阴影、语义色与强调档（含按钮强调档）。
+   上面那段说的共享排版/字距/间距/圆角/控件几何/层级/动效令牌**不提供覆盖位**：它们描述的是
+   工作台的密度与节奏而不是配色，逐个加钩子会让每个值都要维护两套主题的成对兜底，也会让对比度
+   契约失去可解析的落点。宿主若要改密度，应当在宿主侧用 transform 缩放或另行约定一套密度令牌，
+   不要在这里加。两个主题块内的每个令牌都必须带同名覆盖位，由 tooling/checks/designer-styles.mjs
+   的 DESIGNER_STYLE_THEME_TOKEN_UNHOOKED 断言守住。 */
 :host {
   /* ── 动效 ── */
   --designer-motion: var(--base-screen-designer-motion, 150ms cubic-bezier(0.2, 0, 0, 1));
@@ -128,46 +135,48 @@
   --designer-surface-raised: var(--base-screen-designer-surface-raised, #ffffff);
   --designer-surface-control: var(--base-screen-designer-surface-control, #f7f7f7);
   --designer-surface-control-hover: var(--base-screen-designer-surface-control-hover, #ececec);
-  --designer-surface-control-active: #e7e7e7;
+  --designer-surface-control-active: var(--base-screen-designer-surface-control-active, #e7e7e7);
   --designer-surface-overlay: var(--base-screen-designer-surface-overlay, #ffffff);
   --designer-surface-canvas: var(--base-screen-designer-surface-canvas, #efefef);
   --designer-surface-scrim: var(--base-screen-designer-surface-scrim, rgb(23 23 23 / 45%));
   --designer-canvas-grid-line: var(--base-screen-designer-canvas-grid-line, rgb(23 23 23 / 8%));
-  --designer-range-track: rgb(23 23 23 / 16%);
+  --designer-range-track: var(--base-screen-designer-range-track, rgb(23 23 23 / 16%));
 
   /* ── 文本四级灰阶 ── */
   --designer-text-primary: var(--base-screen-designer-text-primary, #171717);
   --designer-text-secondary: var(--base-screen-designer-text-secondary, #4d4d4d);
   --designer-text-muted: var(--base-screen-designer-text-muted, #666666);
   --designer-text-disabled: var(--base-screen-designer-text-disabled, #808080);
-  --designer-text-on-accent: #ffffff;
+  --designer-text-on-accent: var(--base-screen-designer-text-on-accent, #ffffff);
 
   /* ── 边框与焦点：alpha 收边，压在任何表面上都成立 ── */
   --designer-border-subtle: var(--base-screen-designer-border-subtle, rgb(23 23 23 / 10%));
   --designer-border-default: var(--base-screen-designer-border-default, rgb(23 23 23 / 15%));
   --designer-border-strong: var(--base-screen-designer-border-strong, rgb(23 23 23 / 16%));
-  --designer-border-active: rgb(23 23 23 / 26%);
+  --designer-border-active: var(--base-screen-designer-border-active, rgb(23 23 23 / 26%));
   --designer-focus-ring: var(--base-screen-designer-focus-ring, #0070f3);
   /* 阴影当边框（Geist 的标志手法）：0 偏移、0 模糊、1px 扩展的阴影 —— 视觉上是一条 1px 线，
      但不占盒模型、不裁圆角、可与浮起阴影叠在同一条声明里。交互面（按钮/输入/卡片/分段轨）
      用它收边，只有真正的分隔线（面板分区、列表隔离）才用 border。 */
-  --designer-elev-ring: 0 0 0 1px rgb(0 0 0 / 8%);
+  --designer-elev-ring: var(--base-screen-designer-elev-ring, 0 0 0 1px rgb(0 0 0 / 8%));
   /* 卡片三层栈：描边 + 2px 微抬 + 8px 远距 + 内侧浅色高光（Geist 的「从内部发光」）。 */
-  --designer-elev-card:
+  --designer-elev-card: var(
+    --base-screen-designer-elev-card,
     0 0 0 1px rgb(0 0 0 / 8%), 0 2px 2px rgb(0 0 0 / 4%), 0 8px 8px -8px rgb(0 0 0 / 4%),
-    inset 0 0 0 1px var(--designer-surface-control);
+    inset 0 0 0 1px var(--designer-surface-control)
+  );
 
   /* ── 强调色与语义色 ── */
   --designer-accent: var(--base-screen-designer-accent, #0070f3);
   --designer-accent-surface: var(--base-screen-designer-accent-surface, #e3eefb);
-  --designer-accent-text: #145ec2;
+  --designer-accent-text: var(--base-screen-designer-accent-text, #145ec2);
   --designer-success: var(--base-screen-designer-success, #1d9746);
   --designer-success-surface: var(--base-screen-designer-success-surface, #e1f0e6);
   --designer-warning: var(--base-screen-designer-warning, #a48025);
   --designer-warning-surface: var(--base-screen-designer-warning-surface, #f1ede2);
   --designer-danger: var(--base-screen-designer-danger, #dc2626);
   --designer-danger-surface: var(--base-screen-designer-danger-surface, #f8e2e2);
-  --designer-danger-text: #b52a26;
+  --designer-danger-text: var(--base-screen-designer-danger-text, #b52a26);
 
   /* ── 高度与描边：耳语级阴影靠距离做层级，不靠浓度 ── */
   --designer-shadow-overlay: var(
@@ -185,9 +194,18 @@
   );
 
   /* ── 按钮强调档：从 --designer-accent 派生，两套主题自动跟随 ── */
-  --designer-button-primary-background: color-mix(in srgb, var(--designer-accent) 82%, black);
-  --designer-button-primary-hover: color-mix(in srgb, var(--designer-accent) 86%, black);
-  --designer-button-primary-active: color-mix(in srgb, var(--designer-accent) 76%, black);
+  --designer-button-primary-background: var(
+    --base-screen-designer-button-primary-background,
+    color-mix(in srgb, var(--designer-accent) 82%, black)
+  );
+  --designer-button-primary-hover: var(
+    --base-screen-designer-button-primary-hover,
+    color-mix(in srgb, var(--designer-accent) 86%, black)
+  );
+  --designer-button-primary-active: var(
+    --base-screen-designer-button-primary-active,
+    color-mix(in srgb, var(--designer-accent) 76%, black)
+  );
 
   color-scheme: light;
 }
@@ -202,46 +220,57 @@
   --designer-surface-raised: var(--base-screen-designer-surface-raised, #080808);
   --designer-surface-control: var(--base-screen-designer-surface-control, #161616);
   --designer-surface-control-hover: var(--base-screen-designer-surface-control-hover, #2a2a2a);
-  --designer-surface-control-active: #323232;
+  --designer-surface-control-active: var(--base-screen-designer-surface-control-active, #323232);
   --designer-surface-overlay: var(--base-screen-designer-surface-overlay, #262626);
   --designer-surface-canvas: var(--base-screen-designer-surface-canvas, #282828);
   --designer-surface-scrim: var(--base-screen-designer-surface-scrim, rgb(0 0 0 / 70%));
   --designer-canvas-grid-line: var(--base-screen-designer-canvas-grid-line, rgb(245 245 245 / 8%));
-  --designer-range-track: rgb(245 245 245 / 26%);
+  --designer-range-track: var(--base-screen-designer-range-track, rgb(245 245 245 / 26%));
 
   --designer-text-primary: var(--base-screen-designer-text-primary, #f5f5f5);
   --designer-text-secondary: var(--base-screen-designer-text-secondary, #b7b7b7);
   --designer-text-muted: var(--base-screen-designer-text-muted, #aeaeae);
   --designer-text-disabled: var(--base-screen-designer-text-disabled, #7d7d7d);
   /* 黑夜的强调底上放深字，与亮色白字/蓝底同档（4.93:1）。 */
-  --designer-text-on-accent: #1c2b40;
+  --designer-text-on-accent: var(--base-screen-designer-text-on-accent, #1c2b40);
 
   --designer-border-subtle: var(--base-screen-designer-border-subtle, rgb(245 245 245 / 10%));
   --designer-border-default: var(--base-screen-designer-border-default, rgb(245 245 245 / 15%));
   --designer-border-strong: var(--base-screen-designer-border-strong, rgb(245 245 245 / 16%));
-  --designer-border-active: rgb(245 245 245 / 26%);
+  --designer-border-active: var(--base-screen-designer-border-active, rgb(245 245 245 / 26%));
   --designer-focus-ring: var(--base-screen-designer-focus-ring, #5297fc);
-  --designer-elev-ring: 0 0 0 1px rgb(245 245 245 / 15%);
+  --designer-elev-ring: var(--base-screen-designer-elev-ring, 0 0 0 1px rgb(245 245 245 / 15%));
   /* 黑夜的卡片栈把「内侧高光」换成比卡片底亮一档的 control 底，暗面上才看得出内圈。 */
-  --designer-elev-card:
+  --designer-elev-card: var(
+    --base-screen-designer-elev-card,
     0 0 0 1px rgb(245 245 245 / 15%), 0 2px 2px rgb(0 0 0 / 40%), 0 8px 8px -8px rgb(0 0 0 / 45%),
-    inset 0 0 0 1px var(--designer-surface-control);
+    inset 0 0 0 1px var(--designer-surface-control)
+  );
 
   --designer-accent: var(--base-screen-designer-accent, #5297fc);
   --designer-accent-surface: var(--base-screen-designer-accent-surface, #161d27);
-  --designer-accent-text: #609ffc;
+  --designer-accent-text: var(--base-screen-designer-accent-text, #609ffc);
   --designer-success: var(--base-screen-designer-success, #4fcb6f);
   --designer-success-surface: var(--base-screen-designer-success-surface, #17261b);
   --designer-warning: var(--base-screen-designer-warning, #e6b221);
   --designer-warning-surface: var(--base-screen-designer-warning-surface, #292311);
   --designer-danger: var(--base-screen-designer-danger, #fc675c);
   --designer-danger-surface: var(--base-screen-designer-danger-surface, #2b1a18);
-  --designer-danger-text: #fd7469;
+  --designer-danger-text: var(--base-screen-designer-danger-text, #fd7469);
 
   /* 黑夜的强调档向白提亮（设计里黑夜悬停即提亮），深字压在强调色上仍有 5:1。 */
-  --designer-button-primary-background: var(--designer-accent);
-  --designer-button-primary-hover: color-mix(in oklab, var(--designer-accent), white 14%);
-  --designer-button-primary-active: color-mix(in oklab, var(--designer-accent), white 20%);
+  --designer-button-primary-background: var(
+    --base-screen-designer-button-primary-background,
+    var(--designer-accent)
+  );
+  --designer-button-primary-hover: var(
+    --base-screen-designer-button-primary-hover,
+    color-mix(in oklab, var(--designer-accent), white 14%)
+  );
+  --designer-button-primary-active: var(
+    --base-screen-designer-button-primary-active,
+    color-mix(in oklab, var(--designer-accent), white 20%)
+  );
 
   --designer-shadow-overlay: var(
     --base-screen-designer-shadow-overlay,

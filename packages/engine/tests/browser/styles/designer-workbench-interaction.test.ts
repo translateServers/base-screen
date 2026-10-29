@@ -131,9 +131,14 @@ describe('designer workbench interaction and accessibility', () => {
   });
 
   it('keeps all Designer buttons on one interaction-state contract', () => {
-    expect(tokensCss).toContain('--designer-button-primary-background: color-mix(');
-    expect(tokensCss).toContain('--designer-button-primary-hover: color-mix(');
-    expect(tokensCss).toContain('--designer-button-primary-active: color-mix(');
+    // 强调档必须保留 `--base-screen-designer-*` 覆盖位，且兜底仍是从 accent 派生的 color-mix 配方。
+    for (const token of ['background', 'hover', 'active']) {
+      expect(tokensCss).toMatch(
+        new RegExp(
+          `--designer-button-primary-${token}:\\s*var\\(\\s*--base-screen-designer-button-primary-${token},\\s*color-mix\\(`,
+        ),
+      );
+    }
     expect(controlsCss).toMatch(/\.designer-button\s*\{[^}]*touch-action: manipulation;/s);
     // 原型 .btn 契约：描边由 elev-ring 阴影承担、悬停只换底色、按压不缩放。
     expect(controlsCss).toMatch(
@@ -277,7 +282,9 @@ describe('designer workbench interaction and accessibility', () => {
       }
 
       // 主按钮使用独立的深色化 accent token；最终组合色对比度由真实浏览器用例校验。
-      expect(tokensCss).toContain('--designer-button-primary-background: color-mix(');
+      expect(tokensCss).toMatch(
+        /--designer-button-primary-background:\s*var\(\s*--base-screen-designer-button-primary-background,\s*color-mix\(/,
+      );
     }
   });
 

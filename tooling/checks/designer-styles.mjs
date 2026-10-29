@@ -123,26 +123,37 @@ const publicTokens = [
   'surface-raised',
   'surface-control',
   'surface-control-hover',
+  'surface-control-active',
   'surface-overlay',
   'surface-canvas',
   'surface-scrim',
   'canvas-grid-line',
+  'range-track',
   'text-primary',
   'text-secondary',
   'text-muted',
   'text-disabled',
+  'text-on-accent',
   'border-subtle',
   'border-default',
   'border-strong',
+  'border-active',
   'focus-ring',
+  'elev-ring',
+  'elev-card',
   'accent',
   'accent-surface',
+  'accent-text',
   'success',
   'success-surface',
   'warning',
   'warning-surface',
   'danger',
   'danger-surface',
+  'danger-text',
+  'button-primary-background',
+  'button-primary-hover',
+  'button-primary-active',
   'shadow-overlay',
   'shadow-canvas',
   'shadow-float',
@@ -499,6 +510,63 @@ for (const token of publicTokens) {
     )
   ) {
     throw new Error(`DESIGNER_STYLE_PUBLIC_TOKEN_MAPPING_MISSING:${token}`);
+  }
+}
+
+// 覆盖位必须成对落在两个主题块里：`--designer-x: var(--base-screen-designer-x, 兜底)`。
+// 上面那条 MAPPING_MISSING 只要求全文件里出现过这个映射，某个主题块漏掉钩子时它照样通过；
+// 而漏一个覆盖位既不会有肉眼可见的失败，也不会影响兜底值，只能靠这里逐个主题块点名。
+// 裸 `:host` 里的共享排版/间距/几何令牌不在契约内（见 designer-tokens.css 文件头「覆盖位的边界」），
+// 所以只切两个主题块，不做全文件扫描。
+function sliceThemeBlock(cssText, selectorStart) {
+  const braceStart = cssText.indexOf('{', selectorStart);
+  let depth = 0;
+  for (let index = braceStart; index < cssText.length; index += 1) {
+    if (cssText[index] === '{') depth += 1;
+    else if (cssText[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return cssText.slice(braceStart + 1, index);
+    }
+  }
+  throw new Error('DESIGNER_STYLE_THEME_BLOCK_UNBALANCED');
+}
+// 按分号切声明，但跳过括号内的分号：elev-card 这类值里有 rgb(...) 与嵌套 var(...)。
+function themeTokenDeclarations(block) {
+  const declarations = [];
+  const withoutComments = block.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const declarationStart = /(--[a-z0-9-]+)\s*:/g;
+  let match;
+  while ((match = declarationStart.exec(withoutComments)) !== null) {
+    let index = declarationStart.lastIndex;
+    let depth = 0;
+    let value = '';
+    for (; index < withoutComments.length; index += 1) {
+      const character = withoutComments[index];
+      if (character === '(') depth += 1;
+      else if (character === ')') depth -= 1;
+      if (character === ';' && depth === 0) break;
+      value += character;
+    }
+    declarations.push({ name: match[1], value: value.replace(/\s+/g, ' ').trim() });
+    declarationStart.lastIndex = index;
+  }
+  return declarations;
+}
+const lightBlockStart = tokensCss.indexOf(':host([theme="light"])');
+const darkBlockStart = tokensCss.lastIndexOf(':host,', tokensCss.indexOf(':host([theme="dark"])'));
+if (lightBlockStart === -1 || darkBlockStart === -1) {
+  throw new Error('DESIGNER_STYLE_THEME_BLOCK_MISSING');
+}
+const themeBlocks = {
+  light: sliceThemeBlock(tokensCss, lightBlockStart),
+  dark: sliceThemeBlock(tokensCss, darkBlockStart),
+};
+for (const [theme, block] of Object.entries(themeBlocks)) {
+  for (const { name, value } of themeTokenDeclarations(block)) {
+    const suffix = name.slice('--designer-'.length);
+    const hook = new RegExp(`^var\\(\\s*--base-screen-designer-${suffix}\\s*,`);
+    if (hook.test(value)) continue;
+    throw new Error(`DESIGNER_STYLE_THEME_TOKEN_UNHOOKED:${theme}:${suffix}`);
   }
 }
 for (const selector of [

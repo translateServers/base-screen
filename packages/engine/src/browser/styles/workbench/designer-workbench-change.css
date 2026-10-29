@@ -1,8 +1,10 @@
-/* 变更页签的新增面：归属行与历史段。既有卡片/草案条样式仍在 shell / inspector。 */
+/* 变更页签的新增面：归属行与历史段。既有卡片/草案条样式仍在 shell / inspector。
+   本文件不写兜底字面量：令牌都在 designer-tokens.css 的 :host 与两个主题块里定义，
+   写死兜底只会多出一套会过期的真值（上一代 black-alpha 阶梯就曾在此存活）。 */
 .change-pane-origin {
   margin: 0;
-  color: var(--designer-text-secondary, rgba(0, 0, 0, 0.56));
-  font-size: var(--designer-font-size-xs, 11px);
+  color: var(--designer-text-secondary);
+  font-size: var(--designer-font-size-xs);
   line-height: 1.5;
 }
 
@@ -30,31 +32,34 @@
   border: 0;
   border-radius: var(--designer-radius-3);
   background: transparent;
-  color: var(--designer-text-secondary, rgba(0, 0, 0, 0.56));
-  font-size: var(--designer-font-size-xs, 11px);
+  color: var(--designer-text-secondary);
+  font-size: var(--designer-font-size-xs);
   text-align: left;
   cursor: pointer;
 }
 
 .designer-history-node:hover {
-  background: var(--designer-surface-control, rgba(0, 0, 0, 0.04));
-  color: var(--designer-text-primary, rgba(0, 0, 0, 0.88));
+  background: var(--designer-surface-control);
+  color: var(--designer-text-primary);
 }
 
+/* 当前节点用中性灰块 + 1px 收边，不用强调色：选中态全仓统一走中性色。 */
 .designer-history-node[aria-current='true'] {
-  background: var(--designer-surface-selected, rgba(0, 0, 0, 0.06));
-  color: var(--designer-text-primary, rgba(0, 0, 0, 0.88));
-  box-shadow: inset 0 0 0 1px var(--designer-border-default, rgba(0, 0, 0, 0.12));
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
 }
 
 .designer-history-node[data-position='future'] {
   opacity: 0.55;
 }
 
+/* 等宽字体取 family-only 令牌：--designer-font-numeric 是整条 font 简写，
+   放进 font-family 槽会被替换成非法值，整条声明作废（IACVT），兜底也救不回来。 */
 .history-node-index {
-  font-family: var(--designer-font-numeric, monospace);
-  font-size: var(--designer-font-size-xs, 11px);
-  color: var(--designer-text-muted, rgba(0, 0, 0, 0.4));
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  color: var(--designer-text-muted);
 }
 
 .history-node-label {
@@ -64,15 +69,15 @@
 }
 
 .history-node-source {
-  font-family: var(--designer-font-numeric, monospace);
-  font-size: var(--designer-font-size-xs, 11px);
-  color: var(--designer-text-muted, rgba(0, 0, 0, 0.4));
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  color: var(--designer-text-muted);
 }
 
 .history-node-current {
   padding: 0 var(--designer-space-2);
   border-radius: var(--designer-radius-3);
-  background: var(--designer-accent-soft, rgba(0, 112, 243, 0.12));
+  background: var(--designer-accent-surface);
   color: var(--designer-accent);
-  font-size: var(--designer-font-size-xs, 11px);
+  font-size: var(--designer-font-size-xs);
 }
