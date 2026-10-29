@@ -239,6 +239,8 @@
 
 .properties > .inspector-search-workspace {
   min-height: 0;
+  /* 跨满五行时列必须显式写 1：搜索位与页签/内容同占一行，列留 auto 就会被甩到第二列。 */
+  grid-column: 1;
   grid-row: 1 / -1;
 }
 

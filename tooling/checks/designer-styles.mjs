@@ -569,6 +569,57 @@ for (const [theme, block] of Object.entries(themeBlocks)) {
     throw new Error(`DESIGNER_STYLE_THEME_TOKEN_UNHOOKED:${theme}:${suffix}`);
   }
 }
+
+// 右栏（.properties）是显式网格：每个直接子项必须同时声明 grid-column 与 grid-row。
+// 只写行、列留 auto 时，一旦那一行已被别的子项占住，自动布局会另开一列——整块内容被挤成
+// 一条 60px 竖条，而这类塌陷在两份样式都语法合法时不会报任何错。蓝图检查器塌过一次。
+//
+// 按「落点类名」合并而不是按选择器字符串：同一个子项常被多条规则分写（`.properties > x`
+// 给列、`.properties[data-…] > x` 只补行），字符串级合并会把这类正常写法判成缺列。
+const rightPaneChildren = new Map();
+const subjectOf = (selector) => selector.split('>').pop().trim().split(' ').pop();
+for (const file of [...baseLayers, ...controlLayers, ...workbenchLayers]) {
+  const css = source(file).replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const rule = /([^{}]+)\{([^{}]*)\}/g;
+  let match;
+  while ((match = rule.exec(css)) !== null) {
+    for (const raw of match[1].split(',')) {
+      const selector = raw.trim().replace(/\s+/g, ' ');
+      // 只看 .properties 的子孙规则；.properties 自己由 .designer 的网格摆放。
+      if (!selector.includes('.properties')) continue;
+      const subject = subjectOf(selector);
+      if (subject === '.properties' || subject.startsWith('.properties[')) continue;
+      const known = rightPaneChildren.get(subject) ?? { row: false, column: false };
+      if (/(^|;)\s*grid-row\s*:/.test(match[2])) known.row = true;
+      if (/(^|;)\s*grid-column\s*:/.test(match[2])) known.column = true;
+      rightPaneChildren.set(subject, known);
+    }
+  }
+}
+for (const [subject, state] of rightPaneChildren) {
+  if (!state.row || state.column) continue;
+  throw new Error(`DESIGNER_STYLE_GRID_COLUMN_MISSING:${subject}`);
+}
+
+// 蓝图检查器不在 `.properties` 的子孙规则里（它由 [data-authoring-mode="blueprint"] 选中），
+// 但同样是右栏直接子项，按类名单独校验一次。
+const blueprintGrid = rightPaneChildren.get('.blueprint-inspector') ?? { row: false, column: false };
+for (const file of workbenchLayers) {
+  const css = source(file).replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const rule = /([^{}]+)\{([^{}]*)\}/g;
+  let match;
+  while ((match = rule.exec(css)) !== null) {
+    for (const raw of match[1].split(',')) {
+      if (subjectOf(raw.trim().replace(/\s+/g, ' ')) !== '.blueprint-inspector') continue;
+      if (/(^|;)\s*grid-row\s*:/.test(match[2])) blueprintGrid.row = true;
+      if (/(^|;)\s*grid-column\s*:/.test(match[2])) blueprintGrid.column = true;
+    }
+  }
+}
+if (blueprintGrid.row && !blueprintGrid.column) {
+  throw new Error('DESIGNER_STYLE_GRID_COLUMN_MISSING:.blueprint-inspector');
+}
+
 for (const selector of [
   'body',
   ':host::-webkit-scrollbar',
