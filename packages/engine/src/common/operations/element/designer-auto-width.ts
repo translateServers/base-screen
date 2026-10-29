@@ -89,5 +89,8 @@ export function normalizeDesignerAutoWidthTransaction(
       }
     }
   }
-  return { commands };
+  // 只重写 commands，事务自身的字段（provenance / label 等）原样带回。
+  // 早先这里返回 { commands }，把 provenance 丢了，上层只能兜底成 manual——
+  // 于是「采纳智能体提案」在历史里被记成人工编辑。
+  return { ...transaction, commands };
 }

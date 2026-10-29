@@ -158,7 +158,7 @@ function isHostSlottedEvent(event: Event): boolean {
 
 // 判定本体在 `./designer-editable-target.js`；此处 re-export 是因为事件系统、文本选择与
 // surface bindings 都从本模块取用，改指向属于无收益的翻动。
-export { isEditableTarget } from './designer-editable-target.js';
+export { isEditableTarget, isNativeActivationTarget } from './designer-editable-target.js';
 
 export function isInspectorDraftTarget(target: EventTarget | null): boolean {
   const dataset = (target as { readonly dataset?: DOMStringMap } | null)?.dataset;

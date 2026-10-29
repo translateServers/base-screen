@@ -3,7 +3,7 @@ import {
   type DesignerOperationChordInfo,
   resolveDesignerKeyboardPolicy,
 } from '../../common/events/designer-event-policy.js';
-import { isEditableTarget } from './designer-surface-router.js';
+import { isEditableTarget, isNativeActivationTarget } from './designer-surface-router.js';
 
 export interface DesignerEventSystemCallbacks {
   readonly isGestureActive: () => boolean;
@@ -44,6 +44,7 @@ export class DesignerEventSystem {
       },
       {
         editable: isEditableTarget(event.target),
+        activationTarget: isNativeActivationTarget(event.target),
         gestureActive: this.callbacks.isGestureActive(),
         textSelection: this.callbacks.hasTextSelection?.() === true,
       },

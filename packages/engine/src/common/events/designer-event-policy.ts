@@ -14,6 +14,14 @@ export interface DesignerKeyboardPolicyContext {
   readonly gestureActive: boolean;
   /** 设计器表面存在非折叠的文本选区（面板/只读文本被用户选中）。 */
   readonly textSelection: boolean;
+  /**
+   * 焦点落在「自己会用 Enter / Space 激活」的原生控件上（按钮、链接、摘要、role=button 等）。
+   *
+   * 不能并进 editable：按钮不是可编辑目标，但它对 Enter / Space 有原生语义。少了这一位，
+   * `Enter` 会命中注册操作 group-enter 并被 preventDefault，设计器内所有按钮的键盘激活
+   * 都会失效——包括宿主在面板里放的「确认」这类主操作。
+   */
+  readonly activationTarget?: boolean;
 }
 
 export interface DesignerOperationChordInfo {
@@ -90,6 +98,11 @@ export function resolveDesignerKeyboardPolicy(
 ): DesignerKeyboardPolicy {
   if (context.gestureActive) return { kind: 'block' };
   if (event.isComposing === true || event.key === 'Process' || event.altGraph === true) {
+    return { kind: 'allow' };
+  }
+  // 原生激活控件上的 Enter / Space 归控件自己：先于 chord 裁决放行，
+  // 否则它们会被命令通道当成快捷键吃掉（实测设计中所有按钮都无法键盘触发）。
+  if (context.activationTarget === true && (event.key === 'Enter' || event.key === ' ')) {
     return { kind: 'allow' };
   }
   const chord = designerChordFromKeyboardEvent(event);

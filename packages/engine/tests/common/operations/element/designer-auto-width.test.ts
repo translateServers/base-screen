@@ -276,4 +276,24 @@ describe('text automatic width geometry', () => {
       props: { autoWidth: true },
     });
   });
+
+  it('归一化只重写 commands，不丢 provenance', () => {
+    const source = document();
+    const geometry = document();
+    const transaction: ScreenDocumentTransaction = {
+      commands: [
+        {
+          type: 'update-components',
+          componentIds: ['text'],
+          patch: { position: { x: 4, y: 8 } },
+        },
+      ],
+      provenance: { source: 'agent', label: '采纳智能体提案' },
+    };
+    const normalized = normalizeDesignerAutoWidthTransaction(source, geometry, transaction);
+    // 采纳智能体提案在历史里必须记成 agent；早先这里只回传 { commands }，
+    // 上层兜底成 manual，等于把自动提案记成了人工编辑。
+    expect(normalized.provenance).toEqual({ source: 'agent', label: '采纳智能体提案' });
+    expect(normalized.commands.length).toBeGreaterThan(0);
+  });
 });

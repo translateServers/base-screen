@@ -208,4 +208,26 @@ describe('resolveDesignerKeyboardPolicy', () => {
     expect(key({ event: { key: 'Enter' } })).toEqual({ kind: 'allow' });
     expect(key({ event: { key: 'Escape' } })).toEqual({ kind: 'allow' });
   });
+
+  it('原生激活控件上的 Enter / Space 归控件自己，不被命令通道吃掉', () => {
+    // 注册了 Enter 操作时，默认会被路由成命令（随后 preventDefault），按钮的键盘激活就没了。
+    expect(key({ event: { key: 'Enter' }, operation: { repeatable: false } })).toMatchObject({
+      kind: 'command',
+    });
+    // 焦点在按钮/链接上时，Enter 与 Space 必须放行给原生激活。
+    expect(
+      key({
+        event: { key: 'Enter' },
+        context: { activationTarget: true },
+        operation: { repeatable: false },
+      }),
+    ).toEqual({ kind: 'allow' });
+    expect(
+      key({ event: { key: ' ' }, context: { activationTarget: true }, operation: {} }),
+    ).toEqual({ kind: 'allow' });
+    // 只让行这两个键：按钮上的其他快捷键仍然归命令通道。
+    expect(
+      key({ event: { key: 'z', ctrlKey: true }, context: { activationTarget: true }, operation: {} }),
+    ).toMatchObject({ kind: 'command' });
+  });
 });
