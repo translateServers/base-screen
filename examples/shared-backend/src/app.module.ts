@@ -12,14 +12,16 @@ import { HealthModule } from './health/health.module';
 import { MaterialPackagesModule } from './material-packages/material-packages.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { AgentModule } from './agent/agent.module';
 import { ScreensModule } from './screens/screens.module';
 import { SqliteModule } from './sqlite/sqlite.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env.local', '.env'] }),
     PrismaModule,
     ScreensModule,
+    AgentModule,
     MetricsModule,
     // 宿主素材库（ADR-0089）：元数据 + 本地文件；Screen Document 只存 host_image 身份。
     AssetsModule,

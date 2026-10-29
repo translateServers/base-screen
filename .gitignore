@@ -22,6 +22,7 @@ packages/*/LICENSE
 /examples/shared-backend/src/generated/
 /examples/shared-backend/data/assets/
 .env
+.env.local
 !/examples/shared-backend/.env
 .workbuddy
 .schema-build/

@@ -746,3 +746,21 @@ cp my-data.db examples/shared-backend/data/datasources/
 - [基座特性矩阵](../tooling/verification/browser-harness/cases.html)：人眼逐项验证入口（`pnpm dev:browser-harness`）
 - [物料模板 MCP provider](../tooling/material-mcp-server)：面向上层工具链
 - [仓库分层与检查门禁](../AGENTS.md)：包边界、依赖规则与验证命令
+
+## 示例智能体：一句话生成大屏
+
+共享后端内置一个最小智能体（`src/agent/`）：模型只输出**中间表示**（标题、KPI、面板），
+组件树由宿主编译（`agent-compose.ts`）确定性生成，非法结构进不来。生成结果直接落库，
+三个前端都能在列表里打开。
+
+```bash
+curl -X POST http://127.0.0.1:3000/api/agent/generate \
+  -H 'content-type: application/json' \
+  -d '{"topic":"华东渠道库存与周转的经营会大屏"}'
+```
+
+- 配置：`examples/shared-backend/.env.local`（已被 `.gitignore` 忽略），变量
+  `AGENT_LLM_BASE_URL` / `AGENT_LLM_API_KEY` / `AGENT_LLM_MODEL`。
+- 未配置或模型失败时退回确定性结构，响应里的 `mode` 会如实标 `deterministic`，
+  并带 `failure` 诊断码，不假装调用过模型。
+- 图片面板走 `base.image` 的静态数据源；模型没给图时按标题生成稳定的图片地址。
