@@ -1,11 +1,16 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import type { ScreenHistoryNode } from '@base-screen/core';
 import type { ScreenDocumentCommand, ScreenTransactionProvenance } from '@base-screen/core';
 import {
   type DesignerChangeProposal,
   type DesignerChangeProposalInput,
   prepareDesignerChangeProposal,
 } from '../../common/operations/change/designer-change-proposal.js';
+import type {
+  BaseScreenDesignerChangeStateDetail,
+} from '../../common/operations/change/designer-change-events.js';
 import type { DesignerReviewMeta } from '../../common/operations/change/designer-review.js';
+import type { DesignerMetricName } from '../../common/observability/designer-metrics.js';
 import {
   renderChangeCount,
   renderChangePane,
@@ -53,7 +58,11 @@ export class DesignerChangeController {
       ) => DesignerChangeAdoptResult)
     | undefined;
   #getDocument: (() => ScreenDocument | undefined) | undefined;
-  #startIntent: (() => void) | undefined;
+  #startIntent: ((startsFrom?: 'metrics' | 'template' | 'prompt') => void) | undefined;
+  #stateHandler: ((detail: BaseScreenDesignerChangeStateDetail) => void) | undefined;
+  #metricHandler: ((name: DesignerMetricName) => void) | undefined;
+  #historyReader: (() => readonly ScreenHistoryNode[]) | undefined;
+  #revertHandler: ((index: number) => void) | undefined;
 
   connect(bar: HTMLElement, pane: HTMLElement, ghost: HTMLElement, rightPanel: HTMLElement): void {
     this.#bar = bar;
@@ -95,7 +104,26 @@ export class DesignerChangeController {
     this.#getDocument = reader;
   }
 
-  setStartIntentHandler(handler: () => void): void {
+  setStateHandler(handler: (detail: BaseScreenDesignerChangeStateDetail) => void): void {
+    this.#stateHandler = handler;
+  }
+
+  setMetricHandler(handler: (name: DesignerMetricName) => void): void {
+    this.#metricHandler = handler;
+  }
+
+  /** 历史段读 core 的节点列表；回退只移动指针，由 session 执行。 */
+  setHistoryControls(
+    reader: () => readonly ScreenHistoryNode[],
+    revert: (index: number) => void,
+  ): void {
+    this.#historyReader = reader;
+    this.#revertHandler = revert;
+  }
+
+  setStartIntentHandler(
+    handler: (startsFrom?: 'metrics' | 'template' | 'prompt') => void,
+  ): void {
     this.#startIntent = handler;
   }
 
@@ -138,6 +166,7 @@ export class DesignerChangeController {
     if (!this.mountGhost(proposal)) return false;
     this.#input = input;
     this.#proposal = proposal;
+    this.#metricHandler?.('draft_created');
     this.#comparing = false;
     this.#confirmAll = false;
     this.render();
@@ -153,6 +182,7 @@ export class DesignerChangeController {
     if (unit === undefined) return false;
     const commands = proposal.commands.filter((_, index) => unit.commandIndexes.includes(index));
     if (!handler(commands, proposal.provenance).ok) return false;
+    this.#metricHandler?.('change_adopt');
     return this.rebuild(proposal, unit.commandIndexes);
   }
 
@@ -162,6 +192,7 @@ export class DesignerChangeController {
     if (proposal === undefined) return false;
     const unit = proposal.units.find((item) => item.id === unitId);
     if (unit === undefined) return false;
+    this.#metricHandler?.('change_reject');
     return this.rebuild(proposal, unit.commandIndexes);
   }
 
@@ -182,9 +213,18 @@ export class DesignerChangeController {
 
   /** 全部采纳的第二步：整批命令作为一次事务提交。 */
   adoptAll(): boolean {
+    if (!this.#confirmAll) return false;
+    return this.adoptAllDirect();
+  }
+
+  /**
+   * 程序化全部采纳：宿主显式调用即视为已确认，整批命令一次事务提交。
+   * UI 仍走「请求 → 二次确认 → 采纳」，不经过这里。
+   */
+  adoptAllDirect(): boolean {
     const proposal = this.#proposal;
     const handler = this.#adoptHandler;
-    if (!this.#confirmAll || proposal === undefined || handler === undefined) return false;
+    if (proposal === undefined || handler === undefined) return false;
     if (!handler(proposal.commands, proposal.provenance).ok) return false;
     this.clearDraft();
     return true;
@@ -235,8 +275,22 @@ export class DesignerChangeController {
       case 'discard':
         this.discard();
         return true;
+      case 'revert-history': {
+        const index = Number(action.dataset.historyIndex);
+        if (Number.isInteger(index) && index >= 0) {
+          this.#metricHandler?.('revert');
+          this.#revertHandler?.(index);
+        }
+        return true;
+      }
       case 'start-intent':
-        this.#startIntent?.();
+        this.#startIntent?.(
+          action.dataset.changeStart === 'metrics' ||
+            action.dataset.changeStart === 'template' ||
+            action.dataset.changeStart === 'prompt'
+            ? action.dataset.changeStart
+            : undefined,
+        );
         return true;
       case 'exit-review':
         this.exitReview();
@@ -254,6 +308,8 @@ export class DesignerChangeController {
       return true;
     }
     if (this.#paneMode === 'changes') {
+      // 评审态固定停在变更页签：切回检查器会让评审人失去批准/驳回入口。
+      if (this.#review !== undefined) return false;
       event.preventDefault();
       this.setPaneMode('inspector');
       return true;
@@ -300,6 +356,7 @@ export class DesignerChangeController {
 
   private clearDraft(): void {
     this.#ghostHandlers?.clear();
+    if (this.#proposal !== undefined) this.#metricHandler?.('draft_discarded');
     this.#proposal = undefined;
     this.#input = undefined;
     this.#comparing = false;
@@ -313,6 +370,17 @@ export class DesignerChangeController {
    */
   private render(focusAction?: string): void {
     const proposal = this.#proposal;
+    this.#stateHandler?.({
+      pending: proposal !== undefined,
+      unitCount: proposal?.units.length ?? 0,
+      ...(proposal === undefined
+        ? {}
+        : {
+            title: proposal.title,
+            scope: proposal.scope,
+            ...(proposal.origin === undefined ? {} : { origin: proposal.origin }),
+          }),
+    });
     const bar = this.#bar;
     const pane = this.#pane;
     const ghost = this.#ghost;
@@ -338,7 +406,8 @@ export class DesignerChangeController {
     }
     if (bar !== undefined) {
       bar.hidden = proposal === undefined;
-      if (proposal !== undefined) renderDraftBar(bar, proposal, this.#comparing);
+      if (proposal !== undefined)
+        renderDraftBar(bar, proposal, this.#comparing, this.#paneMode === 'changes');
       if (focusAction !== undefined) {
         bar.querySelector<HTMLButtonElement>(`[data-change-action="${focusAction}"]`)?.focus();
       }
@@ -348,11 +417,17 @@ export class DesignerChangeController {
     const showPane = this.#paneMode === 'changes';
     pane.hidden = !showPane;
     if (showPane) {
-      renderChangePane(pane, proposal, this.#confirmAll, {
-        reviewing: this.#review !== undefined,
-        meta: this.#review ?? {},
-        total: this.#reviewTotal,
-      });
+      renderChangePane(
+        pane,
+        proposal,
+        this.#confirmAll,
+        {
+          reviewing: this.#review !== undefined,
+          meta: this.#review ?? {},
+          total: this.#reviewTotal,
+        },
+        this.#historyReader?.(),
+      );
     }
   }
 }

@@ -1,4 +1,5 @@
 import type { ScreenParseResult } from '@base-screen/contracts';
+import type { BaseScreenDesignerChangeProposalSummary } from '../../common/operations/change/designer-change-events.js';
 import {
   type DesignerChangeProposalInput,
   prepareDesignerChangeProposal,
@@ -8,10 +9,7 @@ import {
   getDesignerElementState,
 } from '../runtime/designer-element-state.js';
 
-export interface BaseScreenDesignerChangeProposalSummary {
-  readonly id: string;
-  readonly affectedComponentIds: readonly string[];
-}
+export type { BaseScreenDesignerChangeProposalSummary };
 
 /**
  * 提交一份变更提案：引擎在副本上试算全部命令，成功则挂出幽灵草案。
@@ -37,12 +35,67 @@ export function submitChangeProposal(
   }
   return {
     ok: true,
-    value: { id, affectedComponentIds: prepared.value.affectedComponentIds },
+    value: summarize(prepared.value),
     diagnostics: [],
   };
+}
+
+/**
+ * 读当前待决提案的摘要：标题、作用域、理由、单元与归属。
+ *
+ * 只给摘要，不给候选文档——宿主不需要、也不应该拿它去改文档。
+ */
+export function readPendingChange(
+  element: DesignerElementHost,
+): BaseScreenDesignerChangeProposalSummary | undefined {
+  const proposal = getDesignerElementState(element).changeController.pending;
+  return proposal === undefined ? undefined : summarize(proposal);
+}
+
+/** 采纳一个单元：该单元的命令作为一次普通事务提交，其余单元按当前文档重算。 */
+export function adoptChangeUnit(element: DesignerElementHost, unitId: string): boolean {
+  return getDesignerElementState(element).changeController.adoptUnit(unitId);
+}
+
+/** 忽略一个单元：不写文档，只把它从待决集合里去掉。 */
+export function rejectChangeUnit(element: DesignerElementHost, unitId: string): boolean {
+  return getDesignerElementState(element).changeController.rejectUnit(unitId);
+}
+
+/**
+ * 全部采纳：整批命令一次事务提交。
+ *
+ * 这是宿主显式调用，等价于用户完成二次确认；界面仍走「请求 → 确认 → 采纳」。
+ */
+export function adoptAllChanges(element: DesignerElementHost): boolean {
+  return getDesignerElementState(element).changeController.adoptAllDirect();
 }
 
 /** 撤回未采纳的提案：只清掉幽灵草案，不产生文档或历史副作用。 */
 export function discardPendingChange(element: DesignerElementHost): void {
   getDesignerElementState(element).changeController.discard();
+}
+
+function summarize(proposal: {
+  readonly id: string;
+  readonly title: string;
+  readonly scope: string;
+  readonly rationale: string;
+  readonly affectedComponentIds: readonly string[];
+  readonly units: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly kind: 'added' | 'removed' | 'changed' | 'document';
+  }[];
+  readonly origin?: { readonly author?: string; readonly approver?: string };
+}): BaseScreenDesignerChangeProposalSummary {
+  return {
+    id: proposal.id,
+    title: proposal.title,
+    scope: proposal.scope,
+    rationale: proposal.rationale,
+    affectedComponentIds: proposal.affectedComponentIds,
+    units: proposal.units.map((unit) => ({ id: unit.id, label: unit.label, kind: unit.kind })),
+    ...(proposal.origin === undefined ? {} : { origin: proposal.origin }),
+  };
 }

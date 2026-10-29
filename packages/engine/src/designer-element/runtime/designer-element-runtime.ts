@@ -8,7 +8,14 @@ import {
   requestComponentTextEdit,
 } from '../api/designer-element-authoring.js';
 import { refreshCatalog } from '../api/designer-element-catalog.js';
-import { discardPendingChange, submitChangeProposal } from '../api/designer-element-change.js';
+import {
+  adoptAllChanges,
+  adoptChangeUnit,
+  discardPendingChange,
+  readPendingChange,
+  rejectChangeUnit,
+  submitChangeProposal,
+} from '../api/designer-element-change.js';
 import {
   configure,
   readCatalog,
@@ -18,6 +25,7 @@ import {
 } from '../api/designer-element-configuration.js';
 import {
   readTargetDisplayOverlay,
+  readDisplayMetrics,
   readTargetDisplayProfile,
   setTargetDisplayOverlay,
   setTargetDisplayProfile,
@@ -282,6 +290,10 @@ export const designerElementRuntime = {
   executeTransaction,
   submitChangeProposal,
   discardPendingChange,
+  readPendingChange,
+  adoptChangeUnit,
+  rejectChangeUnit,
+  adoptAllChanges,
   enterPresentationLock,
   exitPresentationLock,
   readPresentationLocked,
@@ -298,6 +310,7 @@ export const designerElementRuntime = {
   setTargetDisplayProfile,
   setTargetDisplayOverlay,
   readTargetDisplayProfile,
+  readDisplayMetrics,
   readTargetDisplayOverlay,
   insertComponent,
   insertComponentFragment,

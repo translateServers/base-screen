@@ -1,5 +1,10 @@
 import type { ScreenIntentScope, ScreenParseResult } from '@base-screen/contracts';
 import type { DesignerIntentHandler } from '../../common/operations/intent/designer-intent.js';
+import {
+  type DesignerParameterPatch,
+  matchDesignerParameterIntent,
+} from '../../common/operations/intent/designer-parameter-intent.js';
+import type { DesignerMetricName } from '../../common/observability/designer-metrics.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { adoptDesignerFormControls } from '../dom/designer-form-controls-dom.js';
 import { escapeHtml } from '../dom/designer-html-escape.js';
@@ -30,11 +35,22 @@ export class DesignerIntentController {
   #scopeOverride = false;
   #pending = false;
   #confirmKind: IntentConfirmKind | undefined;
+  #parameterHandler: ((patch: DesignerParameterPatch) => boolean) | undefined;
+  #metricHandler: ((name: DesignerMetricName) => void) | undefined;
   #confirmText = '';
 
   setHandler(handler: DesignerIntentHandler | undefined): void {
     this.#handler = handler;
     this.render();
+  }
+
+  /** 数值类请求走本地通道：命中即改文档，不交给宿主、不调用模型。 */
+  setParameterHandler(handler: (patch: DesignerParameterPatch) => boolean): void {
+    this.#parameterHandler = handler;
+  }
+
+  setMetricHandler(handler: (name: DesignerMetricName) => void): void {
+    this.#metricHandler = handler;
   }
 
   get available(): boolean {
@@ -139,7 +155,23 @@ export class DesignerIntentController {
       );
       return;
     }
+    const parameter = matchDesignerParameterIntent(text);
+    if (parameter !== null) {
+      if (this.#parameterHandler?.(parameter) === true) {
+        this.#metricHandler?.('parameter_route');
+        input.value = '';
+        this.setStatus(
+          DESIGNER_UI_TEXT.intent.parameterApplied(parameter.label, String(parameter.value)),
+          'info',
+        );
+        this.render();
+        return;
+      }
+      this.setStatus(DESIGNER_UI_TEXT.intent.parameterNoSelection, 'info');
+      return;
+    }
     if (this.#scopeValue.kind === 'screen') {
+      this.#metricHandler?.('clarify_open');
       this.openConfirm('whole-screen', text);
       return;
     }
@@ -179,9 +211,13 @@ export class DesignerIntentController {
     return true;
   }
 
-  focus(): void {
+  /** 起点牌把「从什么起」带进来：只影响这一轮意图，提交后清空。 */
+  focus(startsFrom?: 'metrics' | 'template' | 'prompt'): void {
+    this.#startsFrom = startsFrom;
     this.#input?.focus();
   }
+
+  #startsFrom: 'metrics' | 'template' | 'prompt' | undefined;
 
   private composing(): boolean {
     const input = this.#input;
@@ -193,15 +229,22 @@ export class DesignerIntentController {
     const input = this.#input;
     if (handler === undefined || input === undefined) return;
     this.#pending = true;
+    this.#metricHandler?.('intent_submit');
     this.setStatus(DESIGNER_UI_TEXT.intent.generating, 'info');
     this.render();
     let result: ScreenParseResult<null>;
     try {
-      result = await handler({ instanceId: this.#instanceId, text, scope });
+      result = await handler({
+        instanceId: this.#instanceId,
+        text,
+        scope,
+        ...(this.#startsFrom === undefined ? {} : { startsFrom: this.#startsFrom }),
+      });
     } catch {
       result = { ok: false, diagnostics: [] };
     }
     this.#pending = false;
+    this.#startsFrom = undefined;
     if (result.ok) {
       input.value = '';
       this.setStatus(DESIGNER_UI_TEXT.intent.pending, 'info');

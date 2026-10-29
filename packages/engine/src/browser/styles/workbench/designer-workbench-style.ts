@@ -5,6 +5,7 @@ import blueprintPanelsCss from './designer-workbench-blueprint-panels.css?inline
 import blueprintSurfaceCss from './designer-workbench-blueprint-surface.css?inline';
 import blueprintToolbarCss from './designer-workbench-blueprint-toolbar.css?inline';
 import canvasCss from './designer-workbench-canvas.css?inline';
+import changeCss from './designer-workbench-change.css?inline';
 import chromeCss from './designer-workbench-chrome.css?inline';
 import dataBindingCss from './designer-workbench-data-binding.css?inline';
 import dataCatalogCss from './designer-workbench-data-catalog.css?inline';
@@ -51,6 +52,7 @@ export const DESIGNER_WORKBENCH_CSS = [
   canvasCss,
   inspectorCss,
   inspectorDataCss,
+  changeCss,
   chromeCss,
   selectionCss,
   accessibilityCss,

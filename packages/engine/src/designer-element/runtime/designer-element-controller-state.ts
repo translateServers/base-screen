@@ -21,6 +21,17 @@ import { readDesignerImageNaturalSize } from '../../browser/dom/designer-image-m
 import { hasDesignerTextSelection } from '../../browser/dom/designer-text-selection.js';
 import { designerIcon } from '../../browser/ui/designer-icons.js';
 import { insertDesignerBlueprintVariableNode } from '../../common/operations/blueprint/designer-blueprint-model.js';
+import type { DesignerParameterPatch } from '../../common/operations/intent/designer-parameter-intent.js';
+import {
+  BASE_SCREEN_CHANGE_STATE_EVENT,
+  type BaseScreenDesignerChangeStateDetail,
+} from '../../common/operations/change/designer-change-events.js';
+import {
+  BASE_SCREEN_METRIC_EVENT,
+  type DesignerMetricName,
+  createDesignerMetric,
+} from '../../common/observability/designer-metrics.js';
+import { BASE_SCREEN_GUARD_CHANGE_EVENT } from '../../common/validation/designer-guard.js';
 import {
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
   type BaseScreenCanvasPresentationChangeEventDetail,
@@ -478,7 +489,60 @@ export function initializeDesignerElementControllers(
   });
   // 采纳提案 = 一次普通事务（带 provenance）：必须与手动编辑共享历史与修订号。
   state.changeController.setDocumentReader(() => state.session.document);
-  state.changeController.setStartIntentHandler(() => state.intentController.focus());
+  state.changeController.setStartIntentHandler((startsFrom) =>
+    state.intentController.focus(startsFrom),
+  );
+  state.changeController.setHistoryControls(
+    () => state.session.readHistory(),
+    (index) => {
+      state.runtime.report(element, state.session.revertTo(index));
+    },
+  );
+  state.changeController.setStateHandler((detail: BaseScreenDesignerChangeStateDetail) => {
+    element.dispatchEvent(
+      new CustomEvent<BaseScreenDesignerChangeStateDetail>(BASE_SCREEN_CHANGE_STATE_EVENT, {
+        bubbles: true,
+        composed: true,
+        detail,
+      }),
+    );
+  });
+  const emitMetric = (name: DesignerMetricName): void => {
+    element.dispatchEvent(
+      new CustomEvent(BASE_SCREEN_METRIC_EVENT, {
+        bubbles: true,
+        composed: true,
+        detail: createDesignerMetric(name),
+      }),
+    );
+  };
+  state.changeController.setMetricHandler(emitMetric);
+  state.guardController.setMetricHandler(emitMetric);
+  state.intentController.setMetricHandler(emitMetric);
+  state.intentController.setParameterHandler((patch: DesignerParameterPatch) => {
+    const document = state.session.document;
+    if (document === undefined) return false;
+    const selected = new Set(state.session.interaction.selectedComponentIds);
+    const components = document.components.filter((component) => selected.has(component.id));
+    if (components.length === 0) return false;
+    const commands = components.map((component) => ({
+      type: 'update-components' as const,
+      componentIds: [component.id],
+      patch: parameterComponentPatch(component, patch),
+    }));
+    const result = state.runtime.executeDesignerTransaction(element, { commands });
+    state.runtime.report(element, result);
+    return result.ok;
+  });
+  state.guardController.setChangeHandler((snapshot) => {
+    element.dispatchEvent(
+      new CustomEvent(BASE_SCREEN_GUARD_CHANGE_EVENT, {
+        bubbles: true,
+        composed: true,
+        detail: snapshot,
+      }),
+    );
+  });
   state.changeController.setAdoptHandler((commands, provenance) => {
     const result = state.runtime.executeDesignerTransaction(element, { commands, provenance });
     state.runtime.report(element, result);
@@ -494,7 +558,9 @@ export function initializeDesignerElementControllers(
       state.runtime.report(element, result);
       return result.ok;
     },
+    previewed: () => emitMetric('scene_preview'),
     applied: (sceneId, label) => {
+      emitMetric('scene_apply');
       element.dispatchEvent(
         new CustomEvent<BaseScreenSceneChangeDetail>(BASE_SCREEN_SCENE_CHANGE_EVENT, {
           bubbles: true,
@@ -504,4 +570,21 @@ export function initializeDesignerElementControllers(
       );
     },
   });
+}
+
+/** 数值意图命中后写回组件的补丁：只改命中的那一个字段，其余样式原样带上。 */
+function parameterComponentPatch(
+  component: { readonly style: Record<string, unknown>; readonly size: { width: number; height: number } },
+  patch: DesignerParameterPatch,
+): Record<string, unknown> {
+  if (patch.property === 'style.color') {
+    return { style: { ...component.style, color: patch.value } };
+  }
+  if (patch.property === 'style.fontSize') {
+    return { style: { ...component.style, fontSize: patch.value } };
+  }
+  if (patch.property === 'size.width') {
+    return { size: { ...component.size, width: patch.value } };
+  }
+  return { size: { ...component.size, height: patch.value } };
 }

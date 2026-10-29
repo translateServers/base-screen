@@ -56,7 +56,7 @@ export function undoScreenHistory(history: ScreenHistoryState): ScreenHistorySta
   return {
     past: history.past.slice(0, -1),
     present: entry.before,
-    future: [{ before: entry.before, after: entry.after }, ...history.future],
+    future: [copyEntry(entry), ...history.future],
   };
 }
 
@@ -67,7 +67,7 @@ export function redoScreenHistory(history: ScreenHistoryState): ScreenHistorySta
     return history;
   }
   return {
-    past: [...history.past, { before: entry.before, after: entry.after }],
+    past: [...history.past, copyEntry(entry)],
     present: entry.after,
     future: history.future.slice(1),
   };
@@ -98,21 +98,53 @@ export function revertScreenHistory(
   };
 }
 
-/** 历史节点列表：0 表示初始状态，其余按提交顺序编号，携带来源标注。 */
+/**
+ * 历史节点列表：0 表示初始状态，其余按提交顺序编号，携带来源标注。
+ *
+ * `future` 里的节点同样列出，因此界面能画出「前进栈」：撤销与回退都不删节点，
+ * 用户看得到自己退到了哪一格、还能往哪走。`position` 只相对于当前指针，
+ * 不代表节点是否可编辑。
+ */
 export function readScreenHistoryNodes(history: ScreenHistoryState): readonly ScreenHistoryNode[] {
   assertHistory(history);
-  return [
-    { index: 0 },
-    ...history.past.map((entry, position) => ({
-      index: position + 1,
-      ...(entry.provenance === undefined ? {} : { provenance: entry.provenance }),
-    })),
+  const current = history.past.length;
+  const nodes: ScreenHistoryNode[] = [
+    { index: 0, position: current === 0 ? 'current' : 'past' },
   ];
+  history.past.forEach((entry, position) => {
+    const index = position + 1;
+    nodes.push({
+      index,
+      position: index === current ? 'current' : 'past',
+      ...(entry.provenance === undefined ? {} : { provenance: entry.provenance }),
+    });
+  });
+  history.future.forEach((entry, offset) => {
+    nodes.push({
+      index: current + offset + 1,
+      position: 'future',
+      ...(entry.provenance === undefined ? {} : { provenance: entry.provenance }),
+    });
+  });
+  return nodes;
 }
+
+export type ScreenHistoryNodePosition = 'past' | 'current' | 'future';
 
 export interface ScreenHistoryNode {
   readonly index: number;
+  /** 相对当前指针的位置；`future` 是撤销或回退留下的前进栈。 */
+  readonly position: ScreenHistoryNodePosition;
   readonly provenance?: ScreenTransactionProvenance;
+}
+
+/** 复制条目时保留来源标注：撤销后再重做，历史不能丢掉「谁改的」。 */
+function copyEntry(entry: ScreenHistoryEntry): ScreenHistoryEntry {
+  return {
+    before: entry.before,
+    after: entry.after,
+    ...(entry.provenance === undefined ? {} : { provenance: entry.provenance }),
+  };
 }
 
 function assertHistory(history: ScreenHistoryState): void {

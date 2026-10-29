@@ -184,6 +184,11 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
   }
   const displayLayer = shadow.querySelector<HTMLElement>('[data-display-overlay-layer]');
   if (displayLayer !== null) elementState.targetDisplayController.connect(displayLayer);
+  const displayPanel = shadow.querySelector<HTMLElement>('[data-display-panel]');
+  const displayToggle = shadow.querySelector<HTMLElement>('[data-display-toggle]');
+  if (displayPanel !== null && displayToggle !== null) {
+    elementState.targetDisplayController.setPanel(displayPanel, displayToggle);
+  }
   const designerRoot = shadow.querySelector<HTMLElement>('.designer');
   const presentationHint = shadow.querySelector<HTMLElement>('[data-presentation-lock-hint]');
   if (designerRoot !== null && presentationHint !== null) {

@@ -133,8 +133,39 @@ describe('screen history revert', () => {
       label: '经营会 · 整屏编排',
     });
     expect(readScreenHistoryNodes(history)).toEqual([
-      { index: 0 },
-      { index: 1, provenance: { source: 'agent', label: '经营会 · 整屏编排' } },
+      { index: 0, position: 'past' },
+      {
+        index: 1,
+        position: 'current',
+        provenance: { source: 'agent', label: '经营会 · 整屏编排' },
+      },
+    ]);
+  });
+
+  it('keeps the forward stack in the node list after a revert', () => {
+    const history = threeStepHistory();
+    const reverted = revertScreenHistory(history, 1);
+    expect(readScreenHistoryNodes(reverted)).toEqual([
+      { index: 0, position: 'past' },
+      { index: 1, position: 'current' },
+      { index: 2, position: 'future' },
+    ]);
+  });
+
+  it('keeps provenance across undo and redo', () => {
+    const provenance = { source: 'agent', label: '经营会 · KPI 两行' } as const;
+    const history = commitScreenHistory(createScreenHistory(first), second, 100, provenance);
+
+    const undone = undoScreenHistory(history);
+    expect(readScreenHistoryNodes(undone)).toEqual([
+      { index: 0, position: 'current' },
+      { index: 1, position: 'future', provenance },
+    ]);
+
+    const redone = redoScreenHistory(undone);
+    expect(readScreenHistoryNodes(redone)).toEqual([
+      { index: 0, position: 'past' },
+      { index: 1, position: 'current', provenance },
     ]);
   });
 });

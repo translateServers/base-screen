@@ -25,6 +25,8 @@ export interface DesignerSceneContext {
     provenance: ScreenTransactionProvenance,
   ) => boolean;
   readonly applied: (sceneId: string, label: string) => void;
+  /** 预览已就绪（尚未写入）；用于发出度量事件，缺省时什么也不做。 */
+  readonly previewed?: (sceneId: string) => void;
 }
 
 /**
@@ -177,6 +179,7 @@ export class DesignerSceneController {
       return false;
     }
     this.#preview = prepared.value;
+    this.#context?.previewed?.(sceneId);
     this.render();
     // 预览条出现后把焦点放到主操作上：Escape 只在焦点位于设计器内部时才可达。
     this.#bar?.querySelector<HTMLButtonElement>('[data-scene-action="apply"]')?.focus();

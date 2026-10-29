@@ -7,7 +7,7 @@ import {
   parseCssColor,
   relativeLuminance,
   suggestReadableColor,
-} from '../../../src/common/validation/wcag-contrast.js';
+} from '../../src/validation/contrast.js';
 
 describe('parseCssColor', () => {
   it('accepts short hex, long hex and rgb()', () => {

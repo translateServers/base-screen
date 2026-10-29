@@ -1,11 +1,15 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import type { DesignerMetricName } from '../../common/observability/designer-metrics.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { evaluateContrastGuard } from '../../common/validation/designer-guard.js';
+import {
+  type DesignerGuardSnapshot,
+  evaluateContrastGuard,
+} from '../../common/validation/designer-guard.js';
 import {
   compositeOver,
   parseCssColorAlpha,
   type RgbColor,
-} from '../../common/validation/wcag-contrast.js';
+} from '@base-screen/core';
 import { measureCanvasContrast } from '../dom/guard/designer-contrast-measure.js';
 import {
   type DesignerGuardView,
@@ -28,12 +32,6 @@ interface GuardPreview {
   }[];
 }
 
-/**
- * 对比度守卫：从画布真实渲染测量文本颜色，底栏常驻结果，可预览/应用修复。
- *
- * 守卫不写文档、不调模型：预览只改渲染，应用走一次 `update-components` 事务，
- * 因此修复可被撤销，也不会绕过历史。
- */
 export class DesignerGuardController {
   #strip: HTMLButtonElement | undefined;
   #popover: HTMLElement | undefined;
@@ -48,7 +46,10 @@ export class DesignerGuardController {
   };
   #preview: GuardPreview | undefined;
   #open = false;
+  #enabled = true;
   #pending: ReturnType<typeof setTimeout> | undefined;
+  #changeHandler: ((result: DesignerGuardSnapshot) => void) | undefined;
+  #metricHandler: ((name: DesignerMetricName) => void) | undefined;
   #applyHandler: ((componentId: string, color: string) => boolean) | undefined;
 
   connect(
@@ -78,7 +79,37 @@ export class DesignerGuardController {
     this.#applyHandler = handler;
   }
 
+  setChangeHandler(handler: (result: DesignerGuardSnapshot) => void): void {
+    this.#changeHandler = handler;
+  }
+
+  setMetricHandler(handler: (name: DesignerMetricName) => void): void {
+    this.#metricHandler = handler;
+  }
+
+  /** 关掉守卫只停止测量与展示，不写入任何东西；重新打开会立刻补一次测量。 */
+  setEnabled(enabled: boolean): void {
+    if (this.#enabled === enabled) return;
+    this.#enabled = enabled;
+    if (!enabled) this.#cancelPending();
+    this.render();
+  }
+
+  get enabled(): boolean {
+    return this.#enabled;
+  }
+
+  readResult(): DesignerGuardSnapshot {
+    return {
+      enabled: this.#enabled,
+      checked: this.#view.checked,
+      truncated: this.#view.truncated,
+      issues: this.#view.issues,
+    };
+  }
+
   schedule(document: ScreenDocument): void {
+    if (!this.#enabled) return;
     this.#cancelPending();
     this.#pending = setTimeout(() => {
       this.#pending = undefined;
@@ -88,6 +119,7 @@ export class DesignerGuardController {
 
   /** 立即测量并刷新：文档或主题变化后由宿主调用。 */
   refresh(document: ScreenDocument): void {
+    if (!this.#enabled) return;
     this.clearPreview();
     const canvas = this.#canvas;
     const content = this.#content;
@@ -105,6 +137,7 @@ export class DesignerGuardController {
       issues: result.issues,
       previewComponentId: null,
     };
+    if (result.issues.length > 0) this.#metricHandler?.('guard_fail');
     this.render();
   }
 
@@ -170,6 +203,7 @@ export class DesignerGuardController {
       }),
     };
     this.#view = { ...this.#view, previewComponentId: componentId };
+    this.#metricHandler?.('fix_preview');
     this.render();
     this.#popover?.querySelector<HTMLButtonElement>(`[data-guard-action="apply"]`)?.focus();
   }
@@ -177,6 +211,7 @@ export class DesignerGuardController {
   private applyFix(componentId: string, color: string): void {
     if (componentId === '' || color === '' || this.#applyHandler === undefined) return;
     if (!this.#applyHandler(componentId, color)) return;
+    this.#metricHandler?.('fix_apply');
     this.clearPreview();
   }
 
@@ -207,6 +242,7 @@ export class DesignerGuardController {
   }
 
   private render(): void {
+    this.#changeHandler?.(this.readResult());
     const strip = this.#strip;
     if (strip !== undefined) {
       strip.innerHTML = guardStripMarkup(this.#view);

@@ -40,6 +40,9 @@ export function applyScreenDocumentCommand(document: ScreenDocument, command: Sc
 // @public (undocumented)
 export function applyScreenDocumentTransaction(document: ScreenDocument, transaction: ScreenDocumentTransaction): ScreenTransactionResult;
 
+// @public
+export function blend(from: RgbColor, to: RgbColor, amount: number): RgbColor;
+
 // @public (undocumented)
 export function buildComponentIndex(document: ScreenDocument): ComponentIndex;
 
@@ -78,11 +81,20 @@ export interface ComponentIndex {
 // @public
 export function componentsReferencingDataSources(document: ScreenDocument, dataSourceIds: Iterable<string>): readonly string[];
 
+// @public
+export function compositeOver(top: RgbColor, alpha: number, bottom: RgbColor): RgbColor;
+
+// @public
+export function contrastRatio(a: RgbColor, b: RgbColor): number;
+
 // @public (undocumented)
 export function createScreenHistory(document: ScreenDocument): ScreenHistoryState;
 
 // @public (undocumented)
 export function deleteScreenJsonPath(root: ScreenJsonObject, path: readonly (string | number)[]): ScreenJsonObject | undefined;
+
+// @public
+export function diffScreenDocuments(before: ScreenDocument, after: ScreenDocument): readonly ScreenDiffRow[];
 
 // @public (undocumented)
 export function dispatchScreenBlueprintEvent(plan: ScreenBlueprintPlan, state: ScreenJsonObject, event: ScreenBlueprintEvent): ScreenParseResult<ScreenBlueprintDispatchResult>;
@@ -95,6 +107,9 @@ export function evaluateScreenValueRef(ref: ScreenValueRef, environment: ScreenV
 
 // @public (undocumented)
 export function extractScreenHostResourceVariableDependencies(params: Readonly<Record<string, ScreenHostResourceParameter>>): readonly string[];
+
+// @public (undocumented)
+export function formatCssColor(color: RgbColor): string;
 
 // @public (undocumented)
 export function getAncestorDepth(index: ComponentIndex, id: string): number;
@@ -135,8 +150,20 @@ export function isScreenComponentEffectivelyHidden(document: ScreenDocument, com
 // @public (undocumented)
 export function isScreenComponentEffectivelyLocked(document: ScreenDocument, componentId: string): boolean;
 
+// @public
+export function minimumContrastRatio(fontSizePx: number, fontWeight: number): number;
+
 // @public (undocumented)
 export function moveScreenJsonArrayItem(root: ScreenJsonObject, path: readonly (string | number)[], from: number, to: number): ScreenJsonObject | undefined;
+
+// @public
+export function parseCssColor(value: string): RgbColor | undefined;
+
+// @public
+export function parseCssColorAlpha(value: string): {
+    readonly color: RgbColor;
+    readonly alpha: number;
+} | undefined;
 
 // @public (undocumented)
 export function parseScreenDocumentCommand(input: unknown): ScreenParseResult<ScreenDocumentCommand>;
@@ -156,11 +183,24 @@ export function reduceScreenInteraction(state: ScreenInteractionState, action: S
 // @public (undocumented)
 export function reduceScreenViewport(state: ScreenViewportState, action: ScreenViewportAction): ScreenViewportState;
 
+// @public
+export function relativeLuminance(color: RgbColor): number;
+
 // @public (undocumented)
 export function removeScreenJsonArrayItem(root: ScreenJsonObject, path: readonly (string | number)[], index: number): ScreenJsonObject | undefined;
 
 // @public
 export function revertScreenHistory(history: ScreenHistoryState, targetIndex: number): ScreenHistoryState;
+
+// @public
+export interface RgbColor {
+    // (undocumented)
+    readonly b: number;
+    // (undocumented)
+    readonly g: number;
+    // (undocumented)
+    readonly r: number;
+}
 
 export { SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY }
 
@@ -448,6 +488,28 @@ export { ScreenDataBindingValidation as ScreenHostResourceBindingValidation }
 
 export { ScreenDiagnostic }
 
+// @public
+export interface ScreenDiffEntry {
+    // (undocumented)
+    readonly after: string;
+    // (undocumented)
+    readonly before: string;
+    // (undocumented)
+    readonly path: string;
+}
+
+// @public
+export interface ScreenDiffRow {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly componentName: string;
+    // (undocumented)
+    readonly entries: readonly ScreenDiffEntry[];
+    // (undocumented)
+    readonly kind: 'added' | 'removed' | 'changed';
+}
+
 export { ScreenDocument }
 
 // @public (undocumented)
@@ -503,9 +565,13 @@ export interface ScreenHistoryEntry {
 export interface ScreenHistoryNode {
     // (undocumented)
     readonly index: number;
+    readonly position: ScreenHistoryNodePosition;
     // (undocumented)
     readonly provenance?: ScreenTransactionProvenance;
 }
+
+// @public (undocumented)
+type ScreenHistoryNodePosition = 'past' | 'current' | 'future';
 
 // @public (undocumented)
 export interface ScreenHistoryState {
@@ -706,6 +772,9 @@ export function setScreenJsonArrayItem(root: ScreenJsonObject, path: readonly (s
 
 // @public (undocumented)
 export function setScreenJsonPath(root: ScreenJsonObject, path: readonly (string | number)[], value: ScreenJsonValue): ScreenJsonObject | undefined;
+
+// @public
+export function suggestReadableColor(foreground: RgbColor, background: RgbColor, minRatio: number): RgbColor | undefined;
 
 // @public (undocumented)
 export function traceScreenBlueprintEvent(plan: ScreenBlueprintPlan, state: ScreenJsonObject, event: ScreenBlueprintEvent): ScreenParseResult<ScreenBlueprintTraceResult>;

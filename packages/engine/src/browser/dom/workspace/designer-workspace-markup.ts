@@ -144,6 +144,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           <button type="button" class="topbar-icon-button" data-topbar-snapshot data-tip="${DESIGNER_UI_TEXT.createSnapshot}" aria-label="${DESIGNER_UI_TEXT.createSnapshot}" disabled>${designerIcon('copy')}</button>
           <button type="button" class="topbar-icon-button" data-presentation-lock-toggle data-tip="${DESIGNER_UI_TEXT.presentationLock.enterAria}" aria-label="${DESIGNER_UI_TEXT.presentationLock.enterAria}">${designerIcon('play')}</button>
           <button type="button" class="topbar-icon-button" data-error-console-toggle aria-controls="designer-error-console" aria-haspopup="dialog" aria-expanded="false" data-tip="${DESIGNER_UI_TEXT.errorConsole.openAria}" aria-label="${DESIGNER_UI_TEXT.errorConsole.openAria}">${designerIcon('activity')}<span class="topbar-count" data-error-console-count></span></button>
+          <button type="button" class="topbar-icon-button" data-display-toggle aria-controls="designer-display-panel" aria-haspopup="dialog" aria-expanded="false" data-tip="${DESIGNER_UI_TEXT.targetDisplay.label}" aria-label="${DESIGNER_UI_TEXT.targetDisplay.label}">${designerIcon('grid')}</button>
           <button type="button" class="topbar-icon-button" data-topbar-theme-toggle data-tip="${DESIGNER_UI_TEXT.toggleTheme}" aria-label="${DESIGNER_UI_TEXT.toggleTheme}" aria-pressed="false"><span class="topbar-theme-moon" aria-hidden="true">${designerIcon('moon')}</span><span class="topbar-theme-sun" aria-hidden="true">${designerIcon('sun')}</span></button>
           <button type="button" class="topbar-search-trigger" data-command-palette-toggle aria-expanded="false" aria-controls="designer-command-palette-input" aria-label="${DESIGNER_UI_TEXT.commandPalette.trigger}" data-tip="${DESIGNER_UI_TEXT.commandPalette.trigger}">
             ${designerIcon('search')}
@@ -160,6 +161,8 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         ${menuPanel('view', DESIGNER_UI_TEXT.view, ['zoom-in', 'zoom-out', 'zoom-reset', 'zoom-fit', 'separator', 'toggle-grid', 'toggle-guides', 'toggle-border-guides'])}
         ${menuPanel('tools', DESIGNER_UI_TEXT.tools, ['toggle-workbench', 'show-help'])}
       </header>
+
+      <div class="designer-display-panel" id="designer-display-panel" data-display-panel role="dialog" aria-label="${DESIGNER_UI_TEXT.targetDisplay.label}" hidden></div>
 
       <input type="file" accept="application/json" data-import-document hidden>
 

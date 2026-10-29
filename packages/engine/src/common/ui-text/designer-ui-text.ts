@@ -230,6 +230,18 @@ export const DESIGNER_UI_TEXT = {
     exitCompare: '退出对比',
     close: '关闭',
     draftAria: (title: string, count: number) => `草案未写入：${title}，影响 ${count} 个组件`,
+    // 历史段：指针式回退，节点不删除。
+    historyTitle: '历史',
+    historyInitial: '初始版本',
+    historyNode: (index: number) => `节点 ${index}`,
+    historyHint: '回退只移动指针，不删除节点；可再前进。',
+    historyRevert: '回到这里',
+    historyCurrent: '当前',
+  },
+  // 归属标签：发起与审批都是不透明字符串，引擎不解析身份。
+  origin: {
+    label: (author: string, approver: string) => `发起 ${author} · 审批 ${approver}`,
+    authorOnly: (author: string) => `发起 ${author}`,
   },
   // 右栏一级切换：检查器承载编辑，变更承载待决提案与历史。
   rightPane: {
@@ -263,6 +275,9 @@ export const DESIGNER_UI_TEXT = {
     wholeScreenBody: '整屏修改会改变全部布局与绑定，代价高于局部调整；确认后仍需逐条采纳。',
     wholeScreenConfirm: '确认整屏',
     confirmCancel: '取消',
+    parameterApplied: (label: string, value: string) =>
+      `已交给面板 · 未调用模型（${label} ${value}）`,
+    parameterNoSelection: '先选中组件再改数值；没有作用域时不会猜对象。',
   },
   // 场景切换：场景由宿主定义，切换是一整套布局与数据绑定的替换，先预览后应用。
   scene: {
@@ -290,6 +305,21 @@ export const DESIGNER_UI_TEXT = {
     safeArea: '安全区',
     seam: '拼接缝',
     label: '目标屏',
+    /** 叠加标签：观距 + 物理尺寸 + 最小可读字号，缺项自动省略。 */
+    readout: (distance: string, size: string | null, minFont: number | null) =>
+      [distance, size, minFont === null ? null : `最小可读 ${minFont} px`]
+        .filter((part): part is string => part !== null && part !== '')
+        .join(' · '),
+    physicalSize: (widthM: number, heightM: number) => `${widthM} × ${heightM} m`,
+    close: '关闭目标屏面板',
+    unavailable: '当前环境未提供目标屏参数。',
+    resolution: '分辨率',
+    pitch: '点间距',
+    brightness: '亮度 / 环境',
+    physical: '物理尺寸',
+    angle: '视角',
+    minFont: '最小可读字号',
+    hint: '参数不写入文档；可读性是信息项，不进守卫。',
   },
   // 评审态：只读画布 + 逐条批准/驳回，进度可见。角色与人员由平台注入。
   review: {

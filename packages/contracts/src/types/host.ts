@@ -216,6 +216,12 @@ export interface ScreenTargetDisplayProfile {
   readonly safeAreaPx?: number;
   /** 观距（米），用于 3m 视角的标注。 */
   readonly viewingDistanceM?: number;
+  /** LED 点间距（毫米）：把逻辑像素换算成物理尺寸的唯一依据。 */
+  readonly pixelPitchMm?: number;
+  /** 屏体亮度（cd/m²）。只作为验收输入展示，引擎不做亮度渲染。 */
+  readonly brightnessCdM2?: number;
+  /** 现场环境照度（lux）。与亮度一起判断是否需要调高对比度。 */
+  readonly ambientLux?: number;
 }
 
 export interface ScreenHostCatalogListRequest {

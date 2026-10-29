@@ -1523,8 +1523,11 @@ export interface ScreenTabularDataset {
 
 // @public
 export interface ScreenTargetDisplayProfile {
+    readonly ambientLux?: number;
+    readonly brightnessCdM2?: number;
     // (undocumented)
     readonly columns: number;
+    readonly pixelPitchMm?: number;
     // (undocumented)
     readonly rows: number;
     readonly safeAreaPx?: number;

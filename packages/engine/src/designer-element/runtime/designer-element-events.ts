@@ -68,7 +68,12 @@ export function executeDesignerCommit(
     ...('transaction' in commit
       ? {
           runTransaction: () => {
-            result = element.executeTransaction(commit.transaction);
+            // 设计器内的直接编辑就是 manual：历史要能回答「谁改的」。
+            // 宿主显式给了 provenance（如采纳提案、应用场景）时原样保留。
+            result = element.executeTransaction({
+              ...commit.transaction,
+              provenance: commit.transaction.provenance ?? { source: 'manual' },
+            });
             return result;
           },
         }
@@ -76,7 +81,10 @@ export function executeDesignerCommit(
     ...('command' in commit
       ? {
           runCommand: () => {
-            result = element.executeCommand(commit.command);
+            result = element.executeTransaction({
+              commands: [commit.command],
+              provenance: { source: 'manual' },
+            });
             return result;
           },
         }
@@ -147,6 +155,10 @@ export function onKeyDown(element: DesignerElementHost, event: KeyboardEvent): v
     event.preventDefault();
     return;
   }
+  if (event.key === 'Escape' && elementState.targetDisplayController.closePanel()) {
+    event.preventDefault();
+    return;
+  }
   if (elementState.menuController.onKeyDown(event)) return;
   if (elementState.workbenchController.onKeyDown(event)) return;
   if (
@@ -164,6 +176,15 @@ export function onKeyDown(element: DesignerElementHost, event: KeyboardEvent): v
   // 命中设计器命令 chord 即阻止浏览器默认（命令未启用/不可用时不弹浏览器默认行为），
   // 控件级键优先，命令未命中时回落到 viewport 状态通道。
   const policy = elementState.eventSystem.resolve(event);
+  // 评审是只读态：编辑命令与方向键微调都不执行。Esc 仍交给上层状态机，
+  // 否则评审人会被锁在只读里出不来。
+  if (elementState.changeController.reviewing) {
+    if (event.key === 'Escape') return;
+    if (policy.kind === 'command') {
+      event.preventDefault();
+      return;
+    }
+  }
   if (policy.kind === 'command') {
     event.preventDefault();
     const operation = elementState.operations.findByShortcut(policy.chord);
@@ -177,5 +198,7 @@ export function onKeyDown(element: DesignerElementHost, event: KeyboardEvent): v
     }
     return;
   }
-  if (!event.defaultPrevented) elementState.viewportController.onKeyDown(event);
+  if (!event.defaultPrevented && !elementState.changeController.reviewing) {
+    elementState.viewportController.onKeyDown(event);
+  }
 }

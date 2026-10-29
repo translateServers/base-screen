@@ -257,11 +257,23 @@ const COMMON_SUBLAYERS = [
   ['events', []],
   ['validation', []],
   ['operations', ['project', 'tools']],
+  // operations 的纯逻辑子层单独登记：它们只依赖外部包，彼此不互相引用。
+  ['operations/change', []],
+  ['operations/scene', []],
+  ['operations/display', []],
+  ['operations/intent', []],
+  ['observability', []],
   ['session', ['project', 'operations']],
 ];
 
 function subLayerOf(file, rootDir, subLayers) {
-  const segment = relative(rootDir, file).split(/[\\/]/)[0] ?? '';
+  const segments = relative(rootDir, file).split(/[\\/]/);
+  // 先按两级登记（operations/change），再退回一级（operations）：
+  // 未登记的子目录不会被新规则意外判违规。
+  const nested = `${segments[0] ?? ''}/${segments[1] ?? ''}`;
+  const nestedLayer = subLayers.find(([name]) => name === nested);
+  if (nestedLayer !== undefined) return nestedLayer;
+  const segment = segments[0] ?? '';
   return subLayers.find(([name]) => name === segment);
 }
 

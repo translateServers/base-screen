@@ -44,7 +44,10 @@ import type {
 import type { BaseScreenMaterialCatalogRefreshResult } from '../common/operations/catalog/designer-catalog-refresh.js';
 import type { DesignerChangeProposalInput } from '../common/operations/change/designer-change-proposal.js';
 import type { DesignerReviewMeta } from '../common/operations/change/designer-review.js';
-import type { DesignerDisplayOverlayKind } from '../common/operations/display/designer-target-display.js';
+import type {
+  DesignerDisplayMetrics,
+  DesignerDisplayOverlayKind,
+} from '../common/operations/display/designer-target-display.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
@@ -369,6 +372,26 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.submitChangeProposal(this, input);
   }
 
+  /** 读当前待决提案的摘要；没有待决提案时为 undefined。 */
+  readPendingChange(): BaseScreenDesignerChangeProposalSummary | undefined {
+    return this.#designerState.runtime.readPendingChange(this);
+  }
+
+  /** 采纳一个可独立成立的单元；其余单元会按当前文档重新编译。 */
+  adoptChangeUnit(unitId: string): boolean {
+    return this.#designerState.runtime.adoptChangeUnit(this, unitId);
+  }
+
+  /** 忽略一个单元：不写文档，只从待决集合里去掉。 */
+  rejectChangeUnit(unitId: string): boolean {
+    return this.#designerState.runtime.rejectChangeUnit(this, unitId);
+  }
+
+  /** 全部采纳：整批命令一次事务提交，等价于用户完成二次确认后采纳。 */
+  adoptAllChanges(): boolean {
+    return this.#designerState.runtime.adoptAllChanges(this);
+  }
+
   /** 撤回未采纳的提案。 */
   discardPendingChange(): void {
     this.#designerState.runtime.discardPendingChange(this);
@@ -591,6 +614,11 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   get targetDisplayProfile(): ScreenTargetDisplayProfile | undefined {
     return this.#designerState.runtime.readTargetDisplayProfile(this);
+  }
+
+  /** 目标屏验收读数：物理尺寸、视角、最小可读字号；参数缺失的项为 null。 */
+  readDisplayMetrics(): DesignerDisplayMetrics | undefined {
+    return this.#designerState.runtime.readDisplayMetrics(this);
   }
 
   setTargetDisplayOverlay(kind: DesignerDisplayOverlayKind, enabled: boolean): void {

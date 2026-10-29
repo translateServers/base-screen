@@ -4,7 +4,7 @@ import {
   minimumContrastRatio,
   type RgbColor,
   suggestReadableColor,
-} from './wcag-contrast.js';
+} from '@base-screen/core';
 
 /**
  * 守卫的输入是**已测量**的样本，不是文档字段：对比度只有在真实渲染后才有意义
@@ -74,3 +74,17 @@ export function evaluateContrastGuard(
     issues: [...worst.values()].sort((a, b) => a.ratio - b.ratio),
   };
 }
+
+/**
+ * 守卫的对外快照：宿主、评审页与工具面读同一份，不解析 DOM。
+ * `checked: 0` 表示还没测过，不等于通过。
+ */
+export interface DesignerGuardSnapshot {
+  readonly enabled: boolean;
+  readonly checked: number;
+  readonly truncated: boolean;
+  readonly issues: readonly DesignerContrastIssue[];
+}
+
+/** 守卫结果变化（测量完成、预览、应用、开关）。 */
+export const BASE_SCREEN_GUARD_CHANGE_EVENT = 'base-screen-guard-change';

@@ -5,7 +5,7 @@ import {
   parseCssColor,
   parseCssColorAlpha,
   type RgbColor,
-} from '../../../common/validation/wcag-contrast.js';
+} from '@base-screen/core';
 
 /** 单次测量的组件上限：守卫每次文档变更都要跑，不能让它成为长任务。 */
 const MAX_MEASURED_COMPONENTS = 800;

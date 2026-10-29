@@ -23,6 +23,7 @@ import type { ScreenComponentTextCommitRequest } from '@base-screen/contracts';
 import type { ScreenComponentTextTarget } from '@base-screen/contracts';
 import type { ScreenDesignerHostAdapter } from '@base-screen/contracts';
 import type { ScreenDiagnostic } from '@base-screen/contracts';
+import { ScreenDiffRow } from '@base-screen/core';
 import { ScreenDocument } from '@base-screen/contracts';
 import { ScreenDocumentCommand } from '@base-screen/core';
 import { ScreenDocumentTransaction } from '@base-screen/core';
@@ -63,6 +64,9 @@ export const BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME: 'application/x-base-screen-bl
 // @public (undocumented)
 export const BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT: 'base-screen-canvas-presentation-change';
 
+// @public
+export const BASE_SCREEN_CHANGE_STATE_EVENT = "base-screen-change-state";
+
 // @public (undocumented)
 export const BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT: 'base-screen-designer-back-request';
 
@@ -81,6 +85,9 @@ export const BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX: 'base-screen-designer-
 // @public (undocumented)
 export const BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT: 'base-screen-designer-workbench-mode-change';
 
+// @public
+export const BASE_SCREEN_GUARD_CHANGE_EVENT = "base-screen-guard-change";
+
 // @public (undocumented)
 export const BASE_SCREEN_HOST_RESOURCE_DRAG_MIME: 'application/x-base-screen-host-resource';
 
@@ -89,6 +96,9 @@ export const BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT = "base-screen-ho
 
 // @public (undocumented)
 export const BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT: 'base-screen-material-library-action';
+
+// @public
+export const BASE_SCREEN_METRIC_EVENT = "base-screen-metric";
 
 // @public
 export const BASE_SCREEN_SCENE_CHANGE_EVENT = "base-screen-scene-change";
@@ -387,12 +397,46 @@ export interface BaseScreenDesignerBackRequestEventDetail {
     readonly source: 'topbar';
 }
 
-// @public (undocumented)
-interface BaseScreenDesignerChangeProposalSummary {
+// @public
+export interface BaseScreenDesignerChangeProposalSummary {
     // (undocumented)
     readonly affectedComponentIds: readonly string[];
     // (undocumented)
     readonly id: string;
+    // (undocumented)
+    readonly origin?: DesignerChangeProposalOrigin;
+    // (undocumented)
+    readonly rationale: string;
+    // (undocumented)
+    readonly scope: string;
+    // (undocumented)
+    readonly title: string;
+    // (undocumented)
+    readonly units: readonly BaseScreenDesignerChangeUnitSummary[];
+}
+
+// @public (undocumented)
+export interface BaseScreenDesignerChangeStateDetail {
+    // (undocumented)
+    readonly origin?: DesignerChangeProposalOrigin;
+    // (undocumented)
+    readonly pending: boolean;
+    // (undocumented)
+    readonly scope?: string;
+    // (undocumented)
+    readonly title?: string;
+    // (undocumented)
+    readonly unitCount: number;
+}
+
+// @public (undocumented)
+export interface BaseScreenDesignerChangeUnitSummary {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: DesignerChangeUnitKind;
+    // (undocumented)
+    readonly label: string;
 }
 
 // @public (undocumented)
@@ -449,6 +493,8 @@ export interface BaseScreenDesignerConfiguration {
 export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     get activeSceneId(): string | undefined;
+    adoptAllChanges(): boolean;
+    adoptChangeUnit(unitId: string): boolean;
     // (undocumented)
     align(alignment: BaseScreenAlignment): ScreenParseResult<ScreenDocument>;
     // (undocumented)
@@ -597,7 +643,9 @@ export class BaseScreenDesignerElement extends ElementBase {
     set projectSnapshotPort(value: ScreenProjectSnapshotPort | undefined);
     // (undocumented)
     publish(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
+    readDisplayMetrics(): DesignerDisplayMetrics | undefined;
     readHistory(): readonly ScreenHistoryNode[];
+    readPendingChange(): BaseScreenDesignerChangeProposalSummary | undefined;
     // (undocumented)
     redo(): ScreenParseResult<ScreenDocument>;
     refreshCatalog(catalog: BaseScreenMaterialCatalog): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult>;
@@ -606,6 +654,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     refreshData(componentId?: string): void;
     // (undocumented)
     refreshVariables(options?: ScreenVariableRefreshOptions): void;
+    rejectChangeUnit(unitId: string): boolean;
     // (undocumented)
     reloadRemote(discardChanges?: boolean): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
     // (undocumented)
@@ -904,6 +953,15 @@ export interface BaseScreenMaterialLibraryState {
 export type BaseScreenMaterialLibraryStatus = 'loading' | 'ready' | 'offline' | 'partial' | 'error' | 'update-available';
 
 // @public (undocumented)
+export interface BaseScreenMetricEventDetail {
+    readonly at: number;
+    // (undocumented)
+    readonly name: DesignerMetricName;
+    // (undocumented)
+    readonly payload?: DesignerMetricPayload;
+}
+
+// @public (undocumented)
 export interface BaseScreenSceneChangeDetail {
     // (undocumented)
     readonly label: string;
@@ -930,6 +988,9 @@ export interface CreateBaseScreenCorePluginDesignReadPortOptions {
     // (undocumented)
     readonly getSelection: () => ScreenInteractionState;
 }
+
+// @public (undocumented)
+export function createDesignerMetric(name: DesignerMetricName, payload?: DesignerMetricPayload): BaseScreenMetricEventDetail;
 
 // @public (undocumented)
 const DESIGNER_TOOLS: readonly [{
@@ -963,9 +1024,11 @@ const DESIGNER_TOOLS: readonly [{
 }];
 
 // @public (undocumented)
-interface DesignerChangeProposalInput {
+export interface DesignerChangeProposalInput {
     // (undocumented)
     readonly commands: readonly ScreenDocumentCommand[];
+    // (undocumented)
+    readonly origin?: DesignerChangeProposalOrigin;
     readonly rationale: string;
     // (undocumented)
     readonly scope: string;
@@ -973,14 +1036,128 @@ interface DesignerChangeProposalInput {
     readonly title: string;
 }
 
+// @public
+export interface DesignerChangeProposalOrigin {
+    // (undocumented)
+    readonly approver?: string;
+    // (undocumented)
+    readonly author?: string;
+}
+
+// @public
+interface DesignerChangeUnit {
+    // (undocumented)
+    readonly commandIndexes: readonly number[];
+    // (undocumented)
+    readonly diff: readonly ScreenDiffRow[];
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: 'added' | 'removed' | 'changed' | 'document';
+    // (undocumented)
+    readonly label: string;
+}
+
 // @public (undocumented)
-type DesignerDisplayOverlayKind = 'safe-area' | 'seam' | 'distance';
+export type DesignerChangeUnitKind = DesignerChangeUnit['kind'];
+
+// @public (undocumented)
+export interface DesignerContrastIssue {
+    // (undocumented)
+    readonly backgroundColor: string;
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly componentName: string;
+    // (undocumented)
+    readonly ratio: number;
+    // (undocumented)
+    readonly requiredRatio: number;
+    readonly suggestedColor: string | null;
+    readonly suggestedRatio: number | null;
+    // (undocumented)
+    readonly textColor: string;
+}
+
+// @public (undocumented)
+export interface DesignerDisplayAngularSize {
+    // (undocumented)
+    readonly horizontalDeg: number;
+    // (undocumented)
+    readonly verticalDeg: number;
+}
 
 // @public
-type DesignerIntentHandler = (request: ScreenIntentRequest) => Promise<ScreenParseResult<null>>;
+export interface DesignerDisplayMetrics {
+    // (undocumented)
+    readonly ambientLux: number | undefined;
+    // (undocumented)
+    readonly angular: DesignerDisplayAngularSize | null;
+    // (undocumented)
+    readonly brightnessCdM2: number | undefined;
+    // (undocumented)
+    readonly minimumLegibleFontPx: number | null;
+    // (undocumented)
+    readonly physical: DesignerDisplayPhysicalSize | null;
+}
+
+// @public (undocumented)
+export type DesignerDisplayOverlayKind = 'safe-area' | 'seam' | 'distance';
+
+// @public (undocumented)
+export interface DesignerDisplayPhysicalSize {
+    // (undocumented)
+    readonly heightMm: number;
+    // (undocumented)
+    readonly pixelPitchMm: number;
+    // (undocumented)
+    readonly widthMm: number;
+}
+
+// @public (undocumented)
+export interface DesignerDisplayReadability {
+    readonly actualFontPx: number | null;
+    // (undocumented)
+    readonly ok: boolean;
+    readonly requiredFontPx: number;
+}
 
 // @public
-interface DesignerReviewMeta {
+export interface DesignerGuardSnapshot {
+    // (undocumented)
+    readonly checked: number;
+    // (undocumented)
+    readonly enabled: boolean;
+    // (undocumented)
+    readonly issues: readonly DesignerContrastIssue[];
+    // (undocumented)
+    readonly truncated: boolean;
+}
+
+// @public
+export type DesignerIntentHandler = (request: ScreenIntentRequest) => Promise<ScreenParseResult<null>>;
+
+// @public (undocumented)
+export type DesignerMetricName = 'intent_submit' | 'clarify_open' | 'parameter_route' | 'direct_edit' | 'draft_created' | 'draft_discarded' | 'change_adopt' | 'change_reject' | 'guard_fail' | 'fix_preview' | 'fix_apply' | 'scene_preview' | 'scene_apply' | 'revert' | 'patch_record';
+
+// @public (undocumented)
+export interface DesignerMetricPayload {
+    // (undocumented)
+    readonly componentId?: string;
+    // (undocumented)
+    readonly count?: number;
+    // (undocumented)
+    readonly mode?: string;
+    // (undocumented)
+    readonly scope?: 'screen' | 'components';
+    // (undocumented)
+    readonly source?: 'manual' | 'host' | 'agent';
+    // (undocumented)
+    readonly unitId?: string;
+}
+
+// @public
+export interface DesignerReviewMeta {
     // (undocumented)
     readonly approver?: string;
     // (undocumented)

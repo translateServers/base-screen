@@ -132,3 +132,5 @@ export { reduceScreenViewport } from './state/viewport.js';
 
 export { ScreenCoreInvariantError } from './validation/invariant-error.js';
 export { validateScreenDocumentSemantics } from './validation/validate-semantics.js';
+export * from './validation/contrast.js';
+export * from './diff/screen-diff.js';

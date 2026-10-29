@@ -882,3 +882,81 @@
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
 }
+
+/* 目标屏面板：顶栏入口 + 浮层。参数由宿主提供，面板只读。 */
+.designer-display-panel {
+  position: absolute;
+  top: 56px;
+  right: 16px;
+  z-index: 45;
+  width: 268px;
+  padding: var(--designer-space-3);
+  border-radius: var(--designer-radius-4);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-elev-float, 0 16px 40px -16px rgba(0, 0, 0, 0.28));
+  display: flex;
+  flex-direction: column;
+  gap: var(--designer-space-2);
+}
+
+.display-panel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+}
+
+.display-panel-title {
+  font-size: var(--designer-font-size-sm);
+  font-weight: 600;
+  color: var(--designer-text-primary);
+}
+
+.display-panel-head .topbar-icon-button {
+  margin-left: auto;
+}
+
+.display-panel-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--designer-space-1);
+}
+
+.display-kv {
+  display: flex;
+  align-items: baseline;
+  gap: var(--designer-space-2);
+  font-size: var(--designer-font-size-xs);
+}
+
+.display-kv-label {
+  color: var(--designer-text-muted);
+}
+
+.display-kv-value {
+  margin-left: auto;
+  font-family: var(--designer-font-numeric);
+  color: var(--designer-text-primary);
+}
+
+.display-panel-toggles {
+  display: flex;
+  gap: var(--designer-space-1);
+}
+
+.designer-display-toggle {
+  flex: 1 1 auto;
+  font-size: var(--designer-font-size-xs);
+}
+
+.designer-display-toggle[aria-pressed='true'] {
+  background: var(--designer-accent-soft, rgba(0, 112, 243, 0.12));
+  color: var(--designer-accent-text, var(--designer-accent));
+}
+
+.display-panel-hint,
+.display-panel-empty {
+  margin: 0;
+  font-size: var(--designer-font-size-xs);
+  color: var(--designer-text-muted);
+  line-height: 1.5;
+}

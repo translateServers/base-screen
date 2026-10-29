@@ -1,5 +1,8 @@
 import type { ScreenTargetDisplayProfile } from '@base-screen/contracts';
-import type { DesignerDisplayOverlayKind } from '../../common/operations/display/designer-target-display.js';
+import type {
+  DesignerDisplayMetrics,
+  DesignerDisplayOverlayKind,
+} from '../../common/operations/display/designer-target-display.js';
 import {
   type DesignerElementHost,
   getDesignerElementState,
@@ -32,4 +35,9 @@ export function readTargetDisplayOverlay(
   kind: DesignerDisplayOverlayKind,
 ): boolean {
   return getDesignerElementState(element).targetDisplayController.isOverlayEnabled(kind);
+}
+
+/** 目标屏验收读数：物理尺寸、视角、最小可读字号；参数缺失的项为 null。 */
+export function readDisplayMetrics(element: DesignerElementHost): DesignerDisplayMetrics | undefined {
+  return getDesignerElementState(element).targetDisplayController.readMetrics();
 }

@@ -98,3 +98,35 @@ export {
   BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT,
   type BaseScreenDesignerBackRequestEventDetail,
 } from '../common/operations/workbench/designer-navigation.js';
+export {
+  BASE_SCREEN_CHANGE_STATE_EVENT,
+  type BaseScreenDesignerChangeProposalSummary,
+  type BaseScreenDesignerChangeStateDetail,
+  type BaseScreenDesignerChangeUnitSummary,
+  type DesignerChangeUnitKind,
+} from '../common/operations/change/designer-change-events.js';
+export type {
+  DesignerChangeProposalInput,
+  DesignerChangeProposalOrigin,
+} from '../common/operations/change/designer-change-proposal.js';
+export type { DesignerReviewMeta } from '../common/operations/change/designer-review.js';
+export type { DesignerIntentHandler } from '../common/operations/intent/designer-intent.js';
+export {
+  type DesignerDisplayAngularSize,
+  type DesignerDisplayMetrics,
+  type DesignerDisplayOverlayKind,
+  type DesignerDisplayPhysicalSize,
+  type DesignerDisplayReadability,
+} from '../common/operations/display/designer-target-display.js';
+export {
+  BASE_SCREEN_GUARD_CHANGE_EVENT,
+  type DesignerContrastIssue,
+  type DesignerGuardSnapshot,
+} from '../common/validation/designer-guard.js';
+export {
+  BASE_SCREEN_METRIC_EVENT,
+  type BaseScreenMetricEventDetail,
+  type DesignerMetricName,
+  type DesignerMetricPayload,
+  createDesignerMetric,
+} from '../common/observability/designer-metrics.js';

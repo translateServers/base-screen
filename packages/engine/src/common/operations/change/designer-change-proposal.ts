@@ -1,11 +1,22 @@
-import type { ScreenDiagnostic, ScreenDocument, ScreenJsonObject } from '@base-screen/contracts';
+import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
 import {
   applyScreenDocumentTransaction,
+  diffScreenDocuments,
+  type ScreenDiffRow as DesignerChangeDiffRow,
   type ScreenDocumentCommand,
   type ScreenTransactionProvenance,
 } from '@base-screen/core';
 
-const MAX_VALUE_LENGTH = 80;
+
+/**
+ * 提案的归属标签：`author` 发起、`approver` 审批。
+ *
+ * 都是**不透明字符串**，引擎不解析、不索引、不做权限判断；身份与审批链归宿主。
+ */
+export interface DesignerChangeProposalOrigin {
+  readonly author?: string;
+  readonly approver?: string;
+}
 
 export interface DesignerChangeProposalInput {
   readonly title: string;
@@ -13,20 +24,14 @@ export interface DesignerChangeProposalInput {
   readonly rationale: string;
   readonly scope: string;
   readonly commands: readonly ScreenDocumentCommand[];
+  readonly origin?: DesignerChangeProposalOrigin;
 }
 
-export interface DesignerChangeDiffEntry {
-  readonly path: string;
-  readonly before: string;
-  readonly after: string;
-}
-
-export interface DesignerChangeDiffRow {
-  readonly componentId: string;
-  readonly componentName: string;
-  readonly kind: 'added' | 'removed' | 'changed';
-  readonly entries: readonly DesignerChangeDiffEntry[];
-}
+export type {
+  ScreenDiffEntry as DesignerChangeDiffEntry,
+  ScreenDiffRow as DesignerChangeDiffRow,
+} from '@base-screen/core';
+export { diffScreenDocuments } from '@base-screen/core';
 
 /** 一份**未写入**的候选文档与它的变更说明。 */
 export interface DesignerChangeProposal {
@@ -41,6 +46,7 @@ export interface DesignerChangeProposal {
   /** 可独立采纳的单元；拆不开时只有一个单元，等于整批采纳。 */
   readonly units: readonly DesignerChangeUnit[];
   readonly provenance: ScreenTransactionProvenance;
+  readonly origin?: DesignerChangeProposalOrigin;
 }
 
 /**
@@ -103,6 +109,7 @@ export function prepareDesignerChangeProposal(
       diff,
       units: buildUnits(document, input.commands, diff),
       provenance,
+      ...(input.origin === undefined ? {} : { origin: input.origin }),
     },
   };
 }
@@ -259,94 +266,3 @@ function unitKind(
 }
 
 /** 组件级属性 diff：新增/删除整行，修改按字段展开。 */
-export function diffScreenDocuments(
-  before: ScreenDocument,
-  after: ScreenDocument,
-): readonly DesignerChangeDiffRow[] {
-  const beforeById = new Map(before.components.map((component) => [component.id, component]));
-  const afterById = new Map(after.components.map((component) => [component.id, component]));
-  const rows: DesignerChangeDiffRow[] = [];
-  for (const component of after.components) {
-    const previous = beforeById.get(component.id);
-    if (previous === undefined) {
-      rows.push({
-        componentId: component.id,
-        componentName: component.name,
-        kind: 'added',
-        entries: [],
-      });
-      continue;
-    }
-    const entries = diffComponent(previous, component);
-    if (entries.length > 0) {
-      rows.push({
-        componentId: component.id,
-        componentName: component.name,
-        kind: 'changed',
-        entries,
-      });
-    }
-  }
-  for (const component of before.components) {
-    if (afterById.has(component.id)) continue;
-    rows.push({
-      componentId: component.id,
-      componentName: component.name,
-      kind: 'removed',
-      entries: [],
-    });
-  }
-  return rows;
-}
-
-function diffComponent(
-  before: ScreenDocument['components'][number],
-  after: ScreenDocument['components'][number],
-): readonly DesignerChangeDiffEntry[] {
-  const entries: DesignerChangeDiffEntry[] = [];
-  compareValue('name', before.name, after.name, entries);
-  compareValue('position.x', before.position.x, after.position.x, entries);
-  compareValue('position.y', before.position.y, after.position.y, entries);
-  compareValue('size.width', before.size.width, after.size.width, entries);
-  compareValue('size.height', before.size.height, after.size.height, entries);
-  compareValue('rotation', before.rotation, after.rotation, entries);
-  compareValue('zIndex', before.zIndex, after.zIndex, entries);
-  diffObject('props', before.props, after.props, entries);
-  diffObject('style', before.style, after.style, entries);
-  compareValue('dataValue', before.dataValue ?? null, after.dataValue ?? null, entries);
-  compareValue('dataSource', before.dataSource ?? null, after.dataSource ?? null, entries);
-  compareValue('styleRules', before.styleRules ?? [], after.styleRules ?? [], entries);
-  return entries;
-}
-
-function diffObject(
-  prefix: string,
-  before: ScreenJsonObject,
-  after: ScreenJsonObject,
-  entries: DesignerChangeDiffEntry[],
-): void {
-  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
-  for (const key of keys) {
-    compareValue(`${prefix}.${key}`, before[key], after[key], entries);
-  }
-}
-
-function compareValue(
-  path: string,
-  before: unknown,
-  after: unknown,
-  entries: DesignerChangeDiffEntry[],
-): void {
-  const beforeJson = stableJson(before);
-  if (beforeJson === stableJson(after)) return;
-  entries.push({ path, before: formatValue(beforeJson), after: formatValue(stableJson(after)) });
-}
-
-function stableJson(value: unknown): string {
-  if (value === undefined) return 'null';
-  return JSON.stringify(value) ?? 'null';
-}
-
-function formatValue(json: string): string {
-  return json.length > MAX_VALUE_LENGTH ? `${json.slice(0, MAX_VALUE_LENGTH - 1)}…` : json;
-}

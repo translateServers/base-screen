@@ -1,20 +1,26 @@
 import type {
   DesignerChangeProposal,
+  DesignerChangeProposalOrigin,
   DesignerChangeUnit,
 } from '../../../common/operations/change/designer-change-proposal.js';
+import type { ScreenHistoryNode } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { adoptDesignerFormControls } from '../designer-form-controls-dom.js';
 import { escapeHtml } from '../designer-html-escape.js';
 
 /** 草案条：常驻画布顶部，声明「未写入」，并给出采纳/放弃入口。 */
-export function draftBarMarkup(proposal: DesignerChangeProposal, comparing: boolean): string {
+export function draftBarMarkup(
+  proposal: DesignerChangeProposal,
+  comparing: boolean,
+  paneOpen = false,
+): string {
   const text = DESIGNER_UI_TEXT.change;
   return `<span class="draft-dot" aria-hidden="true"></span>
     <span class="draft-label">${text.draftLabel}</span>
     <span class="draft-title">${escapeHtml(proposal.title)}</span>
     <span class="draft-meta">${text.affected(proposal.affectedComponentIds.length)}</span>
     <span class="draft-actions">
-      <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="toggle-panel" aria-expanded="false">${text.viewChanges}</button>
+      <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="toggle-panel" aria-expanded="${String(paneOpen)}">${text.viewChanges}</button>
       <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="toggle-compare" aria-pressed="${String(comparing)}">${comparing ? text.exitCompare : text.compare}</button>
       <button type="button" class="designer-control designer-button" data-change-action="discard">${text.discard}</button>
       <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>
@@ -29,6 +35,7 @@ export function changePaneMarkup(
   proposal: DesignerChangeProposal | undefined,
   confirmAll: boolean,
   review?: DesignerReviewPane,
+  history?: readonly ScreenHistoryNode[],
 ): string {
   const text = DESIGNER_UI_TEXT.change;
   if (proposal === undefined && review?.reviewing === true) {
@@ -49,6 +56,7 @@ export function changePaneMarkup(
   }
   const units = proposal.units;
   const reviewing = review?.reviewing === true;
+  const origin = originMarkup(proposal.origin);
   const people =
     reviewing && (review.meta.reviewer !== undefined || review.meta.approver !== undefined)
       ? `<p class="change-pane-people">${DESIGNER_UI_TEXT.review.people(
@@ -64,6 +72,7 @@ export function changePaneMarkup(
           : text.remainingUnits(units.length)
       }</span>
     </div>
+    ${origin}
     ${people}
     <p class="change-panel-summary">${escapeHtml(proposal.title)}</p>
     <section class="change-panel-section">
@@ -74,6 +83,7 @@ export function changePaneMarkup(
       <h3 class="change-panel-heading-text">${text.diffLabel}</h3>
       <ul class="change-diff-list">${units.map((unit) => unitMarkup(unit, reviewing)).join('')}</ul>
     </section>
+    ${historyMarkup(history)}
     <footer class="change-panel-actions">
       ${
         reviewing
@@ -137,8 +147,9 @@ export function renderDraftBar(
   bar: HTMLElement,
   proposal: DesignerChangeProposal,
   comparing: boolean,
+  paneOpen = false,
 ): void {
-  bar.innerHTML = draftBarMarkup(proposal, comparing);
+  bar.innerHTML = draftBarMarkup(proposal, comparing, paneOpen);
   adoptDesignerFormControls(bar);
 }
 
@@ -147,8 +158,9 @@ export function renderChangePane(
   proposal: DesignerChangeProposal | undefined,
   confirmAll: boolean,
   review?: DesignerReviewPane,
+  history?: readonly ScreenHistoryNode[],
 ): void {
-  pane.innerHTML = changePaneMarkup(proposal, confirmAll, review);
+  pane.innerHTML = changePaneMarkup(proposal, confirmAll, review, history);
   adoptDesignerFormControls(pane);
 }
 
@@ -157,4 +169,51 @@ export function renderChangeCount(count: HTMLElement, units: number): void {
   count.textContent = units === 0 ? '' : String(units);
   count.hidden = units === 0;
   count.setAttribute('aria-label', DESIGNER_UI_TEXT.rightPane.countAria(units));
+}
+
+/** 归属：两个不透明字符串，缺谁就少谁，都不做身份推断。 */
+function originMarkup(origin: DesignerChangeProposalOrigin | undefined): string {
+  if (origin === undefined) return '';
+  const author = origin.author ?? '';
+  const approver = origin.approver ?? '';
+  if (author === '' && approver === '') return '';
+  const text =
+    author !== '' && approver !== ''
+      ? DESIGNER_UI_TEXT.origin.label(author, approver)
+      : author !== ''
+        ? DESIGNER_UI_TEXT.origin.authorOnly(author)
+        : DESIGNER_UI_TEXT.origin.label('—', approver);
+  return `<p class="change-pane-origin">${escapeHtml(text)}</p>`;
+}
+
+/**
+ * 历史段：指针式回退的可视化。
+ *
+ * 节点顺序即提交顺序，`position` 由 core 给出；`future` 是撤销或回退留下的
+ * 前进栈，同样可点——这正是「回退本身可回退」的入口。
+ */
+function historyMarkup(history: readonly ScreenHistoryNode[] | undefined): string {
+  if (history === undefined || history.length === 0) return '';
+  const text = DESIGNER_UI_TEXT.change;
+  const rows = history
+    .map((node) => {
+      const label =
+        node.index === 0
+          ? text.historyInitial
+          : (node.provenance?.label ?? text.historyNode(node.index));
+      const source = node.provenance?.source ?? '—';
+      const current = node.position === 'current';
+      return `<li><button type="button" class="designer-control designer-history-node" data-change-action="revert-history" data-history-index="${node.index}" data-position="${node.position}" aria-current="${String(current)}">
+        <span class="history-node-index">${node.index}</span>
+        <span class="history-node-label">${escapeHtml(label)}</span>
+        <span class="history-node-source">${escapeHtml(source)}</span>
+        ${current ? `<span class="history-node-current">${text.historyCurrent}</span>` : ''}
+      </button></li>`;
+    })
+    .join('');
+  return `<section class="change-panel-section change-history">
+      <h3 class="change-panel-heading-text">${text.historyTitle}</h3>
+      <ol class="change-history-list">${rows}</ol>
+      <p class="change-panel-hint">${text.historyHint}</p>
+    </section>`;
 }

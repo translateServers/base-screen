@@ -15,6 +15,7 @@ export function initializeDesignerElementSurfaceBindings(
       (target) => state.notificationController.dismiss(target as Element),
       (target) => state.errorConsoleController.onClick(target as Element),
       (target) => state.guardController.onClick(target as Element),
+      (target) => state.targetDisplayController.onClick(target as Element),
       (target) => state.changeController.onClick(target as Element),
       (target) => state.sceneController.onClick(target as Element),
       (target) => state.presentationLockController.onClick(target as Element),
