@@ -291,6 +291,7 @@ export const DESIGNER_UI_TEXT = {
     // 失败/被拒的常驻出口：原因由宿主给，这里只提供动作。重试不重问整屏确认。
     retry: '重试',
     retryWholeScreen: '改用整屏并提交',
+    draftKept: '草稿已保留，接着写会继续用这段文字。',
     empty: '先描述要改什么。',
     scopePending: '选区已变化 · 作用域尚未更新。',
     updateScope: '更新作用域',

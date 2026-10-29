@@ -51,6 +51,11 @@ export class DesignerIntentController {
   #parameterHandler: ((patch: DesignerParameterPatch) => boolean) | undefined;
   #metricHandler: ((name: DesignerMetricName) => void) | undefined;
   #confirmText = '';
+  /**
+   * 「返回检查器」只是折叠书写面，不丢草稿：文字留在输入框里，`data-draft` 收起。
+   * 一旦重新输入或点回输入框，就按「还在写」处理，书写面自己再撑开。
+   */
+  #draftCollapsed = false;
 
   setHandler(handler: DesignerIntentHandler | undefined): void {
     this.#handler = handler;
@@ -96,6 +101,7 @@ export class DesignerIntentController {
     this.#scopeClear = scopeClear;
     this.#status = status;
     this.#confirm = confirm;
+    this.#draftCollapsed = false;
     this.syncScope([], () => undefined);
     this.syncDraftState();
   }
@@ -115,6 +121,7 @@ export class DesignerIntentController {
     this.#abort = undefined;
     this.#pendingScope = undefined;
     this.#confirmKind = undefined;
+    this.#draftCollapsed = false;
   }
 
   /**
@@ -158,6 +165,8 @@ export class DesignerIntentController {
   onInput(): void {
     const input = this.#input;
     if (input === undefined) return;
+    // 折叠态下继续打字 = 回到书写面，不要求用户先找「展开」。
+    this.#draftCollapsed = false;
     if (input.value.trim() === '' && this.#pendingScope !== undefined) {
       this.applyPendingScope();
     }
@@ -226,6 +235,11 @@ export class DesignerIntentController {
       else if (action === 'submit-whole-screen') this.submitAsWholeScreen();
       return true;
     }
+    // 折叠态下点回输入框就是「接着写」：把书写面撑开，但不吞事件——焦点仍交给浏览器。
+    if (target.closest('[data-intent-input]') !== null) {
+      this.resumeDraft();
+      return false;
+    }
     if (target.closest('[data-intent-submit]') === null) return false;
     void this.submit();
     return true;
@@ -252,6 +266,8 @@ export class DesignerIntentController {
   /** 起点牌把「从什么起」带进来：只影响这一轮意图，提交后清空。 */
   focus(startsFrom?: 'metrics' | 'template' | 'prompt'): void {
     this.#startsFrom = startsFrom;
+    this.#draftCollapsed = false;
+    this.syncDraftState();
     this.#input?.focus();
   }
 
@@ -268,7 +284,9 @@ export class DesignerIntentController {
   private syncDraftState(): void {
     const input = this.#input;
     if (input === undefined) return;
-    const draft = input.value.trim() !== '';
+    const composing = input.value.trim() !== '';
+    // 有字但被「返回检查器」折叠过：仍算空闲态，否则那个出口点了也不会有反应。
+    const draft = composing && !this.#draftCollapsed;
     const composer = input.closest('.designer-intent');
     if (composer !== null) composer.toggleAttribute('data-draft', draft);
     if (draft) {
@@ -377,14 +395,28 @@ export class DesignerIntentController {
   }
 
   /**
-   * 会话态退场：清掉草稿，书写面收回成两行，右栏自动交还检查器。
-   * 需要显式入口是因为「写了一半但决定不写」不该强迫用户逐字删空。
+   * 会话态退场：书写面收回两行，右栏交还检查器——**但草稿留下**。
+   *
+   * 这里曾经直接 `input.value = ''`：一次误点就把写了一半的句子连换行一起删掉，无确认、
+   * 无撤销、也没有提示。清空只在提交成功时发生（那是真的用掉了）；退场只是折叠，
+   * 文字还在输入框里，点回输入框或继续打字就重新撑开。
    */
   exitDraft(): void {
     const input = this.#input;
-    if (input !== undefined) input.value = '';
+    if (input === undefined) return;
+    const draft = input.value.trim() !== '';
+    this.#draftCollapsed = draft;
     this.syncDraftState();
-    this.setStatus('', 'info');
+    this.setStatus(draft ? DESIGNER_UI_TEXT.intent.draftKept : '', 'info');
+    this.render();
+  }
+
+  /** 折叠态下接着写：重新撑开书写面（不动文字、不动作用域）。 */
+  private resumeDraft(): void {
+    if (!this.#draftCollapsed) return;
+    this.#draftCollapsed = false;
+    this.syncDraftState();
+    this.render();
   }
 
   private handleConfirm(action: string | undefined): void {
