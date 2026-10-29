@@ -17,6 +17,16 @@ export interface ScreenSummaryShape {
   readonly updatedAt: string;
 }
 
+/** `POST /agent/generate` 的响应：与后端 `AgentGenerateResult` 逐字段对齐。 */
+export interface AgentGenerateShape {
+  /** 后端已经落库的那张新屏；示例宿主只取它的 document 当候选内容。 */
+  readonly screen: ScreenShape;
+  /** 这一轮实际走的通道：`deterministic` 表示没调模型、由确定性兜底产出。 */
+  readonly mode: 'llm' | 'deterministic';
+  readonly imageCount: number;
+  readonly failure?: string;
+}
+
 export interface MetricPoint {
   readonly t: string;
   readonly value: number;

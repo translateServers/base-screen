@@ -12,7 +12,31 @@ const router = useRouter();
 // store 是真源；composable 提供响应式快照。
 const state = useScreensStore();
 const newName = ref('');
+const topic = ref('');
+const generating = ref(false);
 const pendingDeleteId = ref<string | null>(null);
+
+// 生成会在后端新建一张屏，重复提交会得到多张重复的屏，所以生成期间整体锁住。
+async function generateFromTopic(): Promise<void> {
+  const trimmed = topic.value.trim();
+  if (trimmed.length === 0) {
+    showToast('请先描述要生成的大屏主题', 'error');
+    return;
+  }
+  generating.value = true;
+  try {
+    const id = await screensStore.getState().generate(trimmed);
+    if (id === null) {
+      showToast(`生成失败：${screensStore.getState().error ?? '未知错误'}`, 'error');
+      return;
+    }
+    topic.value = '';
+    showToast('已生成，正在打开编辑页', 'success');
+    await router.push(`/screens/${id}/edit`);
+  } finally {
+    generating.value = false;
+  }
+}
 
 async function createScreen(): Promise<void> {
   const trimmed = newName.value.trim();
@@ -54,16 +78,30 @@ onMounted(() => {
       </div>
       <!-- 新建与删除都走页面内控件：window.prompt / window.confirm 在嵌入式浏览器里会被
            直接抑制并返回 null，那样点按钮就只剩「没有反应」。 -->
-      <form class="create-screen" @submit.prevent="createScreen">
-        <input
-          v-model="newName"
-          class="field"
-          type="text"
-          placeholder="新大屏名称"
-          aria-label="新大屏名称"
-        />
-        <button type="submit" class="button button--primary">新建大屏</button>
-      </form>
+      <div class="list-header__actions">
+        <form class="create-screen" @submit.prevent="createScreen">
+          <input
+            v-model="newName"
+            class="field"
+            type="text"
+            placeholder="新大屏名称"
+            aria-label="新大屏名称"
+          />
+          <button type="submit" class="button button--primary">新建大屏</button>
+        </form>
+        <form class="create-screen create-screen--generate" @submit.prevent="generateFromTopic">
+          <input
+            v-model="topic"
+            class="field"
+            type="text"
+            placeholder="一句话描述，例如：华东渠道库存与周转的经营会大屏"
+            aria-label="一句话生成大屏的主题"
+          />
+          <button type="submit" class="button" :disabled="generating">
+            {{ generating ? '生成中…' : '智能生成' }}
+          </button>
+        </form>
+      </div>
     </header>
 
     <ErrorBanner

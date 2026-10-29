@@ -24,31 +24,59 @@ export const screenListView: ViewModule = {
       class: 'field',
       attrs: { type: 'text', placeholder: '新大屏名称', 'aria-label': '新大屏名称' },
     });
+    const topicInput = el('input', {
+      class: 'field',
+      attrs: {
+        type: 'text',
+        placeholder: '一句话描述，例如：华东渠道库存与周转的经营会大屏',
+        'aria-label': '一句话生成大屏的主题',
+      },
+    });
+    const generateButton = el('button', {
+      class: 'button',
+      attrs: { type: 'submit' },
+      text: '智能生成',
+    });
     const header = el('header', { class: 'list-header' }, [
       el('div', { class: 'list-header__title' }, [
         el('h1', { text: '数据可视化工作台' }),
         el('p', { class: 'list-header__subtitle', text: 'BASE SCREEN · 成品大屏示例' }),
       ]),
-      el(
-        'form',
-        {
-          class: 'create-screen',
-          on: {
-            submit: (event: Event) => {
-              event.preventDefault();
-              void createScreen(nameInput);
+      el('div', { class: 'list-header__actions' }, [
+        el(
+          'form',
+          {
+            class: 'create-screen',
+            on: {
+              submit: (event: Event) => {
+                event.preventDefault();
+                void createScreen(nameInput);
+              },
             },
           },
-        },
-        [
-          nameInput,
-          el('button', {
-            class: 'button button--primary',
-            attrs: { type: 'submit' },
-            text: '新建大屏',
-          }),
-        ],
-      ),
+          [
+            nameInput,
+            el('button', {
+              class: 'button button--primary',
+              attrs: { type: 'submit' },
+              text: '新建大屏',
+            }),
+          ],
+        ),
+        el(
+          'form',
+          {
+            class: 'create-screen create-screen--generate',
+            on: {
+              submit: (event: Event) => {
+                event.preventDefault();
+                void generateFromTopic(topicInput, generateButton);
+              },
+            },
+          },
+          [topicInput, generateButton],
+        ),
+      ]),
     ]);
     const body = el('div');
     main.append(el('div', { class: 'page' }, [header, body]));
@@ -205,6 +233,33 @@ async function createScreen(nameInput: HTMLInputElement): Promise<void> {
   nameInput.value = '';
   showToast(`已创建「${trimmed}」`, 'success');
   goToEdit(id);
+}
+
+async function generateFromTopic(
+  topicInput: HTMLInputElement,
+  button: HTMLButtonElement,
+): Promise<void> {
+  const topic = topicInput.value.trim();
+  if (topic.length === 0) {
+    showToast('请先描述要生成的大屏主题', 'error');
+    return;
+  }
+  // 生成会在后端新建一张屏，重复提交会得到多张重复的屏，所以生成期间整体锁住。
+  button.disabled = true;
+  button.textContent = '生成中…';
+  try {
+    const id = await screensStore.getState().generate(topic);
+    if (id === null) {
+      showToast(`生成失败：${screensStore.getState().error ?? '未知错误'}`, 'error');
+      return;
+    }
+    topicInput.value = '';
+    showToast('已生成，正在打开编辑页', 'success');
+    goToEdit(id);
+  } finally {
+    button.disabled = false;
+    button.textContent = '智能生成';
+  }
 }
 
 async function removeScreen(screen: ScreenSummaryShape): Promise<void> {

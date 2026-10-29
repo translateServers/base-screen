@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import type { ScreenDocument } from '@base-screen/contracts';
 import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHostIntentHandler } from '../../examples/vanilla-host/src/screen/host-intent';
@@ -9,31 +11,77 @@ import { createHostIntentHandler } from '../../examples/vanilla-host/src/screen/
  * 提示只从书写面的常驻状态行出一次（见 DesignerIntentOutcome）。
  */
 
-function designer(): BaseScreenDesignerElement {
-  // 只在这两条路径之外被用到：作用域拒绝与传输失败都不会碰设计器。
-  return {} as BaseScreenDesignerElement;
+function document(): ScreenDocument {
+  return {
+    canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
+    components: [],
+    variables: [],
+    blueprint: { relations: [] },
+  };
 }
 
-const handler = () => createHostIntentHandler({ designer: designer(), screenId: 'screen-test' });
+function componentDocument(): ScreenDocument {
+  return {
+    ...document(),
+    components: [
+      {
+        id: 'title',
+        type: 'base.text',
+        name: '标题',
+        parentId: null,
+        position: { x: 40, y: 32 },
+        size: { width: 320, height: 56 },
+        rotation: 0,
+        zIndex: 1,
+        status: { locked: false, hidden: false },
+        props: {},
+        style: { color: '#ffffff', fontSize: 32 },
+        dataSource: null,
+        dataValue: { kind: 'inline', value: '旧标题' },
+      },
+    ],
+  };
+}
+
+function designer(initial: ScreenDocument = document()) {
+  const current = initial;
+  const events = new EventTarget();
+  return {
+    addEventListener: vi.fn(events.addEventListener.bind(events)),
+    removeEventListener: vi.fn(events.removeEventListener.bind(events)),
+    dispatchEvent: events.dispatchEvent.bind(events),
+    getDocument: vi.fn((): ScreenDocument | undefined => current),
+    readPendingChange: vi.fn((): unknown => undefined),
+    submitChangeProposal: vi.fn(() => ({ ok: true, diagnostics: [], value: {} })),
+  };
+}
+
+const handler = (element = designer()) =>
+  createHostIntentHandler({
+    designer: element as unknown as BaseScreenDesignerElement,
+    screenId: 'screen-test',
+  });
+
+const request = {
+  instanceId: 'instance-test',
+  text: '生成一张作战室',
+  scope: { kind: 'screen' as const },
+};
+
+function candidateResponse(candidate: unknown = document()): Response {
+  return Response.json({
+    name: '作战室',
+    document: candidate,
+    mode: 'deterministic',
+    imageCount: 0,
+  });
+}
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('host intent handler failure contract', () => {
-  it('refuses a component scope with a reason and the whole-screen remedy', async () => {
-    const result = await handler()({
-      instanceId: 'instance-test',
-      text: '把这块的标题改成今晚开抢',
-      scope: { kind: 'components', componentIds: ['title'] },
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('unreachable');
-    expect(result.reason).toContain('只支持整屏');
-    expect(result.remedy).toBe('whole-screen');
-  });
-
   it('reports the transport error in the reason instead of only a toast', async () => {
     vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
     vi.stubGlobal(
@@ -61,5 +109,284 @@ describe('host intent handler failure contract', () => {
     expect(result.reason).toBe('模型通道不可用。');
     // 传输失败没有「换个作用域就好了」这种补救，别给假出口。
     expect(result.remedy).toBeUndefined();
+  });
+});
+
+describe('host intent component edits', () => {
+  it('posts the selected component context and submits a bounded update proposal', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    const fetch = vi.fn(async () =>
+      Response.json({
+        summary: '标题已更新',
+        patches: [{ componentId: 'title', text: '今晚开抢' }],
+        mode: 'deterministic',
+        failure: 'AGENT_NOT_CONFIGURED',
+      }),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const element = designer(componentDocument());
+    const controller = new AbortController();
+
+    const result = await handler(element)(
+      {
+        instanceId: 'instance-test',
+        text: '把标题改成今晚开抢',
+        scope: { kind: 'components', componentIds: ['title'] },
+      },
+      controller.signal,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(fetch).toHaveBeenCalledExactlyOnceWith('http://api.test/agent/edit', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instruction: '把标题改成今晚开抢',
+        components: [
+          {
+            id: 'title',
+            type: 'base.text',
+            name: '标题',
+            props: {},
+            style: { color: '#ffffff', fontSize: 32 },
+            position: { x: 40, y: 32 },
+            size: { width: 320, height: 56 },
+            text: '旧标题',
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
+    expect(proposal?.scope).toBe('标题');
+    expect(proposal?.rationale).toContain('仅修改已选中的 1 个组件');
+    expect(proposal?.commands).toEqual([
+      {
+        type: 'update-components',
+        componentIds: ['title'],
+        patch: { dataValue: { kind: 'inline', value: '今晚开抢' } },
+      },
+    ]);
+  });
+
+  it('rejects patches that target anything outside the selected scope', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          summary: '越界修改',
+          patches: [{ componentId: 'other', style: { color: '#ffffff' } }],
+          mode: 'deterministic',
+        }),
+      ),
+    );
+    const element = designer(componentDocument());
+
+    const result = await handler(element)({
+      instanceId: 'instance-test',
+      text: '改成白色',
+      scope: { kind: 'components', componentIds: ['title'] },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toContain('不安全或不完整');
+    expect(element.submitChangeProposal).not.toHaveBeenCalled();
+  });
+
+  it('never replaces a data-bound text component with an inline value', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          summary: '错误地改成内联文本',
+          patches: [{ componentId: 'title', text: '今晚开抢' }],
+          mode: 'deterministic',
+        }),
+      ),
+    );
+    const bound = componentDocument();
+    const component = bound.components[0]!;
+    bound.components[0] = {
+      ...component,
+      dataValue: { kind: 'data-source-field', dataSourceId: 'metrics', path: ['title'] },
+    };
+    const element = designer(bound);
+
+    const result = await handler(element)({
+      instanceId: 'instance-test',
+      text: '把标题改成今晚开抢',
+      scope: { kind: 'components', componentIds: ['title'] },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toContain('不安全或不完整');
+    expect(element.submitChangeProposal).not.toHaveBeenCalled();
+  });
+});
+
+describe('host intent candidate safety', () => {
+  it('posts only to the candidate endpoint and submits an unsaved proposal', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    const fetch = vi.fn(async () => candidateResponse());
+    vi.stubGlobal('fetch', fetch);
+    const element = designer();
+    const before = element.getDocument();
+    const controller = new AbortController();
+
+    expect((await handler(element)(request, controller.signal)).ok).toBe(true);
+    expect(fetch).toHaveBeenCalledExactlyOnceWith('http://api.test/agent/candidate', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic: request.text }),
+      signal: controller.signal,
+    });
+    expect(element.submitChangeProposal).toHaveBeenCalledOnce();
+    expect(element.getDocument()).toBe(before);
+  });
+
+  it.each(['abort', 'document', 'undo', 'unload', 'pending'] as const)(
+    'does not submit a late successful response after %s',
+    async (change) => {
+      vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+      let finish!: (response: Response) => void;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          () =>
+            new Promise<Response>((resolve) => {
+              finish = resolve;
+            }),
+        ),
+      );
+      const element = designer();
+      const controller = new AbortController();
+      const result = handler(element)(request, controller.signal);
+      if (change === 'abort') controller.abort();
+      if (change === 'document') element.getDocument.mockReturnValue(document());
+      if (change === 'undo') element.dispatchEvent(new Event('base-screen-change'));
+      if (change === 'unload') element.getDocument.mockReturnValue(undefined);
+      if (change === 'pending') element.readPendingChange.mockReturnValue({ id: 'existing' });
+      finish(candidateResponse());
+
+      expect((await result).ok).toBe(false);
+      expect(element.submitChangeProposal).not.toHaveBeenCalled();
+      expect(element.removeEventListener).toHaveBeenCalledWith(
+        'base-screen-change',
+        element.addEventListener.mock.calls[0]?.[1],
+      );
+    },
+  );
+
+  it.each(['abort', 'unloaded', 'pending'] as const)(
+    'refuses %s before dispatch',
+    async (state) => {
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
+      const element = designer();
+      const controller = new AbortController();
+      if (state === 'abort') controller.abort();
+      if (state === 'unloaded') element.getDocument.mockReturnValue(undefined);
+      if (state === 'pending') element.readPendingChange.mockReturnValue({ id: 'existing' });
+
+      expect((await handler(element)(request, controller.signal)).ok).toBe(false);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(element.submitChangeProposal).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects an invalid candidate document without submitting it', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => candidateResponse({ invalid: true })),
+    );
+    const element = designer();
+
+    const result = await handler(element)(request);
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+    expect(element.submitChangeProposal).not.toHaveBeenCalled();
+  });
+
+  it('explains why the deterministic fallback ran in the proposal rationale', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          name: '作战室',
+          document: document(),
+          mode: 'deterministic',
+          imageCount: 0,
+          failure: 'AGENT_NOT_CONFIGURED',
+        }),
+      ),
+    );
+    const element = designer();
+
+    expect((await handler(element)(request)).ok).toBe(true);
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
+    expect(proposal?.title).toBe('智能体 · 生成一张作战室');
+    expect(proposal?.origin).toEqual({ author: '智能体' });
+    expect(proposal?.rationale).toContain('未配置模型');
+    expect(proposal?.rationale).not.toContain('AGENT_NOT_CONFIGURED');
+  });
+
+  it('reports engine rejection without claiming success', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => candidateResponse()),
+    );
+    const element = designer();
+    element.submitChangeProposal.mockReturnValue({ ok: false, diagnostics: [], value: {} });
+
+    const result = await handler(element)(request);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toContain('引擎拒绝');
+  });
+});
+
+const HOSTS = ['vanilla-host', 'react-host', 'vue-host'] as const;
+const EDITORS = {
+  'vanilla-host': 'examples/vanilla-host/src/views/screen-edit.ts',
+  'react-host': 'examples/react-host/src/components/screen-editor.tsx',
+  'vue-host': 'examples/vue-host/src/components/ScreenEditor.vue',
+} as const;
+
+/**
+ * 三端的书写面必须逐字对等：适配器只有一份（模型调用、文档校验、提案编译都在里面），
+ * 差异只允许出现在框架的挂载/卸载写法上。少一处接线时列表里仍能看到智能体生成的屏，
+ * 只有设计器右栏退回「当前环境未接入智能体」——这种半接线状态最容易被当成环境问题。
+ */
+describe('host intent wiring parity', () => {
+  it('keeps one intent adapter across hosts', () => {
+    const baseline = readFileSync(`examples/${HOSTS[0]}/src/screen/host-intent.ts`, 'utf8');
+    for (const host of HOSTS.slice(1)) {
+      expect(
+        readFileSync(`examples/${host}/src/screen/host-intent.ts`, 'utf8'),
+        `${host}/src/screen/host-intent.ts 必须与 vanilla 逐字一致`,
+      ).toBe(baseline);
+    }
+  });
+
+  it('binds the handler after load and unbinds it on teardown in every host', () => {
+    for (const host of HOSTS) {
+      const source = readFileSync(EDITORS[host], 'utf8');
+      const bound = source.indexOf(
+        'setIntentHandler(createHostIntentHandler({ designer: element, screenId }))',
+      );
+      // 提案对着当前文档试算：绑定早于 load 会让第一次提交必被引擎拒绝。
+      const loaded = source.indexOf('await element.load(screenId)');
+      expect(bound, `${host} 未绑定意图处理器`).toBeGreaterThan(-1);
+      expect(loaded, `${host} 未调用 element.load`).toBeGreaterThan(-1);
+      expect(bound, `${host} 必须在 load 之后绑定意图处理器`).toBeGreaterThan(loaded);
+      expect(source, `${host} 未在卸载时解绑意图处理器`).toContain('setIntentHandler(undefined)');
+    }
   });
 });

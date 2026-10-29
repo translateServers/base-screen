@@ -1,5 +1,6 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
 import { describe, expect, it } from 'vitest';
+import { summarizeChangeProposal } from '../../../../src/common/operations/change/designer-change-events.js';
 import {
   commandsForUnits,
   diffScreenDocuments,
@@ -33,6 +34,25 @@ function screenDocument(
     variables: [],
     blueprint: { relations: [] },
   };
+}
+
+function preparedProposal(
+  document: ScreenDocument,
+  commands: Parameters<typeof prepareDesignerChangeProposal>[1]['commands'],
+): Extract<ReturnType<typeof prepareDesignerChangeProposal>, { ok: true }>['value'] {
+  const result = prepareDesignerChangeProposal(
+    document,
+    {
+      title: '整屏替换',
+      rationale: '',
+      scope: '整屏',
+      commands,
+    },
+    'change-replacement',
+  );
+  expect(result.ok).toBe(true);
+  if (!result.ok) throw new Error('expected proposal to compile');
+  return result.value;
 }
 
 const recolor = {
@@ -267,5 +287,98 @@ describe('designer change units', () => {
     if (!result.ok) return;
     expect(result.value.units).toHaveLength(1);
     expect(result.value.units[0]?.commandIndexes).toEqual([0, 1, 2]);
+  });
+});
+
+describe('whole-screen replacement presentation', () => {
+  const oldTitle = textComponent({ id: 'old-title', name: '旧标题' });
+  const oldKpi = textComponent({ id: 'old-kpi', name: '旧指标' });
+  const newTitle = textComponent({ id: 'new-title', name: '新标题' });
+  const newKpi = textComponent({ id: 'new-kpi', name: '新指标' });
+
+  it('marks a full replacement and keeps its component count and independent units', () => {
+    const commands = [
+      { type: 'remove-components', componentIds: ['old-title', 'old-kpi'] },
+      { type: 'add-component', component: newTitle },
+      { type: 'add-component', component: newKpi },
+    ] as const;
+    const proposal = preparedProposal(screenDocument([oldTitle, oldKpi]), commands);
+    const removalUnit = proposal.units.find((unit) => unit.presentation !== undefined);
+
+    expect(removalUnit).toMatchObject({
+      id: 'old-title',
+      presentation: { kind: 'whole-screen-replacement', addedCount: 2 },
+    });
+    expect(proposal.units).toHaveLength(3);
+    expect(commandsForUnits(proposal, ['old-title'])).toEqual([commands[0]]);
+    expect(commandsForUnits(proposal, ['new-title'])).toEqual([commands[1]]);
+  });
+
+  it('does not mark ordinary updates, additions, or partial removals', () => {
+    const update = preparedProposal(screenDocument([oldTitle]), [
+      {
+        type: 'update-components',
+        componentIds: ['old-title'],
+        patch: { style: { color: '#646b71', fontSize: 32 } },
+      },
+    ]);
+    const addition = preparedProposal(screenDocument([oldTitle]), [
+      { type: 'add-component', component: newTitle },
+    ]);
+    const partialRemoval = preparedProposal(screenDocument([oldTitle, oldKpi]), [
+      { type: 'remove-components', componentIds: ['old-title'] },
+      { type: 'add-component', component: newTitle },
+    ]);
+
+    for (const proposal of [update, addition, partialRemoval]) {
+      expect(proposal.units.every((unit) => unit.presentation === undefined)).toBe(true);
+    }
+  });
+
+  it('ignores locked components when recognizing the replaced set', () => {
+    const locked = textComponent({
+      id: 'locked-header',
+      name: '锁定页头',
+      status: { locked: true, hidden: false },
+    });
+    const proposal = preparedProposal(screenDocument([oldTitle, oldKpi, locked]), [
+      { type: 'remove-components', componentIds: ['old-title', 'old-kpi'] },
+      { type: 'add-component', component: newTitle },
+    ]);
+
+    expect(proposal.units.find((unit) => unit.presentation !== undefined)?.presentation).toEqual({
+      kind: 'whole-screen-replacement',
+      addedCount: 1,
+    });
+  });
+
+  it('does not mark additions that are removed again in the same proposal', () => {
+    const proposal = preparedProposal(screenDocument([oldTitle]), [
+      { type: 'remove-components', componentIds: ['old-title'] },
+      { type: 'add-component', component: newTitle },
+      { type: 'remove-components', componentIds: ['new-title'] },
+    ]);
+
+    expect(proposal.units.every((unit) => unit.presentation === undefined)).toBe(true);
+  });
+
+  it('does not mark an add-only proposal on an empty screen', () => {
+    const proposal = preparedProposal(screenDocument([]), [
+      { type: 'add-component', component: newTitle },
+    ]);
+
+    expect(proposal.units.every((unit) => unit.presentation === undefined)).toBe(true);
+  });
+
+  it('preserves the presentation in the public proposal summary', () => {
+    const proposal = preparedProposal(screenDocument([oldTitle]), [
+      { type: 'remove-components', componentIds: ['old-title'] },
+      { type: 'add-component', component: newTitle },
+    ]);
+    const summary = summarizeChangeProposal(proposal);
+
+    expect(summary.units.find((unit) => unit.id === 'old-title')).toMatchObject({
+      presentation: { kind: 'whole-screen-replacement', addedCount: 1 },
+    });
   });
 });

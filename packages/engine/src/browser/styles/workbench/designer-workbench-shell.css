@@ -888,11 +888,9 @@
 .change-diff-name {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
   color: var(--designer-text-primary);
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .change-diff-kind {
@@ -900,7 +898,8 @@
 }
 
 .change-diff-entry {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: baseline;
   gap: var(--designer-space-2);
   min-width: 0;
@@ -908,17 +907,16 @@
 }
 
 .change-diff-path {
-  flex: 0 0 auto;
+  grid-column: 1 / -1;
   color: var(--designer-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .change-diff-before {
   min-width: 0;
-  overflow: hidden;
   color: var(--designer-text-muted);
   text-decoration: line-through;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .change-diff-arrow {
@@ -927,10 +925,8 @@
 
 .change-diff-after {
   min-width: 0;
-  overflow: hidden;
   color: var(--designer-text-primary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .change-panel-actions {
@@ -954,6 +950,7 @@
 }
 
 .change-diff-single {
+  grid-column: 1 / -1;
   color: var(--designer-text-muted);
 }
 
@@ -1061,7 +1058,12 @@
   outline-offset: -2px;
 }
 
-/* 评审入口与页签同一档：26px 图标按钮，不抢页签的视觉重量。 */
+/* 评审入口位于智能体提案区顶部，靠右对齐；26px 图标按钮，不抢提案的视觉重量。 */
+.change-pane-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .properties .right-pane-review {
   width: 26px;
   height: 26px;
@@ -1098,14 +1100,14 @@
   font: var(--designer-font-small);
 }
 
-/* 切到变更页签时收起检查器内容（不销毁状态）；行高分配归 inspector 层。 */
-.properties[data-right-pane="changes"] > .panel-heading,
-.properties[data-right-pane="changes"] > .inspector-tabs,
-.properties[data-right-pane="changes"] > .blueprint-inspector,
-.properties[data-right-pane="changes"] > .inspector-context,
-.properties[data-right-pane="changes"] > .inspector-toolbar,
-.properties[data-right-pane="changes"] > .inspector-search-workspace,
-.properties[data-right-pane="changes"] > .inspector-pane {
+/* 切到智能体页签时收起检查器内容（不销毁状态）；行高分配归 inspector 层。 */
+.properties[data-right-pane="intent"] > .panel-heading,
+.properties[data-right-pane="intent"] > .inspector-tabs,
+.properties[data-right-pane="intent"] > .blueprint-inspector,
+.properties[data-right-pane="intent"] > .inspector-context,
+.properties[data-right-pane="intent"] > .inspector-toolbar,
+.properties[data-right-pane="intent"] > .inspector-search-workspace,
+.properties[data-right-pane="intent"] > .inspector-pane {
   display: none;
 }
 
@@ -1136,15 +1138,36 @@
 .change-empty {
   display: flex;
   flex-direction: column;
-  gap: var(--designer-space-3);
+  align-items: flex-start;
+  gap: var(--designer-space-2);
+}
+
+.change-empty-mark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent-text);
+}
+
+.change-empty-mark svg {
+  width: 16px;
+  height: 16px;
 }
 
 .change-empty-title {
+  margin: var(--designer-space-1) 0 0;
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-md);
+  font-weight: 600;
+}
+
+.change-empty-copy {
   margin: 0 0 var(--designer-space-1);
   color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  line-height: 1.55;
 }
 
 .change-start-list {
@@ -1160,6 +1183,7 @@
    无边框、控制面底色，悬停才提升一档。 */
 .change-start-card {
   display: flex;
+  width: 100%;
   flex-direction: column;
   gap: var(--designer-space-2);
   align-items: flex-start;
@@ -1169,6 +1193,7 @@
   background: var(--designer-surface-control);
   color: var(--designer-text-primary);
   cursor: pointer;
+  font: var(--designer-font-small);
   text-align: left;
 }
 
@@ -1178,6 +1203,12 @@
 
 .change-start-hint {
   color: var(--designer-text-muted);
+  line-height: 1.5;
+}
+
+.change-start-title {
+  color: var(--designer-text-primary);
+  font-weight: 600;
 }
 
 /* 意图输入区：右栏底部常驻。没有处理器时停用并说明原因，不模拟回复。 */
@@ -1204,10 +1235,23 @@
 }
 
 .intent-label {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: var(--designer-space-1);
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
   font-weight: 600;
+}
+
+.intent-label-icon {
+  display: inline-flex;
+  color: var(--designer-accent-text);
+}
+
+.intent-label-icon svg {
+  width: 13px;
+  height: 13px;
 }
 
 .intent-spacer {
@@ -1326,56 +1370,35 @@
   display: none;
 }
 
-/* 返回检查器与结果去向都只在会话态出现：紧凑态下面板本来就是检查器。 */
-.intent-back {
-  display: none;
-  flex: 0 0 auto;
-  height: var(--designer-control-height-compact);
-  padding: 0 var(--designer-space-2);
-  border: 0;
-  background: transparent;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  cursor: pointer;
-}
-
-.intent-back:hover {
-  color: var(--designer-text-primary);
-}
-
 .intent-sheet-hint {
-  display: none;
   margin: 0;
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
 }
 
-.designer-intent[data-draft] .intent-back {
-  display: block;
-}
-
-.designer-intent[data-draft] .intent-sheet-hint {
-  display: block;
-}
-
-/* 会话态整体放大一档：书写面里 11px 正文太小，行距也要放开。 */
-.designer-intent[data-draft] {
+/* 智能体页签下书写面里 11px 正文太小，整体放大一档、行距放开。 */
+.properties[data-right-pane="intent"] .designer-intent {
   padding: var(--designer-space-4);
   gap: var(--designer-space-3);
 }
 
-.designer-intent[data-draft] .intent-hint {
-  display: none;
+.properties[data-right-pane="intent"] .intent-box {
+  min-height: 60px;
+  padding: var(--designer-space-2) var(--designer-space-3);
+  border: 1px solid var(--designer-border-default);
+  background: var(--designer-surface-control);
 }
 
-.designer-intent[data-draft] .intent-box {
-  border: 0;
-  padding: 0;
-  background: transparent;
-}
-
-.designer-intent[data-draft] .intent-input {
+.properties[data-right-pane="intent"] .intent-input {
   font: var(--designer-font-size-md) / 1.7 var(--designer-font-family);
+  min-height: 48px;
+}
+
+.properties[data-right-pane="intent"] .intent-box:focus-within {
+  border-color: var(--designer-border-active);
+  box-shadow:
+    inset 0 0 0 1px var(--designer-border-active),
+    0 0 0 3px var(--designer-accent-surface);
 }
 
 .intent-box {
@@ -1422,18 +1445,19 @@
   color: var(--designer-text-muted);
 }
 
-/* 会话态（见 data-draft）：书写面接管右栏，输入框铺满剩余高度，提交钮贴底。 */
-.designer-intent[data-draft] .intent-box {
+/* 智能体页签：书写面接管右栏，输入框铺满剩余高度，提交钮贴底。 */
+.properties[data-right-pane="intent"] .intent-box {
   flex: 1 1 auto;
   align-items: stretch;
 }
 
-.designer-intent[data-draft] .intent-input {
+/* 切页签时控制器会清掉自动增高写入的内联高度，让输入框交给右栏布局拉伸。 */
+.properties[data-right-pane="intent"] .intent-input {
   height: 100%;
   max-height: none;
 }
 
-.designer-intent[data-draft] .intent-submit {
+.properties[data-right-pane="intent"] .intent-submit {
   align-self: flex-end;
 }
 
@@ -1477,6 +1501,19 @@
   margin: 0;
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
+}
+
+.intent-status:not(:empty):not([data-variant="failure"])::before {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--designer-text-muted);
+  content: "";
+}
+
+.intent-status[data-tone="error"]:not([data-variant="failure"])::before {
+  background: var(--designer-danger-text);
 }
 
 .intent-status span {
@@ -1549,11 +1586,10 @@
   gap: var(--designer-space-2);
 }
 
-/* 评审态：画布只读，隐藏意图输入与编辑工具条；右栏固定为变更页签。 */
+/* 评审态：画布只读，隐藏意图输入与编辑工具条；右栏固定为智能体页签（只留提案与评审）。 */
 .designer[data-review-mode="true"] .designer-intent,
 .designer[data-review-mode="true"] .scenes,
 .designer[data-review-mode="true"] .workspace-local-toolbar,
-.designer[data-review-mode="true"] .right-pane-switch,
 .designer[data-review-mode="true"] .draft-actions,
 .designer[data-review-mode="true"] .canvas-hint,
 .designer[data-review-mode="true"] [data-selection],
@@ -1561,16 +1597,16 @@
   display: none;
 }
 
-/* 评审态只有变更流一屏：一级切换与意图都已退场，变更列表从第一行铺满。 */
+/* 评审态只有提案流一屏：页签行仍在，提案列表铺满其余高度，不再留书写面。 */
 .designer[data-review-mode="true"]:not([data-right-collapsed="true"])
 .properties[data-inspector-context-kind] {
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: 38px minmax(0, 1fr);
 }
 
 .designer[data-review-mode="true"]:not([data-right-collapsed="true"])
   .properties[data-inspector-context-kind]
   > .right-pane-changes {
-  grid-row: 1 / -1;
+  grid-row: 2;
 }
 
 .designer[data-review-mode="true"] .canvas-content {

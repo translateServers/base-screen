@@ -223,7 +223,7 @@
 - `readPendingChange()` / `adoptChangeUnit(id)` / `rejectChangeUnit(id)` / `adoptAllChanges()`
 - `readContrastGuard()` / `setContrastGuardEnabled(enabled)`
 - 事件：`base-screen-change-state`、`base-screen-guard-change`、`base-screen-metric`
-- 变更页签：归属行、历史段（指针 + 前进栈 + 回退）
+- 提案区（现位于「智能体」页签，原「变更」页签已并入）：归属行、历史段（指针 + 前进栈 + 回退）
 - 目标屏：点间距/亮度/照度参数，物理尺寸、角尺寸、最小可读字号；距离标签带读数
 
 ### 6.1 本轮完成的验证

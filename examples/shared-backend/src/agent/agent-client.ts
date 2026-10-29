@@ -1,6 +1,8 @@
 import { Logger } from '@nestjs/common';
 
-const DEFAULT_TIMEOUT_MS = 15_000;
+// 中间表示现在要模型写图表数据点与清单明细，输出比「只有标题」长；15s 会在冷启动的
+// 网关上误判成不可达（abort），进而静默退回确定性兜底——看起来就像「没接模型」。
+const DEFAULT_TIMEOUT_MS = 25_000;
 
 export interface AgentClientConfig {
   readonly baseUrl: string;
@@ -47,7 +49,9 @@ export async function requestAgentCompletion(
       signal: controller.signal,
     });
     if (!response.ok) {
-      logger.warn(`agent request failed: status=${response.status} elapsed=${Date.now() - startedAt}ms`);
+      logger.warn(
+        `agent request failed: status=${response.status} elapsed=${Date.now() - startedAt}ms`,
+      );
       return { ok: false, failure: `AGENT_HTTP_${response.status}` };
     }
     const payload = (await response.json()) as {

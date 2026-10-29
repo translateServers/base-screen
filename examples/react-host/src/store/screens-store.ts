@@ -15,6 +15,8 @@ export interface ScreensState {
   load(): Promise<void>;
   /** 成功返回新大屏 id，失败返回 null（错误文案已写入 store.error）。 */
   create(name: string): Promise<string | null>;
+  /** 一句话生成并落库；成功返回新大屏 id，失败返回 null（错误文案已写入 store.error）。 */
+  generate(topic: string): Promise<string | null>;
   remove(id: string): Promise<boolean>;
 }
 
@@ -47,6 +49,20 @@ export const useScreensStore = create<ScreensState>()((set, get) => ({
       return null;
     }
     // 新建成功后不整表重拉：把新项插入本地列表，再交给后端顺序保证。
+    set((state) => ({
+      screens: [toSummary(result.data.screen), ...state.screens],
+      status: 'ready',
+      error: null,
+    }));
+    return result.data.screen.id;
+  },
+
+  async generate(topic: string): Promise<string | null> {
+    const result = await api.generateScreen(topic);
+    if (!result.ok) {
+      set({ error: result.error.message });
+      return null;
+    }
     set((state) => ({
       screens: [toSummary(result.data.screen), ...state.screens],
       status: 'ready',

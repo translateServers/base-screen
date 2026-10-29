@@ -21,22 +21,21 @@ import { DesignerWorkbenchController } from '../../browser/controllers/workbench
 import { readDesignerImageNaturalSize } from '../../browser/dom/designer-image-metadata-dom.js';
 import { hasDesignerTextSelection } from '../../browser/dom/designer-text-selection.js';
 import { designerIcon } from '../../browser/ui/designer-icons.js';
-import { insertDesignerBlueprintVariableNode } from '../../common/operations/blueprint/designer-blueprint-model.js';
-import type { DesignerParameterPatch } from '../../common/operations/intent/designer-parameter-intent.js';
-import {
-  BASE_SCREEN_CHANGE_STATE_EVENT,
-  type BaseScreenDesignerChangeStateDetail,
-} from '../../common/operations/change/designer-change-events.js';
 import {
   BASE_SCREEN_METRIC_EVENT,
-  type DesignerMetricName,
   createDesignerMetric,
+  type DesignerMetricName,
 } from '../../common/observability/designer-metrics.js';
-import { BASE_SCREEN_GUARD_CHANGE_EVENT } from '../../common/validation/designer-guard.js';
+import { insertDesignerBlueprintVariableNode } from '../../common/operations/blueprint/designer-blueprint-model.js';
 import {
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
   type BaseScreenCanvasPresentationChangeEventDetail,
 } from '../../common/operations/canvas/canvas-presentation.js';
+import {
+  BASE_SCREEN_CHANGE_STATE_EVENT,
+  type BaseScreenDesignerChangeStateDetail,
+} from '../../common/operations/change/designer-change-events.js';
+import type { DesignerParameterPatch } from '../../common/operations/intent/designer-parameter-intent.js';
 import {
   BASE_SCREEN_SCENE_CHANGE_EVENT,
   type BaseScreenSceneChangeDetail,
@@ -47,6 +46,7 @@ import {
 } from '../../common/operations/workbench/designer-navigation.js';
 import { DesignerProjectGateway } from '../../common/project/designer-project-gateway.js';
 import { DesignerSession } from '../../common/session/designer-session.js';
+import { BASE_SCREEN_GUARD_CHANGE_EVENT } from '../../common/validation/designer-guard.js';
 import { getDesignerGeometryDocument } from './designer-element-geometry.js';
 import type { DesignerElementHost, DesignerElementState } from './designer-element-state.js';
 
@@ -490,9 +490,14 @@ export function initializeDesignerElementControllers(
   });
   // 采纳提案 = 一次普通事务（带 provenance）：必须与手动编辑共享历史与修订号。
   state.changeController.setDocumentReader(() => state.session.document);
-  state.changeController.setStartIntentHandler((startsFrom) =>
-    state.intentController.focus(startsFrom),
-  );
+  state.changeController.setIntentScopeReader(() => state.intentController.scope);
+  state.changeController.setPaneModeHandler((mode) => {
+    state.intentController.setWritingMode(mode === 'intent');
+  });
+  state.changeController.setStartIntentHandler((startsFrom) => {
+    state.changeController.setPaneMode('intent');
+    state.intentController.focus(startsFrom);
+  });
   state.changeController.setHistoryControls(
     () => state.session.readHistory(),
     (index) => {
@@ -586,7 +591,10 @@ export function initializeDesignerElementControllers(
 
 /** 数值意图命中后写回组件的补丁：只改命中的那一个字段，其余样式原样带上。 */
 function parameterComponentPatch(
-  component: { readonly style: Record<string, unknown>; readonly size: { width: number; height: number } },
+  component: {
+    readonly style: Record<string, unknown>;
+    readonly size: { width: number; height: number };
+  },
   patch: DesignerParameterPatch,
 ): Record<string, unknown> {
   if (patch.property === 'style.color') {

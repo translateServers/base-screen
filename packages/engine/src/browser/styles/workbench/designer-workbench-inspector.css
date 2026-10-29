@@ -43,50 +43,14 @@
 
 .designer:not([data-right-collapsed="true"]) .properties > .right-pane-changes {
   grid-column: 1;
-  grid-row: 4;
+  grid-row: 2;
+  display: none;
 }
 
 .designer:not([data-right-collapsed="true"]) .properties > .designer-intent {
   grid-column: 1;
-  grid-row: 5;
-}
-
-/* 会话态：输入框里一旦有内容，这块面板的用途就变了——用户在写指令，不是在看属性。
-   此刻把身份行、页签行、内容行全部让出来，书写面接管第 2 行到底部。
-   写空（提交成功或手动清掉）就退回检查器，不需要额外状态机。 */
-.designer:not([data-right-collapsed="true"])
-  .properties:has(> .designer-intent[data-draft])
-  > .right-pane-switch,
-.designer:not([data-right-collapsed="true"])
-  .properties:has(> .designer-intent[data-draft])
-  > .panel-heading,
-.designer:not([data-right-collapsed="true"])
-  .properties:has(> .designer-intent[data-draft])
-  > .inspector-context,
-.designer:not([data-right-collapsed="true"])
-  .properties:has(> .designer-intent[data-draft])
-  > .inspector-tabs,
-.designer:not([data-right-collapsed="true"])
-  .properties:has(> .designer-intent[data-draft])
-  > .inspector-toolbar,
-.designer:not([data-right-collapsed="true"])
-  .properties:has(> .designer-intent[data-draft])
-  > .inspector-pane,
-.designer:not([data-right-collapsed="true"])
-  .properties:has(> .designer-intent[data-draft])
-  > .right-pane-changes,
-.designer:not([data-right-collapsed="true"])
-  .properties:has(> .designer-intent[data-draft])
-  > .blueprint-inspector {
+  grid-row: 3 / -1;
   display: none;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties:has(> .designer-intent[data-draft])
-  > .designer-intent {
-  grid-column: 1;
-  grid-row: 1 / -1;
-  border-top: 0;
 }
 
 /* 画布与多选没有属性页签行：面板标题占用身份行，内容直接落到第 4 行。 */
@@ -111,16 +75,33 @@
   display: none;
 }
 
-/* 变更页签：一级切换不动，检查器各段整行收为 0。 */
-.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="changes"] {
-  grid-template-rows: 38px 0 0 minmax(0, 1fr) auto;
+/* 智能体页签：提案与评审（上）+ 书写面（下），检查器各段整行收起（不销毁状态）。
+   必须排在画布/多选的行模板之后，否则同特异性下会被覆盖。 */
+.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] {
+  grid-template-rows: 38px minmax(0, 1fr) auto;
 }
 
-/* 画布与多选的列头标题在变更页签下也必须退场，否则会落进 0 高的行里压住卡片。 */
-.designer:not([data-right-collapsed="true"])
-  .properties[data-right-pane="changes"][data-inspector-context-kind]
-  > .panel-heading {
+.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .panel-heading,
+.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .inspector-context,
+.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .inspector-tabs,
+.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .inspector-toolbar,
+.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .inspector-search-workspace,
+.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .inspector-pane,
+.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .blueprint-inspector {
   display: none;
+}
+
+.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .right-pane-changes {
+  display: flex;
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .designer-intent {
+  display: flex;
+  grid-column: 1;
+  grid-row: 3;
+  border-top: 0;
 }
 
 .properties .inspector-tabs {

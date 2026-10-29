@@ -1,17 +1,19 @@
-import type { ScreenDocument } from '@base-screen/contracts';
-import type { ScreenHistoryNode } from '@base-screen/core';
-import type { ScreenDocumentCommand, ScreenTransactionProvenance } from '@base-screen/core';
+import type { ScreenDocument, ScreenIntentScope } from '@base-screen/contracts';
+import type {
+  ScreenDocumentCommand,
+  ScreenHistoryNode,
+  ScreenTransactionProvenance,
+} from '@base-screen/core';
+import type { DesignerMetricName } from '../../common/observability/designer-metrics.js';
+import type { BaseScreenDesignerChangeStateDetail } from '../../common/operations/change/designer-change-events.js';
 import {
   type DesignerChangeProposal,
   type DesignerChangeProposalInput,
   prepareDesignerChangeProposal,
 } from '../../common/operations/change/designer-change-proposal.js';
-import type {
-  BaseScreenDesignerChangeStateDetail,
-} from '../../common/operations/change/designer-change-events.js';
 import type { DesignerReviewMeta } from '../../common/operations/change/designer-review.js';
-import type { DesignerMetricName } from '../../common/observability/designer-metrics.js';
 import {
+  type DesignerChangeFeedback,
   renderChangeCount,
   renderChangePane,
   renderDraftBar,
@@ -26,10 +28,14 @@ export interface DesignerChangeAdoptResult {
   readonly ok: boolean;
 }
 
-type RightPaneMode = 'inspector' | 'changes';
+type RightPaneMode = 'inspector' | 'intent';
+
+function parsePaneMode(value: string | undefined): RightPaneMode {
+  return value === 'intent' ? 'intent' : 'inspector';
+}
 
 /**
- * 幽灵草案 + 逐条采纳 + 右栏变更页签。
+ * 幽灵草案 + 逐条采纳 + 右栏智能体页签下的提案区。
  *
  * 候选文档以叠加层呈现，**不写入 canonical 文档、不进历史**；采纳按「单元」提交，
  * 每个单元是一次普通事务（带 provenance），因此撤销、修订号与手动编辑走同一条路径。
@@ -50,6 +56,7 @@ export class DesignerChangeController {
   #reviewTotal = 0;
   #comparing = false;
   #confirmAll = false;
+  #feedback: DesignerChangeFeedback | undefined;
   #ghostHandlers: DesignerChangeGhostHandlers | undefined;
   #adoptHandler:
     | ((
@@ -58,8 +65,11 @@ export class DesignerChangeController {
       ) => DesignerChangeAdoptResult)
     | undefined;
   #getDocument: (() => ScreenDocument | undefined) | undefined;
+  #getIntentScope: (() => ScreenIntentScope) | undefined;
   #startIntent: ((startsFrom?: 'metrics' | 'template' | 'prompt') => void) | undefined;
   #stateHandler: ((detail: BaseScreenDesignerChangeStateDetail) => void) | undefined;
+  #paneModeHandler: ((mode: RightPaneMode) => void) | undefined;
+  #lastRenderedPaneMode: RightPaneMode | undefined;
   #metricHandler: ((name: DesignerMetricName) => void) | undefined;
   #historyReader: (() => readonly ScreenHistoryNode[]) | undefined;
   #revertHandler: ((index: number) => void) | undefined;
@@ -76,6 +86,7 @@ export class DesignerChangeController {
     this.#ghostHandlers = undefined;
     this.#adoptHandler = undefined;
     this.#getDocument = undefined;
+    this.#getIntentScope = undefined;
     this.#bar = undefined;
     this.#pane = undefined;
     this.#ghost = undefined;
@@ -83,8 +94,10 @@ export class DesignerChangeController {
     this.#input = undefined;
     this.#proposal = undefined;
     this.#paneMode = 'inspector';
+    this.#lastRenderedPaneMode = undefined;
     this.#comparing = false;
     this.#confirmAll = false;
+    this.#feedback = undefined;
   }
 
   setGhostHandlers(handlers: DesignerChangeGhostHandlers): void {
@@ -104,8 +117,16 @@ export class DesignerChangeController {
     this.#getDocument = reader;
   }
 
+  setIntentScopeReader(reader: () => ScreenIntentScope): void {
+    this.#getIntentScope = reader;
+  }
+
   setStateHandler(handler: (detail: BaseScreenDesignerChangeStateDetail) => void): void {
     this.#stateHandler = handler;
+  }
+
+  setPaneModeHandler(handler: (mode: RightPaneMode) => void): void {
+    this.#paneModeHandler = handler;
   }
 
   setMetricHandler(handler: (name: DesignerMetricName) => void): void {
@@ -121,9 +142,7 @@ export class DesignerChangeController {
     this.#revertHandler = revert;
   }
 
-  setStartIntentHandler(
-    handler: (startsFrom?: 'metrics' | 'template' | 'prompt') => void,
-  ): void {
+  setStartIntentHandler(handler: (startsFrom?: 'metrics' | 'template' | 'prompt') => void): void {
     this.#startIntent = handler;
   }
 
@@ -139,11 +158,11 @@ export class DesignerChangeController {
     return this.#review !== undefined;
   }
 
-  /** 进入评审态：只读画布、强制切到变更页签，逐条批准/驳回。 */
+  /** 进入评审态：只读画布、强制切到智能体页签，逐条批准/驳回。 */
   enterReview(meta: DesignerReviewMeta = {}): void {
     this.#review = meta;
     this.#reviewTotal = this.#proposal?.units.length ?? 0;
-    this.#paneMode = 'changes';
+    this.#paneMode = 'intent';
     this.render();
   }
 
@@ -160,12 +179,19 @@ export class DesignerChangeController {
     this.render();
   }
 
-  /** 提交一份提案：挂幽灵草案并更新计数，页签保持不动。 */
+  /** 提交一份提案；已有待决草案时拒绝替换，并打开原草案供用户处理。 */
   submit(proposal: DesignerChangeProposal, input: DesignerChangeProposalInput): boolean {
+    if (this.#proposal !== undefined) {
+      this.#feedback = { kind: 'draft-pending' };
+      this.#paneMode = 'intent';
+      this.render();
+      return false;
+    }
     if (this.#ghostHandlers === undefined) return false;
     if (!this.mountGhost(proposal)) return false;
     this.#input = input;
     this.#proposal = proposal;
+    this.#feedback = undefined;
     this.#metricHandler?.('draft_created');
     this.#comparing = false;
     this.#confirmAll = false;
@@ -181,9 +207,15 @@ export class DesignerChangeController {
     const unit = proposal.units.find((item) => item.id === unitId);
     if (unit === undefined) return false;
     const commands = proposal.commands.filter((_, index) => unit.commandIndexes.includes(index));
-    if (!handler(commands, proposal.provenance).ok) return false;
+    if (!handler(commands, proposal.provenance).ok) {
+      this.#feedback = { kind: 'adopt-failed', unitId };
+      this.#paneMode = 'intent';
+      this.render();
+      return false;
+    }
     this.#metricHandler?.('change_adopt');
-    return this.rebuild(proposal, unit.commandIndexes);
+    this.rebuild(proposal, unit.commandIndexes);
+    return true;
   }
 
   /** 忽略单个单元：不写文档，只把它从待决集合里去掉。 */
@@ -193,14 +225,15 @@ export class DesignerChangeController {
     const unit = proposal.units.find((item) => item.id === unitId);
     if (unit === undefined) return false;
     this.#metricHandler?.('change_reject');
-    return this.rebuild(proposal, unit.commandIndexes);
+    this.rebuild(proposal, unit.commandIndexes);
+    return true;
   }
 
-  /** 全部采纳的第一步：切到变更页签并进入确认态，不写文档。 */
+  /** 全部采纳的第一步：切到智能体页签并进入确认态，不写文档。 */
   requestAdoptAll(): void {
     if (this.#proposal === undefined) return;
     this.#confirmAll = true;
-    this.#paneMode = 'changes';
+    this.#paneMode = 'intent';
     this.render('request-adopt-all');
     this.#pane?.querySelector<HTMLButtonElement>('[data-change-action="adopt"]')?.focus();
   }
@@ -225,13 +258,20 @@ export class DesignerChangeController {
     const proposal = this.#proposal;
     const handler = this.#adoptHandler;
     if (proposal === undefined || handler === undefined) return false;
-    if (!handler(proposal.commands, proposal.provenance).ok) return false;
+    if (!handler(proposal.commands, proposal.provenance).ok) {
+      this.#feedback = { kind: 'adopt-failed' };
+      this.#paneMode = 'intent';
+      this.render();
+      return false;
+    }
+    this.#metricHandler?.('change_adopt');
     this.clearDraft();
     return true;
   }
 
   discard(): void {
     if (this.#proposal === undefined) return;
+    this.#metricHandler?.('draft_discarded');
     this.clearDraft();
   }
 
@@ -243,7 +283,7 @@ export class DesignerChangeController {
     }
     const paneTab = target.closest<HTMLElement>('[data-right-pane-tab]');
     if (paneTab !== null) {
-      this.setPaneMode(paneTab.dataset.rightPaneTab === 'changes' ? 'changes' : 'inspector');
+      this.setPaneMode(parsePaneMode(paneTab.dataset.rightPaneTab));
       return true;
     }
     const action = target.closest<HTMLElement>('[data-change-action]');
@@ -251,7 +291,7 @@ export class DesignerChangeController {
     const unitId = action.dataset.changeUnit;
     switch (action.dataset.changeAction) {
       case 'toggle-panel':
-        this.setPaneMode(this.#paneMode === 'changes' ? 'inspector' : 'changes');
+        this.setPaneMode(this.#paneMode === 'intent' ? 'inspector' : 'intent');
         return true;
       case 'toggle-compare':
         this.#comparing = !this.#comparing;
@@ -277,7 +317,8 @@ export class DesignerChangeController {
         return true;
       case 'revert-history': {
         const index = Number(action.dataset.historyIndex);
-        if (Number.isInteger(index) && index >= 0) {
+        const node = this.#historyReader?.().find((item) => item.index === index);
+        if (Number.isInteger(index) && node?.position === 'past' && this.#revertHandler) {
           this.#metricHandler?.('revert');
           this.#revertHandler?.(index);
         }
@@ -307,8 +348,8 @@ export class DesignerChangeController {
       this.cancelAdoptAll();
       return true;
     }
-    if (this.#paneMode === 'changes') {
-      // 评审态固定停在变更页签：切回检查器会让评审人失去批准/驳回入口。
+    if (this.#paneMode === 'intent') {
+      // 评审态固定停在智能体页签：切回检查器会让评审人失去批准/驳回入口。
       if (this.#review !== undefined) return false;
       event.preventDefault();
       this.setPaneMode('inspector');
@@ -329,15 +370,21 @@ export class DesignerChangeController {
     );
   }
 
-  /** 用剩余命令重新编译；剩余为空或不再成立时直接收尾，不留半份状态。 */
-  private rebuild(proposal: DesignerChangeProposal, removedIndexes: readonly number[]): boolean {
+  /** 用剩余命令重新编译；失效时移除幽灵层，但保留明确的就地反馈。 */
+  private rebuild(proposal: DesignerChangeProposal, removedIndexes: readonly number[]): void {
     const remaining = proposal.commands.filter((_, index) => !removedIndexes.includes(index));
+    const remainingCount = proposal.units.filter(
+      (unit) => !unit.commandIndexes.some((index) => removedIndexes.includes(index)),
+    ).length;
     const document = this.#getDocument?.();
     const input = this.#input;
-    if (remaining.length === 0 || document === undefined || input === undefined) {
-      const exhausted = remaining.length === 0;
+    if (remaining.length === 0) {
       this.clearDraft();
-      return exhausted;
+      return;
+    }
+    if (document === undefined || input === undefined) {
+      this.clearDraft({ kind: 'remaining-invalid', remainingCount });
+      return;
     }
     const prepared = prepareDesignerChangeProposal(
       document,
@@ -345,18 +392,19 @@ export class DesignerChangeController {
       proposal.id,
     );
     if (!prepared.ok || !this.mountGhost(prepared.value)) {
-      this.clearDraft();
-      return false;
+      this.clearDraft({ kind: 'remaining-invalid', remainingCount });
+      return;
     }
     this.#proposal = prepared.value;
+    this.#feedback = undefined;
     this.#confirmAll = false;
     this.render();
-    return true;
   }
 
-  private clearDraft(): void {
+  private clearDraft(feedback?: DesignerChangeFeedback): void {
     this.#ghostHandlers?.clear();
-    if (this.#proposal !== undefined) this.#metricHandler?.('draft_discarded');
+    this.#feedback = feedback;
+    if (feedback !== undefined) this.#paneMode = 'intent';
     this.#proposal = undefined;
     this.#input = undefined;
     this.#comparing = false;
@@ -387,15 +435,16 @@ export class DesignerChangeController {
     const rightPanel = this.#rightPanel;
     if (rightPanel !== undefined) {
       rightPanel.dataset.rightPane = this.#paneMode;
+      if (this.#lastRenderedPaneMode !== this.#paneMode) {
+        this.#lastRenderedPaneMode = this.#paneMode;
+        this.#paneModeHandler?.(this.#paneMode);
+      }
       rightPanel
         .querySelector('[data-right-pane-tab="inspector"]')
         ?.setAttribute('aria-selected', String(this.#paneMode === 'inspector'));
       rightPanel
-        .querySelector('[data-right-pane-tab="changes"]')
-        ?.setAttribute('aria-selected', String(this.#paneMode === 'changes'));
-      rightPanel
-        .querySelector('[data-review-toggle]')
-        ?.setAttribute('aria-pressed', String(this.#review !== undefined));
+        .querySelector('[data-right-pane-tab="intent"]')
+        ?.setAttribute('aria-selected', String(this.#paneMode === 'intent'));
       const count = rightPanel.querySelector<HTMLElement>('[data-change-count]');
       if (count !== null) renderChangeCount(count, proposal?.units.length ?? 0);
       const root = rightPanel.closest<HTMLElement>('.designer');
@@ -407,14 +456,14 @@ export class DesignerChangeController {
     if (bar !== undefined) {
       bar.hidden = proposal === undefined;
       if (proposal !== undefined)
-        renderDraftBar(bar, proposal, this.#comparing, this.#paneMode === 'changes');
+        renderDraftBar(bar, proposal, this.#comparing, this.#paneMode === 'intent');
       if (focusAction !== undefined) {
         bar.querySelector<HTMLButtonElement>(`[data-change-action="${focusAction}"]`)?.focus();
       }
     }
     if (ghost !== undefined) ghost.hidden = proposal === undefined || this.#comparing;
     if (pane === undefined) return;
-    const showPane = this.#paneMode === 'changes';
+    const showPane = this.#paneMode === 'intent';
     pane.hidden = !showPane;
     if (showPane) {
       renderChangePane(
@@ -427,6 +476,8 @@ export class DesignerChangeController {
           total: this.#reviewTotal,
         },
         this.#historyReader?.(),
+        this.#feedback,
+        this.#getIntentScope?.(),
       );
     }
   }

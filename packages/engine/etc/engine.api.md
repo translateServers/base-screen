@@ -437,6 +437,8 @@ export interface BaseScreenDesignerChangeUnitSummary {
     readonly kind: DesignerChangeUnitKind;
     // (undocumented)
     readonly label: string;
+    // (undocumented)
+    readonly presentation?: DesignerChangeUnitPresentation;
 }
 
 // @public (undocumented)
@@ -663,6 +665,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     replaceDocument(document: ScreenDocument): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     replaceHostResource(componentId: string, intent: BaseScreenHostResourceAuthoringIntent): ScreenParseResult<ScreenDocument>;
+    requestComponentChoice(candidateIds: readonly string[], prompt?: string): Promise<string | null>;
     // (undocumented)
     requestComponentTextEdit(target: ScreenComponentTextTarget): string | null;
     // (undocumented)
@@ -1056,10 +1059,20 @@ interface DesignerChangeUnit {
     readonly kind: 'added' | 'removed' | 'changed' | 'document';
     // (undocumented)
     readonly label: string;
+    // (undocumented)
+    readonly presentation?: DesignerChangeUnitPresentation;
 }
 
 // @public (undocumented)
 export type DesignerChangeUnitKind = DesignerChangeUnit['kind'];
+
+// @public
+export interface DesignerChangeUnitPresentation {
+    // (undocumented)
+    readonly addedCount: number;
+    // (undocumented)
+    readonly kind: 'whole-screen-replacement';
+}
 
 // @public (undocumented)
 export interface DesignerContrastIssue {
@@ -1135,7 +1148,16 @@ export interface DesignerGuardSnapshot {
 }
 
 // @public
-export type DesignerIntentHandler = (request: ScreenIntentRequest) => Promise<ScreenParseResult<null>>;
+export type DesignerIntentHandler = (request: ScreenIntentRequest, signal?: AbortSignal) => Promise<DesignerIntentOutcome>;
+
+// @public
+export type DesignerIntentOutcome = IntentSuccess | (IntentFailure & {
+    readonly reason?: string;
+    readonly remedy?: DesignerIntentRemedy;
+});
+
+// @public
+export type DesignerIntentRemedy = 'whole-screen';
 
 // @public (undocumented)
 export type DesignerMetricName = 'intent_submit' | 'clarify_open' | 'parameter_route' | 'direct_edit' | 'draft_created' | 'draft_discarded' | 'change_adopt' | 'change_reject' | 'guard_fail' | 'fix_preview' | 'fix_apply' | 'scene_preview' | 'scene_apply' | 'revert' | 'patch_record';
@@ -1225,6 +1247,16 @@ const ElementBase: {
     new (): HTMLElement;
     prototype: HTMLElement;
 };
+
+// @public (undocumented)
+type IntentFailure = Extract<ScreenParseResult<null>, {
+    ok: false;
+}>;
+
+// @public (undocumented)
+type IntentSuccess = Extract<ScreenParseResult<null>, {
+    ok: true;
+}>;
 
 // @public (undocumented)
 export function parseBaseScreenBlueprintCanvasCommand(input: unknown): ScreenParseResult<BaseScreenBlueprintCanvasCommand>;

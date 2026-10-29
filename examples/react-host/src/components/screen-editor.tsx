@@ -23,6 +23,7 @@ import {
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
+import { createHostIntentHandler } from '../screen/host-intent';
 import { createHostResourceAuthoringPanel } from '../screen/host-resource-authoring';
 import { loadHostRuntime } from '../screen/host-runtime';
 import {
@@ -190,6 +191,7 @@ export function ScreenEditorPage(): React.ReactElement {
       detach = (): void => {
         element.removeEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
         element.removeEventListener('base-screen-project-conflict', onConflict);
+        element.setIntentHandler(undefined);
         runtime.bindDesigner(null);
       };
 
@@ -200,6 +202,12 @@ export function ScreenEditorPage(): React.ReactElement {
         return;
       }
       useScreenSessionStore.getState().loaded(loaded.value.name, loaded.value.revision);
+
+      // 示例接线：把右栏书写面接到示例智能体（整屏 `POST /agent/candidate`、选中组件
+      // `POST /agent/edit`）。必须在 load 成功之后绑定——
+      // 提案要对着当前文档试算，文档没到时提交只会被引擎拒绝。解绑在 detach 里做，
+      // 页面走了之后不会再有请求回来改一块已经不在的设计器。
+      element.setIntentHandler(createHostIntentHandler({ designer: element, screenId }));
 
       resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });
       // 浮动面板挂 body：不能塞进框架根节点（Vue 的 fragment anchor 会被打乱）。

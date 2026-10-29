@@ -1,6 +1,7 @@
 import type {
   DesignerChangeProposalOrigin,
   DesignerChangeUnit,
+  DesignerChangeUnitPresentation,
 } from './designer-change-proposal.js';
 
 /** 待决提案的计数与状态变化；宿主据此更新未读角标，不需要轮询。 */
@@ -12,6 +13,7 @@ export interface BaseScreenDesignerChangeUnitSummary {
   readonly id: string;
   readonly label: string;
   readonly kind: DesignerChangeUnitKind;
+  readonly presentation?: DesignerChangeUnitPresentation;
 }
 
 /** 提案的外部摘要：不含候选文档，宿主拿到也不需要能改文档。 */
@@ -34,17 +36,15 @@ export interface BaseScreenDesignerChangeStateDetail {
 }
 
 /** 提案 → 摘要：只暴露展示与定位所需的字段。 */
-export function summarizeChangeProposal(
-  proposal: {
-    readonly id: string;
-    readonly title: string;
-    readonly scope: string;
-    readonly rationale: string;
-    readonly affectedComponentIds: readonly string[];
-    readonly units: readonly DesignerChangeUnit[];
-    readonly origin?: DesignerChangeProposalOrigin;
-  },
-): BaseScreenDesignerChangeProposalSummary {
+export function summarizeChangeProposal(proposal: {
+  readonly id: string;
+  readonly title: string;
+  readonly scope: string;
+  readonly rationale: string;
+  readonly affectedComponentIds: readonly string[];
+  readonly units: readonly DesignerChangeUnit[];
+  readonly origin?: DesignerChangeProposalOrigin;
+}): BaseScreenDesignerChangeProposalSummary {
   return {
     id: proposal.id,
     title: proposal.title,
@@ -55,6 +55,7 @@ export function summarizeChangeProposal(
       id: unit.id,
       label: unit.label,
       kind: unit.kind,
+      ...(unit.presentation === undefined ? {} : { presentation: unit.presentation }),
     })),
     ...(proposal.origin === undefined ? {} : { origin: proposal.origin }),
   };

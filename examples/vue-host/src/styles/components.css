@@ -49,6 +49,7 @@
 
 .list-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--spacing-3);
@@ -221,6 +222,29 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-2);
+}
+
+.list-header__actions {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-3);
+}
+
+.create-screen--generate {
+  flex: 0 1 560px;
+  min-width: 0;
+}
+
+.create-screen--generate .field {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.create-screen button {
+  white-space: nowrap;
 }
 
 .field {

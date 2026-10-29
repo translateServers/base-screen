@@ -126,12 +126,6 @@ function actionTarget(action: string): Element {
   } as unknown as Element;
 }
 
-function typingTarget(): Element {
-  return {
-    closest: (selector: string) => (selector === '[data-intent-input]' ? {} : null),
-  } as unknown as Element;
-}
-
 function confirmTarget(action: string): Element {
   const button = { dataset: { intentConfirmAction: action } };
   return {
@@ -243,30 +237,23 @@ describe('designer intent controller', () => {
     expect(input.value).toBe('');
   });
 
-  it('keeps the draft when leaving the writing surface, and re-opens it on the next keystroke', () => {
-    const { controller, input, composer, status } = harness();
+  it('marks the composer as drafting while text is present and clears the mark when empty', () => {
+    const { controller, input, composer } = harness();
     input.value = '第一行\n第二行';
     controller.onInput();
-
-    controller.exitDraft();
-
-    expect(input.value).toBe('第一行\n第二行');
-    expect(composer.hasAttribute('data-draft')).toBe(false);
-    expect(status.innerHTML).toContain(DESIGNER_UI_TEXT.intent.draftKept);
-
-    controller.onInput();
     expect(composer.hasAttribute('data-draft')).toBe(true);
+
+    input.value = '';
+    controller.onInput();
+    expect(composer.hasAttribute('data-draft')).toBe(false);
   });
 
-  it('re-opens the writing surface when the draft input is clicked again', () => {
-    const { controller, input, composer } = harness();
-    input.value = '写了一半';
-    controller.onInput();
-    controller.exitDraft();
-    expect(composer.hasAttribute('data-draft')).toBe(false);
+  it('clears auto-grown height when the agent tab takes over the right pane', () => {
+    const { controller, input } = harness();
+    input.style.height = '84px';
 
-    // 不吞这次点击：焦点仍由浏览器交给输入框。
-    expect(controller.onClick(typingTarget())).toBe(false);
-    expect(composer.hasAttribute('data-draft')).toBe(true);
+    controller.setWritingMode(true);
+
+    expect(input.style.height).toBe('');
   });
 });

@@ -1,12 +1,11 @@
 import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
 import {
   applyScreenDocumentTransaction,
-  diffScreenDocuments,
   type ScreenDiffRow as DesignerChangeDiffRow,
+  diffScreenDocuments,
   type ScreenDocumentCommand,
   type ScreenTransactionProvenance,
 } from '@base-screen/core';
-
 
 /**
  * 提案的归属标签：`author` 发起、`approver` 审批。
@@ -61,6 +60,13 @@ export interface DesignerChangeUnit {
   readonly kind: 'added' | 'removed' | 'changed' | 'document';
   readonly commandIndexes: readonly number[];
   readonly diff: readonly DesignerChangeDiffRow[];
+  readonly presentation?: DesignerChangeUnitPresentation;
+}
+
+/** 只用于展示的提案单元语义；不参与命令分组或采纳计算。 */
+export interface DesignerChangeUnitPresentation {
+  readonly kind: 'whole-screen-replacement';
+  readonly addedCount: number;
 }
 
 export type DesignerChangeProposalResult =
@@ -136,6 +142,7 @@ function buildUnits(
 ): readonly DesignerChangeUnit[] {
   const componentCommands = commands.map((command) => componentTargets(command));
   const groups = groupComponentTargets(componentCommands);
+  const replacement = wholeScreenReplacement(document, commands, diff);
   const names = new Map(document.components.map((component) => [component.id, component.name]));
   for (const command of commands) {
     if (command.type === 'add-component') names.set(command.component.id, command.component.name);
@@ -153,12 +160,25 @@ function buildUnits(
     const rows = diff.filter((row) => group.componentIds.has(row.componentId));
     if (rows.length === 0) return [wholeUnit(commands, diff)];
     for (const row of rows) covered.add(row.componentId);
+    const commandIndexes = [...group.indexes].sort((a, b) => a - b);
+    const isWholeScreenRemoval =
+      replacement !== undefined &&
+      rows.some((row) => row.kind === 'removed') &&
+      commandIndexes.some((index) => replacement.removeCommandIndexes.has(index));
     units.push({
       id: root,
       label: unitLabel(group.componentIds, names),
       kind: unitKind(rows),
-      commandIndexes: [...group.indexes].sort((a, b) => a - b),
+      commandIndexes,
       diff: rows,
+      ...(isWholeScreenRemoval
+        ? {
+            presentation: {
+              kind: 'whole-screen-replacement' as const,
+              addedCount: replacement.addedCount,
+            },
+          }
+        : {}),
     });
   }
 
@@ -179,6 +199,41 @@ function buildUnits(
     });
   }
   return units.length === 0 ? [wholeUnit(commands, diff)] : units;
+}
+
+/**
+ * 整屏替换只在展示层识别的组合语义：先清空全部未锁定组件，再新增一组组件。
+ * 锁定组件不属于被替换集合，但会保留下来，不影响识别。
+ */
+function wholeScreenReplacement(
+  document: ScreenDocument,
+  commands: readonly ScreenDocumentCommand[],
+  diff: readonly DesignerChangeDiffRow[],
+):
+  | {
+      readonly removeCommandIndexes: ReadonlySet<number>;
+      readonly addedCount: number;
+    }
+  | undefined {
+  const unlockedIds = new Set(
+    document.components
+      .filter((component) => !component.status.locked)
+      .map((component) => component.id),
+  );
+  if (unlockedIds.size === 0) return undefined;
+  const addedCount = diff.filter((row) => row.kind === 'added').length;
+  if (addedCount === 0) return undefined;
+  const removeCommandIndexes = new Set<number>();
+  commands.forEach((command, index) => {
+    if (command.type !== 'remove-components') return;
+    if (sameIds(unlockedIds, command.componentIds)) removeCommandIndexes.add(index);
+  });
+  return removeCommandIndexes.size === 0 ? undefined : { removeCommandIndexes, addedCount };
+}
+
+function sameIds(expected: ReadonlySet<string>, actual: readonly string[]): boolean {
+  const actualIds = new Set(actual);
+  return actualIds.size === expected.size && [...expected].every((id) => actualIds.has(id));
 }
 
 function wholeUnit(

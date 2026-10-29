@@ -603,7 +603,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#designerState.runtime.setSceneHandler(this, handler);
   }
 
-  /** 进入评审态：画布只读、右栏固定为变更页签，逐条批准/驳回。 */
+  /** 进入评审态：画布只读、右栏固定为智能体页签，逐条批准/驳回。 */
   enterReviewMode(meta: DesignerReviewMeta = {}): void {
     this.#designerState.runtime.enterReviewMode(this, meta);
   }

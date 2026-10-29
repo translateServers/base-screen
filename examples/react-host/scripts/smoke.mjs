@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { preview } from 'vite';
@@ -56,6 +56,8 @@ function requireArtifacts() {
 function prepareDatabase() {
   rmSync(SMOKE_DB, { force: true });
   rmSync(`${SMOKE_DB}-journal`, { force: true });
+  // Windows 下让 schema engine 自己创建全新 SQLite 文件会偶发空错误；先落空文件再迁移。
+  writeFileSync(SMOKE_DB, '');
   const migrated = spawnSync(process.execPath, [PRISMA_CLI, 'migrate', 'deploy'], {
     cwd: BACKEND_DIR,
     env: { ...process.env, DATABASE_URL: SMOKE_DATABASE_URL },
@@ -1377,6 +1379,46 @@ async function main() {
     }, resourceBaseline);
     if (!resourceRestored) fail('M: 撤销后组件数未回到基线');
 
+    // M2) 编辑页入口：右下角「数据源」「素材」带返回线索跳到宿主页，并能回到原编辑页。
+    //     编辑页没有宿主顶栏，这两个按钮是页面间唯一的出口——删掉就只剩「返回列表」，
+    //     未保存的改动随之丢弃。返回线索（sessionStorage）也必须真的写进去。
+    const editorHash = await page.evaluate(() => window.location.hash);
+    if (!/^#\/screens\/[^/]+\/edit$/.test(editorHash)) {
+      fail(`M2: 编辑页 hash 未对齐：${editorHash}`);
+    }
+    await page.locator('[data-editor-datasources]').click();
+    await page.waitForFunction(() => window.location.hash === '#/datasources', undefined, {
+      timeout: 10_000,
+    });
+    const datasourceReturnHref = await page
+      .locator('[data-ds-return-screen]')
+      .getAttribute('href', { timeout: 10_000 });
+    if (datasourceReturnHref !== editorHash) {
+      fail(`M2: 数据源页「返回大屏」指向 ${datasourceReturnHref}，应为 ${editorHash}`);
+    }
+    await page.locator('[data-ds-return-screen]').click();
+    await page.waitForFunction((expected) => window.location.hash === expected, editorHash, {
+      timeout: 10_000,
+    });
+    await page.waitForFunction(
+      () => document.querySelector('base-screen-designer')?.document !== undefined,
+      undefined,
+      { timeout: 20_000 },
+    );
+    await page.locator('[data-editor-assets]').click();
+    await page.waitForFunction(() => window.location.hash === '#/assets', undefined, {
+      timeout: 10_000,
+    });
+    const assetReturnHref = await page
+      .locator('[data-asset-admin-return]')
+      .getAttribute('href', { timeout: 10_000 });
+    if (assetReturnHref !== editorHash) {
+      fail(`M2: 素材页「返回大屏」指向 ${assetReturnHref}，应为 ${editorHash}`);
+    }
+    await page.locator('[data-asset-admin-return]').click();
+    await page.waitForFunction((expected) => window.location.hash === expected, editorHash, {
+      timeout: 10_000,
+    });
     // N) 素材后台：公共上传/删除、临时筛选与删除保护、设计器临时上传、删屏清理。
     await page.evaluate(() => {
       window.location.hash = '#/assets';

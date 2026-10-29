@@ -1,3 +1,4 @@
+import type { ScreenJsonValue } from '@base-screen/contracts';
 import type {
   AgentGenerateShape,
   DatasetCatalog,
@@ -38,6 +39,42 @@ export interface ApiError {
 export type ApiResult<T> =
   | { readonly ok: true; readonly data: T }
   | { readonly ok: false; readonly error: ApiError };
+
+export interface AgentCandidateShape {
+  readonly name: string;
+  readonly document: unknown;
+  readonly mode: 'llm' | 'deterministic';
+  readonly imageCount: number;
+  readonly failure?: string;
+}
+
+export interface AgentEditableComponentShape {
+  readonly id: string;
+  readonly type: string;
+  readonly name: string;
+  readonly props: Readonly<Record<string, ScreenJsonValue>>;
+  readonly style: Readonly<Record<string, ScreenJsonValue>>;
+  readonly text?: string;
+  readonly position: { readonly x: number; readonly y: number };
+  readonly size: { readonly width: number; readonly height: number };
+}
+
+export interface AgentComponentPatchShape {
+  readonly componentId: string;
+  readonly name?: string;
+  readonly text?: string;
+  readonly props?: Readonly<Record<string, ScreenJsonValue>>;
+  readonly style?: Readonly<Record<string, ScreenJsonValue>>;
+  readonly position?: { readonly x: number; readonly y: number };
+  readonly size?: { readonly width: number; readonly height: number };
+}
+
+export interface AgentComponentEditShape {
+  readonly summary: string;
+  readonly patches: readonly AgentComponentPatchShape[];
+  readonly mode: 'llm' | 'deterministic';
+  readonly failure?: string;
+}
 
 interface RequestOptions {
   readonly method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -189,15 +226,35 @@ export const api = {
   deleteScreen: (id: string): Promise<ApiResult<{ ok: true }>> =>
     request(`/screens/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   /**
-   * 示例智能体生成一屏（示例接线：设计器右栏的书写面经这里落到后端）。
+   * 示例智能体生成并创建一屏，保留列表页的创建行为。
    *
    * 后端会**新建一张屏**并返回它的 document；没配模型或模型输出不可用时退回确定性
-   * 结构，响应里的 `mode` 如实标注实际通道。`signal` 用于用户取消，取消后不产生提案。
+   * 结构，响应里的 `mode` 如实标注实际通道。取消请求不保证撤销后端创建。
    */
   generateScreen: (topic: string, signal?: AbortSignal): Promise<ApiResult<AgentGenerateShape>> =>
     request('/agent/generate', {
       method: 'POST',
       body: { topic },
+      ...(signal === undefined ? {} : { signal }),
+    }),
+  /** 编辑器只生成候选，不创建或更新后端大屏。 */
+  generateScreenCandidate: (
+    topic: string,
+    signal?: AbortSignal,
+  ): Promise<ApiResult<AgentCandidateShape>> =>
+    request('/agent/candidate', {
+      method: 'POST',
+      body: { topic },
+      ...(signal === undefined ? {} : { signal }),
+    }),
+  generateComponentCandidate: (
+    instruction: string,
+    components: readonly AgentEditableComponentShape[],
+    signal?: AbortSignal,
+  ): Promise<ApiResult<AgentComponentEditShape>> =>
+    request('/agent/edit', {
+      method: 'POST',
+      body: { instruction, components },
       ...(signal === undefined ? {} : { signal }),
     }),
   getScreenAlarmBindings: (

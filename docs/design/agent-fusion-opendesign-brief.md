@@ -2,6 +2,7 @@
 
 > 状态：待评审（配合已接受的 [ADR-0092](../decisions/ADR-0092-change-proposal-and-ghost-draft.md)）  
 > 用途：交给 OpenDesign 生成页面设计；本文不是仓库实现契约。  
+> 结构已变更：右栏不再有独立的「变更」页签，提案、评审与历史收进「智能体」页签，意图输入区位于其下方；下文 P1、P2 与第 7 节中的「变更页签」表述以此为准，现行结构见 ADR-0092 第 4 节。
 > 关联：[大屏设计器价值研究报告](../../.base-screen/local/base-screen-design/大屏设计器价值研究报告.html)、
 > [智能体融合下大屏设计器交互形态研究](../../.base-screen/local/base-screen-design/智能体融合下大屏设计器交互形态研究.html)、
 > 已有形态参考：`agent-workbench.html`（同目录）。

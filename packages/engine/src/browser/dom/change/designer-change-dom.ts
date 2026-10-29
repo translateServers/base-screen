@@ -1,12 +1,19 @@
+import type { ScreenIntentScope } from '@base-screen/contracts';
+import type { ScreenHistoryNode } from '@base-screen/core';
 import type {
   DesignerChangeProposal,
   DesignerChangeProposalOrigin,
   DesignerChangeUnit,
 } from '../../../common/operations/change/designer-change-proposal.js';
-import type { ScreenHistoryNode } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { designerIcon } from '../../ui/designer-icons.js';
 import { adoptDesignerFormControls } from '../designer-form-controls-dom.js';
 import { escapeHtml } from '../designer-html-escape.js';
+
+export type DesignerChangeFeedback =
+  | { readonly kind: 'draft-pending' }
+  | { readonly kind: 'adopt-failed'; readonly unitId?: string }
+  | { readonly kind: 'remaining-invalid'; readonly remainingCount: number };
 
 /** 草案条：常驻画布顶部，声明「未写入」，并给出采纳/放弃入口。 */
 export function draftBarMarkup(
@@ -20,15 +27,19 @@ export function draftBarMarkup(
     <span class="draft-title">${escapeHtml(proposal.title)}</span>
     <span class="draft-meta">${text.affected(proposal.affectedComponentIds.length)}</span>
     <span class="draft-actions">
-      <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="toggle-panel" aria-expanded="${String(paneOpen)}">${text.viewChanges}</button>
+      <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="toggle-panel" aria-expanded="${String(paneOpen)}">${paneOpen ? text.hideChanges : text.viewChanges}</button>
       <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="toggle-compare" aria-pressed="${String(comparing)}">${comparing ? text.exitCompare : text.compare}</button>
-      <button type="button" class="designer-control designer-button" data-change-action="discard">${text.discard}</button>
-      <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>
+      ${
+        paneOpen
+          ? ''
+          : `<button type="button" class="designer-control designer-button" data-change-action="discard">${text.discard}</button>
+      <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>`
+      }
     </span>`;
 }
 
 /**
- * 变更页签：按「可独立采纳的单元」分组，每条能单独采纳或忽略；全部采纳需要二次确认。
+ * 提案区（智能体页签）：按「可独立采纳的单元」分组，每条能单独采纳或忽略；全部采纳需要二次确认。
  * 没有提案时给三张起点牌（从指标树 / 模板 / 一句话起），而不是空白。
  */
 export function changePaneMarkup(
@@ -36,28 +47,49 @@ export function changePaneMarkup(
   confirmAll: boolean,
   review?: DesignerReviewPane,
   history?: readonly ScreenHistoryNode[],
+  feedback?: DesignerChangeFeedback,
+  intentScope?: ScreenIntentScope,
 ): string {
   const text = DESIGNER_UI_TEXT.change;
+  const notice =
+    feedback?.kind === 'adopt-failed' && feedback.unitId !== undefined
+      ? ''
+      : feedbackMarkup(feedback);
+  const reviewToggle = `<div class="change-pane-toolbar"><button type="button" class="designer-control designer-button designer-icon-button right-pane-review" data-review-toggle aria-pressed="${String(review?.reviewing === true)}" data-tip="${DESIGNER_UI_TEXT.review.title}" aria-label="${DESIGNER_UI_TEXT.review.title}">${designerIcon('eye')}</button></div>`;
+  if (proposal === undefined && feedback?.kind === 'remaining-invalid') {
+    return `${reviewToggle}${notice}${historyMarkup(history)}${
+      review?.reviewing === true
+        ? `<button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>`
+        : ''
+    }`;
+  }
   if (proposal === undefined && review?.reviewing === true) {
     // 评审态没有提案分两种：进来时就没有待审条目，和逐条处理完之后的收尾。
     // 两者都显示「评审完成」会让空评审读起来像「审完了」，把没审过说成审过。
     const empty = review.total === 0;
-    return `<div class="change-empty">
+    return `${reviewToggle}${notice}<div class="change-empty">
       <p class="change-empty-title">${
         empty ? DESIGNER_UI_TEXT.review.empty : DESIGNER_UI_TEXT.review.done
       }</p>
       <button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>
-    </div>`;
+    </div>${historyMarkup(history)}`;
   }
   if (proposal === undefined) {
-    return `<div class="change-empty">
-      <p class="change-empty-title">${text.empty}</p>
-      <ul class="change-start-list">
-        <li class="change-start-card"><button type="button" class="designer-control designer-button" data-change-action="start-intent" data-change-start="metrics">${text.startFromMetrics}</button><span class="change-start-hint">${text.startFromMetricsHint}</span></li>
-        <li class="change-start-card"><button type="button" class="designer-control designer-button" data-change-action="start-intent" data-change-start="template">${text.startFromTemplate}</button><span class="change-start-hint">${text.startFromTemplateHint}</span></li>
-        <li class="change-start-card"><button type="button" class="designer-control designer-button" data-change-action="start-intent" data-change-start="prompt">${text.startFromPrompt}</button><span class="change-start-hint">${text.startFromPromptHint}</span></li>
-      </ul>
-    </div>`;
+    const componentScope = intentScope?.kind === 'components';
+    return `${reviewToggle}${notice}<div class="change-empty">
+      <span class="change-empty-mark" aria-hidden="true">${designerIcon('sparkle')}</span>
+      <p class="change-empty-title">${componentScope ? text.componentEmptyTitle : text.emptyTitle}</p>
+      <p class="change-empty-copy">${componentScope ? text.componentEmptyHint : text.emptyHint}</p>
+      ${
+        componentScope
+          ? ''
+          : `<ul class="change-start-list">
+        <li><button type="button" class="change-start-card" data-change-action="start-intent" data-change-start="metrics"><span class="change-start-title">${text.startFromMetrics}</span><span class="change-start-hint">${text.startFromMetricsHint}</span></button></li>
+        <li><button type="button" class="change-start-card" data-change-action="start-intent" data-change-start="template"><span class="change-start-title">${text.startFromTemplate}</span><span class="change-start-hint">${text.startFromTemplateHint}</span></button></li>
+        <li><button type="button" class="change-start-card" data-change-action="start-intent" data-change-start="prompt"><span class="change-start-title">${text.startFromPrompt}</span><span class="change-start-hint">${text.startFromPromptHint}</span></button></li>
+      </ul>`
+      }
+    </div>${historyMarkup(history)}`;
   }
   const units = proposal.units;
   const reviewing = review?.reviewing === true;
@@ -69,7 +101,7 @@ export function changePaneMarkup(
           review.meta.approver ?? '',
         )}</p>`
       : '';
-  return `<div class="change-pane-heading">
+  return `${reviewToggle}${notice}<div class="change-pane-heading">
       <span class="change-pane-scope">${escapeHtml(proposal.scope)}</span>
       <span class="change-pane-summary">${
         reviewing
@@ -86,7 +118,7 @@ export function changePaneMarkup(
     </section>
     <section class="change-panel-section">
       <h3 class="change-panel-heading-text">${text.diffLabel}</h3>
-      <ul class="change-diff-list">${units.map((unit) => unitMarkup(unit, reviewing)).join('')}</ul>
+      <ul class="change-diff-list">${units.map((unit) => unitMarkup(unit, reviewing, feedback)).join('')}</ul>
     </section>
     ${historyMarkup(history)}
     <footer class="change-panel-actions">
@@ -114,9 +146,125 @@ export interface DesignerReviewPane {
   readonly total: number;
 }
 
-function unitMarkup(unit: DesignerChangeUnit, reviewing = false): string {
+function feedbackMarkup(feedback: DesignerChangeFeedback | undefined): string {
+  if (feedback === undefined) return '';
+  const text =
+    feedback.kind === 'draft-pending'
+      ? DESIGNER_UI_TEXT.change.feedbackDraftPending
+      : feedback.kind === 'remaining-invalid'
+        ? DESIGNER_UI_TEXT.change.feedbackRemainingInvalid(feedback.remainingCount)
+        : DESIGNER_UI_TEXT.change.feedbackAdoptFailed;
+  return `<p class="change-panel-hint" role="alert" data-change-feedback="${feedback.kind}">${escapeHtml(text)}</p>`;
+}
+
+function isJsonRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readableValue(value: unknown): string {
+  const text = DESIGNER_UI_TEXT.change.diffValue;
+  if (value === null || value === undefined) return text.unset;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return text.list(value.length);
+  if (isJsonRecord(value)) return text.object(Object.keys(value).length);
+  return text.unset;
+}
+
+function literalValue(value: unknown): string {
+  return DESIGNER_UI_TEXT.change.diffValue.literal(readableValue(value));
+}
+
+function fieldLocation(value: Readonly<Record<string, unknown>>): string {
+  const dataSourceId = typeof value.dataSourceId === 'string' ? value.dataSourceId : '';
+  const path = Array.isArray(value.path)
+    ? value.path
+        .filter(
+          (segment): segment is string | number =>
+            typeof segment === 'string' || typeof segment === 'number',
+        )
+        .map(String)
+    : [];
+  return path.length === 0 ? dataSourceId : `${dataSourceId}/${path.join('.')}`;
+}
+
+function diffValueText(raw: string): string {
+  const text = DESIGNER_UI_TEXT.change.diffValue;
+  if (raw.includes('…')) return text.tooLong;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return text.tooLong;
+  }
+  if (!isJsonRecord(value)) return readableValue(value);
+  if (value.kind === 'inline' && 'value' in value) return literalValue(value.value);
+  if (value.kind === 'variable' && typeof value.variableId === 'string') {
+    return text.variable(value.variableId);
+  }
+  if (value.kind === 'data-source-field' && typeof value.dataSourceId === 'string') {
+    return text.dataSourceField(fieldLocation(value));
+  }
+  if (value.type === 'dataset' && typeof value.datasetId === 'string') {
+    return text.dataset(value.datasetId);
+  }
+  if (
+    value.type === 'host-resource' &&
+    typeof value.resourceType === 'string' &&
+    typeof value.resourceId === 'string'
+  ) {
+    return text.resource(value.resourceType, value.resourceId);
+  }
+  if (value.type === 'variable' && typeof value.variableId === 'string') {
+    return text.variable(value.variableId);
+  }
+  if (value.type === 'static' && 'value' in value) return literalValue(value.value);
+  return text.object(Object.keys(value).length);
+}
+
+function diffPathText(path: string): string {
+  const text = DESIGNER_UI_TEXT.change.diffPath;
+  switch (path) {
+    case 'name':
+      return text.name;
+    case 'position.x':
+      return text.positionX;
+    case 'position.y':
+      return text.positionY;
+    case 'size.width':
+      return text.sizeWidth;
+    case 'size.height':
+      return text.sizeHeight;
+    case 'rotation':
+      return text.rotation;
+    case 'zIndex':
+      return text.zIndex;
+    case 'dataValue':
+      return text.dataValue;
+    case 'dataSource':
+      return text.dataSource;
+    case 'styleRules':
+      return text.styleRules;
+    default:
+      if (path.startsWith('props.')) return text.prop(path.slice('props.'.length));
+      if (path.startsWith('style.')) return text.style(path.slice('style.'.length));
+      return text.other;
+  }
+}
+
+function unitMarkup(
+  unit: DesignerChangeUnit,
+  reviewing = false,
+  feedback?: DesignerChangeFeedback,
+): string {
   const text = DESIGNER_UI_TEXT.change;
   const label = unit.label === '' ? text.unitDocument : unit.label;
+  const heading =
+    unit.presentation?.kind === 'whole-screen-replacement'
+      ? text.wholeScreenReplacement(unit.presentation.addedCount)
+      : unit.kind === 'removed'
+        ? text.removedUnit
+        : label;
   const entries = unit.diff
     .map((row) => {
       if (row.kind !== 'changed') {
@@ -126,10 +274,10 @@ function unitMarkup(unit: DesignerChangeUnit, reviewing = false): string {
       return row.entries
         .map(
           (entry) => `<li class="change-diff-entry">
-        <code class="change-diff-path">${escapeHtml(entry.path)}</code>
-        <span class="change-diff-before">${escapeHtml(entry.before)}</span>
+        <code class="change-diff-path">${escapeHtml(diffPathText(entry.path))}</code>
+        <span class="change-diff-before">${escapeHtml(diffValueText(entry.before))}</span>
         <span class="change-diff-arrow" aria-hidden="true">→</span>
-        <span class="change-diff-after">${escapeHtml(entry.after)}</span>
+        <span class="change-diff-after">${escapeHtml(diffValueText(entry.after))}</span>
       </li>`,
         )
         .join('');
@@ -137,10 +285,11 @@ function unitMarkup(unit: DesignerChangeUnit, reviewing = false): string {
     .join('');
   return `<li class="change-diff-row" data-change-unit-row="${escapeHtml(unit.id)}" data-kind="${unit.kind}">
       <div class="change-diff-head">
-        <span class="change-diff-name">${escapeHtml(label)}</span>
+        <span class="change-diff-name">${escapeHtml(heading)}</span>
         <span class="change-diff-kind">${text.unitKind[unit.kind]}</span>
       </div>
       <ul class="change-diff-entries">${entries}</ul>
+      ${feedback?.kind === 'adopt-failed' && feedback.unitId === unit.id ? feedbackMarkup(feedback) : ''}
       <div class="change-unit-actions">
         <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="reject-unit" data-change-unit="${escapeHtml(unit.id)}">${reviewing ? DESIGNER_UI_TEXT.review.reject : text.rejectUnit}</button>
         <button type="button" class="designer-control designer-button" data-change-action="adopt-unit" data-change-unit="${escapeHtml(unit.id)}">${reviewing ? DESIGNER_UI_TEXT.review.approve : text.adoptUnit}</button>
@@ -164,8 +313,10 @@ export function renderChangePane(
   confirmAll: boolean,
   review?: DesignerReviewPane,
   history?: readonly ScreenHistoryNode[],
+  feedback?: DesignerChangeFeedback,
+  intentScope?: ScreenIntentScope,
 ): void {
-  pane.innerHTML = changePaneMarkup(proposal, confirmAll, review, history);
+  pane.innerHTML = changePaneMarkup(proposal, confirmAll, review, history, feedback, intentScope);
   adoptDesignerFormControls(pane);
 }
 
@@ -195,7 +346,7 @@ function originMarkup(origin: DesignerChangeProposalOrigin | undefined): string 
  * 历史段：指针式回退的可视化。
  *
  * 节点顺序即提交顺序，`position` 由 core 给出；`future` 是撤销或回退留下的
- * 前进栈，同样可点——这正是「回退本身可回退」的入口。
+ * 前进栈，只能通过重做恢复，不能传给仅支持 past 的回退入口。
  */
 function historyMarkup(history: readonly ScreenHistoryNode[] | undefined): string {
   if (history === undefined || history.length === 0) return '';
@@ -206,19 +357,24 @@ function historyMarkup(history: readonly ScreenHistoryNode[] | undefined): strin
         node.index === 0
           ? text.historyInitial
           : (node.provenance?.label ?? text.historyNode(node.index));
-      const source = node.provenance?.source ?? '—';
+      const source =
+        node.provenance?.source === undefined ? '—' : text.historySource[node.provenance.source];
       const current = node.position === 'current';
-      return `<li><button type="button" class="designer-control designer-history-node" data-change-action="revert-history" data-history-index="${node.index}" data-position="${node.position}" aria-current="${String(current)}">
+      return `<li><button type="button" class="designer-control designer-history-node" data-change-action="revert-history" data-history-index="${node.index}" data-position="${node.position}" aria-current="${String(current)}"${node.position === 'past' ? '' : ' disabled'}>
         <span class="history-node-index">${node.index}</span>
         <span class="history-node-label">${escapeHtml(label)}</span>
         <span class="history-node-source">${escapeHtml(source)}</span>
         ${current ? `<span class="history-node-current">${text.historyCurrent}</span>` : ''}
+        ${node.position === 'future' ? `<span class="history-node-current">${text.historyFuture}</span>` : ''}
       </button></li>`;
     })
     .join('');
-  return `<section class="change-panel-section change-history">
-      <h3 class="change-panel-heading-text">${text.historyTitle}</h3>
+  return `<details class="change-panel-section change-history">
+      <summary class="change-history-summary">
+        <span class="change-history-title">${text.historyTitle}</span>
+        <span class="change-history-count">${text.historyCount(history.length)}</span>
+      </summary>
       <ol class="change-history-list">${rows}</ol>
       <p class="change-panel-hint">${text.historyHint}</p>
-    </section>`;
+    </details>`;
 }

@@ -15,8 +15,11 @@ export function ScreenListPage(): React.ReactElement {
   const error = useScreensStore((state) => state.error);
   const load = useScreensStore((state) => state.load);
   const create = useScreensStore((state) => state.create);
+  const generate = useScreensStore((state) => state.generate);
   const remove = useScreensStore((state) => state.remove);
   const [newName, setNewName] = useState('');
+  const [topic, setTopic] = useState('');
+  const [generating, setGenerating] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,6 +44,28 @@ export function ScreenListPage(): React.ReactElement {
     navigate(`/screens/${id}/edit`);
   };
 
+  // 生成会在后端新建一张屏，重复提交会得到多张重复的屏，所以生成期间整体锁住。
+  const generateFromTopic = async (): Promise<void> => {
+    const trimmed = topic.trim();
+    if (trimmed.length === 0) {
+      showToast('请先描述要生成的大屏主题', 'error');
+      return;
+    }
+    setGenerating(true);
+    try {
+      const id = await generate(trimmed);
+      if (id === null) {
+        showToast(`生成失败：${useScreensStore.getState().error ?? '未知错误'}`, 'error');
+        return;
+      }
+      setTopic('');
+      showToast('已生成，正在打开编辑页', 'success');
+      navigate(`/screens/${id}/edit`);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const removeScreen = async (id: string, name: string): Promise<void> => {
     setPendingDeleteId(null);
     if (!(await remove(id))) {
@@ -57,25 +82,46 @@ export function ScreenListPage(): React.ReactElement {
           <h1>数据可视化工作台</h1>
           <p className="list-header__subtitle">BASE SCREEN · 成品大屏示例</p>
         </div>
-        <form
-          className="create-screen"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void createScreen();
-          }}
-        >
-          <input
-            className="field"
-            type="text"
-            aria-label="新大屏名称"
-            placeholder="新大屏名称"
-            value={newName}
-            onChange={(event) => setNewName(event.target.value)}
-          />
-          <button type="submit" className="button button--primary">
-            新建大屏
-          </button>
-        </form>
+        <div className="list-header__actions">
+          <form
+            className="create-screen"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createScreen();
+            }}
+          >
+            <input
+              className="field"
+              type="text"
+              aria-label="新大屏名称"
+              placeholder="新大屏名称"
+              value={newName}
+              onChange={(event) => setNewName(event.target.value)}
+            />
+            <button type="submit" className="button button--primary">
+              新建大屏
+            </button>
+          </form>
+          <form
+            className="create-screen create-screen--generate"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void generateFromTopic();
+            }}
+          >
+            <input
+              className="field"
+              type="text"
+              aria-label="一句话生成大屏的主题"
+              placeholder="一句话描述，例如：华东渠道库存与周转的经营会大屏"
+              value={topic}
+              onChange={(event) => setTopic(event.target.value)}
+            />
+            <button type="submit" className="button" disabled={generating}>
+              {generating ? '生成中…' : '智能生成'}
+            </button>
+          </form>
+        </div>
       </header>
 
       {status === 'error' ? (

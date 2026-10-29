@@ -13,6 +13,7 @@
 
 1. `undoScreenHistory` / `redoScreenHistory` 重建历史条目时只复制 `{before, after}`，撤销再重做后 `provenance` 永久丢失；设计器内的手动编辑也从未标注 `manual`。
 2. 评审态只读只在 CSS（`pointer-events: none`）；键盘命令与方向键微调仍会改文档，Esc 还会把用户从变更页签切走——而评审态下页签切换按钮是被隐藏的，等于把评审人锁死。
+   （实现时已修正：Esc 在评审态下不再切走页签，评审入口移到智能体页签的提案区标题行，不再依赖隐藏的页签栏按钮。键盘改文档的问题仍属 ADR-0092 评审态的既有范围，未在本 ADR 处理。）
 
 ## 决策
 
@@ -69,7 +70,7 @@ WCAG 计算（解析、合成、亮度、比值、门槛、建议色）从 `engi
   表示没测过，不等于通过。
 - 事件：`base-screen-change-state`、`base-screen-guard-change`、`base-screen-metric`。
 - 度量只发事件（15 个基础名），不计算指标、不联网；指标口径与采集归宿主。
-- 变更页签新增历史段与归属行；历史段读 `readScreenHistoryNodes`，回退走 `session.revertTo`。
+- 「智能体」页签的提案区新增历史段与归属行；历史段读 `readScreenHistoryNodes`，回退走 `session.revertTo`。
 
 ## 影响
 

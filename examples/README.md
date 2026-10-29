@@ -54,7 +54,8 @@ screen/host-alarm-controller.ts  screen/host-alarm-style-authoring.ts
 screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
 screen/asset-library.ts  screen/asset-return.ts  screen/blueprint-canvas.ts
 screen/datasource-return.ts
-screen/host-refresh-controller.ts  screen/host-resource-plugin.ts  screen/host-runtime.ts
+screen/host-intent.ts  screen/host-refresh-controller.ts  screen/host-resource-plugin.ts
+screen/host-runtime.ts
 screen/metric-value.ts  screen/online-materials.ts  screen/project-adapter.ts
 store/screen-session-store.ts  store/screens-store.ts  types.ts
 styles/asset-library.css  styles/online-materials.css
@@ -212,6 +213,10 @@ G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构�
 N 段是**素材后台与临时上传**闭环：`#/assets` 导航高亮与公共种子列表、公共素材上传/删除、
 临时素材空态与筛选、设计器左栏临时上传并插入后进入保存文档、后台临时行显示绑定大屏、
 被引用时删除被 409 拦截、删除大屏后临时素材被清理。
+
+M 段是**宿主资源作者面**闭环：编辑页右下角打开作者面，页面内插入 `demo_metric`/`alarm_warning`
+的翻牌读数，自动选中同型组件后改绑到 `alarm_info`，两次撤销回到基线。M2 段锁住编辑页的
+页面间出口：「数据源」「素材」按钮带返回线索跳到宿主页，两页的「返回大屏」都必须指回原编辑页。
 
 ## 成品屏种子
 
@@ -759,6 +764,14 @@ curl -X POST http://127.0.0.1:3000/api/agent/generate \
   -d '{"topic":"华东渠道库存与周转的经营会大屏"}'
 ```
 
+- 三个编辑页的右栏「意图书写面」都已接线（`src/screen/host-intent.ts`，三端逐字一致）：
+  一句话 → 整屏走 `POST /agent/candidate`、选中组件走 `POST /agent/edit` → 候选文档或补丁编译成
+  提案，进右栏「智能体」页签逐条采纳才写入；提案理由会写明走的是模型还是确定性兜底，兜底时
+  给出原因（未配置模型、模型输出未通过校验等）；组件作用域只接受选区内组件的 `props` / `style`
+  与文本补丁，越界或重复的补丁整份丢弃，已绑数据的文本不会被换成内联值。
+- 模型只写中间表示：`kpis`，以及每个面板的数据——chart 的 `points`（5–7 个点）与 list 的
+  `items`（3–5 条）。柱高按同面板最大值归一、清单逐条照抄，编译器不补任何预设数字；
+  缺数据就整份拒绝（`failure: AGENT_SPEC_INVALID`）并退回兜底，页脚写明这一轮走的通道。
 - 配置：`examples/shared-backend/.env.local`（已被 `.gitignore` 忽略），变量
   `AGENT_LLM_BASE_URL` / `AGENT_LLM_API_KEY` / `AGENT_LLM_MODEL`。
 - 未配置或模型失败时退回确定性结构，响应里的 `mode` 会如实标 `deterministic`，

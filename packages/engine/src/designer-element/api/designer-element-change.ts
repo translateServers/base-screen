@@ -1,5 +1,8 @@
 import type { ScreenParseResult } from '@base-screen/contracts';
-import type { BaseScreenDesignerChangeProposalSummary } from '../../common/operations/change/designer-change-events.js';
+import {
+  type BaseScreenDesignerChangeProposalSummary,
+  summarizeChangeProposal,
+} from '../../common/operations/change/designer-change-events.js';
 import {
   type DesignerChangeProposalInput,
   prepareDesignerChangeProposal,
@@ -35,7 +38,7 @@ export function submitChangeProposal(
   }
   return {
     ok: true,
-    value: summarize(prepared.value),
+    value: summarizeChangeProposal(prepared.value),
     diagnostics: [],
   };
 }
@@ -49,7 +52,7 @@ export function readPendingChange(
   element: DesignerElementHost,
 ): BaseScreenDesignerChangeProposalSummary | undefined {
   const proposal = getDesignerElementState(element).changeController.pending;
-  return proposal === undefined ? undefined : summarize(proposal);
+  return proposal === undefined ? undefined : summarizeChangeProposal(proposal);
 }
 
 /** 采纳一个单元：该单元的命令作为一次普通事务提交，其余单元按当前文档重算。 */
@@ -74,28 +77,4 @@ export function adoptAllChanges(element: DesignerElementHost): boolean {
 /** 撤回未采纳的提案：只清掉幽灵草案，不产生文档或历史副作用。 */
 export function discardPendingChange(element: DesignerElementHost): void {
   getDesignerElementState(element).changeController.discard();
-}
-
-function summarize(proposal: {
-  readonly id: string;
-  readonly title: string;
-  readonly scope: string;
-  readonly rationale: string;
-  readonly affectedComponentIds: readonly string[];
-  readonly units: readonly {
-    readonly id: string;
-    readonly label: string;
-    readonly kind: 'added' | 'removed' | 'changed' | 'document';
-  }[];
-  readonly origin?: { readonly author?: string; readonly approver?: string };
-}): BaseScreenDesignerChangeProposalSummary {
-  return {
-    id: proposal.id,
-    title: proposal.title,
-    scope: proposal.scope,
-    rationale: proposal.rationale,
-    affectedComponentIds: proposal.affectedComponentIds,
-    units: proposal.units.map((unit) => ({ id: unit.id, label: unit.label, kind: unit.kind })),
-    ...(proposal.origin === undefined ? {} : { origin: proposal.origin }),
-  };
 }

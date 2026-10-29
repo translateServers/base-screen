@@ -212,7 +212,8 @@ export const screenEditView: ViewModule = {
       }
       screenSessionStore.getState().loaded(loaded.value.name, loaded.value.revision);
 
-      // 示例接线：把右栏书写面接到 `POST /agent/generate`。必须在 load 成功之后绑定——
+      // 示例接线：把右栏书写面接到示例智能体（整屏 `POST /agent/candidate`、选中组件
+      // `POST /agent/edit`）。必须在 load 成功之后绑定——
       // 提案要对着当前文档试算，文档没到时提交只会被引擎拒绝。解绑在 detach 里做，
       // 页面走了之后不会再有请求回来改一块已经不在的设计器。
       element.setIntentHandler(createHostIntentHandler({ designer: element, screenId }));

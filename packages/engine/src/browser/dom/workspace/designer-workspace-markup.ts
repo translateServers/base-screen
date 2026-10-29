@@ -299,9 +299,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       </header>
       <div class="right-pane-switch" role="tablist" aria-label="${DESIGNER_UI_TEXT.rightPane.label}">
         <button type="button" class="right-pane-tab" data-right-pane-tab="inspector" role="tab" aria-selected="true">${DESIGNER_UI_TEXT.rightPane.inspector}</button>
-        <button type="button" class="right-pane-tab" data-right-pane-tab="changes" role="tab" aria-selected="false">${DESIGNER_UI_TEXT.rightPane.changes}<span class="right-pane-count" data-change-count data-empty="true"></span></button>
-        <span class="right-pane-spacer"></span>
-        <button type="button" class="designer-control designer-button designer-icon-button right-pane-review" data-review-toggle aria-pressed="false" data-tip="${DESIGNER_UI_TEXT.review.title}" aria-label="${DESIGNER_UI_TEXT.review.title}">${designerIcon('eye')}</button>
+        <button type="button" class="right-pane-tab" data-right-pane-tab="intent" role="tab" aria-selected="false">${DESIGNER_UI_TEXT.rightPane.intent}<span class="right-pane-count" data-change-count data-empty="true"></span></button>
       </div>
       <div class="inspector-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.inspector}">
         <button type="button" class="designer-tab" id="designer-appearance-tab" role="tab" aria-controls="designer-appearance-panel" aria-selected="true" data-inspector-tab="appearance"><span>${DESIGNER_UI_TEXT.appearance}</span></button>
@@ -345,13 +343,12 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <div class="right-pane-changes" data-change-pane hidden></div>
       <section class="designer-intent" data-intent-composer tabindex="-1" aria-label="${DESIGNER_UI_TEXT.intent.title}">
         <div class="intent-top">
-          <span class="intent-label">${DESIGNER_UI_TEXT.intent.label}</span>
+          <span class="intent-label"><span class="intent-label-icon" aria-hidden="true">${designerIcon('sparkle')}</span>${DESIGNER_UI_TEXT.intent.label}</span>
           <span class="intent-scope-chip" data-intent-scope-chip>
             <span class="intent-scope-label" data-intent-scope>${DESIGNER_UI_TEXT.intent.scopeScreen}</span>
             <button type="button" class="intent-scope-clear" data-intent-scope-clear aria-label="${DESIGNER_UI_TEXT.intent.scopeClear}" hidden>${designerIcon('close')}</button>
           </span>
           <span class="intent-spacer"></span>
-          <button type="button" class="intent-back" data-intent-action="exit-draft">${DESIGNER_UI_TEXT.intent.backToInspector}</button>
           <span class="intent-hint">${DESIGNER_UI_TEXT.intent.keyHint}</span>
         </div>
         <div class="intent-box">

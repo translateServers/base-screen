@@ -1,4 +1,4 @@
-/* 变更页签的新增面：归属行与历史段。既有卡片/草案条样式仍在 shell / inspector。
+/* 提案区（智能体页签）的新增面：归属行与历史段。既有卡片/草案条样式仍在 shell / inspector。
    本文件不写兜底字面量：令牌都在 designer-tokens.css 的 :host 与两个主题块里定义，
    写死兜底只会多出一套会过期的真值（上一代 black-alpha 阶梯就曾在此存活）。 */
 .change-pane-origin {
@@ -9,7 +9,47 @@
 }
 
 .change-history {
+  padding-top: var(--designer-space-3);
+  border-top: 1px solid var(--designer-border-subtle);
   gap: var(--designer-space-3);
+}
+
+.change-history-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  color: var(--designer-text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.change-history-summary::-webkit-details-marker {
+  display: none;
+}
+
+.change-history-summary::before {
+  color: var(--designer-text-muted);
+  content: "›";
+  transition: transform var(--designer-motion);
+}
+
+.change-history[open] .change-history-summary::before {
+  transform: rotate(90deg);
+}
+
+.change-history-summary:focus-visible {
+  outline: 2px solid var(--designer-accent);
+  outline-offset: 2px;
+}
+
+.change-history-title {
+  font-weight: 600;
+}
+
+.change-history-count {
+  margin-left: auto;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
 }
 
 .change-history-list {
@@ -44,13 +84,13 @@
 }
 
 /* 当前节点用中性灰块 + 1px 收边，不用强调色：选中态全仓统一走中性色。 */
-.designer-history-node[aria-current='true'] {
+.designer-history-node[aria-current="true"] {
   background: var(--designer-surface-control-active);
   color: var(--designer-text-primary);
   box-shadow: inset 0 0 0 1px var(--designer-border-default);
 }
 
-.designer-history-node[data-position='future'] {
+.designer-history-node[data-position="future"] {
   opacity: 0.55;
 }
 
