@@ -115,9 +115,12 @@ export function composeScreenDocument(spec: AgentScreenSpec): ComposeResult {
   });
 
   // 标题
+  // 字重只能取 base.text 样式 schema 声明的枚举值（'400' | '700'）：写成 '600' 时文档结构
+  // 仍合法，但设计器的渲染器会按物料 manifest 校验样式并整份拒绝——表现是幽灵草案不出现、
+  // 变更提案被引擎判为失败。改字重前先看 packages/material/src/text.ts 的 styleSchema。
   text('agent-title', '标题', spec.title, { x: MARGIN, y: 44, width: 1200, height: 62 }, {
     fontSize: 46,
-    fontWeight: '600',
+    fontWeight: '700',
   });
   text('agent-subtitle', '副标题', spec.subtitle, { x: MARGIN, y: 112, width: 1400, height: 30 }, {
     fontSize: 20,
@@ -137,7 +140,7 @@ export function composeScreenDocument(spec: AgentScreenSpec): ComposeResult {
     });
     text(`agent-kpi-${index}-value`, '指标值', kpi.value, { x: x + 20, y: y + 50, width: kpiWidth - 40, height: 54 }, {
       fontSize: 42,
-      fontWeight: '600',
+      fontWeight: '700',
     });
     if (kpi.delta !== undefined && kpi.delta !== '') {
       text(`agent-kpi-${index}-delta`, '同比', kpi.delta, { x: x + 20, y: y + 108, width: kpiWidth - 40, height: 24 }, {
@@ -159,7 +162,7 @@ export function composeScreenDocument(spec: AgentScreenSpec): ComposeResult {
     rect(`agent-panel-${index}-bg`, '面板底板', { x, y, width: panelWidth, height }, { fill: '#10161e' });
     text(`agent-panel-${index}-title`, '面板标题', panel.title, { x: x + 20, y: y + 16, width: panelWidth - 40, height: 28 }, {
       fontSize: 21,
-      fontWeight: '600',
+      fontWeight: '700',
     });
     if (panel.note !== undefined && panel.note !== '') {
       text(`agent-panel-${index}-note`, '面板说明', panel.note, { x: x + 20, y: y + 48, width: panelWidth - 40, height: 22 }, {

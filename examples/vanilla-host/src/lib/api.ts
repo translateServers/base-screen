@@ -1,4 +1,5 @@
 import type {
+  AgentGenerateShape,
   DatasetCatalog,
   DatasetDefinition,
   HostAssetShape,
@@ -187,6 +188,18 @@ export const api = {
     request(`/screens/${encodeURIComponent(id)}`, { method: 'PUT', body: { document, revision } }),
   deleteScreen: (id: string): Promise<ApiResult<{ ok: true }>> =>
     request(`/screens/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /**
+   * 示例智能体生成一屏（示例接线：设计器右栏的书写面经这里落到后端）。
+   *
+   * 后端会**新建一张屏**并返回它的 document；没配模型或模型输出不可用时退回确定性
+   * 结构，响应里的 `mode` 如实标注实际通道。`signal` 用于用户取消，取消后不产生提案。
+   */
+  generateScreen: (topic: string, signal?: AbortSignal): Promise<ApiResult<AgentGenerateShape>> =>
+    request('/agent/generate', {
+      method: 'POST',
+      body: { topic },
+      ...(signal === undefined ? {} : { signal }),
+    }),
   getScreenAlarmBindings: (
     id: string,
     signal?: AbortSignal,
