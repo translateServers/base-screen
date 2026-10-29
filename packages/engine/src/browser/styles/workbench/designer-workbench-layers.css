@@ -200,7 +200,7 @@
   border-radius: var(--designer-radius-pill);
   background: var(--designer-accent);
   color: var(--designer-text-on-accent);
-  font: 600 var(--designer-font-size-xs) / 1 var(--designer-font-numeric);
+  font: 600 var(--designer-font-size-xs) / 1 var(--designer-font-family-mono);
 }
 
 /* 整行即拖拽把手：行上的名称区、图标与缩进留白都能起手，不额外占一个把手位。

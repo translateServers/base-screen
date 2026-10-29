@@ -122,7 +122,7 @@
   padding: var(--designer-space-3) var(--designer-space-3) calc(var(--designer-space-1) + 1px)
     var(--designer-space-4);
   color: var(--designer-text-muted);
-  font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-family-mono);
   letter-spacing: 0.05em;
   text-transform: none;
 }
@@ -151,7 +151,7 @@
 .variable-group-count {
   margin-left: auto;
   color: var(--designer-text-muted);
-  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-family-mono);
 }
 
 .variable-group-add {
@@ -347,7 +347,7 @@
   max-width: 104px;
   overflow: hidden;
   color: var(--designer-text-muted);
-  font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-family-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

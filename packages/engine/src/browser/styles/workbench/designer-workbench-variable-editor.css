@@ -151,7 +151,7 @@
   border-radius: var(--designer-radius-1);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
-  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-family-mono);
   box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
 }
 
@@ -344,7 +344,7 @@
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
-  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-family-mono);
   box-shadow: var(--designer-elev-ring);
 }
 
@@ -359,7 +359,7 @@
 .variable-editor-section-hint {
   margin-left: auto;
   color: var(--designer-text-disabled);
-  font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-family-mono);
   white-space: nowrap;
 }
 
@@ -491,7 +491,7 @@
 .variable-catalog-title {
   overflow: hidden;
   color: var(--designer-text-primary);
-  font: 500 11px / 1.4 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-family-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -499,7 +499,7 @@
 .variable-catalog-sub {
   overflow: hidden;
   color: var(--designer-text-muted);
-  font: 500 var(--designer-font-size-xs) / 1.45 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.45 var(--designer-font-family-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -565,7 +565,7 @@
 }
 
 .variable-host-catalog-item code {
-  font: 500 11px / 1.4 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.4 var(--designer-font-family-mono);
 }
 
 .variable-host-catalog-item span {
@@ -577,7 +577,7 @@
 .variable-selected-host-id {
   display: block;
   color: var(--designer-text-muted);
-  font: 500 var(--designer-font-size-xs) / 1.5 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.5 var(--designer-font-family-mono);
   overflow-wrap: anywhere;
 }
 
@@ -608,7 +608,7 @@
   max-height: 104px;
   padding: calc(var(--designer-space-3) + 1px) var(--designer-space-4);
   color: var(--designer-text-secondary);
-  font: 500 var(--designer-font-size-xs) / 1.65 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.65 var(--designer-font-family-mono);
 }
 
 .variable-run-section {
@@ -643,7 +643,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--designer-text-muted);
-  font: 500 var(--designer-font-size-xs) / 1.5 var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1.5 var(--designer-font-family-mono);
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
