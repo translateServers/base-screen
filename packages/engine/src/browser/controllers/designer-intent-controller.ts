@@ -89,7 +89,7 @@ export class DesignerIntentController {
     this.#status = status;
     this.#confirm = confirm;
     this.syncScope([], () => undefined);
-    this.autoGrow();
+    this.syncDraftState();
   }
 
   release(): void {
@@ -152,7 +152,7 @@ export class DesignerIntentController {
     if (input.value.trim() === '' && this.#pendingScope !== undefined) {
       this.applyPendingScope();
     }
-    this.autoGrow();
+    this.syncDraftState();
     this.renderStatus();
   }
 
@@ -249,10 +249,20 @@ export class DesignerIntentController {
    * 输入框随内容长高，上限交给 CSS 的 max-height 兜住。
    * 固定 `rows=2` 时，长指令只在 36px 里内部滚动：用户读不回顾已写的内容，
    * 也看不出下面还有字。
+   *
+   * 有草稿时反过来：把高度交回 CSS，让书写面拉伸占满右栏（见 data-draft 的样式）。
+   * 写一句话的同时盯着一屏属性表既挤也没有用——空稿才回到两行。
    */
-  private autoGrow(): void {
+  private syncDraftState(): void {
     const input = this.#input;
     if (input === undefined) return;
+    const draft = input.value.trim() !== '';
+    const composer = input.closest('.designer-intent');
+    if (composer !== null) composer.toggleAttribute('data-draft', draft);
+    if (draft) {
+      input.style.height = '';
+      return;
+    }
     input.style.height = 'auto';
     input.style.height = `${input.scrollHeight}px`;
   }
@@ -300,7 +310,7 @@ export class DesignerIntentController {
       this.setStatus(DESIGNER_UI_TEXT.intent.cancelled, 'info');
     } else if (result.ok) {
       input.value = '';
-      this.autoGrow();
+      this.syncDraftState();
       this.setStatus(DESIGNER_UI_TEXT.intent.pending, 'info');
       // 生成期间选区变化过：输入已清空，把挂起的选区并入作用域，保持 chip 与画布一致。
       if (this.#pendingScope !== undefined) this.applyPendingScope();

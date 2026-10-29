@@ -51,6 +51,41 @@
   grid-row: 5;
 }
 
+/* 会话态：输入框里一旦有内容，这块面板的用途就变了——用户在写指令，不是在看属性。
+   此刻把身份行、页签行、内容行全部让出来，书写面接管第 2 行到底部。
+   写空（提交成功或手动清掉）就退回检查器，不需要额外状态机。 */
+.designer:not([data-right-collapsed="true"])
+  .properties:has(> .designer-intent[data-draft])
+  > .panel-heading,
+.designer:not([data-right-collapsed="true"])
+  .properties:has(> .designer-intent[data-draft])
+  > .inspector-context,
+.designer:not([data-right-collapsed="true"])
+  .properties:has(> .designer-intent[data-draft])
+  > .inspector-tabs,
+.designer:not([data-right-collapsed="true"])
+  .properties:has(> .designer-intent[data-draft])
+  > .inspector-toolbar,
+.designer:not([data-right-collapsed="true"])
+  .properties:has(> .designer-intent[data-draft])
+  > .inspector-pane,
+.designer:not([data-right-collapsed="true"])
+  .properties:has(> .designer-intent[data-draft])
+  > .right-pane-changes,
+.designer:not([data-right-collapsed="true"])
+  .properties:has(> .designer-intent[data-draft])
+  > .blueprint-inspector {
+  display: none;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:has(> .designer-intent[data-draft])
+  > .designer-intent {
+  grid-column: 1;
+  grid-row: 2 / -1;
+  border-top: 0;
+}
+
 /* 画布与多选没有属性页签行：面板标题占用身份行，内容直接落到第 4 行。 */
 .designer:not([data-right-collapsed="true"]) .properties[data-inspector-context-kind="canvas"],
 .designer:not([data-right-collapsed="true"])

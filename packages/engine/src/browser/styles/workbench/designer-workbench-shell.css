@@ -1318,6 +1318,21 @@
   color: var(--designer-text-muted);
 }
 
+/* 会话态（见 data-draft）：书写面接管右栏，输入框铺满剩余高度，提交钮贴底。 */
+.designer-intent[data-draft] .intent-box {
+  flex: 1 1 auto;
+  align-items: stretch;
+}
+
+.designer-intent[data-draft] .intent-input {
+  height: 100%;
+  max-height: none;
+}
+
+.designer-intent[data-draft] .intent-submit {
+  align-self: flex-end;
+}
+
 .intent-input:disabled {
   color: var(--designer-text-muted);
 }
