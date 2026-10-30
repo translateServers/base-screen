@@ -12,31 +12,52 @@
   z-index: 100;
 }
 
-.designer-color-palette-trigger {
+/* 触发器是「字段形态的按钮」：基座 `.designer-button` 来自 actions.css，import 顺序在本文件
+   之后，同为单类选择器时基座赢——inline-flex、justify-content: center、12px 内距会把字段结构
+   整个盖掉，于是色值行看起来是一颗居中的圆按钮（与色相/透明度滑杆压扁轨道是同一个坑）。
+   这里用双类复合选择器把字段形态钉死，不依赖 import 顺序。
+   形态对齐同列的 `.designer-input` / `.designer-select-trigger`：内容左对齐、走 elev-ring 描边、
+   右侧留一枚 chevron 交代「点了会开弹层」。 */
+.designer-button.designer-color-palette-trigger {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 12px;
+  grid-template-columns: 20px minmax(0, 1fr) 14px;
+  justify-content: normal;
   align-items: center;
-  gap: var(--designer-space-2);
+  gap: var(--designer-space-3);
   width: 100%;
   height: var(--designer-control-height);
-  padding: 0 var(--designer-space-2);
-  border-color: var(--designer-border-default);
+  /* 右内距取控件统一的 9px：chevron 的右缘要和同列的 .designer-select-trigger 对齐成一条竖线。
+     左内距只留 4px —— 色块是一整块实色，贴边才不会被内距挤成一颗悬空的小图标。 */
+  padding: 0 var(--designer-control-padding-inline) 0 var(--designer-space-2);
   background: var(--designer-surface-control);
+  box-shadow: var(--designer-elev-ring);
   color: var(--designer-text-primary);
+  font-weight: 400;
   text-align: left;
 }
 
-.designer-color-palette-trigger:hover:not(:disabled),
-.designer-color-palette-trigger[aria-expanded="true"] {
-  border-color: var(--designer-border-strong);
-  background: var(--designer-surface-control-hover);
+/* 悬停只加描边、不换底：与 `.designer-control:hover` 同一反应，字段不该整行闪成按钮态。 */
+.designer-button.designer-color-palette-trigger:hover:not(:disabled) {
+  background: var(--designer-surface-control);
+  box-shadow: 0 0 0 1px var(--designer-border-strong);
 }
 
-.designer-color-palette-trigger:disabled {
-  cursor: not-allowed;
+/* 展开即当前编辑面：与 `.designer-select-trigger[aria-expanded="true"]` 同一圈 2px 焦点环。 */
+.designer-button.designer-color-palette-trigger[aria-expanded="true"] {
+  box-shadow: 0 0 0 2px var(--designer-focus-ring);
+}
+
+/* 键盘焦点收进描边环：字段不吃按钮基座的 offset outline，否则环会浮在行间空隙上。 */
+.designer-button.designer-color-palette-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--designer-focus-ring);
+}
+
+.designer-button.designer-color-palette-trigger:disabled {
   background: var(--designer-surface-workspace);
+  box-shadow: var(--designer-elev-ring);
   color: var(--designer-text-disabled);
-  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+  cursor: not-allowed;
 }
 
 .designer-fill-color-checkerboard {
@@ -73,8 +94,21 @@
   width: 20px;
   height: 20px;
   border: 0;
-  border-radius: var(--designer-radius-control);
+  /* 20px 色块用 4px 圆角：6px 在这么小的方块上会收成一颗糖豆，读不出「色值带」。 */
+  border-radius: var(--designer-radius-2);
   isolation: isolate;
+}
+
+/* 触发器里的透明底棋盘比预览面（28px 高）再细一档：10px 网格落进 20px 方只剩 2×2 四格，
+   看着像一枚棋子图标，不像「透出底纹」。双类选择器压过共享的 .designer-fill-color-checkerboard，
+   不靠同文件声明顺序。 */
+.designer-fill-color-checkerboard.designer-color-palette-trigger-swatch {
+  background-size: 6px 6px;
+  background-position:
+    0 0,
+    0 3px,
+    3px -3px,
+    -3px 0;
 }
 
 .designer-color-palette-trigger-swatch::after {
@@ -92,22 +126,27 @@
   font: var(--designer-font-numeric);
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding-left: var(--designer-space-2);
 }
 
-/* 触发器右端只留一个中性 chevron 表示“可展开调色板”。
-   此前用 conic 彩虹环冒充调色板图标，在低饱和的检查器里是最抢眼的一块彩色，
-   与“颜色值本身才是内容”的层级相反。 */
-.designer-color-palette-trigger-icon {
-  width: 8px;
-  height: 8px;
-  margin-right: var(--designer-space-2);
-  border: 0;
-  border-right: 1.5px solid var(--designer-text-muted);
-  border-bottom: 1.5px solid var(--designer-text-muted);
-  border-radius: 0;
-  background: none;
-  transform: rotate(45deg) translateY(-1px);
+/* 右侧 chevron：交代「点了会开弹层」，也是字段与纯文本输入的唯一区别。 */
+.designer-color-palette-trigger-caret {
+  display: grid;
+  place-items: center;
+  color: var(--designer-text-muted);
+  transition: transform var(--designer-motion);
+}
+
+/* `.designer-button svg`（actions.css，import 在本文件之后）会把图标顶到 16px：
+   双类选择器按回 14px，与自绘下拉的 `.designer-select-caret` 同尺寸、同右缘（9px 内距 + 半个图标）。 */
+.designer-color-palette-trigger .designer-color-palette-trigger-caret svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.designer-button.designer-color-palette-trigger[aria-expanded="true"]
+  .designer-color-palette-trigger-caret {
+  transform: rotate(180deg);
 }
 
 .designer-color-popover {

@@ -77,12 +77,12 @@ function createColorPaletteTrigger(ownerDocument: Document, popoverId: string): 
   const value = ownerDocument.createElement('span');
   value.className = 'designer-color-palette-trigger-value';
   value.dataset.colorPaletteTriggerValue = '';
-  const icon = ownerDocument.createElement('span');
-  icon.className = 'designer-color-palette-trigger-icon';
-  icon.setAttribute('aria-hidden', 'true');
+  const caret = ownerDocument.createElement('span');
+  caret.className = 'designer-color-palette-trigger-caret';
+  caret.innerHTML = designerIcon('chevron-down');
   trigger.appendChild(swatch);
   trigger.appendChild(value);
-  trigger.appendChild(icon);
+  trigger.appendChild(caret);
   return trigger;
 }
 

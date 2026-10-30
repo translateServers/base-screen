@@ -135,6 +135,13 @@ describe('compact palette layout', () => {
 
     expect(trigger.attributes.get('aria-haspopup')).toBe('dialog');
     expect(trigger.attributes.get('aria-expanded')).toBe('false');
+    // 字段形态的三段：色块 / 色值 / 右侧 chevron。chevron 是「点了会开弹层」的唯一提示，
+    // 少了它触发器和一颗普通按钮没有区别。
+    const caret = trigger.children.at(-1)!;
+    expect(caret.className).toBe('designer-color-palette-trigger-caret');
+    expect(
+      ((caret as FakeElement & { readonly innerHTML?: string }).innerHTML ?? '').includes('<svg'),
+    ).toBe(true);
     expect(popover.attributes.get('role')).toBe('dialog');
     expect(popover.hidden).toBe(true);
 
