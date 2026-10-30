@@ -22,9 +22,14 @@ export function draftBarMarkup(
   paneOpen = false,
 ): string {
   const text = DESIGNER_UI_TEXT.change;
-  return `<span class="draft-dot" aria-hidden="true"></span>
-    <span class="draft-label">${text.draftLabel}</span>
-    <span class="draft-title">${escapeHtml(proposal.title)}</span>
+  return `<span class="draft-state">
+      <span class="draft-dot" aria-hidden="true"></span>
+      <span class="draft-label">${text.draftLabel}</span>
+    </span>
+    <span class="draft-summary">
+      <span class="draft-title">${escapeHtml(proposal.title)}</span>
+      <span class="draft-sub">${escapeHtml(proposal.scope)}</span>
+    </span>
     <span class="draft-meta">${text.affected(proposal.affectedComponentIds.length)}</span>
     <span class="draft-actions">
       <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="toggle-panel" aria-expanded="${String(paneOpen)}">${paneOpen ? text.hideChanges : text.viewChanges}</button>
@@ -55,7 +60,11 @@ export function changePaneMarkup(
     feedback?.kind === 'adopt-failed' && feedback.unitId !== undefined
       ? ''
       : feedbackMarkup(feedback);
-  const reviewToggle = `<div class="change-pane-toolbar"><button type="button" class="designer-control designer-button designer-icon-button right-pane-review" data-review-toggle aria-pressed="${String(review?.reviewing === true)}" data-tip="${DESIGNER_UI_TEXT.review.title}" aria-label="${DESIGNER_UI_TEXT.review.title}">${designerIcon('eye')}</button></div>`;
+  // 没有提案时评审入口无事可做：空态里它只会把用户带进一个「零条目」的评审态。
+  const reviewToggle =
+    proposal === undefined
+      ? ''
+      : `<div class="change-pane-toolbar"><button type="button" class="designer-control designer-button designer-icon-button right-pane-review" data-review-toggle aria-pressed="${String(review?.reviewing === true)}" data-tip="${DESIGNER_UI_TEXT.review.title}" aria-label="${DESIGNER_UI_TEXT.review.title}">${designerIcon('eye')}</button></div>`;
   if (proposal === undefined && feedback?.kind === 'remaining-invalid') {
     return `${reviewToggle}${notice}${historyMarkup(history)}${
       review?.reviewing === true
@@ -83,11 +92,13 @@ export function changePaneMarkup(
       ${
         componentScope
           ? ''
-          : `<ul class="change-start-list">
-        <li><button type="button" class="change-start-card" data-change-action="start-intent" data-change-start="metrics"><span class="change-start-title">${text.startFromMetrics}</span><span class="change-start-hint">${text.startFromMetricsHint}</span></button></li>
-        <li><button type="button" class="change-start-card" data-change-action="start-intent" data-change-start="template"><span class="change-start-title">${text.startFromTemplate}</span><span class="change-start-hint">${text.startFromTemplateHint}</span></button></li>
-        <li><button type="button" class="change-start-card" data-change-action="start-intent" data-change-start="prompt"><span class="change-start-title">${text.startFromPrompt}</span><span class="change-start-hint">${text.startFromPromptHint}</span></button></li>
-      </ul>`
+          : `<button type="button" class="change-start-card" data-change-action="start-intent">
+        <span class="change-start-copy">
+          <span class="change-start-title">${text.startFromPrompt}</span>
+          <span class="change-start-hint">${text.startFromPromptHint}</span>
+        </span>
+        <span class="change-start-icon" aria-hidden="true">${designerIcon('chevron-right')}</span>
+      </button>`
       }
     </div>${historyMarkup(history)}`;
   }
@@ -112,31 +123,33 @@ export function changePaneMarkup(
     ${origin}
     ${people}
     <p class="change-panel-summary">${escapeHtml(proposal.title)}</p>
-    <section class="change-panel-section">
-      <h3 class="change-panel-heading-text">${text.rationaleLabel}</h3>
+    <details class="change-panel-section change-pane-disclosure change-rationale">
+      <summary class="change-pane-disclosure-summary">
+        <span class="change-pane-disclosure-title">${text.rationaleLabel}</span>
+        <span class="change-pane-disclosure-chevron" aria-hidden="true">›</span>
+      </summary>
       <p class="change-panel-rationale">${escapeHtml(proposal.rationale)}</p>
-    </section>
+    </details>
     <section class="change-panel-section">
       <h3 class="change-panel-heading-text">${text.diffLabel}</h3>
       <ul class="change-diff-list">${units.map((unit) => unitMarkup(unit, reviewing, feedback)).join('')}</ul>
     </section>
     ${historyMarkup(history)}
     <footer class="change-panel-actions">
-      ${
+      <span class="change-panel-hint">${
         reviewing
-          ? `<span class="change-panel-hint">${DESIGNER_UI_TEXT.review.progress(
-              review.total - units.length,
-              review.total,
-            )}</span>
-             <button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>`
+          ? DESIGNER_UI_TEXT.review.progress(review.total - units.length, review.total)
+          : text.adoptHint
+      }</span>
+      <span class="change-panel-action-buttons">${
+        reviewing
+          ? `<button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>`
           : confirmAll
-            ? `<span class="change-panel-hint">${text.adoptHint}</span>
-             <button type="button" class="designer-control designer-button" data-change-action="cancel-adopt-all">${text.cancelAdoptAll}</button>
+            ? `<button type="button" class="designer-control designer-button" data-change-action="cancel-adopt-all">${text.cancelAdoptAll}</button>
              <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="adopt">${text.confirmAdoptAll}</button>`
-            : `<span class="change-panel-hint">${text.adoptHint}</span>
-             <button type="button" class="designer-control designer-button" data-change-action="discard">${text.discard}</button>
+            : `<button type="button" class="designer-control designer-button" data-change-action="discard">${text.discard}</button>
              <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>`
-      }
+      }</span>
     </footer>`;
 }
 
@@ -246,8 +259,14 @@ function diffPathText(path: string): string {
     case 'styleRules':
       return text.styleRules;
     default:
-      if (path.startsWith('props.')) return text.prop(path.slice('props.'.length));
-      if (path.startsWith('style.')) return text.style(path.slice('style.'.length));
+      if (path.startsWith('props.')) {
+        const key = path.slice('props.'.length);
+        return text.prop((text.propKeys as Readonly<Record<string, string>>)[key] ?? key);
+      }
+      if (path.startsWith('style.')) {
+        const key = path.slice('style.'.length);
+        return text.style((text.styleKeys as Readonly<Record<string, string>>)[key] ?? key);
+      }
       return text.other;
   }
 }

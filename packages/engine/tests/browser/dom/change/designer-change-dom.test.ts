@@ -164,6 +164,25 @@ describe('draft bar', () => {
     expect(closed).toContain('data-change-action="discard"');
     expect(closed).toContain('data-change-action="request-adopt-all"');
   });
+
+  it('renders the draft bar as separated state, summary, impact and actions', () => {
+    const html = draftBarMarkup(proposal(), false, true);
+    expect(html).toContain('class="draft-state"');
+    expect(html).toContain('class="draft-summary"');
+    expect(html).toContain('class="draft-sub"');
+    expect(html).toContain('class="draft-meta"');
+    expect(html).toContain('class="draft-actions"');
+  });
+});
+
+describe('proposal disclosure and footer', () => {
+  it('folds rationale and groups global actions in a footer row', () => {
+    const html = changePaneMarkup(proposal(), false);
+    expect(html).toContain('change-rationale');
+    expect(html).toContain('<summary class="change-pane-disclosure-summary">');
+    expect(html).toContain('修改依据');
+    expect(html).toContain('change-panel-action-buttons');
+  });
 });
 
 describe('agent empty state', () => {
@@ -265,7 +284,8 @@ describe('change diff presentation', () => {
     expect(html).toContain('变量 · threshold');
     expect(html).toContain('资源 · image/cover');
     expect(html).toContain('属性 · customField');
-    expect(html).toContain('样式 · fontSize');
+    expect(html).toContain('样式 · 字号');
+    expect(html).not.toContain('样式 · fontSize');
     expect(html).toContain('旧值');
     expect(html).not.toContain('dataSource');
     expect(html).not.toContain('customField"');

@@ -494,9 +494,9 @@ export function initializeDesignerElementControllers(
   state.changeController.setPaneModeHandler((mode) => {
     state.intentController.setWritingMode(mode === 'intent');
   });
-  state.changeController.setStartIntentHandler((startsFrom) => {
+  state.changeController.setStartIntentHandler(() => {
     state.changeController.setPaneMode('intent');
-    state.intentController.focus(startsFrom);
+    state.intentController.focus();
   });
   state.changeController.setHistoryControls(
     () => state.session.readHistory(),

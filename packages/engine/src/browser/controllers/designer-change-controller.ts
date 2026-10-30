@@ -66,7 +66,7 @@ export class DesignerChangeController {
     | undefined;
   #getDocument: (() => ScreenDocument | undefined) | undefined;
   #getIntentScope: (() => ScreenIntentScope) | undefined;
-  #startIntent: ((startsFrom?: 'metrics' | 'template' | 'prompt') => void) | undefined;
+  #startIntent: (() => void) | undefined;
   #stateHandler: ((detail: BaseScreenDesignerChangeStateDetail) => void) | undefined;
   #paneModeHandler: ((mode: RightPaneMode) => void) | undefined;
   #lastRenderedPaneMode: RightPaneMode | undefined;
@@ -142,7 +142,7 @@ export class DesignerChangeController {
     this.#revertHandler = revert;
   }
 
-  setStartIntentHandler(handler: (startsFrom?: 'metrics' | 'template' | 'prompt') => void): void {
+  setStartIntentHandler(handler: () => void): void {
     this.#startIntent = handler;
   }
 
@@ -325,13 +325,7 @@ export class DesignerChangeController {
         return true;
       }
       case 'start-intent':
-        this.#startIntent?.(
-          action.dataset.changeStart === 'metrics' ||
-            action.dataset.changeStart === 'template' ||
-            action.dataset.changeStart === 'prompt'
-            ? action.dataset.changeStart
-            : undefined,
-        );
+        this.#startIntent?.();
         return true;
       case 'exit-review':
         this.exitReview();

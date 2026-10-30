@@ -87,24 +87,15 @@ function harness() {
   const input = new FakeTextArea(composer);
   const submit = new FakeElement(['intent-submit']);
   const scope = new FakeElement(['intent-scope']);
-  const allows = new FakeElement();
-  const blocks = new FakeElement();
-  const capability = new FakeElement(['intent-capability']);
   const scopeClear = new FakeElement(['intent-scope-clear']);
   const status = new FakeElement(['intent-status']);
   const confirm = new FakeElement(['intent-confirm']);
-  capability.querySelector = ((selector: string) => {
-    if (selector === '[data-intent-allows]') return allows;
-    if (selector === '[data-intent-blocks]') return blocks;
-    return null;
-  }) as never;
   const controller = new DesignerIntentController();
   controller.connect(
     'instance-1',
     input as unknown as HTMLTextAreaElement,
     submit as unknown as HTMLButtonElement,
     scope as unknown as HTMLElement,
-    capability as unknown as HTMLElement,
     scopeClear as unknown as HTMLButtonElement,
     status as unknown as HTMLElement,
     confirm as unknown as HTMLElement,

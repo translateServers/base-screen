@@ -794,6 +794,22 @@
   white-space: nowrap;
 }
 
+/* 智能体草案条：与场景预览条共用悬浮位置，但按 Vercel 式信息分段组织。 */
+.designer-draft-bar {
+  min-height: 42px;
+  gap: 0;
+  padding: 0 var(--designer-space-1) 0 var(--designer-space-2);
+  border-radius: var(--designer-radius-3);
+}
+
+.draft-state {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-2);
+}
+
 .draft-dot {
   width: 6px;
   height: 6px;
@@ -804,17 +820,42 @@
 
 .draft-label {
   color: var(--designer-warning);
+  font: var(--designer-font-small);
   font-weight: 600;
+}
+
+.draft-summary {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 var(--designer-space-3);
 }
 
 .draft-title {
   min-width: 0;
   overflow: hidden;
   color: var(--designer-text-primary);
+  font: var(--designer-font-size-sm) / 1.2 var(--designer-font-family);
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.draft-sub {
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  letter-spacing: 0.03em;
   text-overflow: ellipsis;
 }
 
 .draft-meta {
+  flex: 0 0 auto;
+  padding: 0 var(--designer-space-3);
+  border-left: 1px solid var(--designer-border-subtle);
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
 }
@@ -829,6 +870,11 @@
   display: flex;
   align-items: center;
   gap: var(--designer-space-1);
+}
+
+.draft-actions {
+  padding-left: var(--designer-space-2);
+  border-left: 1px solid var(--designer-border-subtle);
 }
 
 .scene-bar-dot {
@@ -954,7 +1000,7 @@
   font-size: var(--designer-font-size-xs);
 }
 
-.designer-display-toggle[aria-pressed='true'] {
+.designer-display-toggle[aria-pressed="true"] {
   background: var(--designer-accent-surface);
   color: var(--designer-accent-text);
 }

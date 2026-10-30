@@ -6,10 +6,6 @@ import type {
   DesignerIntentRemedy,
 } from '../../common/operations/intent/designer-intent.js';
 import {
-  type DesignerIntentCapabilityComponent,
-  describeIntentCapability,
-} from '../../common/operations/intent/designer-intent-capability.js';
-import {
   type DesignerParameterPatch,
   matchDesignerParameterIntent,
 } from '../../common/operations/intent/designer-parameter-intent.js';
@@ -32,9 +28,6 @@ export class DesignerIntentController {
   #input: HTMLTextAreaElement | undefined;
   #submit: HTMLButtonElement | undefined;
   #scope: HTMLElement | undefined;
-  #capabilityAllows: HTMLElement | undefined;
-  #capabilityBlocks: HTMLElement | undefined;
-  #capabilityComponents: readonly DesignerIntentCapabilityComponent[] = [];
   #scopeClear: HTMLButtonElement | undefined;
   #status: HTMLElement | undefined;
   #confirm: HTMLElement | undefined;
@@ -90,8 +83,6 @@ export class DesignerIntentController {
     input: HTMLTextAreaElement,
     submit: HTMLButtonElement,
     scope: HTMLElement,
-    /** 能力提示：随作用域说明这一轮能改什么，由 render 统一刷新。 */
-    capability: HTMLElement,
     scopeClear: HTMLButtonElement,
     status: HTMLElement,
     confirm: HTMLElement,
@@ -100,10 +91,6 @@ export class DesignerIntentController {
     this.#input = input;
     this.#submit = submit;
     this.#scope = scope;
-    this.#capabilityAllows =
-      capability.querySelector<HTMLElement>('[data-intent-allows]') ?? undefined;
-    this.#capabilityBlocks =
-      capability.querySelector<HTMLElement>('[data-intent-blocks]') ?? undefined;
     this.#scopeClear = scopeClear;
     this.#status = status;
     this.#confirm = confirm;
@@ -115,9 +102,6 @@ export class DesignerIntentController {
     this.#input = undefined;
     this.#submit = undefined;
     this.#scope = undefined;
-    this.#capabilityAllows = undefined;
-    this.#capabilityBlocks = undefined;
-    this.#capabilityComponents = [];
     this.#scopeClear = undefined;
     this.#status = undefined;
     this.#confirm = undefined;
@@ -138,11 +122,9 @@ export class DesignerIntentController {
   syncScope(
     selectedComponentIds: readonly string[],
     componentName: (id: string) => string | undefined,
-    components: readonly DesignerIntentCapabilityComponent[] = [],
   ): void {
     const ids = [...selectedComponentIds];
     this.#componentName = componentName;
-    this.#capabilityComponents = components;
     const key = ids.join(',');
     if (key !== this.#lastSelectionKey) {
       this.#lastSelectionKey = key;
@@ -261,13 +243,10 @@ export class DesignerIntentController {
   }
 
   /** 起点牌把「从什么起」带进来：只影响这一轮意图，提交后清空。 */
-  focus(startsFrom?: 'metrics' | 'template' | 'prompt'): void {
-    this.#startsFrom = startsFrom;
+  focus(): void {
     this.syncDraftState();
     this.#input?.focus();
   }
-
-  #startsFrom: 'metrics' | 'template' | 'prompt' | undefined;
 
   /**
    * 输入框随内容长高，上限交给 CSS 的 max-height 兜住。
@@ -316,15 +295,9 @@ export class DesignerIntentController {
     this.focusIntentArea();
     let result: DesignerIntentOutcome;
     try {
-      result = await handler(
-        {
-          instanceId: this.#instanceId,
-          text,
-          scope,
-          ...(this.#startsFrom === undefined ? {} : { startsFrom: this.#startsFrom }),
-        },
-        abort.signal,
-      );
+      // 空态只剩「从一句话起」一个入口，引擎不再区分起点；`startsFrom` 仍是宿主契约里的
+      // 可选字段（宿主自建入口时可自行填），引擎侧不再产生它。
+      result = await handler({ instanceId: this.#instanceId, text, scope }, abort.signal);
     } catch {
       result = { ok: false, diagnostics: [] };
     }
@@ -332,7 +305,6 @@ export class DesignerIntentController {
     const cancelled = abort.signal.aborted;
     if (this.#abort === abort) this.#abort = undefined;
     this.#pending = false;
-    this.#startsFrom = undefined;
     if (cancelled) {
       this.setStatus(DESIGNER_UI_TEXT.intent.cancelled, 'info');
     } else if (result.ok) {
@@ -561,19 +533,6 @@ export class DesignerIntentController {
         : DESIGNER_UI_TEXT.intent.unavailable;
     }
     if (this.#submit !== undefined) this.#submit.disabled = !available || this.#pending;
-    if (this.#capabilityAllows !== undefined && this.#capabilityBlocks !== undefined) {
-      // 作用域已解除时提示回到整屏：用户清掉 chip 之后，选区还在画布上，
-      // 但这一轮意图的对象已经变成整屏，提示不能继续按旧选区说。
-      const capability =
-        this.#scopeValue.kind === 'screen'
-          ? {
-              allows: DESIGNER_UI_TEXT.intent.capability.screenAllows,
-              blocks: DESIGNER_UI_TEXT.intent.capability.screenBlocks,
-            }
-          : describeIntentCapability(this.#capabilityComponents);
-      this.#capabilityAllows.textContent = capability.allows;
-      this.#capabilityBlocks.textContent = capability.blocks;
-    }
     if (this.#scopeClear !== undefined) {
       this.#scopeClear.hidden = this.#scopeValue.kind === 'screen';
     }
