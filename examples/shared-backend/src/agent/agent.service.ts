@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DatasetCatalogService } from '../datasets/dataset-catalog.service';
 import type { ScreenShape } from '../screens/screen.types';
 import { ScreensService } from '../screens/screens.service';
 import {
@@ -19,9 +20,8 @@ import {
   parseAgentComponentEditSpec,
   readEditableComponents,
 } from './agent-component-edit';
-import type { AgentPromptReferences } from './agent-spec';
 import { composeScreenDocument } from './agent-compose';
-import { DatasetCatalogService } from '../datasets/dataset-catalog.service';
+import type { AgentPromptReferences } from './agent-spec';
 import {
   type AgentBlock,
   type AgentBlockColumn,
@@ -101,11 +101,17 @@ export class AgentService {
     raw: readonly Record<string, unknown>[] | undefined,
   ): Promise<{
     prompt: AgentPromptReferences | undefined;
-    compose: { assets: { id: string; name: string }[]; datasets: { datasetId: string; name: string; columns: { id: string; type: string }[] }[] } | undefined;
+    compose:
+      | {
+          assets: { id: string; name: string }[];
+          datasets: { datasetId: string; name: string; columns: { id: string; type: string }[] }[];
+        }
+      | undefined;
   }> {
     if (raw === undefined || raw.length === 0) return { prompt: undefined, compose: undefined };
     const assets: { id: string; name: string }[] = [];
-    const datasets: { datasetId: string; name: string; columns: { id: string; type: string }[] }[] = [];
+    const datasets: { datasetId: string; name: string; columns: { id: string; type: string }[] }[] =
+      [];
     for (const item of raw) {
       const kind = item.kind;
       if (kind === 'asset') {
@@ -133,7 +139,8 @@ export class AgentService {
         }
       }
     }
-    if (assets.length === 0 && datasets.length === 0) return { prompt: undefined, compose: undefined };
+    if (assets.length === 0 && datasets.length === 0)
+      return { prompt: undefined, compose: undefined };
     return {
       prompt: {
         assets,

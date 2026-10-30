@@ -111,7 +111,8 @@ export interface AgentPromptReferences {
 function renderReferencesPrompt(references: AgentPromptReferences | undefined): string {
   if (references === undefined) return '';
   const lines: string[] = [];
-  for (const asset of references.assets) lines.push(`- 素材：${asset.name}（assetId: ${asset.id}）`);
+  for (const asset of references.assets)
+    lines.push(`- 素材：${asset.name}（assetId: ${asset.id}）`);
   for (const dataset of references.datasets) {
     const columns = dataset.columns.length === 0 ? '字段未知' : dataset.columns.join(' / ');
     lines.push(`- 数据集：${dataset.name}（datasetId: ${dataset.datasetId}，字段：${columns}）`);

@@ -48,7 +48,7 @@ describe('host assets (e2e)', () => {
 
   it('starts empty and rejects non-bitmap or spoofed uploads', async () => {
     const server = app.getHttpServer();
-    await request(server).get('/api/assets').expect(200).expect({ assets: [] });
+    await request(server).get('/api/assets').expect(200).expect({ assets: [], total: 0 });
 
     const unsupported = await request(server)
       .post('/api/assets')
@@ -165,7 +165,7 @@ describe('host assets (e2e)', () => {
 
     await request(server).delete(`/api/assets/${assetId}`).expect(200);
     await request(server).get(`/api/assets/${assetId}/content`).expect(404);
-    await request(server).get('/api/assets').expect(200).expect({ assets: [] });
+    await request(server).get('/api/assets').expect(200).expect({ assets: [], total: 0 });
   });
 
   it('keeps temporary uploads scoped to their screen and renews them on save', async () => {
@@ -193,7 +193,7 @@ describe('host assets (e2e)', () => {
     expect(typeof uploaded.body.asset.expiresAt).toBe('string');
 
     // 默认列表只返回公共素材；设计器按 screenId 取公共 + 本屏临时。
-    await request(server).get('/api/assets').expect(200).expect({ assets: [] });
+    await request(server).get('/api/assets').expect(200).expect({ assets: [], total: 0 });
     const visible = await request(server).get(`/api/assets?screenId=${screenId}`).expect(200);
     expect(visible.body.assets.map((asset: { id: string }) => asset.id)).toEqual([tempId]);
     const admin = await request(server).get('/api/assets?scope=temporary').expect(200);
@@ -259,7 +259,10 @@ describe('host assets (e2e)', () => {
     screenId = '';
     expect(await prisma.asset.findUnique({ where: { id: tempId } })).toBeNull();
     expect(existsSync(resolve(ASSET_DIR, `${tempId}.png`))).toBe(false);
-    await request(server).get('/api/assets?scope=temporary').expect(200).expect({ assets: [] });
+    await request(server)
+      .get('/api/assets?scope=temporary')
+      .expect(200)
+      .expect({ assets: [], total: 0 });
   });
 
   it('sweeps expired unreferenced temporary assets but keeps public assets', async () => {

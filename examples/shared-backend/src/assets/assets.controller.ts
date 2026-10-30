@@ -29,8 +29,10 @@ export class AssetsController {
   @ApiOperation({
     summary: '素材列表（默认公共；scope=temporary 查看临时；screenId 取公共 + 本屏临时）',
   })
-  async list(@Query() query: ListAssetsQueryDto): Promise<{ assets: readonly AssetShape[] }> {
-    return { assets: await this.assets.list(query) };
+  async list(
+    @Query() query: ListAssetsQueryDto,
+  ): Promise<{ assets: readonly AssetShape[]; total: number }> {
+    return this.assets.list(query);
   }
 
   @Post()

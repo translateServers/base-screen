@@ -217,12 +217,33 @@ export interface ScreenIntentReferenceOption {
   readonly thumbnailUrl?: string;
 }
 
-/** 引用目录端口：一次性返回全量（素材与数据集都有既有上限），引擎本地过滤。 */
+/**
+ * 引用目录端口：**分页 + 查询**，不要指望引擎本地过滤。
+ *
+ * 宿主素材动辄上千，一次性全量返回会让选择器首帧就渲染几千行。
+ * 引擎首屏只取 `limit` 条，输入关键字时带 `query` 重新查，滚到底带 `offset` 取下一页。
+ */
+export interface ScreenIntentReferenceCatalogRequest {
+  readonly kinds: readonly ScreenIntentReferenceKind[];
+  /** 关键字；空串表示不筛。由宿主决定搜名称还是搜说明。 */
+  readonly query?: string;
+  /** 本页条数上限；引擎默认 20。 */
+  readonly limit?: number;
+  /** 跳过前 N 条（含已加载的）。 */
+  readonly offset?: number;
+  readonly signal: ScreenAbortSignal;
+}
+
+export interface ScreenIntentReferenceCatalogPage {
+  readonly items: readonly ScreenIntentReferenceOption[];
+  /** 匹配 `query` 的总条数；宿主不知道时可以省略，此时引擎只按「本页是否满」判断还有没有下一页。 */
+  readonly total?: number;
+}
+
 export interface ScreenIntentReferenceCatalogPort {
-  catalog(request: {
-    readonly kinds: readonly ScreenIntentReferenceKind[];
-    readonly signal: ScreenAbortSignal;
-  }): Promise<ScreenParseResult<readonly ScreenIntentReferenceOption[]>>;
+  catalog(
+    request: ScreenIntentReferenceCatalogRequest,
+  ): Promise<ScreenParseResult<ScreenIntentReferenceCatalogPage>>;
 }
 
 /**

@@ -195,6 +195,11 @@ export interface AssetListQuery {
   readonly scope?: 'public' | 'temporary';
   /** 设计器：返回公共 + 当前大屏临时素材。 */
   readonly screenId?: string;
+  /** 名称关键字；素材库面板不传，意图引用选择器按页搜。 */
+  readonly q?: string;
+  /** 分页：不传 limit 时后端返回全量（素材库面板依赖这个行为）。 */
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 export interface AssetUploadQuery {
@@ -324,9 +329,15 @@ export const api = {
   listAssets: (
     query: AssetListQuery = {},
     signal?: AbortSignal,
-  ): Promise<ApiResult<{ assets: HostAssetShape[] }>> =>
+  ): Promise<ApiResult<{ assets: HostAssetShape[]; total: number }>> =>
     request(
-      `/assets${toSearch({ scope: query.scope, screenId: query.screenId })}`,
+      `/assets${toSearch({
+        scope: query.scope,
+        screenId: query.screenId,
+        q: query.q,
+        limit: query.limit,
+        offset: query.offset,
+      })}`,
       signal === undefined ? {} : { signal },
     ),
   uploadAsset: (

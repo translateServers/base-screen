@@ -331,6 +331,9 @@ export const DESIGNER_UI_TEXT = {
     referenceKindAsset: '素材',
     referenceKindDataset: '数据集',
     referenceEmpty: '没有可引用的素材或数据集。',
+    referenceMore: (total?: number) =>
+      total === undefined ? '继续滚动加载更多' : `继续滚动加载更多（共 ${total} 项）`,
+    referenceTotal: (total: number) => `共 ${total} 项`,
     referenceEmptySearch: '没有匹配的素材或数据集。',
     referenceLimit: (max: number) => `最多引用 ${max} 项。`,
     referenceDuplicate: '这一项已经引用过了。',

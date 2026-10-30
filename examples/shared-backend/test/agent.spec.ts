@@ -7,8 +7,8 @@ import { AgentService, parseCatalogSpec } from '../src/agent/agent.service';
 const datasetsStub = {
   describe: async () => ({ fields: [] }),
 } as unknown as DatasetCatalogService;
+
 import type { AgentCatalog } from '../src/agent/agent-catalog';
-import type { DatasetCatalogService } from '../src/datasets/dataset-catalog.service';
 import { requestAgentCompletion } from '../src/agent/agent-client';
 import {
   type AgentEditableComponent,
@@ -19,6 +19,7 @@ import { composeScreenDocument } from '../src/agent/agent-compose';
 import type { AgentScreenSpec } from '../src/agent/agent-spec';
 import { AgentCandidateDto } from '../src/agent/dto/agent-candidate.dto';
 import { AgentComponentEditDto } from '../src/agent/dto/agent-component-edit.dto';
+import type { DatasetCatalogService } from '../src/datasets/dataset-catalog.service';
 import type { ScreensService } from '../src/screens/screens.service';
 
 jest.mock('../src/agent/agent-client', () => ({ requestAgentCompletion: jest.fn() }));

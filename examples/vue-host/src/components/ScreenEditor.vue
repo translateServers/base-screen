@@ -216,9 +216,7 @@ onMounted(() => {
       }),
     );
     // 引用目录：素材 + 数据集拍平成一份清单交给引擎，选择器与 chip 都在引擎侧。
-    element.setIntentReferenceCatalog(
-      createHostIntentReferenceCatalog({ api, screenId, logger }),
-    );
+    element.setIntentReferenceCatalog(createHostIntentReferenceCatalog({ api, screenId, logger }));
 
     resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });
     // 浮动面板挂 body：不能塞进框架根节点（Vue 的 fragment anchor 会被打乱）。

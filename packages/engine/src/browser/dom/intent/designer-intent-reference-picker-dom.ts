@@ -14,6 +14,10 @@ import { createDesignerInput } from '../designer-ui-primitives.js';
  */
 
 const POPOVER_GAP = 4;
+/** 搜索去抖：太短会把每个字符都打成一次请求。 */
+const REFERENCE_QUERY_DEBOUNCE_MS = 180;
+/** 距底部多少像素开始预取下一页。 */
+const REFERENCE_LOAD_MORE_THRESHOLD_PX = 48;
 const POPOVER_MIN_WIDTH = 240;
 const POPOVER_MAX_WIDTH = 320;
 
@@ -22,6 +26,13 @@ export interface IntentReferencePickerOptions {
   readonly anchor: () => HTMLElement | undefined;
   readonly overlayHost: () => HTMLElement | undefined;
   readonly options: () => readonly ScreenIntentReferenceOption[];
+  /** 匹配当前关键字的**总条数**；宿主不提供时为 undefined。 */
+  readonly total?: () => number | undefined;
+  readonly hasMore?: () => boolean;
+  /** 搜索关键字变化（已去抖）；由控制器负责带 query 重新取第一页。 */
+  readonly onQuery?: (query: string) => void;
+  /** 列表滚到底：取下一页。 */
+  readonly onLoadMore?: () => void;
   readonly onSelect: (option: ScreenIntentReferenceOption) => void;
   readonly onClose?: () => void;
 }
@@ -30,6 +41,7 @@ export interface IntentReferencePicker {
   open(focusSearch: boolean): void;
   close(restoreFocus: boolean): void;
   isOpen(): boolean;
+  render(): void;
   handleKeyDown(event: KeyboardEvent): boolean;
   dispose(): void;
 }
@@ -62,26 +74,24 @@ export function createIntentReferencePicker(
   let query = '';
   let filtered: readonly ScreenIntentReferenceOption[] = [];
   let activeIndex = -1;
+  let queryTimer: ReturnType<typeof setTimeout> | undefined;
   let disposeListeners: (() => void) | undefined;
 
   const optionKey = (item: ScreenIntentReferenceOption): string => `${item.kind}:${item.id}`;
   const optionId = (index: number): string => `designer-intent-ref-option-${index}`;
 
-  function matches(item: ScreenIntentReferenceOption, needle: string): boolean {
-    if (needle === '') return true;
-    const haystack = `${item.label} ${item.note ?? ''}`.toLowerCase();
-    return haystack.includes(needle);
-  }
-
+  /**
+   * 目录是分页来的，筛选在宿主侧完成——这里只画这一页，不再本地过滤：
+   * 本地过滤只会把「还没加载到的那些」误判成不存在。
+   */
   function renderList(): void {
     const all = input.options();
-    const needle = query.trim().toLowerCase();
-    filtered = all.filter((item) => matches(item, needle));
+    filtered = all;
     list.replaceChildren();
     if (filtered.length === 0) {
       const empty = ownerDocument.createElement('p');
       empty.className = 'intent-ref-empty';
-      empty.textContent = needle === '' ? text.referenceEmpty : text.referenceEmptySearch;
+      empty.textContent = query === '' ? text.referenceEmpty : text.referenceEmptySearch;
       list.append(empty);
       list.removeAttribute('aria-activedescendant');
       activeIndex = -1;
@@ -103,7 +113,23 @@ export function createIntentReferencePicker(
       }
       list.append(renderOption(item, index));
     });
+    const more = renderFooter();
+    if (more !== null) list.append(more);
     syncActive();
+  }
+
+  /** 底部一行：还有多少没加载 / 一共匹配多少。宿主不说 total 时只提示「继续滚动」。 */
+  function renderFooter(): HTMLElement | null {
+    const hasMore = input.hasMore?.() === true;
+    const total = input.total?.();
+    if (!hasMore && total === undefined) return null;
+    const foot = ownerDocument.createElement('p');
+    foot.className = 'intent-ref-empty';
+    foot.dataset.intentRefFoot = 'true';
+    foot.textContent = hasMore
+      ? text.referenceMore(total === undefined ? undefined : total)
+      : text.referenceTotal(total ?? filtered.length);
+    return foot;
   }
 
   function renderOption(item: ScreenIntentReferenceOption, index: number): HTMLElement {
@@ -225,6 +251,10 @@ export function createIntentReferencePicker(
     disposeListeners = undefined;
     query = '';
     search.value = '';
+    if (queryTimer !== undefined) {
+      clearTimeout(queryTimer);
+      queryTimer = undefined;
+    }
     if (restoreFocus) input.anchor()?.focus();
     input.onClose?.();
   }
@@ -246,11 +276,22 @@ export function createIntentReferencePicker(
     else list.focus();
   }
 
+  // 输入即查会把每个字符都打成一次请求：180ms 去抖，与数据面板目录搜索同一档口径。
   search.addEventListener('input', () => {
     query = search.value;
-    activeIndex = 0;
-    renderList();
-    position();
+    if (queryTimer !== undefined) clearTimeout(queryTimer);
+    queryTimer = setTimeout(() => {
+      queryTimer = undefined;
+      activeIndex = 0;
+      input.onQuery?.(query);
+    }, REFERENCE_QUERY_DEBOUNCE_MS);
+  });
+
+  // 滚到底自动取下一页；同一页重复触发由控制器侧的 loading 闸门挡掉。
+  list.addEventListener('scroll', () => {
+    if (input.hasMore?.() !== true) return;
+    const remaining = list.scrollHeight - list.scrollTop - list.clientHeight;
+    if (remaining <= REFERENCE_LOAD_MORE_THRESHOLD_PX) input.onLoadMore?.();
   });
 
   list.addEventListener('click', (event) => {
@@ -308,7 +349,16 @@ export function createIntentReferencePicker(
     open: openPicker,
     close,
     isOpen: () => open,
+    /** 控制器拿到新一页后调用：只重画列表，不重置搜索与激活项。 */
+    render: () => {
+      if (!open) return;
+      renderList();
+      position();
+    },
     handleKeyDown,
-    dispose: () => close(false),
+    dispose: () => {
+      if (queryTimer !== undefined) clearTimeout(queryTimer);
+      close(false);
+    },
   };
 }

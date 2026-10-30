@@ -20,6 +20,8 @@ import { designerIcon } from '../ui/designer-icons.js';
 
 /** 一屏里能挂的引用上限：再多也不会被模型用全，只会把输入区撑高。 */
 const INTENT_REFERENCE_LIMIT = 8;
+/** 选择器每页条数：首屏与「继续滚动」都按这个粒度取。 */
+const INTENT_REFERENCE_PAGE = 20;
 
 import { adoptDesignerFormControls } from '../dom/designer-form-controls-dom.js';
 import { escapeHtml } from '../dom/designer-html-escape.js';
@@ -183,7 +185,12 @@ export class DesignerIntentController {
     if (input.value.trim() === '' && this.#pendingScope !== undefined) {
       this.applyPendingScope();
     }
-    if (this.shouldOpenPicker(event)) this.openReferencePicker(true);
+    if (this.shouldOpenPicker(event)) {
+      this.#options = [];
+      this.#optionsQuery = '';
+      this.openReferencePicker(true);
+      void this.loadOptions({ query: '', append: false });
+    }
     this.syncDraftState();
     this.renderStatus();
   }
@@ -244,6 +251,15 @@ export class DesignerIntentController {
       anchor: () => this.#refAdd,
       overlayHost: this.#overlayHost,
       options: () => this.#options,
+      total: () => this.#optionsTotal,
+      hasMore: () => this.optionsHasMore,
+      onQuery: (query) => {
+        void this.loadOptions({ query, append: false });
+      },
+      onLoadMore: () => {
+        if (!this.optionsHasMore) return;
+        void this.loadOptions({ query: this.#optionsQuery, append: true });
+      },
       onSelect: (option) => this.addReference(option),
       onClose: () => this.#refAdd?.setAttribute('aria-expanded', 'false'),
     });
@@ -251,15 +267,42 @@ export class DesignerIntentController {
   }
 
   #options: readonly ScreenIntentReferenceOption[] = [];
+  #optionsQuery = '';
+  #optionsTotal: number | undefined;
+  #optionsLoading = false;
 
-  /** 拉一次目录：选择器打开期间本地过滤，不再重复请求。 */
-  private async loadOptions(): Promise<void> {
+  /**
+   * 拉一页目录。宿主素材上千，所以永远带 `limit` + `offset`：
+   * 首屏 20 条，输入关键字重查，滚到底追加下一页。
+   */
+  private async loadOptions(page: { query: string; append: boolean }): Promise<void> {
     const catalog = this.#catalog;
-    if (catalog === undefined) return;
-    const abort = new AbortController();
-    const result = await catalog.catalog({ kinds: ['asset', 'dataset'], signal: abort.signal });
-    if (!result.ok) return;
-    this.#options = result.value;
+    if (catalog === undefined || this.#optionsLoading) return;
+    this.#optionsLoading = true;
+    if (!page.append) this.#optionsQuery = page.query;
+    try {
+      const abort = new AbortController();
+      const result = await catalog.catalog({
+        kinds: ['asset', 'dataset'],
+        query: page.query,
+        limit: INTENT_REFERENCE_PAGE,
+        offset: page.append ? this.#options.length : 0,
+        signal: abort.signal,
+      });
+      if (!result.ok) return;
+      const items = result.value.items;
+      this.#options = page.append ? [...this.#options, ...items] : items;
+      this.#optionsTotal = result.value.total;
+      this.#picker?.render();
+    } finally {
+      this.#optionsLoading = false;
+    }
+  }
+
+  /** 本页是否还有下一页：有 total 用它，没有就按「本页是否取满」判断。 */
+  private get optionsHasMore(): boolean {
+    if (this.#optionsTotal !== undefined) return this.#options.length < this.#optionsTotal;
+    return this.#options.length > 0 && this.#options.length % INTENT_REFERENCE_PAGE === 0;
   }
 
   /** 加一条引用。除选择器外，宿主也可以在打开输入区前预置引用。 */
@@ -376,7 +419,10 @@ export class DesignerIntentController {
       if (this.#picker?.isOpen() === true) this.closeReferencePicker(false);
       else {
         this.#options = [];
-        void this.loadOptions().then(() => this.openReferencePicker(false));
+        this.#optionsQuery = '';
+        void this.loadOptions({ query: '', append: false }).then(() =>
+          this.openReferencePicker(false),
+        );
       }
       return true;
     }

@@ -8,10 +8,10 @@ import { resolveApiBase } from '../lib/api-base.js';
 import type { HostAssetShape } from '../types.js';
 
 /**
- * 意图引用目录：把「素材」与「数据集」拍平成引擎要的一份可选清单。
+ * 意图引用目录：把「素材」与「数据集」拍平成引擎要的一份分页清单。
  *
- * 引擎只认 `kind` 与展示字段，不发请求、不解析 id 语义；这里负责把两类实体取回来、
- * 拼上展示用的副标题与缩略图地址。两类各自独立失败——素材接口挂了不该让数据集也消失。
+ * 引擎从不要求全量：它带 `query` / `limit` / `offset` 来问，这里按页回答。
+ * 两类各自独立失败——素材接口挂了不该让数据集也消失。
  */
 export interface HostIntentReferenceCatalogOptions {
   readonly api: Pick<typeof HostApi, 'listAssets' | 'listDatasets'>;
@@ -19,7 +19,8 @@ export interface HostIntentReferenceCatalogOptions {
   readonly logger?: { warn: (message: string, detail?: unknown) => void };
 }
 
-const DATASET_LIMIT = 50;
+/** 与引擎侧 `INTENT_REFERENCE_PAGE` 保持一致；请求里没带时用它兜底。 */
+const DEFAULT_PAGE = 20;
 
 function assetOption(asset: HostAssetShape): ScreenIntentReferenceOption {
   const size = Math.max(1, Math.round(asset.byteSize / 1024));
@@ -37,22 +38,46 @@ export function createHostIntentReferenceCatalog(
   options: HostIntentReferenceCatalogOptions,
 ): ScreenIntentReferenceCatalogPort {
   return {
-    async catalog(request): Promise<ScreenParseResult<readonly ScreenIntentReferenceOption[]>> {
-      const items: ScreenIntentReferenceOption[] = [];
+    async catalog(
+      request,
+    ): Promise<
+      ScreenParseResult<{ items: readonly ScreenIntentReferenceOption[]; total: number }>
+    > {
+      const limit = request.limit ?? DEFAULT_PAGE;
+      const offset = Math.max(0, request.offset ?? 0);
+      const query = request.query?.trim() ?? '';
       const wants = new Set(request.kinds);
+      const items: ScreenIntentReferenceOption[] = [];
+      let total = 0;
 
       if (wants.has('asset')) {
-        // 契约里的 signal 是引擎侧的窄类型，不能直接当 fetch 的 AbortSignal 用：
-        // 目录只在打开选择器时拉一次，跟着选择器关闭作废即可。
-        const assets = await options.api.listAssets({ screenId: options.screenId });
-        if (assets.ok) items.push(...assets.data.assets.map(assetOption));
-        else options.logger?.warn('intent reference assets unavailable', assets.error);
+        // 素材走服务端分页 + 名称搜索：`/api/assets?q=&limit=&offset=`。
+        const assets = await options.api.listAssets({
+          screenId: options.screenId,
+          ...(query === '' ? {} : { q: query }),
+          limit,
+          offset,
+        });
+        if (assets.ok) {
+          items.push(...assets.data.assets.map(assetOption));
+          // 后端还没升级到这个版本时不带 total：退化成「本页条数」，不影响翻页判断。
+          total += assets.data.total ?? assets.data.assets.length;
+        } else {
+          options.logger?.warn('intent reference assets unavailable', assets.error);
+        }
       }
 
       if (wants.has('dataset')) {
-        const datasets = await options.api.listDatasets({ limit: DATASET_LIMIT });
+        // 数据集目录接口只有 query + limit，没有 offset：按 offset+limit 取一窗再就地切片。
+        // total 因此只代表「本窗口内可见的条数」，用来判断还有没有下一页足够。
+        const datasets = await options.api.listDatasets({
+          ...(query === '' ? {} : { query }),
+          limit: Math.min(200, offset + limit),
+        });
         if (datasets.ok) {
-          for (const item of datasets.data.items) {
+          const window = datasets.data.items;
+          total += window.length;
+          for (const item of window.slice(offset, offset + limit)) {
             items.push({
               kind: 'dataset',
               id: item.datasetId,
@@ -66,7 +91,7 @@ export function createHostIntentReferenceCatalog(
         }
       }
 
-      return { ok: true, value: items, diagnostics: [] };
+      return { ok: true, value: { items, total }, diagnostics: [] };
     },
   };
 }

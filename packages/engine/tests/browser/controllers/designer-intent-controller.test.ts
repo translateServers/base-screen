@@ -241,7 +241,7 @@ describe('designer intent controller', () => {
     h.controller.setHandler(async () => ({ ok: true, value: null, diagnostics: [] }));
     expect(h.refAdd.hidden).toBe(true);
     h.controller.setReferenceCatalog({
-      catalog: async () => ({ ok: true, value: [], diagnostics: [] }),
+      catalog: async () => ({ ok: true, value: { items: [] }, diagnostics: [] }),
     });
     expect(h.refAdd.hidden).toBe(false);
   });
@@ -250,7 +250,7 @@ describe('designer intent controller', () => {
     const h = harness();
     const calls: { references?: readonly unknown[] }[] = [];
     h.controller.setHandler(async (request) => {
-      calls.push({ references: request.references });
+      calls.push({ ...(request.references === undefined ? {} : { references: request.references }) });
       return { ok: true, value: null, diagnostics: [] };
     });
     h.controller.addReference({ kind: 'asset', id: 'asset-1', label: '远山' });

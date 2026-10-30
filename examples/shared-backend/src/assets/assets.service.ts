@@ -28,6 +28,11 @@ const ASSET_CONTENT_URL_PATTERN = /\/assets\/([^/?#]+)\/content/g;
 export interface AssetListQuery {
   readonly scope?: AssetScope;
   readonly screenId?: string;
+  /** 名称关键字；不传或空串表示不筛。 */
+  readonly q?: string;
+  /** 分页：两者都不传时返回全量（素材库面板依赖这个行为）。 */
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 export interface AssetUploadOptions {
@@ -89,7 +94,9 @@ export class AssetsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(query: AssetListQuery = {}): Promise<readonly AssetShape[]> {
+  async list(
+    query: AssetListQuery = {},
+  ): Promise<{ readonly assets: readonly AssetShape[]; readonly total: number }> {
     const temporaryOnly = query.scope === 'temporary';
     if (temporaryOnly && query.screenId !== undefined) {
       throw new BadRequestException({
@@ -105,16 +112,26 @@ export class AssetsService {
     }
     if (query.screenId !== undefined) await this.requireScreen(query.screenId);
 
-    const [rows, screens] = await Promise.all([
-      this.prisma.asset.findMany({
-        where:
-          query.screenId !== undefined
-            ? { OR: [{ temporary: false }, { temporary: true, screenId: query.screenId }] }
-            : temporaryOnly
-              ? { temporary: true }
-              : { temporary: false },
-        orderBy: { createdAt: 'desc' },
-      }),
+    const scopeWhere =
+      query.screenId !== undefined
+        ? { OR: [{ temporary: false }, { temporary: true, screenId: query.screenId }] }
+        : temporaryOnly
+          ? { temporary: true }
+          : { temporary: false };
+    // 关键字只按名称做包含匹配：素材没有标签体系，搜说明会搜出用户想不到的结果。
+    const where =
+      query.q === undefined || query.q.trim() === ''
+        ? scopeWhere
+        : { AND: [scopeWhere, { name: { contains: query.q.trim() } }] };
+    const paging =
+      query.limit === undefined
+        ? {}
+        : { take: query.limit, ...(query.offset === undefined ? {} : { skip: query.offset }) };
+
+    const [rows, total, screens] = await Promise.all([
+      this.prisma.asset.findMany({ where, orderBy: { createdAt: 'desc' }, ...paging }),
+      // 只在分页时统计总数：全量调用方自己就有数组长度，多一次 count 没意义。
+      query.limit === undefined ? Promise.resolve(undefined) : this.prisma.asset.count({ where }),
       this.prisma.screen.findMany({
         select: { id: true, name: true, document: true },
       }),
@@ -134,13 +151,15 @@ export class AssetsService {
       }
     }
     const screenNames = new Map(screens.map((screen) => [screen.id, screen.name]));
-    return rows.map((row) =>
+    const assets = rows.map((row) =>
       toAssetShape(
         row,
         referenceCounts.get(row.id) ?? 0,
         row.screenId === null ? null : (screenNames.get(row.screenId) ?? null),
       ),
     );
+    // 分页调用方要「共多少项」；全量调用方拿到的 total 就等于数组长度。
+    return { assets, total: total ?? assets.length };
   }
 
   async content(id: string): Promise<{ readonly buffer: Buffer; readonly asset: AssetShape }> {
