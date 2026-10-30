@@ -18,7 +18,10 @@ export class AgentController {
   @Post('candidate')
   @ApiOperation({ summary: '生成整屏候选文档，不创建或更新大屏' })
   async candidate(@Body() dto: AgentCandidateDto): Promise<AgentCandidateResult> {
-    return this.agent.generateCandidate({ topic: dto.topic });
+    return this.agent.generateCandidate({
+      topic: dto.topic,
+      ...(dto.catalog === undefined ? {} : { catalog: dto.catalog }),
+    });
   }
 
   @Post('edit')
@@ -36,6 +39,7 @@ export class AgentController {
     return this.agent.generate({
       topic: dto.topic,
       ...(dto.name === undefined ? {} : { name: dto.name }),
+      ...(dto.catalog === undefined ? {} : { catalog: dto.catalog }),
     });
   }
 }

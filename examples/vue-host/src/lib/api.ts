@@ -45,7 +45,43 @@ export interface AgentCandidateShape {
   readonly document: unknown;
   readonly mode: 'llm' | 'deterministic';
   readonly imageCount: number;
+  /** 目录来源：client = 本次随请求带来的设计器目录；fallback = 后端内置最小目录。 */
+  readonly catalogSource?: 'client' | 'fallback';
+  /** 实际落进文档的物料 type，用于核对「用的确实是设计器里的组件」。 */
+  readonly materials?: readonly string[];
   readonly failure?: string;
+}
+
+/**
+ * 智能体目录摘要：设计器当前可用的物料 + 素材库里的静态资源。
+ *
+ * 由宿主从 `runtime.catalog`（官方物料 + 宿主物料 + 在线物料包 + 插件贡献合并后的结果）
+ * 与 `/api/assets` 现算出，随每次请求带上——宿主新发布一个在线物料或上传一张图，
+ * 下一句话就能用上，不需要重启、不需要快照文件。
+ */
+export interface AgentCatalogPropShape {
+  readonly kind: 'string' | 'number' | 'boolean' | 'enum';
+  readonly values?: readonly string[];
+}
+
+export interface AgentCatalogMaterialShape {
+  readonly type: string;
+  readonly name: string;
+  readonly category: string;
+  readonly data: 'scalar' | 'tabular' | 'none';
+  readonly asset: boolean;
+  readonly size: { readonly width: number; readonly height: number };
+  readonly props: Readonly<Record<string, AgentCatalogPropShape>>;
+  readonly roles: readonly { readonly id: string; readonly min: number; readonly max: number }[];
+  readonly defaults: {
+    readonly props: Readonly<Record<string, string | number | boolean | null>>;
+    readonly style: Readonly<Record<string, string | number | boolean | null>>;
+  };
+}
+
+export interface AgentCatalogShape {
+  readonly materials: readonly AgentCatalogMaterialShape[];
+  readonly assets: readonly { readonly id: string; readonly name: string }[];
 }
 
 export interface AgentEditableComponentShape {
@@ -240,11 +276,12 @@ export const api = {
   /** 编辑器只生成候选，不创建或更新后端大屏。 */
   generateScreenCandidate: (
     topic: string,
+    catalog: AgentCatalogShape | undefined,
     signal?: AbortSignal,
   ): Promise<ApiResult<AgentCandidateShape>> =>
     request('/agent/candidate', {
       method: 'POST',
-      body: { topic },
+      body: catalog === undefined ? { topic } : { topic, catalog },
       ...(signal === undefined ? {} : { signal }),
     }),
   generateComponentCandidate: (

@@ -754,9 +754,9 @@ cp my-data.db examples/shared-backend/data/datasources/
 
 ## 示例智能体：一句话生成大屏
 
-共享后端内置一个最小智能体（`src/agent/`）：模型只输出**中间表示**（标题、KPI、面板），
-组件树由宿主编译（`agent-compose.ts`）确定性生成，非法结构进不来。生成结果直接落库，
-三个前端都能在列表里打开。
+共享后端内置一个最小智能体（`src/agent/`）：模型只输出**中间表示**（标题、KPI、图块），
+组件树由宿主编译（`agent-compose.ts`）按**宿主设计器的实时目录**生成，非法结构进不来。
+生成结果直接落库，三个前端都能在列表里打开。
 
 ```bash
 curl -X POST http://127.0.0.1:3000/api/agent/generate \
@@ -764,16 +764,34 @@ curl -X POST http://127.0.0.1:3000/api/agent/generate \
   -d '{"topic":"华东渠道库存与周转的经营会大屏"}'
 ```
 
+### 组件与素材从哪来（目录驱动）
+
+- 编辑页每次提交意图时，宿主把**当前设计器目录**压成摘要随请求带上（`src/screen/agent-catalog.ts`，
+  三端逐字一致）：物料 `type` / 名称 / 数据形态 / 参数（含枚举）/ 绑定角色 / 默认值，外加
+  `/api/assets?screenId=` 返回的可用素材。目录读的是 `runtime.catalog`——官方物料、宿主自有物料、
+  **在线物料包（ADR-0090）** 与插件贡献合并后的那一份，所以刚发布的在线组件、刚上传的素材，
+  下一句话就能用上，不需要导出快照或重启后端。
+- 模型只负责「用哪个组件、放几列、给什么数据」：`blocks[]` 里的 `type` 必须来自目录，
+  `span` 是四列栅格里占几列；数据型组件给 `table`（列 + 行），值型组件给 `text` 或 `assetId`。
+- 编译器（`agent-compose.ts`）不认识任何具体 `type`：它按物料 manifest 声明的
+  `staticData.kind` 决定要不要数据、按 `dataBinding.roles` 把列分到绑定角色、按 `defaultStyle`
+  起样式，只叠加一层设计令牌（字号 / 字重 / 文字色）。目录里没有的 `type` 直接判整份失败
+  （`failure: AGENT_SPEC_INVALID`），不猜、不替换成别的组件。
+- 素材走 `host-resource` 身份：文档里只写 `dataSources` + `data-source-field` 引用，
+  不写任何 URL；素材 id 不在宿主清单里同样整份拒绝。响应里的 `materials` 列出实际用到的
+  物料类型，`catalogSource` 说明这次用的是宿主目录（`client`）还是兜底目录（`fallback`）。
+- 不做目录/素材的静态快照：目录只存在于浏览器运行时，落盘快照必然滞后于在线物料的发布与下架。
+
+### 交互与失败
+
 - 三个编辑页的右栏「意图书写面」都已接线（`src/screen/host-intent.ts`，三端逐字一致）：
   一句话 → 整屏走 `POST /agent/candidate`、选中组件走 `POST /agent/edit` → 候选文档或补丁编译成
   提案，进右栏「智能体」页签逐条采纳才写入；提案理由会写明走的是模型还是确定性兜底，兜底时
   给出原因（未配置模型、模型输出未通过校验等）；组件作用域只接受选区内组件的 `props` / `style`
   与文本补丁，越界或重复的补丁整份丢弃，已绑数据的文本不会被换成内联值。
-- 模型只写中间表示：`kpis`，以及每个面板的数据——chart 的 `points`（5–7 个点）与 list 的
-  `items`（3–5 条）。柱高按同面板最大值归一、清单逐条照抄，编译器不补任何预设数字；
-  缺数据就整份拒绝（`failure: AGENT_SPEC_INVALID`）并退回兜底，页脚写明这一轮走的通道。
+- 整屏候选带来的数据源实例会随提案一起替换（id 冲突时重新编号并回写引用），只保留被保留组件
+  仍引用的旧实例；否则组件里的 `data-value` 引用会指向不存在的实例，被引擎整批拒绝。
 - 配置：`examples/shared-backend/.env.local`（已被 `.gitignore` 忽略），变量
   `AGENT_LLM_BASE_URL` / `AGENT_LLM_API_KEY` / `AGENT_LLM_MODEL`。
-- 未配置或模型失败时退回确定性结构，响应里的 `mode` 会如实标 `deterministic`，
-  并带 `failure` 诊断码，不假装调用过模型。
-- 图片面板走 `base.image` 的静态数据源；模型没给图时按标题生成稳定的图片地址。
+- 未配置或模型失败时退回确定性结构（同样按目录挑组件，没有素材就不画图片块），响应里的
+  `mode` 会如实标 `deterministic`，并带 `failure` 诊断码，不假装调用过模型。

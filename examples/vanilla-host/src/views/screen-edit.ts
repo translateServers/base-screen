@@ -216,7 +216,14 @@ export const screenEditView: ViewModule = {
       // `POST /agent/edit`）。必须在 load 成功之后绑定——
       // 提案要对着当前文档试算，文档没到时提交只会被引擎拒绝。解绑在 detach 里做，
       // 页面走了之后不会再有请求回来改一块已经不在的设计器。
-      element.setIntentHandler(createHostIntentHandler({ designer: element, screenId }));
+      element.setIntentHandler(
+        createHostIntentHandler({
+          designer: element,
+          screenId,
+          // 读函数而不是快照：在线物料包上下架会整体替换 runtime.catalog。
+          catalog: () => runtime.catalog,
+        }),
+      );
 
       resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });
       // 浮动面板挂 body：不能塞进框架根节点（Vue 的 fragment anchor 会被打乱）。

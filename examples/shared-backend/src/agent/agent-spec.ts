@@ -1,10 +1,11 @@
-/**
- * 智能体输出的中间表示。
+/** 智能体输出的中间表示。
  *
  * 模型只负责「这屏讲什么、有哪些模块、模块里的数长什么样」，不直接写 Screen Document：
  * 组件树由 `agent-compose.ts` 确定性编译，非法结构进不来。这也是报告里
  * 「Agent 写可编译的中间表示、设计器做编译器后端」的落点。
  */
+import type { AgentCatalog } from './agent-catalog';
+import { renderCatalogPrompt } from './agent-catalog';
 export interface AgentKpi {
   readonly label: string;
   readonly value: string;
@@ -43,48 +44,92 @@ export interface AgentImagePanel extends AgentPanelBase {
 
 export type AgentPanel = AgentChartPanel | AgentListPanel | AgentImagePanel;
 
+/** 表格载荷：模型给的是「列 + 行」，绑定角色由编译器按目录里的 roles 分配。 */
+export interface AgentBlockColumn {
+  readonly id: string;
+  readonly label: string;
+  readonly type: 'string' | 'number' | 'boolean';
+}
+
+export interface AgentBlockTable {
+  readonly columns: readonly AgentBlockColumn[];
+  readonly rows: readonly Readonly<Record<string, string | number | boolean>>[];
+}
+
+/**
+ * 目录驱动的图块：`type` 必须是宿主目录里真实存在的物料。
+ *
+ * 与 v1 的 `panels`（chart / list / image 三种写死形态）相比，这里不再替模型决定
+ * 「用什么组件」——模型从目录里挑，编译器只负责把它变成合法文档。
+ */
+export interface AgentBlock {
+  readonly type: string;
+  readonly title: string;
+  readonly note?: string;
+  /** 四列栅格里占几列，1–4。 */
+  readonly span: number;
+  readonly text?: string;
+  readonly assetId?: string;
+  readonly table?: AgentBlockTable;
+  readonly props?: Readonly<Record<string, string | number | boolean>>;
+}
+
 export interface AgentScreenSpec {
   readonly title: string;
   readonly subtitle: string;
   readonly kpis: readonly AgentKpi[];
-  readonly panels: readonly AgentPanel[];
+  /** v1：写死的三种面板形态；仅当模型仍输出旧结构时使用。 */
+  readonly panels?: readonly AgentPanel[];
+  /** v2：目录驱动的图块。 */
+  readonly blocks?: readonly AgentBlock[];
   /** 由调用方补充：模型与耗时，用于界面上如实标注。 */
   readonly mode?: 'llm' | 'deterministic';
 }
 
-export const AGENT_SYSTEM_PROMPT = `你是一个大屏信息架构师。用户给你一个主题，你只输出 JSON，不要解释。
+export function buildAgentUserPrompt(topic: string): string {
+  return `主题：${topic}\n请按系统提示的结构输出 JSON。`;
+}
 
-JSON 结构：
+/**
+ * v2 系统提示词：组件清单来自宿主目录，不再由后端写死。
+ *
+ * 保留原 v1 提示词的「只输出 JSON / 数字要能对上 / 简体中文」这些纪律，把
+ * 「哪些组件能用」整段换成目录摘要；模型不再自己描述柱高与清单，而是给表格数据。
+ */
+export function buildCatalogSystemPrompt(catalog: AgentCatalog): string {
+  return `你是一个大屏信息架构师。用户给你一个主题，你只输出 JSON，不要解释。
+
+${renderCatalogPrompt(catalog)}
+
+输出结构：
 {
   "title": "大屏标题，8 字以内",
   "subtitle": "一句口径说明，20 字以内",
   "kpis": [{ "label": "指标名", "value": "数值", "delta": "+4.2%" }],
-  "panels": [
+  "blocks": [
     {
-      "kind": "chart",
-      "title": "趋势标题",
-      "note": "单位：万元",
-      "points": [{ "label": "周一", "value": 128 }, { "label": "周二", "value": 164 }]
-    },
-    {
-      "kind": "list",
-      "title": "清单标题",
-      "note": "按影响范围排序",
-      "items": ["华东渠道缺货 12 家", "在途补货 4.1 万件", "周转天数 31 天"]
-    },
-    { "kind": "image", "title": "现场图", "note": "巡检画面" }
+      "type": "上面列出的某个 type",
+      "title": "块标题，10 字以内",
+      "note": "单位或口径，18 字以内",
+      "span": 2,
+      "table": {
+        "columns": [{ "id": "day", "label": "日期", "type": "string" }, { "id": "amount", "label": "金额", "type": "number" }],
+        "rows": [{ "day": "10-24", "amount": 128 }]
+      }
+    }
   ]
 }
 
 约束：
 - kpis 3 到 5 个，value 必须带单位或百分号，delta 可省略。
-- panels 3 到 4 个，至少一个是 image，至少一个是 chart。
-- chart 面板必须给 points：5 到 7 个点，label 不超过 4 个字（日期写成 10-23 这种），value 是数字（不带单位，单位写进 note），各点数值要有明显差异，不要全部相同。
-- list 面板必须给 items：3 到 5 条，每条不超过 18 个字，写主题对应的具体口径与数量，不要写「示例」「待补充」这类占位词。
-- image 面板不要给 points 或 items。
-- 所有数字必须服从同一个主题口径，彼此能对上；不要复述用户原句。
+- blocks 2 到 4 个；span 取 1 到 4，表示在四列栅格里占几列，同一行 span 之和不要超过 4。
+- 数据型组件（图表、表格）span 取 2 到 4：一列宽（约 430px）放不下多列表头，会挤成一团；
+  文字与素材类块 span 取 1 到 2。整屏尽量排满一行，别留半行空位。
+- 数据型组件必须给 table：columns 1 到 4 列，rows 3 到 12 行；图表类要有一个字符串列做维度、至少一个数值列做度量。
+- 值型组件给 text；如果给了「可用静态素材」，图片类组件优先用 assetId（只能写列表里的 id），不要编造图片地址。
+- 无数据组件只给 type 与 span，可以带 title。
+- props 只能写该组件「参数」里列出的键，枚举只能取列出的值；没列出的键不要写。
+- 不要给组件写颜色、字号等样式，视觉由宿主统一决定。
+- 所有数字必须服从同一个主题口径，彼此能对上；不要复述用户原句，不要写「示例」「待补充」。
 - 全部使用简体中文，不要 emoji，不要 markdown，不要代码块围栏。`;
-
-export function buildAgentUserPrompt(topic: string): string {
-  return `主题：${topic}\n请按系统提示的结构输出 JSON。`;
 }

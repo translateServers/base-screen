@@ -1,9 +1,21 @@
-import type { ScreenComponentNode, ScreenDocument, ScreenJsonValue } from '@base-screen/contracts';
+import type {
+  ScreenComponentNode,
+  ScreenDataSource,
+  ScreenDocument,
+  ScreenJsonValue,
+} from '@base-screen/contracts';
 import { parseScreenDocument } from '@base-screen/contracts';
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
 import type { DesignerChangeProposalInput, DesignerIntentHandler } from '@base-screen/sdk/engine';
-import { type AgentComponentPatchShape, type AgentEditableComponentShape, api } from '../lib/api';
+import {
+  type AgentCatalogShape,
+  type AgentComponentPatchShape,
+  type AgentEditableComponentShape,
+  api,
+} from '../lib/api';
 import { createLogger } from '../lib/logger';
+import { buildAgentCatalog } from './agent-catalog';
 
 const logger = createLogger('host-intent');
 
@@ -16,8 +28,15 @@ type ComponentUpdatePatch = Mutable<
 
 export interface HostIntentOptions {
   readonly designer: BaseScreenDesignerElement;
-  /** 当前大屏 id：只用于日志，提案本身不落库。 */
+  /** 当前大屏 id：只用于日志与素材范围，提案本身不落库。 */
   readonly screenId: string;
+  /**
+   * 设计器当前目录的读取函数。
+   *
+   * 用函数而不是快照：在线物料包发布、下架都会整体替换 `runtime.catalog`，
+   * 传值会一直用旧的那份。取不到时返回 `undefined`，此时退回后端的兜底目录。
+   */
+  readonly catalog?: () => BaseScreenMaterialCatalog | undefined;
 }
 
 /**
@@ -125,7 +144,10 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
         return { ok: true, value: null, diagnostics: [] };
       }
 
-      const generated = await api.generateScreenCandidate(request.text, signal);
+      // 目录与素材在每次提交时现取：在线物料包刚发布、素材刚上传，这一句就能用上。
+      // 没有目录来源时保持同步进到请求，不额外制造一个 await 点。
+      const catalog = options.catalog === undefined ? undefined : await readAgentCatalog(options);
+      const generated = await api.generateScreenCandidate(request.text, catalog, signal);
       const reason = staleReason();
       if (reason !== undefined) return { ok: false, diagnostics: [], reason };
       if (!generated.ok) {
@@ -303,10 +325,13 @@ function isSize(value: unknown): value is { readonly width: number; readonly hei
 /**
  * 把「整屏候选文档」编译成一次可试算的提案命令。
  *
- * 引擎没有「整份替换文档」的命令：替换必须拆成画布、组件、变量、蓝图四类。
+ * 引擎没有「整份替换文档」的命令：替换必须拆成画布、组件、数据源、变量、蓝图五类。
  * - 锁定组件**不删**：引擎会以 `CORE_COMMAND_TARGET_LOCKED` 拒绝整批删除，而锁定本来就是
  *   宿主给「这段不许动」的表达，智能体不该绕过它——保留原位，候选只覆盖未锁定的部分；
  * - 新组件 zIndex 接在当前最大值之后，生成内容整体落在保留内容之上；
+ * - 候选带来的数据源实例要一起换（素材身份、数据集都靠它），否则组件里的
+ *   `dataValue.data-source-field` 会指向一个不存在的 id，被引擎以
+ *   `VALUE_REF_TARGET_MISSING` 整批拒绝。id 与现有实例冲突时重新编号并回写引用；
  * - 变量与蓝图只在真的不同时才整体替换：这两处被保留的锁定组件可能仍在引用，
  *   无脑写入 `[]` 只会得到一份校验不通过的候选。
  */
@@ -330,6 +355,11 @@ function compileWholeScreenCommands(
     .map((component) => component.id);
   if (removable.length > 0) commands.push({ type: 'remove-components', componentIds: removable });
 
+  const { sources, remapped } = adoptDataSources(current, next);
+  if (sources !== undefined) {
+    commands.push({ type: 'replace-data-sources', dataSources: sources });
+  }
+
   const zIndexBase = current.components.reduce(
     (max, component) => Math.max(max, component.zIndex),
     0,
@@ -337,7 +367,7 @@ function compileWholeScreenCommands(
   for (const component of next.components) {
     commands.push({
       type: 'add-component',
-      component: { ...component, zIndex: component.zIndex + zIndexBase },
+      component: { ...remapValueRef(component, remapped), zIndex: component.zIndex + zIndexBase },
     });
   }
 
@@ -348,6 +378,63 @@ function compileWholeScreenCommands(
     commands.push({ type: 'replace-blueprint', blueprint: next.blueprint });
   }
   return commands;
+}
+
+/**
+ * 保留现有数据源实例（锁定组件可能还在引用），再把候选带来的实例接上；
+ * id 冲突时重新编号，并返回「旧 id → 新 id」的映射供组件引用改写。
+ */
+function adoptDataSources(
+  current: ScreenDocument,
+  next: ScreenDocument,
+): {
+  readonly sources?: readonly ScreenDataSource[];
+  readonly remapped: ReadonlyMap<string, string>;
+} {
+  const incoming = next.dataSources ?? [];
+  // 只保留「保留下来的组件（锁定的那些）仍引用」的实例：被删组件的数据源留在文档里
+  // 就是一份没人读的孤儿，还会在数据源面板里占位。
+  const retained = current.components.filter((component) => component.status.locked);
+  const stillReferenced = new Set<string>();
+  for (const component of retained) {
+    const value = component.dataValue;
+    if (value?.kind === 'data-source-field') stillReferenced.add(value.dataSourceId);
+  }
+  const kept = (current.dataSources ?? []).filter((source) => stillReferenced.has(source.id));
+  if (incoming.length === 0) {
+    return kept.length === (current.dataSources ?? []).length
+      ? { remapped: new Map() }
+      : { sources: kept, remapped: new Map() };
+  }
+
+  const taken = new Set(kept.map((source) => source.id));
+  const remapped = new Map<string, string>();
+  const appended: ScreenDataSource[] = [];
+  for (const source of incoming) {
+    let id = source.id;
+    let suffix = 1;
+    while (taken.has(id)) {
+      id = `${source.id}-${suffix}`;
+      suffix += 1;
+    }
+    taken.add(id);
+    if (id !== source.id) remapped.set(source.id, id);
+    appended.push(id === source.id ? source : { ...source, id });
+  }
+  return { sources: [...kept, ...appended], remapped };
+}
+
+/** 组件里的取值引用跟着实例 id 走。 */
+function remapValueRef(
+  component: ScreenComponentNode,
+  remapped: ReadonlyMap<string, string>,
+): ScreenComponentNode {
+  if (remapped.size === 0) return component;
+  const value = component.dataValue;
+  if (value?.kind !== 'data-source-field') return component;
+  const nextId = remapped.get(value.dataSourceId);
+  if (nextId === undefined) return component;
+  return { ...component, dataValue: { ...value, dataSourceId: nextId } };
 }
 
 /** 锁定组件被跳过时如实写进理由：用户在变更卡上要能看见「为什么还留着几个旧组件」。 */
@@ -394,4 +481,24 @@ function describeComponentFailure(failure: string | undefined): string {
 function truncate(text: string, max: number): string {
   const trimmed = text.trim();
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max)}…`;
+}
+
+/**
+ * 现算一份「智能体目录」：设计器当前 catalog（含在线物料包）+ 本屏可见的素材。
+ *
+ * 取不到目录就返回 `undefined`，让后端退回内置最小目录——宁可少几个组件形态，
+ * 也不要把一个空目录发过去（后端会按「目录里没有物料」直接 400）。
+ */
+async function readAgentCatalog(
+  options: HostIntentOptions,
+): Promise<AgentCatalogShape | undefined> {
+  const catalog = options.catalog?.();
+  if (catalog === undefined) return undefined;
+  const assets = await api.listAssets({ screenId: options.screenId });
+  if (!assets.ok) {
+    // 素材接口失败不该让整句话失败：目录照发，图片类组件这次就没有候选素材。
+    logger.warn('agent catalog assets unavailable', assets.error.message);
+    return buildAgentCatalog(catalog, []);
+  }
+  return buildAgentCatalog(catalog, assets.data.assets);
 }

@@ -2,7 +2,8 @@ import { ConfigService } from '@nestjs/config';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AgentController } from '../src/agent/agent.controller';
-import { AgentService, parseSpec } from '../src/agent/agent.service';
+import { AgentService, parseCatalogSpec } from '../src/agent/agent.service';
+import type { AgentCatalog } from '../src/agent/agent-catalog';
 import { requestAgentCompletion } from '../src/agent/agent-client';
 import {
   type AgentEditableComponent,
@@ -53,7 +54,9 @@ describe('agent candidate and persisted generation', () => {
     expect(candidate).toMatchObject({
       name: '渠道经营',
       mode: 'deterministic',
-      imageCount: 1,
+      // 兜底目录里没有素材，就不画图片块——不假装有一张图。
+      imageCount: 0,
+      catalogSource: 'fallback',
       failure: 'AGENT_NOT_CONFIGURED',
       document: { canvas: { width: 1920, height: 1080 } },
     });
@@ -113,6 +116,8 @@ describe('agent candidate and persisted generation', () => {
         screen: saved,
         mode: candidate.mode,
         imageCount: candidate.imageCount,
+        catalogSource: candidate.catalogSource,
+        materials: candidate.materials,
         failure: candidate.failure,
       });
     },
@@ -144,173 +149,383 @@ function modelJson(panels: readonly Record<string, unknown>[]): string {
   });
 }
 
-interface ComposedComponent {
-  readonly id: string;
+const TEST_CATALOG: AgentCatalog = {
+  source: 'client',
+  assets: [{ id: 'a-1', name: '远山' }],
+  materials: [
+    {
+      type: 'base.text',
+      name: '文本',
+      category: '基础',
+      data: 'scalar',
+      asset: false,
+      size: { width: 320, height: 72 },
+      props: { autoWidth: { kind: 'boolean' } },
+      roles: [],
+      defaults: {
+        props: { autoWidth: false },
+        style: { color: '#e9eef5', fontSize: 20, fontWeight: '400', textAlign: 'left' },
+      },
+    },
+    {
+      type: 'base.rectangle',
+      name: '矩形',
+      category: '基础',
+      data: 'none',
+      asset: false,
+      size: { width: 240, height: 160 },
+      props: {},
+      roles: [],
+      defaults: { props: {}, style: { fill: '#141b24', borderRadius: 12 } },
+    },
+    {
+      type: 'base.chart',
+      name: '图表',
+      category: '数据',
+      data: 'tabular',
+      asset: false,
+      size: { width: 480, height: 280 },
+      props: {},
+      roles: [
+        { id: 'dimension', min: 1, max: 1 },
+        { id: 'measures', min: 1, max: 8 },
+      ],
+      defaults: { props: {}, style: { backgroundColor: '#111827', color: '#f9fafb' } },
+    },
+    {
+      type: 'base.image',
+      name: '图片',
+      category: '基础',
+      data: 'scalar',
+      asset: true,
+      size: { width: 240, height: 160 },
+      props: {},
+      roles: [],
+      defaults: { props: {}, style: { objectFit: 'cover', opacity: 1 } },
+    },
+    {
+      type: 'plugin.echarts',
+      name: 'ECharts 图表',
+      category: '数据',
+      data: 'tabular',
+      asset: false,
+      size: { width: 480, height: 280 },
+      props: {
+        seriesType: { kind: 'enum', values: ['line', 'bar'] },
+        showTooltip: { kind: 'boolean' },
+      },
+      roles: [
+        { id: 'dimension', min: 1, max: 1 },
+        { id: 'measures', min: 1, max: 8 },
+      ],
+      defaults: { props: { seriesType: 'line', showTooltip: true }, style: {} },
+    },
+    {
+      type: 'board.status-grid',
+      name: '状态宫格',
+      category: '看板',
+      data: 'tabular',
+      asset: false,
+      size: { width: 480, height: 280 },
+      props: {},
+      roles: [{ id: 'columns', min: 2, max: 4 }],
+      defaults: { props: {}, style: {} },
+    },
+  ],
+};
+
+function blocksJson(blocks: readonly Record<string, unknown>[]): string {
+  return JSON.stringify({
+    title: '华东渠道周会',
+    subtitle: '按周汇总的渠道经营口径',
+    kpis: [
+      { label: '总量', value: '28.6 万' },
+      { label: '周转', value: '31.4 天' },
+      { label: '缺货', value: '12 家' },
+    ],
+    blocks,
+  });
+}
+
+interface ComposedNode {
+  readonly type: string;
+  readonly name: string;
   readonly position: { readonly x: number; readonly y: number };
   readonly size: { readonly width: number; readonly height: number };
-  readonly dataSource: { readonly value?: unknown } | null;
+  readonly props: Record<string, unknown>;
+  readonly dataSource: unknown;
+  readonly dataValue?: unknown;
+  readonly dataBinding?: unknown;
 }
 
-function componentsOf(document: Record<string, unknown>): ComposedComponent[] {
-  return document.components as ComposedComponent[];
+function composeOk(spec: AgentScreenSpec): Record<string, unknown> {
+  const composed = composeScreenDocument({ spec, catalog: TEST_CATALOG });
+  if (!composed.ok) throw new Error(`compose failed: ${composed.diagnostics[0]?.code}`);
+  return composed.value.document;
 }
 
-function textsOf(document: Record<string, unknown>): string[] {
-  return componentsOf(document)
-    .map((component) => component.dataSource?.value)
-    .filter((value): value is string => typeof value === 'string');
+function nodesOf(document: Record<string, unknown>): ComposedNode[] {
+  return document.components as ComposedNode[];
 }
 
-describe('parseSpec 数据校验', () => {
-  it('接受带 points / items 的面板，并原样保留模型给的数', () => {
-    const parsed = parseSpec(
+function findNode(document: Record<string, unknown>, type: string): ComposedNode {
+  const node = nodesOf(document).find((component) => component.type === type);
+  if (node === undefined) throw new Error(`component ${type} not found`);
+  return node;
+}
+
+const TREND_TABLE = {
+  columns: [
+    { id: 'day', label: '日期', type: 'string' },
+    { id: 'amount', label: '金额', type: 'number' },
+  ],
+  rows: [
+    { day: '10-21', amount: 120 },
+    { day: '10-22', amount: 164 },
+    { day: '10-23', amount: 98 },
+  ],
+};
+
+describe('目录驱动的解析与编译', () => {
+  it('表格数据编成 inline 值 + 目录声明的绑定角色，且不产出 legacy dataSource', () => {
+    const spec = parseCatalogSpec(
+      blocksJson([{ type: 'base.chart', title: '近三日趋势', span: 2, table: TREND_TABLE }]),
+      TEST_CATALOG,
+    );
+    expect(spec).not.toBeNull();
+    const document = composeOk(spec as AgentScreenSpec);
+    const chart = findNode(document, 'base.chart');
+
+    expect(chart.dataSource).toBeNull();
+    expect(chart.dataValue).toEqual({
+      kind: 'inline',
+      value: {
+        fields: [
+          { id: 'day', label: '日期', valueType: 'string', nullable: false },
+          { id: 'amount', label: '金额', valueType: 'number', nullable: false },
+        ],
+        rows: TREND_TABLE.rows,
+      },
+    });
+    // dimension 取非数值列，measures 取数值列——角色 id 来自目录，不是写死的 type。
+    expect(chart.dataBinding).toEqual({ fields: { dimension: ['day'], measures: ['amount'] } });
+    expect(document.dataSources).toBeUndefined();
+  });
+
+  it('图片用素材身份：文档里只有 resourceId，没有 URL', () => {
+    const spec = parseCatalogSpec(
+      blocksJson([{ type: 'base.image', title: '现场', span: 1, assetId: 'a-1' }]),
+      TEST_CATALOG,
+    );
+    expect(spec).not.toBeNull();
+    const document = composeOk(spec as AgentScreenSpec);
+    const image = findNode(document, 'base.image');
+
+    expect(image.dataValue).toEqual({
+      kind: 'data-source-field',
+      dataSourceId: 'agent-ds-1',
+      path: [],
+    });
+    expect(document.dataSources).toEqual([
+      {
+        id: 'agent-ds-1',
+        name: '远山',
+        source: { kind: 'host-resource', resourceType: 'host_image', resourceId: 'a-1' },
+        params: {},
+      },
+    ]);
+    expect(JSON.stringify(document)).not.toContain('http');
+  });
+
+  it('目录里没有的 type 整份拒绝，而不是悄悄换成别的组件', () => {
+    expect(
+      parseCatalogSpec(
+        blocksJson([{ type: 'base.heatmap', title: '热力', span: 1 }]),
+        TEST_CATALOG,
+      ),
+    ).toBeNull();
+    expect(
+      parseCatalogSpec(
+        blocksJson([{ type: 'base.image', title: '现场', span: 1, assetId: 'missing' }]),
+        TEST_CATALOG,
+      ),
+    ).toBeNull();
+  });
+
+  it('表格行数越界、列类型与值不符时整份拒绝', () => {
+    const tooFewRows = {
+      columns: TREND_TABLE.columns,
+      rows: TREND_TABLE.rows.slice(0, 2),
+    };
+    expect(
+      parseCatalogSpec(
+        blocksJson([{ type: 'base.chart', title: '趋势', span: 2, table: tooFewRows }]),
+        TEST_CATALOG,
+      ),
+    ).toBeNull();
+
+    const stringInNumber = {
+      columns: TREND_TABLE.columns,
+      rows: [{ day: '10-21', amount: '很多' }, ...TREND_TABLE.rows.slice(1)],
+    };
+    expect(
+      parseCatalogSpec(
+        blocksJson([{ type: 'base.chart', title: '趋势', span: 2, table: stringInNumber }]),
+        TEST_CATALOG,
+      ),
+    ).toBeNull();
+  });
+
+  it('props 只能取目录声明的键与枚举值，越界的整份拒绝', () => {
+    expect(
+      parseCatalogSpec(
+        blocksJson([
+          {
+            type: 'plugin.echarts',
+            title: '趋势',
+            span: 2,
+            table: TREND_TABLE,
+            props: { seriesType: 'pie' },
+          },
+        ]),
+        TEST_CATALOG,
+      ),
+    ).toBeNull();
+    expect(
+      parseCatalogSpec(
+        blocksJson([
+          {
+            type: 'plugin.echarts',
+            title: '趋势',
+            span: 2,
+            table: TREND_TABLE,
+            props: { theme: 'dark' },
+          },
+        ]),
+        TEST_CATALOG,
+      ),
+    ).toBeNull();
+
+    const spec = parseCatalogSpec(
+      blocksJson([
+        {
+          type: 'plugin.echarts',
+          title: '趋势',
+          span: 2,
+          table: TREND_TABLE,
+          props: { seriesType: 'bar' },
+        },
+      ]),
+      TEST_CATALOG,
+    );
+    const document = composeOk(spec as AgentScreenSpec);
+    expect(findNode(document, 'plugin.echarts').props.seriesType).toBe('bar');
+    // 没给的参数回到目录默认值。
+    expect(findNode(document, 'plugin.echarts').props.showTooltip).toBe(true);
+  });
+
+  it('span 决定栅格宽度：两块 span 2 同行，三块 span 2 折行', () => {
+    const spec = parseCatalogSpec(
+      blocksJson([
+        { type: 'base.chart', title: '趋势一', span: 2, table: TREND_TABLE },
+        { type: 'plugin.echarts', title: '趋势二', span: 2, table: TREND_TABLE },
+      ]),
+      TEST_CATALOG,
+    );
+    const document = composeOk(spec as AgentScreenSpec);
+    const chart = findNode(document, 'base.chart');
+    const echarts = findNode(document, 'plugin.echarts');
+    expect(chart.position.y).toBe(echarts.position.y);
+    expect(chart.size.width).toBeGreaterThan(700);
+
+    const wrapped = composeOk(
+      parseCatalogSpec(
+        blocksJson([
+          { type: 'base.chart', title: '一', span: 2, table: TREND_TABLE },
+          { type: 'plugin.echarts', title: '二', span: 2, table: TREND_TABLE },
+          { type: 'base.text', title: '三', span: 1, text: '备注' },
+        ]),
+        TEST_CATALOG,
+      ) as AgentScreenSpec,
+    );
+    const texts = nodesOf(wrapped).filter((node) => node.type === 'base.text');
+    const lastText = texts[texts.length - 1];
+    expect(lastText?.position.y ?? 0).toBeGreaterThan(findNode(wrapped, 'base.chart').position.y);
+  });
+
+  it('列满足不了绑定角色时该块退化为无数据，屏仍然产出并给出降级告警', () => {
+    const spec = parseCatalogSpec(
+      blocksJson([
+        { type: 'base.chart', title: '趋势', span: 2, table: TREND_TABLE },
+        {
+          type: 'board.status-grid',
+          title: '宫格',
+          span: 2,
+          table: {
+            columns: [{ id: 'only', label: '唯一列', type: 'string' }],
+            rows: [{ only: 'a' }, { only: 'b' }, { only: 'c' }],
+          },
+        },
+      ]),
+      TEST_CATALOG,
+    );
+    expect(spec).not.toBeNull();
+    const composed = composeScreenDocument({
+      spec: spec as AgentScreenSpec,
+      catalog: TEST_CATALOG,
+    });
+    expect(composed.ok).toBe(true);
+    if (!composed.ok) return;
+    expect(composed.value.warnings.map((item) => item.code)).toContain(
+      'AGENT_BLOCK_BINDING_UNSATISFIED',
+    );
+    // 降级的块仍在文档里，只是没有数据引用；其余块照常带数据。
+    const grid = findNode(composed.value.document, 'board.status-grid');
+    expect(grid.dataValue).toBeNull();
+    expect(findNode(composed.value.document, 'base.chart').dataBinding).toEqual({
+      fields: { dimension: ['day'], measures: ['amount'] },
+    });
+  });
+
+  it('素材型物料只认 assetId：给了 text 就跳过该块，不把句子塞进 img.src', () => {
+    const spec = parseCatalogSpec(
+      blocksJson([
+        { type: 'base.chart', title: '趋势', span: 2, table: TREND_TABLE },
+        { type: 'base.image', title: '现场', span: 2, text: '拣选作业现场' },
+      ]),
+      TEST_CATALOG,
+    );
+    expect(spec).not.toBeNull();
+    const composed = composeScreenDocument({
+      spec: spec as AgentScreenSpec,
+      catalog: TEST_CATALOG,
+    });
+    expect(composed.ok).toBe(true);
+    if (!composed.ok) return;
+    expect(composed.value.warnings.map((item) => item.code)).toContain(
+      'AGENT_BLOCK_ASSET_REQUIRED',
+    );
+    // 整块跳过时连标题也不留，画布上不会出现一个只有标题的空洞。
+    expect(nodesOf(composed.value.document).some((node) => node.type === 'base.image')).toBe(false);
+    expect(nodesOf(composed.value.document).some((node) => node.name === '现场')).toBe(false);
+  });
+
+  it('v1 panels 仍被接受，并按目录折算成块（兼容旧输出）', () => {
+    const spec = parseCatalogSpec(
       modelJson([
         specPanel('chart', {
-          points: [
-            { label: '周一', value: 120 },
-            { label: '周二', value: 164 },
-            { label: '周三', value: 98 },
-            { label: '周四', value: 210 },
-            { label: '周五', value: 176 },
-          ],
+          points: [1, 2, 3, 4, 5].map((value) => ({ label: String(value), value })),
         }),
         specPanel('list', { items: ['华东缺货 12 家', '在途 4.1 万件', '周转 31 天'] }),
-        { kind: 'image', title: '现场图' },
       ]),
+      TEST_CATALOG,
     );
-    expect(parsed).not.toBeNull();
-    const chart = parsed?.panels[0];
-    const list = parsed?.panels[1];
-    expect(chart?.kind).toBe('chart');
-    expect(list?.kind).toBe('list');
-    if (chart?.kind !== 'chart' || list?.kind !== 'list') throw new Error('unreachable');
-    expect(chart.points.map((point) => point.value)).toEqual([120, 164, 98, 210, 176]);
-    expect(list.items).toEqual(['华东缺货 12 家', '在途 4.1 万件', '周转 31 天']);
-  });
-
-  it('图表少于 5 个点、清单少于 3 条时整份拒绝（宁可兜底，也不编数据）', () => {
-    const chartTooShort = [
-      specPanel('chart', {
-        points: [
-          { label: '周一', value: 1 },
-          { label: '周二', value: 2 },
-          { label: '周三', value: 3 },
-          { label: '周四', value: 4 },
-        ],
-      }),
-      specPanel('list', { items: ['甲', '乙', '丙'] }),
-      { kind: 'image', title: '现场图' },
-    ];
-    const listTooShort = [
-      specPanel('chart', {
-        points: [
-          { label: '周一', value: 1 },
-          { label: '周二', value: 2 },
-          { label: '周三', value: 3 },
-          { label: '周四', value: 4 },
-          { label: '周五', value: 5 },
-        ],
-      }),
-      specPanel('list', { items: ['甲', '乙'] }),
-      { kind: 'image', title: '现场图' },
-    ];
-    expect(parseSpec(modelJson(chartTooShort))).toBeNull();
-    expect(parseSpec(modelJson(listTooShort))).toBeNull();
-  });
-
-  it('图表全是零或数值不是数字时拒绝', () => {
-    const zero = [1, 2, 3, 4, 5].map((index) => ({ label: `第${index}天`, value: 0 }));
-    const stringy = [1, 2, 3, 4, 5].map((index) => ({
-      label: `第${index}天`,
-      value: String(index),
-    }));
-    const tail = [
-      specPanel('list', { items: ['甲', '乙', '丙'] }),
-      { kind: 'image', title: '现场图' },
-    ];
-    expect(parseSpec(modelJson([specPanel('chart', { points: zero }), ...tail]))).toBeNull();
-    expect(parseSpec(modelJson([specPanel('chart', { points: stringy }), ...tail]))).toBeNull();
-  });
-});
-
-describe('composeScreenDocument 只画模型给的数', () => {
-  const parsed = parseSpec(
-    modelJson([
-      specPanel('chart', {
-        points: [
-          { label: '周一', value: 120 },
-          { label: '周二', value: 164 },
-          { label: '周三', value: 98 },
-          { label: '周四', value: 210 },
-          { label: '周五', value: 176 },
-        ],
-      }),
-      specPanel('list', { items: ['华东缺货 12 家', '在途 4.1 万件', '周转 31 天'] }),
-      { kind: 'image', title: '现场图' },
-    ]),
-  );
-  if (parsed === null) throw new Error('fixture 必须能通过校验');
-  const spec: AgentScreenSpec = { ...parsed, mode: 'llm' };
-  const composed = composeScreenDocument(spec);
-  const components = componentsOf(composed.document);
-  const texts = textsOf(composed.document);
-  const bars = components
-    .filter((component) => /^agent-panel-0-bar-\d+$/.test(component.id))
-    .sort((left, right) => left.id.localeCompare(right.id, 'en', { numeric: true }));
-
-  it('柱数与点数一致，柱高按最大值归一', () => {
-    expect(bars).toHaveLength(5);
-    const heights = bars.map((bar) => bar.size.height);
-    // 210 是最大值，对应柱必须最高；98 最小，对应柱必须最矮。
-    expect(heights[3]).toBe(Math.max(...heights));
-    expect(heights[2]).toBe(Math.min(...heights));
-    expect(new Set(heights).size).toBeGreaterThan(1);
-  });
-
-  it('柱顶量与 X 轴标签都来自模型', () => {
-    expect(texts).toEqual(expect.arrayContaining(['120', '164', '98', '210', '176']));
-    expect(texts).toEqual(expect.arrayContaining(['周一', '周二', '周三', '周四', '周五']));
-  });
-
-  it('清单行逐条等于模型 items，页面上不留任何预设明细', () => {
-    for (const item of ['· 华东缺货 12 家', '· 在途 4.1 万件', '· 周转 31 天']) {
-      expect(texts).toContain(item);
-    }
-    for (const preset of ['一线渠道库存 6.2 万吨', '二线渠道库存 4.8 万吨', '待补货门店 12 家']) {
-      expect(texts).not.toContain(preset);
-    }
-  });
-
-  it('页脚写明这一轮实际走的通道', () => {
-    const footer = texts.find((text) => text.startsWith('生成自示例智能体'));
-    expect(footer).toContain('模型输出');
-    const fallback = composeScreenDocument({ ...parsed, mode: 'deterministic' });
-    expect(textsOf(fallback.document)).toContain(
-      '生成自示例智能体 · 确定性兜底 · 未调用模型 · 布局由宿主编译，未写入设计器历史',
-    );
-  });
-
-  it('过长的 X 轴标签按柱宽截断，不压到相邻柱', () => {
-    // 四个面板 + 七个点：每根柱约 47px，8 个汉字（96px）必然放不下。
-    const longLabels = parseSpec(
-      modelJson([
-        specPanel('chart', {
-          points: [1, 2, 3, 4, 5, 6, 7].map((index) => ({
-            label: '华东大区库存总量',
-            value: index,
-          })),
-        }),
-        specPanel('chart', {
-          points: [1, 2, 3, 4, 5].map((index) => ({ label: '区域', value: index })),
-        }),
-        specPanel('list', { items: ['甲', '乙', '丙'] }),
-        { kind: 'image', title: '现场图' },
-      ]),
-    );
-    if (longLabels === null) throw new Error('fixture 必须能通过校验');
-    const composedLong = textsOf(composeScreenDocument(longLabels).document);
-    expect(composedLong).not.toContain('华东大区库存总量');
-    expect(composedLong).toEqual(expect.arrayContaining(['华东…', '区域']));
+    expect(spec).not.toBeNull();
+    expect(spec?.blocks?.map((block) => block.type)).toEqual(['base.chart', 'base.text']);
+    const document = composeOk(spec as AgentScreenSpec);
+    expect(findNode(document, 'base.chart').dataBinding).toEqual({
+      fields: { dimension: ['label'], measures: ['value'] },
+    });
   });
 });
 
