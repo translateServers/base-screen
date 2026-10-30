@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class AgentGenerateDto {
   @ApiProperty({ description: '大屏主题，一句话', minLength: 2, maxLength: 120 })
@@ -21,6 +29,19 @@ export class AgentGenerateDto {
    * 未知字段一律拒绝并 400）。放在请求里而不是快照文件里，是为了让「刚发布的在线物料」
    * 与「刚上传的素材」下一句话就能用上。
    */
+  /**
+   * 用户在这一句话上显式引用的素材与数据集。
+   *
+   * 元素形如 `{ kind: 'asset', assetId }` / `{ kind: 'dataset', datasetId }`，由引擎上送。
+   * 这里只校验「是个对象数组、不超上限」，具体身份在 service 里按目录与数据集目录逐一核对。
+   */
+  @ApiPropertyOptional({ description: '用户引用的素材与数据集', type: 'array' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @IsObject({ each: true })
+  references?: Record<string, unknown>[];
+
   @ApiPropertyOptional({
     description: '宿主带来的组件目录与素材清单；省略时使用最小内置目录',
     type: 'object',

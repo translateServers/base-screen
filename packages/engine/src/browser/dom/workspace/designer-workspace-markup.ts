@@ -350,8 +350,13 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           </span>
         </div>
         <div class="intent-box">
+          <div class="intent-refs" data-intent-refs hidden></div>
           <textarea class="intent-input" data-intent-input rows="2" placeholder="${DESIGNER_UI_TEXT.intent.placeholder}" aria-label="${DESIGNER_UI_TEXT.intent.placeholder}"></textarea>
-          <button type="button" class="intent-submit" data-intent-submit aria-label="${DESIGNER_UI_TEXT.intent.submit}" data-tip="${DESIGNER_UI_TEXT.intent.submit}">${designerIcon('arrow-up')}</button>
+          <div class="intent-foot">
+            <button type="button" class="intent-ref-add" data-intent-ref-add aria-label="${DESIGNER_UI_TEXT.intent.referenceAdd}" data-tip="${DESIGNER_UI_TEXT.intent.referenceAdd}" aria-expanded="false" hidden>${designerIcon('plus')}</button>
+            <span class="intent-foot-spacer"></span>
+            <button type="button" class="intent-submit" data-intent-submit aria-label="${DESIGNER_UI_TEXT.intent.submit}" data-tip="${DESIGNER_UI_TEXT.intent.submit}">${designerIcon('arrow-up')}</button>
+          </div>
         </div>
         <p class="intent-status" data-intent-status role="status" aria-live="polite"></p>
         <div class="intent-confirm" data-intent-confirm role="alertdialog" aria-modal="false" hidden></div>

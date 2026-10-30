@@ -101,11 +101,21 @@ interface Sink {
  *    （与迁移后的 canonical 形态一致，不再产出 legacy `dataSource`），
  *    素材写 `dataSources` 实例 + `data-source-field` 引用，文档里只留资源身份。
  */
+export interface ComposeReferences {
+  readonly assets: readonly { readonly id: string; readonly name: string }[];
+  readonly datasets: readonly {
+    readonly datasetId: string;
+    readonly name: string;
+    readonly columns: readonly { readonly id: string; readonly type: string }[];
+  }[];
+}
+
 export function composeScreenDocument(input: {
   readonly spec: AgentScreenSpec;
   readonly catalog: AgentCatalog;
+  readonly references?: ComposeReferences;
 }): ComposeOutcome {
-  const { spec, catalog } = input;
+  const { spec, catalog, references } = input;
   const sink: Sink = { diagnostics: [], warnings: [], dataSources: [] };
   const components: Component[] = [];
   const used = new Set<string>();
@@ -211,7 +221,7 @@ export function composeScreenDocument(input: {
             width: columnWidth * span + GAP * (span - 1),
             height: rowHeight,
           },
-          { catalog, textMaterial, assetMaterial, push, pushText },
+          { catalog, textMaterial, assetMaterial, push, pushText, references },
           { sink, onAsset: () => (imageCount += 1) },
         );
         offset += span;
@@ -306,6 +316,7 @@ function compileBlock(
     catalog: AgentCatalog;
     textMaterial: AgentCatalogMaterial | undefined;
     assetMaterial: AgentCatalogMaterial | undefined;
+    references: ComposeReferences | undefined;
     push: (
       material: AgentCatalogMaterial,
       name: string,
@@ -388,10 +399,43 @@ function resolveBlockPayload(
   context: {
     catalog: AgentCatalog;
     textMaterial: AgentCatalogMaterial | undefined;
+    references: ComposeReferences | undefined;
   },
   target: { sink: Sink; onAsset: () => void },
 ): BlockPayload | null {
   if (material.data === 'tabular') {
+    const datasetId = block.datasetId ?? '';
+    if (datasetId !== '') {
+      const dataset = context.references?.datasets.find((item) => item.datasetId === datasetId);
+      if (dataset !== undefined) {
+        const dataSourceId = `agent-ds-${target.sink.dataSources.length + 1}`;
+        target.sink.dataSources.push({
+          id: dataSourceId,
+          name: dataset.name,
+          source: { kind: 'dataset', datasetId: dataset.datasetId },
+          params: {},
+        });
+        // 列类型来自数据集 describe，角色分配与表格走同一套算法，避免两条规则漂移。
+        const binding = assignRoles(material, {
+          columns: dataset.columns.map((column) => ({
+            id: column.id,
+            label: column.id,
+            type: column.type === 'number' ? 'number' : 'string',
+          })),
+          rows: [],
+        });
+        return {
+          dataValue: { kind: 'data-source-field', dataSourceId, path: [] },
+          ...(binding === null ? {} : { dataBinding: { fields: binding } }),
+        };
+      }
+      // 引用的数据集不在本次上下文里（已下架或宿主没解析出来）：如实记，再按 table 走。
+      target.sink.warnings.push({
+        code: 'AGENT_DATASET_UNKNOWN',
+        path: `blocks.${block.title}`,
+        message: `数据集 ${datasetId} 不在本轮引用里，该块改用示例数据。`,
+      });
+    }
     const table = block.table;
     if (table === undefined) {
       target.sink.diagnostics.push({

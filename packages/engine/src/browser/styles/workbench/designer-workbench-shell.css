@@ -1210,21 +1210,6 @@
   gap: var(--designer-space-2);
 }
 
-.change-empty-mark {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border-radius: var(--designer-radius-3);
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent-text);
-}
-
-.change-empty-mark svg {
-  width: 16px;
-  height: 16px;
-}
-
 .change-empty-title {
   margin: var(--designer-space-1) 0 0;
   color: var(--designer-text-primary);
@@ -1236,74 +1221,6 @@
   margin: 0 0 var(--designer-space-1);
   color: var(--designer-text-muted);
   line-height: 1.55;
-}
-
-/* 空态只有一个入口：点它把焦点交给下方输入框。整行可点，右侧 chevron 说明「会往前走」，
-   整块不再像三张可以各点各的表单卡。 */
-.change-start-card {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: var(--designer-space-3);
-  padding: var(--designer-space-3) var(--designer-space-4);
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-3);
-  background: var(--designer-surface-control);
-  color: var(--designer-text-primary);
-  cursor: pointer;
-  font: var(--designer-font-small);
-  text-align: left;
-  transition:
-    background var(--designer-motion),
-    border-color var(--designer-motion);
-}
-
-.change-start-card:hover {
-  background: var(--designer-surface-control-hover);
-  border-color: var(--designer-border-strong);
-}
-
-.change-start-card:focus-visible {
-  outline: 2px solid var(--designer-accent);
-  outline-offset: -2px;
-}
-
-.change-start-copy {
-  display: flex;
-  min-width: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: var(--designer-space-1);
-}
-
-.change-start-hint {
-  color: var(--designer-text-muted);
-  line-height: 1.5;
-}
-
-.change-start-title {
-  color: var(--designer-text-primary);
-  font-weight: 600;
-}
-
-.change-start-icon {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  color: var(--designer-text-muted);
-  transition:
-    color var(--designer-motion),
-    transform var(--designer-motion);
-}
-
-.change-start-icon svg {
-  width: 14px;
-  height: 14px;
-}
-
-.change-start-card:hover .change-start-icon {
-  color: var(--designer-text-secondary);
-  transform: translateX(2px);
 }
 
 /* 意图输入区：右栏底部常驻。没有处理器时停用并说明原因，不模拟回复。 */
@@ -1428,12 +1345,14 @@
     0 0 0 3px var(--designer-accent-surface);
 }
 
+/* 输入框是一个三段式容器：引用行 / 正文 / 工具行。
+   工具行左放「引用」入口、右放提交——入口贴着用户正在打的字，不再挤在正文右侧。 */
 .intent-box {
   display: flex;
   min-width: 0;
-  align-items: flex-end;
-  gap: var(--designer-space-2);
-  padding: var(--designer-space-1);
+  flex-direction: column;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-2);
   border: 1px solid var(--designer-border-default);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
@@ -1453,6 +1372,7 @@
 .intent-input {
   flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
   min-height: 36px;
   /* 内容长高由 JS 写入 height，这里只兜上限：约 8 行后转为内部滚动，
      再高高就会把画布挤没。 */
@@ -1472,20 +1392,15 @@
   color: var(--designer-text-muted);
 }
 
-/* 智能体页签：书写面接管右栏，输入框铺满剩余高度，提交钮贴底。 */
+/* 智能体页签：书写面接管右栏，正文铺满剩余高度，工具行贴底。 */
 .properties[data-right-pane="intent"] .intent-box {
   flex: 1 1 auto;
-  align-items: stretch;
 }
 
 /* 切页签时控制器会清掉自动增高写入的内联高度，让输入框交给右栏布局拉伸。 */
 .properties[data-right-pane="intent"] .intent-input {
-  height: 100%;
+  height: auto;
   max-height: none;
-}
-
-.properties[data-right-pane="intent"] .intent-submit {
-  align-self: flex-end;
 }
 
 .intent-input:disabled {
@@ -1518,6 +1433,216 @@
 .intent-submit svg {
   width: 14px;
   height: 14px;
+}
+
+/* 引用行：chip 贴在正文上方，和正文同属一个输入容器，不再另开附件区。 */
+.intent-refs {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--designer-space-1);
+}
+
+/* 作者样式里的 display 会盖掉 UA 的 [hidden]，这里显式兜底（同 .intent-scope-clear）。 */
+.intent-refs[hidden] {
+  display: none;
+}
+
+.intent-ref-chip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: var(--designer-space-1);
+  padding: 0 var(--designer-space-1) 0 var(--designer-space-2);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent-text);
+  font: var(--designer-font-small);
+}
+
+.intent-ref-chip-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.intent-ref-chip-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.intent-ref-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intent-ref-chip-remove {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-pill);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.intent-ref-chip-remove:hover {
+  background: var(--designer-surface-control-hover);
+}
+
+.intent-ref-chip-remove svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* 工具行：左「引用」入口、右提交。 */
+.intent-foot {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-2);
+}
+
+.intent-foot-spacer {
+  flex: 1 1 auto;
+}
+
+.intent-ref-add {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-control);
+  background: transparent;
+  color: var(--designer-text-muted);
+  cursor: pointer;
+}
+
+.intent-ref-add:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.intent-ref-add:disabled {
+  color: var(--designer-text-disabled);
+  cursor: not-allowed;
+}
+
+.intent-ref-add svg {
+  width: 14px;
+  height: 14px;
+}
+
+.intent-ref-add[hidden] {
+  display: none;
+}
+
+/* 引用选择器：贴在输入框上方的轻浮层。右栏 overflow:hidden，所以必须 fixed 渲染到 overlay host。 */
+.intent-ref-popover {
+  position: fixed;
+  z-index: var(--designer-z-popover);
+  display: flex;
+  max-height: 320px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-overlay);
+  background: var(--designer-surface-panel);
+  box-shadow: var(--designer-elev-card);
+}
+
+.intent-ref-search {
+  flex: 0 0 auto;
+  margin: var(--designer-space-2);
+}
+
+.intent-ref-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--designer-space-1) var(--designer-space-1);
+}
+
+.intent-ref-group {
+  padding: var(--designer-space-2) var(--designer-space-2) var(--designer-space-1);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.intent-ref-option {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-1) var(--designer-space-2);
+  border: 0;
+  border-radius: var(--designer-radius-3);
+  background: transparent;
+  color: var(--designer-text-primary);
+  cursor: pointer;
+  font: var(--designer-font-small);
+  text-align: left;
+}
+
+.intent-ref-option[data-active="true"] {
+  background: var(--designer-surface-control-hover);
+}
+
+.intent-ref-option-thumb {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: var(--designer-radius-1);
+  object-fit: cover;
+}
+
+.intent-ref-option-icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--designer-text-muted);
+}
+
+.intent-ref-option-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.intent-ref-option-text {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.intent-ref-option-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intent-ref-option-note {
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intent-ref-empty {
+  padding: var(--designer-space-3) var(--designer-space-2);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
 }
 
 .intent-status {

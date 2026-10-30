@@ -139,11 +139,11 @@ export function initializeDesignerElementSurfaceBindings(
       (target) => state.commandPaletteController.onInput(target as Element),
       (target) => state.datasetController.onInput(target),
       (target) => state.variablesController.onInput(target),
-      (target) => {
+      (target, event) => {
         if (target !== null && (target as Element).closest('[data-intent-input]') === null) {
           return false;
         }
-        state.intentController.onInput();
+        state.intentController.onInput(event as InputEvent);
         return true;
       },
       (_target, event) => state.panelController.onInput(event),

@@ -34,6 +34,10 @@ class FakeElement {
     this.attributes.delete(name);
   }
 
+  setAttribute(name: string, value: string): void {
+    this.attributes.add(`${name}=${value}`);
+  }
+
   closest(selector: string): FakeElement | null {
     return this.classes.some((token) => selector === `.${token}`) ? this : null;
   }
@@ -90,6 +94,8 @@ function harness() {
   const scopeClear = new FakeElement(['intent-scope-clear']);
   const status = new FakeElement(['intent-status']);
   const confirm = new FakeElement(['intent-confirm']);
+  const refs = new FakeElement(['intent-refs']);
+  const refAdd = new FakeElement(['intent-ref-add']);
   const controller = new DesignerIntentController();
   controller.connect(
     'instance-1',
@@ -99,8 +105,10 @@ function harness() {
     scopeClear as unknown as HTMLButtonElement,
     status as unknown as HTMLElement,
     confirm as unknown as HTMLElement,
+    refs as unknown as HTMLElement,
+    refAdd as unknown as HTMLButtonElement,
   );
-  return { controller, input, composer, scope, status, confirm, scopeClear };
+  return { controller, input, composer, scope, status, confirm, scopeClear, refAdd };
 }
 
 function actionTarget(action: string): Element {
@@ -226,6 +234,33 @@ describe('designer intent controller', () => {
     // 作用域真的解除了：chip 回到整屏，✕ 也跟着藏起来。
     expect(scope.textContent).toBe(DESIGNER_UI_TEXT.intent.scopeScreen);
     expect(input.value).toBe('');
+  });
+
+  it('hides the reference entry until a catalog port is bound', () => {
+    const h = harness();
+    h.controller.setHandler(async () => ({ ok: true, value: null, diagnostics: [] }));
+    expect(h.refAdd.hidden).toBe(true);
+    h.controller.setReferenceCatalog({
+      catalog: async () => ({ ok: true, value: [], diagnostics: [] }),
+    });
+    expect(h.refAdd.hidden).toBe(false);
+  });
+
+  it('sends bound references with the request and clears them on success', async () => {
+    const h = harness();
+    const calls: { references?: readonly unknown[] }[] = [];
+    h.controller.setHandler(async (request) => {
+      calls.push({ references: request.references });
+      return { ok: true, value: null, diagnostics: [] };
+    });
+    h.controller.addReference({ kind: 'asset', id: 'asset-1', label: '远山' });
+    h.input.value = '用这张图做头图';
+    // 整屏提交要先过二次确认，这条用例只关心请求体，所以走「直接按整屏发」的出口。
+    h.controller.submitAsWholeScreen();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls[0]?.references).toEqual([{ kind: 'asset', assetId: 'asset-1', name: '远山' }]);
+    // 提交成功后引用与文本一起清空，下一句不会带着上一轮的引用。
+    expect(h.controller.references).toEqual([]);
   });
 
   it('marks the composer as drafting while text is present and clears the mark when empty', () => {

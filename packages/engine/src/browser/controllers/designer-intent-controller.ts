@@ -1,4 +1,9 @@
-import type { ScreenIntentScope } from '@base-screen/contracts';
+import type {
+  ScreenIntentReference,
+  ScreenIntentReferenceCatalogPort,
+  ScreenIntentReferenceOption,
+  ScreenIntentScope,
+} from '@base-screen/contracts';
 import type { DesignerMetricName } from '../../common/observability/designer-metrics.js';
 import type {
   DesignerIntentHandler,
@@ -10,6 +15,12 @@ import {
   matchDesignerParameterIntent,
 } from '../../common/operations/intent/designer-parameter-intent.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { createIntentReferencePicker } from '../dom/intent/designer-intent-reference-picker-dom.js';
+import { designerIcon } from '../ui/designer-icons.js';
+
+/** 一屏里能挂的引用上限：再多也不会被模型用全，只会把输入区撑高。 */
+const INTENT_REFERENCE_LIMIT = 8;
+
 import { adoptDesignerFormControls } from '../dom/designer-form-controls-dom.js';
 import { escapeHtml } from '../dom/designer-html-escape.js';
 
@@ -45,6 +56,12 @@ export class DesignerIntentController {
   #metricHandler: ((name: DesignerMetricName) => void) | undefined;
   #confirmText = '';
   #writingMode = false;
+  #refsHost: HTMLElement | undefined;
+  #refAdd: HTMLButtonElement | undefined;
+  #catalog: ScreenIntentReferenceCatalogPort | undefined;
+  #references: readonly ScreenIntentReferenceOption[] = [];
+  #picker: ReturnType<typeof createIntentReferencePicker> | undefined;
+  #overlayHost: () => HTMLElement | undefined = () => undefined;
 
   setHandler(handler: DesignerIntentHandler | undefined): void {
     this.#handler = handler;
@@ -64,6 +81,8 @@ export class DesignerIntentController {
   setWritingMode(active: boolean): void {
     this.#writingMode = active;
     if (active) this.syncDraftState();
+    // 右栏换页会重渲染输入区，浮层挂在 overlay host 里不会自己消失。
+    this.closeReferencePicker(false);
   }
 
   get available(): boolean {
@@ -86,6 +105,8 @@ export class DesignerIntentController {
     scopeClear: HTMLButtonElement,
     status: HTMLElement,
     confirm: HTMLElement,
+    refsHost: HTMLElement,
+    refAdd: HTMLButtonElement,
   ): void {
     this.#instanceId = instanceId;
     this.#input = input;
@@ -94,6 +115,8 @@ export class DesignerIntentController {
     this.#scopeClear = scopeClear;
     this.#status = status;
     this.#confirm = confirm;
+    this.#refsHost = refsHost;
+    this.#refAdd = refAdd;
     this.syncScope([], () => undefined);
     this.syncDraftState();
   }
@@ -105,6 +128,11 @@ export class DesignerIntentController {
     this.#scopeClear = undefined;
     this.#status = undefined;
     this.#confirm = undefined;
+    this.#refsHost = undefined;
+    this.#refAdd = undefined;
+    this.#picker?.dispose();
+    this.#picker = undefined;
+    this.#references = [];
     this.#handler = undefined;
     this.#pending = false;
     this.#abort = undefined;
@@ -149,14 +177,158 @@ export class DesignerIntentController {
   }
 
   /** 输入框内容变化：从「输入中」回到空闲时，把挂起的选区变化并入作用域。 */
-  onInput(): void {
+  onInput(event?: InputEvent): void {
     const input = this.#input;
     if (input === undefined) return;
     if (input.value.trim() === '' && this.#pendingScope !== undefined) {
       this.applyPendingScope();
     }
+    if (this.shouldOpenPicker(event)) this.openReferencePicker(true);
     this.syncDraftState();
     this.renderStatus();
+  }
+
+  /**
+   * `@` 才开选择器：用 `InputEvent.data` 判别而不是 keydown，输入法合成期不会给出单个 `@`；
+   * 再要求「前面是行首或空白」，邮箱与正文里本来就有的 `@` 不会误触。
+   */
+  private shouldOpenPicker(event: InputEvent | undefined): boolean {
+    if (event === undefined || this.#catalog === undefined || this.#pending) return false;
+    if (event.isComposing === true) return false;
+    if (event.inputType !== 'insertText' || event.data !== '@') return false;
+    const input = this.#input;
+    const caret = input?.selectionStart ?? 0;
+    const before = (input?.value ?? '').slice(0, Math.max(0, caret - 1));
+    // 中文写句子不空格（「用@」也要能弹），只把邮箱本地部分的字符排除掉：
+    // `a@b.com` 不弹，`用@`、`：@`、行首 `@` 都弹。
+    return before === '' || !/[A-Za-z0-9._%+-]$/.test(before);
+  }
+
+  /** 引用目录端口：宿主不实现时 `+` 与 `@` 都不出现，输入区退化成今天的纯文本。 */
+  setReferenceCatalog(catalog: ScreenIntentReferenceCatalogPort | undefined): void {
+    this.#catalog = catalog;
+    if (catalog === undefined) this.closeReferencePicker(false);
+    this.render();
+  }
+
+  setOverlayHost(host: () => HTMLElement | undefined): void {
+    this.#overlayHost = host;
+  }
+
+  get references(): readonly ScreenIntentReference[] {
+    return this.#references.map((item) =>
+      item.kind === 'asset'
+        ? { kind: 'asset', assetId: item.id, name: item.label }
+        : { kind: 'dataset', datasetId: item.id, name: item.label },
+    );
+  }
+
+  private openReferencePicker(focusSearch: boolean): void {
+    if (this.#catalog === undefined) return;
+    const picker = this.picker();
+    if (picker === undefined) return;
+    picker.open(focusSearch);
+    this.#refAdd?.setAttribute('aria-expanded', 'true');
+  }
+
+  private closeReferencePicker(restoreFocus: boolean): void {
+    this.#picker?.close(restoreFocus);
+    this.#refAdd?.setAttribute('aria-expanded', 'false');
+  }
+
+  private picker(): ReturnType<typeof createIntentReferencePicker> | undefined {
+    if (this.#catalog === undefined) return undefined;
+    if (this.#picker !== undefined) return this.#picker;
+    this.#picker = createIntentReferencePicker({
+      ownerDocument: this.#input?.ownerDocument ?? document,
+      anchor: () => this.#refAdd,
+      overlayHost: this.#overlayHost,
+      options: () => this.#options,
+      onSelect: (option) => this.addReference(option),
+      onClose: () => this.#refAdd?.setAttribute('aria-expanded', 'false'),
+    });
+    return this.#picker;
+  }
+
+  #options: readonly ScreenIntentReferenceOption[] = [];
+
+  /** 拉一次目录：选择器打开期间本地过滤，不再重复请求。 */
+  private async loadOptions(): Promise<void> {
+    const catalog = this.#catalog;
+    if (catalog === undefined) return;
+    const abort = new AbortController();
+    const result = await catalog.catalog({ kinds: ['asset', 'dataset'], signal: abort.signal });
+    if (!result.ok) return;
+    this.#options = result.value;
+  }
+
+  /** 加一条引用。除选择器外，宿主也可以在打开输入区前预置引用。 */
+  addReference(option: ScreenIntentReferenceOption): void {
+    const exists = this.#references.some(
+      (item) => item.kind === option.kind && item.id === option.id,
+    );
+    if (exists) {
+      this.setStatus(DESIGNER_UI_TEXT.intent.referenceDuplicate, 'info');
+      return;
+    }
+    if (this.#references.length >= INTENT_REFERENCE_LIMIT) {
+      this.setStatus(DESIGNER_UI_TEXT.intent.referenceLimit(INTENT_REFERENCE_LIMIT), 'info');
+      return;
+    }
+    this.#references = [...this.#references, option];
+    this.renderReferences();
+    // 触发用的 @ 只起打开作用，落成 chip 之后把它从正文里去掉，别留一个孤零零的符号。
+    const input = this.#input;
+    if (input !== undefined) {
+      const caret = input.selectionStart ?? input.value.length;
+      if (caret > 0 && input.value[caret - 1] === '@') {
+        input.value = `${input.value.slice(0, caret - 1)}${input.value.slice(caret)}`;
+        input.selectionStart = caret - 1;
+        input.selectionEnd = caret - 1;
+      }
+    }
+    this.#input?.focus();
+  }
+
+  private removeReference(kind: string, id: string): void {
+    this.#references = this.#references.filter((item) => !(item.kind === kind && item.id === id));
+    this.renderReferences();
+    this.#input?.focus();
+  }
+
+  private renderReferences(): void {
+    const host = this.#refsHost;
+    if (host === undefined) return;
+    // 单测环境没有 DOM（仓库不用 jsdom），chip 渲染交给集成/浏览器验证。
+    if (host.ownerDocument === undefined) return;
+    host.replaceChildren();
+    host.hidden = this.#references.length === 0;
+    for (const item of this.#references) {
+      const chip = host.ownerDocument.createElement('span');
+      chip.className = 'intent-ref-chip';
+      chip.dataset.intentRef = `${item.kind}:${item.id}`;
+
+      const icon = host.ownerDocument.createElement('span');
+      icon.className = 'intent-ref-chip-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.innerHTML = designerIcon(item.kind === 'asset' ? 'image' : 'table');
+      chip.append(icon);
+
+      const name = host.ownerDocument.createElement('span');
+      name.className = 'intent-ref-chip-name';
+      name.textContent = item.label;
+      chip.append(name);
+
+      const remove = host.ownerDocument.createElement('button');
+      remove.type = 'button';
+      remove.className = 'intent-ref-chip-remove';
+      remove.dataset.intentRefRemove = `${item.kind}:${item.id}`;
+      remove.setAttribute('aria-label', DESIGNER_UI_TEXT.intent.referenceRemove(item.label));
+      remove.innerHTML = designerIcon('close');
+      chip.append(remove);
+
+      host.append(chip);
+    }
   }
 
   async submit(): Promise<void> {
@@ -200,6 +372,20 @@ export class DesignerIntentController {
   }
 
   onClick(target: Element): boolean {
+    if (target.closest('[data-intent-ref-add]') !== null) {
+      if (this.#picker?.isOpen() === true) this.closeReferencePicker(false);
+      else {
+        this.#options = [];
+        void this.loadOptions().then(() => this.openReferencePicker(false));
+      }
+      return true;
+    }
+    const chipRemove = target.closest<HTMLElement>('[data-intent-ref-remove]');
+    if (chipRemove !== null) {
+      const [kind, ...rest] = (chipRemove.dataset.intentRefRemove ?? '').split(':');
+      if (kind !== undefined) this.removeReference(kind, rest.join(':'));
+      return true;
+    }
     if (target.closest('[data-intent-scope-clear]') !== null) {
       if (this.#scopeValue.kind === 'screen') return true;
       this.openConfirm('remove-scope', '');
@@ -225,6 +411,8 @@ export class DesignerIntentController {
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
+    // 浮层开着时键盘归它：否则 Enter 会先被 submit 吃掉、Esc 会先退页签。
+    if (this.#picker?.isOpen() === true && this.#picker.handleKeyDown(event)) return true;
     if (event.key === 'Escape' && this.#confirmKind !== undefined) {
       event.preventDefault();
       this.closeConfirm();
@@ -236,6 +424,7 @@ export class DesignerIntentController {
       this.cancelPending();
       return true;
     }
+    if (event.isComposing) return false;
     if (event.key !== 'Enter' || event.shiftKey || event.target !== this.#input) return false;
     event.preventDefault();
     void this.submit();
@@ -243,11 +432,6 @@ export class DesignerIntentController {
   }
 
   /** 起点牌把「从什么起」带进来：只影响这一轮意图，提交后清空。 */
-  focus(): void {
-    this.syncDraftState();
-    this.#input?.focus();
-  }
-
   /**
    * 输入框随内容长高，上限交给 CSS 的 max-height 兜住。
    * 固定 `rows=2` 时，长指令只在 36px 里内部滚动：用户读不回顾已写的内容，
@@ -297,7 +481,16 @@ export class DesignerIntentController {
     try {
       // 空态只剩「从一句话起」一个入口，引擎不再区分起点；`startsFrom` 仍是宿主契约里的
       // 可选字段（宿主自建入口时可自行填），引擎侧不再产生它。
-      result = await handler({ instanceId: this.#instanceId, text, scope }, abort.signal);
+      const references = this.references;
+      result = await handler(
+        {
+          instanceId: this.#instanceId,
+          text,
+          scope,
+          ...(references.length === 0 ? {} : { references }),
+        },
+        abort.signal,
+      );
     } catch {
       result = { ok: false, diagnostics: [] };
     }
@@ -309,6 +502,9 @@ export class DesignerIntentController {
       this.setStatus(DESIGNER_UI_TEXT.intent.cancelled, 'info');
     } else if (result.ok) {
       input.value = '';
+      // 引用是这一句话的一部分：提交成功才随文本一起清掉，失败时留着让用户重试。
+      this.#references = [];
+      this.renderReferences();
       this.syncDraftState();
       this.setStatus(DESIGNER_UI_TEXT.intent.pending, 'info');
       // 生成期间选区变化过：输入已清空，把挂起的选区并入作用域，保持 chip 与画布一致。
@@ -533,6 +729,11 @@ export class DesignerIntentController {
         : DESIGNER_UI_TEXT.intent.unavailable;
     }
     if (this.#submit !== undefined) this.#submit.disabled = !available || this.#pending;
+    if (this.#refAdd !== undefined) {
+      // 没有目录端口就不出现入口：与其给一个点了没反应的按钮，不如让输入区保持纯文本。
+      this.#refAdd.hidden = this.#catalog === undefined || !available;
+      this.#refAdd.disabled = this.#pending;
+    }
     if (this.#scopeClear !== undefined) {
       this.#scopeClear.hidden = this.#scopeValue.kind === 'screen';
     }

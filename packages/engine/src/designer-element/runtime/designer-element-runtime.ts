@@ -24,8 +24,8 @@ import {
   writeLeftPanelGroups,
 } from '../api/designer-element-configuration.js';
 import {
-  readTargetDisplayOverlay,
   readDisplayMetrics,
+  readTargetDisplayOverlay,
   readTargetDisplayProfile,
   setTargetDisplayOverlay,
   setTargetDisplayProfile,
@@ -94,6 +94,7 @@ import {
   readIntentAvailable,
   requestComponentChoice,
   setIntentHandler,
+  setIntentReferenceCatalog,
 } from '../api/designer-element-intent.js';
 import {
   readBackButton,
@@ -302,6 +303,7 @@ export const designerElementRuntime = {
   exitPresentationLock,
   readPresentationLocked,
   setIntentHandler,
+  setIntentReferenceCatalog,
   readIntentAvailable,
   requestComponentChoice,
   setSceneCatalog,

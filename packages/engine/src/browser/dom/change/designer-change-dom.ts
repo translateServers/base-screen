@@ -85,22 +85,14 @@ export function changePaneMarkup(
   }
   if (proposal === undefined) {
     const componentScope = intentScope?.kind === 'components';
-    return `${reviewToggle}${notice}<div class="change-empty">
-      <span class="change-empty-mark" aria-hidden="true">${designerIcon('sparkle')}</span>
-      <p class="change-empty-title">${componentScope ? text.componentEmptyTitle : text.emptyTitle}</p>
-      <p class="change-empty-copy">${componentScope ? text.componentEmptyHint : text.emptyHint}</p>
-      ${
-        componentScope
-          ? ''
-          : `<button type="button" class="change-start-card" data-change-action="start-intent">
-        <span class="change-start-copy">
-          <span class="change-start-title">${text.startFromPrompt}</span>
-          <span class="change-start-hint">${text.startFromPromptHint}</span>
-        </span>
-        <span class="change-start-icon" aria-hidden="true">${designerIcon('chevron-right')}</span>
-      </button>`
-      }
-    </div>${historyMarkup(history)}`;
+    // 空态不写说明书：整屏什么都不铺（入口就是右栏底部的输入框），
+    // 组件作用域只给一行指导——那里确实需要说清「改的是选中组件」。
+    // 空态没有任何内容时，历史就是唯一的内容——展开它，别让面板只剩一大片空。
+    return `${reviewToggle}${notice}${
+      componentScope
+        ? `<div class="change-empty"><p class="change-empty-copy">${text.componentEmptyHint}</p></div>`
+        : ''
+    }${historyMarkup(history, true)}`;
   }
   const units = proposal.units;
   const reviewing = review?.reviewing === true;
@@ -367,7 +359,7 @@ function originMarkup(origin: DesignerChangeProposalOrigin | undefined): string 
  * 节点顺序即提交顺序，`position` 由 core 给出；`future` 是撤销或回退留下的
  * 前进栈，只能通过重做恢复，不能传给仅支持 past 的回退入口。
  */
-function historyMarkup(history: readonly ScreenHistoryNode[] | undefined): string {
+function historyMarkup(history: readonly ScreenHistoryNode[] | undefined, open = false): string {
   if (history === undefined || history.length === 0) return '';
   const text = DESIGNER_UI_TEXT.change;
   const rows = history
@@ -388,7 +380,7 @@ function historyMarkup(history: readonly ScreenHistoryNode[] | undefined): strin
       </button></li>`;
     })
     .join('');
-  return `<details class="change-panel-section change-history">
+  return `<details class="change-panel-section change-history"${open ? ' open' : ''}>
       <summary class="change-history-summary">
         <span class="change-history-title">${text.historyTitle}</span>
         <span class="change-history-count">${text.historyCount(history.length)}</span>

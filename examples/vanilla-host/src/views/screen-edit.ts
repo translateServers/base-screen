@@ -26,6 +26,7 @@ import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
 import { createHostIntentHandler } from '../screen/host-intent';
+import { createHostIntentReferenceCatalog } from '../screen/host-intent-reference';
 import { createHostResourceAuthoringPanel } from '../screen/host-resource-authoring';
 import { loadHostRuntime } from '../screen/host-runtime';
 import {
@@ -201,6 +202,7 @@ export const screenEditView: ViewModule = {
         element.removeEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
         element.removeEventListener('base-screen-project-conflict', onConflict);
         element.setIntentHandler(undefined);
+        element.setIntentReferenceCatalog(undefined);
         runtime.bindDesigner(null);
       };
 
@@ -223,6 +225,11 @@ export const screenEditView: ViewModule = {
           // 读函数而不是快照：在线物料包上下架会整体替换 runtime.catalog。
           catalog: () => runtime.catalog,
         }),
+      );
+      // 引用目录：素材 + 数据集拍平成一份清单交给引擎，选择器与 chip 都在引擎侧，
+      // 三端只需要这一行。宿主不接的话输入区不会出现引用入口。
+      element.setIntentReferenceCatalog(
+        createHostIntentReferenceCatalog({ api, screenId, logger }),
       );
 
       resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });

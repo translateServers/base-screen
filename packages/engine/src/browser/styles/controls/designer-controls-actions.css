@@ -439,23 +439,6 @@
   font-weight: 500;
 }
 
-/* 变更空态的起点卡：整张卡片是点击面，卡内按钮退成标题行，不再叠一层控件底。 */
-.change-start-card .designer-button {
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: var(--designer-text-primary);
-  font-weight: 600;
-  text-align: left;
-}
-
-.change-start-card .designer-button:hover:not(:disabled) {
-  background: transparent;
-  color: var(--designer-text-primary);
-}
-
 /* 定位蓝图是次级动作，不抢面板里唯一的主按钮权重。 */
 .properties .inspector-pane .designer-blueprint-editor-hint + .designer-button {
   background: var(--designer-surface-control);

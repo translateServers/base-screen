@@ -186,12 +186,12 @@ describe('proposal disclosure and footer', () => {
 });
 
 describe('agent empty state', () => {
-  it('presents a compact, clickable start path instead of pipeline wording', () => {
+  it('leaves the whole-screen empty state bare instead of writing a pitch', () => {
     const html = changePaneMarkup(undefined, false);
-    expect(html).toContain('change-empty-mark');
-    expect(html).toContain('把想法变成可审的修改');
-    expect(html).toContain('采纳前不会写入文档');
-    expect(html).toContain('<button type="button" class="change-start-card"');
+    // 入口就是右栏底部的输入框：空态不再铺标题、说明或起点卡。
+    expect(html).not.toContain('change-start-card');
+    expect(html).not.toContain('change-empty');
+    expect(html).not.toContain('采纳前不会写入文档');
     expect(html).not.toContain('当前没有待处理的变更');
   });
 
@@ -200,9 +200,9 @@ describe('agent empty state', () => {
       kind: 'components',
       componentIds: ['title'],
     });
-    expect(html).toContain('修改选中组件');
+    // 组件作用域确实需要说清「改的是选中组件」，所以保留一行指导。
     expect(html).toContain('描述要改的内容、样式或布局');
-    expect(html).not.toContain('data-change-action="start-intent"');
+    expect(html).not.toContain('change-start-card');
   });
 });
 

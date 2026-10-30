@@ -1,4 +1,4 @@
-import type { ScreenJsonValue } from '@base-screen/contracts';
+import type { ScreenIntentReference, ScreenJsonValue } from '@base-screen/contracts';
 import type {
   AgentGenerateShape,
   DatasetCatalog,
@@ -277,11 +277,16 @@ export const api = {
   generateScreenCandidate: (
     topic: string,
     catalog: AgentCatalogShape | undefined,
+    references?: readonly ScreenIntentReference[],
     signal?: AbortSignal,
   ): Promise<ApiResult<AgentCandidateShape>> =>
     request('/agent/candidate', {
       method: 'POST',
-      body: catalog === undefined ? { topic } : { topic, catalog },
+      body: {
+        topic,
+        ...(catalog === undefined ? {} : { catalog }),
+        ...(references === undefined || references.length === 0 ? {} : { references }),
+      },
       ...(signal === undefined ? {} : { signal }),
     }),
   generateComponentCandidate: (

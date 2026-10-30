@@ -9,6 +9,7 @@ import type {
   ScreenHostCatalogPort,
   ScreenHostDatasetPort,
   ScreenHostResourcePort,
+  ScreenIntentReferenceCatalogPort,
   ScreenParseResult,
   ScreenProjectAdapter,
   ScreenProjectCatalogPort,
@@ -555,6 +556,13 @@ export class BaseScreenDesignerElement extends ElementBase {
    * 绑定意图处理器：宿主在这里接入自己的智能体，产出提案后调用 submitChangeProposal。
    * 传 undefined 解绑，输入区回到「未接入」停用态。
    */
+  /**
+   * 绑定引用目录（素材 / 数据集）。不绑定则输入区不出现引用入口——老宿主无需改动。
+   */
+  setIntentReferenceCatalog(catalog: ScreenIntentReferenceCatalogPort | undefined): void {
+    this.#designerState.runtime.setIntentReferenceCatalog(this, catalog);
+  }
+
   setIntentHandler(handler: DesignerIntentHandler | undefined): void {
     this.#designerState.runtime.setIntentHandler(this, handler);
   }

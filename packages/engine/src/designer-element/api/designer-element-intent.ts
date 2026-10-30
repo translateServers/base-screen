@@ -1,3 +1,4 @@
+import type { ScreenIntentReferenceCatalogPort } from '@base-screen/contracts';
 import type { DesignerIntentHandler } from '../../common/operations/intent/designer-intent.js';
 import {
   type DesignerElementHost,
@@ -13,6 +14,17 @@ export function setIntentHandler(
   handler: DesignerIntentHandler | undefined,
 ): void {
   getDesignerElementState(element).intentController.setHandler(handler);
+}
+
+/**
+ * 绑定引用目录端口（素材 / 数据集）：宿主把两类实体拍平成一份可选清单交给引擎，
+ * 引擎负责选择器与 chip。不绑定时输入区不出现引用入口，退化成纯文本。
+ */
+export function setIntentReferenceCatalog(
+  element: DesignerElementHost,
+  catalog: ScreenIntentReferenceCatalogPort | undefined,
+): void {
+  getDesignerElementState(element).intentController.setReferenceCatalog(catalog);
 }
 
 export function readIntentAvailable(element: DesignerElementHost): boolean {

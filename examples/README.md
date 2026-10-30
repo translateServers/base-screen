@@ -54,7 +54,8 @@ screen/host-alarm-controller.ts  screen/host-alarm-style-authoring.ts
 screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
 screen/asset-library.ts  screen/asset-return.ts  screen/blueprint-canvas.ts
 screen/datasource-return.ts
-screen/host-intent.ts  screen/host-refresh-controller.ts  screen/host-resource-plugin.ts
+screen/host-intent.ts  screen/host-intent-reference.ts  screen/host-refresh-controller.ts
+screen/host-resource-plugin.ts
 screen/host-runtime.ts
 screen/metric-value.ts  screen/online-materials.ts  screen/project-adapter.ts
 store/screen-session-store.ts  store/screens-store.ts  types.ts

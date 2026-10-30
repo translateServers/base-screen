@@ -19,7 +19,9 @@ import {
   parseAgentComponentEditSpec,
   readEditableComponents,
 } from './agent-component-edit';
+import type { AgentPromptReferences } from './agent-spec';
 import { composeScreenDocument } from './agent-compose';
+import { DatasetCatalogService } from '../datasets/dataset-catalog.service';
 import {
   type AgentBlock,
   type AgentBlockColumn,
@@ -64,6 +66,7 @@ export class AgentService {
   constructor(
     private readonly screens: ScreensService,
     private readonly config: ConfigService,
+    private readonly datasets: DatasetCatalogService,
   ) {}
 
   async generate(input: {
@@ -85,12 +88,73 @@ export class AgentService {
     };
   }
 
+  /**
+   * 把上送的引用核对成两份视图：
+   * - `prompt`：给模型看的可读清单（名称 + id + 数据集字段）；
+   * - `compose`：给编译器用的列信息（`datasetId` → 字段类型，供角色分配）。
+   *
+   * 认不出来的引用直接丢掉并记日志——宿主已经按目录过滤过一次，这里只做兜底，
+   * 不因为一条失效引用就把整句话打回。
+   */
+  private async resolveReferences(
+    catalog: AgentCatalog,
+    raw: readonly Record<string, unknown>[] | undefined,
+  ): Promise<{
+    prompt: AgentPromptReferences | undefined;
+    compose: { assets: { id: string; name: string }[]; datasets: { datasetId: string; name: string; columns: { id: string; type: string }[] }[] } | undefined;
+  }> {
+    if (raw === undefined || raw.length === 0) return { prompt: undefined, compose: undefined };
+    const assets: { id: string; name: string }[] = [];
+    const datasets: { datasetId: string; name: string; columns: { id: string; type: string }[] }[] = [];
+    for (const item of raw) {
+      const kind = item.kind;
+      if (kind === 'asset') {
+        const assetId = typeof item.assetId === 'string' ? item.assetId : '';
+        const asset = catalog.assets.find((entry) => entry.id === assetId);
+        if (asset === undefined) {
+          this.logger.warn(`agent reference asset dropped: ${assetId}`);
+          continue;
+        }
+        assets.push({ id: asset.id, name: asset.name });
+        continue;
+      }
+      if (kind === 'dataset') {
+        const datasetId = typeof item.datasetId === 'string' ? item.datasetId : '';
+        try {
+          const definition = await this.datasets.describe(datasetId);
+          // 契约里的字段类型是 valueType；编译器只关心 number/其它二分，这里就地归并。
+          const columns = (definition.fields ?? []).map((field) => ({
+            id: field.id,
+            type: field.valueType === 'number' ? 'number' : 'string',
+          }));
+          datasets.push({ datasetId, name: definition.name, columns });
+        } catch {
+          this.logger.warn(`agent reference dataset dropped: ${datasetId}`);
+        }
+      }
+    }
+    if (assets.length === 0 && datasets.length === 0) return { prompt: undefined, compose: undefined };
+    return {
+      prompt: {
+        assets,
+        datasets: datasets.map((dataset) => ({
+          datasetId: dataset.datasetId,
+          name: dataset.name,
+          columns: dataset.columns.map((column) => column.id),
+        })),
+      },
+      compose: { assets, datasets },
+    };
+  }
+
   async generateCandidate(input: {
     topic: string;
     catalog?: unknown;
+    references?: readonly Record<string, unknown>[];
   }): Promise<AgentCandidateResult> {
     const topic = input.topic.trim();
     const catalog = this.resolveCatalog(input.catalog);
+    const references = await this.resolveReferences(catalog, input.references);
     const baseUrl = this.config.get<string>('AGENT_LLM_BASE_URL') ?? '';
     const apiKey = this.config.get<string>('AGENT_LLM_API_KEY') ?? '';
     const model = this.config.get<string>('AGENT_LLM_MODEL') ?? '';
@@ -103,7 +167,7 @@ export class AgentService {
       const result = await requestAgentCompletion(
         { baseUrl, apiKey, model },
         // 目录随请求到来，所以提示词也是按目录现生成的：宿主装了新物料，下一句话就能用上。
-        buildCatalogSystemPrompt(catalog),
+        buildCatalogSystemPrompt(catalog, references.prompt),
         buildAgentUserPrompt(topic),
         this.logger,
       );
@@ -123,7 +187,11 @@ export class AgentService {
       failure = 'AGENT_NOT_CONFIGURED';
     }
 
-    const composed = composeScreenDocument({ spec, catalog });
+    const composed = composeScreenDocument(
+      references.compose === undefined
+        ? { spec, catalog }
+        : { spec, catalog, references: references.compose },
+    );
     if (!composed.ok) {
       const [diagnostic] = composed.diagnostics;
       return {

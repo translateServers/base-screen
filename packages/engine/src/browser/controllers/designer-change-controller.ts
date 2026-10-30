@@ -66,7 +66,6 @@ export class DesignerChangeController {
     | undefined;
   #getDocument: (() => ScreenDocument | undefined) | undefined;
   #getIntentScope: (() => ScreenIntentScope) | undefined;
-  #startIntent: (() => void) | undefined;
   #stateHandler: ((detail: BaseScreenDesignerChangeStateDetail) => void) | undefined;
   #paneModeHandler: ((mode: RightPaneMode) => void) | undefined;
   #lastRenderedPaneMode: RightPaneMode | undefined;
@@ -140,10 +139,6 @@ export class DesignerChangeController {
   ): void {
     this.#historyReader = reader;
     this.#revertHandler = revert;
-  }
-
-  setStartIntentHandler(handler: () => void): void {
-    this.#startIntent = handler;
   }
 
   get pending(): DesignerChangeProposal | undefined {
@@ -324,9 +319,6 @@ export class DesignerChangeController {
         }
         return true;
       }
-      case 'start-intent':
-        this.#startIntent?.();
-        return true;
       case 'exit-review':
         this.exitReview();
         return true;

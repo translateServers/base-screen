@@ -26,6 +26,7 @@ const SHARED_FILES = [
   'src/screen/asset-return.ts',
   'src/screen/host-resource-plugin.ts',
   'src/screen/host-data-channel.ts',
+  'src/screen/host-intent-reference.ts',
   'src/types.ts',
   'src/styles/asset-library.css',
 ] as const;

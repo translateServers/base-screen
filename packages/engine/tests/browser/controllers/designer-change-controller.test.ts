@@ -138,7 +138,7 @@ describe('designer change controller', () => {
     h.controller.setPaneMode('inspector');
     h.controller.setPaneMode('intent');
     expect(h.pane.innerHTML).toContain('data-change-feedback="remaining-invalid"');
-    expect(h.pane.innerHTML).not.toContain('data-change-action="start-intent"');
+    expect(h.pane.innerHTML).not.toContain('change-start-card');
   });
 
   it('also reports ghost remount failure instead of silently removing the remainder', () => {

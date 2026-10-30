@@ -26,6 +26,7 @@ import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
 import { createHostIntentHandler } from '../screen/host-intent';
+import { createHostIntentReferenceCatalog } from '../screen/host-intent-reference';
 import { createHostResourceAuthoringPanel } from '../screen/host-resource-authoring';
 import { type HostRuntime, loadHostRuntime } from '../screen/host-runtime';
 import {
@@ -214,6 +215,10 @@ onMounted(() => {
         catalog: () => host.catalog,
       }),
     );
+    // 引用目录：素材 + 数据集拍平成一份清单交给引擎，选择器与 chip 都在引擎侧。
+    element.setIntentReferenceCatalog(
+      createHostIntentReferenceCatalog({ api, screenId, logger }),
+    );
 
     resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });
     // 浮动面板挂 body：不能塞进框架根节点（Vue 的 fragment anchor 会被打乱）。
@@ -248,6 +253,7 @@ onBeforeUnmount(() => {
   onlineMaterials = undefined;
   unsubscribeSession?.();
   element?.setIntentHandler(undefined);
+  element?.setIntentReferenceCatalog(undefined);
   element?.remove();
   designer.value = null;
   runtime?.bindDesigner(null);

@@ -95,13 +95,17 @@ export function initialize(element: DesignerElementHost): void {
   const intentScopeClear = shadow.querySelector<HTMLButtonElement>('[data-intent-scope-clear]');
   const intentStatus = shadow.querySelector<HTMLElement>('[data-intent-status]');
   const intentConfirm = shadow.querySelector<HTMLElement>('[data-intent-confirm]');
+  const intentRefs = shadow.querySelector<HTMLElement>('[data-intent-refs]');
+  const intentRefAdd = shadow.querySelector<HTMLButtonElement>('[data-intent-ref-add]');
   if (
     intentInput !== null &&
     intentSubmit !== null &&
     intentScope !== null &&
     intentScopeClear !== null &&
     intentStatus !== null &&
-    intentConfirm !== null
+    intentConfirm !== null &&
+    intentRefs !== null &&
+    intentRefAdd !== null
   ) {
     elementState.intentController.connect(
       elementState.instanceId,
@@ -111,6 +115,8 @@ export function initialize(element: DesignerElementHost): void {
       intentScopeClear,
       intentStatus,
       intentConfirm,
+      intentRefs,
+      intentRefAdd,
     );
     // 问句与取消出口就在意图状态行上：不新建浮层，也不再占一块界面。
     elementState.intentChoiceController.connect(intentStatus);

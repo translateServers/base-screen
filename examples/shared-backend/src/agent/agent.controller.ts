@@ -21,6 +21,7 @@ export class AgentController {
     return this.agent.generateCandidate({
       topic: dto.topic,
       ...(dto.catalog === undefined ? {} : { catalog: dto.catalog }),
+      ...(dto.references === undefined ? {} : { references: dto.references }),
     });
   }
 

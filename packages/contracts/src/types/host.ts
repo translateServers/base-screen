@@ -193,7 +193,48 @@ export type ScreenIntentScope =
   | { readonly kind: 'components'; readonly componentIds: readonly string[] };
 
 /**
- * 一次意图提交：引擎只负责把「一句话 + 作用域」结构化后交给宿主。
+ * 可被意图引用的实体类别。
+ *
+ * 引擎只认这两个枚举值，不解析 id 语义、不发请求——素材与数据集的目录由宿主端口提供，
+ * 引擎负责选择器、chip 与结构化上送。
+ */
+export type ScreenIntentReferenceKind = 'asset' | 'dataset';
+
+/**
+ * 选择器里的一行。**只用于 UI**：不进 `ScreenIntentRequest`，更不会写进文档。
+ *
+ * `thumbnailUrl` 是瞬态展示数据（素材没有缩略图端点，宿主通常直接给内容地址），
+ * 引擎只把它当 `<img src>` 用，不校验、不拼接、不落库。
+ */
+export interface ScreenIntentReferenceOption {
+  readonly kind: ScreenIntentReferenceKind;
+  /** 素材是 assetId，数据集是 datasetId。 */
+  readonly id: string;
+  readonly label: string;
+  readonly note?: string;
+  /** 数据集分组，用于选择器分段。 */
+  readonly groupId?: string;
+  readonly thumbnailUrl?: string;
+}
+
+/** 引用目录端口：一次性返回全量（素材与数据集都有既有上限），引擎本地过滤。 */
+export interface ScreenIntentReferenceCatalogPort {
+  catalog(request: {
+    readonly kinds: readonly ScreenIntentReferenceKind[];
+    readonly signal: ScreenAbortSignal;
+  }): Promise<ScreenParseResult<readonly ScreenIntentReferenceOption[]>>;
+}
+
+/**
+ * 提交时携带的引用。字段按类别分开命名（`assetId` / `datasetId`）而不是通用 `id`：
+ * 判别联合里同名会让「给错 id」在类型上失声。
+ */
+export type ScreenIntentReference =
+  | { readonly kind: 'asset'; readonly assetId: string; readonly name?: string }
+  | { readonly kind: 'dataset'; readonly datasetId: string; readonly name?: string };
+
+/**
+ * 一次意图提交：引擎只负责把「一句话 + 作用域 + 引用」结构化后交给宿主。
  * 不含模型、凭证或传输配置——这些都在宿主侧。
  */
 export interface ScreenIntentRequest {
@@ -201,6 +242,8 @@ export interface ScreenIntentRequest {
   readonly text: string;
   readonly scope: ScreenIntentScope;
   readonly startsFrom?: 'metrics' | 'template' | 'prompt';
+  /** 用户显式引用的素材与数据集；没有引用时整键省略。 */
+  readonly references?: readonly ScreenIntentReference[];
 }
 
 /**

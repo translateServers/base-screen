@@ -70,6 +70,8 @@ export interface AgentBlock {
   readonly span: number;
   readonly text?: string;
   readonly assetId?: string;
+  /** 引用数据集：由宿主指定的 datasetId，交给编译器落成数据源实例与绑定。 */
+  readonly datasetId?: string;
   readonly table?: AgentBlockTable;
   readonly props?: Readonly<Record<string, string | number | boolean>>;
 }
@@ -96,10 +98,39 @@ export function buildAgentUserPrompt(topic: string): string {
  * 保留原 v1 提示词的「只输出 JSON / 数字要能对上 / 简体中文」这些纪律，把
  * 「哪些组件能用」整段换成目录摘要；模型不再自己描述柱高与清单，而是给表格数据。
  */
-export function buildCatalogSystemPrompt(catalog: AgentCatalog): string {
+export interface AgentPromptReferences {
+  readonly assets: readonly { readonly id: string; readonly name: string }[];
+  readonly datasets: readonly {
+    readonly datasetId: string;
+    readonly name: string;
+    readonly columns: readonly string[];
+  }[];
+}
+
+/** 用户本轮显式引用的素材与数据集：模型必须用上，不能编造别的 id。 */
+function renderReferencesPrompt(references: AgentPromptReferences | undefined): string {
+  if (references === undefined) return '';
+  const lines: string[] = [];
+  for (const asset of references.assets) lines.push(`- 素材：${asset.name}（assetId: ${asset.id}）`);
+  for (const dataset of references.datasets) {
+    const columns = dataset.columns.length === 0 ? '字段未知' : dataset.columns.join(' / ');
+    lines.push(`- 数据集：${dataset.name}（datasetId: ${dataset.datasetId}，字段：${columns}）`);
+  }
+  if (lines.length === 0) return '';
+  return `
+
+用户在本轮已指定以下引用，必须用上，不要编造其他 id：
+${lines.join('\n')}
+数据型块二选一：给 table（示例数据）或给 datasetId（用户引用的数据集），不得同时给。`;
+}
+
+export function buildCatalogSystemPrompt(
+  catalog: AgentCatalog,
+  references?: AgentPromptReferences,
+): string {
   return `你是一个大屏信息架构师。用户给你一个主题，你只输出 JSON，不要解释。
 
-${renderCatalogPrompt(catalog)}
+${renderCatalogPrompt(catalog)}${renderReferencesPrompt(references)}
 
 输出结构：
 {

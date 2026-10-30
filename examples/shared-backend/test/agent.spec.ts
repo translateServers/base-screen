@@ -3,7 +3,12 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AgentController } from '../src/agent/agent.controller';
 import { AgentService, parseCatalogSpec } from '../src/agent/agent.service';
+
+const datasetsStub = {
+  describe: async () => ({ fields: [] }),
+} as unknown as DatasetCatalogService;
 import type { AgentCatalog } from '../src/agent/agent-catalog';
+import type { DatasetCatalogService } from '../src/datasets/dataset-catalog.service';
 import { requestAgentCompletion } from '../src/agent/agent-client';
 import {
   type AgentEditableComponent,
@@ -43,6 +48,7 @@ describe('agent candidate and persisted generation', () => {
     const service = new AgentService(
       screens as unknown as ScreensService,
       new ConfigService(config),
+      datasetsStub,
     );
     return { service, screens, created, saved, controller: new AgentController(service) };
   }
@@ -546,7 +552,11 @@ describe('component-scoped agent edits', () => {
       create: jest.fn(),
       update: jest.fn(),
     };
-    return new AgentService(screens as unknown as ScreensService, new ConfigService(config));
+    return new AgentService(
+      screens as unknown as ScreensService,
+      new ConfigService(config),
+      datasetsStub,
+    );
   }
 
   it('validates the component edit request envelope', async () => {

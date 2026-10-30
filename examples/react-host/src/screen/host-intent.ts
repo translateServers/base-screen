@@ -147,7 +147,12 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
       // 目录与素材在每次提交时现取：在线物料包刚发布、素材刚上传，这一句就能用上。
       // 没有目录来源时保持同步进到请求，不额外制造一个 await 点。
       const catalog = options.catalog === undefined ? undefined : await readAgentCatalog(options);
-      const generated = await api.generateScreenCandidate(request.text, catalog, signal);
+      const generated = await api.generateScreenCandidate(
+        request.text,
+        catalog,
+        request.references,
+        signal,
+      );
       const reason = staleReason();
       if (reason !== undefined) return { ok: false, diagnostics: [], reason };
       if (!generated.ok) {
