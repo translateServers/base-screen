@@ -20,7 +20,7 @@ import {
   parseAgentComponentEditSpec,
   readEditableComponents,
 } from './agent-component-edit';
-import { composeScreenDocument } from './agent-compose';
+import { type ComposeReferences, composeScreenDocument } from './agent-compose';
 import type { AgentPromptReferences } from './agent-spec';
 import {
   type AgentBlock,
@@ -166,7 +166,7 @@ export class AgentService {
     const apiKey = this.config.get<string>('AGENT_LLM_API_KEY') ?? '';
     const model = this.config.get<string>('AGENT_LLM_MODEL') ?? '';
 
-    let spec = deterministicSpec(topic, catalog);
+    let spec = deterministicSpec(topic, catalog, references.compose);
     let mode: 'llm' | 'deterministic' = 'deterministic';
     let failure: string | undefined;
 
@@ -317,7 +317,11 @@ export class AgentService {
  * 兜底也要给全 `points` / `items`——编译器不接受「只有标题、数据留空」的面板，否则又会
  * 退回预设数字。数值按主题哈希确定（同一主题可复现），页脚与副标题会写明未调用模型。
  */
-function deterministicSpec(topic: string, catalog: AgentCatalog): AgentScreenSpec {
+function deterministicSpec(
+  topic: string,
+  catalog: AgentCatalog,
+  references?: ComposeReferences,
+): AgentScreenSpec {
   const subject = topic === '' ? '示例大屏' : topic;
   const seed = hash(subject);
   const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
@@ -342,7 +346,7 @@ function deterministicSpec(topic: string, catalog: AgentCatalog): AgentScreenSpe
       { label: '缺货', value: `${seed % 30} 家`, delta: `+${seed % 7}` },
       { label: '在途', value: `${3000 + (seed % 2000)} 万` },
     ],
-    blocks: deterministicBlocks(subject, points, catalog) ?? [],
+    blocks: deterministicBlocks(subject, points, catalog, references) ?? [],
   };
 }
 
@@ -354,11 +358,34 @@ function deterministicBlocks(
   subject: string,
   points: readonly AgentChartPoint[],
   catalog: AgentCatalog,
+  references?: ComposeReferences,
 ): AgentBlock[] | null {
   const chart = pickTabularMaterial(catalog);
   const text = pickTextMaterial(catalog);
   const asset = pickAssetMaterial(catalog);
   const blocks: AgentBlock[] = [];
+
+  // 兜底也必须用上用户引用：模型不可用时，用户选的图和数据集在产物里不能凭空消失。
+  const referencedAsset = references?.assets[0];
+  if (asset !== undefined && referencedAsset !== undefined) {
+    blocks.push({
+      type: asset.type,
+      title: referencedAsset.name,
+      note: '来自本轮引用',
+      span: 2,
+      assetId: referencedAsset.id,
+    });
+  }
+  const referencedDataset = references?.datasets[0];
+  if (chart !== undefined && referencedDataset !== undefined) {
+    blocks.push({
+      type: chart.type,
+      title: referencedDataset.name,
+      note: '来自本轮引用数据集',
+      span: 2,
+      datasetId: referencedDataset.datasetId,
+    });
+  }
   if (chart !== undefined) {
     blocks.push({
       type: chart.type,
@@ -386,7 +413,7 @@ function deterministicBlocks(
     });
   }
   const firstAsset = catalog.assets[0];
-  if (asset !== undefined && firstAsset !== undefined) {
+  if (asset !== undefined && firstAsset !== undefined && referencedAsset === undefined) {
     blocks.push({
       type: asset.type,
       title: '现场图',
@@ -494,6 +521,13 @@ function readBlocks(value: readonly unknown[], catalog: AgentCatalog): AgentBloc
     };
 
     if (material.data === 'tabular') {
+      // 数据型块二选一：给 `datasetId` 表示用用户引用的真实数据集，给 `table` 才是示例数据。
+      // 这里只收下 id，认不认得出这个数据集由编译器按本轮引用判断（认不出会记警告并回落表格）。
+      const datasetId = typeof block.datasetId === 'string' ? block.datasetId.trim() : '';
+      if (datasetId !== '') {
+        blocks.push({ ...base, datasetId });
+        continue;
+      }
       const table = readBlockTable(block.table);
       if (table === null) return null;
       blocks.push({ ...base, table });

@@ -2,7 +2,11 @@ import { Logger } from '@nestjs/common';
 
 // 中间表示现在要模型写图表数据点与清单明细，输出比「只有标题」长；15s 会在冷启动的
 // 网关上误判成不可达（abort），进而静默退回确定性兜底——看起来就像「没接模型」。
-const DEFAULT_TIMEOUT_MS = 25_000;
+/**
+ * 整屏 JSON 有几千 token，慢的时候 15–30s 才回包：原来 25s 会在正常波动里被 abort，
+ * 结果是「模型没问题但页面掉进兜底」。默认 60s，可用环境变量调整。
+ */
+const DEFAULT_TIMEOUT_MS = Number(process.env.AGENT_LLM_TIMEOUT_MS ?? 60_000);
 
 export interface AgentClientConfig {
   readonly baseUrl: string;
@@ -68,7 +72,9 @@ export async function requestAgentCompletion(
     logger.warn(
       `agent request error: ${error instanceof Error ? error.name : 'unknown'} elapsed=${Date.now() - startedAt}ms`,
     );
-    return { ok: false, failure: 'AGENT_UNREACHABLE' };
+    // 超时与网络错误分开报：前者是「再等一会儿可能就好了」，后者才是真的连不上。
+    const timedOut = error instanceof Error && error.name === 'AbortError';
+    return { ok: false, failure: timedOut ? 'AGENT_TIMEOUT' : 'AGENT_UNREACHABLE' };
   } finally {
     clearTimeout(timer);
   }

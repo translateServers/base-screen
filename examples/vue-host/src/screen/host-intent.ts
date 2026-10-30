@@ -463,6 +463,7 @@ function describeAgentFailure(failure: string | undefined): string {
   if (failure === undefined) return '未调用模型';
   if (failure === 'AGENT_NOT_CONFIGURED') return '未配置模型';
   if (failure === 'AGENT_SPEC_INVALID') return '模型输出未通过校验';
+  if (failure === 'AGENT_TIMEOUT') return '模型响应超时';
   if (failure === 'AGENT_UNREACHABLE') return '模型服务不可达';
   if (failure === 'AGENT_EMPTY_RESPONSE') return '模型返回为空';
   if (failure.startsWith('AGENT_HTTP_')) return '模型服务返回错误';

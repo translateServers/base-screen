@@ -107,6 +107,19 @@ export interface AgentPromptReferences {
   }[];
 }
 
+/**
+ * 引用落到块上的硬规则。
+ *
+ * 有数据集引用时不允许再给 table：模型很愿意用「顺手编的示例数据」，那样用户引用的数据集
+ * 就白选了——产物看起来正常，但屏上跑的是假数据。
+ */
+function referenceRule(references: AgentPromptReferences): string {
+  if (references.datasets.length > 0) {
+    return '数据型块必须给 datasetId（只能用上面列出的引用数据集），不要给 table、也不要同时给两者。';
+  }
+  return '数据型块给 table（示例数据）；没有引用数据集时不要写 datasetId。';
+}
+
 /** 用户本轮显式引用的素材与数据集：模型必须用上，不能编造别的 id。 */
 function renderReferencesPrompt(references: AgentPromptReferences | undefined): string {
   if (references === undefined) return '';
@@ -122,7 +135,7 @@ function renderReferencesPrompt(references: AgentPromptReferences | undefined): 
 
 用户在本轮已指定以下引用，必须用上，不要编造其他 id：
 ${lines.join('\n')}
-数据型块二选一：给 table（示例数据）或给 datasetId（用户引用的数据集），不得同时给。`;
+${referenceRule(references)}`;
 }
 
 export function buildCatalogSystemPrompt(
