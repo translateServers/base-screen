@@ -175,8 +175,8 @@
    放在 .stage 的兄弟节点上，避免命中 `.stage > *` 的绝对定位规则。 */
 .editor-datasource-link {
   position: fixed;
-  right: var(--spacing-4);
-  bottom: var(--spacing-4);
+  right: var(--editor-float-right);
+  bottom: var(--editor-float-bottom);
   z-index: 40;
   display: inline-flex;
   align-items: center;
@@ -197,7 +197,8 @@
 
 /* 素材管理入口：与数据源入口同层，叠在宿主资源作者面之上。 */
 .editor-assets-link {
-  bottom: calc(var(--spacing-4) + 84px);
+  right: calc(var(--editor-float-right) + 248px);
+  bottom: var(--editor-float-bottom);
 }
 
 .ds-return-link {
@@ -205,11 +206,19 @@
 }
 
 /* 编辑页浮动的宿主资源作者面（与「数据源」入口同层，向上叠一行）：
-   host-resource 的授权与目录归宿主，数据面板只读，这里是宿主侧的创建/改绑入口。 */
+    host-resource 的授权与目录归宿主，数据面板只读，这里是宿主侧的创建/改绑入口。 */
+:root {
+  /* 引擎右栏宽度（.designer 网格第 5 列 336px）。宿主浮层避开这一列。 */
+  --editor-right-panel-width: 336px;
+  /* 四个入口共用底部一行，横向避让右栏。 */
+  --editor-float-right: calc(var(--editor-right-panel-width) + var(--spacing-3));
+  --editor-float-bottom: calc(var(--spacing-4) + 90px);
+}
+
 .editor-resource-authoring {
   position: fixed;
-  right: var(--spacing-4);
-  bottom: calc(var(--spacing-4) + 42px);
+  right: calc(var(--editor-float-right) + 72px);
+  bottom: var(--editor-float-bottom);
   z-index: 40;
 }
 

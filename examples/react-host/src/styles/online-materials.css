@@ -2,8 +2,8 @@
 
 .editor-online-materials {
   position: fixed;
-  right: var(--editor-float-right);
-  bottom: calc(var(--editor-float-bottom) + 80px);
+  right: calc(var(--editor-float-right) + 160px);
+  bottom: var(--editor-float-bottom);
   z-index: 41;
 }
 

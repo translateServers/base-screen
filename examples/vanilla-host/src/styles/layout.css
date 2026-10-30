@@ -197,8 +197,8 @@
 
 /* 素材管理入口：与数据源入口同层，叠在宿主资源作者面之上。 */
 .editor-assets-link {
-  /* 原值与 .editor-online-materials 完全相同，两个入口叠成一团；错开一档。 */
-  bottom: calc(var(--editor-float-bottom) + 120px);
+  right: calc(var(--editor-float-right) + 248px);
+  bottom: var(--editor-float-bottom);
 }
 
 .ds-return-link {
@@ -211,18 +211,17 @@
   /* 引擎右栏宽度（`.designer` 网格第 5 列 336px）。宿主浮层要避开这一列，
      否则会压在面板内的主操作上。引擎若调整右栏宽度，这里需要同步。 */
   --editor-right-panel-width: 336px;
-  /* 宿主浮动快捷键统一停靠在画布右侧：横向避开右栏，纵向让出底部状态栏（30px）。
-     四个入口按 40px 步进竖排，互相之间不再叠压。 */
+  /* 宿主浮动快捷键统一停靠在画布底部右侧：横向避开右栏，纵向让出状态栏。
+     四个入口共用一行，按固定偏移从右向左排列。 */
   --editor-float-right: calc(var(--editor-right-panel-width) + var(--spacing-3));
-  --editor-float-bottom: calc(var(--spacing-4) + 34px);
+  --editor-float-bottom: calc(var(--spacing-4) + 90px);
 }
 
 .editor-resource-authoring {
   position: fixed;
-  /* 停靠画布右下，而不是右栏列内：右栏底部是意图书写面与「确认整屏」二次确认，
-     浮层压上去会让主操作完全点不到（实测确认按钮被整体覆盖，只剩 12px 窄带可点）。 */
-  right: var(--editor-float-right);
-  bottom: calc(var(--editor-float-bottom) + 40px);
+  /* 停靠画布右下，而不是右栏列内：右栏底部是意图书写面与「确认整屏」二次确认。 */
+  right: calc(var(--editor-float-right) + 72px);
+  bottom: var(--editor-float-bottom);
   z-index: 40;
 }
 
