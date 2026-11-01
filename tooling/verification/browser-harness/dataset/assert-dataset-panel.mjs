@@ -330,6 +330,45 @@ export async function assertDatasetPanelInteraction(designer, page) {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(150);
 
+  // 2.4) 两个绑定弹层互斥：指标（多选）先开，再点维度的单选触发器，指标必须收起；
+  //      收起要在原地完成——维度自己的触发器和弹层不能被整段重绘换掉（点了没反应）。
+  await dataPanel.locator(`[data-dataset-binding-trigger="${roleId}"]`).click();
+  await page.waitForTimeout(150);
+  const dimensionTrigger = '[data-dataset-binding-role="dimension"] .designer-select-trigger';
+  await dataPanel.locator(dimensionTrigger).click();
+  await page.waitForTimeout(150);
+  const exclusive = await dataPanel.evaluate((panel, openRole) => {
+    const metricTrigger = panel.querySelector(`[data-dataset-binding-trigger="${openRole}"]`);
+    const metricMenu = panel.querySelector(`[data-dataset-binding-menu="${openRole}"]`);
+    const single = panel.querySelector(
+      '[data-dataset-binding-role="dimension"] .designer-select-trigger',
+    );
+    const singleMenu = single
+      ?.closest('.designer-select-control')
+      ?.querySelector('.designer-select-menu');
+    return {
+      metricExpanded: metricTrigger?.getAttribute('aria-expanded'),
+      metricMenuHidden: metricMenu?.hidden,
+      dimensionExpanded: single?.getAttribute('aria-expanded'),
+      dimensionMenuHidden: singleMenu?.hidden,
+      dimensionConnected: single?.isConnected,
+    };
+  }, roleId);
+  if (
+    exclusive.metricExpanded !== 'false' ||
+    exclusive.metricMenuHidden !== true ||
+    exclusive.dimensionExpanded !== 'true' ||
+    exclusive.dimensionMenuHidden !== false ||
+    exclusive.dimensionConnected !== true
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_BINDING_EXCLUSIVE_FAILED:${JSON.stringify(exclusive)}`,
+    );
+  }
+  // 收起维度弹层，给后面的段落断言留一个中性状态。
+  await dataPanel.locator(dimensionTrigger).click();
+  await page.waitForTimeout(150);
+
   // 2.5) 操作条让位：**不等式判据**（不看截图）——滚到底时最后一段的底边不得越过操作条顶边。
   // 「最后一段」用 `[data-ds-section]` 而不取任意后代：toast / 通知会干扰。
   await dataPanel.evaluate((panel) => {

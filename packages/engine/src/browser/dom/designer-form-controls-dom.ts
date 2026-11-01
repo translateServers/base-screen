@@ -95,9 +95,6 @@ function adoptTextarea(textarea: HTMLTextAreaElement): void {
 }
 
 function adoptSelect(select: HTMLSelectElement): void {
-  const parent = select.parentNode;
-  if (parent === null) return;
-  const marker = select.nextSibling;
   const next = createDesignerSelect(select.ownerDocument, {
     options: Array.from(select.options).map((option) => ({
       disabled: option.disabled,
@@ -109,8 +106,8 @@ function adoptSelect(select: HTMLSelectElement): void {
   copyControlAttributes(select, next);
   next.value = select.value;
   const enhanced = enhanceDesignerSelect(next);
-  // 增强会把原生 select 移进新外壳：先记住原位置，再把外壳插回去。
-  parent.insertBefore(enhanced.element, marker);
+  // 增强只把新建的 next 收进外壳，模板里的原 select 仍是独立节点：原位替换，避免同一字段出现两个下拉。
+  select.replaceWith(enhanced.element);
 }
 
 /** 搬运除 class/type/value 之外的全部属性：值由原语构造时写入，class 单独合并。 */

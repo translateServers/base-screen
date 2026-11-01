@@ -22,6 +22,7 @@ import {
 } from './designer-dataset-draft-controller.js';
 import { setDatasetPreviewTab } from './designer-dataset-preview-controller.js';
 import {
+  dismissDatasetBindingMenu,
   isDatasetWorkbenchStep,
   retryDatasetLink,
   syncDataPanelApplyBar,
@@ -170,10 +171,11 @@ export function handleDatasetClick(
     return true;
   }
   if (context.state.bindingOpenRoleId !== null) {
-    const insideMenu = target.closest('[data-dataset-binding-role]') !== null;
-    if (!insideMenu) {
-      context.state.bindingOpenRoleId = null;
-      syncDatasetSurface(context);
+    // 只有点回当前展开角色的那一行才算「在弹层里」；其它角色的行（如维度的单选触发器）
+    // 都是弹层外，必须收起——但只能就地收，不能重绘段（维度自己的弹层已在目标阶段打开）。
+    const openRole = target.closest<HTMLElement>('[data-dataset-binding-role]');
+    if (openRole?.dataset.datasetBindingRole !== context.state.bindingOpenRoleId) {
+      dismissDatasetBindingMenu(context);
     }
   }
   const bindingAction = target.closest<HTMLButtonElement>('[data-dataset-binding-role-action]');

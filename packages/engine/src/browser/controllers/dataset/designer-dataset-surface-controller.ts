@@ -4,6 +4,7 @@ import { materialSupportsHostResourceSelection } from '../../../common/operation
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { syncDataPanelNotice } from '../../dom/dataset/designer-data-panel-notice.js';
 import {
+  sectionContentKey,
   stampDataSectionKeys,
   syncDatasetSections,
 } from '../../dom/dataset/designer-data-section-diff.js';
@@ -226,6 +227,40 @@ export function syncDatasetSurface(
   }
   applyDesignerDataState(panel, createDatasetPanelOptions(context, panel, 'inspector').dataState);
   restoreFocus?.();
+}
+
+/**
+ * 收起已展开的绑定字段弹层，但**不重建段**。
+ *
+ * 触发场景是「先开指标（多选）再点维度（单选）」：两个弹层互斥，但点击维度的触发器时，
+ * 维度自己的弹层已在事件目标阶段打开。若这里走 `syncDatasetSurface`，段内容键变化会让
+ * `source` 段整段 `replaceWith`，刚打开的维度弹层连同触发器一起被替换掉（表现为点了没反应）。
+ * 因此只就地收起菜单、同步 ARIA，并把 `source` 段的内容键对齐到新状态——下一次按状态渲染
+ * 时不会再判定「内容未变」而拒绝重开指标弹层，也不会多重建一次。
+ */
+export function dismissDatasetBindingMenu(context: DesignerDatasetControllerContext): void {
+  const roleId = context.state.bindingOpenRoleId;
+  if (roleId === null) return;
+  context.state.bindingOpenRoleId = null;
+  const panel = context.state.panel;
+  for (const root of [panel, context.callbacks.getWorkbenchHost?.()]) {
+    if (root === undefined) continue;
+    for (const menu of root.querySelectorAll<HTMLElement>('[data-dataset-binding-menu]')) {
+      if (menu.dataset.datasetBindingMenu !== roleId) continue;
+      menu.hidden = true;
+      menu.parentElement
+        ?.querySelector<HTMLButtonElement>('[data-dataset-binding-trigger]')
+        ?.setAttribute('aria-expanded', 'false');
+    }
+    if (panel === undefined) continue;
+    const source = root.querySelector<HTMLElement>('[data-ds-section="source"]');
+    if (source !== null) {
+      source.dataset.dsContentKey = sectionContentKey(
+        'source',
+        createDatasetPanelOptions(context, panel, surfaceOf(root, panel)),
+      );
+    }
+  }
 }
 
 /**
