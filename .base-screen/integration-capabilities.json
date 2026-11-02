@@ -172,26 +172,6 @@
       "publicApi": [],
       "references": ["packages/renderer/src/viewer/viewer.ts", "packages/renderer/src/index.ts"],
       "checks": ["engine"]
-    },
-    {
-      "id": "integration-workflow",
-      "title": "跨仓开发工作流",
-      "owner": "base-screen + host",
-      "availability": "current",
-      "boundary": "上游维护通用工具与能力索引，宿主维护消费映射和执行命令；不改变产品运行时边界。",
-      "publicApi": ["pnpm integration"],
-      "references": [
-        ".agents/skills/base-screen-integration-workflow/SKILL.md",
-        ".agents/skills/base-screen-integration-workflow/scripts/workflow.mjs",
-        "tests/fixtures/__fixtures__/integration-workflow-suite.ts",
-        "tests/integration/integration-workflow-bootstrap.test.ts",
-        "tests/integration/integration-workflow-sync.test.ts",
-        "tests/integration/integration-workflow-integrity.test.ts",
-        "tests/integration/integration-workflow-verification.test.ts",
-        "tests/integration/integration-workflow-drift.test.ts",
-        "tests/integration/integration-workflow-recovery.test.ts"
-      ],
-      "checks": ["workflow"]
     }
   ]
 }

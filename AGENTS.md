@@ -1,10 +1,5 @@
 # Base Screen 仓库指南
 
-## 跨仓协作入口
-
-- 涉及 xjdatahub 接入、职责划分、包同步或联合验收时，先执行 pnpm integration status，再按能力执行 context；使用 [跨仓工作流 Skill](.agents/skills/base-screen-integration-workflow/SKILL.md)，不全量读取两个仓库的知识库。
-- 同一任务可按已确定职责修改双方相关源码；同步采用任务记录和受管文件保护。上游当前源码与下游实际包分开核验，未同步能力不得视为已接入。
-- 规范唯一维护在 Skill 的 references/workflow.md；提交、推送、部署和生产操作仍遵循用户授权。
 - **仪表盘创建**：宿主需要生成或刷新其专属的大屏设计 Skill（`design-<hostId>-screens`，使其他模型能依据宿主已脱敏的物料、数据、样例与品牌目录产出可导入的 Screen Document）时，使用 [create-base-screen-host-skill](skills/create-base-screen-host-skill/SKILL.md)；生成的子 Skill 不连接宿主端口、不查询实时数据、不存储凭证，也不把 URL、SQL、header、token 或服务对象写入 Screen Document。
 - **物料创建**：宿主需要生成或刷新其专属的物料创作 Skill（`create-<hostId>-material`，覆盖原生、React、Vue 物料的创作、公共 ABI 校验与显式注册）时，使用 [create-base-screen-host-material-skill](skills/create-base-screen-host-material-skill/SKILL.md)；生成的子 Skill 不发布、不提交、不激活生产代码、不安装依赖、不连接实时服务，注册策略缺省为 propose，且不把凭证、URL、SQL、token、DOM 引用、函数或框架实例写入 manifest、编辑器描述符、Screen Document 或宿主快照。
 - **宿主接入与管理运维**：宿主首次接入、例行刷新快照与生成的 Skill、漂移诊断或 CI 验证时，使用 [manage-base-screen-host-skills](skills/manage-base-screen-host-skills/SKILL.md)；它自身不查询宿主 API、绝不修改物料注册文件，生成产物与托管工具链均落在宿主受管目录（`.agents/skills/`、`.base-screen/tooling/`），任一步失败时既有快照与 Skill 保持原状。
@@ -29,7 +24,6 @@
 - 外围插件依赖方向严格单向：`plugins/*` 可依赖 `packages/*` 的公共导出，`packages/*` 绝不依赖 `plugins/*`（含 dev 与 test）。外围插件无运行时特权，走与宿主插件相同的宿主提供/宿主加载/宿主授权通道，不新增信任通道。
 - 新增包、放宽包清单或改变跨包导出时，必须更新包及边界检查。仅当该变更改变长期架构决策、包依赖/所有权或公共兼容策略时，才新增或更新 ADR；只有跨多个独立交付阶段、需要迁移或回滚方案，或用户明确要求时，才创建 Spec。所有包都是私有的、仅 ESM、只发布 `dist`，并通过 `exports` 暴露公共 API。
 - 派生事实只有一个权威落点，引用而不复制：固定包清单在 `tooling/checks/packages.mjs`，依赖白名单在 `tooling/checks/boundaries.mjs`，工具版本在 manifest 与 lockfile。散文不得复述可由这些来源推导的数量或清单，避免产生两份没有门禁比对的副本。
-- 机器可读索引 `.base-screen/integration-capabilities.json` 的 `references` 必须指向仍然存在的路径：`pnpm integration` 在 peer 仓库存在时校验它们，删除或改名被引用文件时必须同批更新该索引。
 - 跨包导入只能使用声明的 `@base-screen/*` 公共导出。`tooling/checks/boundaries.mjs` 会拒绝未声明的依赖、来自 `examples`、`tooling` 或 Nebula 的导入、被禁止的依赖图边，以及对 `testing` 的生产依赖。
 - 依赖白名单编码在 `tooling/checks/boundaries.mjs` 中，**按区维护**：`packages/` 区只有 `contracts` 可以使用外部 `zod`，React/Vue 仅作为各自桥接包的 peer 依赖；`plugins/` 区改为逐插件显式申报允许的外部依赖，不接受通配与继承。新增依赖时，必须同时更新该白名单和对应清单。
 - `contracts`、`core`、`plugin-core`、`plugin-manager`、`plugin-sdk` 和 `testing` 使用 `tsc` 构建；它们内部的相对 TypeScript 导入必须使用 `.js` 后缀（`.json` 除外）。浏览器包和桥接包在声明文件生成后使用 Vite。

@@ -10,10 +10,6 @@
       "reason": "宿主 Skill 资产变更，根级宿主 Skill 测试覆盖其生成器"
     },
     {
-      "pattern": ".agents/skills/**",
-      "reason": "跨仓工作流 Skill 变更，根级集成工作流测试覆盖"
-    },
-    {
       "pattern": "AGENTS.md",
       "reason": "仓库指南变更，根级治理测试覆盖"
     },

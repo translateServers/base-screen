@@ -10,7 +10,6 @@ playwright-report/
 test-results/
 tarballs/
 .playwright-mcp/
-.tmp-xj-tarballs*/
 packages/*/LICENSE
 *.tsbuildinfo
 *.db
@@ -28,10 +27,6 @@ packages/*/LICENSE
 .schema-build/
 .trae
 .zcode
-.agents/*
-!.agents/skills/
-.agents/skills/*
-!.agents/skills/base-screen-integration-workflow/
 .base-screen/local/
 .local/
 .qoder/
