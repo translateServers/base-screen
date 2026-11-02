@@ -49,4 +49,28 @@ describe('designer style sheet sharing', () => {
     expect(adoptDesignerStyleSheets(first)).toBe(true);
     expect(first.adoptedStyleSheets).toHaveLength(1);
   });
+
+  it('rewrites the already adopted sheet so a hot CSS update reaches shadow roots', async () => {
+    vi.resetModules();
+    const replaceSync = vi.fn();
+    class FakeSheet {
+      constructor() {
+        return { replaceSync };
+      }
+    }
+    vi.stubGlobal('CSSStyleSheet', FakeSheet);
+    const { adoptDesignerStyleSheets: adopt, refreshDesignerStyleText: refresh } = await import(
+      '../../../src/browser/styles/designer-style.js'
+    );
+    const root = { adoptedStyleSheets: [] } as unknown as ShadowRoot;
+
+    expect(adopt(root)).toBe(true);
+    const adopted = root.adoptedStyleSheets[0];
+    expect(replaceSync).toHaveBeenCalledTimes(1);
+
+    refresh('.designer { background: red; }');
+    expect(replaceSync).toHaveBeenLastCalledWith('.designer { background: red; }');
+    // 就地重写：root 仍引用同一张 sheet，不需要重新挂载或重建元素。
+    expect(root.adoptedStyleSheets).toEqual([adopted]);
+  });
 });
