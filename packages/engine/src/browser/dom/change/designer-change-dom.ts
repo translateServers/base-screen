@@ -65,8 +65,10 @@ export function changePaneMarkup(
     proposal === undefined
       ? ''
       : `<div class="change-pane-toolbar"><button type="button" class="designer-control designer-button designer-icon-button right-pane-review" data-review-toggle aria-pressed="${String(review?.reviewing === true)}" data-tip="${DESIGNER_UI_TEXT.review.title}" aria-label="${DESIGNER_UI_TEXT.review.title}">${designerIcon('eye')}</button></div>`;
+  // 智能体内容区保留与检查器同规格的分区标题，避免整块只有列表没有抬头。
+  const paneHead = `<div class="change-pane-head"><h3 class="change-pane-title">${escapeHtml(text.panelTitle)}</h3>${reviewToggle}</div>`;
   if (proposal === undefined && feedback?.kind === 'remaining-invalid') {
-    return `${reviewToggle}${notice}${historyMarkup(history)}${
+    return `${paneHead}${notice}${historyMarkup(history)}${
       review?.reviewing === true
         ? `<button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>`
         : ''
@@ -76,23 +78,25 @@ export function changePaneMarkup(
     // 评审态没有提案分两种：进来时就没有待审条目，和逐条处理完之后的收尾。
     // 两者都显示「评审完成」会让空评审读起来像「审完了」，把没审过说成审过。
     const empty = review.total === 0;
-    return `${reviewToggle}${notice}<div class="change-empty">
-      <p class="change-empty-title">${
+    return `${paneHead}${notice}<div class="designer-empty-state">
+      <p class="change-empty-copy">${
         empty ? DESIGNER_UI_TEXT.review.empty : DESIGNER_UI_TEXT.review.done
       }</p>
-      <button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>
+      <span class="designer-empty-actions">
+        <button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>
+      </span>
     </div>${historyMarkup(history)}`;
   }
   if (proposal === undefined) {
     const componentScope = intentScope?.kind === 'components';
-    // 空态不写说明书：整屏什么都不铺（入口就是右栏底部的输入框），
-    // 组件作用域只给一行指导——那里确实需要说清「改的是选中组件」。
-    // 空态没有任何内容时，历史就是唯一的内容——展开它，别让面板只剩一大片空。
-    return `${reviewToggle}${notice}${
-      componentScope
-        ? `<div class="change-empty"><p class="change-empty-copy">${text.componentEmptyHint}</p></div>`
-        : ''
-    }${historyMarkup(history, true)}`;
+    const historyContent = historyMarkup(history, true);
+    // 组件作用域需要说清「改的是选中组件」；整屏只在历史也为空时补一条明确空态。
+    let emptyCopy = '';
+    if (componentScope) emptyCopy = text.componentEmptyHint;
+    else if (historyContent === '') emptyCopy = text.emptyPending;
+    const emptyState =
+      emptyCopy === '' ? '' : `<p class="designer-empty-state">${escapeHtml(emptyCopy)}</p>`;
+    return `${paneHead}${notice}${emptyState}${historyContent}`;
   }
   const units = proposal.units;
   const reviewing = review?.reviewing === true;
@@ -104,7 +108,7 @@ export function changePaneMarkup(
           review.meta.approver ?? '',
         )}</p>`
       : '';
-  return `${reviewToggle}${notice}<div class="change-pane-heading">
+  return `${paneHead}${notice}<div class="change-pane-heading">
       <span class="change-pane-scope">${escapeHtml(proposal.scope)}</span>
       <span class="change-pane-summary">${
         reviewing

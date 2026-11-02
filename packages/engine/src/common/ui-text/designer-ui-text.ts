@@ -205,6 +205,7 @@ export const DESIGNER_UI_TEXT = {
     rationaleLabel: '修改依据',
     diffLabel: '改动预览',
     componentEmptyHint: '描述要改的内容、样式或布局。',
+    emptyPending: '暂无待处理提案，可在下方输入修改指令。',
     adoptHint: '采纳后写入文档并进入历史，可用撤销回退。',
     added: '新增组件',
     removed: '删除此旧组件',

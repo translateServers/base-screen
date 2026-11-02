@@ -169,7 +169,7 @@ function componentItem(
     placed && counts !== undefined
       ? `<em class="blueprint-palette-counts">${escapeHtml(DESIGNER_UI_TEXT.blueprint.relationCounts(counts.outboundCount ?? 0, counts.inboundCount ?? 0))}</em>`
       : '';
-  return `<div class="designer-list-row blueprint-palette-item" data-density="comfortable" data-depth="${depth}" style="--bp-indent: ${depth * 12}px" data-placed="${String(placed)}" data-selected="${String(selected)}"${placed ? '' : ` draggable="true" data-blueprint-drag-kind="component" data-component-id="${escapeAttribute(componentId)}" data-blueprint-drag-label="${escapeAttribute(name)}"`}>
+  return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-depth="${depth}" style="--bp-indent: ${depth * 16}px" data-placed="${String(placed)}" data-selected="${String(selected)}"${placed ? '' : ` draggable="true" data-blueprint-drag-kind="component" data-component-id="${escapeAttribute(componentId)}" data-blueprint-drag-label="${escapeAttribute(name)}"`}>
     <button type="button" class="blueprint-palette-primary" ${action} aria-label="${escapeAttribute(actionLabel)}">
       <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('layers')}</span>
       <span><strong>${escapeHtml(name)}</strong><small>${escapeHtml(node.materialType ?? '')} · ${DESIGNER_UI_TEXT.blueprint.componentEventCount(eventCount)}${escapeHtml(structure)}</small></span>
@@ -208,8 +208,8 @@ function relationsPane(
   const host = graph.nodes.find((node) => node.id === 'host');
   const hostRow =
     host === undefined
-      ? `<div class="designer-list-row blueprint-palette-item" data-density="comfortable"><button type="button" class="blueprint-palette-primary" data-blueprint-insert-host aria-label="${DESIGNER_UI_TEXT.blueprint.relationList.addHost}"><span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('activity')}</span><span><strong>${DESIGNER_UI_TEXT.blueprint.hostNode}</strong><small>${DESIGNER_UI_TEXT.blueprint.hostNodeHint}</small></span><span class="blueprint-palette-inline-add" aria-hidden="true">${designerIcon('plus')}</span></button></div>`
-      : `<div class="designer-list-row blueprint-palette-item" data-density="comfortable" data-placed="true" data-selected="${String(selection?.kind === 'node' && selection.id === host.id)}"><button type="button" class="blueprint-palette-primary" data-blueprint-select-node="${host.id}" aria-label="${DESIGNER_UI_TEXT.blueprint.hostNode}"><span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('activity')}</span><span><strong>${DESIGNER_UI_TEXT.blueprint.hostNode}</strong><small>${DESIGNER_UI_TEXT.blueprint.hostNodeHint}</small></span><em>${DESIGNER_UI_TEXT.blueprint.placed}</em></button></div>`;
+      ? `<div class="designer-list-row blueprint-palette-item" data-density="default"><button type="button" class="blueprint-palette-primary" data-blueprint-insert-host aria-label="${DESIGNER_UI_TEXT.blueprint.relationList.addHost}"><span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('activity')}</span><span><strong>${DESIGNER_UI_TEXT.blueprint.hostNode}</strong><small>${DESIGNER_UI_TEXT.blueprint.hostNodeHint}</small></span><span class="blueprint-palette-inline-add" aria-hidden="true">${designerIcon('plus')}</span></button></div>`
+      : `<div class="designer-list-row blueprint-palette-item" data-density="default" data-placed="true" data-selected="${String(selection?.kind === 'node' && selection.id === host.id)}"><button type="button" class="blueprint-palette-primary" data-blueprint-select-node="${host.id}" aria-label="${DESIGNER_UI_TEXT.blueprint.hostNode}"><span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('activity')}</span><span><strong>${DESIGNER_UI_TEXT.blueprint.hostNode}</strong><small>${DESIGNER_UI_TEXT.blueprint.hostNodeHint}</small></span><em>${DESIGNER_UI_TEXT.blueprint.placed}</em></button></div>`;
   const order: readonly (keyof typeof DESIGNER_UI_TEXT.blueprint.relationCategories)[] = [
     'structure',
     'interaction',
@@ -253,7 +253,7 @@ function relationRow(
   const text = `${source} ${target} ${meta} ${condition}`.toLocaleLowerCase();
   if (query.length > 0 && !text.includes(query)) return null;
   const selected = selection?.kind === 'edge' && selection.id === edgeId;
-  return `<div class="designer-list-row blueprint-palette-item" data-density="comfortable" data-kind="relation" data-selected="${String(selected)}">
+  return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-kind="relation" data-selected="${String(selected)}">
     <button type="button" class="blueprint-palette-primary" data-blueprint-select-relation="${escapeAttribute(edgeId)}" aria-label="${escapeAttribute(`${source} → ${target}`)}">
       <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon(relation.type === 'semantic' ? 'link' : 'activity')}</span>
       <span><strong>${escapeHtml(source)} → ${escapeHtml(target)}</strong><small>${escapeHtml(meta)}</small></span>
@@ -273,7 +273,7 @@ function containmentRow(
   const text = `${source} ${target} ${meta}`.toLocaleLowerCase();
   if (query.length > 0 && !text.includes(query)) return null;
   const selected = selection?.kind === 'edge' && selection.id === edge.id;
-  return `<div class="designer-list-row blueprint-palette-item" data-density="comfortable" data-kind="structure" data-selected="${String(selected)}">
+  return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-kind="structure" data-selected="${String(selected)}">
     <button type="button" class="blueprint-palette-primary" data-blueprint-select-relation="${escapeAttribute(edge.id)}" aria-label="${escapeAttribute(`${source} → ${target}`)}" data-tip="${escapeAttribute(DESIGNER_UI_TEXT.blueprint.relationList.containmentHint)}">
       <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('group')}</span>
       <span><strong>${escapeHtml(source)} → ${escapeHtml(target)}</strong><small>${meta}</small></span>
@@ -319,7 +319,7 @@ function variableItem(variable: DesignerVariableView, placed: boolean, selected:
   const actionLabel = placed
     ? DESIGNER_UI_TEXT.blueprint.locateVariable(variable.name)
     : DESIGNER_UI_TEXT.blueprint.addVariableNode(variable.name);
-  return `<div class="designer-list-row blueprint-palette-item" data-density="comfortable" data-kind="variable" data-placed="${String(placed)}" data-selected="${String(selected)}"${placed ? '' : ` draggable="true" data-blueprint-drag-kind="variable" data-variable-id="${escapeAttribute(variable.id)}" data-blueprint-drag-label="${escapeAttribute(variable.name)}"`}>
+  return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-kind="variable" data-placed="${String(placed)}" data-selected="${String(selected)}"${placed ? '' : ` draggable="true" data-blueprint-drag-kind="variable" data-variable-id="${escapeAttribute(variable.id)}" data-blueprint-drag-label="${escapeAttribute(variable.name)}"`}>
     <button type="button" class="blueprint-palette-primary" ${action} aria-label="${escapeAttribute(actionLabel)}">
       <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('variable')}</span>
       <span><strong>${escapeHtml(variable.name)}</strong><small>${escapeHtml(DESIGNER_UI_TEXT.blueprint.variableKind[variable.type])} · ${escapeHtml(detail)}</small></span>${placed ? `<em>${DESIGNER_UI_TEXT.blueprint.placed}</em>` : `<span class="blueprint-palette-inline-add" aria-hidden="true">${designerIcon('plus')}</span>`}

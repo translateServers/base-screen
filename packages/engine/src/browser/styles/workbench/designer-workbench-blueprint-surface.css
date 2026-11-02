@@ -105,7 +105,7 @@
 }
 
 .designer[data-authoring-mode="blueprint"] .rail {
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: var(--designer-row-height-comfortable) minmax(0, 1fr);
 }
 
 .designer[data-authoring-mode="blueprint"] .rail > .scenes,

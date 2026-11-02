@@ -186,13 +186,19 @@ describe('proposal disclosure and footer', () => {
 });
 
 describe('agent empty state', () => {
-  it('leaves the whole-screen empty state bare instead of writing a pitch', () => {
+  it('renders the shared dashed empty state when whole-screen has no draft and no history', () => {
     const html = changePaneMarkup(undefined, false);
-    // 入口就是右栏底部的输入框：空态不再铺标题、说明或起点卡。
+    expect(html).toContain('change-pane-title');
+    expect(html).toContain('designer-empty-state');
+    expect(html).toContain('暂无待处理提案，可在下方输入修改指令。');
     expect(html).not.toContain('change-start-card');
-    expect(html).not.toContain('change-empty');
-    expect(html).not.toContain('采纳前不会写入文档');
-    expect(html).not.toContain('当前没有待处理的变更');
+  });
+
+  it('keeps history instead of covering it with the empty copy', () => {
+    const nodes = [{ index: 0, position: 'past' as const }];
+    const html = changePaneMarkup(undefined, false, undefined, nodes);
+    expect(html).toContain('change-history');
+    expect(html).not.toContain('designer-empty-state');
   });
 
   it('focuses component scope on editing the selection instead of whole-screen starters', () => {
@@ -201,6 +207,7 @@ describe('agent empty state', () => {
       componentIds: ['title'],
     });
     // 组件作用域确实需要说清「改的是选中组件」，所以保留一行指导。
+    expect(html).toContain('designer-empty-state');
     expect(html).toContain('描述要改的内容、样式或布局');
     expect(html).not.toContain('change-start-card');
   });

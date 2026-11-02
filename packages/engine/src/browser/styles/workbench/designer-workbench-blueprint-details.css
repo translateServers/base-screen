@@ -20,7 +20,7 @@
 .blueprint-library-shell {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: var(--designer-row-height-comfortable) minmax(0, 1fr);
   background: var(--designer-surface-panel);
 }
 
@@ -36,15 +36,16 @@
   scrollbar-gutter: auto;
 }
 
+/* 与设计视图的身份行同高、同左右内距：标题 14px + 副行 12px。 */
 .blueprint-inspector-topbar {
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--designer-space-3);
-  padding: 0 var(--designer-space-3);
+  padding: 0 var(--designer-space-6);
   border-bottom: 1px solid var(--designer-border-subtle);
-  background: var(--designer-surface-raised);
+  background: var(--designer-surface-panel);
 }
 
 .blueprint-inspector-topbar > span:first-child {
@@ -56,8 +57,10 @@
 .blueprint-inspector-topbar strong {
   overflow: hidden;
   color: var(--designer-text-primary);
-  font: var(--designer-font-small);
+  font-size: var(--designer-font-size-md);
   font-weight: 600;
+  letter-spacing: var(--designer-tracking-ui);
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -66,7 +69,6 @@
   overflow: hidden;
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: var(--designer-font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -77,11 +79,7 @@
 }
 
 .blueprint-library-main > .blueprint-panel-scroll {
-  padding: var(--designer-space-4) var(--designer-space-4) var(--designer-space-5);
-}
-
-.blueprint-inspector-shell > .blueprint-panel-scroll {
-  padding: var(--designer-space-3);
+  padding: 0 var(--designer-space-3) var(--designer-space-5);
 }
 
 .blueprint-palette-group {
@@ -132,7 +130,7 @@
   box-sizing: border-box;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px;
+  grid-template-columns: minmax(0, 1fr) 24px;
   align-items: stretch;
   margin-bottom: var(--designer-space-1);
 }
@@ -159,7 +157,7 @@
 .blueprint-palette-primary,
 .blueprint-palette-action {
   min-width: 0;
-  min-height: 44px;
+  min-height: var(--designer-row-height);
   border: 0;
   background: transparent;
   color: inherit;
@@ -168,7 +166,7 @@
 
 .blueprint-palette-primary {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--designer-space-3);
   padding: var(--designer-space-1) var(--designer-space-3);
@@ -214,8 +212,8 @@
   min-height: 16px;
   padding: 0 var(--designer-space-1);
   border-radius: var(--designer-radius-pill);
-  background: color-mix(in srgb, var(--designer-border-default) 32%, transparent);
-  color: var(--designer-accent);
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent-text);
   font: var(--designer-font-small);
   font-size: var(--designer-font-size-xs);
   font-style: normal;
@@ -235,8 +233,8 @@
 
 .blueprint-palette-glyph {
   display: inline-grid;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
   box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
@@ -247,7 +245,11 @@
     color var(--designer-motion);
 }
 
-.blueprint-palette-glyph svg,
+.blueprint-palette-glyph svg {
+  width: 13px;
+  height: 13px;
+}
+
 .blueprint-palette-action svg,
 .blueprint-palette-inline-add svg {
   width: 12px;
@@ -256,15 +258,15 @@
 
 .blueprint-palette-action {
   display: grid;
-  width: 28px;
+  width: 24px;
   place-items: center;
   border-radius: var(--designer-radius-3);
   color: var(--designer-text-muted);
 }
 
 .blueprint-palette-action:hover {
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent);
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
 }
 
 .blueprint-palette-inline-add {
@@ -282,7 +284,7 @@
 
 .blueprint-inspector-shell {
   display: grid;
-  grid-template-rows: 56px minmax(0, 1fr);
+  grid-template-rows: var(--designer-row-height-comfortable) minmax(0, 1fr);
   background: var(--designer-surface-panel);
 }
 
@@ -299,8 +301,8 @@
 
 .blueprint-inspector-mode {
   position: relative;
-  width: 30px;
-  height: 30px;
+  width: var(--designer-control-height-compact);
+  height: var(--designer-control-height-compact);
   display: grid;
   place-items: center;
   padding: 0;
@@ -322,9 +324,16 @@
   outline-offset: -2px;
 }
 
+/* 选中态与设计视图的 tab 同一套中性画法：control-active 底 + 1px 收边；
+   强调色只落在图标上，不把整颗按钮染成蓝色。 */
 .blueprint-inspector-mode[aria-selected="true"] {
-  border-color: color-mix(in srgb, var(--designer-accent) 45%, var(--designer-border-subtle));
-  background: var(--designer-accent-surface);
+  border-color: transparent;
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
+}
+
+.blueprint-inspector-mode[aria-selected="true"] svg {
   color: var(--designer-accent);
 }
 
@@ -364,7 +373,7 @@
 
 .blueprint-inspector-section-content {
   min-width: 0;
-  padding: var(--designer-space-3);
+  padding: var(--designer-space-4) var(--designer-space-6) var(--designer-space-5);
 }
 
 .blueprint-inspector-facts {
@@ -529,17 +538,17 @@
 }
 
 .blueprint-inspector-shell .blueprint-delete-button {
-  width: calc(100% - var(--designer-space-6));
-  margin: var(--designer-space-4) var(--designer-space-3);
+  width: calc(100% - var(--designer-space-8));
+  margin: var(--designer-space-4) var(--designer-space-6);
 }
 
 .blueprint-inspector-shell .blueprint-inspector-status {
-  padding: var(--designer-space-5) var(--designer-space-4);
+  padding: var(--designer-space-4) var(--designer-space-6) var(--designer-space-5);
 }
 
 @container designer-shell (max-width: 1279px) {
   .blueprint-palette-primary {
-    grid-template-columns: 20px minmax(0, 1fr);
+    grid-template-columns: 22px minmax(0, 1fr);
   }
 
   .blueprint-palette-primary em,

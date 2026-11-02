@@ -380,7 +380,7 @@
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
   /* 列头 / 场景区 / 面板内容：场景由宿主提供时才占一行，缺省 hidden 不占高度。 */
-  grid-template-rows: 44px auto minmax(0, 1fr);
+  grid-template-rows: var(--designer-row-height-comfortable) auto minmax(0, 1fr);
   border-right: 1px solid var(--designer-border-default);
 }
 
@@ -630,9 +630,10 @@
   padding: var(--designer-space-5);
 }
 
-/* 检查器内容列（原型 .inspector-pane）：上 8 / 左右 12 / 下 24。 */
+/* 检查器内容列（原型 .inspector-pane）：上 8 / 左右 12 / 下 24；滚动轨道常驻。 */
 .inspector-pane {
   padding: var(--designer-space-4) var(--designer-space-5) var(--designer-space-7);
+  scrollbar-gutter: stable;
 }
 
 .rail-view {
@@ -847,11 +848,13 @@
   gap: var(--designer-space-2);
 }
 
+.change-pane-title,
 .change-panel-heading-text {
   margin: 0;
   color: var(--designer-text-muted);
-  font: var(--designer-font-small);
+  font-size: var(--designer-font-size-xs);
   font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .change-panel-rationale {
@@ -874,10 +877,9 @@
   flex-direction: column;
   gap: var(--designer-space-2);
   padding: var(--designer-space-3);
-  border: 0;
+  border: 1px solid var(--designer-border-subtle);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
-  box-shadow: var(--designer-elev-card);
 }
 
 .change-diff-head {
@@ -979,9 +981,9 @@
 .change-pane-disclosure {
   gap: 0;
   overflow: hidden;
+  border: 1px solid var(--designer-border-subtle);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
-  box-shadow: var(--designer-elev-card);
 }
 
 .change-pane-disclosure-summary {
@@ -1154,14 +1156,15 @@
   text-align: center;
 }
 
+/* 智能体内容区与检查器共用同一内容盒：上 8 / 左右 12 / 下 24，滚动轨道预留。 */
 .right-pane-changes {
   display: flex;
   flex-direction: column;
   gap: var(--designer-space-3);
   min-height: 0;
   overflow: auto;
-  padding: var(--designer-space-3);
-  font: var(--designer-font-small);
+  padding: var(--designer-space-4) var(--designer-space-5) var(--designer-space-7);
+  scrollbar-gutter: stable;
 }
 
 /* 切到智能体页签时收起检查器内容（不销毁状态）；行高分配归 inspector 层。 */
@@ -1177,6 +1180,14 @@
 
 .properties[data-right-pane="inspector"] > [data-change-pane] {
   display: none;
+}
+
+.change-pane-head {
+  display: flex;
+  min-height: 26px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--designer-space-2);
 }
 
 .change-pane-heading {
@@ -1203,24 +1214,9 @@
   font: var(--designer-font-numeric);
 }
 
-.change-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--designer-space-2);
-}
-
-.change-empty-title {
-  margin: var(--designer-space-1) 0 0;
-  color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-md);
-  font-weight: 600;
-}
-
 .change-empty-copy {
-  margin: 0 0 var(--designer-space-1);
+  margin: 0;
   color: var(--designer-text-muted);
-  line-height: 1.55;
 }
 
 /* 意图输入区：右栏底部常驻。没有处理器时停用并说明原因，不模拟回复。 */
@@ -1320,9 +1316,9 @@
   height: 10px;
 }
 
-/* 智能体页签下书写面里 11px 正文太小，整体放大一档、行距放开。 */
+/* 智能体页签书写面与内容区共用同一左右内边距；正文沿用面板 13/1.5，不再单开 14px 档。 */
 .properties[data-right-pane="intent"] .designer-intent {
-  padding: var(--designer-space-4);
+  padding: var(--designer-space-4) var(--designer-space-5) var(--designer-space-5);
   gap: var(--designer-space-3);
 }
 
@@ -1334,7 +1330,7 @@
 }
 
 .properties[data-right-pane="intent"] .intent-input {
-  font: var(--designer-font-size-md) / 1.7 var(--designer-font-family);
+  font: var(--designer-font);
   min-height: 48px;
 }
 
