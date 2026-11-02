@@ -569,6 +569,16 @@
   bottom: calc(100% + 4px);
 }
 
+/* 面板与浮层普遍带 overflow 裁切和固定高度，绝对定位的弹层会被截断（蓝图模拟区只剩一条）。
+   自绘下拉在展开时改用视口坐标，并写入按可用空间夹紧的 max-height，超出部分在弹层内滚动。 */
+.designer-select-menu[data-floating="true"] {
+  position: fixed;
+  top: auto;
+  bottom: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .designer-select-menu[hidden] {
   display: none;
 }
