@@ -183,6 +183,16 @@ describe('proposal disclosure and footer', () => {
     expect(html).toContain('修改依据');
     expect(html).toContain('change-panel-action-buttons');
   });
+
+  it('keeps the review entry out of the scrolling change pane', () => {
+    const html = changePaneMarkup(proposal(), false, {
+      reviewing: false,
+      meta: {},
+      total: 1,
+    });
+    expect(html).toContain('change-pane-title');
+    expect(html).not.toContain('data-review-toggle');
+  });
 });
 
 describe('agent empty state', () => {

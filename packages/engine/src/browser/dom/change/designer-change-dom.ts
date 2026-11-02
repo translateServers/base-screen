@@ -6,9 +6,9 @@ import type {
   DesignerChangeUnit,
 } from '../../../common/operations/change/designer-change-proposal.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../../ui/designer-icons.js';
 import { adoptDesignerFormControls } from '../designer-form-controls-dom.js';
 import { escapeHtml } from '../designer-html-escape.js';
+import { createDesignerIconButton } from '../designer-ui-primitives.js';
 
 export type DesignerChangeFeedback =
   | { readonly kind: 'draft-pending' }
@@ -60,13 +60,8 @@ export function changePaneMarkup(
     feedback?.kind === 'adopt-failed' && feedback.unitId !== undefined
       ? ''
       : feedbackMarkup(feedback);
-  // 没有提案时评审入口无事可做：空态里它只会把用户带进一个「零条目」的评审态。
-  const reviewToggle =
-    proposal === undefined
-      ? ''
-      : `<div class="change-pane-toolbar"><button type="button" class="designer-control designer-button designer-icon-button right-pane-review" data-review-toggle aria-pressed="${String(review?.reviewing === true)}" data-tip="${DESIGNER_UI_TEXT.review.title}" aria-label="${DESIGNER_UI_TEXT.review.title}">${designerIcon('eye')}</button></div>`;
   // 智能体内容区保留与检查器同规格的分区标题，避免整块只有列表没有抬头。
-  const paneHead = `<div class="change-pane-head"><h3 class="change-pane-title">${escapeHtml(text.panelTitle)}</h3>${reviewToggle}</div>`;
+  const paneHead = `<div class="change-pane-head"><h3 class="change-pane-title">${escapeHtml(text.panelTitle)}</h3></div>`;
   if (proposal === undefined && feedback?.kind === 'remaining-invalid') {
     return `${paneHead}${notice}${historyMarkup(history)}${
       review?.reviewing === true
@@ -333,6 +328,31 @@ export function renderChangePane(
 ): void {
   pane.innerHTML = changePaneMarkup(proposal, confirmAll, review, history, feedback, intentScope);
   adoptDesignerFormControls(pane);
+  renderChangeReviewToggle(pane, proposal, review);
+}
+
+/** 评审入口挂在身份行右侧，避免与内容区标题行争高度；没有提案时为空。 */
+function renderChangeReviewToggle(
+  pane: HTMLElement,
+  proposal: DesignerChangeProposal | undefined,
+  review?: DesignerReviewPane,
+): void {
+  const slot = pane
+    .closest<HTMLElement>('[data-right-panel]')
+    ?.querySelector<HTMLElement>('[data-change-pane-review]');
+  if (slot === null || slot === undefined) return;
+  if (proposal === undefined) {
+    slot.replaceChildren();
+    return;
+  }
+  const button = createDesignerIconButton(pane.ownerDocument, {
+    icon: 'eye',
+    label: DESIGNER_UI_TEXT.review.title,
+    className: 'right-pane-review',
+    pressed: review?.reviewing === true,
+  });
+  button.dataset.reviewToggle = '';
+  slot.replaceChildren(button);
 }
 
 /** 右栏页签的待决计数：只改文本，不重建页签，避免焦点丢失。 */

@@ -21,7 +21,8 @@
   grid-row: 1;
 }
 
-.designer:not([data-right-collapsed="true"]) .properties > .inspector-context {
+.designer:not([data-right-collapsed="true"]) .properties > .inspector-context,
+.designer:not([data-right-collapsed="true"]) .properties > .change-pane-identity {
   grid-column: 1;
   grid-row: 2;
 }
@@ -75,32 +76,48 @@
   display: none;
 }
 
-/* 智能体页签：提案与评审（上）+ 书写面（下），检查器各段整行收起（不销毁状态）。
+/* 智能体页签：身份行 + 提案与评审（上）+ 书写面（下），检查器各段整行收起（不销毁状态）。
    必须排在画布/多选的行模板之后，否则同特异性下会被覆盖。 */
 .designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] {
-  grid-template-rows: 38px minmax(0, 1fr) auto;
+  grid-template-rows: 38px 44px minmax(0, 1fr) auto;
 }
 
 .designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .panel-heading,
-.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .inspector-context,
-.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .inspector-tabs,
-.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .inspector-toolbar,
-.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .inspector-search-workspace,
-.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .inspector-pane,
-.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .blueprint-inspector {
+.designer:not([data-right-collapsed="true"])
+  .properties[data-right-pane="intent"]
+  > .inspector-context,
+.designer:not([data-right-collapsed="true"])
+  .properties[data-right-pane="intent"]
+  > .inspector-tabs,
+.designer:not([data-right-collapsed="true"])
+  .properties[data-right-pane="intent"]
+  > .inspector-toolbar,
+.designer:not([data-right-collapsed="true"])
+  .properties[data-right-pane="intent"]
+  > .inspector-search-workspace,
+.designer:not([data-right-collapsed="true"])
+  .properties[data-right-pane="intent"]
+  > .inspector-pane,
+.designer:not([data-right-collapsed="true"])
+  .properties[data-right-pane="intent"]
+  > .blueprint-inspector {
   display: none;
 }
 
-.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .right-pane-changes {
-  display: flex;
-  grid-column: 1;
-  grid-row: 2;
-}
-
-.designer:not([data-right-collapsed="true"]) .properties[data-right-pane="intent"] > .designer-intent {
+.designer:not([data-right-collapsed="true"])
+  .properties[data-right-pane="intent"]
+  > .right-pane-changes {
   display: flex;
   grid-column: 1;
   grid-row: 3;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties[data-right-pane="intent"]
+  > .designer-intent {
+  display: flex;
+  grid-column: 1;
+  grid-row: 4;
   border-top: 0;
 }
 
@@ -125,8 +142,8 @@
   display: none;
 }
 
-.properties .inspector-context {
-  display: flex;
+.properties .inspector-context,
+.properties .change-pane-identity {
   height: 44px;
   min-height: 0;
   align-items: center;
@@ -134,6 +151,23 @@
   padding: 0 calc(var(--designer-space-6) + var(--designer-space-2));
   border-bottom: 0;
   background: var(--designer-surface-panel);
+}
+
+.properties .inspector-context {
+  display: flex;
+}
+
+/* 智能体身份行默认退场，仅智能体页签出现；与检查器身份行共用同一几何。 */
+.properties > .change-pane-identity {
+  display: none;
+}
+
+.properties[data-right-pane="intent"] > .change-pane-identity {
+  display: flex;
+}
+
+.properties .change-pane-identity > .inspector-context-heading {
+  flex: 1 1 auto;
 }
 
 .properties .inspector-context-heading {
@@ -248,6 +282,7 @@
 .properties[data-inspector-search-open] > .right-pane-switch,
 .properties[data-inspector-search-open] > .inspector-tabs,
 .properties[data-inspector-search-open] > .inspector-context,
+.properties[data-inspector-search-open] > .change-pane-identity,
 .properties[data-inspector-search-open] > .inspector-toolbar,
 .properties[data-inspector-search-open] > .inspector-pane,
 .properties[data-inspector-search-open] > .right-pane-changes,

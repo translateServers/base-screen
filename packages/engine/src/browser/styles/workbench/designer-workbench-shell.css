@@ -549,6 +549,7 @@
 /* 右栏折叠为空轨：导航、变更、意图与列头一并退场，48px 只留把手。 */
 .designer[data-right-collapsed="true"] .properties > .panel-heading,
 .designer[data-right-collapsed="true"] .properties > .right-pane-switch,
+.designer[data-right-collapsed="true"] .properties > .change-pane-identity,
 .designer[data-right-collapsed="true"] .properties > .right-pane-changes,
 .designer[data-right-collapsed="true"] .properties > .designer-intent,
 .designer[data-right-collapsed="true"] .properties > .blueprint-inspector {
@@ -866,17 +867,22 @@
 .change-diff-entries {
   display: flex;
   flex-direction: column;
-  gap: var(--designer-space-2);
+  gap: var(--designer-space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* 提案单元是卡片层：卡间距与检查器条件样式卡列表一致；条目内仍用 6px 紧凑节奏。 */
+.change-diff-list {
+  gap: var(--designer-space-5);
+}
+
 .change-diff-row {
   display: flex;
   flex-direction: column;
-  gap: var(--designer-space-2);
-  padding: var(--designer-space-3);
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-4);
   border: 1px solid var(--designer-border-subtle);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
@@ -991,7 +997,7 @@
   min-height: 34px;
   align-items: center;
   gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-3);
+  padding: 0 var(--designer-space-4);
   color: var(--designer-text-secondary);
   cursor: pointer;
   list-style: none;
@@ -1016,7 +1022,7 @@
 }
 
 .change-pane-disclosure .change-panel-rationale {
-  padding: 0 var(--designer-space-3) var(--designer-space-3);
+  padding: 0 var(--designer-space-4) var(--designer-space-4);
   line-height: 1.65;
 }
 
@@ -1124,12 +1130,7 @@
   outline-offset: -2px;
 }
 
-/* 评审入口位于智能体提案区顶部，靠右对齐；26px 图标按钮，不抢提案的视觉重量。 */
-.change-pane-toolbar {
-  display: flex;
-  justify-content: flex-end;
-}
-
+/* 评审入口位于智能体身份行右侧；26px 图标按钮，不抢提案的视觉重量。 */
 .properties .right-pane-review {
   width: 26px;
   height: 26px;
@@ -1156,14 +1157,14 @@
   text-align: center;
 }
 
-/* 智能体内容区与检查器共用同一内容盒：上 8 / 左右 12 / 下 24，滚动轨道预留。 */
+/* 智能体内容区与检查器实际内容盒一致：上 0 / 左右 16 / 下 24，滚动轨道预留。 */
 .right-pane-changes {
   display: flex;
   flex-direction: column;
   gap: var(--designer-space-3);
   min-height: 0;
   overflow: auto;
-  padding: var(--designer-space-4) var(--designer-space-5) var(--designer-space-7);
+  padding: 0 var(--designer-space-6) var(--designer-space-7);
   scrollbar-gutter: stable;
 }
 
@@ -1183,11 +1184,8 @@
 }
 
 .change-pane-head {
-  display: flex;
-  min-height: 26px;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--designer-space-2);
+  /* 与检查器首段标题的上距一致；首个内容元素盒仍贴内容区顶边。 */
+  padding-top: calc(var(--designer-space-5) + var(--designer-space-1));
 }
 
 .change-pane-heading {
@@ -1316,9 +1314,12 @@
   height: 10px;
 }
 
-/* 智能体页签书写面与内容区共用同一左右内边距；正文沿用面板 13/1.5，不再单开 14px 档。 */
+/* 智能体书写面与内容区共用左右内边距；上距为 0，由内容区底部 24px 形成卡片到输入区的间隔。
+   overflow-y 让 scrollbar-gutter 生效，与内容区共享同一轨道宽度，右边缘不靠猜测像素补齐。 */
 .properties[data-right-pane="intent"] .designer-intent {
-  padding: var(--designer-space-4) var(--designer-space-5) var(--designer-space-5);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 0 var(--designer-space-6) var(--designer-space-5);
   gap: var(--designer-space-3);
 }
 
@@ -1745,16 +1746,16 @@
   display: none;
 }
 
-/* 评审态只有提案流一屏：页签行仍在，提案列表铺满其余高度，不再留书写面。 */
+/* 评审态只有提案流一屏：页签行与身份行仍在，提案列表铺满其余高度，不再留书写面。 */
 .designer[data-review-mode="true"]:not([data-right-collapsed="true"])
 .properties[data-inspector-context-kind] {
-  grid-template-rows: 38px minmax(0, 1fr);
+  grid-template-rows: 38px 44px minmax(0, 1fr);
 }
 
 .designer[data-review-mode="true"]:not([data-right-collapsed="true"])
   .properties[data-inspector-context-kind]
   > .right-pane-changes {
-  grid-row: 2;
+  grid-row: 3;
 }
 
 .designer[data-review-mode="true"] .canvas-content {

@@ -301,6 +301,18 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <button type="button" class="right-pane-tab" data-right-pane-tab="inspector" role="tab" aria-selected="true">${DESIGNER_UI_TEXT.rightPane.inspector}</button>
         <button type="button" class="right-pane-tab" data-right-pane-tab="intent" role="tab" aria-selected="false">${DESIGNER_UI_TEXT.rightPane.intent}<span class="right-pane-count" data-change-count data-empty="true"></span></button>
       </div>
+      <header class="change-pane-identity" data-change-pane-identity>
+        <div class="inspector-context-heading">
+          <span class="inspector-context-icon" aria-hidden="true">${designerIcon('sparkle')}</span>
+          <div class="inspector-context-identity">
+            <div class="inspector-context-title-row">
+              <strong class="inspector-context-title">${DESIGNER_UI_TEXT.rightPane.intent}</strong>
+            </div>
+            <span class="inspector-context-subtitle">${DESIGNER_UI_TEXT.change.paneSubtitle}</span>
+          </div>
+        </div>
+        <div class="inspector-context-actions" data-change-pane-review></div>
+      </header>
       <div class="inspector-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.inspector}">
         <button type="button" class="designer-tab" id="designer-appearance-tab" role="tab" aria-controls="designer-appearance-panel" aria-selected="true" data-inspector-tab="appearance"><span>${DESIGNER_UI_TEXT.appearance}</span></button>
         <button type="button" class="designer-tab" id="designer-data-tab" role="tab" aria-controls="designer-data-panel" aria-selected="false" data-inspector-tab="data"><span>${DESIGNER_UI_TEXT.inspectorUi.dataSource}</span></button>

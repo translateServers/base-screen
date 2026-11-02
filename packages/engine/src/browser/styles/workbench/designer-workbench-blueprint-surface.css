@@ -161,7 +161,7 @@
   .properties[data-right-pane="intent"]
   > .right-pane-changes {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
 }
 
 .designer[data-authoring-mode="blueprint"] .statusbar-end {

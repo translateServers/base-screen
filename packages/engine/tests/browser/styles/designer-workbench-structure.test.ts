@@ -118,6 +118,83 @@ describe('designer workbench structure and layout', () => {
     );
   });
 
+  it('keeps the agent pane on the inspector content box and identity grid', () => {
+    const inspectorPane = workbenchCss.match(
+      /\.properties \.inspector-pane\s*\{[^}]*padding: ([^;]+);/s,
+    )?.[1];
+    const agentPane = workbenchCss.match(/\.right-pane-changes\s*\{[^}]*padding: ([^;]+);/s)?.[1];
+    expect(inspectorPane).toBe('0 var(--designer-space-6) var(--designer-space-7)');
+    expect(agentPane).toBe(inspectorPane);
+    expect(workbenchCss).toMatch(/\.right-pane-changes\s*\{[^}]*scrollbar-gutter: stable;/s);
+    // 身份行共用 44px 行高与 20px 内边距；智能体态只在 intent 页签出现。
+    expect(workbenchCss).toMatch(
+      /\.properties \.inspector-context,\s*\.properties \.change-pane-identity\s*\{[^}]*height: 44px;[^}]*padding: 0 calc\(var\(--designer-space-6\) \+ var\(--designer-space-2\)\);/s,
+    );
+    expect(workbenchCss).toMatch(/\.properties > \.change-pane-identity\s*\{[^}]*display: none;/s);
+    expect(workbenchCss).toMatch(
+      /\.properties\[data-right-pane="intent"\] > \.change-pane-identity\s*\{[^}]*display: flex;/s,
+    );
+  });
+
+  it('keeps the agent rows aligned to the inspector identity row and tabs difference', () => {
+    expect(workbenchCss).toMatch(
+      /\.properties\[data-right-pane="intent"\]\s*\{[^}]*grid-template-rows: 38px 44px minmax\(0, 1fr\) auto;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.properties\[data-right-pane="intent"\]\s*>\s*\.right-pane-changes\s*\{[^}]*grid-row: 3;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.properties\[data-right-pane="intent"\]\s*>\s*\.designer-intent\s*\{[^}]*grid-row: 4;/s,
+    );
+    // 书写面与内容区共用 16px 左右内边距，并以同一条 stable gutter 对齐右边缘。
+    expect(workbenchCss).toMatch(
+      /\.properties\[data-right-pane="intent"\] \.designer-intent\s*\{[^}]*overflow-y: auto;[^}]*scrollbar-gutter: stable;[^}]*padding: 0 var\(--designer-space-6\) var\(--designer-space-5\);/s,
+    );
+  });
+
+  it('matches proposal cards and section titles to inspector recipes', () => {
+    const diffRow = workbenchCss.match(/\.change-diff-row\s*\{([^}]*)\}/s)?.[1] ?? '';
+    expect(diffRow).toContain('gap: var(--designer-space-3);');
+    expect(diffRow).toContain('padding: var(--designer-space-4);');
+    expect(diffRow).toContain('border: 1px solid var(--designer-border-subtle);');
+    expect(diffRow).toContain('border-radius: var(--designer-radius-3);');
+    expect(diffRow).toContain('background: var(--designer-surface-control);');
+    expect(diffRow).not.toContain('box-shadow');
+    expect(workbenchCss).toMatch(/\.change-diff-list\s*\{[^}]*gap: var\(--designer-space-5\);/s);
+
+    const styleRule =
+      workbenchCss.match(/\.properties \.designer-style-rule\s*\{([^}]*)\}/s)?.[1] ?? '';
+    expect(styleRule).toContain('gap: var(--designer-space-3);');
+    expect(styleRule).toContain('padding: var(--designer-space-4);');
+    expect(styleRule).toContain('border: 1px solid var(--designer-border-subtle);');
+    expect(styleRule).toContain('border-radius: var(--designer-radius-3);');
+    expect(styleRule).toContain('background: var(--designer-surface-control);');
+
+    const agentTitle =
+      workbenchCss.match(
+        /\.change-pane-title,\s*\.change-panel-heading-text\s*\{([^}]*)\}/s,
+      )?.[1] ?? '';
+    expect(agentTitle).toContain('font-size: var(--designer-font-size-xs);');
+    expect(agentTitle).toContain('font-weight: 600;');
+    expect(agentTitle).toContain('letter-spacing: 0.04em;');
+
+    const inspectorTitle =
+      workbenchCss.match(
+        /\.properties \.inspector-pane \.designer-inspector-section-title\s*\{([^}]*)\}/s,
+      )?.[1] ?? '';
+    expect(inspectorTitle).toContain('font-size: var(--designer-font-size-xs);');
+    expect(inspectorTitle).toContain('font-weight: 600;');
+    expect(inspectorTitle).toContain('letter-spacing: 0.04em;');
+
+    // 标题上距与检查器首段几何一致，标题盒贴内容区顶边，视线仍落在 14px。
+    expect(workbenchCss).toMatch(
+      /\.change-pane-head\s*\{[^}]*padding-top: calc\(var\(--designer-space-5\) \+ var\(--designer-space-1\)\);/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.properties \.designer-panel-section\.designer-inspector-geometry-section\s*\{[^}]*padding-top: calc\(var\(--designer-space-5\) \+ var\(--designer-space-1\)\);/s,
+    );
+  });
+
   it('keeps inspector pane focus scrolling free of scroll-padding nudges', () => {
     // scroll-padding-block 会把边缘附近的焦点控件视为"需要滚入视口"：mousedown 聚焦
     // checkbox/select 时浏览器每次都会把面板滚动位置拖向控件（一次变化一次跳动），
