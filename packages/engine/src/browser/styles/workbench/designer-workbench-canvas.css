@@ -92,11 +92,7 @@
 }
 
 .viewport[data-grid="false"] {
-  background-image: radial-gradient(
-    circle at 50% 0,
-    color-mix(in srgb, var(--designer-accent) 7%, transparent),
-    transparent 42%
-  );
+  background-image: radial-gradient(circle at 50% 0, var(--designer-canvas-glow), transparent 42%);
   background-size: 100% 100%;
 }
 

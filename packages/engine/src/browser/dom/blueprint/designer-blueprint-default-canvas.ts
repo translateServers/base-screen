@@ -32,12 +32,13 @@ import {
  * 发出 `base-screen-blueprint-canvas-command`。语义图、canonical 编辑、历史与
  * 模拟结果均由引擎提供，这里只负责图形、手势和画布局部控件。
  *
- * 样式在 `designer-workbench-blueprint-canvas.css`，文案在
- * `designer-blueprint-ui-text.ts` 的 `canvasSurface` 段。
+ * 样式在 `designer-workbench-blueprint-canvas*.css`（骨架 / 连线 / 节点 / 浮层），
+ * 文案在 `designer-blueprint-ui-text.ts` 的 `canvasSurface` 段。
  */
 
 const NODE_WIDTH = 208;
-const NODE_HEADER = 45;
+/** 节点卡片头部：与 --designer-row-height-comfortable 一致（见 -nodes.css）。 */
+const NODE_HEADER = 44;
 const PORT_ROW = 28;
 const SUBTITLE_HEIGHT = 21;
 const VARIABLE_VALUE_ROW = 40;

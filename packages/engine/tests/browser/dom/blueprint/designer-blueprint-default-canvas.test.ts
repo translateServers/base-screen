@@ -25,6 +25,12 @@ const markup = readSource('../../../../src/browser/dom/workspace/designer-worksp
 const css = readSource(
   '../../../../src/browser/styles/workbench/designer-workbench-blueprint-canvas.css',
 );
+const edgesCss = readSource(
+  '../../../../src/browser/styles/workbench/designer-workbench-blueprint-canvas-edges.css',
+);
+const nodesCss = readSource(
+  '../../../../src/browser/styles/workbench/designer-workbench-blueprint-canvas-nodes.css',
+);
 const surfaceCss = readSource(
   '../../../../src/browser/styles/workbench/designer-workbench-blueprint-surface.css',
 );
@@ -62,12 +68,13 @@ describe('engine default blueprint canvas', () => {
     expect(controller).toContain('fallback.hidden = assigned !== undefined');
   });
 
-  it('keeps the 24px port hit area, far-zoom labels and screen-space dot grid', () => {
-    expect(css).toMatch(
+  it('keeps the 24px port hit area, far-zoom labels and shared canvas grid tokens', () => {
+    expect(nodesCss).toMatch(
       /\.designer-blueprint-canvas-port\s*\{[^}]*width: 24px;[^}]*height: 24px;/s,
     );
-    expect(css).toMatch(/background-size:\s*20px 20px;/);
-    expect(css).toContain('.designer-blueprint-canvas-viewport[data-zoom-far="true"]');
+    expect(css).toContain('background-image: var(--designer-canvas-surface-image);');
+    expect(css).toContain('background-size: var(--designer-canvas-surface-size);');
+    expect(edgesCss).toContain('.designer-blueprint-canvas-viewport[data-zoom-far="true"]');
   });
 
   it('keeps the no-host fallback hidden behind the shared slot-ready state', () => {

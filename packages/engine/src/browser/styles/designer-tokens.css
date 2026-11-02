@@ -107,6 +107,17 @@
   --designer-column-header-height: 40px;
   --designer-ruler-size: 22px;
 
+  /* ── 画布底纹 ──
+     设计视口与蓝图画布共用同一套点阵 + 顶部光晕：两处只引用 image/size 组合，
+     不再各自维护栅格尺寸与光晕浓度。 */
+  --designer-canvas-grid-size: 24px;
+  --designer-canvas-glow: color-mix(in srgb, var(--designer-accent) 7%, transparent);
+  --designer-canvas-surface-image:
+    radial-gradient(circle, var(--designer-canvas-grid-line) 1px, transparent 1px),
+    radial-gradient(circle at 50% 0, var(--designer-canvas-glow), transparent 42%);
+  --designer-canvas-surface-size:
+    var(--designer-canvas-grid-size) var(--designer-canvas-grid-size), 100% 100%;
+
   /* ── 画布覆盖层：参考线与测量是编辑 affordance，按体系「交互与焦点沿用强调蓝」收进
      强调色族（批 4b）。吸附线取 accent；测量读数取 accent-text——文字需 AA，accent
      原色压工作区底约 3.6:1 不够，accent-text 在双主题下分别是 5.6:1 / 6.2:1。

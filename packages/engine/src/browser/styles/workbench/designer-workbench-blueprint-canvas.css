@@ -1,4 +1,5 @@
-/* 引擎内置蓝图中央画布：40px 画布条 + 无限点阵画布 + 可收起模拟抽屉。 */
+/* 引擎内置蓝图中央画布的骨架：40px 画布条 + 无限点阵画布。节点、连线与浮层
+   分别在同目录的 -nodes / -edges / -overlays 文件里，沿用同一套 token。 */
 .designer-blueprint-canvas {
   position: absolute;
   inset: 0;
@@ -22,21 +23,21 @@
   display: none;
 }
 
-/* 画布条 */
+/* 画布条：与设计视图的工作区工具条同高、同底色、同一条下缘发丝线。 */
 .designer-blueprint-canvas-bar {
   position: relative;
   z-index: var(--designer-z-workspace-overlay);
   display: flex;
   flex: none;
+  box-sizing: border-box;
   align-items: center;
-  gap: var(--designer-space-2);
+  gap: var(--designer-space-5);
   height: var(--designer-column-header-height);
   padding: 0 var(--designer-space-5);
-  background: var(--designer-surface-panel);
-}
-
-.designer-blueprint-canvas-bar .designer-icon-button {
-  width: 24px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  background: var(--designer-surface-raised);
+  box-shadow: 0 1px 0 var(--designer-border-subtle);
 }
 
 .designer-blueprint-canvas-bar .designer-blueprint-canvas-bar-chevron {
@@ -58,7 +59,7 @@
 .designer-blueprint-canvas-bar-separator {
   flex: none;
   width: 1px;
-  height: 16px;
+  height: 22px;
   background: var(--designer-border-subtle);
 }
 
@@ -85,9 +86,10 @@
   display: grid;
   min-width: 168px;
   padding: var(--designer-space-2);
-  border-radius: var(--designer-radius-4);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-5);
   background: var(--designer-surface-overlay);
-  box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
+  box-shadow: var(--designer-shadow-overlay);
 }
 
 .designer-blueprint-canvas-menu-item {
@@ -117,16 +119,24 @@
   background: var(--designer-warning);
 }
 
+/* 缩放读数：与设计视图工作区工具条里的 .zoom-value 同尺寸、同字体。 */
 .designer-blueprint-canvas-zoom {
-  min-width: 44px;
-  color: var(--designer-text-muted);
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: 0 0 48px;
+  width: 48px;
+  height: var(--designer-control-height-compact);
+  align-items: center;
+  justify-content: center;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-sm);
   font-variant-numeric: tabular-nums;
   text-align: center;
+  white-space: nowrap;
 }
 
-/* 画布表面 */
+/* 画布表面：与设计视口共用同一份点阵 + 顶部光晕 token。 */
 .designer-blueprint-canvas-viewport {
   position: relative;
   flex: 1 1 auto;
@@ -135,8 +145,8 @@
   cursor: default;
   touch-action: none;
   background-color: var(--designer-surface-canvas);
-  background-image: radial-gradient(circle, var(--designer-canvas-grid-line) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image: var(--designer-canvas-surface-image);
+  background-size: var(--designer-canvas-surface-size);
   outline: none;
 }
 
@@ -152,9 +162,10 @@
   cursor: crosshair;
 }
 
+/* 键盘焦点与设计视口一致：内描边，不用外轮廓，避免在贴边画布上被裁掉。 */
 .designer-blueprint-canvas-viewport:focus-visible {
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: -2px;
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
 }
 
 .designer-blueprint-canvas-layers {
@@ -163,744 +174,12 @@
   transform-origin: 0 0;
 }
 
-.designer-blueprint-canvas-edges {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.designer-blueprint-canvas-edge-line {
-  fill: none;
-  stroke: color-mix(in srgb, var(--designer-text-muted) 82%, transparent);
-  stroke-width: 1.4;
-  vector-effect: non-scaling-stroke;
-  transition:
-    stroke var(--designer-motion),
-    stroke-width var(--designer-motion),
-    opacity var(--designer-motion);
-  pointer-events: none;
-}
-
-.designer-blueprint-canvas-edge-group[data-kind="dependency"] .designer-blueprint-canvas-edge-line {
-  stroke: var(--designer-text-disabled);
-  stroke-width: 1.6;
-  stroke-dasharray: 1 5;
-  stroke-linecap: round;
-}
-
-.designer-blueprint-canvas-edge-group[data-kind="semantic"] .designer-blueprint-canvas-edge-line {
-  stroke-dasharray: 7 5;
-}
-
-.designer-blueprint-canvas-edge-group[data-kind="containment"]
-  .designer-blueprint-canvas-edge-line {
-  opacity: 0.55;
-  stroke-dasharray: 1 5;
-}
-
-.designer-blueprint-canvas-edge-group[data-kind="relation"] .designer-blueprint-canvas-edge-line {
-  stroke: var(--designer-text-secondary);
-  stroke-width: 1.5;
-}
-
-.designer-blueprint-canvas-edge-group:hover .designer-blueprint-canvas-edge-line {
-  stroke: var(--designer-text-primary);
-  stroke-width: 2;
-}
-
-.designer-blueprint-canvas-edge-group[data-selected="true"] .designer-blueprint-canvas-edge-line {
-  stroke: var(--designer-accent);
-  stroke-width: 2.4;
-}
-
-.designer-blueprint-canvas-edge-group[data-traced="true"] .designer-blueprint-canvas-edge-line {
-  stroke: var(--designer-accent);
-  stroke-width: 2.2;
-}
-
-.designer-blueprint-canvas-edge-group[data-failed="true"] .designer-blueprint-canvas-edge-line {
-  stroke: var(--designer-danger);
-  stroke-width: 2.2;
-}
-
-.designer-blueprint-canvas-edge-caps {
-  fill: var(--designer-text-muted);
-  stroke: none;
-  pointer-events: none;
-}
-
-.designer-blueprint-canvas-edge-group[data-kind="dependency"] .designer-blueprint-canvas-edge-caps,
-.designer-blueprint-canvas-edge-group[data-kind="semantic"] .designer-blueprint-canvas-edge-caps {
-  fill: var(--designer-text-disabled);
-}
-
-.designer-blueprint-canvas-edge-group[data-kind="relation"] .designer-blueprint-canvas-edge-caps {
-  fill: var(--designer-text-secondary);
-}
-
-.designer-blueprint-canvas-edge-group[data-selected="true"] .designer-blueprint-canvas-edge-caps,
-.designer-blueprint-canvas-edge-group[data-traced="true"] .designer-blueprint-canvas-edge-caps {
-  fill: var(--designer-accent);
-}
-
-.designer-blueprint-canvas-edge-hit {
-  fill: none;
-  stroke: transparent;
-  stroke-width: 16;
-  pointer-events: stroke;
-  cursor: pointer;
-}
-
-.designer-blueprint-canvas-edge-group[data-selected="true"] .designer-blueprint-canvas-edge-hit {
-  stroke: color-mix(in srgb, var(--designer-accent) 8%, transparent);
-}
-
-.designer-blueprint-canvas-edge-hit:focus-visible {
-  stroke: color-mix(in srgb, var(--designer-focus-ring) 35%, transparent);
-  outline: none;
-}
-
-.designer-blueprint-canvas-edge-labels {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-}
-
-.designer-blueprint-canvas-edge-label {
-  position: absolute;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--designer-space-2);
-  height: 22px;
-  max-width: 168px;
-  padding: 0 calc(var(--designer-space-3) + 1px);
-  overflow: hidden;
-  border-radius: var(--designer-radius-3);
-  background: var(--designer-surface-overlay);
-  box-shadow:
-    0 0 0 1px var(--designer-border-default),
-    var(--designer-shadow-float);
-  color: var(--designer-text-secondary);
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
-  font-weight: 500;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  pointer-events: auto;
-  cursor: pointer;
-  transform: translate(-50%, -50%);
-  transition:
-    color var(--designer-motion),
-    box-shadow var(--designer-motion);
-}
-
-.designer-blueprint-canvas-edge-label-icon {
-  display: inline-flex;
-  flex: none;
-  width: 10px;
-  height: 10px;
-  color: var(--designer-text-disabled);
-}
-
-.designer-blueprint-canvas-edge-label-icon svg {
-  width: 10px;
-  height: 10px;
-}
-
-.designer-blueprint-canvas-edge-label-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.designer-blueprint-canvas-edge-label:hover {
-  color: var(--designer-text-primary);
-  box-shadow:
-    0 0 0 1px var(--designer-border-strong),
-    var(--designer-shadow-float);
-}
-
-.designer-blueprint-canvas-edge-label:hover .designer-blueprint-canvas-edge-label-icon {
-  color: var(--designer-text-secondary);
-}
-
-.designer-blueprint-canvas-edge-label[data-kind="dependency"],
-.designer-blueprint-canvas-edge-label[data-kind="semantic"] {
-  color: var(--designer-text-muted);
-}
-
-.designer-blueprint-canvas-edge-label[data-selected="true"] {
-  color: var(--designer-text-primary);
-  box-shadow:
-    0 0 0 1px var(--designer-accent),
-    var(--designer-shadow-float);
-}
-
-.designer-blueprint-canvas-edge-label[data-selected="true"]
-  .designer-blueprint-canvas-edge-label-icon {
-  color: var(--designer-accent);
-}
-
-.designer-blueprint-canvas-edge-label[data-traced="true"] {
-  color: var(--designer-text-primary);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--designer-accent) 55%, transparent),
-    var(--designer-shadow-float);
-}
-
-.designer-blueprint-canvas-viewport[data-zoom-far="true"]
-  .designer-blueprint-canvas-edge-label:not([data-selected="true"]):not([data-traced="true"]) {
-  display: none;
-}
-
-.designer-blueprint-canvas-overlay {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.designer-blueprint-canvas-link-preview {
-  fill: none;
-  stroke: var(--designer-accent);
-  stroke-width: 2;
-  stroke-dasharray: 5 4;
-  pointer-events: none;
-}
-
-/* 节点 */
-.designer-blueprint-canvas-node {
-  position: absolute;
-  box-sizing: border-box;
-  border-radius: var(--designer-radius-3);
-  background: var(--designer-surface-raised);
-  box-shadow: var(--designer-elev-card);
-  cursor: default;
-  transition:
-    background-color var(--designer-motion),
-    box-shadow var(--designer-motion),
-    outline-color var(--designer-motion);
-}
-
-.designer-blueprint-canvas-node:hover {
-  box-shadow:
-    var(--designer-elev-card),
-    0 0 0 1px var(--designer-border-strong),
-    var(--designer-shadow-float);
-}
-
-.designer-blueprint-canvas-node:focus-visible {
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: 2px;
-}
-
-.designer-blueprint-canvas-node[data-traced="true"] {
-  outline: 1px solid color-mix(in srgb, var(--designer-accent) 48%, transparent);
-  outline-offset: 0;
-}
-
-.designer-blueprint-canvas-node[data-selected="true"] {
-  background: var(--designer-surface-raised);
-  outline: 1px solid color-mix(in srgb, var(--designer-accent) 72%, transparent);
-  outline-offset: 0;
-  box-shadow:
-    var(--designer-elev-card),
-    0 0 0 3px var(--designer-accent-surface),
-    var(--designer-shadow-float);
-}
-
-.designer-blueprint-canvas-node[data-kind="host"] {
-  background: color-mix(in srgb, var(--designer-accent) 4%, var(--designer-surface-raised));
-}
-
-.designer-blueprint-canvas-node[data-failed="true"] {
-  outline: 1px solid var(--designer-danger);
-  outline-offset: 0;
-}
-
-.designer-blueprint-canvas-node[data-unconnected="true"] {
-  outline: 1px solid var(--designer-border-default);
-  outline-offset: 0;
-}
-
-/* 默认主题为黑夜：比工作台面板更深的浮层影，与原型的事件画布一致。 */
-:host(:not([theme="light"])) .designer-blueprint-canvas-node {
-  box-shadow:
-    0 0 0 1px var(--designer-border-default),
-    0 2px 4px color-mix(in srgb, var(--designer-surface-scrim) 60%, transparent),
-    0 16px 32px -20px color-mix(in srgb, var(--designer-surface-scrim) 75%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--designer-text-primary) 5%, transparent) inset;
-}
-
-.designer-blueprint-canvas-node[data-selected="true"]:focus-visible,
-.designer-blueprint-canvas-node[data-failed="true"]:focus-visible {
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: 2px;
-}
-
-.designer-blueprint-canvas-node-header {
-  display: grid;
-  box-sizing: border-box;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--designer-space-3);
-  height: 45px;
-  padding: calc(var(--designer-space-3) + 1px)
-    calc(var(--designer-space-4) + var(--designer-space-1));
-  overflow: hidden;
-  border-radius: var(--designer-radius-3) var(--designer-radius-3) 0 0;
-}
-
-.designer-blueprint-canvas-node[data-selected="true"] .designer-blueprint-canvas-node-header {
-  background: color-mix(in srgb, var(--designer-text-primary) 3%, transparent);
-}
-
-.designer-blueprint-canvas-node-icon {
-  display: grid;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--designer-radius-3);
-  background: var(--designer-surface-control);
-  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
-  color: var(--designer-text-secondary);
-  place-items: center;
-}
-
-.designer-blueprint-canvas-node-icon svg {
-  width: 12px;
-  height: 12px;
-}
-
-.designer-blueprint-canvas-node[data-kind="variable"] .designer-blueprint-canvas-node-icon {
-  background: var(--designer-accent-surface);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 18%, transparent);
-  color: var(--designer-accent-text);
-}
-
-.designer-blueprint-canvas-node[data-kind="host"] .designer-blueprint-canvas-node-icon {
-  color: var(--designer-text-secondary);
-}
-
-.designer-blueprint-canvas-node-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 1px;
-  overflow: hidden;
-}
-
-.designer-blueprint-canvas-node-kind {
-  overflow: hidden;
-  color: var(--designer-text-muted);
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.designer-blueprint-canvas-node-title {
-  overflow: hidden;
-  color: var(--designer-text-primary);
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.designer-blueprint-canvas-node-relcount {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--designer-space-1) + 1px);
-  height: 16px;
-  padding: 0 calc(var(--designer-space-2) + 1px);
-  border-radius: var(--designer-radius-pill);
-  background: var(--designer-surface-control);
-  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
-  color: var(--designer-text-muted);
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.designer-blueprint-canvas-node-relcount b {
-  color: var(--designer-text-secondary);
-  font-weight: 500;
-}
-
-.designer-blueprint-canvas-node-subtitle {
-  box-sizing: border-box;
-  height: 21px;
-  padding: 0 calc(var(--designer-space-4) + var(--designer-space-1));
-  overflow: hidden;
-  color: var(--designer-text-muted);
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
-  font-weight: 500;
-  line-height: 21px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.designer-blueprint-canvas-node-value {
-  display: flex;
-  box-sizing: border-box;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--designer-space-3);
-  height: 40px;
-  padding: 0 calc(var(--designer-space-4) + var(--designer-space-1));
-  border-top: 1px solid var(--designer-border-subtle);
-  color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-xs);
-  white-space: nowrap;
-}
-
-.designer-blueprint-canvas-node-value b {
-  overflow: hidden;
-  color: var(--designer-text-primary);
-  font-family: var(--designer-font-family-mono);
-  font-size: 11px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.designer-blueprint-canvas-node-value span:last-child {
-  flex: none;
-  color: var(--designer-text-muted);
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
-}
-
-.designer-blueprint-canvas-node-summary {
-  position: absolute;
-  right: 0;
-  left: 0;
-  display: flex;
-  box-sizing: border-box;
-  align-items: center;
-  padding: 0 calc(var(--designer-space-4) + var(--designer-space-1));
-  overflow: hidden;
-  border-top: 1px solid var(--designer-border-subtle);
-  border-radius: 0 0 var(--designer-radius-3) var(--designer-radius-3);
-  color: var(--designer-text-muted);
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.designer-blueprint-canvas-ports {
-  position: absolute;
-  right: 0;
-  left: 0;
-}
-
-.designer-blueprint-canvas-port-row {
-  display: flex;
-  align-items: center;
-  gap: calc(var(--designer-space-2) + 1px);
-  height: 28px;
-  padding: 0 calc(var(--designer-space-5) + var(--designer-space-1)) 0
-    calc(var(--designer-space-4) + var(--designer-space-1));
-  overflow: hidden;
-  border-top: 1px solid var(--designer-border-subtle);
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-xs);
-  white-space: nowrap;
-  transition:
-    background-color var(--designer-motion),
-    color var(--designer-motion);
-}
-
-.designer-blueprint-canvas-port-row:hover {
-  background: color-mix(in srgb, var(--designer-text-primary) 4%, transparent);
-  color: var(--designer-text-primary);
-}
-
-.designer-blueprint-canvas-port-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.designer-blueprint-canvas-port-tag {
-  flex: none;
-  color: var(--designer-text-muted);
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
-  font-weight: 500;
-  letter-spacing: 0.04em;
-}
-
-.designer-blueprint-canvas-port-row[data-semantic="true"] .designer-blueprint-canvas-port-name,
-.designer-blueprint-canvas-port-row[data-containment="true"] .designer-blueprint-canvas-port-name {
-  font-family: var(--designer-font-family);
-}
-
-.designer-blueprint-canvas-port-row[data-semantic="true"] .designer-blueprint-canvas-port-tag {
-  color: color-mix(in oklab, var(--designer-accent) 42%, var(--designer-text-muted));
-}
-
-.designer-blueprint-canvas-port-row[data-available="false"] {
-  color: var(--designer-text-disabled);
-}
-
-.designer-blueprint-canvas-port-row[data-available="false"]:hover {
-  background: color-mix(in srgb, var(--designer-text-primary) 2%, transparent);
-  color: var(--designer-text-muted);
-}
-
-.designer-blueprint-canvas-port-row[data-available="false"] .designer-blueprint-canvas-port-tag {
-  color: var(--designer-text-disabled);
-}
-
-.designer-blueprint-canvas-port-lock {
-  display: inline-flex;
-  flex: none;
-  width: 9px;
-  height: 9px;
-  color: var(--designer-text-disabled);
-}
-
-.designer-blueprint-canvas-port-lock svg {
-  width: 9px;
-  height: 9px;
-}
-
-.designer-blueprint-canvas-port {
-  position: absolute;
-  box-sizing: border-box;
-  display: grid;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--designer-radius-3);
-  cursor: crosshair;
-  place-items: center;
-  pointer-events: auto;
-  translate: 0 -50%;
-  z-index: 4;
-}
-
-.designer-blueprint-canvas-port::before {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--designer-text-muted);
-  box-shadow: 0 0 0 2px var(--designer-surface-raised);
-  content: "";
-  transition:
-    background-color var(--designer-motion),
-    box-shadow var(--designer-motion);
-}
-
-.designer-blueprint-canvas-port-in {
-  left: -12px;
-}
-
-.designer-blueprint-canvas-port-in::before {
-  background: transparent;
-  box-shadow:
-    inset 0 0 0 1.5px var(--designer-text-muted),
-    0 0 0 2px var(--designer-surface-raised);
-}
-
-.designer-blueprint-canvas-port-out {
-  right: -12px;
-}
-
-.designer-blueprint-canvas-port:hover::before {
-  background: var(--designer-text-primary);
-  box-shadow:
-    0 0 0 2px var(--designer-surface-raised),
-    0 0 0 3px var(--designer-border-active);
-}
-
-.designer-blueprint-canvas-port:focus-visible {
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: -2px;
-}
-
-.designer-blueprint-canvas-port[data-available="false"] {
-  cursor: not-allowed;
-}
-
-.designer-blueprint-canvas-port[data-available="false"]::before {
-  border: 1px dashed var(--designer-border-active);
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--designer-border-strong);
-}
-
-.designer-blueprint-canvas-port[data-dependency="true"] {
-  cursor: default;
-}
-
-.designer-blueprint-canvas-port[data-dependency="true"]::before {
-  border-radius: var(--designer-radius-1);
-  background: var(--designer-text-muted);
-  transform: rotate(45deg);
-}
-
-.designer-blueprint-canvas-port[data-semantic="true"]::before {
-  border-radius: var(--designer-radius-1);
-  background: var(--designer-text-secondary);
-  transform: rotate(45deg);
-}
-
-.designer-blueprint-canvas-port[data-containment="true"] {
-  cursor: default;
-}
-
-.designer-blueprint-canvas-port[data-containment="true"]::before {
-  border-radius: var(--designer-radius-1);
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--designer-text-disabled);
-}
-
-.designer-blueprint-canvas-port-in[data-armed="true"]::before {
-  background: var(--designer-accent);
-  box-shadow:
-    0 0 0 2px var(--designer-surface-raised),
-    0 0 0 4px var(--designer-accent-surface);
-}
-
-.designer-blueprint-canvas-port-in[data-hover="true"]::before {
-  background: var(--designer-accent);
-  box-shadow:
-    0 0 0 2px var(--designer-surface-raised),
-    0 0 0 4px var(--designer-accent-surface);
-}
-
-.designer-blueprint-canvas-viewport[data-hand="true"] .designer-blueprint-canvas-node,
-.designer-blueprint-canvas-viewport[data-hand="true"] .designer-blueprint-canvas-edge-label,
-.designer-blueprint-canvas-viewport[data-hand="true"] .designer-blueprint-canvas-port {
-  cursor: grab;
-}
-
-.designer-blueprint-canvas-viewport[data-panning="true"] .designer-blueprint-canvas-node,
-.designer-blueprint-canvas-viewport[data-panning="true"] .designer-blueprint-canvas-edge-label,
-.designer-blueprint-canvas-viewport[data-panning="true"] .designer-blueprint-canvas-port {
-  cursor: grabbing;
-}
-
 .designer-blueprint-canvas-marquee {
   position: absolute;
   z-index: var(--designer-z-workspace-overlay);
   border: 1px solid var(--designer-accent);
   background: color-mix(in srgb, var(--designer-accent) 14%, transparent);
   pointer-events: none;
-}
-
-/* 空态与提示 */
-.designer-blueprint-canvas-empty {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: min(400px, calc(100% - 48px));
-  padding: var(--designer-space-7);
-  border-radius: var(--designer-radius-4);
-  background: var(--designer-surface-panel);
-  box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
-  transform: translate(-50%, -50%);
-}
-
-.designer-blueprint-canvas-empty h3 {
-  margin: 0 0 var(--designer-space-2);
-  color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-lg);
-  font-weight: 600;
-}
-
-.designer-blueprint-canvas-empty p {
-  margin: 0 0 var(--designer-space-4);
-  color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-sm);
-  line-height: 1.5;
-}
-
-.designer-blueprint-canvas-empty ol {
-  display: grid;
-  gap: var(--designer-space-2);
-  margin: 0 0 var(--designer-space-5);
-  padding-left: var(--designer-space-6);
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-sm);
-}
-
-.designer-blueprint-canvas-empty-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--designer-space-3);
-}
-
-.designer-blueprint-canvas-empty-hint {
-  color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-xs);
-}
-
-.designer-blueprint-canvas-no-events {
-  position: absolute;
-  top: var(--designer-space-5);
-  left: 50%;
-  display: flex;
-  max-width: min(560px, calc(100% - 32px));
-  gap: var(--designer-space-2);
-  padding: var(--designer-space-4) var(--designer-space-5);
-  border-radius: var(--designer-radius-3);
-  background: var(--designer-surface-overlay);
-  box-shadow: var(--designer-elev-ring);
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-xs);
-  pointer-events: none;
-  transform: translateX(-50%);
-}
-
-.designer-blueprint-canvas-no-events strong {
-  color: var(--designer-warning);
-  white-space: nowrap;
-}
-
-.designer-blueprint-canvas-status {
-  position: absolute;
-  bottom: 56px;
-  left: 50%;
-  z-index: var(--designer-z-popover);
-  max-width: calc(100% - 32px);
-  padding: var(--designer-space-3) calc(var(--designer-space-4) + var(--designer-space-1));
-  border-radius: var(--designer-radius-pill);
-  background: var(--designer-surface-overlay);
-  box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-xs);
-  pointer-events: none;
-  transform: translateX(-50%);
-}
-
-.designer-blueprint-canvas-status[data-tone="error"] {
-  color: var(--designer-danger);
-}
-
-.designer-blueprint-canvas[data-simulation="open"] .designer-blueprint-canvas-status {
-  bottom: 250px;
 }
 
 /* 抓手势只属于画布背景：画布内的浮层、抽屉与空态不继承 grab。 */
@@ -912,228 +191,6 @@
 .designer-blueprint-canvas-status,
 .designer-blueprint-canvas-edge-labels {
   cursor: default;
-}
-
-/* 校验浮层 */
-.designer-blueprint-canvas-problems {
-  position: absolute;
-  top: var(--designer-space-5);
-  right: var(--designer-space-5);
-  z-index: var(--designer-z-popover);
-  width: min(340px, calc(100% - 24px));
-  max-height: 50%;
-  padding: var(--designer-space-5);
-  overflow: auto;
-  border-radius: var(--designer-radius-4);
-  background: var(--designer-surface-overlay);
-  box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
-}
-
-.designer-blueprint-canvas-problems header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--designer-space-2);
-  margin-bottom: var(--designer-space-4);
-  color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-base);
-}
-
-.designer-blueprint-canvas-problems ul {
-  display: grid;
-  gap: var(--designer-space-4);
-  margin: 0;
-  padding-left: var(--designer-space-6);
-}
-
-.designer-blueprint-canvas-problems li {
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-xs);
-  line-height: 1.5;
-}
-
-.designer-blueprint-canvas-problems li[data-severity="error"] {
-  color: var(--designer-danger);
-}
-
-.designer-blueprint-canvas-problems code {
-  display: block;
-  margin-top: var(--designer-space-1);
-  color: var(--designer-text-muted);
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
-}
-
-.designer-blueprint-canvas-panel-icon {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  color: var(--designer-text-muted);
-  background: transparent;
-  box-shadow: none;
-}
-
-.designer-blueprint-canvas-panel-icon:hover {
-  color: var(--designer-text-primary);
-  background: var(--designer-surface-control-hover);
-}
-
-/* 模拟区 */
-.designer-blueprint-canvas-simulation-bar {
-  position: absolute;
-  right: var(--designer-space-5);
-  bottom: var(--designer-space-5);
-  left: var(--designer-space-5);
-  z-index: var(--designer-z-workspace-overlay);
-  display: flex;
-  align-items: center;
-  gap: var(--designer-space-3);
-  height: 32px;
-  padding: 0 var(--designer-space-4);
-  border-radius: var(--designer-radius-4);
-  background: var(--designer-surface-overlay);
-  box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
-  color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-xs);
-}
-
-.designer-blueprint-canvas-simulation-bar-icon {
-  display: inline-flex;
-  flex: none;
-  width: 14px;
-  height: 14px;
-  color: var(--designer-text-muted);
-}
-
-.designer-blueprint-canvas-simulation-bar-icon svg {
-  width: 14px;
-  height: 14px;
-}
-
-.designer-blueprint-canvas-simulation-bar-label {
-  flex: 1 1 auto;
-  overflow: hidden;
-  color: var(--designer-text-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.designer-blueprint-canvas-simulation {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: var(--designer-z-popover);
-  display: flex;
-  flex-direction: column;
-  height: 238px;
-  border-top: 1px solid var(--designer-border-subtle);
-  background: var(--designer-surface-overlay);
-  box-shadow: var(--designer-shadow-float);
-}
-
-.designer-blueprint-canvas-simulation-header {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  height: var(--designer-column-header-height);
-  padding: 0 var(--designer-space-5);
-  border-bottom: 1px solid var(--designer-border-subtle);
-  color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-base);
-  font-weight: 600;
-}
-
-.designer-blueprint-canvas-simulation-content {
-  display: grid;
-  flex: 1 1 auto;
-  min-height: 0;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-  gap: var(--designer-space-5);
-  padding: var(--designer-space-5);
-  overflow: hidden;
-}
-
-.designer-blueprint-canvas-simulation-controls {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: var(--designer-space-4);
-}
-
-.designer-blueprint-canvas-simulation-field {
-  display: grid;
-  min-width: 0;
-  gap: var(--designer-space-1);
-  color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-xs);
-}
-
-.designer-blueprint-canvas-simulation-payload {
-  flex: 1 1 auto;
-  min-height: 56px;
-  resize: none;
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
-  line-height: 1.5;
-}
-
-.designer-blueprint-canvas-simulation-footer {
-  display: flex;
-  align-items: center;
-  gap: var(--designer-space-3);
-}
-
-.designer-blueprint-canvas-simulation-status {
-  flex: 1 1 auto;
-  overflow: hidden;
-  color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.designer-blueprint-canvas-simulation-status[data-tone="success"] {
-  color: var(--designer-success);
-}
-
-.designer-blueprint-canvas-simulation-status[data-tone="error"] {
-  color: var(--designer-danger);
-}
-
-.designer-blueprint-canvas-simulation-run {
-  height: var(--designer-control-height);
-  font-size: var(--designer-font-size-sm);
-}
-
-.designer-blueprint-canvas-simulation-trace {
-  min-width: 0;
-  overflow: auto;
-}
-
-.designer-blueprint-canvas-simulation-trace h4 {
-  margin: 0 0 var(--designer-space-3);
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-xs);
-  font-weight: 600;
-}
-
-.designer-blueprint-canvas-simulation-trace ol {
-  display: grid;
-  gap: var(--designer-space-2);
-  margin: 0;
-  padding-left: var(--designer-space-6);
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-xs);
-  line-height: 1.5;
-}
-
-.designer-blueprint-canvas-simulation-trace-empty {
-  margin: 0;
-  color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-xs);
 }
 
 /* 窄容器：只留图标，缩放数值让位。 */
@@ -1150,14 +207,6 @@
 
 @container (max-width: 470px) {
   .designer-blueprint-canvas-zoom {
-    display: none;
-  }
-
-  .designer-blueprint-canvas-simulation-content {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .designer-blueprint-canvas-simulation-trace {
     display: none;
   }
 }

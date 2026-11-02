@@ -1,0 +1,213 @@
+/* 蓝图画布的连线与边标签。连线语义（dependency / semantic / containment /
+   relation）是蓝图视图的业务差异，保留各自线型；交互态与设计视图的选中框
+   对齐：悬停中性提亮、选中强调色 2px。 */
+.designer-blueprint-canvas-edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.designer-blueprint-canvas-edge-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--designer-text-muted) 82%, transparent);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition:
+    stroke var(--designer-motion),
+    stroke-width var(--designer-motion),
+    opacity var(--designer-motion);
+  pointer-events: none;
+}
+
+.designer-blueprint-canvas-edge-group[data-kind="dependency"] .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-text-disabled);
+  stroke-width: 1.6;
+  stroke-dasharray: 1 5;
+  stroke-linecap: round;
+}
+
+.designer-blueprint-canvas-edge-group[data-kind="semantic"] .designer-blueprint-canvas-edge-line {
+  stroke-dasharray: 7 5;
+}
+
+.designer-blueprint-canvas-edge-group[data-kind="containment"]
+  .designer-blueprint-canvas-edge-line {
+  opacity: 0.55;
+  stroke-dasharray: 1 5;
+}
+
+.designer-blueprint-canvas-edge-group[data-kind="relation"] .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-text-secondary);
+  stroke-width: 1.5;
+}
+
+.designer-blueprint-canvas-edge-group:hover .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-text-primary);
+  stroke-width: 2;
+}
+
+.designer-blueprint-canvas-edge-group[data-selected="true"] .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-accent);
+  stroke-width: 2;
+}
+
+.designer-blueprint-canvas-edge-group[data-traced="true"] .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-accent);
+  stroke-width: 2;
+}
+
+.designer-blueprint-canvas-edge-group[data-failed="true"] .designer-blueprint-canvas-edge-line {
+  stroke: var(--designer-danger);
+  stroke-width: 2;
+}
+
+.designer-blueprint-canvas-edge-caps {
+  fill: var(--designer-text-muted);
+  stroke: none;
+  pointer-events: none;
+}
+
+.designer-blueprint-canvas-edge-group[data-kind="dependency"] .designer-blueprint-canvas-edge-caps,
+.designer-blueprint-canvas-edge-group[data-kind="semantic"] .designer-blueprint-canvas-edge-caps {
+  fill: var(--designer-text-disabled);
+}
+
+.designer-blueprint-canvas-edge-group[data-kind="relation"] .designer-blueprint-canvas-edge-caps {
+  fill: var(--designer-text-secondary);
+}
+
+.designer-blueprint-canvas-edge-group[data-selected="true"] .designer-blueprint-canvas-edge-caps,
+.designer-blueprint-canvas-edge-group[data-traced="true"] .designer-blueprint-canvas-edge-caps {
+  fill: var(--designer-accent);
+}
+
+.designer-blueprint-canvas-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 16;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.designer-blueprint-canvas-edge-group[data-selected="true"] .designer-blueprint-canvas-edge-hit {
+  stroke: color-mix(in srgb, var(--designer-accent) 8%, transparent);
+}
+
+.designer-blueprint-canvas-edge-hit:focus-visible {
+  stroke: color-mix(in srgb, var(--designer-focus-ring) 35%, transparent);
+  outline: none;
+}
+
+.designer-blueprint-canvas-edge-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.designer-blueprint-canvas-edge-label {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  height: 22px;
+  max-width: 168px;
+  padding: 0 calc(var(--designer-space-3) + 1px);
+  overflow: hidden;
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-surface-overlay);
+  box-shadow:
+    0 0 0 1px var(--designer-border-default),
+    var(--designer-shadow-float);
+  color: var(--designer-text-secondary);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 500;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition:
+    color var(--designer-motion),
+    box-shadow var(--designer-motion);
+}
+
+.designer-blueprint-canvas-edge-label-icon {
+  display: inline-flex;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  color: var(--designer-text-disabled);
+}
+
+.designer-blueprint-canvas-edge-label-icon svg {
+  width: 10px;
+  height: 10px;
+}
+
+.designer-blueprint-canvas-edge-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.designer-blueprint-canvas-edge-label:hover {
+  color: var(--designer-text-primary);
+  box-shadow:
+    0 0 0 1px var(--designer-border-strong),
+    var(--designer-shadow-float);
+}
+
+.designer-blueprint-canvas-edge-label:hover .designer-blueprint-canvas-edge-label-icon {
+  color: var(--designer-text-secondary);
+}
+
+.designer-blueprint-canvas-edge-label[data-kind="dependency"],
+.designer-blueprint-canvas-edge-label[data-kind="semantic"] {
+  color: var(--designer-text-muted);
+}
+
+.designer-blueprint-canvas-edge-label[data-selected="true"] {
+  color: var(--designer-text-primary);
+  box-shadow:
+    0 0 0 1px var(--designer-accent),
+    var(--designer-shadow-float);
+}
+
+.designer-blueprint-canvas-edge-label[data-selected="true"]
+  .designer-blueprint-canvas-edge-label-icon {
+  color: var(--designer-accent);
+}
+
+.designer-blueprint-canvas-edge-label[data-traced="true"] {
+  color: var(--designer-text-primary);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--designer-accent) 55%, transparent),
+    var(--designer-shadow-float);
+}
+
+.designer-blueprint-canvas-viewport[data-zoom-far="true"]
+  .designer-blueprint-canvas-edge-label:not([data-selected="true"]):not([data-traced="true"]) {
+  display: none;
+}
+
+.designer-blueprint-canvas-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.designer-blueprint-canvas-link-preview {
+  fill: none;
+  stroke: var(--designer-accent);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  pointer-events: none;
+}

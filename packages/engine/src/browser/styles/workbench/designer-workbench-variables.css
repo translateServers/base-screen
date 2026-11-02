@@ -657,15 +657,7 @@ button.variable-reference-count:focus-visible {
   /* 画布表面不交给浏览器手势：平移/缩放由 wheel 通道接管（触控板双指对应 ctrl+wheel）。 */
   touch-action: none;
   background-color: var(--designer-surface-canvas);
-  background-image:
-    radial-gradient(circle, var(--designer-canvas-grid-line) 1px, transparent 1px),
-    radial-gradient(
-      circle at 50% 0,
-      color-mix(in srgb, var(--designer-accent) 7%, transparent),
-      transparent 42%
-    );
-  background-size:
-    24px 24px,
-    100% 100%;
+  background-image: var(--designer-canvas-surface-image);
+  background-size: var(--designer-canvas-surface-size);
   background-position: 0 0;
 }

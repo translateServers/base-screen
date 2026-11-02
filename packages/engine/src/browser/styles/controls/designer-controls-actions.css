@@ -217,10 +217,10 @@
   padding: 0;
 }
 
-/* 蓝图画布工具条：小号透明按钮，选中态用静止底而不是强调色。 */
+/* 蓝图画布工具条：与工作区工具条同一档控件高度，选中态用静止底而不是强调色。 */
 .designer-button[data-variant="canvas-tool"] {
-  height: 24px;
-  min-height: 24px;
+  height: var(--designer-control-height-compact);
+  min-height: var(--designer-control-height-compact);
   gap: var(--designer-space-2);
   padding: 0 var(--designer-space-4);
   color: var(--designer-text-secondary);

@@ -1,5 +1,8 @@
 import accessibilityCss from './designer-workbench-accessibility.css?inline';
 import blueprintCanvasCss from './designer-workbench-blueprint-canvas.css?inline';
+import blueprintCanvasEdgesCss from './designer-workbench-blueprint-canvas-edges.css?inline';
+import blueprintCanvasNodesCss from './designer-workbench-blueprint-canvas-nodes.css?inline';
+import blueprintCanvasOverlaysCss from './designer-workbench-blueprint-canvas-overlays.css?inline';
 import blueprintDetailsCss from './designer-workbench-blueprint-details.css?inline';
 import blueprintPanelsCss from './designer-workbench-blueprint-panels.css?inline';
 import blueprintSurfaceCss from './designer-workbench-blueprint-surface.css?inline';
@@ -37,6 +40,9 @@ export const DESIGNER_WORKBENCH_CSS = [
   panelsCss,
   blueprintSurfaceCss,
   blueprintCanvasCss,
+  blueprintCanvasEdgesCss,
+  blueprintCanvasNodesCss,
+  blueprintCanvasOverlaysCss,
   blueprintPanelsCss,
   blueprintDetailsCss,
   materialsCss,

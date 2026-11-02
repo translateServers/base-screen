@@ -1,0 +1,414 @@
+/* 蓝图节点卡片与端口。节点是拓扑视图的业务差异（设计画布渲染真实物料），
+   但卡片底、圆角、阴影、悬停与选中都引用设计体系 token，交互态与画布选中框
+   对齐：悬停是强调色淡环，选中是 2px 强调色轮廓。 */
+.designer-blueprint-canvas-node {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-surface-raised);
+  box-shadow: var(--designer-elev-card);
+  cursor: default;
+  transition:
+    background-color var(--designer-motion),
+    box-shadow var(--designer-motion),
+    outline-color var(--designer-motion);
+}
+
+.designer-blueprint-canvas-node:hover {
+  outline: 1px solid color-mix(in oklab, var(--designer-accent) 45%, transparent);
+  outline-offset: 0;
+  box-shadow: var(--designer-elev-card), var(--designer-shadow-float);
+}
+
+.designer-blueprint-canvas-node:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
+}
+
+.designer-blueprint-canvas-node[data-traced="true"] {
+  outline: 1px solid color-mix(in srgb, var(--designer-accent) 48%, transparent);
+  outline-offset: 0;
+}
+
+.designer-blueprint-canvas-node[data-selected="true"] {
+  background: var(--designer-surface-raised);
+  outline: 2px solid var(--designer-accent);
+  outline-offset: 0;
+  box-shadow: var(--designer-elev-card), var(--designer-shadow-float);
+}
+
+.designer-blueprint-canvas-node[data-kind="host"] {
+  background: color-mix(in srgb, var(--designer-accent) 4%, var(--designer-surface-raised));
+}
+
+.designer-blueprint-canvas-node[data-failed="true"] {
+  outline: 1px solid var(--designer-danger);
+  outline-offset: 0;
+}
+
+.designer-blueprint-canvas-node[data-unconnected="true"] {
+  outline: 1px solid var(--designer-border-default);
+  outline-offset: 0;
+}
+
+.designer-blueprint-canvas-node[data-selected="true"]:focus-visible,
+.designer-blueprint-canvas-node[data-failed="true"]:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
+}
+
+.designer-blueprint-canvas-node-header {
+  display: grid;
+  box-sizing: border-box;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--designer-space-3);
+  height: var(--designer-row-height-comfortable);
+  padding: var(--designer-space-3) calc(var(--designer-space-4) + var(--designer-space-1));
+  overflow: hidden;
+  border-radius: var(--designer-radius-3) var(--designer-radius-3) 0 0;
+}
+
+.designer-blueprint-canvas-node[data-selected="true"] .designer-blueprint-canvas-node-header {
+  background: color-mix(in srgb, var(--designer-text-primary) 3%, transparent);
+}
+
+.designer-blueprint-canvas-node-icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+  color: var(--designer-text-secondary);
+  place-items: center;
+}
+
+.designer-blueprint-canvas-node-icon svg {
+  width: var(--designer-icon-size-xs);
+  height: var(--designer-icon-size-xs);
+}
+
+.designer-blueprint-canvas-node[data-kind="variable"] .designer-blueprint-canvas-node-icon {
+  background: var(--designer-accent-surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 18%, transparent);
+  color: var(--designer-accent-text);
+}
+
+.designer-blueprint-canvas-node[data-kind="host"] .designer-blueprint-canvas-node-icon {
+  color: var(--designer-text-secondary);
+}
+
+.designer-blueprint-canvas-node-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.designer-blueprint-canvas-node-kind {
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 500;
+  letter-spacing: var(--designer-tracking-base);
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-blueprint-canvas-node-title {
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-base);
+  font-weight: 600;
+  letter-spacing: var(--designer-tracking-ui);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-blueprint-canvas-node-relcount {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--designer-space-1) + 1px);
+  height: var(--designer-space-6);
+  padding: 0 calc(var(--designer-space-2) + 1px);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.designer-blueprint-canvas-node-relcount b {
+  color: var(--designer-text-secondary);
+  font-weight: 500;
+}
+
+.designer-blueprint-canvas-node-subtitle {
+  box-sizing: border-box;
+  height: 21px;
+  padding: 0 calc(var(--designer-space-4) + var(--designer-space-1));
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 500;
+  line-height: 21px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-blueprint-canvas-node-value {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--designer-space-3);
+  height: var(--designer-row-height);
+  padding: 0 calc(var(--designer-space-4) + var(--designer-space-1));
+  border-top: 1px solid var(--designer-border-subtle);
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+  white-space: nowrap;
+}
+
+.designer-blueprint-canvas-node-value b {
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font-family: var(--designer-font-family-mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-blueprint-canvas-node-value span:last-child {
+  flex: none;
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+}
+
+.designer-blueprint-canvas-node-summary {
+  position: absolute;
+  right: 0;
+  left: 0;
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  padding: 0 calc(var(--designer-space-4) + var(--designer-space-1));
+  overflow: hidden;
+  border-top: 1px solid var(--designer-border-subtle);
+  border-radius: 0 0 var(--designer-radius-3) var(--designer-radius-3);
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-blueprint-canvas-ports {
+  position: absolute;
+  right: 0;
+  left: 0;
+}
+
+.designer-blueprint-canvas-port-row {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--designer-space-2) + 1px);
+  height: var(--designer-control-height-compact);
+  padding: 0 calc(var(--designer-space-5) + var(--designer-space-1)) 0
+    calc(var(--designer-space-4) + var(--designer-space-1));
+  overflow: hidden;
+  border-top: 1px solid var(--designer-border-subtle);
+  color: var(--designer-text-secondary);
+  font-size: var(--designer-font-size-xs);
+  white-space: nowrap;
+  transition:
+    background-color var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.designer-blueprint-canvas-port-row:hover {
+  background: color-mix(in srgb, var(--designer-text-primary) 4%, transparent);
+  color: var(--designer-text-primary);
+}
+
+.designer-blueprint-canvas-port-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-blueprint-canvas-port-tag {
+  flex: none;
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.designer-blueprint-canvas-port-row[data-semantic="true"] .designer-blueprint-canvas-port-name,
+.designer-blueprint-canvas-port-row[data-containment="true"] .designer-blueprint-canvas-port-name {
+  font-family: var(--designer-font-family);
+}
+
+.designer-blueprint-canvas-port-row[data-semantic="true"] .designer-blueprint-canvas-port-tag {
+  color: color-mix(in oklab, var(--designer-accent) 42%, var(--designer-text-muted));
+}
+
+.designer-blueprint-canvas-port-row[data-available="false"] {
+  color: var(--designer-text-disabled);
+}
+
+.designer-blueprint-canvas-port-row[data-available="false"]:hover {
+  background: color-mix(in srgb, var(--designer-text-primary) 2%, transparent);
+  color: var(--designer-text-muted);
+}
+
+.designer-blueprint-canvas-port-row[data-available="false"] .designer-blueprint-canvas-port-tag {
+  color: var(--designer-text-disabled);
+}
+
+.designer-blueprint-canvas-port-lock {
+  display: inline-flex;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  color: var(--designer-text-disabled);
+}
+
+.designer-blueprint-canvas-port-lock svg {
+  width: 9px;
+  height: 9px;
+}
+
+.designer-blueprint-canvas-port {
+  position: absolute;
+  box-sizing: border-box;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--designer-radius-3);
+  cursor: crosshair;
+  place-items: center;
+  pointer-events: auto;
+  translate: 0 -50%;
+  z-index: 4;
+}
+
+.designer-blueprint-canvas-port::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--designer-text-muted);
+  box-shadow: 0 0 0 2px var(--designer-surface-raised);
+  content: "";
+  transition:
+    background-color var(--designer-motion),
+    box-shadow var(--designer-motion);
+}
+
+.designer-blueprint-canvas-port-in {
+  left: -12px;
+}
+
+.designer-blueprint-canvas-port-in::before {
+  background: transparent;
+  box-shadow:
+    inset 0 0 0 1.5px var(--designer-text-muted),
+    0 0 0 2px var(--designer-surface-raised);
+}
+
+.designer-blueprint-canvas-port-out {
+  right: -12px;
+}
+
+.designer-blueprint-canvas-port:hover::before {
+  background: var(--designer-text-primary);
+  box-shadow:
+    0 0 0 2px var(--designer-surface-raised),
+    0 0 0 3px var(--designer-border-active);
+}
+
+.designer-blueprint-canvas-port:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -2px;
+}
+
+.designer-blueprint-canvas-port[data-available="false"] {
+  cursor: not-allowed;
+}
+
+.designer-blueprint-canvas-port[data-available="false"]::before {
+  border: 1px dashed var(--designer-border-active);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--designer-border-strong);
+}
+
+.designer-blueprint-canvas-port[data-dependency="true"] {
+  cursor: default;
+}
+
+.designer-blueprint-canvas-port[data-dependency="true"]::before {
+  border-radius: var(--designer-radius-1);
+  background: var(--designer-text-muted);
+  transform: rotate(45deg);
+}
+
+.designer-blueprint-canvas-port[data-semantic="true"]::before {
+  border-radius: var(--designer-radius-1);
+  background: var(--designer-text-secondary);
+  transform: rotate(45deg);
+}
+
+.designer-blueprint-canvas-port[data-containment="true"] {
+  cursor: default;
+}
+
+.designer-blueprint-canvas-port[data-containment="true"]::before {
+  border-radius: var(--designer-radius-1);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--designer-text-disabled);
+}
+
+.designer-blueprint-canvas-port-in[data-armed="true"]::before {
+  background: var(--designer-accent);
+  box-shadow:
+    0 0 0 2px var(--designer-surface-raised),
+    0 0 0 4px var(--designer-accent-surface);
+}
+
+.designer-blueprint-canvas-port-in[data-hover="true"]::before {
+  background: var(--designer-accent);
+  box-shadow:
+    0 0 0 2px var(--designer-surface-raised),
+    0 0 0 4px var(--designer-accent-surface);
+}
+
+.designer-blueprint-canvas-viewport[data-hand="true"] .designer-blueprint-canvas-node,
+.designer-blueprint-canvas-viewport[data-hand="true"] .designer-blueprint-canvas-edge-label,
+.designer-blueprint-canvas-viewport[data-hand="true"] .designer-blueprint-canvas-port {
+  cursor: grab;
+}
+
+.designer-blueprint-canvas-viewport[data-panning="true"] .designer-blueprint-canvas-node,
+.designer-blueprint-canvas-viewport[data-panning="true"] .designer-blueprint-canvas-edge-label,
+.designer-blueprint-canvas-viewport[data-panning="true"] .designer-blueprint-canvas-port {
+  cursor: grabbing;
+}
