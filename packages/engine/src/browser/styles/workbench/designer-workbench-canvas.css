@@ -794,7 +794,8 @@
 .designer-draft-bar {
   min-height: 42px;
   gap: 0;
-  padding: 0 var(--designer-space-1) 0 var(--designer-space-2);
+  /* 右端留 6px：主按钮是白底实心块，贴到圆角上会显得出框。 */
+  padding: 0 var(--designer-space-3) 0 var(--designer-space-2);
   border-radius: var(--designer-radius-3);
 }
 
@@ -802,8 +803,9 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-2);
+  /* 色点与标签读作一个整体：4px 在 44px 条里会散成两个元素。 */
+  gap: var(--designer-space-1);
+  padding: 0 var(--designer-space-3) 0 var(--designer-space-2);
 }
 
 .draft-dot {
@@ -814,10 +816,12 @@
   background: var(--designer-warning);
 }
 
+/* 状态由 6px 色点承担即可：全彩 + 600 字重的标签会盖过标题，
+   而「未写入」是需要处理的上下文，不是告警。 */
 .draft-label {
-  color: var(--designer-warning);
+  color: var(--designer-text-secondary);
   font: var(--designer-font-small);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .draft-summary {
@@ -826,34 +830,28 @@
   flex: 1 1 auto;
   flex-direction: column;
   justify-content: center;
-  gap: 1px;
+  gap: var(--designer-space-2);
   padding: 0 var(--designer-space-3);
 }
 
+/* 标题比两侧元信息大 1px，单靠字重撑不开 42px 条里的三档文字。 */
 .draft-title {
   min-width: 0;
   overflow: hidden;
   color: var(--designer-text-primary);
-  font: var(--designer-font-size-sm) / 1.2 var(--designer-font-family);
+  font: var(--designer-font-size-base) / 1.2 var(--designer-font-family);
   font-weight: 600;
   text-overflow: ellipsis;
 }
 
+/* 作用域与影响数同处副行：省掉一整段横向占位，标题能多拿约 100px。
+   作用域是范围词（整屏/选区）不是代码标识，所以跟标签同族，不用等宽 + 字距。 */
 .draft-sub {
   overflow: hidden;
   color: var(--designer-text-muted);
-  font-family: var(--designer-font-family-mono);
-  font-size: var(--designer-font-size-xs);
-  letter-spacing: 0.03em;
+  font: var(--designer-font-small);
+  font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
-}
-
-.draft-meta {
-  flex: 0 0 auto;
-  padding: 0 var(--designer-space-3);
-  border-left: 1px solid var(--designer-border-subtle);
-  color: var(--designer-text-muted);
-  font: var(--designer-font-numeric);
 }
 
 .designer-draft-bar[hidden],
@@ -865,12 +863,18 @@
 .scene-bar-actions {
   display: flex;
   align-items: center;
-  gap: var(--designer-space-1);
+  gap: var(--designer-space-2);
 }
 
 .draft-actions {
-  padding-left: var(--designer-space-2);
+  padding-left: var(--designer-space-3);
   border-left: 1px solid var(--designer-border-subtle);
+}
+
+/* 四个按钮读作两组：审阅（看变更/对比）与决定（放弃/采纳）。
+   只靠 4px 等距时，两个实心块会和前两个文字键连成一片。 */
+.draft-actions [data-change-action="discard"] {
+  margin-left: var(--designer-space-2);
 }
 
 .scene-bar-dot {

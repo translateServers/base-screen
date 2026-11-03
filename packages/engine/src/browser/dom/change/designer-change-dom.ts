@@ -15,7 +15,13 @@ export type DesignerChangeFeedback =
   | { readonly kind: 'adopt-failed'; readonly unitId?: string }
   | { readonly kind: 'remaining-invalid'; readonly remainingCount: number };
 
-/** 草案条：常驻画布顶部，声明「未写入」，并给出采纳/放弃入口。 */
+/**
+ * 草案条：常驻画布顶部，声明「未写入」，并给出采纳/放弃入口。
+ *
+ * 标题可用的横向空间是零和的——画布容器的 90% 减去状态、影响、按钮三段；
+ * 实测 662px 条里只剩 186px（约 14 字）。所以标题单行截断后补原生 `title`，
+ * 不用 `data-tip`：那是短标签气泡，几十字的主题会被撑成一条横条。
+ */
 export function draftBarMarkup(
   proposal: DesignerChangeProposal,
   comparing: boolean,
@@ -27,18 +33,17 @@ export function draftBarMarkup(
       <span class="draft-label">${text.draftLabel}</span>
     </span>
     <span class="draft-summary">
-      <span class="draft-title">${escapeHtml(proposal.title)}</span>
-      <span class="draft-sub">${escapeHtml(proposal.scope)}</span>
+      <span class="draft-title" title="${escapeHtml(proposal.title)}">${escapeHtml(proposal.title)}</span>
+      <span class="draft-sub">${escapeHtml(proposal.scope)} · ${text.affected(proposal.affectedComponentIds.length)}</span>
     </span>
-    <span class="draft-meta">${text.affected(proposal.affectedComponentIds.length)}</span>
     <span class="draft-actions">
-      <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="toggle-panel" aria-expanded="${String(paneOpen)}">${paneOpen ? text.hideChanges : text.viewChanges}</button>
-      <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="toggle-compare" aria-pressed="${String(comparing)}">${comparing ? text.exitCompare : text.compare}</button>
+      <button type="button" class="designer-control designer-button" data-size="compact" data-variant="ghost" data-change-action="toggle-panel" aria-expanded="${String(paneOpen)}">${paneOpen ? text.hideChanges : text.viewChanges}</button>
+      <button type="button" class="designer-control designer-button" data-size="compact" data-variant="ghost" data-change-action="toggle-compare" aria-pressed="${String(comparing)}">${comparing ? text.exitCompare : text.compare}</button>
       ${
         paneOpen
           ? ''
-          : `<button type="button" class="designer-control designer-button" data-change-action="discard">${text.discard}</button>
-      <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>`
+          : `<button type="button" class="designer-control designer-button" data-size="compact" data-change-action="discard">${text.discard}</button>
+      <button type="button" class="designer-control designer-button" data-size="compact" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>`
       }
     </span>`;
 }

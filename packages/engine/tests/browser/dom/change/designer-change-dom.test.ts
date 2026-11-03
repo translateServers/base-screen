@@ -165,13 +165,14 @@ describe('draft bar', () => {
     expect(closed).toContain('data-change-action="request-adopt-all"');
   });
 
-  it('renders the draft bar as separated state, summary, impact and actions', () => {
+  it('folds scope and impact into the summary subline instead of a standalone segment', () => {
     const html = draftBarMarkup(proposal(), false, true);
     expect(html).toContain('class="draft-state"');
     expect(html).toContain('class="draft-summary"');
     expect(html).toContain('class="draft-sub"');
-    expect(html).toContain('class="draft-meta"');
     expect(html).toContain('class="draft-actions"');
+    // 影响数不再是独立分段：它和 scope 同处副行，把横向空间让给标题。
+    expect(html).not.toContain('class="draft-meta"');
   });
 });
 

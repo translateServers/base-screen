@@ -101,7 +101,12 @@ export function prepareDesignerChangeProposal(
   });
   if (!result.ok) return { ok: false, reason: 'invalid', diagnostics: result.diagnostics };
   const diff = diffScreenDocuments(document, result.document);
-  if (diff.length === 0) return { ok: false, reason: 'empty', diagnostics: [] };
+  // 只有组件级 diff 是不够的：`diffScreenDocuments` 按组件 id 对齐，纯画布变更（背景色/背景图/
+  // 尺寸）在它眼里是「没有差异」，于是「把背景改成天蓝色」这类提案会被判空直接拒掉。
+  // 画布、变量、蓝图的变化在这里单独补一次判定。
+  if (diff.length === 0 && !hasDocumentLevelChange(document, result.document)) {
+    return { ok: false, reason: 'empty', diagnostics: [] };
+  }
   return {
     ok: true,
     value: {
@@ -234,6 +239,15 @@ function wholeScreenReplacement(
 function sameIds(expected: ReadonlySet<string>, actual: readonly string[]): boolean {
   const actualIds = new Set(actual);
   return actualIds.size === expected.size && [...expected].every((id) => actualIds.has(id));
+}
+
+/** 组件 diff 覆盖不到的区域：画布、变量、蓝图。字段顺序由 contracts 固定，可直接比较序列化结果。 */
+function hasDocumentLevelChange(before: ScreenDocument, after: ScreenDocument): boolean {
+  return (
+    JSON.stringify(before.canvas) !== JSON.stringify(after.canvas) ||
+    JSON.stringify(before.variables) !== JSON.stringify(after.variables) ||
+    JSON.stringify(before.blueprint) !== JSON.stringify(after.blueprint)
+  );
 }
 
 function wholeUnit(

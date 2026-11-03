@@ -363,7 +363,8 @@ export const DESIGNER_UI_TEXT = {
     scopeClearConfirm: '解除作用域',
     scopeClearCancel: '保留选区',
     wholeScreenTitle: '确认整屏作用域',
-    wholeScreenBody: '整屏修改会改变全部布局与绑定，代价高于局部调整；确认后仍需逐条采纳。',
+    wholeScreenBody:
+      '整屏指令可能改动全部布局；只想调画布或某个组件时，建议先选中组件再说。确认后仍需逐条采纳。',
     wholeScreenConfirm: '确认整屏',
     confirmCancel: '取消',
     parameterApplied: (label: string, value: string) =>

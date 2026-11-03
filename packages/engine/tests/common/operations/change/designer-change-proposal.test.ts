@@ -131,6 +131,42 @@ describe('prepareDesignerChangeProposal', () => {
     );
     expect(result).toMatchObject({ ok: false, reason: 'empty' });
   });
+
+  it('accepts a canvas-only change as a document-level unit', () => {
+    const result = prepareDesignerChangeProposal(
+      screenDocument(),
+      {
+        title: '把背景颜色改为天蓝色',
+        rationale: '只改画布背景色',
+        scope: '画布背景',
+        commands: [{ type: 'update-canvas', patch: { backgroundColor: '#87ceeb' } }],
+      },
+      'change-canvas',
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // 组件 diff 是空的，但画布确实变了：提案要能成立，且挂在文档级单元上。
+    expect(result.value.diff).toEqual([]);
+    expect(result.value.affectedComponentIds).toEqual([]);
+    expect(result.value.units).toMatchObject([{ id: 'document', kind: 'document' }]);
+    expect(result.value.candidate.canvas.backgroundColor).toBe('#87ceeb');
+    expect(result.value.candidate.components).toEqual(screenDocument().components);
+  });
+
+  it('still rejects a canvas command that changes nothing', () => {
+    const result = prepareDesignerChangeProposal(
+      screenDocument(),
+      {
+        title: '背景写回原值',
+        rationale: '',
+        scope: '画布背景',
+        commands: [{ type: 'update-canvas', patch: { backgroundColor: '#ffffff' } }],
+      },
+      'change-canvas-same',
+    );
+    expect(result).toMatchObject({ ok: false, reason: 'empty' });
+  });
 });
 
 describe('diffScreenDocuments', () => {
