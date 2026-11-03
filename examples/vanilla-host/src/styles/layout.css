@@ -171,58 +171,8 @@
   }
 }
 
-/* 编辑页浮动的数据源入口：设计器占满视口，入口不参与其布局。
-   放在 .stage 的兄弟节点上，避免命中 `.stage > *` 的绝对定位规则。 */
-.editor-datasource-link {
-  position: fixed;
-  right: var(--editor-float-right);
-  bottom: var(--editor-float-bottom);
-  z-index: 40;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  padding: 8px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-solid);
-  color: var(--color-text);
-  font-size: 12px;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-}
-
-.editor-datasource-link:hover {
-  border-color: var(--color-accent);
-}
-
-/* 素材管理入口：与数据源入口同层，叠在宿主资源作者面之上。 */
-.editor-assets-link {
-  right: calc(var(--editor-float-right) + 248px);
-  bottom: var(--editor-float-bottom);
-}
-
 .ds-return-link {
   white-space: nowrap;
-}
-
-/* 编辑页浮动的宿主资源作者面（与「数据源」入口同层，向上叠一行）：
-   host-resource 的授权与目录归宿主，数据面板只读，这里是宿主侧的创建/改绑入口。 */
-:root {
-  /* 引擎右栏宽度（`.designer` 网格第 5 列 336px）。宿主浮层要避开这一列，
-     否则会压在面板内的主操作上。引擎若调整右栏宽度，这里需要同步。 */
-  --editor-right-panel-width: 336px;
-  /* 宿主浮动快捷键统一停靠在画布底部右侧：横向避开右栏，纵向让出状态栏。
-     四个入口共用一行，按固定偏移从右向左排列。 */
-  --editor-float-right: calc(var(--editor-right-panel-width) + var(--spacing-3));
-  --editor-float-bottom: calc(var(--spacing-4) + 90px);
-}
-
-.editor-resource-authoring {
-  position: fixed;
-  /* 停靠画布右下，而不是右栏列内：右栏底部是意图书写面与「确认整屏」二次确认。 */
-  right: calc(var(--editor-float-right) + 72px);
-  bottom: var(--editor-float-bottom);
-  z-index: 40;
 }
 
 .editor-resource-authoring .button {

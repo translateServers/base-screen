@@ -1,12 +1,5 @@
 /* 宿主在线物料面板（ADR-0090）：三端共用的浮层入口与编辑对话框。 */
 
-.editor-online-materials {
-  position: fixed;
-  right: calc(var(--editor-float-right) + 160px);
-  bottom: var(--editor-float-bottom);
-  z-index: 41;
-}
-
 .editor-online-toggle {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }

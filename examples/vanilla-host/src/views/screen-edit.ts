@@ -14,9 +14,7 @@ import {
   HOST_ASSET_LIBRARY_GROUP_ID,
   type HostAssetLibraryHandle,
 } from '../screen/asset-library';
-import { rememberAssetReturn } from '../screen/asset-return';
 import { createBlueprintCanvas } from '../screen/blueprint-canvas';
-import { rememberDatasourceReturn } from '../screen/datasource-return';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
   createHostAlarmStyleAuthoring,
@@ -27,12 +25,7 @@ import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
 import { createHostIntentHandler } from '../screen/host-intent';
 import { createHostIntentReferenceCatalog } from '../screen/host-intent-reference';
-import { createHostResourceAuthoringPanel } from '../screen/host-resource-authoring';
 import { loadHostRuntime } from '../screen/host-runtime';
-import {
-  createOnlineMaterialPanel,
-  type OnlineMaterialPanelHandle,
-} from '../screen/online-materials';
 import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
 import { screenSessionStore } from '../store/screen-session-store';
@@ -60,26 +53,12 @@ export const screenEditView: ViewModule = {
     });
 
     const stage = el('div', { class: 'stage' });
-    const datasourcesButton = el('button', {
-      class: 'button editor-datasource-link',
-      text: '数据源',
-      attrs: { type: 'button', 'data-editor-datasources': '' },
-    });
-    const assetsButton = el('button', {
-      class: 'button editor-datasource-link editor-assets-link',
-      text: '素材',
-      attrs: { type: 'button', 'data-editor-assets': '' },
-    });
-    container.append(stage, datasourcesButton, assetsButton);
+    container.append(stage);
 
     let designer: BaseScreenDesignerElement | undefined;
     let alarms: ReturnType<typeof createHostAlarmController> | undefined;
-    // 宿主资源作者面：host-resource 的创建/改绑入口（数据面板对它只读）。
-    let resourceAuthoring: ReturnType<typeof createHostResourceAuthoringPanel> | undefined;
     // 素材库左栏 + 统一选择桥（ADR-0089）：宿主自己的上传/目录/删除保护。
     let assetLibrary: HostAssetLibraryHandle | undefined;
-    // 在线物料（ADR-0090）：宿主生成/审核 ESM，发布后热刷新 catalog。
-    let onlineMaterials: OnlineMaterialPanelHandle | undefined;
     let detach: (() => void) | undefined;
     let disposed = false;
 
@@ -178,17 +157,6 @@ export const screenEditView: ViewModule = {
       };
       element.addEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
 
-      const onDatasources = (): void => {
-        rememberDatasourceReturn(`#/screens/${screenId}/edit`);
-        window.location.hash = '#/datasources';
-      };
-      const onAssets = (): void => {
-        rememberAssetReturn(`#/screens/${screenId}/edit`);
-        window.location.hash = '#/assets';
-      };
-      datasourcesButton.addEventListener('click', onDatasources);
-      assetsButton.addEventListener('click', onAssets);
-
       // 保存由用户显式触发（顶栏「保存」/ Ctrl+S，经宿主 project adapter）；冲突面板由引擎
       // 渲染，宿主只把冲突转成 toast。宿主不订阅文档变化，也不在离开前隐式落盘。
       const onConflict = (): void => {
@@ -197,8 +165,6 @@ export const screenEditView: ViewModule = {
       element.addEventListener('base-screen-project-conflict', onConflict);
 
       detach = (): void => {
-        datasourcesButton.removeEventListener('click', onDatasources);
-        assetsButton.removeEventListener('click', onAssets);
         element.removeEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
         element.removeEventListener('base-screen-project-conflict', onConflict);
         element.setIntentHandler(undefined);
@@ -232,13 +198,8 @@ export const screenEditView: ViewModule = {
         createHostIntentReferenceCatalog({ api, screenId, logger }),
       );
 
-      resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });
-      // 浮动面板挂 body：不能塞进框架根节点（Vue 的 fragment anchor 会被打乱）。
-      document.body.append(resourceAuthoring.element);
       assetLibrary = createHostAssetLibrary({ designer: element, screenId });
       element.append(assetLibrary.element);
-      onlineMaterials = createOnlineMaterialPanel({ designer: element, runtime });
-      document.body.append(onlineMaterials.element);
     })().catch((error: unknown) => {
       if (disposed) return;
       logger.error('editor bootstrap failed', error);
@@ -250,18 +211,12 @@ export const screenEditView: ViewModule = {
       disposed = true;
       detach?.();
       unsubscribe();
-      resourceAuthoring?.dispose();
-      resourceAuthoring = undefined;
       assetLibrary?.dispose();
       assetLibrary = undefined;
-      onlineMaterials?.dispose();
-      onlineMaterials = undefined;
       alarms?.stop();
       alarms = undefined;
       designer?.remove();
       designer = undefined;
-      datasourcesButton.remove();
-      assetsButton.remove();
       stage.remove();
       screenSessionStore.getState().reset();
       logger.debug('edit view released');

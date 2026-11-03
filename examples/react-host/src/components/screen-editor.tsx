@@ -12,9 +12,7 @@ import {
   HOST_ASSET_LIBRARY_GROUP_ID,
   type HostAssetLibraryHandle,
 } from '../screen/asset-library';
-import { rememberAssetReturn } from '../screen/asset-return';
 import { createBlueprintCanvas } from '../screen/blueprint-canvas';
-import { rememberDatasourceReturn } from '../screen/datasource-return';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
   createHostAlarmStyleAuthoring,
@@ -25,12 +23,7 @@ import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
 import { createHostIntentHandler } from '../screen/host-intent';
 import { createHostIntentReferenceCatalog } from '../screen/host-intent-reference';
-import { createHostResourceAuthoringPanel } from '../screen/host-resource-authoring';
 import { loadHostRuntime } from '../screen/host-runtime';
-import {
-  createOnlineMaterialPanel,
-  type OnlineMaterialPanelHandle,
-} from '../screen/online-materials';
 import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
 import { useScreenSessionStore } from '../store/screen-session-store';
@@ -50,16 +43,6 @@ export function ScreenEditorPage(): React.ReactElement {
   const { screenId } = useParams<{ screenId: string }>();
   const navigate = useNavigate();
   const stageRef = useRef<HTMLDivElement>(null);
-  const openDatasources = (): void => {
-    if (screenId === undefined) return;
-    rememberDatasourceReturn(`#/screens/${screenId}/edit`);
-    navigate('/datasources');
-  };
-  const openAssets = (): void => {
-    if (screenId === undefined) return;
-    rememberAssetReturn(`#/screens/${screenId}/edit`);
-    navigate('/assets');
-  };
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -73,12 +56,8 @@ export function ScreenEditorPage(): React.ReactElement {
 
     let designer: BaseScreenDesignerElement | undefined;
     let alarms: ReturnType<typeof createHostAlarmController> | undefined;
-    // 宿主资源作者面：host-resource 的创建/改绑入口（数据面板对它只读）。
-    let resourceAuthoring: ReturnType<typeof createHostResourceAuthoringPanel> | undefined;
     // 素材库左栏 + 统一选择桥（ADR-0089）：宿主自己的上传/目录/删除保护。
     let assetLibrary: HostAssetLibraryHandle | undefined;
-    // 在线物料（ADR-0090）：宿主生成/审核 ESM，发布后热刷新 catalog。
-    let onlineMaterials: OnlineMaterialPanelHandle | undefined;
     let detach: (() => void) | undefined;
     let disposed = false;
 
@@ -222,13 +201,8 @@ export function ScreenEditorPage(): React.ReactElement {
         createHostIntentReferenceCatalog({ api, screenId, logger }),
       );
 
-      resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });
-      // 浮动面板挂 body：不能塞进框架根节点（Vue 的 fragment anchor 会被打乱）。
-      document.body.append(resourceAuthoring.element);
       assetLibrary = createHostAssetLibrary({ designer: element, screenId });
       element.append(assetLibrary.element);
-      onlineMaterials = createOnlineMaterialPanel({ designer: element, runtime });
-      document.body.append(onlineMaterials.element);
     })().catch((error: unknown) => {
       if (disposed) return;
       logger.error('editor bootstrap failed', error);
@@ -239,12 +213,8 @@ export function ScreenEditorPage(): React.ReactElement {
       disposed = true;
       detach?.();
       unsubscribeSession();
-      resourceAuthoring?.dispose();
-      resourceAuthoring = undefined;
       assetLibrary?.dispose();
       assetLibrary = undefined;
-      onlineMaterials?.dispose();
-      onlineMaterials = undefined;
       alarms?.stop();
       alarms = undefined;
       designer?.remove();
@@ -254,25 +224,5 @@ export function ScreenEditorPage(): React.ReactElement {
     };
   }, [screenId, navigate]);
 
-  return (
-    <>
-      <div className="stage" ref={stageRef} />
-      <button
-        type="button"
-        className="button editor-datasource-link"
-        data-editor-datasources=""
-        onClick={openDatasources}
-      >
-        数据源
-      </button>
-      <button
-        type="button"
-        className="button editor-datasource-link editor-assets-link"
-        data-editor-assets=""
-        onClick={openAssets}
-      >
-        素材
-      </button>
-    </>
-  );
+  return <div className="stage" ref={stageRef} />;
 }

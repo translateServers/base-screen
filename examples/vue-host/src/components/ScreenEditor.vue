@@ -14,9 +14,7 @@ import {
   HOST_ASSET_LIBRARY_GROUP_ID,
   type HostAssetLibraryHandle,
 } from '../screen/asset-library';
-import { rememberAssetReturn } from '../screen/asset-return';
 import { createBlueprintCanvas } from '../screen/blueprint-canvas';
-import { rememberDatasourceReturn } from '../screen/datasource-return';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
   createHostAlarmStyleAuthoring,
@@ -27,12 +25,7 @@ import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
 import { createHostIntentHandler } from '../screen/host-intent';
 import { createHostIntentReferenceCatalog } from '../screen/host-intent-reference';
-import { createHostResourceAuthoringPanel } from '../screen/host-resource-authoring';
 import { type HostRuntime, loadHostRuntime } from '../screen/host-runtime';
-import {
-  createOnlineMaterialPanel,
-  type OnlineMaterialPanelHandle,
-} from '../screen/online-materials';
 import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
 import { screenSessionStore } from '../store/screen-session-store';
@@ -49,28 +42,13 @@ let onConflict: (() => void) | undefined;
 let unsubscribeSession: (() => void) | undefined;
 let runtime: HostRuntime | undefined;
 let alarms: ReturnType<typeof createHostAlarmController> | undefined;
-// 宿主资源作者面：host-resource 的创建/改绑入口（数据面板对它只读）。
-let resourceAuthoring: ReturnType<typeof createHostResourceAuthoringPanel> | undefined;
 // 素材库左栏 + 统一选择桥（ADR-0089）：宿主自己的上传/目录/删除保护。
 let assetLibrary: HostAssetLibraryHandle | undefined;
-// 在线物料（ADR-0090）：宿主生成/审核 ESM，发布后热刷新 catalog。
-let onlineMaterials: OnlineMaterialPanelHandle | undefined;
 // 运行时的激活是异步的；await 期间路由可能已经切走，configure 必须能被取消。
 let disposed = false;
 
 // 保存由用户显式触发（顶栏「保存」/ Ctrl+S，经宿主 project adapter）；宿主不订阅文档变化，
 // 也不在离开前隐式落盘——未保存的改动随页面卸载丢弃。三端逐条对等。
-function goDatasources(): void {
-  const screenId = typeof route.params.screenId === 'string' ? route.params.screenId : '';
-  rememberDatasourceReturn(`#/screens/${screenId}/edit`);
-  void router.push('/datasources');
-}
-
-function goAssets(): void {
-  const screenId = typeof route.params.screenId === 'string' ? route.params.screenId : '';
-  rememberAssetReturn(`#/screens/${screenId}/edit`);
-  void router.push('/assets');
-}
 
 onMounted(() => {
   const screenId = route.params.screenId;
@@ -218,13 +196,8 @@ onMounted(() => {
     // 引用目录：素材 + 数据集拍平成一份清单交给引擎，选择器与 chip 都在引擎侧。
     element.setIntentReferenceCatalog(createHostIntentReferenceCatalog({ api, screenId, logger }));
 
-    resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });
-    // 浮动面板挂 body：不能塞进框架根节点（Vue 的 fragment anchor 会被打乱）。
-    document.body.append(resourceAuthoring.element);
     assetLibrary = createHostAssetLibrary({ designer: element, screenId });
     element.append(assetLibrary.element);
-    onlineMaterials = createOnlineMaterialPanel({ designer: element, runtime: host });
-    document.body.append(onlineMaterials.element);
   })().catch((error: unknown) => {
     if (disposed) return;
     logger.error('editor bootstrap failed', error);
@@ -243,12 +216,8 @@ onBeforeUnmount(() => {
   }
   alarms?.stop();
   alarms = undefined;
-  resourceAuthoring?.dispose();
-  resourceAuthoring = undefined;
   assetLibrary?.dispose();
   assetLibrary = undefined;
-  onlineMaterials?.dispose();
-  onlineMaterials = undefined;
   unsubscribeSession?.();
   element?.setIntentHandler(undefined);
   element?.setIntentReferenceCatalog(undefined);
@@ -262,20 +231,4 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="stage" class="stage" />
-  <button
-    type="button"
-    class="button editor-datasource-link"
-    data-editor-datasources=""
-    @click="goDatasources"
-  >
-    数据源
-  </button>
-  <button
-    type="button"
-    class="button editor-datasource-link editor-assets-link"
-    data-editor-assets=""
-    @click="goAssets"
-  >
-    素材
-  </button>
 </template>
