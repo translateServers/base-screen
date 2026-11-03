@@ -23,30 +23,15 @@ import type {
  * 三端（vanilla / react / vue）逐字共享，与 `host-intent.ts` 同一对等约定。
  */
 
-const MAX_MATERIALS = 32;
-const MAX_ASSETS = 200;
-const MAX_PROPS = 12;
-const MAX_ENUM_VALUES = 8;
-const MAX_ROLES = 8;
-const MAX_DEFAULT_KEYS = 40;
-
-export function buildAgentCatalog(
-  catalog: BaseScreenMaterialCatalog,
-  assets: readonly { readonly id: string; readonly name: string }[],
-): AgentCatalogShape {
+export function buildAgentCatalog(catalog: BaseScreenMaterialCatalog): AgentCatalogShape {
   const materials = catalog
     .list()
+    .filter((entry) => entry.manifest.libraryVisible !== false)
     .map((entry) => readMaterial(entry.manifest))
     .filter((material): material is AgentCatalogMaterialShape => material !== null)
-    .sort((left, right) => left.type.localeCompare(right.type))
-    .slice(0, MAX_MATERIALS);
+    .sort((left, right) => left.type.localeCompare(right.type));
 
-  return {
-    materials,
-    assets: assets
-      .map((asset) => ({ id: asset.id, name: asset.name.slice(0, 60) }))
-      .slice(0, MAX_ASSETS),
-  };
+  return { materials };
 }
 
 function readMaterial(manifest: BaseScreenMaterialManifest): AgentCatalogMaterialShape | null {
@@ -58,13 +43,15 @@ function readMaterial(manifest: BaseScreenMaterialManifest): AgentCatalogMateria
     category: manifest.category.slice(0, 40),
     data: readDataKind(manifest),
     // 只有声明了「素材选择桥」的物料才允许被素材身份直接赋值，与数据面板的入口规则一致。
-    asset: manifest.hostResourceSelection === true,
+    asset:
+      manifest.hostResourceSelection === true &&
+      manifest.dataCapabilities.includes('host-resource'),
     size: {
       width: Math.round(manifest.defaultSize.width),
       height: Math.round(manifest.defaultSize.height),
     },
     props: readProps(manifest.propsSchema),
-    roles: (manifest.dataBinding?.roles ?? []).slice(0, MAX_ROLES).map((role) => ({
+    roles: (manifest.dataBinding?.roles ?? []).map((role) => ({
       id: role.id,
       min: role.minFields,
       max: role.maxFields,
@@ -88,16 +75,15 @@ function readProps(
 ): Readonly<Record<string, AgentCatalogPropShape>> {
   const output: Record<string, AgentCatalogPropShape> = {};
   for (const [key, property] of Object.entries(schema.properties)) {
-    if (Object.keys(output).length >= MAX_PROPS) break;
     if (property.kind === 'string' || property.kind === 'number' || property.kind === 'boolean') {
       output[key] = { kind: property.kind };
       continue;
     }
     if (property.kind === 'enum') {
       // 只把字符串枚举带进提示词：数值/布尔枚举没法用「取值列表」表达，留给默认值。
-      const values = (property.values ?? [])
-        .filter((value): value is string => typeof value === 'string')
-        .slice(0, MAX_ENUM_VALUES);
+      const values = (property.values ?? []).filter(
+        (value): value is string => typeof value === 'string',
+      );
       if (values.length === 0) continue;
       output[key] = { kind: 'enum', values };
     }
@@ -112,7 +98,6 @@ function scalarOnly(
 ): Record<string, string | number | boolean | null> {
   const output: Record<string, string | number | boolean | null> = {};
   for (const [key, value] of Object.entries(input)) {
-    if (Object.keys(output).length >= MAX_DEFAULT_KEYS) break;
     if (value === null || typeof value === 'string' || typeof value === 'number') {
       output[key] = value;
       continue;

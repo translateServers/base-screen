@@ -163,6 +163,16 @@ export const FEATURE_CASE_CATALOG = [
     stressGrouping: false,
   },
   {
+    id: 'agent-host-resource',
+    title: '智能体图片提案',
+    summary: '宿主提供图片候选，智能体产出 host-resource 幽灵草案并经用户采纳。',
+    lookAt: '右侧智能体页签；用 @ 选择 Harness image，再提交图片提案。',
+    packages: ['contracts', 'plugin-core', 'engine', 'renderer'],
+    focused: 'pnpm --filter @base-screen/engine test',
+    verify: 'pnpm verify:browser',
+    stressGrouping: false,
+  },
+  {
     id: 'composite-insertion',
     title: '组合插入',
     summary: '一次 insertComponentFragment 建出容器 + 标题 + 分隔线 + 读数四件套。',

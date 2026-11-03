@@ -1,8 +1,16 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  Injectable,
+  Logger,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AssetsService } from '../assets/assets.service';
 import { DatasetCatalogService } from '../datasets/dataset-catalog.service';
 import type { ScreenShape } from '../screens/screen.types';
 import { ScreensService } from '../screens/screens.service';
+import type { AgentCanvasPatch } from './agent-canvas';
 import {
   type AgentCatalog,
   type AgentCatalogDiagnostic,
@@ -11,7 +19,7 @@ import {
   pickAssetMaterial,
   pickTextMaterial,
 } from './agent-catalog';
-import { requestAgentCompletion } from './agent-client';
+import { requestAgentCompletion, resolveAgentLlmSettings } from './agent-client';
 import {
   AGENT_COMPONENT_EDIT_SYSTEM_PROMPT,
   type AgentComponentPatch,
@@ -21,6 +29,12 @@ import {
   readEditableComponents,
 } from './agent-component-edit';
 import { type ComposeReferences, composeScreenDocument } from './agent-compose';
+import {
+  type AgentIntentScope,
+  type AgentRoutedBy,
+  type AgentUnsupportedReason,
+  routeAgentAction,
+} from './agent-route';
 import type { AgentPromptReferences } from './agent-spec';
 import {
   type AgentBlock,
@@ -33,6 +47,12 @@ import {
   buildCatalogSystemPrompt,
 } from './agent-spec';
 
+/** 降级告警：code 供宿主归类，message 是能直接念给用户听的一句话。 */
+export interface AgentWarning {
+  readonly code: string;
+  readonly message: string;
+}
+
 export interface AgentCandidateResult {
   readonly name: string;
   readonly document: Record<string, unknown>;
@@ -43,8 +63,8 @@ export interface AgentCandidateResult {
   readonly catalogSource: 'client' | 'fallback';
   /** 实际落进文档的物料 type，便于宿主核对「用的确实是目录里的组件」。 */
   readonly materials: readonly string[];
-  /** 非阻断降级（例如某块的列满足不了物料绑定角色），屏仍产出。 */
-  readonly warnings?: readonly string[];
+  /** 非阻断降级（裁行、丢块、丢参数），屏仍产出；宿主据此在提案理由里如实说明。 */
+  readonly warnings?: readonly AgentWarning[];
   readonly failure?: string;
 }
 
@@ -59,6 +79,45 @@ export interface AgentComponentEditResult {
   readonly failure?: string;
 }
 
+/** 统一动作入口的入参：作用域 + 文本 + 该作用域需要的上下文。 */
+export interface AgentActInput {
+  readonly text: string;
+  readonly scope: AgentIntentScope;
+  readonly componentIds?: readonly string[];
+  readonly components?: readonly unknown[];
+  readonly screenId?: string;
+  readonly catalog?: unknown;
+  readonly references?: readonly Record<string, unknown>[];
+  /** 画布当前值，用于判"改了等于没改"；结构由路由侧做有界读取。 */
+  readonly canvas?: unknown;
+  /** 当前屏摘要，只用于路由提示词；同样在路由侧收窄。 */
+  readonly context?: unknown;
+}
+
+/**
+ * 统一动作结果：判别联合，宿主按 `kind` 分派。
+ *
+ * `generate_screen` / `edit_components` 直接摊平既有结果，避免宿主再包一层；
+ * `set_canvas` 只回 patch，编译成 `update-canvas` 是宿主的职责。
+ */
+export type AgentActResult =
+  | ({ readonly kind: 'generate_screen'; readonly routedBy: AgentRoutedBy } & AgentCandidateResult)
+  | ({
+      readonly kind: 'edit_components';
+      readonly routedBy: AgentRoutedBy;
+    } & AgentComponentEditResult)
+  | {
+      readonly kind: 'set_canvas';
+      readonly routedBy: AgentRoutedBy;
+      readonly patch: AgentCanvasPatch;
+    }
+  | {
+      readonly kind: 'unsupported';
+      readonly routedBy: AgentRoutedBy;
+      readonly reason: AgentUnsupportedReason;
+      readonly suggestion?: string;
+    };
+
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger('AgentService');
@@ -67,6 +126,7 @@ export class AgentService {
     private readonly screens: ScreensService,
     private readonly config: ConfigService,
     private readonly datasets: DatasetCatalogService,
+    private readonly assets: AssetsService,
   ) {}
 
   async generate(input: {
@@ -156,33 +216,60 @@ export class AgentService {
 
   async generateCandidate(input: {
     topic: string;
+    screenId?: string;
     catalog?: unknown;
     references?: readonly Record<string, unknown>[];
   }): Promise<AgentCandidateResult> {
     const topic = input.topic.trim();
-    const catalog = this.resolveCatalog(input.catalog);
+    const clientCatalog = this.resolveCatalog(input.catalog);
+    let assetCatalogWarning: string | undefined;
+    let availableAssets: AgentCatalog['assets'] = [];
+    if (input.screenId !== undefined) {
+      try {
+        availableAssets = (await this.assets.list({ screenId: input.screenId })).assets.map(
+          (asset) => ({ id: asset.id, name: asset.name.slice(0, 60) }),
+        );
+      } catch (error) {
+        if (error instanceof HttpException) throw error;
+        assetCatalogWarning = 'AGENT_ASSET_CATALOG_UNAVAILABLE';
+        this.logger.warn('agent image catalog unavailable; candidate will omit host images');
+      }
+    }
+    const catalog: AgentCatalog = {
+      ...clientCatalog,
+      assets: availableAssets,
+    };
     const references = await this.resolveReferences(catalog, input.references);
-    const baseUrl = this.config.get<string>('AGENT_LLM_BASE_URL') ?? '';
-    const apiKey = this.config.get<string>('AGENT_LLM_API_KEY') ?? '';
-    const model = this.config.get<string>('AGENT_LLM_MODEL') ?? '';
+    const settings = resolveAgentLlmSettings(this.config);
 
     let spec = deterministicSpec(topic, catalog, references.compose);
     let mode: 'llm' | 'deterministic' = 'deterministic';
     let failure: string | undefined;
+    // 解析期的降级（裁行、丢块、丢参数）与编译期的降级合并成一份，供宿主如实展示。
+    const parseWarnings: string[] = [];
 
-    if (baseUrl !== '' && apiKey !== '' && model !== '') {
+    if (settings !== null) {
       const result = await requestAgentCompletion(
-        { baseUrl, apiKey, model },
+        settings,
         // 目录随请求到来，所以提示词也是按目录现生成的：宿主装了新物料，下一句话就能用上。
         buildCatalogSystemPrompt(catalog, references.prompt),
         buildAgentUserPrompt(topic),
         this.logger,
       );
       if (result.ok && result.text !== undefined) {
-        const parsed = parseCatalogSpec(result.text, catalog);
+        const parsed = parseCatalogSpec(result.text, catalog, parseWarnings);
         if (parsed === null) {
           failure = 'AGENT_SPEC_INVALID';
           this.logger.warn('agent spec rejected by validation');
+        } else if ((parsed.blocks ?? []).length === 0) {
+          // 文档结构合法但一块都用不了：保留模型给的标题与 KPI，布局退回确定性块。
+          // 直接整屏换成模板会把"某一块的错"放大成"整屏都不是你的内容"。
+          const fallback = deterministicSpec(topic, catalog, references.compose);
+          spec = { ...parsed, blocks: fallback.blocks ?? [] };
+          mode = 'deterministic';
+          failure = 'AGENT_BLOCKS_ALL_INVALID';
+          parseWarnings.push('AGENT_BLOCKS_ALL_INVALID');
+          this.logger.warn('agent spec has no usable blocks; fell back to deterministic layout');
         } else {
           spec = parsed;
           mode = 'llm';
@@ -194,23 +281,33 @@ export class AgentService {
       failure = 'AGENT_NOT_CONFIGURED';
     }
 
+    // mode 要跟着 spec 一起进编译器：页脚靠它如实标注「模型输出 / 确定性兜底」。
     const composed = composeScreenDocument(
       references.compose === undefined
-        ? { spec, catalog }
-        : { spec, catalog, references: references.compose },
+        ? { spec: { ...spec, mode }, catalog }
+        : { spec: { ...spec, mode }, catalog, references: references.compose },
     );
     if (!composed.ok) {
       const [diagnostic] = composed.diagnostics;
-      return {
-        name: spec.title,
-        document: emptyDocument(),
-        mode,
-        imageCount: 0,
-        catalogSource: catalog.source,
-        materials: [],
-        failure: diagnostic?.code ?? 'AGENT_COMPOSE_FAILED',
-      };
+      // 编译不出合法文档时不能把空文档交出去：宿主会把它编译成「删光未锁定组件 + 不新增」
+      // 的整屏提案，比失败更糟。改成 422，让宿主如实告诉用户这次没有产出。
+      throw new UnprocessableEntityException({
+        error: diagnostic?.code ?? 'AGENT_COMPOSE_FAILED',
+        message: diagnostic?.message ?? '智能体产出无法编译成合法文档。',
+      });
     }
+    // 同一类降级只保留一条：模型常把三块都写超行，重复念三遍没有信息量。
+    const deduped = new Map<string, AgentWarning>();
+    for (const warning of [
+      ...parseWarnings.map((code) => ({ code, message: describeWarning(code) })),
+      ...(assetCatalogWarning === undefined
+        ? []
+        : [{ code: assetCatalogWarning, message: describeWarning(assetCatalogWarning) }]),
+      ...composed.value.warnings.map((item) => ({ code: item.code, message: item.message })),
+    ]) {
+      if (!deduped.has(warning.code)) deduped.set(warning.code, warning);
+    }
+    const warnings = [...deduped.values()];
     return {
       name: spec.title,
       document: composed.value.document,
@@ -218,9 +315,7 @@ export class AgentService {
       imageCount: composed.value.imageCount,
       catalogSource: catalog.source,
       materials: composed.value.materials,
-      ...(composed.value.warnings.length === 0
-        ? {}
-        : { warnings: composed.value.warnings.map((item) => item.code) }),
+      ...(warnings.length === 0 ? {} : { warnings }),
       ...(failure === undefined ? {} : { failure }),
     };
   }
@@ -265,16 +360,14 @@ export class AgentService {
       };
     }
 
-    const baseUrl = this.config.get<string>('AGENT_LLM_BASE_URL') ?? '';
-    const apiKey = this.config.get<string>('AGENT_LLM_API_KEY') ?? '';
-    const model = this.config.get<string>('AGENT_LLM_MODEL') ?? '';
+    const settings = resolveAgentLlmSettings(this.config);
     let spec = deterministicComponentEdit(instruction, components);
     let mode: 'llm' | 'deterministic' = 'deterministic';
     let failure: string | undefined = spec === null ? undefined : 'AGENT_NOT_CONFIGURED';
 
-    if (baseUrl !== '' && apiKey !== '' && model !== '') {
+    if (settings !== null) {
       const result = await requestAgentCompletion(
-        { baseUrl, apiKey, model },
+        settings,
         AGENT_COMPONENT_EDIT_SYSTEM_PROMPT,
         buildAgentComponentUserPrompt(instruction, components),
         this.logger,
@@ -307,6 +400,70 @@ export class AgentService {
       patches: spec.patches,
       mode,
       ...(failure === undefined ? {} : { failure }),
+    };
+  }
+
+  /**
+   * 统一动作入口：先路由，再分派到既有能力。
+   *
+   * 这一层存在的唯一理由是"别把修改指令当生成指令"。路由拿不到结论时返回
+   * `unsupported`，绝不默认重生成——整屏替换的代价是用户已排好的所有组件。
+   */
+  async act(input: AgentActInput): Promise<AgentActResult> {
+    const text = input.text.trim();
+    if (text === '') {
+      throw new BadRequestException({
+        error: 'AGENT_INSTRUCTION_EMPTY',
+        message: '指令为空。',
+      });
+    }
+    const components = input.components ?? [];
+    if (input.scope === 'components' && components.length === 0) {
+      throw new BadRequestException({
+        error: 'AGENT_COMPONENT_CONTEXT_INVALID',
+        message: '组件作用域需要携带 components。',
+      });
+    }
+    if (input.scope !== 'components' && components.length > 0) {
+      throw new BadRequestException({
+        error: 'AGENT_SCOPE_MISMATCH',
+        message: '整屏或画布作用域不应携带 components。',
+      });
+    }
+
+    const decision = await routeAgentAction({
+      text,
+      scope: input.scope,
+      ...(input.context === undefined ? {} : { digest: input.context }),
+      ...(input.canvas === undefined ? {} : { canvasState: input.canvas }),
+      settings: resolveAgentLlmSettings(this.config),
+      logger: this.logger,
+    });
+
+    if (decision.action === 'generate_screen') {
+      const candidate = await this.generateCandidate({
+        topic: text,
+        ...(input.screenId === undefined ? {} : { screenId: input.screenId }),
+        ...(input.catalog === undefined ? {} : { catalog: input.catalog }),
+        ...(input.references === undefined ? {} : { references: input.references }),
+      });
+      return { kind: 'generate_screen', routedBy: decision.routedBy, ...candidate };
+    }
+
+    if (decision.action === 'edit_components') {
+      const edit = await this.editComponents({ instruction: text, components });
+      return { kind: 'edit_components', routedBy: decision.routedBy, ...edit };
+    }
+
+    if (decision.action === 'set_canvas') {
+      return { kind: 'set_canvas', routedBy: decision.routedBy, patch: decision.patch };
+    }
+
+    return {
+      kind: 'unsupported',
+      routedBy: decision.routedBy,
+      reason: decision.reason,
+      ...(decision.suggestion === undefined ? {} : { suggestion: decision.suggestion }),
     };
   }
 }
@@ -432,21 +589,15 @@ function pickTabularMaterial(catalog: AgentCatalog): AgentCatalogMaterial | unde
   return withRoles.find((material) => material.category.includes('数据')) ?? withRoles[0];
 }
 
-/** 空文档：编译失败时返回它，而不是把半成品当成屏交出去。 */
-function emptyDocument(): Record<string, unknown> {
-  return {
-    canvas: { width: 1920, height: 1080, backgroundColor: '#0b1020' },
-    components: [],
-    variables: [],
-    blueprint: { relations: [] },
-  };
-}
-
 /**
  * 解析模型输出。优先读 v2 的 `blocks`（目录驱动）；仍收到 v1 的 `panels` 时按目录折算成块，
  * 保证旧客户端/旧模型的输出不会因为升级而直接报错。
  */
-export function parseCatalogSpec(text: string, catalog: AgentCatalog): AgentScreenSpec | null {
+export function parseCatalogSpec(
+  text: string,
+  catalog: AgentCatalog,
+  warnings: string[] = [],
+): AgentScreenSpec | null {
   const cleaned = text
     .trim()
     .replace(/^```(?:json)?/i, '')
@@ -476,42 +627,71 @@ export function parseCatalogSpec(text: string, catalog: AgentCatalog): AgentScre
       return { label, value, ...(delta === undefined || delta === '' ? {} : { delta }) };
     })
     .filter((item): item is { label: string; value: string; delta?: string } => item !== null);
-  if (kpis.length < 3) return null;
+  // 从 3 条放宽到 1 条：少一条 KPI 不值得把整屏作废，排版会按实际数量分栏。
+  if (kpis.length < 1) return null;
 
   if (Array.isArray(record.blocks)) {
-    const blocks = readBlocks(record.blocks, catalog);
-    if (blocks === null || blocks.length === 0) return null;
-    return { title: title.slice(0, 20), subtitle: subtitle.slice(0, 40), kpis, blocks };
+    // 块全被丢掉时仍返回 spec（blocks 为空）：调用方要区分"文档非法"与"没有可用块"，
+    // 后者应该保留标题/KPI 再补确定性布局，而不是整屏作废。
+    return {
+      title: title.slice(0, 20),
+      subtitle: subtitle.slice(0, 40),
+      kpis,
+      blocks: readBlocks(record.blocks, catalog, warnings),
+    };
   }
 
   if (Array.isArray(record.panels)) {
     const panels = readPanels(record.panels);
     if (panels === null) return null;
     const blocks = panelsToBlocks(panels, catalog);
-    if (blocks === null || blocks.length === 0) return null;
+    if (blocks === null) return null;
     return { title: title.slice(0, 20), subtitle: subtitle.slice(0, 40), kpis, blocks };
   }
   return null;
 }
 
-/** v2 块逐项校验：type 必须在目录里，数据形态必须与物料声明对得上。 */
-function readBlocks(value: readonly unknown[], catalog: AgentCatalog): AgentBlock[] | null {
+/**
+ * v2 块逐项校验。
+ *
+ * 原则：**单块瑕疵只降级该块**，不做整份拒绝——整份拒绝的代价是整屏掉进模板，
+ * 用户已经排好的内容全没了。只有"一条块都用不了"才交给调用方退回确定性布局。
+ * 所有降级都记进 `warnings`，由提案理由如实告诉用户。
+ */
+function readBlocks(
+  value: readonly unknown[],
+  catalog: AgentCatalog,
+  warnings: string[],
+): AgentBlock[] {
   const blocks: AgentBlock[] = [];
   for (const item of value.slice(0, 4)) {
-    if (typeof item !== 'object' || item === null) return null;
-    const block = item as Record<string, unknown>;
+    const block = asRecord(item);
+    if (block === null) {
+      warnings.push('AGENT_BLOCK_INVALID');
+      continue;
+    }
     const type = typeof block.type === 'string' ? block.type.trim() : '';
     const material = catalog.materials.find((candidate) => candidate.type === type);
-    if (type === '' || material === undefined) return null;
-    const title = typeof block.title === 'string' ? block.title.trim() : '';
-    if (title.length > 24) return null;
-    const note = typeof block.note === 'string' ? block.note.trim() : '';
-    if (note.length > 32) return null;
-    const span = typeof block.span === 'number' ? Math.round(block.span) : 1;
-    if (span < 1 || span > 4) return null;
-    const props = readBlockProps(block.props, material);
-    if (props === null) return null;
+    if (type === '' || material === undefined) {
+      warnings.push('AGENT_BLOCK_TYPE_UNKNOWN');
+      continue;
+    }
 
+    let title = typeof block.title === 'string' ? block.title.trim() : '';
+    if (title.length > 24) {
+      title = title.slice(0, 24);
+      warnings.push('AGENT_BLOCK_TEXT_TRIMMED');
+    }
+    let note = typeof block.note === 'string' ? block.note.trim() : '';
+    if (note.length > 32) {
+      note = note.slice(0, 32);
+      warnings.push('AGENT_BLOCK_TEXT_TRIMMED');
+    }
+    const rawSpan = typeof block.span === 'number' ? Math.round(block.span) : 1;
+    const span = Math.min(4, Math.max(1, Number.isFinite(rawSpan) ? rawSpan : 1));
+    if (span !== rawSpan) warnings.push('AGENT_BLOCK_SPAN_CLAMPED');
+
+    const props = readBlockProps(block.props, material, warnings);
     const base = {
       type,
       title,
@@ -528,20 +708,33 @@ function readBlocks(value: readonly unknown[], catalog: AgentCatalog): AgentBloc
         blocks.push({ ...base, datasetId });
         continue;
       }
-      const table = readBlockTable(block.table);
-      if (table === null) return null;
+      const table = readBlockTable(block.table, warnings);
+      if (table === null) {
+        warnings.push('AGENT_BLOCK_DATA_MISSING');
+        continue;
+      }
       blocks.push({ ...base, table });
       continue;
     }
     if (material.data === 'scalar') {
-      const text = typeof block.text === 'string' ? block.text.trim() : '';
+      let text = typeof block.text === 'string' ? block.text.trim() : '';
       const assetId = typeof block.assetId === 'string' ? block.assetId.trim() : '';
       if (assetId !== '') {
-        if (!material.asset || !catalog.assets.some((asset) => asset.id === assetId)) return null;
+        if (!material.asset || !catalog.assets.some((asset) => asset.id === assetId)) {
+          warnings.push('AGENT_ASSET_UNKNOWN');
+          continue;
+        }
         blocks.push({ ...base, assetId });
         continue;
       }
-      if (text === '' || text.length > 160) return null;
+      if (text === '') {
+        warnings.push('AGENT_BLOCK_DATA_MISSING');
+        continue;
+      }
+      if (text.length > 160) {
+        text = text.slice(0, 160);
+        warnings.push('AGENT_BLOCK_TEXT_TRIMMED');
+      }
       blocks.push({ ...base, text });
       continue;
     }
@@ -553,76 +746,155 @@ function readBlocks(value: readonly unknown[], catalog: AgentCatalog): AgentBloc
 function readBlockProps(
   value: unknown,
   material: AgentCatalogMaterial,
-): Record<string, string | number | boolean> | undefined | null {
+  warnings: string[],
+): Record<string, string | number | boolean> | undefined {
   if (value === undefined) return undefined;
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
+  const record = asRecord(value);
+  if (record === null) {
+    warnings.push('AGENT_BLOCK_PROPS_DROPPED');
+    return undefined;
+  }
   const keys = Object.keys(record);
-  if (keys.length > 8) return null;
+  if (keys.length > 8) warnings.push('AGENT_BLOCK_PROPS_DROPPED');
   const output: Record<string, string | number | boolean> = {};
-  for (const key of keys) {
+  for (const key of keys.slice(0, 8)) {
     const declared = material.props[key];
     const raw = record[key];
-    if (declared === undefined) return null;
+    if (declared === undefined) {
+      warnings.push('AGENT_BLOCK_PROPS_DROPPED');
+      continue;
+    }
     if (declared.kind === 'number') {
-      if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
+      if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+        warnings.push('AGENT_BLOCK_PROPS_DROPPED');
+        continue;
+      }
       output[key] = raw;
       continue;
     }
     if (declared.kind === 'boolean') {
-      if (typeof raw !== 'boolean') return null;
+      if (typeof raw !== 'boolean') {
+        warnings.push('AGENT_BLOCK_PROPS_DROPPED');
+        continue;
+      }
       output[key] = raw;
       continue;
     }
-    if (typeof raw !== 'string') return null;
-    if (declared.kind === 'enum' && declared.values?.includes(raw) !== true) return null;
+    if (typeof raw !== 'string') {
+      warnings.push('AGENT_BLOCK_PROPS_DROPPED');
+      continue;
+    }
+    if (declared.kind === 'enum' && declared.values?.includes(raw) !== true) {
+      warnings.push('AGENT_BLOCK_PROPS_DROPPED');
+      continue;
+    }
     output[key] = raw.slice(0, 80);
   }
-  return output;
+  return Object.keys(output).length === 0 ? undefined : output;
 }
 
-function readBlockTable(value: unknown): AgentBlockTable | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const table = value as Record<string, unknown>;
+/**
+ * 表格载荷：列与行都裁剪到可渲染范围，列类型与值不符就把该列退化为文本。
+ *
+ * 早先任何一处不符都 return null，于是模型多写一行、写错一个类型，整屏就作废。
+ */
+function readBlockTable(value: unknown, warnings: string[]): AgentBlockTable | null {
+  const table = asRecord(value);
+  if (table === null) return null;
   if (!Array.isArray(table.columns) || !Array.isArray(table.rows)) return null;
-  if (table.columns.length < 1 || table.columns.length > 4) return null;
-  if (table.rows.length < 3 || table.rows.length > 12) return null;
+  if (table.columns.length < 1 || table.rows.length < 1) return null;
+
+  if (table.columns.length > 4) warnings.push('AGENT_BLOCK_COLUMNS_TRIMMED');
   const columns: AgentBlockColumn[] = [];
-  for (const item of table.columns) {
-    if (typeof item !== 'object' || item === null) return null;
-    const column = item as Record<string, unknown>;
+  for (const item of table.columns.slice(0, 4)) {
+    const column = asRecord(item);
+    if (column === null) return null;
     const id = typeof column.id === 'string' ? column.id.trim() : '';
-    const label = typeof column.label === 'string' ? column.label.trim() : '';
+    const rawLabel = typeof column.label === 'string' ? column.label.trim() : '';
     const type = column.type;
     if (!/^[a-zA-Z][a-zA-Z0-9_]{0,15}$/.test(id)) return null;
-    if (label === '' || label.length > 12) return null;
+    if (rawLabel === '') return null;
     if (type !== 'string' && type !== 'number' && type !== 'boolean') return null;
     if (columns.some((existing) => existing.id === id)) return null;
+    let label = rawLabel;
+    if (label.length > 12) {
+      label = label.slice(0, 12);
+      warnings.push('AGENT_BLOCK_TEXT_TRIMMED');
+    }
     columns.push({ id, label, type });
   }
+
+  if (table.rows.length > 8) warnings.push('AGENT_BLOCK_ROWS_TRIMMED');
+  const coerced = new Set<string>();
   const rows: Record<string, string | number | boolean>[] = [];
-  for (const item of table.rows) {
-    if (typeof item !== 'object' || item === null) return null;
-    const row = item as Record<string, unknown>;
+  for (const item of table.rows.slice(0, 8)) {
+    const row = asRecord(item);
+    if (row === null) {
+      warnings.push('AGENT_BLOCK_INVALID');
+      continue;
+    }
     const output: Record<string, string | number | boolean> = {};
     for (const column of columns) {
       const raw = row[column.id];
       if (column.type === 'number') {
-        if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
-        output[column.id] = raw;
+        if (typeof raw === 'number' && Number.isFinite(raw)) {
+          output[column.id] = raw;
+          continue;
+        }
+        coerced.add(column.id);
+        output[column.id] = raw === undefined || raw === null ? '' : String(raw).slice(0, 24);
         continue;
       }
       if (column.type === 'boolean') {
-        if (typeof raw !== 'boolean') return null;
-        output[column.id] = raw;
+        if (typeof raw === 'boolean') {
+          output[column.id] = raw;
+          continue;
+        }
+        coerced.add(column.id);
+        output[column.id] = raw === undefined || raw === null ? '' : String(raw).slice(0, 24);
         continue;
       }
-      if (typeof raw !== 'string' && typeof raw !== 'number') return null;
-      output[column.id] = String(raw).slice(0, 24);
+      output[column.id] = raw === undefined || raw === null ? '' : String(raw).slice(0, 24);
     }
     rows.push(output);
   }
-  return { columns, rows };
+  if (rows.length === 0) return null;
+  if (coerced.size > 0) warnings.push('AGENT_BLOCK_COLUMN_COERCED');
+
+  return {
+    columns: columns.map((column) =>
+      coerced.has(column.id) ? { ...column, type: 'string' as const } : column,
+    ),
+    rows,
+  };
+}
+
+/** 降级码 → 能直接念给用户的一句话。宿主不再自己维护一份码表。 */
+const WARNING_MESSAGES: Readonly<Record<string, string>> = {
+  AGENT_BLOCK_TYPE_UNKNOWN: '有模块用了目录里没有的组件，已跳过',
+  AGENT_ASSET_UNKNOWN: '有模块的素材不在授权清单里，已跳过',
+  AGENT_BLOCK_DATA_MISSING: '有模块缺少数据，已跳过',
+  AGENT_BLOCK_ROWS_TRIMMED: '表格超过 8 行，已裁剪',
+  AGENT_BLOCK_COLUMNS_TRIMMED: '表格超过 4 列，已裁剪',
+  AGENT_BLOCK_COLUMN_COERCED: '有列的值与声明类型不符，已按文本处理',
+  AGENT_BLOCK_PROPS_DROPPED: '有组件参数不在目录声明里，已忽略',
+  AGENT_BLOCK_SPAN_CLAMPED: '有模块宽度越界，已收进 1–4 列',
+  AGENT_BLOCK_TEXT_TRIMMED: '有文案超出长度上限，已截断',
+  AGENT_BLOCK_INVALID: '有模块结构不完整，已跳过',
+  AGENT_BLOCK_BINDING_UNSATISFIED: '有模块的列不满足绑定角色，已退化为无数据',
+  AGENT_DATASET_UNKNOWN: '引用的数据集不在本轮上下文里，已改用示例数据',
+  AGENT_BLOCKS_ALL_INVALID: '模型给的分块都不可用，已改用确定性布局',
+  AGENT_ASSET_CATALOG_UNAVAILABLE: '素材目录不可用，本次未使用宿主图片',
+};
+
+function describeWarning(code: string): string {
+  return WARNING_MESSAGES[code] ?? '部分内容已降级';
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 /** v1 面板（chart / list / image）按目录折算成块；目录缺对应物料时该面板不出现。 */

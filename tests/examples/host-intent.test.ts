@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import type { ScreenDocument } from '@base-screen/contracts';
 import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createHostIntentHandler } from '../../examples/vanilla-host/src/screen/host-intent';
+import {
+  createHostIntentHandler,
+  parseCanvasBackgroundInstruction,
+} from '../../examples/vanilla-host/src/screen/host-intent';
 
 /**
  * 宿主对「失败/被拒」的交代：一句原因 +（可选）一个能继续走的动作。
@@ -68,12 +71,17 @@ const request = {
   scope: { kind: 'screen' as const },
 };
 
-function candidateResponse(candidate: unknown = document()): Response {
+/** 整屏作用域现在统一打 `/agent/act`；这个 helper 给"路由判定为生成"的响应形状。 */
+function screenActResponse(candidate: unknown = componentDocument()): Response {
   return Response.json({
+    kind: 'generate_screen',
+    routedBy: 'rule',
     name: '作战室',
     document: candidate,
     mode: 'deterministic',
     imageCount: 0,
+    catalogSource: 'client',
+    materials: [],
   });
 }
 
@@ -228,20 +236,139 @@ describe('host intent component edits', () => {
   });
 });
 
-describe('host intent candidate safety', () => {
-  it('posts only to the candidate endpoint and submits an unsaved proposal', async () => {
+describe('host intent canvas background', () => {
+  it('turns a background-colour instruction into update-canvas, not a new screen', async () => {
     vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-    const fetch = vi.fn(async () => candidateResponse());
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const element = designer();
+
+    const result = await handler(element)(
+      { ...request, text: '把背景颜色改为天蓝色' },
+      new AbortController().signal,
+    );
+
+    expect(result.ok).toBe(true);
+    // 关键：不重新生成整屏，连模型都不调。
+    expect(fetch).not.toHaveBeenCalled();
+    expect(element.submitChangeProposal).toHaveBeenCalledOnce();
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
+    expect(proposal?.scope).toBe('画布背景');
+    expect(proposal?.commands).toEqual([
+      { type: 'update-canvas', patch: { backgroundColor: '#87ceeb' } },
+    ]);
+  });
+
+  it.each([
+    ['把背景颜色改为天蓝色', '#87ceeb'],
+    ['背景改成 #1e293b', '#1e293b'],
+    ['把大屏背景换成深蓝色', '#16305c'],
+    ['页面底色改为米色', '#f2ead8'],
+    // 要动内容的一律放回整屏生成，不能被当成「只换底色」。
+    ['生成一张天蓝色背景的销售大屏', null],
+    ['把背景改成天蓝色，再加一个图表', null],
+    ['把标题颜色改为蓝色', null],
+  ])('parses canvas background from 「%s」', (text, expected) => {
+    expect(parseCanvasBackgroundInstruction(text)).toBe(expected);
+  });
+});
+
+describe('host intent action routing', () => {
+  it('turns a set_canvas action into an update-canvas proposal', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          kind: 'set_canvas',
+          routedBy: 'model',
+          patch: { backgroundColor: '#16305c' },
+        }),
+      ),
+    );
+    const element = designer();
+
+    // 这句不走本地规则（不是「背景改为 X」的句式），必须由后端路由判定。
+    const result = await handler(element)({ ...request, text: '帮我弄个清爽点的底色' });
+
+    expect(result.ok).toBe(true);
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
+    expect(proposal?.scope).toBe('画布');
+    expect(proposal?.commands).toEqual([
+      { type: 'update-canvas', patch: { backgroundColor: '#16305c' } },
+    ]);
+  });
+
+  it('reports the unsupported reason from the router', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          kind: 'unsupported',
+          routedBy: 'model',
+          reason: 'missing_reference',
+          suggestion: '先选中要改的组件',
+        }),
+      ),
+    );
+    const element = designer();
+
+    const result = await handler(element)({ ...request, text: '把那个再大一点' });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toBe('先选中要改的组件');
+    expect(element.submitChangeProposal).not.toHaveBeenCalled();
+  });
+
+  it('never submits a whole-screen proposal built from an empty document', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => screenActResponse(document())),
+    );
+    const element = designer();
+
+    const result = await handler(element)(request);
+
+    expect(result.ok).toBe(false);
+    expect(element.submitChangeProposal).not.toHaveBeenCalled();
+  });
+});
+
+describe('host intent candidate safety', () => {
+  it('routes the screen scope through /agent/act and submits an unsaved proposal', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    const fetch = vi.fn(async () => screenActResponse());
     vi.stubGlobal('fetch', fetch);
     const element = designer();
     const before = element.getDocument();
     const controller = new AbortController();
 
     expect((await handler(element)(request, controller.signal)).ok).toBe(true);
-    expect(fetch).toHaveBeenCalledExactlyOnceWith('http://api.test/agent/candidate', {
+    // 关键：不再直接打 /agent/candidate；动作由后端判定，宿主只负责编译。
+    expect(fetch).toHaveBeenCalledExactlyOnceWith('http://api.test/agent/act', {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic: request.text }),
+      body: JSON.stringify({
+        text: request.text,
+        scope: 'screen',
+        screenId: 'screen-test',
+        canvas: { backgroundColor: '#000000', hasBackgroundImage: false },
+        context: {
+          canvas: {
+            width: 1920,
+            height: 1080,
+            backgroundColor: '#000000',
+            hasBackgroundImage: false,
+          },
+          componentCount: 0,
+          types: [],
+          selection: [],
+          lockedCount: 0,
+        },
+      }),
       signal: controller.signal,
     });
     expect(element.submitChangeProposal).toHaveBeenCalledOnce();
@@ -270,7 +397,7 @@ describe('host intent candidate safety', () => {
       if (change === 'undo') element.dispatchEvent(new Event('base-screen-change'));
       if (change === 'unload') element.getDocument.mockReturnValue(undefined);
       if (change === 'pending') element.readPendingChange.mockReturnValue({ id: 'existing' });
-      finish(candidateResponse());
+      finish(screenActResponse());
 
       expect((await result).ok).toBe(false);
       expect(element.submitChangeProposal).not.toHaveBeenCalled();
@@ -302,7 +429,7 @@ describe('host intent candidate safety', () => {
     vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => candidateResponse({ invalid: true })),
+      vi.fn(async () => screenActResponse({ invalid: true })),
     );
     const element = designer();
 
@@ -318,8 +445,10 @@ describe('host intent candidate safety', () => {
       'fetch',
       vi.fn(async () =>
         Response.json({
+          kind: 'generate_screen',
+          routedBy: 'rule',
           name: '作战室',
-          document: document(),
+          document: componentDocument(),
           mode: 'deterministic',
           imageCount: 0,
           failure: 'AGENT_NOT_CONFIGURED',
@@ -336,11 +465,58 @@ describe('host intent candidate safety', () => {
     expect(proposal?.rationale).not.toContain('AGENT_NOT_CONFIGURED');
   });
 
+  it('names the degradation count in the proposal rationale', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          kind: 'generate_screen',
+          routedBy: 'model',
+          name: '作战室',
+          document: componentDocument(),
+          mode: 'llm',
+          imageCount: 0,
+          warnings: [{ code: 'AGENT_BLOCK_ROWS_TRIMMED', message: '表格超过 8 行，已裁剪' }],
+        }),
+      ),
+    );
+    const element = designer();
+
+    expect((await handler(element)(request)).ok).toBe(true);
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
+    expect(proposal?.rationale).toContain('有 1 处降级：表格超过 8 行，已裁剪');
+  });
+
+  it('reports the failure even when the model still produced a screen', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          kind: 'generate_screen',
+          routedBy: 'model',
+          name: '作战室',
+          document: componentDocument(),
+          mode: 'llm',
+          imageCount: 0,
+          failure: 'AGENT_SPEC_INVALID',
+        }),
+      ),
+    );
+    const element = designer();
+
+    expect((await handler(element)(request)).ok).toBe(true);
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
+    // 有产出不等于没出问题：failure 必须出现在理由里，而不是被「由模型生成」盖过去。
+    expect(proposal?.rationale).toContain('模型输出未通过校验');
+  });
+
   it('reports engine rejection without claiming success', async () => {
     vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => candidateResponse()),
+      vi.fn(async () => screenActResponse()),
     );
     const element = designer();
     element.submitChangeProposal.mockReturnValue({ ok: false, diagnostics: [], value: {} });

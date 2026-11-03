@@ -9,9 +9,12 @@ import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
 import type { DesignerChangeProposalInput, DesignerIntentHandler } from '@base-screen/sdk/engine';
 import {
+  type AgentCanvasPatchShape,
   type AgentCatalogShape,
   type AgentComponentPatchShape,
   type AgentEditableComponentShape,
+  type AgentScreenDigestShape,
+  type AgentWarningShape,
   api,
 } from '../lib/api';
 import { createLogger } from '../lib/logger';
@@ -144,24 +147,105 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
         return { ok: true, value: null, diagnostics: [] };
       }
 
-      // 目录与素材在每次提交时现取：在线物料包刚发布、素材刚上传，这一句就能用上。
-      // 没有目录来源时保持同步进到请求，不额外制造一个 await 点。
-      const catalog = options.catalog === undefined ? undefined : await readAgentCatalog(options);
-      const generated = await api.generateScreenCandidate(
-        request.text,
-        catalog,
-        request.references,
+      // 画布级调整：作用域是整屏，但意图不是重做内容。
+      // 「把背景颜色改为天蓝色」如果落进下面的整屏生成分支，模型会把组件一起重出一屏——
+      // 用户只是想换个底色。画布背景是 canonical 配置（`canvas.backgroundColor`），
+      // 直接提交一条 update-canvas 提案：不调模型、不碰任何组件、不进整屏替换。
+      const canvasBackground = parseCanvasBackgroundInstruction(request.text);
+      if (canvasBackground !== null) {
+        const submitted = options.designer.submitChangeProposal({
+          title: `智能体 · ${truncate(request.text, 18)}`,
+          rationale: `只改画布背景色，组件保持不动；候选未写入文档。背景色 ${canvasBackground}。若与现有文字对比不足，可再单独调整文字色。`,
+          scope: '画布背景',
+          commands: [{ type: 'update-canvas', patch: { backgroundColor: canvasBackground } }],
+          origin: { author: '智能体' },
+        });
+        if (!submitted.ok) {
+          logger.warn('change proposal rejected', submitted.diagnostics);
+          return {
+            ok: false,
+            diagnostics: submitted.diagnostics,
+            reason: '提案被引擎拒绝（命令或渲染校验未通过），未生成变更。',
+          };
+        }
+        return { ok: true, value: null, diagnostics: [] };
+      }
+
+      // 整屏作用域交给后端统一路由：生成 / 改画布 / 明确不支持，都从这里分派。
+      // 以前这里只有 generateScreenCandidate，所以"改个背景色"也会被当成新主题重做一屏。
+      // 每次请求都从当前 catalog 同步构造物料摘要；图片由后端按 screenId 查询并校验。
+      const catalog = options.catalog === undefined ? undefined : readAgentCatalog(options);
+      const acted = await api.actAgent(
+        {
+          text: request.text,
+          scope: 'screen',
+          screenId: options.screenId,
+          ...(catalog === undefined ? {} : { catalog }),
+          ...(request.references === undefined || request.references.length === 0
+            ? {}
+            : { references: request.references }),
+          canvas: {
+            backgroundColor: current.canvas.backgroundColor,
+            hasBackgroundImage: current.canvas.backgroundImage != null,
+          },
+          context: buildScreenDigest(current),
+        },
         signal,
       );
       const reason = staleReason();
       if (reason !== undefined) return { ok: false, diagnostics: [], reason };
-      if (!generated.ok) {
-        logger.warn('agent generate failed', generated.error);
-        return { ok: false, diagnostics: [], reason: describeFailure(generated.error.message) };
+      if (!acted.ok) {
+        logger.warn('agent act failed', acted.error);
+        return { ok: false, diagnostics: [], reason: describeFailure(acted.error.message) };
       }
 
-      // 候选仍须通过 canonical 文档校验，结构不合法的内容永不进草案。
-      const parsed = parseScreenDocument(generated.data.document);
+      if (acted.data.kind === 'unsupported') {
+        logger.debug('agent action unsupported', acted.data.reason);
+        return {
+          ok: false,
+          diagnostics: [],
+          reason: acted.data.suggestion ?? describeUnsupported(acted.data.reason),
+        };
+      }
+
+      if (acted.data.kind === 'set_canvas') {
+        const canvasCommands = compileCanvasCommands(current, acted.data.patch);
+        if (canvasCommands === undefined) {
+          return {
+            ok: false,
+            diagnostics: [],
+            reason: '画布已经是你说的样子，没有需要应用的改动。',
+          };
+        }
+        const canvasSubmitted = options.designer.submitChangeProposal({
+          title: `智能体 · ${truncate(request.text, 18)}`,
+          rationale: '只改画布，组件保持不动；候选未写入文档。',
+          scope: '画布',
+          commands: canvasCommands,
+          origin: { author: '智能体' },
+        });
+        if (!canvasSubmitted.ok) {
+          logger.warn('change proposal rejected', canvasSubmitted.diagnostics);
+          return {
+            ok: false,
+            diagnostics: canvasSubmitted.diagnostics,
+            reason: '提案被引擎拒绝（命令或渲染校验未通过），未生成变更。',
+          };
+        }
+        return { ok: true, value: null, diagnostics: [] };
+      }
+
+      if (acted.data.kind === 'edit_components') {
+        // 整屏作用域不该出现组件编辑：路由与作用域不一致时拒绝，而不是猜"改哪个"。
+        return {
+          ok: false,
+          diagnostics: [],
+          reason: '这条指令像是要改组件，请先选中组件再发送。',
+        };
+      }
+
+      // generate_screen：候选仍须通过 canonical 文档校验，结构不合法的内容永不进草案。
+      const parsed = parseScreenDocument(acted.data.document);
       if (!parsed.ok) {
         logger.warn('agent document rejected', parsed.diagnostics);
         return {
@@ -170,11 +254,20 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
           reason: '智能体返回的大屏文档结构不合法，未生成变更。',
         };
       }
+      if (parsed.value.components.length === 0) {
+        // 空文档会成为「删光未锁定组件」的整屏提案，比失败更糟：宁可什么都不提交。
+        logger.warn('agent document has no usable components');
+        return {
+          ok: false,
+          diagnostics: [],
+          reason: '模型这次没有产出可用组件，未生成变更。',
+        };
+      }
 
       const commands = compileWholeScreenCommands(current, parsed.value);
       const submitted = options.designer.submitChangeProposal({
         title: `智能体 · ${truncate(request.text, 18)}`,
-        rationale: `${describeMode(generated.data.mode, generated.data.failure)}。布局由后端确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeLocked(current)}`,
+        rationale: `${describeMode(acted.data.mode, acted.data.failure, acted.data.warnings ?? [])}。布局由后端确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeLocked(current)}`,
         scope: '整屏',
         commands,
         origin: { author: '智能体' },
@@ -454,15 +547,46 @@ function describeLocked(current: ScreenDocument): string {
  * 通道说明只陈述事实：模型产出，或兜底且写明没用模型的原因。
  * 原因码来自示例后端（`AGENT_*`），这里翻成用户能看懂、知道下一步怎么办的话。
  */
-function describeMode(mode: 'llm' | 'deterministic', failure: string | undefined): string {
-  if (mode === 'llm') return '由模型生成';
+/**
+ * 通道说明只陈述事实：模型产出、模型产出但有降级、或兜底且写明没用模型的原因。
+ *
+ * `mode === 'llm'` 时不再无视 `failure`：模型出来了但某几块被裁掉，也要让用户看见，
+ * 否则"由模型生成"就是一句不完整的话。
+ */
+function describeMode(
+  mode: 'llm' | 'deterministic',
+  failure: string | undefined,
+  warnings: readonly AgentWarningShape[] = [],
+): string {
+  if (mode === 'llm') {
+    const details = [
+      ...(failure === undefined ? [] : [describeAgentFailure(failure)]),
+      ...(warnings.length === 0 ? [] : [describeWarnings(warnings)]),
+    ];
+    return details.length === 0 ? '由模型生成' : `由模型生成（${details.join('；')}）`;
+  }
   return `已用确定性结构生成（${describeAgentFailure(failure)}）`;
+}
+
+function describeWarnings(warnings: readonly AgentWarningShape[]): string {
+  const [first] = warnings;
+  if (first === undefined) return '';
+  return warnings.length === 1
+    ? `有 1 处降级：${first.message}`
+    : `有 ${warnings.length} 处降级，例如${first.message}`;
 }
 
 function describeAgentFailure(failure: string | undefined): string {
   if (failure === undefined) return '未调用模型';
   if (failure === 'AGENT_NOT_CONFIGURED') return '未配置模型';
   if (failure === 'AGENT_SPEC_INVALID') return '模型输出未通过校验';
+  if (failure === 'AGENT_BLOCKS_ALL_INVALID') return '模型给的分块都不可用，已改用确定性布局';
+  if (failure === 'AGENT_COMPOSE_FAILED') return '布局编译失败';
+  if (failure === 'AGENT_CATALOG_UNUSABLE') return '目录里没有可用的基础物料';
+  if (failure === 'AGENT_COMPONENT_INSTRUCTION_UNSUPPORTED') return '没有识别到可安全应用的修改';
+  if (failure.startsWith('AGENT_BLOCK_') || failure.startsWith('AGENT_DATASET_')) {
+    return '部分模块已降级';
+  }
   if (failure === 'AGENT_TIMEOUT') return '模型响应超时';
   if (failure === 'AGENT_UNREACHABLE') return '模型服务不可达';
   if (failure === 'AGENT_EMPTY_RESPONSE') return '模型返回为空';
@@ -489,22 +613,136 @@ function truncate(text: string, max: number): string {
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max)}…`;
 }
 
-/**
- * 现算一份「智能体目录」：设计器当前 catalog（含在线物料包）+ 本屏可见的素材。
- *
- * 取不到目录就返回 `undefined`，让后端退回内置最小目录——宁可少几个组件形态，
- * 也不要把一个空目录发过去（后端会按「目录里没有物料」直接 400）。
- */
-async function readAgentCatalog(
-  options: HostIntentOptions,
-): Promise<AgentCatalogShape | undefined> {
+/** 构造当前设计器的智能体物料摘要；图片素材由候选接口按 screenId 从后端授权目录读取。 */
+function readAgentCatalog(options: HostIntentOptions): AgentCatalogShape | undefined {
   const catalog = options.catalog?.();
-  if (catalog === undefined) return undefined;
-  const assets = await api.listAssets({ screenId: options.screenId });
-  if (!assets.ok) {
-    // 素材接口失败不该让整句话失败：目录照发，图片类组件这次就没有候选素材。
-    logger.warn('agent catalog assets unavailable', assets.error.message);
-    return buildAgentCatalog(catalog, []);
-  }
-  return buildAgentCatalog(catalog, assets.data.assets);
+  return catalog === undefined ? undefined : buildAgentCatalog(catalog);
 }
+
+/**
+ * 当前屏摘要：只算结构骨架，供后端判断"在改已有屏还是新建"。
+ *
+ * 刻意不带几何与正文——那是用户内容，也是 token 大头；路由只需要知道"有几块、什么类型、
+ * 画布多大、有没有锁定"。
+ */
+export function buildScreenDigest(document: ScreenDocument): AgentScreenDigestShape {
+  const counts = new Map<string, number>();
+  for (const component of document.components) {
+    counts.set(component.type, (counts.get(component.type) ?? 0) + 1);
+  }
+  const types = [...counts.entries()]
+    .map(([type, count]) => ({ type, count }))
+    .sort((left, right) => right.count - left.count || left.type.localeCompare(right.type))
+    .slice(0, 8);
+  return {
+    canvas: {
+      width: document.canvas.width,
+      height: document.canvas.height,
+      backgroundColor: document.canvas.backgroundColor,
+      hasBackgroundImage: document.canvas.backgroundImage != null,
+    },
+    componentCount: document.components.length,
+    types,
+    // 整屏作用域本来就没有选中项；留空字段让后端提示词如实写"当前未选中"。
+    selection: [],
+    lockedCount: document.components.filter((component) => component.status.locked).length,
+  };
+}
+
+/**
+ * 把后端给的画布 patch 编成一条 `update-canvas`。
+ *
+ * 三件事必须在这里做：只接受白名单字段、不合法值直接拒（而不是塞进文档）、
+ * 与当前值相同则不提交（否则引擎会以空提案拒绝，用户看到的是莫名其妙的失败）。
+ */
+export function compileCanvasCommands(
+  current: ScreenDocument,
+  patch: AgentCanvasPatchShape,
+): readonly ProposalCommand[] | undefined {
+  const next: {
+    backgroundColor?: string;
+    backgroundImage?: string | null;
+    backgroundImageFit?: 'cover' | 'contain' | null;
+  } = {};
+
+  if (patch.backgroundColor !== undefined) {
+    if (!/^#[0-9a-f]{3,8}$/i.test(patch.backgroundColor)) return undefined;
+    if (patch.backgroundColor !== current.canvas.backgroundColor) {
+      next.backgroundColor = patch.backgroundColor;
+    }
+  }
+
+  if (patch.backgroundImage === null) {
+    if (current.canvas.backgroundImage != null) {
+      next.backgroundImage = null;
+      next.backgroundImageFit = null;
+    }
+  } else if (patch.backgroundImage !== undefined) {
+    if (!/^https?:\/\//i.test(patch.backgroundImage) || patch.backgroundImage.length > 2048) {
+      return undefined;
+    }
+    next.backgroundImage = patch.backgroundImage;
+    if (patch.backgroundImageFit === 'cover' || patch.backgroundImageFit === 'contain') {
+      next.backgroundImageFit = patch.backgroundImageFit;
+    }
+  }
+
+  return Object.keys(next).length === 0 ? undefined : [{ type: 'update-canvas', patch: next }];
+}
+
+/** 路由给出"不支持"时的兜底说明：后端带了 suggestion 就用它，没带按原因给一句。 */
+function describeUnsupported(reason: string): string {
+  if (reason === 'missing_reference') return '这句话指向的对象不明确，请先选中组件或说清要改哪块。';
+  if (reason === 'out_of_domain') {
+    return '这个需求超出了当前能改的范围（支持布局、样式、文案与画布）。';
+  }
+  if (reason === 'unsafe_scope') return '这个改动会影响整屏结构，需要更明确的指令。';
+  if (reason === 'model_unavailable') return '暂时无法判断这条指令要做什么，试试更直接的说法。';
+  return '还没支持这类修改，未生成变更。';
+}
+
+/**
+ * 画布背景色指令 → 目标颜色；不是「只换底色」就返回 null，交回整屏生成。
+ *
+ * 判定刻意收得很窄：整句必须是「(把/将)? [画布/页面/大屏/屏幕] 背景[色] 改/换/设为 + 纯颜色」。
+ * 这样「生成一张天蓝色背景的销售大屏」「把背景改蓝一点再加个图表」都不会被拦成画布编辑——
+ * 它们确实要动内容。
+ */
+export function parseCanvasBackgroundInstruction(instruction: string): string | null {
+  const match = instruction
+    .trim()
+    .match(
+      /^(?:把|将)?\s*(?:画布|页面|大屏|屏幕|整屏)?\s*的?\s*(?:背景|底色)(?:颜色|色)?\s*(?:改|换|设|调|变)(?:为|成|到|一下)?\s*(.+)$/,
+    );
+  if (match === null) return null;
+  const value = (match[1] ?? '').trim().replace(/[。.!！?？]+$/g, '');
+  if (value === '') return null;
+  const hex = /^#[0-9a-f]{3,8}$/i.exec(value);
+  if (hex !== null) return hex[0].toLowerCase();
+  const normalized = value.replace(/\s+/g, '').replace(/色$/, '');
+  return CANVAS_COLOR_VALUES.find(([name]) => name === normalized)?.[1] ?? null;
+}
+
+/**
+ * 画布背景常用色。只收「名字就是颜色」的说法，避免把「天蓝色条纹」这类描述误判成纯色。
+ * 深色系沿用示例画布的深底，浅色系按大屏常见的衬底取值。
+ */
+const CANVAS_COLOR_VALUES: readonly (readonly [string, string])[] = [
+  ['天蓝', '#87ceeb'],
+  ['天空蓝', '#87ceeb'],
+  ['浅蓝', '#a9c8f5'],
+  ['淡蓝', '#a9c8f5'],
+  ['深蓝', '#16305c'],
+  ['藏青', '#1e293b'],
+  ['米', '#f2ead8'],
+  ['粉', '#f5c2d1'],
+  ['红', '#d64545'],
+  ['蓝', '#3b82f6'],
+  ['绿', '#3fae6a'],
+  ['白', '#ffffff'],
+  ['黑', '#0b1020'],
+  ['黄', '#f4c542'],
+  ['橙', '#ef8a3c'],
+  ['紫', '#8b7cf6'],
+  ['灰', '#8b97a8'],
+];

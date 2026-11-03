@@ -1,3 +1,4 @@
+import type { ScreenIntentReferenceCatalogPort } from '../../../packages/contracts/src/index.ts';
 import type { BaseScreenDesignerElement } from '../../../packages/sdk/src/index.ts';
 import {
   FEATURE_CASE_CATALOG,
@@ -61,6 +62,72 @@ async function applyCanvas(designer: BaseScreenDesignerElement): Promise<void> {
   await painted();
 }
 
+async function applyAgentHostResource(designer: BaseScreenDesignerElement): Promise<void> {
+  setHostShellVisible(false);
+  designer.setWorkbenchMode('canvas');
+  const option = { kind: 'asset' as const, id: 'harness-image-asset', label: 'Harness image' };
+  const referenceCatalog: ScreenIntentReferenceCatalogPort = {
+    async catalog(request) {
+      const items = request.kinds.includes('asset') ? [option] : [];
+      return { ok: true, value: { items, total: items.length }, diagnostics: [] };
+    },
+  };
+  designer.setIntentReferenceCatalog(referenceCatalog);
+  designer.setIntentHandler(async (request) => {
+    const manifest = designer.catalog?.get('base.image')?.manifest;
+    if (manifest === undefined) {
+      return { ok: false, diagnostics: [], reason: 'Harness image material is unavailable.' };
+    }
+    const reference = request.references?.find((item) => item.kind === 'asset');
+    const resourceId = reference?.kind === 'asset' ? reference.assetId : option.id;
+    const resourceName =
+      reference?.kind === 'asset' ? (reference.name ?? option.label) : option.label;
+    const sourceId = 'agent-harness-image-source';
+    const submitted = designer.submitChangeProposal({
+      title: '智能体图片提案',
+      rationale: `根据「${request.text}」添加宿主图片素材。`,
+      scope: '整屏',
+      origin: { author: 'Harness agent' },
+      commands: [
+        {
+          type: 'replace-data-sources',
+          dataSources: [
+            {
+              id: sourceId,
+              name: resourceName,
+              source: { kind: 'host-resource', resourceType: 'host_image', resourceId },
+              params: {},
+            },
+          ],
+        },
+        {
+          type: 'add-component',
+          component: {
+            id: 'agent-harness-image',
+            type: manifest.type,
+            name: resourceName,
+            parentId: null,
+            position: { x: 560, y: 24 },
+            size: manifest.defaultSize,
+            rotation: 0,
+            zIndex: 30,
+            status: { locked: false, hidden: false },
+            props: manifest.defaultProps,
+            style: manifest.defaultStyle,
+            dataSource: null,
+            dataValue: { kind: 'data-source-field', dataSourceId: sourceId, path: [] },
+          },
+        },
+      ],
+    });
+    return submitted.ok
+      ? { ok: true, value: null, diagnostics: [] }
+      : { ok: false, diagnostics: submitted.diagnostics, reason: 'Harness proposal was rejected.' };
+  });
+  await until(() => designer.shadowRoot?.querySelector('[data-right-pane-tab="intent"]') !== null);
+  clickShadow(designer, '[data-right-pane-tab="intent"]');
+  await painted();
+}
 async function applyMaterialGroups(designer: BaseScreenDesignerElement): Promise<void> {
   await applyCanvas(designer);
 }
@@ -420,6 +487,7 @@ async function applyCompositeInsertion(designer: BaseScreenDesignerElement): Pro
 
 const CASE_APPLIERS = {
   canvas: applyCanvas,
+  'agent-host-resource': applyAgentHostResource,
   'material-groups': applyMaterialGroups,
   'plugin-command': applyPluginCommand,
   'plugin-panel': applyPluginPanel,

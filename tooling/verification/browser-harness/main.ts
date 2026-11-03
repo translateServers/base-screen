@@ -178,6 +178,12 @@ const designerAuthoringPlugin: BaseScreenPluginRuntime = {
         },
       },
       {
+        kind: 'dataResourceType',
+        id: 'host_image',
+        name: 'Harness image',
+        configSchema: { kind: 'object', properties: {}, required: [] },
+      },
+      {
         kind: 'command',
         id: 'harness.nudge-selection',
         name: 'Nudge selection',
@@ -1036,7 +1042,16 @@ const variableRequests: Array<{
   readonly purpose: string;
 }> = [];
 const resourcePort = {
-  async resolve() {
+  async resolve({
+    resourceType,
+    resourceId,
+  }: {
+    readonly resourceType: string;
+    readonly resourceId: string;
+  }) {
+    if (resourceType === 'host_image' && resourceId === 'harness-image-asset') {
+      return { ok: true as const, value: '/cover.svg', diagnostics: [] };
+    }
     return { ok: true as const, value: { records: 5 }, diagnostics: [] };
   },
 };

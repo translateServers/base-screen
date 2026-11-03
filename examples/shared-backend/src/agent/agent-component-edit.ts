@@ -49,6 +49,8 @@ JSON 结构：
 约束：
 - componentId 只能来自选中组件列表，每个组件最多一个 patch。
 - 只写需要变化的字段；props/style 只写要改的键，不要复制整份对象。
+- 样式键必须是组件现有 style 里已有的键：形状类用 fill，卡片与图表用 backgroundColor，文字颜色用 color。
+  不要给组件塞它不支持的键——写了也不会生效。
 - 不得新增或删除组件，不得修改 dataSource、dataValue、dataBinding。
 - 样式值必须符合现有组件语义；不要编造用户没要求的大量视觉变化。
 - 指令无法安全映射到组件修改时，返回 {"summary":"无法应用","patches":[]}。
@@ -174,12 +176,22 @@ export function deterministicComponentEdit(
       patchText = replacement;
     }
     if (color !== null) {
-      if (/背景/.test(normalized) || (!textual && 'backgroundColor' in component.style)) {
-        style.backgroundColor = color;
+      // 背景色的落点按组件真实支持的键走：形状是 fill，卡片/图表是 backgroundColor。
+      // 以前一律写 backgroundColor，选中矩形说「背景改蓝」等于没改。
+      const backgroundKey =
+        'fill' in component.style
+          ? 'fill'
+          : 'backgroundColor' in component.style
+            ? 'backgroundColor'
+            : undefined;
+      const wantsBackground = /背景|底色/.test(normalized);
+      if (wantsBackground) {
+        // 文本组件没有背景键：宁可不改，也不要把「改背景」误解成把字染色。
+        if (backgroundKey !== undefined) style[backgroundKey] = color;
       } else if (textual || 'color' in component.style) {
         style.color = color;
-      } else {
-        style.backgroundColor = color;
+      } else if (backgroundKey !== undefined) {
+        style[backgroundKey] = color;
       }
     }
     if (fontSize !== null) style.fontSize = fontSize;
@@ -271,7 +283,10 @@ function extractColor(instruction: string): string | null {
   const hex = instruction.match(/#[0-9a-f]{3,8}\b/i);
   if (hex !== null) return hex[0];
   if (!/颜色|色|背景/.test(instruction)) return null;
-  const named = COLOR_VALUES.find(([name]) => instruction.includes(name));
+  // 长词优先：「天蓝色」不能被「蓝」抢走。
+  const named = [...COLOR_VALUES]
+    .sort((left, right) => right[0].length - left[0].length)
+    .find(([name]) => instruction.includes(name));
   return named?.[1] ?? null;
 }
 
@@ -300,7 +315,10 @@ function extractScale(instruction: string): number | null {
 }
 
 function isColorPhrase(value: string): boolean {
-  return /^(?:红色?|蓝色?|绿色?|白色?|黑色?|黄色?|橙色?|紫色?|灰色?|#[0-9a-f]{3,8})$/i.test(value);
+  if (/^#[0-9a-f]{3,8}$/i.test(value)) return true;
+  // 用同一张颜色表判断，避免「天蓝色」被当成要替换的正文（那会把标题改成「天蓝色」三个字）。
+  const normalized = value.replace(/\s+/g, '').replace(/色$/, '');
+  return COLOR_VALUES.some(([name]) => name === normalized);
 }
 
 function stripCodeFence(text: string): string {
@@ -351,6 +369,12 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 }
 
 const COLOR_VALUES: readonly (readonly [string, string])[] = [
+  ['天空蓝', '#87ceeb'],
+  ['天蓝', '#87ceeb'],
+  ['浅蓝', '#a9c8f5'],
+  ['淡蓝', '#a9c8f5'],
+  ['深蓝', '#16305c'],
+  ['藏青', '#1e293b'],
   ['红', '#ff5c5c'],
   ['蓝', '#4c9df3'],
   ['绿', '#4fcc6f'],
@@ -360,4 +384,6 @@ const COLOR_VALUES: readonly (readonly [string, string])[] = [
   ['橙', '#fb923c'],
   ['紫', '#a78bfa'],
   ['灰', '#94a3b8'],
+  ['米', '#f2ead8'],
+  ['粉', '#f5c2d1'],
 ];

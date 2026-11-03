@@ -148,7 +148,7 @@ ${renderCatalogPrompt(catalog)}${renderReferencesPrompt(references)}
 
 输出结构：
 {
-  "title": "大屏标题，8 字以内",
+  "title": "大屏标题，12 字以内",
   "subtitle": "一句口径说明，20 字以内",
   "kpis": [{ "label": "指标名", "value": "数值", "delta": "+4.2%" }],
   "blocks": [
@@ -167,10 +167,13 @@ ${renderCatalogPrompt(catalog)}${renderReferencesPrompt(references)}
 
 约束：
 - kpis 3 到 5 个，value 必须带单位或百分号，delta 可省略。
-- blocks 2 到 4 个；span 取 1 到 4，表示在四列栅格里占几列，同一行 span 之和不要超过 4。
-- 数据型组件（图表、表格）span 取 2 到 4：一列宽（约 430px）放不下多列表头，会挤成一团；
-  文字与素材类块 span 取 1 到 2。整屏尽量排满一行，别留半行空位。
-- 数据型组件必须给 table：columns 1 到 4 列，rows 3 到 12 行；图表类要有一个字符串列做维度、至少一个数值列做度量。
+- blocks 3 到 4 个，覆盖「趋势 / 结构 / 明细」；用户要求结论或要点时，用一个文字类块承载，不要塞进 note。
+- span 取 1 到 4，表示在四列栅格里占几列。数据型组件 span 取 2 到 4（一列宽约 430px，放不下多列表头会挤成一团）；
+  文字与素材类块 span 取 1 到 2。同一行 span 之和要凑满 4（4、2+2、3+1），不要留下半行空位。
+- 数据型组件必须给 table：columns 1 到 4 列，rows 3 到 8 行；图表类要有一个字符串列做维度、至少一个数值列做度量。
+  超过 8 行会被自动裁剪，宁可少几行；饼图尤其控制在 8 行以内。
+- 组件参数里如果图型可选（如 seriesType 的 line/bar/area/pie），按数据形态选：时间序列用 line 或 area，
+  分类对比（品类、城市、渠道）用 bar，占比用 pie；不要一律用折线。
 - 值型组件给 text；如果给了「可用静态素材」，图片类组件优先用 assetId（只能写列表里的 id），不要编造图片地址。
 - 无数据组件只给 type 与 span，可以带 title。
 - props 只能写该组件「参数」里列出的键，枚举只能取列出的值；没列出的键不要写。

@@ -23,11 +23,8 @@ export class AgentGenerateDto {
   name?: string;
 
   /**
-   * 宿主设计器的实时目录：物料摘要 + 素材清单。
-   *
-   * 只校验「是个对象」，内部形状由 `parseAgentCatalog` 严格解析（越界数量、非法 type、
-   * 未知字段一律拒绝并 400）。放在请求里而不是快照文件里，是为了让「刚发布的在线物料」
-   * 与「刚上传的素材」下一句话就能用上。
+   * 宿主设计器的可用物料摘要。内部形状由 `parseAgentCatalog` 严格解析。
+   * 图片候选由后端按候选请求的 `screenId` 从资产库读取，客户端提供的 assets 字段不参与授权。
    */
   /**
    * 用户在这一句话上显式引用的素材与数据集。
@@ -43,7 +40,7 @@ export class AgentGenerateDto {
   references?: Record<string, unknown>[];
 
   @ApiPropertyOptional({
-    description: '宿主带来的组件目录与素材清单；省略时使用最小内置目录',
+    description: '宿主带来的组件目录；省略时使用最小内置目录',
     type: 'object',
     additionalProperties: true,
   })

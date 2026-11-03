@@ -40,6 +40,12 @@ export type ApiResult<T> =
   | { readonly ok: true; readonly data: T }
   | { readonly ok: false; readonly error: ApiError };
 
+/** 降级告警：message 由后端给，宿主直接拼进提案理由。 */
+export interface AgentWarningShape {
+  readonly code: string;
+  readonly message: string;
+}
+
 export interface AgentCandidateShape {
   readonly name: string;
   readonly document: unknown;
@@ -49,6 +55,8 @@ export interface AgentCandidateShape {
   readonly catalogSource?: 'client' | 'fallback';
   /** 实际落进文档的物料 type，用于核对「用的确实是设计器里的组件」。 */
   readonly materials?: readonly string[];
+  /** 非阻断降级：屏仍然产出，但要如实告诉用户哪几处被裁/被跳过。 */
+  readonly warnings?: readonly AgentWarningShape[];
   readonly failure?: string;
 }
 
@@ -81,7 +89,6 @@ export interface AgentCatalogMaterialShape {
 
 export interface AgentCatalogShape {
   readonly materials: readonly AgentCatalogMaterialShape[];
-  readonly assets: readonly { readonly id: string; readonly name: string }[];
 }
 
 export interface AgentEditableComponentShape {
@@ -111,6 +118,73 @@ export interface AgentComponentEditShape {
   readonly mode: 'llm' | 'deterministic';
   readonly failure?: string;
 }
+
+/** 画布 patch：与 `update-canvas` 的白名单一致，`null` 表示清除背景图。 */
+export interface AgentCanvasPatchShape {
+  readonly backgroundColor?: string;
+  readonly backgroundImage?: string | null;
+  readonly backgroundImageFit?: 'cover' | 'contain' | null;
+}
+
+/**
+ * 当前屏摘要：只带结构骨架，不带几何与正文。
+ *
+ * 后端用它判断"这句话是在改已有屏还是新建"，所以字段刻意少：组件数量、类型分布、
+ * 选中项名称、画布配置。传整份文档既贵也把用户内容送进了提示词。
+ */
+export interface AgentScreenDigestShape {
+  readonly canvas: {
+    readonly width: number;
+    readonly height: number;
+    readonly backgroundColor: string;
+    readonly hasBackgroundImage: boolean;
+  };
+  readonly componentCount: number;
+  readonly types: readonly { readonly type: string; readonly count: number }[];
+  readonly selection: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly type: string;
+  }[];
+  readonly lockedCount: number;
+}
+
+export interface AgentActInputShape {
+  readonly text: string;
+  readonly scope: 'screen' | 'canvas' | 'components';
+  readonly componentIds?: readonly string[];
+  readonly components?: readonly AgentEditableComponentShape[];
+  readonly screenId?: string;
+  readonly catalog?: AgentCatalogShape;
+  readonly references?: readonly ScreenIntentReference[];
+  readonly canvas?: {
+    readonly backgroundColor?: string;
+    readonly hasBackgroundImage?: boolean;
+  };
+  readonly context?: AgentScreenDigestShape;
+}
+
+/** 统一动作结果：按 `kind` 判别，宿主据此选择编译路径。 */
+export type AgentActShape =
+  | ({
+      readonly kind: 'generate_screen';
+      readonly routedBy: 'rule' | 'model';
+    } & AgentCandidateShape)
+  | ({
+      readonly kind: 'edit_components';
+      readonly routedBy: 'rule' | 'model';
+    } & AgentComponentEditShape)
+  | {
+      readonly kind: 'set_canvas';
+      readonly routedBy: 'rule' | 'model';
+      readonly patch: AgentCanvasPatchShape;
+    }
+  | {
+      readonly kind: 'unsupported';
+      readonly routedBy: 'rule' | 'model';
+      readonly reason: string;
+      readonly suggestion?: string;
+    };
 
 interface RequestOptions {
   readonly method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -281,6 +355,7 @@ export const api = {
   /** 编辑器只生成候选，不创建或更新后端大屏。 */
   generateScreenCandidate: (
     topic: string,
+    screenId: string,
     catalog: AgentCatalogShape | undefined,
     references?: readonly ScreenIntentReference[],
     signal?: AbortSignal,
@@ -289,6 +364,7 @@ export const api = {
       method: 'POST',
       body: {
         topic,
+        screenId,
         ...(catalog === undefined ? {} : { catalog }),
         ...(references === undefined || references.length === 0 ? {} : { references }),
       },
@@ -302,6 +378,18 @@ export const api = {
     request('/agent/edit', {
       method: 'POST',
       body: { instruction, components },
+      ...(signal === undefined ? {} : { signal }),
+    }),
+  /**
+   * 统一动作入口：后端先判"要做什么"，再执行。
+   *
+   * 与 `/agent/candidate` 的区别是**不会默认重生成**：拿不准就回 `unsupported`，
+   * 由宿主把原因交给用户，而不是悄悄替换整屏。
+   */
+  actAgent: (input: AgentActInputShape, signal?: AbortSignal): Promise<ApiResult<AgentActShape>> =>
+    request('/agent/act', {
+      method: 'POST',
+      body: input,
       ...(signal === undefined ? {} : { signal }),
     }),
   getScreenAlarmBindings: (

@@ -22,15 +22,18 @@ const SUBTITLE_Y = 112;
 const SUBTITLE_HEIGHT = 30;
 const KPI_Y = 172;
 const KPI_HEIGHT = 148;
-const BLOCK_TOP = 348;
-const FOOTER_Y = 1020;
+const BLOCK_TOP = 344;
+const FOOTER_Y = 1026;
 const FOOTER_HEIGHT = 26;
-const CONTENT_BOTTOM = 996;
+const CONTENT_BOTTOM = 1010;
 
 const MUTED = '#93a0b0';
 const BODY = '#c7d2e0';
 const DELTA = '#4fcb6f';
 const FOOTER_COLOR = '#8a97a8';
+/** 亮底卡片上的文字色：与 `MUTED` / `BODY` 成对使用，按卡片填充亮度二选一。 */
+const DARK_TEXT = '#0f172a';
+const DARK_MUTED = '#4a5a70';
 
 export interface ComposeDiagnostic {
   readonly code: string;
@@ -80,6 +83,13 @@ interface TextToken {
   readonly fontSize?: number;
   readonly fontWeight?: string;
   readonly color?: string;
+  readonly lineSpacing?: number;
+}
+
+/** 卡片上的文字色：按卡片填充亮度二选一，避免蓝底配灰字。 */
+interface TextPalette {
+  readonly primary: string;
+  readonly muted: string;
 }
 
 interface Sink {
@@ -167,20 +177,18 @@ export function composeScreenDocument(input: {
     });
   };
 
+  /**
+   * 卡片底板：只给指标卡这类需要视觉承载的块用。
+   *
+   * 画布背景不铺组件——`canvas.backgroundColor` / `backgroundImage` 本身就是 canonical 配置
+   * （设计器「画布 › 背景填充 / 背景图片」直接改它），再铺一块 1920×1080 的矩形等于同一件事
+   * 做两遍：多一个挡在最底层、容易误选的假组件，导出体积也白涨。v1 编译器铺这层是为了兜底
+   * 各宿主的画布底色；画布背景进契约之后它就是纯冗余（也正是它把椭圆 bug 放大成了整屏）。
+   */
   const pushSurface = (name: string, box: Box, style?: Record<string, JsonValue>): void => {
     if (surfaceMaterial === undefined) return;
     push(surfaceMaterial, name, box, { style: style ?? {} });
   };
-
-  // 画布背景：不依赖任何业务物料，始终铺一层；是否圆角/描边按物料默认值走。
-  pushSurface(
-    '背景',
-    { x: 0, y: 0, width: WIDTH, height: HEIGHT },
-    {
-      ...(surfaceMaterial?.defaults.style.borderRadius === undefined ? {} : { borderRadius: 0 }),
-      ...(surfaceMaterial?.defaults.style.borderWidth === undefined ? {} : { borderWidth: 0 }),
-    },
-  );
 
   pushText(
     '标题',
@@ -198,21 +206,38 @@ export function composeScreenDocument(input: {
     { fontSize: 20, color: MUTED },
   );
 
-  composeKpis(spec, { pushSurface, pushText });
+  composeKpis(
+    spec,
+    { pushSurface, pushText },
+    textPalette(
+      typeof surfaceMaterial?.defaults.style.fill === 'string'
+        ? surfaceMaterial.defaults.style.fill
+        : undefined,
+    ),
+    tintedSurfaceStyle(
+      typeof surfaceMaterial?.defaults.style.fill === 'string'
+        ? surfaceMaterial.defaults.style.fill
+        : undefined,
+    ),
+  );
 
   const blocks = spec.blocks ?? [];
   const rows = packRows(blocks);
   if (rows.length > 0) {
     const columnWidth = Math.floor((WIDTH - MARGIN * 2 - GAP * (COLUMNS - 1)) / COLUMNS);
-    const rowHeight = Math.max(
-      150,
-      Math.floor((CONTENT_BOTTOM - BLOCK_TOP - GAP * (rows.length - 1)) / rows.length),
+    // 行高不再平均切：数据块（表格/图表）比文本块更吃纵向空间，按内容权重分配总高。
+    const heights = distributeRowHeights(
+      rows,
+      CONTENT_BOTTOM - BLOCK_TOP - GAP * (rows.length - 1),
     );
+    let y = BLOCK_TOP;
     rows.forEach((row, rowIndex) => {
-      const y = BLOCK_TOP + rowIndex * (rowHeight + GAP);
+      // 行内 span 补齐到 4 列：单块独占一行时铺满整行，而不是只占半屏、右边留一片空。
+      const spans = stretchSpans(row);
+      const rowHeight = heights[rowIndex] ?? 240;
       let offset = 0;
-      for (const block of row) {
-        const span = clamp(block.span, 1, COLUMNS);
+      row.forEach((block, blockIndex) => {
+        const span = spans[blockIndex] ?? clamp(block.span, 1, COLUMNS);
         compileBlock(
           block,
           {
@@ -225,7 +250,8 @@ export function composeScreenDocument(input: {
           { sink, onAsset: () => (imageCount += 1) },
         );
         offset += span;
-      }
+      });
+      y += rowHeight + GAP;
     });
   }
 
@@ -279,24 +305,26 @@ function composeKpis(
     pushSurface: (name: string, box: Box, style?: Record<string, JsonValue>) => void;
     pushText: (name: string, value: string, box: Box, token?: TextToken) => void;
   },
+  palette: TextPalette,
+  cardStyle: Record<string, JsonValue>,
 ): void {
   const kpis = spec.kpis.slice(0, 5);
   if (kpis.length === 0) return;
   const width = Math.floor((WIDTH - MARGIN * 2 - GAP * (kpis.length - 1)) / kpis.length);
   kpis.forEach((kpi, index) => {
     const x = MARGIN + index * (width + GAP);
-    context.pushSurface('指标卡', { x, y: KPI_Y, width, height: KPI_HEIGHT });
+    context.pushSurface('指标卡', { x, y: KPI_Y, width, height: KPI_HEIGHT }, cardStyle);
     context.pushText(
       '指标名',
       kpi.label,
       { x: x + 20, y: KPI_Y + 18, width: width - 40, height: 26 },
-      { fontSize: 18, color: MUTED },
+      { fontSize: 18, color: palette.muted },
     );
     context.pushText(
       '指标值',
       kpi.value,
       { x: x + 20, y: KPI_Y + 50, width: width - 40, height: 54 },
-      { fontSize: 42, fontWeight: '700' },
+      { fontSize: 42, fontWeight: '700', color: palette.primary },
     );
     if (kpi.delta !== undefined && kpi.delta !== '') {
       context.pushText(
@@ -334,7 +362,7 @@ function compileBlock(
 ): void {
   const material = context.catalog.materials.find((item) => item.type === block.type);
   if (material === undefined) {
-    target.sink.diagnostics.push({
+    target.sink.warnings.push({
       code: 'AGENT_MATERIAL_UNKNOWN',
       path: `blocks.${block.title}`,
       message: `目录里没有物料 ${block.type}。`,
@@ -349,22 +377,27 @@ function compileBlock(
 
   const isTextBlock =
     context.textMaterial !== undefined && material.type === context.textMaterial.type;
-  const hasTitle = block.title.trim() !== '' && !isTextBlock;
+  // 文本块只有在「标题就是正文」时才省略块标题（那是把一句话当块用）；
+  // 标题与正文不同（例如「结论与建议」+ 三行结论）时必须留着，否则整块的信息层级就丢了。
+  const textValue = (block.text ?? '').trim();
+  const titleIsBody = isTextBlock && textValue !== '' && block.title.trim() === textValue;
+  const hasTitle = block.title.trim() !== '' && !titleIsBody;
   const hasNote = hasTitle && (block.note ?? '').trim() !== '';
   const headerHeight = hasTitle ? (hasNote ? 62 : 36) : 0;
 
   if (hasTitle) {
+    // 标题与卡片左边缘对齐（卡片由 inset 内缩 16，标题不再额外偏移），整列看起来是一条竖线。
     context.pushText(
       '块标题',
       block.title,
-      { x: box.x + 4, y: box.y, width: box.width - 8, height: 28 },
+      { x: box.x, y: box.y, width: box.width, height: 28 },
       { fontSize: 21, fontWeight: '700' },
     );
     if (hasNote) {
       context.pushText(
         '块说明',
         block.note ?? '',
-        { x: box.x + 4, y: box.y + 30, width: box.width - 8, height: 22 },
+        { x: box.x, y: box.y + 30, width: box.width, height: 22 },
         { fontSize: 14, color: MUTED },
       );
     }
@@ -377,9 +410,13 @@ function compileBlock(
     height: box.height - headerHeight,
   };
   const name = block.title.trim() === '' ? material.name : block.title;
-  context.push(material, name, isTextBlock ? body : inset(body), {
+  // 文本块也走同一内边距：同排的表格/图表卡片内容从 x+16 起，纯文字贴着块边会显得错位。
+  const targetBox = inset(body);
+  const style = { ...(payload.style ?? {}), ...fitRowHeight(material, block, targetBox.height) };
+  context.push(material, name, targetBox, {
     props: sanitizeProps(material, block.props),
     ...payload,
+    ...(Object.keys(style).length === 0 ? {} : { style }),
   });
 }
 
@@ -438,7 +475,7 @@ function resolveBlockPayload(
     }
     const table = block.table;
     if (table === undefined) {
-      target.sink.diagnostics.push({
+      target.sink.warnings.push({
         code: 'AGENT_BLOCK_DATA_MISSING',
         path: `blocks.${block.title}`,
         message: `${material.type} 是数据型组件，但没有给 table。`,
@@ -467,7 +504,7 @@ function resolveBlockPayload(
     if (assetId !== '') {
       const asset = context.catalog.assets.find((item) => item.id === assetId);
       if (asset === undefined) {
-        target.sink.diagnostics.push({
+        target.sink.warnings.push({
           code: 'AGENT_ASSET_UNKNOWN',
           path: `blocks.${block.title}`,
           message: `素材 ${assetId} 不在宿主素材清单里。`,
@@ -502,7 +539,7 @@ function resolveBlockPayload(
     }
     const text = block.text ?? '';
     if (text === '') {
-      target.sink.diagnostics.push({
+      target.sink.warnings.push({
         code: 'AGENT_BLOCK_DATA_MISSING',
         path: `blocks.${block.title}`,
         message: `${material.type} 是值型组件，但没有给 text。`,
@@ -512,7 +549,16 @@ function resolveBlockPayload(
     const isTextBlock =
       context.textMaterial !== undefined && material.type === context.textMaterial.type;
     return {
-      ...(isTextBlock ? { style: tokenStyle(material, { fontSize: 18, color: BODY }) } : {}),
+      ...(isTextBlock
+        ? {
+            style: tokenStyle(material, {
+              fontSize: 18,
+              color: BODY,
+              // 多行结论按单行紧排会糊成一片；单行不动，避免把一句标题撑开。
+              lineSpacing: text.includes('\n') ? 8 : 0,
+            }),
+          }
+        : {}),
       dataValue: { kind: 'inline', value: text },
     };
   }
@@ -537,6 +583,62 @@ export function packRows(blocks: readonly AgentBlock[]): AgentBlock[][] {
   }
   if (current.length > 0) rows.push(current);
   return rows;
+}
+
+/**
+ * 行内 span 补齐到四列。
+ *
+ * 模型经常给「一块 span 2 独占一行」，按原样排就只占半屏、右侧留一大片空。
+ * 补齐按 span 从大到小逐列分配：单块直接铺满，两块 1+1 变成 2+2，不改相对宽度关系。
+ */
+export function stretchSpans(row: readonly AgentBlock[]): number[] {
+  const spans = row.map((block) => clamp(block.span, 1, COLUMNS));
+  let remaining = COLUMNS - spans.reduce((sum, span) => sum + span, 0);
+  if (remaining <= 0 || spans.length === 0) return spans;
+  const order = spans
+    .map((span, index) => ({ span, index }))
+    .sort((left, right) => right.span - left.span || left.index - right.index)
+    .map((item) => item.index);
+  let cursor = 0;
+  while (remaining > 0) {
+    const index = order[cursor % order.length]!;
+    spans[index] = (spans[index] ?? 1) + 1;
+    remaining -= 1;
+    cursor += 1;
+  }
+  return spans;
+}
+
+/**
+ * 行高按内容权重分配：带 table / 数据集的块更吃纵向空间（表格要放下整表不滚动），
+ * 纯文本与素材块让位。分配后再做最小高度兜底，超出总高时从最高的行里回收。
+ */
+export function distributeRowHeights(
+  rows: readonly (readonly AgentBlock[])[],
+  available: number,
+): number[] {
+  if (rows.length === 0) return [];
+  const minHeight = Math.max(120, Math.min(200, Math.floor(available / rows.length)));
+  const weights = rows.map((row) =>
+    row.some((block) => block.table !== undefined || (block.datasetId ?? '') !== '') ? 1.35 : 1,
+  );
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || 1;
+  const heights = weights.map((weight) =>
+    Math.max(minHeight, Math.floor((available * weight) / totalWeight)),
+  );
+  let overflow = heights.reduce((sum, height) => sum + height, 0) - available;
+  while (overflow > 0) {
+    let tallest = 0;
+    heights.forEach((height, index) => {
+      if (height > (heights[tallest] ?? 0)) tallest = index;
+    });
+    const reducible = (heights[tallest] ?? 0) - minHeight;
+    if (reducible <= 0) break;
+    const cut = Math.min(reducible, overflow);
+    heights[tallest] = (heights[tallest] ?? 0) - cut;
+    overflow -= cut;
+  }
+  return heights;
 }
 
 /**
@@ -626,7 +728,79 @@ function tokenStyle(material: AgentCatalogMaterial, token: TextToken): Record<st
   if (token.fontSize !== undefined && 'fontSize' in style) output.fontSize = token.fontSize;
   if (token.fontWeight !== undefined && 'fontWeight' in style) output.fontWeight = token.fontWeight;
   if (token.color !== undefined && 'color' in style) output.color = token.color;
+  if (token.lineSpacing !== undefined && 'lineSpacing' in style)
+    output.lineSpacing = token.lineSpacing;
   return output;
+}
+
+/**
+ * 表格行高按块高收紧。
+ *
+ * 物料默认行高（32px）是按「随手拖一个表格」定的；自动排版时块高由栅格决定，
+ * 6 行数据 + 表头常常差几个像素就溢出成滚动条，右侧那条滚动条和半截行最显廉价。
+ * 这里只在物料声明过 `rowHeight` 时按可用高度重算，且只缩不放，保持物料自己的上限。
+ */
+function fitRowHeight(
+  material: AgentCatalogMaterial,
+  block: AgentBlock,
+  bodyHeight: number,
+): Record<string, JsonValue> {
+  if (!('rowHeight' in material.defaults.style)) return {};
+  const rows = block.table?.rows.length ?? 0;
+  if (rows === 0) return {};
+  const declared = material.defaults.style.rowHeight;
+  const max = typeof declared === 'number' && declared > 0 ? declared : 32;
+  // 表头也占一行，再留 4px 余量，避免最后一行刚好被裁。
+  const fitted = Math.floor((bodyHeight - 4) / (rows + 1));
+  return { rowHeight: Math.min(max, Math.max(20, fitted)) };
+}
+
+/** 按填充亮度选文字色：亮底用深字，深底/无法解析（渐变等）用浅字。 */
+function textPalette(fill: string | undefined): TextPalette {
+  const luminance = fill === undefined ? null : relativeLuminance(fill);
+  if (luminance !== null && luminance > 0.5) return { primary: DARK_TEXT, muted: DARK_MUTED };
+  // 深底：数值保持近白，说明文字用比画布灰底更亮的一档——品牌蓝底上 #93a0b0 会发灰。
+  return { primary: '#e9eef5', muted: '#c6d3e4' };
+}
+
+function relativeLuminance(color: string): number | null {
+  const channels = parseHexColor(color);
+  if (channels === null) return null;
+  const linear = channels.map((channel) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * linear[0]! + 0.7152 * linear[1]! + 0.0722 * linear[2]!;
+}
+
+/**
+ * 指标卡的高饱和品牌色降成浅淡的品牌底。
+ *
+ * 四张纯品牌蓝卡铺在深色画布上会把整屏的视觉重量全抢走；降透明度后保留色相，
+ * 又退回到「卡片」的层级。只对高饱和色生效：深灰底板、浅色卡片保持原样。
+ */
+function tintedSurfaceStyle(fill: string | undefined): Record<string, JsonValue> {
+  const channels = fill === undefined ? null : parseHexColor(fill);
+  if (channels === null) return {};
+  const max = Math.max(...channels);
+  const min = Math.min(...channels);
+  if (max === 0) return {};
+  const lightness = (max + min) / 510;
+  const saturation = (max - min) / (max + min === 0 ? 1 : 255 - Math.abs(max + min - 255));
+  if (saturation < 0.45 || lightness > 0.6) return {};
+  return { opacity: 0.3 };
+}
+
+function parseHexColor(color: string): [number, number, number] | null {
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
+  if (match === null) return null;
+  const hex = match[1]!;
+  const full = hex.length === 3 ? [...hex].map((char) => char + char).join('') : hex;
+  return [
+    Number.parseInt(full.slice(0, 2), 16),
+    Number.parseInt(full.slice(2, 4), 16),
+    Number.parseInt(full.slice(4, 6), 16),
+  ];
 }
 
 /** 数据组件四周留 16px，避免贴到块标题与块边缘。 */

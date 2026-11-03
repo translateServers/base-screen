@@ -1,11 +1,13 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  type AgentActResult,
   type AgentCandidateResult,
   type AgentComponentEditResult,
   type AgentGenerateResult,
   AgentService,
 } from './agent.service';
+import { AgentActDto } from './dto/agent-act.dto';
 import { AgentCandidateDto } from './dto/agent-candidate.dto';
 import { AgentComponentEditDto } from './dto/agent-component-edit.dto';
 import { AgentGenerateDto } from './dto/agent-generate.dto';
@@ -15,11 +17,27 @@ import { AgentGenerateDto } from './dto/agent-generate.dto';
 export class AgentController {
   constructor(private readonly agent: AgentService) {}
 
+  @Post('act')
+  @ApiOperation({ summary: '把一句话路由成动作并执行：生成整屏 / 改组件 / 改画布 / 明确不支持' })
+  async act(@Body() dto: AgentActDto): Promise<AgentActResult> {
+    return this.agent.act({
+      text: dto.text,
+      scope: dto.scope,
+      ...(dto.componentIds === undefined ? {} : { componentIds: dto.componentIds }),
+      ...(dto.components === undefined ? {} : { components: dto.components }),
+      ...(dto.screenId === undefined ? {} : { screenId: dto.screenId }),
+      ...(dto.catalog === undefined ? {} : { catalog: dto.catalog }),
+      ...(dto.references === undefined ? {} : { references: dto.references }),
+      ...(dto.canvas === undefined ? {} : { canvas: dto.canvas }),
+      ...(dto.context === undefined ? {} : { context: dto.context }),
+    });
+  }
   @Post('candidate')
   @ApiOperation({ summary: '生成整屏候选文档，不创建或更新大屏' })
   async candidate(@Body() dto: AgentCandidateDto): Promise<AgentCandidateResult> {
     return this.agent.generateCandidate({
       topic: dto.topic,
+      screenId: dto.screenId,
       ...(dto.catalog === undefined ? {} : { catalog: dto.catalog }),
       ...(dto.references === undefined ? {} : { references: dto.references }),
     });

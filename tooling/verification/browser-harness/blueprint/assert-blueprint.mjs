@@ -537,7 +537,7 @@ export async function assertSemanticChartAuthoring(designer, page) {
     const xField = panel.querySelector('[data-property="x"]')?.closest('[data-property-symbol]');
     const yField = panel.querySelector('[data-property="y"]')?.closest('[data-property-symbol]');
     const zField = panel.querySelector('[data-property-symbol="Z"]');
-    const subtitle = panel.querySelector('.inspector-context-subtitle');
+    const subtitle = panel.querySelector('[data-inspector-context] .inspector-context-subtitle');
     const panelRect = panel.getBoundingClientRect();
     const tabsRect = panel.querySelector('.inspector-tabs')?.getBoundingClientRect();
     const toolbarRect = panel.querySelector('.inspector-toolbar')?.getBoundingClientRect();

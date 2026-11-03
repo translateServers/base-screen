@@ -1,4 +1,5 @@
 import { withViteBrowser } from '../browser-verification.mjs';
+import { assertAgentHostResourceProposal } from './agent/assert-agent-host-resource-proposal.mjs';
 import { assertCompositeInsertion } from './authoring/assert-composite-insertion.mjs';
 import {
   assertAuthoringImportAndInspector,
@@ -122,6 +123,7 @@ export async function runBrowserHarness(serverPort) {
       await assertInspectorDataTabCapability(browser, baseUrl);
       // 固定值 / 变量配置态回到来源浮层的那一行：没有它，这两类形态再也接不上数据集。
       await assertStaticSourceSwitch(browser, baseUrl);
+      await assertAgentHostResourceProposal(baseUrl, browser);
       for (const viewport of [
         { width: 1024, height: 640 },
         { width: 1366, height: 768 },
