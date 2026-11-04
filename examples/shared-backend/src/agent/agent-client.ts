@@ -118,7 +118,9 @@ export async function requestAgentCompletion(
       `agent request error: ${error instanceof Error ? error.name : 'unknown'} elapsed=${Date.now() - startedAt}ms`,
     );
     // 超时与网络错误分开报：前者是「再等一会儿可能就好了」，后者才是真的连不上。
-    const timedOut = error instanceof Error && error.name === 'AbortError';
+    // 不用 `instanceof Error`：fetch 抛出的 AbortError 可能来自另一个 realm（如测试沙箱），
+    // 那样 instanceof 为 false，超时会被误报成 AGENT_UNREACHABLE。按 name 判断与 realm 无关。
+    const timedOut = isAbortError(error);
     return { ok: false, failure: timedOut ? 'AGENT_TIMEOUT' : 'AGENT_UNREACHABLE' };
   } finally {
     clearTimeout(timer);
@@ -198,11 +200,22 @@ export async function requestAgentToolCall(
     logger.warn(
       `agent tool request error: ${error instanceof Error ? error.name : 'unknown'} elapsed=${Date.now() - startedAt}ms`,
     );
-    const timedOut = error instanceof Error && error.name === 'AbortError';
+    // 不用 `instanceof Error`：fetch 抛出的 AbortError 可能来自另一个 realm（如测试沙箱），
+    // 那样 instanceof 为 false，超时会被误报成 AGENT_UNREACHABLE。按 name 判断与 realm 无关。
+    const timedOut = isAbortError(error);
     return { ok: false, failure: timedOut ? 'AGENT_TIMEOUT' : 'AGENT_UNREACHABLE' };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** 只看 `name`：跨 realm 的错误对象 `instanceof Error` 为 false，但 `name` 仍然可靠。 */
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { name?: unknown }).name === 'AbortError'
+  );
 }
 
 function trimBaseUrl(baseUrl: string): string {

@@ -20,6 +20,8 @@ const ISOLATED_DATABASE_URLS: readonly string[] = [
   'file:../data/test.ds-service.db',
   'file:../data/test.ds-api.db',
   'file:../data/test.ds-catalog.db',
+  'file:../data/test.agent-flow.db',
+  'file:../data/test.agent-live.db',
 ];
 
 export default function globalSetup(): void {

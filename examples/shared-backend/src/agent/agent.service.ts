@@ -46,6 +46,7 @@ import {
   buildAgentUserPrompt,
   buildCatalogSystemPrompt,
 } from './agent-spec';
+import { resolveStylePreset } from './agent-style';
 
 /** 降级告警：code 供宿主归类，message 是能直接念给用户听的一句话。 */
 export interface AgentWarning {
@@ -282,10 +283,12 @@ export class AgentService {
     }
 
     // mode 要跟着 spec 一起进编译器：页脚靠它如实标注「模型输出 / 确定性兜底」。
+    // 风格在编译前解析成预设：颜色只来自后端色板，模型给的非法风格名回退默认预设。
+    const style = resolveStylePreset(spec.style);
     const composed = composeScreenDocument(
       references.compose === undefined
-        ? { spec: { ...spec, mode }, catalog }
-        : { spec: { ...spec, mode }, catalog, references: references.compose },
+        ? { spec: { ...spec, mode }, catalog, style }
+        : { spec: { ...spec, mode }, catalog, references: references.compose, style },
     );
     if (!composed.ok) {
       const [diagnostic] = composed.diagnostics;
@@ -468,11 +471,14 @@ export class AgentService {
   }
 }
 
+/** 兜底数值占位：明确表示「没有数据」，不是 0，也不是随机数。 */
+const PENDING_VALUE = '—';
+
 /**
- * 没配模型或模型输出不可用时的兜底。
+ * 没配模型或模型输出不可用时的兜底：只给版式与占位，不给任何数字。
  *
- * 兜底也要给全 `points` / `items`——编译器不接受「只有标题、数据留空」的面板，否则又会
- * 退回预设数字。数值按主题哈希确定（同一主题可复现），页脚与副标题会写明未调用模型。
+ * 旧实现用主题哈希生成「总量 35.5 万」这类确定但虚构的数，画在主视觉上，与真实经营数据无从区分。
+ * 现在数值位统一为占位，图表与清单不再伪造序列；副标题明确写出「未生成数据」。
  */
 function deterministicSpec(
   topic: string,
@@ -480,30 +486,18 @@ function deterministicSpec(
   references?: ComposeReferences,
 ): AgentScreenSpec {
   const subject = topic === '' ? '示例大屏' : topic;
-  const seed = hash(subject);
-  const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-  const points: AgentChartPoint[] = days.map((label, index) => ({
-    label,
-    value: 40 + ((seed >>> (index * 3)) % 60),
-  }));
+  // 兜底只给版式，不给数字：没有模型产物时，任何数值都是伪造的，哪怕是确定性的。
+  // 数值位统一写占位，宿主一眼能看出「还没有数据」，而不是把假数当真数画在主视觉上。
   return {
-    title: subject.slice(0, 10),
-    subtitle: '示例智能体的确定性兜底 · 未调用模型',
+    title: subject,
+    subtitle: '未生成数据 · 等待模型或数据源',
     kpis: [
-      {
-        label: '总量',
-        value: `${20 + (seed % 60)}.${seed % 10} 万`,
-        delta: `+${seed % 9}.${(seed >>> 3) % 10}%`,
-      },
-      {
-        label: '周转',
-        value: `${20 + ((seed >>> 2) % 20)}.${(seed >>> 1) % 10} 天`,
-        delta: `-${seed % 5}.${seed % 10}`,
-      },
-      { label: '缺货', value: `${seed % 30} 家`, delta: `+${seed % 7}` },
-      { label: '在途', value: `${3000 + (seed % 2000)} 万` },
+      { label: '总量', value: PENDING_VALUE },
+      { label: '周转', value: PENDING_VALUE },
+      { label: '缺货', value: PENDING_VALUE },
+      { label: '在途', value: PENDING_VALUE },
     ],
-    blocks: deterministicBlocks(subject, points, catalog, references) ?? [],
+    blocks: deterministicBlocks(catalog, references) ?? [],
   };
 }
 
@@ -512,8 +506,6 @@ function deterministicSpec(
  * 目录里没有的形态直接不出现，而不是退回写死的 type。
  */
 function deterministicBlocks(
-  subject: string,
-  points: readonly AgentChartPoint[],
   catalog: AgentCatalog,
   references?: ComposeReferences,
 ): AgentBlock[] | null {
@@ -543,30 +535,13 @@ function deterministicBlocks(
       datasetId: referencedDataset.datasetId,
     });
   }
-  if (chart !== undefined) {
-    blocks.push({
-      type: chart.type,
-      title: '近 7 日趋势',
-      note: '按日汇总 · 相对量',
-      span: 2,
-      table: {
-        columns: [
-          { id: 'day', label: '日期', type: 'string' },
-          { id: 'value', label: '数值', type: 'number' },
-        ],
-        rows: points.map((point) => ({ day: point.label, value: point.value })),
-      },
-    });
-  }
   if (text !== undefined) {
     blocks.push({
       type: text.type,
       title: '重点事项',
-      note: '口径待确认',
+      note: '待生成',
       span: blocks.length === 0 ? 2 : 1,
-      text: [`· ${subject.slice(0, 12)} 指标口径待确认`, '· 数据源待接入', '· 明细维度待补齐'].join(
-        '\n',
-      ),
+      text: ['· 等待模型生成或数据源接入', '· 数据未就绪，暂不展示指标'].join('\n'),
     });
   }
   const firstAsset = catalog.assets[0];
@@ -636,6 +611,7 @@ export function parseCatalogSpec(
     return {
       title: title.slice(0, 20),
       subtitle: subtitle.slice(0, 40),
+      ...(typeof record.style === 'string' ? { style: record.style.trim() } : {}),
       kpis,
       blocks: readBlocks(record.blocks, catalog, warnings),
     };
@@ -870,7 +846,7 @@ function readBlockTable(value: unknown, warnings: string[]): AgentBlockTable | n
 }
 
 /** 降级码 → 能直接念给用户的一句话。宿主不再自己维护一份码表。 */
-const WARNING_MESSAGES: Readonly<Record<string, string>> = {
+export const WARNING_MESSAGES: Readonly<Record<string, string>> = {
   AGENT_BLOCK_TYPE_UNKNOWN: '有模块用了目录里没有的组件，已跳过',
   AGENT_ASSET_UNKNOWN: '有模块的素材不在授权清单里，已跳过',
   AGENT_BLOCK_DATA_MISSING: '有模块缺少数据，已跳过',
@@ -1006,14 +982,4 @@ function readListItems(value: unknown): readonly string[] | null {
   const items = value.slice(0, 5).map((item) => (typeof item === 'string' ? item.trim() : ''));
   if (items.some((item) => item === '' || item.length > 24)) return null;
   return items.length >= 3 ? items : null;
-}
-
-/** FNV-1a：兜底数值只求稳定可复现，不承担任何业务含义。 */
-function hash(text: string): number {
-  let value = 2166136261;
-  for (let index = 0; index < text.length; index += 1) {
-    value ^= text.charCodeAt(index);
-    value = Math.imul(value, 16777619);
-  }
-  return value >>> 0;
 }

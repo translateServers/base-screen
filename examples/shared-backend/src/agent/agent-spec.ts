@@ -6,6 +6,7 @@
  */
 import type { AgentCatalog } from './agent-catalog';
 import { renderCatalogPrompt } from './agent-catalog';
+import { STYLE_PRESET_IDS, STYLE_PRESETS } from './agent-style';
 export interface AgentKpi {
   readonly label: string;
   readonly value: string;
@@ -79,6 +80,8 @@ export interface AgentBlock {
 export interface AgentScreenSpec {
   readonly title: string;
   readonly subtitle: string;
+  /** 模型选择的风格预设 id（见 agent-style.ts）；缺省或非法时由编译前回退到默认预设。 */
+  readonly style?: string;
   readonly kpis: readonly AgentKpi[];
   /** v1：写死的三种面板形态；仅当模型仍输出旧结构时使用。 */
   readonly panels?: readonly AgentPanel[];
@@ -150,6 +153,7 @@ ${renderCatalogPrompt(catalog)}${renderReferencesPrompt(references)}
 {
   "title": "大屏标题，12 字以内",
   "subtitle": "一句口径说明，20 字以内",
+  "style": "从下列风格中选一个 id，按主题气质选：${STYLE_PRESET_IDS.map((id) => `${id}=${STYLE_PRESETS[id].label}`).join('；')}",
   "kpis": [{ "label": "指标名", "value": "数值", "delta": "+4.2%" }],
   "blocks": [
     {

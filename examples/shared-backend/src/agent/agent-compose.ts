@@ -7,12 +7,17 @@ import {
   pickTextMaterial,
 } from './agent-catalog';
 import type { AgentBlock, AgentBlockTable, AgentScreenSpec } from './agent-spec';
+import {
+  DEFAULT_STYLE_PRESET,
+  STYLE_PRESETS,
+  type StylePalette,
+  type StylePreset,
+} from './agent-style';
 
 const WIDTH = 1920;
 const HEIGHT = 1080;
 const MARGIN = 64;
 const GAP = 24;
-const CANVAS_BACKGROUND = '#0b1020';
 
 /** 四列栅格：块的 `span` 表示占几列。 */
 const COLUMNS = 4;
@@ -26,14 +31,6 @@ const BLOCK_TOP = 344;
 const FOOTER_Y = 1026;
 const FOOTER_HEIGHT = 26;
 const CONTENT_BOTTOM = 1010;
-
-const MUTED = '#93a0b0';
-const BODY = '#c7d2e0';
-const DELTA = '#4fcb6f';
-const FOOTER_COLOR = '#8a97a8';
-/** 亮底卡片上的文字色：与 `MUTED` / `BODY` 成对使用，按卡片填充亮度二选一。 */
-const DARK_TEXT = '#0f172a';
-const DARK_MUTED = '#4a5a70';
 
 export interface ComposeDiagnostic {
   readonly code: string;
@@ -86,12 +83,6 @@ interface TextToken {
   readonly lineSpacing?: number;
 }
 
-/** 卡片上的文字色：按卡片填充亮度二选一，避免蓝底配灰字。 */
-interface TextPalette {
-  readonly primary: string;
-  readonly muted: string;
-}
-
 interface Sink {
   /** 阻断性诊断：出现任意一条就整份失败。 */
   readonly diagnostics: ComposeDiagnostic[];
@@ -124,8 +115,11 @@ export function composeScreenDocument(input: {
   readonly spec: AgentScreenSpec;
   readonly catalog: AgentCatalog;
   readonly references?: ComposeReferences;
+  /** 风格预设；缺省为默认预设。颜色只从预设取，不接受任何自由色值。 */
+  readonly style?: StylePreset;
 }): ComposeOutcome {
   const { spec, catalog, references } = input;
+  const palette = (input.style ?? STYLE_PRESETS[DEFAULT_STYLE_PRESET]).palette;
   const sink: Sink = { diagnostics: [], warnings: [], dataSources: [] };
   const components: Component[] = [];
   const used = new Set<string>();
@@ -171,8 +165,9 @@ export function composeScreenDocument(input: {
 
   const pushText = (name: string, value: string, box: Box, token: TextToken = {}): void => {
     if (textMaterial === undefined || value === '') return;
+    // 未指定颜色的文字用预设主文字色；否则会落回目录物料的写死默认值，整屏文字色就不随风格变了。
     push(textMaterial, name, box, {
-      style: tokenStyle(textMaterial, token),
+      style: tokenStyle(textMaterial, { color: palette.text, ...token }),
       dataValue: { kind: 'inline', value },
     });
   };
@@ -187,7 +182,8 @@ export function composeScreenDocument(input: {
    */
   const pushSurface = (name: string, box: Box, style?: Record<string, JsonValue>): void => {
     if (surfaceMaterial === undefined) return;
-    push(surfaceMaterial, name, box, { style: style ?? {} });
+    // 卡片底色来自预设；目录物料的默认填充只是兜底的占位，不能盖过风格。
+    push(surfaceMaterial, name, box, { style: { fill: palette.card, ...(style ?? {}) } });
   };
 
   pushText(
@@ -203,23 +199,10 @@ export function composeScreenDocument(input: {
     '副标题',
     spec.subtitle,
     { x: MARGIN, y: SUBTITLE_Y, width: 1400, height: SUBTITLE_HEIGHT },
-    { fontSize: 20, color: MUTED },
+    { fontSize: 20, color: palette.muted },
   );
 
-  composeKpis(
-    spec,
-    { pushSurface, pushText },
-    textPalette(
-      typeof surfaceMaterial?.defaults.style.fill === 'string'
-        ? surfaceMaterial.defaults.style.fill
-        : undefined,
-    ),
-    tintedSurfaceStyle(
-      typeof surfaceMaterial?.defaults.style.fill === 'string'
-        ? surfaceMaterial.defaults.style.fill
-        : undefined,
-    ),
-  );
+  composeKpis(spec, { pushSurface, pushText }, palette, tintedSurfaceStyle(palette.card));
 
   const blocks = spec.blocks ?? [];
   const rows = packRows(blocks);
@@ -246,7 +229,7 @@ export function composeScreenDocument(input: {
             width: columnWidth * span + GAP * (span - 1),
             height: rowHeight,
           },
-          { catalog, textMaterial, assetMaterial, push, pushText, references },
+          { catalog, textMaterial, assetMaterial, push, pushText, references, palette },
           { sink, onAsset: () => (imageCount += 1) },
         );
         offset += span;
@@ -265,7 +248,7 @@ export function composeScreenDocument(input: {
     '页脚',
     `生成自示例智能体${modeLabel === '' ? '' : ` · ${modeLabel}`} · 组件目录来自宿主设计器（${catalog.materials.length} 种可用物料）`,
     { x: MARGIN, y: FOOTER_Y, width: 1600, height: FOOTER_HEIGHT },
-    { fontSize: 14, color: FOOTER_COLOR },
+    { fontSize: 14, color: palette.footer },
   );
 
   if (sink.diagnostics.length > 0) return { ok: false, diagnostics: sink.diagnostics };
@@ -289,7 +272,7 @@ export function composeScreenDocument(input: {
       materials: [...used],
       warnings: sink.warnings,
       document: {
-        canvas: { width: WIDTH, height: HEIGHT, backgroundColor: CANVAS_BACKGROUND },
+        canvas: { width: WIDTH, height: HEIGHT, backgroundColor: palette.canvas },
         components,
         variables: [],
         ...(sink.dataSources.length === 0 ? {} : { dataSources: sink.dataSources }),
@@ -305,7 +288,7 @@ function composeKpis(
     pushSurface: (name: string, box: Box, style?: Record<string, JsonValue>) => void;
     pushText: (name: string, value: string, box: Box, token?: TextToken) => void;
   },
-  palette: TextPalette,
+  palette: StylePalette,
   cardStyle: Record<string, JsonValue>,
 ): void {
   const kpis = spec.kpis.slice(0, 5);
@@ -324,14 +307,14 @@ function composeKpis(
       '指标值',
       kpi.value,
       { x: x + 20, y: KPI_Y + 50, width: width - 40, height: 54 },
-      { fontSize: 42, fontWeight: '700', color: palette.primary },
+      { fontSize: 42, fontWeight: '700', color: palette.text },
     );
     if (kpi.delta !== undefined && kpi.delta !== '') {
       context.pushText(
         '同比',
         kpi.delta,
         { x: x + 20, y: KPI_Y + 108, width: width - 40, height: 24 },
-        { fontSize: 16, color: DELTA },
+        { fontSize: 16, color: palette.accent },
       );
     }
   });
@@ -345,6 +328,7 @@ function compileBlock(
     textMaterial: AgentCatalogMaterial | undefined;
     assetMaterial: AgentCatalogMaterial | undefined;
     references: ComposeReferences | undefined;
+    palette: StylePalette;
     push: (
       material: AgentCatalogMaterial,
       name: string,
@@ -398,7 +382,7 @@ function compileBlock(
         '块说明',
         block.note ?? '',
         { x: box.x, y: box.y + 30, width: box.width, height: 22 },
-        { fontSize: 14, color: MUTED },
+        { fontSize: 14, color: context.palette.muted },
       );
     }
   }
@@ -437,6 +421,7 @@ function resolveBlockPayload(
     catalog: AgentCatalog;
     textMaterial: AgentCatalogMaterial | undefined;
     references: ComposeReferences | undefined;
+    palette: StylePalette;
   },
   target: { sink: Sink; onAsset: () => void },
 ): BlockPayload | null {
@@ -553,7 +538,7 @@ function resolveBlockPayload(
         ? {
             style: tokenStyle(material, {
               fontSize: 18,
-              color: BODY,
+              color: context.palette.text,
               // 多行结论按单行紧排会糊成一片；单行不动，避免把一句标题撑开。
               lineSpacing: text.includes('\n') ? 8 : 0,
             }),
@@ -753,24 +738,6 @@ function fitRowHeight(
   // 表头也占一行，再留 4px 余量，避免最后一行刚好被裁。
   const fitted = Math.floor((bodyHeight - 4) / (rows + 1));
   return { rowHeight: Math.min(max, Math.max(20, fitted)) };
-}
-
-/** 按填充亮度选文字色：亮底用深字，深底/无法解析（渐变等）用浅字。 */
-function textPalette(fill: string | undefined): TextPalette {
-  const luminance = fill === undefined ? null : relativeLuminance(fill);
-  if (luminance !== null && luminance > 0.5) return { primary: DARK_TEXT, muted: DARK_MUTED };
-  // 深底：数值保持近白，说明文字用比画布灰底更亮的一档——品牌蓝底上 #93a0b0 会发灰。
-  return { primary: '#e9eef5', muted: '#c6d3e4' };
-}
-
-function relativeLuminance(color: string): number | null {
-  const channels = parseHexColor(color);
-  if (channels === null) return null;
-  const linear = channels.map((channel) => {
-    const value = channel / 255;
-    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * linear[0]! + 0.7152 * linear[1]! + 0.0722 * linear[2]!;
 }
 
 /**
