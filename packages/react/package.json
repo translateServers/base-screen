@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/react",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "将 React 组件桥接为 Base Screen 物料",
   "private": true,
   "license": "MIT",

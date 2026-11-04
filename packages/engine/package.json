@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/engine",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Designer 会话、画布交互、检查器和工作台编排",
   "private": true,
   "license": "MIT",
