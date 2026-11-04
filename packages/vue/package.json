@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/vue",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "将 Vue 组件桥接为 Base Screen 物料",
   "private": true,
   "license": "MIT",

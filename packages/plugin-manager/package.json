@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/plugin-manager",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "插件预检、加载管理、生命周期和能力授权",
   "private": true,
   "license": "MIT",

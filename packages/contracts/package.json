@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/contracts",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Screen Document、宿主契约、严格解析、诊断、序列化与 JSON Schema",
   "private": true,
   "license": "MIT",

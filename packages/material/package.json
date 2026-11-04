@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/material",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "官方物料实现、Manifest 和注册辅助",
   "private": true,
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/sdk",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Viewer、Designer、物料与插件的产品级组合入口",
   "private": true,
   "license": "MIT",

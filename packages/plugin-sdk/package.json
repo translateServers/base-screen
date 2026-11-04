@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/plugin-sdk",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "面向插件与物料作者的定义、注册和物料包辅助",
   "private": true,
   "license": "MIT",

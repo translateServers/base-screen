@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/renderer",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "物料模型与 DOM 渲染，保持纯展示职责",
   "private": true,
   "license": "MIT",
