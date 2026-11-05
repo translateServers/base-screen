@@ -70,6 +70,163 @@ describe('agent action routing', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('routes a gradient instruction to a contract-shaped background patch', async () => {
+    const fetchMock = stubFetch(() => Response.json({}));
+
+    const decision = await routeAgentAction({
+      text: '把背景改成渐变的天蓝色',
+      scope: 'screen',
+      settings: null,
+      logger,
+    });
+
+    // 渐变是画布本来就有的能力：规则直接成 patch，零模型调用、不重生成整屏。
+    expect(decision).toEqual({
+      action: 'set_canvas',
+      routedBy: 'rule',
+      patch: {
+        background: {
+          type: 'linear-gradient',
+          angle: 180,
+          stops: [
+            { color: '#87ceeb', position: 0 },
+            // 同色系压暗 18%：固定比例，同一句话永远得到同一个文档。
+            { color: '#6fa9c1', position: 100 },
+          ],
+        },
+      },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('honours both ends of a named gradient and the radial form', async () => {
+    const ranged = await routeAgentAction({
+      text: '把背景改成从 #87ceeb 到 #ffffff 的渐变',
+      scope: 'canvas',
+      settings: null,
+      logger,
+    });
+    expect(ranged).toMatchObject({
+      action: 'set_canvas',
+      patch: {
+        background: {
+          type: 'linear-gradient',
+          stops: [
+            { color: '#87ceeb', position: 0 },
+            { color: '#ffffff', position: 100 },
+          ],
+        },
+      },
+    });
+
+    const radial = await routeAgentAction({
+      text: '把背景改成径向渐变的深蓝色',
+      scope: 'canvas',
+      settings: null,
+      logger,
+    });
+    expect(radial).toMatchObject({
+      action: 'set_canvas',
+      patch: {
+        background: {
+          type: 'radial-gradient',
+          position: { x: 50, y: 50 },
+          stops: [{ color: '#16305c', position: 0 }, { position: 100 }],
+        },
+      },
+    });
+  });
+
+  it('keeps the gradient when the model returns one, and rejects malformed stops', async () => {
+    stubFetch(() =>
+      toolCall('set_canvas', {
+        background: {
+          type: 'linear-gradient',
+          angle: 90,
+          stops: [
+            { color: '#0b1020', position: 0 },
+            { color: '#3b82f6', position: 100 },
+          ],
+        },
+      }),
+    );
+
+    const accepted = await routeAgentAction({
+      text: '背景弄成蓝色调的渐变',
+      scope: 'canvas',
+      settings: SETTINGS,
+      logger,
+    });
+    expect(accepted).toMatchObject({ action: 'set_canvas', routedBy: 'model' });
+    if (accepted.action !== 'set_canvas') return;
+    expect(accepted.patch.background).toEqual({
+      type: 'linear-gradient',
+      angle: 90,
+      stops: [
+        { color: '#0b1020', position: 0 },
+        { color: '#3b82f6', position: 100 },
+      ],
+    });
+
+    // 色标位置不递增的值进文档只会被 core 拒绝，这里直接判非法而不是"没变化"。
+    stubFetch(() =>
+      toolCall('set_canvas', {
+        background: {
+          type: 'linear-gradient',
+          angle: 90,
+          stops: [
+            { color: '#0b1020', position: 60 },
+            { color: '#3b82f6', position: 20 },
+          ],
+        },
+      }),
+    );
+    const rejected = await routeAgentAction({
+      text: '背景弄成蓝色调的渐变',
+      scope: 'canvas',
+      settings: SETTINGS,
+      logger,
+    });
+    expect(rejected.action).toBe('unsupported');
+  });
+
+  it('reports an already-applied gradient as no change', async () => {
+    const decision = await routeAgentAction({
+      text: '把背景改成渐变的天蓝色',
+      scope: 'screen',
+      settings: null,
+      logger,
+      canvasState: {
+        backgroundColor: '#87ceeb',
+        background: {
+          type: 'linear-gradient',
+          angle: 180,
+          stops: [
+            { color: '#87ceeb', position: 0 },
+            { color: '#6fa9c1', position: 100 },
+          ],
+        },
+      },
+    });
+
+    expect(decision).toMatchObject({ action: 'unsupported', routedBy: 'rule' });
+    if (decision.action !== 'unsupported') return;
+    expect(decision.suggestion).toContain('画布没有变化');
+  });
+
+  it('keeps mixed instructions out of the canvas rule', async () => {
+    // 渐变现在没有颜色也能识别，但"改成渐变，再加个图表"不是纯画布指令：
+    // 把它当 set_canvas 会把后半句丢掉。
+    const decision = await routeAgentAction({
+      text: '把背景改成渐变，再加个图表',
+      scope: 'screen',
+      settings: null,
+      logger,
+    });
+
+    expect(decision.action).not.toBe('set_canvas');
+  });
+
   it('routes a generation instruction without spending a routing call', async () => {
     const fetchMock = stubFetch(() => Response.json({}));
 
@@ -155,7 +312,8 @@ describe('agent action routing', () => {
       action: 'unsupported',
       routedBy: 'model',
       reason: 'not_implemented',
-      suggestion: '没听懂要改哪里。可以选中组件后再说，或直接说"把背景改成 #0f172a"。',
+      suggestion:
+        '没听懂要改哪里。可以选中组件后再说，或直接说"把背景改成 #0f172a""背景改成渐变的天蓝色"。',
     });
   });
 

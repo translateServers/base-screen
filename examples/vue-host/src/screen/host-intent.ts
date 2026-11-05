@@ -1,10 +1,15 @@
 import type {
+  ScreenCanvasBackground,
   ScreenComponentNode,
   ScreenDataSource,
   ScreenDocument,
   ScreenJsonValue,
 } from '@base-screen/contracts';
-import { parseScreenDocument } from '@base-screen/contracts';
+import {
+  isScreenCanvasBackground,
+  isScreenCanvasPaletteColor,
+  parseScreenDocument,
+} from '@base-screen/contracts';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
 import type { DesignerChangeProposalInput, DesignerIntentHandler } from '@base-screen/sdk/engine';
@@ -153,11 +158,26 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
       // 直接提交一条 update-canvas 提案：不调模型、不碰任何组件、不进整屏替换。
       const canvasBackground = parseCanvasBackgroundInstruction(request.text);
       if (canvasBackground !== null) {
+        // 走同一条编译器：纯色要同步 `background`（否则渐变会盖住新底色），
+        // 与后端 set_canvas 落地后的结果保持一致。
+        const canvasCommands = compileCanvasCommands(current, {
+          backgroundColor: canvasBackground,
+        });
+        if (!canvasCommands.ok) {
+          return {
+            ok: false,
+            diagnostics: [],
+            reason:
+              canvasCommands.problem === 'invalid'
+                ? '这个底色不是合法的颜色值，未生成变更。'
+                : '画布已经是这个底色了，没有需要应用的改动。',
+          };
+        }
         const submitted = options.designer.submitChangeProposal({
           title: `智能体 · ${truncate(request.text, 18)}`,
           rationale: `只改画布背景色，组件保持不动；候选未写入文档。背景色 ${canvasBackground}。若与现有文字对比不足，可再单独调整文字色。`,
           scope: '画布背景',
-          commands: [{ type: 'update-canvas', patch: { backgroundColor: canvasBackground } }],
+          commands: canvasCommands.commands,
           origin: { author: '智能体' },
         });
         if (!submitted.ok) {
@@ -186,6 +206,10 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
             : { references: request.references }),
           canvas: {
             backgroundColor: current.canvas.backgroundColor,
+            // 带上当前填充：后端据此判断"改成渐变"到底是变更还是空操作。
+            ...(current.canvas.background === undefined
+              ? {}
+              : { background: current.canvas.background }),
             hasBackgroundImage: current.canvas.backgroundImage != null,
           },
           context: buildScreenDigest(current),
@@ -210,18 +234,21 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
 
       if (acted.data.kind === 'set_canvas') {
         const canvasCommands = compileCanvasCommands(current, acted.data.patch);
-        if (canvasCommands === undefined) {
+        if (!canvasCommands.ok) {
           return {
             ok: false,
             diagnostics: [],
-            reason: '画布已经是你说的样子，没有需要应用的改动。',
+            reason:
+              canvasCommands.problem === 'invalid'
+                ? '智能体返回的画布取值不合法，未生成变更。'
+                : '画布已经是你说的样子，没有需要应用的改动。',
           };
         }
         const canvasSubmitted = options.designer.submitChangeProposal({
           title: `智能体 · ${truncate(request.text, 18)}`,
           rationale: '只改画布，组件保持不动；候选未写入文档。',
           scope: '画布',
-          commands: canvasCommands,
+          commands: canvasCommands.commands,
           origin: { author: '智能体' },
         });
         if (!canvasSubmitted.ok) {
@@ -639,6 +666,10 @@ export function buildScreenDigest(document: ScreenDocument): AgentScreenDigestSh
       width: document.canvas.width,
       height: document.canvas.height,
       backgroundColor: document.canvas.backgroundColor,
+      // 填充形态（纯色/渐变）是"改成渐变"这类指令的判断依据，摘要里只说形态不说色标。
+      ...(document.canvas.background === undefined
+        ? {}
+        : { backgroundType: document.canvas.background.type }),
       hasBackgroundImage: document.canvas.backgroundImage != null,
     },
     componentCount: document.components.length,
@@ -652,23 +683,60 @@ export function buildScreenDigest(document: ScreenDocument): AgentScreenDigestSh
 /**
  * 把后端给的画布 patch 编成一条 `update-canvas`。
  *
- * 三件事必须在这里做：只接受白名单字段、不合法值直接拒（而不是塞进文档）、
+ * 三件事必须在这里做：只接受契约承认的字段、不合法值直接拒（而不是塞进文档）、
  * 与当前值相同则不提交（否则引擎会以空提案拒绝，用户看到的是莫名其妙的失败）。
+ *
+ * 字段与取值一律由契约判定（`isScreenCanvasBackground` / `isScreenCanvasPaletteColor`），
+ * 这里不再手写"背景只有纯色"的子集——那份子集正是"智能体说渐变不支持"的第二个来源。
  */
+/**
+ * 编译结果刻意区分"不合法"与"没变化"：两者都不可提交，但用户看到的说法完全不同——
+ * 把非法取值说成"已经是这样了"是最容易让人以为功能坏掉的那种提示。
+ */
+export type CanvasPatchCompileResult =
+  | { readonly ok: true; readonly commands: readonly ProposalCommand[] }
+  | { readonly ok: false; readonly problem: 'invalid' | 'unchanged' };
+
 export function compileCanvasCommands(
   current: ScreenDocument,
   patch: AgentCanvasPatchShape,
-): readonly ProposalCommand[] | undefined {
+): CanvasPatchCompileResult {
   const next: {
     backgroundColor?: string;
+    background?: ScreenCanvasBackground | null;
     backgroundImage?: string | null;
     backgroundImageFit?: 'cover' | 'contain' | null;
   } = {};
+  let invalid = false;
+
+  if (patch.background !== undefined) {
+    if (patch.background === null) {
+      if (current.canvas.background !== undefined) next.background = null;
+    } else if (isScreenCanvasBackground(patch.background)) {
+      if (!jsonEquals(patch.background, current.canvas.background)) {
+        next.background = patch.background;
+      }
+    } else {
+      invalid = true;
+    }
+  }
 
   if (patch.backgroundColor !== undefined) {
-    if (!/^#[0-9a-f]{3,8}$/i.test(patch.backgroundColor)) return undefined;
-    if (patch.backgroundColor !== current.canvas.backgroundColor) {
-      next.backgroundColor = patch.backgroundColor;
+    if (isScreenCanvasPaletteColor(patch.backgroundColor)) {
+      const color = patch.backgroundColor;
+      const currentFill = current.canvas.background;
+      // 渲染层是渐变优先于 `backgroundColor` 的：只写底色而不同步 `background`，
+      // 用户看到的就是"改成纯色没反应"。所以纯色一律连同 `background` 一起落成 solid——
+      // 除非这次 patch 自己带了 `background`（那是明确的渐变意图，不能被底色覆盖）。
+      if (
+        patch.background === undefined &&
+        (currentFill?.type !== 'solid' || currentFill.color !== color)
+      ) {
+        next.background = { type: 'solid', color };
+      }
+      if (color !== current.canvas.backgroundColor) next.backgroundColor = color;
+    } else {
+      invalid = true;
     }
   }
 
@@ -679,15 +747,23 @@ export function compileCanvasCommands(
     }
   } else if (patch.backgroundImage !== undefined) {
     if (!/^https?:\/\//i.test(patch.backgroundImage) || patch.backgroundImage.length > 2048) {
-      return undefined;
-    }
-    next.backgroundImage = patch.backgroundImage;
-    if (patch.backgroundImageFit === 'cover' || patch.backgroundImageFit === 'contain') {
-      next.backgroundImageFit = patch.backgroundImageFit;
+      invalid = true;
+    } else {
+      next.backgroundImage = patch.backgroundImage;
+      if (patch.backgroundImageFit === 'cover' || patch.backgroundImageFit === 'contain') {
+        next.backgroundImageFit = patch.backgroundImageFit;
+      }
     }
   }
 
-  return Object.keys(next).length === 0 ? undefined : [{ type: 'update-canvas', patch: next }];
+  if (invalid) return { ok: false, problem: 'invalid' };
+  return Object.keys(next).length === 0
+    ? { ok: false, problem: 'unchanged' }
+    : { ok: true, commands: [{ type: 'update-canvas', patch: next }] };
+}
+
+function jsonEquals(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 /** 路由给出"不支持"时的兜底说明：后端带了 suggestion 就用它，没带按原因给一句。 */
@@ -702,11 +778,15 @@ function describeUnsupported(reason: string): string {
 }
 
 /**
- * 画布背景色指令 → 目标颜色；不是「只换底色」就返回 null，交回整屏生成。
+ * 画布背景色指令 → 目标纯色；不是「只换底色」就返回 null，交回整屏生成。
  *
  * 判定刻意收得很窄：整句必须是「(把/将)? [画布/页面/大屏/屏幕] 背景[色] 改/换/设为 + 纯颜色」。
  * 这样「生成一张天蓝色背景的销售大屏」「把背景改蓝一点再加个图表」都不会被拦成画布编辑——
  * 它们确实要动内容。
+ *
+ * 只处理纯色是刻意的：渐变要派生色标与角度，那套语义在后端 `matchCanvasInstruction` 里，
+ * 本地再抄一遍就会出现两份"看起来差不多"的渐变（同一句话两种结果）。渐变句子在这里返回
+ * null，落到后端路由——它同样是零模型执行的规则。
  */
 export function parseCanvasBackgroundInstruction(instruction: string): string | null {
   const match = instruction
@@ -717,7 +797,8 @@ export function parseCanvasBackgroundInstruction(instruction: string): string | 
   if (match === null) return null;
   const value = (match[1] ?? '').trim().replace(/[。.!！?？]+$/g, '');
   if (value === '') return null;
-  const hex = /^#[0-9a-f]{3,8}$/i.exec(value);
+  // 合法 CSS 十六进制长度起步：`#12345` 写进文档不会报错、只会渲染成透明。
+  const hex = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(value);
   if (hex !== null) return hex[0].toLowerCase();
   const normalized = value.replace(/\s+/g, '').replace(/色$/, '');
   return CANVAS_COLOR_VALUES.find(([name]) => name === normalized)?.[1] ?? null;

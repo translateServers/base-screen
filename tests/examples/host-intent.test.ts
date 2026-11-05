@@ -254,8 +254,12 @@ describe('host intent canvas background', () => {
     expect(element.submitChangeProposal).toHaveBeenCalledOnce();
     const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
     expect(proposal?.scope).toBe('画布背景');
+    // 纯色同时落 `background`：渲染层渐变优先，只写 backgroundColor 会让旧渐变继续生效。
     expect(proposal?.commands).toEqual([
-      { type: 'update-canvas', patch: { backgroundColor: '#87ceeb' } },
+      {
+        type: 'update-canvas',
+        patch: { background: { type: 'solid', color: '#87ceeb' }, backgroundColor: '#87ceeb' },
+      },
     ]);
   });
 
@@ -270,6 +274,108 @@ describe('host intent canvas background', () => {
     ['把标题颜色改为蓝色', null],
   ])('parses canvas background from 「%s」', (text, expected) => {
     expect(parseCanvasBackgroundInstruction(text)).toBe(expected);
+  });
+});
+
+describe('host intent canvas gradient', () => {
+  const GRADIENT = {
+    type: 'linear-gradient' as const,
+    angle: 180,
+    stops: [
+      { color: '#87ceeb', position: 0 },
+      { color: '#6fa9c1', position: 100 },
+    ],
+  };
+
+  function gradientDocument(): ScreenDocument {
+    return {
+      ...document(),
+      canvas: { width: 1920, height: 1080, backgroundColor: '#87ceeb', background: GRADIENT },
+    };
+  }
+
+  it('forwards a gradient patch from the router instead of dropping it', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    const fetchMock = vi.fn(async () =>
+      Response.json({ kind: 'set_canvas', routedBy: 'rule', patch: { background: GRADIENT } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const element = designer();
+
+    // 渐变的派生在后端规则里，本地规则只认纯色，所以这句会走到 /agent/act。
+    const result = await handler(element)({ ...request, text: '把背景改成渐变的天蓝色' });
+
+    expect(result.ok).toBe(true);
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
+    expect(proposal?.commands).toEqual([
+      { type: 'update-canvas', patch: { background: GRADIENT } },
+    ]);
+  });
+
+  it('sends the current fill so the backend can tell a no-op', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    const fetchMock = vi.fn(async () =>
+      Response.json({ kind: 'set_canvas', routedBy: 'rule', patch: { background: GRADIENT } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await handler(designer(gradientDocument()))({ ...request, text: '把背景改成渐变的深蓝色' });
+
+    const body = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as { body: string } | undefined)?.body),
+    ) as { canvas?: { background?: unknown } };
+    expect(body.canvas?.background).toEqual(GRADIENT);
+  });
+
+  it('turns an existing gradient back into the requested solid colour', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const element = designer(gradientDocument());
+
+    const result = await handler(element)({ ...request, text: '背景换成白色' });
+
+    expect(result.ok).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
+    // 关键：渐变不会自己消失，必须同时把它收成 solid，否则用户看到"改了没反应"。
+    expect(proposal?.commands).toEqual([
+      {
+        type: 'update-canvas',
+        patch: { background: { type: 'solid', color: '#ffffff' }, backgroundColor: '#ffffff' },
+      },
+    ]);
+  });
+
+  it('rejects a malformed gradient instead of claiming nothing changed', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          kind: 'set_canvas',
+          routedBy: 'model',
+          patch: {
+            background: {
+              type: 'linear-gradient',
+              angle: 180,
+              stops: [
+                { color: '#87ceeb', position: 60 },
+                { color: '#fff', position: 20 },
+              ],
+            },
+          },
+        }),
+      ),
+    );
+    const element = designer();
+
+    const result = await handler(element)({ ...request, text: '背景做成蓝色渐变' });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toContain('不合法');
+    expect(element.submitChangeProposal).not.toHaveBeenCalled();
   });
 });
 
@@ -295,7 +401,10 @@ describe('host intent action routing', () => {
     const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
     expect(proposal?.scope).toBe('画布');
     expect(proposal?.commands).toEqual([
-      { type: 'update-canvas', patch: { backgroundColor: '#16305c' } },
+      {
+        type: 'update-canvas',
+        patch: { background: { type: 'solid', color: '#16305c' }, backgroundColor: '#16305c' },
+      },
     ]);
   });
 
