@@ -4,7 +4,7 @@ import type {
   BaseScreenPluginPanelElement,
 } from '@base-screen/plugin-core';
 import { BASE_SCREEN_PLUGIN_PANEL_ACTION_EVENT } from '@base-screen/plugin-core';
-import { designerIcon } from '../../ui/designer-icons.js';
+import { designerIcon } from '../../dom/designer-icons.js';
 import { createDesignerTabButton } from '../designer-ui-primitives.js';
 
 const PLUGIN_TAB_PREFIX = 'plugin:';

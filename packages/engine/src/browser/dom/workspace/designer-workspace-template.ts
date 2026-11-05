@@ -1,6 +1,6 @@
 import { DESIGNER_OPERATION_TEXT } from '../../../common/operations/designer-operation-registry.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../../ui/designer-icons.js';
+import { designerIcon } from '../../dom/designer-icons.js';
 import { menuActionIcon, menuSubmenuIcon } from '../menu/designer-menu-icons.js';
 import { TOGGLE_MENU_ACTIONS } from '../menu/designer-menu-model.js';
 

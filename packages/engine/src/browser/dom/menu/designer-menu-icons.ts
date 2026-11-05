@@ -1,4 +1,4 @@
-import type { DesignerIconName } from '../../ui/designer-icons.js';
+import type { DesignerIconName } from '../../dom/designer-icons.js';
 
 /**
  * 菜单动作图标。顶栏下拉与画布右键共用同一份登记：未登记的动作不画字形，

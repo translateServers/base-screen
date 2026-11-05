@@ -5,7 +5,7 @@ import {
   type ScreenInteractionState,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import type { DesignerIconName } from '../../ui/designer-icons.js';
+import type { DesignerIconName } from '../../dom/designer-icons.js';
 import { materialCategoryIcon } from '../material-library/designer-material-library-dom.js';
 import type { DesignerLayerToolbarState } from './designer-layers-toolbar-dom.js';
 

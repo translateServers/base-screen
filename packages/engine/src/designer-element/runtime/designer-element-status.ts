@@ -1,6 +1,6 @@
 import type { ScreenDiagnostic, ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
 import { downloadDesignerDocument } from '../../browser/dom/workspace/designer-workspace.js';
-import { designerIcon } from '../../browser/ui/designer-icons.js';
+import { designerIcon } from '../../browser/dom/designer-icons.js';
 import { selectedComponents } from '../../common/operations/selection/designer-selection.js';
 import type { ScreenProjectPhase } from '../../common/project/project-controller.js';
 import { DESIGNER_TOOLS } from '../../common/tools/designer-tools.js';

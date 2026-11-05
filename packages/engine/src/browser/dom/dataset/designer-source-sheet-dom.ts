@@ -1,6 +1,6 @@
 import { parseScreenTabularDataset } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../../ui/designer-icons.js';
+import { designerIcon } from '../../dom/designer-icons.js';
 import { createDesignerInput, createDesignerTextarea } from '../designer-ui-primitives.js';
 import { designerDataEntryItems } from './designer-data-entry-dom.js';
 import {

@@ -1,7 +1,7 @@
 import type { DesignerVariableReference } from '../../common/operations/designer-variable-operations.js';
 import type { DesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../ui/designer-icons.js';
+import { designerIcon } from '../dom/designer-icons.js';
 
 export function createVariableReferenceCount(
   ownerDocument: Document,

@@ -11,7 +11,7 @@ import {
   readDesignerVariableViews,
 } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../ui/designer-icons.js';
+import { designerIcon } from '../dom/designer-icons.js';
 import { createDesignerButton } from './designer-ui-primitives.js';
 import {
   appendVariableReferenceList,

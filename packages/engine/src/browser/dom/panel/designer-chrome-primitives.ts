@@ -1,4 +1,4 @@
-import { type DesignerIconName, designerIcon } from '../../ui/designer-icons.js';
+import { type DesignerIconName, designerIcon } from '../../dom/designer-icons.js';
 import { createDesignerButton, designerClassNames } from '../designer-ui-primitives.js';
 
 /**

@@ -3,7 +3,7 @@ import type { ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { getDesignerInspectorContext } from '../../common/operations/style/designer-inspector.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
+import { type DesignerIconName, designerIcon } from '../dom/designer-icons.js';
 import {
   DESIGNER_INSPECTOR_SEARCH_SECTION_SELECTOR,
   decorateDesignerInspectorSearchables,

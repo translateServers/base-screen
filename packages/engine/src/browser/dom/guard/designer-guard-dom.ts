@@ -1,6 +1,6 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerContrastIssue } from '../../../common/validation/designer-guard.js';
-import { designerIcon } from '../../ui/designer-icons.js';
+import { designerIcon } from '../../dom/designer-icons.js';
 import { adoptDesignerFormControls } from '../designer-form-controls-dom.js';
 import { escapeHtml } from '../designer-html-escape.js';
 

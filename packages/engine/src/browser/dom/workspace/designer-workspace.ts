@@ -9,7 +9,7 @@ import {
   type DesignerToolMaterialTypes,
 } from '../../../common/tools/designer-tools.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { designerIcon, designerToolGlyph } from '../../ui/designer-icons.js';
+import { designerIcon, designerToolGlyph } from '../../dom/designer-icons.js';
 import { adoptDesignerFormControls } from '../designer-form-controls-dom.js';
 import { renderDesignerLeftPanelGroups } from '../designer-left-panel-groups-dom.js';
 import {

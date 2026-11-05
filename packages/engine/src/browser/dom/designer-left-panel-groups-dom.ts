@@ -5,7 +5,7 @@ import {
   baseScreenDesignerLeftPanelSlotName,
 } from '../../common/operations/workbench/designer-left-panel-groups.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../ui/designer-icons.js';
+import { designerIcon } from '../dom/designer-icons.js';
 import { createDesignerTabButton } from './designer-ui-primitives.js';
 
 const HOST_TAB_PREFIX = 'host:';
