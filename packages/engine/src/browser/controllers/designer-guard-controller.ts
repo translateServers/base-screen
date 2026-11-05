@@ -1,15 +1,11 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import { compositeOver, parseCssColorAlpha, type RgbColor } from '@base-screen/core';
 import type { DesignerMetricName } from '../../common/observability/designer-metrics.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
   type DesignerGuardSnapshot,
   evaluateContrastGuard,
 } from '../../common/validation/designer-guard.js';
-import {
-  compositeOver,
-  parseCssColorAlpha,
-  type RgbColor,
-} from '@base-screen/core';
 import { measureCanvasContrast } from '../dom/guard/designer-contrast-measure.js';
 import {
   type DesignerGuardView,

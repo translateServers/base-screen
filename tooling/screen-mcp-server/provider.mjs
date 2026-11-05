@@ -111,7 +111,8 @@ export async function createScreenProvider(screenFile) {
           requiredRatio,
           textColor: apis.formatCssColor(text),
           backgroundColor: apis.formatCssColor(background),
-          suggestedColor: suggested === null || suggested === undefined ? null : apis.formatCssColor(suggested),
+          suggestedColor:
+            suggested === null || suggested === undefined ? null : apis.formatCssColor(suggested),
         });
       }
       return ok({
@@ -267,7 +268,12 @@ export async function createScreenProvider(screenFile) {
           ? snapshotTarget(document)
           : normalizeScreenDocument(apis, candidate);
       if (!target.ok)
-        return failure({ valid: false, diagnostics: target.diagnostics, metrics: null, budget: null });
+        return failure({
+          valid: false,
+          diagnostics: target.diagnostics,
+          metrics: null,
+          budget: null,
+        });
       const doc = target.document;
       const index = apis.buildComponentIndex(doc);
       let maxDepth = 0;
@@ -294,13 +300,25 @@ export async function createScreenProvider(screenFile) {
       };
       const violations = [];
       if (metrics.components > limits.maxComponents)
-        violations.push({ code: 'PERF_COMPONENTS', actual: metrics.components, limit: limits.maxComponents });
+        violations.push({
+          code: 'PERF_COMPONENTS',
+          actual: metrics.components,
+          limit: limits.maxComponents,
+        });
       if (metrics.maxDepth > limits.maxDepth)
         violations.push({ code: 'PERF_DEPTH', actual: metrics.maxDepth, limit: limits.maxDepth });
       if (metrics.dataBindings > limits.maxBindings)
-        violations.push({ code: 'PERF_BINDINGS', actual: metrics.dataBindings, limit: limits.maxBindings });
+        violations.push({
+          code: 'PERF_BINDINGS',
+          actual: metrics.dataBindings,
+          limit: limits.maxBindings,
+        });
       if (metrics.styleRules > limits.maxStyleRules)
-        violations.push({ code: 'PERF_STYLE_RULES', actual: metrics.styleRules, limit: limits.maxStyleRules });
+        violations.push({
+          code: 'PERF_STYLE_RULES',
+          actual: metrics.styleRules,
+          limit: limits.maxStyleRules,
+        });
       return ok({ valid: violations.length === 0, metrics, budget: { limits, violations } });
     },
     /**
@@ -312,12 +330,15 @@ export async function createScreenProvider(screenFile) {
         candidate === undefined
           ? snapshotTarget(document)
           : normalizeScreenDocument(apis, candidate);
-      if (!normalized.ok) return failure({ fit: null, commands: [], diagnostics: normalized.diagnostics });
+      if (!normalized.ok)
+        return failure({ fit: null, commands: [], diagnostics: normalized.diagnostics });
       const doc = normalized.document;
       const scale = Math.min(target.width / doc.canvas.width, target.height / doc.canvas.height);
       const dx = (target.width - doc.canvas.width * scale) / 2;
       const dy = (target.height - doc.canvas.height * scale) / 2;
-      const commands = [{ type: 'update-canvas', patch: { width: target.width, height: target.height } }];
+      const commands = [
+        { type: 'update-canvas', patch: { width: target.width, height: target.height } },
+      ];
       const below = [];
       for (const component of doc.components) {
         const width = Math.max(1, Math.round(component.size.width * scale));

@@ -37,7 +37,10 @@ export function displayPanelMarkup(
   if (profile.brightnessCdM2 !== undefined || profile.ambientLux !== undefined) {
     row(
       text.brightness,
-      [profile.brightnessCdM2 === undefined ? null : `${profile.brightnessCdM2} cd/m²`, profile.ambientLux === undefined ? null : `${profile.ambientLux} lux`]
+      [
+        profile.brightnessCdM2 === undefined ? null : `${profile.brightnessCdM2} cd/m²`,
+        profile.ambientLux === undefined ? null : `${profile.ambientLux} lux`,
+      ]
         .filter((part): part is string => part !== null)
         .join(' / '),
     );

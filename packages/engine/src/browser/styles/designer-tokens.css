@@ -173,7 +173,9 @@
   /* 卡片三层栈：描边 + 2px 微抬 + 8px 远距 + 内侧浅色高光（Geist 的「从内部发光」）。 */
   --designer-elev-card: var(
     --base-screen-designer-elev-card,
-    0 0 0 1px rgb(0 0 0 / 8%), 0 2px 2px rgb(0 0 0 / 4%), 0 8px 8px -8px rgb(0 0 0 / 4%),
+    0 0 0 1px rgb(0 0 0 / 8%),
+    0 2px 2px rgb(0 0 0 / 4%),
+    0 8px 8px -8px rgb(0 0 0 / 4%),
     inset 0 0 0 1px var(--designer-surface-control)
   );
 
@@ -254,7 +256,9 @@
   /* 黑夜的卡片栈把「内侧高光」换成比卡片底亮一档的 control 底，暗面上才看得出内圈。 */
   --designer-elev-card: var(
     --base-screen-designer-elev-card,
-    0 0 0 1px rgb(245 245 245 / 15%), 0 2px 2px rgb(0 0 0 / 40%), 0 8px 8px -8px rgb(0 0 0 / 45%),
+    0 0 0 1px rgb(245 245 245 / 15%),
+    0 2px 2px rgb(0 0 0 / 40%),
+    0 8px 8px -8px rgb(0 0 0 / 45%),
     inset 0 0 0 1px var(--designer-surface-control)
   );
 

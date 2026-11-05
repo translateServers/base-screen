@@ -38,6 +38,8 @@ export function readTargetDisplayOverlay(
 }
 
 /** 目标屏验收读数：物理尺寸、视角、最小可读字号；参数缺失的项为 null。 */
-export function readDisplayMetrics(element: DesignerElementHost): DesignerDisplayMetrics | undefined {
+export function readDisplayMetrics(
+  element: DesignerElementHost,
+): DesignerDisplayMetrics | undefined {
   return getDesignerElementState(element).targetDisplayController.readMetrics();
 }
