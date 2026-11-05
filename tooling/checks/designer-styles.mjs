@@ -609,7 +609,10 @@ for (const [subject, state] of rightPaneChildren) {
 
 // 蓝图检查器不在 `.properties` 的子孙规则里（它由 [data-authoring-mode="blueprint"] 选中），
 // 但同样是右栏直接子项，按类名单独校验一次。
-const blueprintGrid = rightPaneChildren.get('.blueprint-inspector') ?? { row: false, column: false };
+const blueprintGrid = rightPaneChildren.get('.blueprint-inspector') ?? {
+  row: false,
+  column: false,
+};
 for (const file of workbenchLayers) {
   const css = source(file).replace(/\/\*[\s\S]*?\*\//g, ' ');
   const rule = /([^{}]+)\{([^{}]*)\}/g;

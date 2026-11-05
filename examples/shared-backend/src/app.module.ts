@@ -1,6 +1,7 @@
 import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { AgentModule } from './agent/agent.module';
 import { AlarmsModule } from './alarms/alarms.module';
 import { AssetsModule } from './assets/assets.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -12,7 +13,6 @@ import { HealthModule } from './health/health.module';
 import { MaterialPackagesModule } from './material-packages/material-packages.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { AgentModule } from './agent/agent.module';
 import { ScreensModule } from './screens/screens.module';
 import { SqliteModule } from './sqlite/sqlite.module';
 

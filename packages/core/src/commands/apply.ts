@@ -1,4 +1,8 @@
-import { type ScreenDocument, screenJsonEquals } from '@base-screen/contracts';
+import {
+  SCREEN_CANVAS_FIELDS,
+  type ScreenDocument,
+  screenJsonEquals,
+} from '@base-screen/contracts';
 import { componentsReferencingDataSources } from '../data/data-source-dependents.js';
 import { prefixDiagnostic, sortDiagnostics } from '../internal/diagnostics.js';
 import { assertCoreValidDocument } from '../internal/document.js';
@@ -28,16 +32,10 @@ import type {
   ScreenTransactionResult,
 } from './types.js';
 
-// canvas patch 字段白名单（ADR-0043：backgroundImage/backgroundImageFit 为可选字段，
+// canvas patch 字段白名单来自契约（`SCREEN_CANVAS_FIELDS`）而不是这里再抄一份：
+// 抄一份的代价是契约新增字段时这里静默拒绝，且没有任何测试会红（ADR-0043：可选字段在
 // patch 中值为 null 表示删除该字段——canvas 全部字段均不可空，null 无歧义）。
-const CANVAS_FIELDS = new Set([
-  'width',
-  'height',
-  'backgroundColor',
-  'background',
-  'backgroundImage',
-  'backgroundImageFit',
-]);
+const CANVAS_FIELDS = new Set<string>(SCREEN_CANVAS_FIELDS);
 
 export function applyScreenDocumentCommand(
   document: ScreenDocument,

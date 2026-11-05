@@ -28,7 +28,7 @@ const FORBIDDEN_TEXT_PROPS = [
 
 /**
  * R2 的扫描范围：官方物料、外围插件物料，以及 harness 的演示物料。
- * 豁免见 `CHART_FURNITURE_EXEMPTIONS`；`tooling/material-mcp-server` 的模板字符串不参与。
+ * 豁免见 `CHART_FURNITURE_EXEMPTIONS`。
  */
 const MATERIAL_GLOBS = ['packages/material/src', 'plugins', 'tooling/verification/browser-harness'];
 

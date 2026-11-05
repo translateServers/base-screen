@@ -1,11 +1,6 @@
 import type { ScreenComponentNode } from '@base-screen/contracts';
+import { compositeOver, parseCssColor, parseCssColorAlpha, type RgbColor } from '@base-screen/core';
 import type { DesignerContrastSample } from '../../../common/validation/designer-guard.js';
-import {
-  compositeOver,
-  parseCssColor,
-  parseCssColorAlpha,
-  type RgbColor,
-} from '@base-screen/core';
 
 /** 单次测量的组件上限：守卫每次文档变更都要跑，不能让它成为长任务。 */
 const MAX_MEASURED_COMPONENTS = 800;

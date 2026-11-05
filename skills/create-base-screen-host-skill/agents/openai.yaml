@@ -1,4 +1,0 @@
-interface:
-  display_name: "创建宿主大屏设计 Skill"
-  short_description: "生成支持在线物料 MCP 与离线兜底的大屏设计 Skill"
-  default_prompt: "使用 $create-base-screen-host-skill 从宿主规范快照生成支持在线物料 MCP 查询与离线兜底的大屏设计 Skill。"

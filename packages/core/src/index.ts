@@ -66,6 +66,7 @@ export {
   collectScreenValueRefDependencies,
   evaluateScreenValueRef,
 } from './data/value-ref.js';
+export * from './diff/screen-diff.js';
 export type {
   ScreenAlignmentDelta,
   ScreenHitTestOptions,
@@ -129,8 +130,6 @@ export type { ScreenInteractionAction, ScreenInteractionState } from './state/in
 export { reduceScreenInteraction } from './state/interaction.js';
 export type { ScreenViewportAction, ScreenViewportState } from './state/viewport.js';
 export { reduceScreenViewport } from './state/viewport.js';
-
+export * from './validation/contrast.js';
 export { ScreenCoreInvariantError } from './validation/invariant-error.js';
 export { validateScreenDocumentSemantics } from './validation/validate-semantics.js';
-export * from './validation/contrast.js';
-export * from './diff/screen-diff.js';

@@ -227,7 +227,11 @@ describe('resolveDesignerKeyboardPolicy', () => {
     ).toEqual({ kind: 'allow' });
     // 只让行这两个键：按钮上的其他快捷键仍然归命令通道。
     expect(
-      key({ event: { key: 'z', ctrlKey: true }, context: { activationTarget: true }, operation: {} }),
+      key({
+        event: { key: 'z', ctrlKey: true },
+        context: { activationTarget: true },
+        operation: {},
+      }),
     ).toMatchObject({ kind: 'command' });
   });
 });

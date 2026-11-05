@@ -323,10 +323,11 @@
 
 .material-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(104px, 100%), 1fr));
+  /* 72px 是「缩略图 + 两到三字名称」的下限，也是默认左栏排满 3 列的安全上限：
+     内容区约 248px = 72×3 + 8×2 + 余量；1024 档左栏排 2 列。列宽再往下名称就开始截断。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(72px, 100%), 1fr));
   align-content: start;
-  /* 原型 --od-gap：卡间 10px（不在 space 令牌列上，保持字面值）。 */
-  gap: calc(var(--designer-space-4) + var(--designer-space-1));
+  gap: var(--designer-space-4);
   margin: 0;
   padding: var(--designer-space-5) var(--designer-space-3) var(--designer-space-7);
   overflow: hidden auto;

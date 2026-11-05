@@ -48,7 +48,8 @@ const RULES: readonly {
   {
     property: 'style.color',
     label: '颜色',
-    pattern: /(?:文字颜色|字体颜色|颜色)\s*(?:改成|改为|设为|设置为|调成|变成)?\s*(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})/,
+    pattern:
+      /(?:文字颜色|字体颜色|颜色)\s*(?:改成|改为|设为|设置为|调成|变成)?\s*(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})/,
     parse: (raw) => raw.toLowerCase(),
   },
 ];

@@ -164,7 +164,6 @@ pnpm dev:react-host         # 终端 2：任选一个前端（vanilla 5173 / rea
 | [react-host](./examples/react-host) | React 宿主前端：react-router、hooks、React 物料桥（样式自包含） | `pnpm dev:react-host`；`pnpm verify:examples` |
 | [vue-host](./examples/vue-host) | Vue 宿主前端：vue-router、SFC 物料桥；同时是 tarball 外部消费者载体 | `pnpm dev:vue-host`；`pnpm verify:tarball` |
 | [browser-harness](./tooling/verification/browser-harness) | 基座特性矩阵：Viewer、Designer、官方物料、项目适配器与插件管理器组合；导航页 `/cases.html` | `pnpm dev:browser-harness` |
-| [material-mcp-server](./tooling/material-mcp-server) | 面向上层工具链的物料模板 MCP provider | `node tooling/material-mcp-server/server.mjs`；由 `pnpm verify:material-mcp` 验证 |
 
 ## 包结构
 

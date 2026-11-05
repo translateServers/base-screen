@@ -108,9 +108,7 @@ export function revertScreenHistory(
 export function readScreenHistoryNodes(history: ScreenHistoryState): readonly ScreenHistoryNode[] {
   assertHistory(history);
   const current = history.past.length;
-  const nodes: ScreenHistoryNode[] = [
-    { index: 0, position: current === 0 ? 'current' : 'past' },
-  ];
+  const nodes: ScreenHistoryNode[] = [{ index: 0, position: current === 0 ? 'current' : 'past' }];
   history.past.forEach((entry, position) => {
     const index = position + 1;
     nodes.push({

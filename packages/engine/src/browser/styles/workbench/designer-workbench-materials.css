@@ -1,5 +1,8 @@
-/* 物料卡片：大缩略图 + 名称行；交互只改边框/阴影/图标缩放等绘制属性，几何恒定。 */
+/* 物料卡片：紧凑缩略图 + 名称行；交互只改边框/阴影/图标缩放等绘制属性，几何恒定。
+   `position: relative` 是类型覆盖层的定位上下文——类型不再占一行布局，改为悬浮在缩略图上，
+   卡片的可见信息只留「图 + 名」，这是同类工具（Figma / Webflow 物料面板）的密度基线。 */
 .material-card {
+  position: relative;
   display: flex;
   width: 100%;
   min-width: 0;
@@ -36,7 +39,10 @@
   z-index: 1;
 }
 
-/* 缩略图（原型 .material-thumb）：中性底 + 网格纹理，深浅主题共用一套；识别色留给图标。 */
+/* 缩略图（原型 .material-thumb）：中性底 + 网格纹理，深浅主题共用一套；识别色留给图标。
+   比例必须保留：封面适配（ADR-0041）按「容器 vs 图片」宽高比做一次性决策，
+   容器一旦变成超宽条，正常比例的封面会被判为异形而退成 contain、留出大片信箱边。
+   密度靠列数拿，不靠压扁缩略图。 */
 .material-thumb {
   position: relative;
   display: grid;
@@ -116,7 +122,7 @@
   object-fit: contain;
 }
 
-/* 名称与类型分两行，避免两个关键标识在窄卡片内互相挤压。 */
+/* 名称单行：卡片只留「图 + 名」两段可见信息，类型不再占一行布局。 */
 .material-card-meta {
   display: grid;
   min-width: 0;
@@ -124,28 +130,22 @@
   padding: 0 var(--designer-space-1) var(--designer-space-1);
 }
 
+/* 名称用 12px 而非 13px：3 列下名称列只有约 61px，13px 只放得下 4 个字，
+   「ECharts 图表」这类名字会被截成「ECharts …」。12px 多容一个字，且仍在体系的小字档内。 */
 .material-name {
   min-width: 0;
   overflow: hidden;
   color: var(--designer-text-primary);
   font: var(--designer-font-small);
-  font-size: var(--designer-font-size-base);
   font-weight: 600;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* 类型是给开发看的标识（`base.rectangle`），不是设计面信息：DOMM 里保留节点与 data-tip
+   供命令面板和测试取用，但视觉上不占位。完整标识改由卡片自身的悬浮提示承载——
+   那样每张卡片省下一行，一屏可见物料数翻倍。 */
 .material-type {
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-numeric);
-  font-size: var(--designer-font-size-xs);
-  font-weight: 400;
-  line-height: 1.2;
-  letter-spacing: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none;
 }

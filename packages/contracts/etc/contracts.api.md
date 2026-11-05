@@ -29,6 +29,12 @@ export function isBoundedScreenImageUrl(value: unknown, maxCodePoints?: number):
 export function isScreenAuthoringRequest(value: unknown): value is ScreenAuthoringRequest;
 
 // @public
+export function isScreenCanvasBackground(value: unknown): value is ScreenCanvasBackground;
+
+// @public (undocumented)
+export function isScreenCanvasPaletteColor(value: unknown): value is string;
+
+// @public
 export function isScreenComponentId(value: unknown): value is string;
 
 // @public (undocumented)
@@ -217,6 +223,12 @@ export const SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY = "blueprint.actio
 
 // @public (undocumented)
 export const SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY = "blueprint.trigger.material-event";
+
+// @public
+export const SCREEN_CANVAS_BACKGROUND_TYPES: readonly ScreenCanvasBackground['type'][];
+
+// @public
+export const SCREEN_CANVAS_FIELDS: readonly ['width', 'height', 'backgroundColor', 'background', 'backgroundImage', 'backgroundImageFit'];
 
 // @public (undocumented)
 export const SCREEN_DOCUMENT_JSON_SCHEMA: ScreenJsonObject;
@@ -1122,9 +1134,62 @@ export interface ScreenHostResourceResolveOptions {
 }
 
 // @public
+export type ScreenIntentReference = {
+    readonly kind: 'asset';
+    readonly assetId: string;
+    readonly name?: string;
+} | {
+    readonly kind: 'dataset';
+    readonly datasetId: string;
+    readonly name?: string;
+};
+
+// @public (undocumented)
+export interface ScreenIntentReferenceCatalogPage {
+    // (undocumented)
+    readonly items: readonly ScreenIntentReferenceOption[];
+    readonly total?: number;
+}
+
+// @public (undocumented)
+export interface ScreenIntentReferenceCatalogPort {
+    // (undocumented)
+    catalog(request: ScreenIntentReferenceCatalogRequest): Promise<ScreenParseResult<ScreenIntentReferenceCatalogPage>>;
+}
+
+// @public
+export interface ScreenIntentReferenceCatalogRequest {
+    // (undocumented)
+    readonly kinds: readonly ScreenIntentReferenceKind[];
+    readonly limit?: number;
+    readonly offset?: number;
+    readonly query?: string;
+    // (undocumented)
+    readonly signal: ScreenAbortSignal;
+}
+
+// @public
+export type ScreenIntentReferenceKind = 'asset' | 'dataset';
+
+// @public
+export interface ScreenIntentReferenceOption {
+    readonly groupId?: string;
+    readonly id: string;
+    // (undocumented)
+    readonly kind: ScreenIntentReferenceKind;
+    // (undocumented)
+    readonly label: string;
+    // (undocumented)
+    readonly note?: string;
+    // (undocumented)
+    readonly thumbnailUrl?: string;
+}
+
+// @public
 export interface ScreenIntentRequest {
     // (undocumented)
     readonly instanceId: string;
+    readonly references?: readonly ScreenIntentReference[];
     // (undocumented)
     readonly scope: ScreenIntentScope;
     // (undocumented)

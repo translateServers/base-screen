@@ -1,8 +1,10 @@
 import { Logger } from '@nestjs/common';
 import {
+  type AgentCanvasBackground,
   type AgentCanvasPatch,
   type AgentCanvasState,
   isCanvasInstruction,
+  MAX_GRADIENT_STOPS,
   matchCanvasInstruction,
   parseCanvasColor,
 } from './agent-canvas';
@@ -89,6 +91,57 @@ const MAX_SUGGESTION_LENGTH = 120;
 const GENERATION_INTENT =
   /^(?:请|帮我|帮忙|给我|麻烦)?\s*(?:生成|做|来|建|创建|新建|设计|重做|重新设计|换一版|出一张|出一屏|出个)/;
 
+/**
+ * 背景形态与结构：与契约 `ScreenCanvas.background` 同形。
+ *
+ * 后端是 CJS 且刻意不依赖契约包，所以这是一份"必须与契约一致"的副本——不一致的代价
+ * 不是报错，而是模型在工具 schema 里看不到渐变，于是把"改成渐变"回答成"只支持纯色"。
+ * 一致性由根级 `tests/examples/canvas-background-parity.test.ts` 逐类型比对：契约新增
+ * 形态时那条测试直接红。
+ */
+export const AGENT_CANVAS_BACKGROUND_TYPES = [
+  'solid',
+  'linear-gradient',
+  'radial-gradient',
+] as const;
+
+export const AGENT_CANVAS_BACKGROUND_SCHEMA = {
+  type: 'object',
+  description:
+    '背景填充。纯色：{type:"solid",color}；线性渐变：{type:"linear-gradient",angle,stops}；径向渐变：{type:"radial-gradient",position:{x,y},stops}。stops 至少两个色标且 position 严格递增。用户说"渐变的某色"时用它，不要让用户改给图片 URL。',
+  properties: {
+    type: { type: 'string', enum: [...AGENT_CANVAS_BACKGROUND_TYPES] },
+    color: { type: 'string', description: '仅 solid 使用：十六进制色值' },
+    angle: {
+      type: 'number',
+      description: '仅 linear-gradient 使用：0-360 度，180 为自上而下（大屏常用默认）',
+    },
+    position: {
+      type: 'object',
+      description: '仅 radial-gradient 使用：圆心百分比坐标',
+      properties: { x: { type: 'number' }, y: { type: 'number' } },
+      required: ['x', 'y'],
+      additionalProperties: false,
+    },
+    stops: {
+      type: 'array',
+      minItems: 2,
+      maxItems: 8,
+      items: {
+        type: 'object',
+        properties: {
+          color: { type: 'string', description: '十六进制色值，例如 #87ceeb' },
+          position: { type: 'number', description: '0-100，严格递增' },
+        },
+        required: ['color', 'position'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['type'],
+  additionalProperties: false,
+} as const;
+
 export const AGENT_ACTION_TOOLS = [
   {
     type: 'function',
@@ -102,11 +155,16 @@ export const AGENT_ACTION_TOOLS = [
     type: 'function',
     function: {
       name: 'set_canvas',
-      description: '只改画布：背景色、背景图。不新增、不删除、不修改任何组件。',
+      description:
+        '只改画布：背景纯色、线性/径向渐变、背景图（含清除）。不新增、不删除、不修改任何组件。',
       parameters: {
         type: 'object',
         properties: {
-          backgroundColor: { type: 'string', description: '十六进制颜色，例如 #0f172a' },
+          backgroundColor: {
+            type: 'string',
+            description: '纯色背景的十六进制颜色，例如 #0f172a。它不会清除已设置的渐变。',
+          },
+          background: AGENT_CANVAS_BACKGROUND_SCHEMA,
           backgroundImage: {
             type: ['string', 'null'],
             description: '背景图 URL；null 表示清除背景图',
@@ -175,7 +233,7 @@ export async function routeAgentAction(input: RouteAgentActionInput): Promise<Ag
       action: 'unsupported',
       routedBy: 'rule',
       reason: 'not_implemented',
-      suggestion: '画布没有变化：换个颜色（例如 #87ceeb）或给出 https 背景图地址。',
+      suggestion: '画布没有变化：换个颜色（例如 #87ceeb）、换一种渐变，或给出 https 背景图地址。',
     };
   }
 
@@ -201,7 +259,7 @@ async function routeWithModel(
       routedBy: 'rule',
       reason: 'model_unavailable',
       suggestion:
-        '试试更直接的指令：把背景改成 #0f172a / 做一张华东销售大屏 / 先选中组件再改文案。',
+        '试试更直接的指令：把背景改成 #0f172a / 把背景改成渐变的天蓝色 / 做一张华东销售大屏 / 先选中组件再改文案。',
     };
   }
 
@@ -238,7 +296,8 @@ async function routeWithModel(
     action: 'unsupported',
     routedBy: 'model',
     reason: 'not_implemented',
-    suggestion: '没听懂要改哪里。可以选中组件后再说，或直接说"把背景改成 #0f172a"。',
+    suggestion:
+      '没听懂要改哪里。可以选中组件后再说，或直接说"把背景改成 #0f172a""背景改成渐变的天蓝色"。',
   };
 }
 
@@ -254,6 +313,7 @@ async function routeWithJsonPrompt(
 
 只输出一个 JSON 对象，不要解释。可用 action：${allowed.join('、')}。
 示例：{"action":"generate_screen"} / {"action":"set_canvas","backgroundColor":"#0f172a"} /
+{"action":"set_canvas","background":{"type":"linear-gradient","angle":180,"stops":[{"color":"#87ceeb","position":0},{"color":"#a8ddf5","position":100}]}} /
 {"action":"unsupported","reason":"not_implemented","suggestion":"先选中组件再改文案"}。`,
     buildRouteUserPrompt(input.text, input.scope, input.digest),
     input.logger,
@@ -346,9 +406,18 @@ function readDecision(
 function readCanvasPatch(args: Record<string, unknown>): AgentCanvasPatch | null {
   const patch: {
     backgroundColor?: string;
+    background?: AgentCanvasBackground | null;
     backgroundImage?: string | null;
     backgroundImageFit?: 'cover' | 'contain' | null;
   } = {};
+
+  if (args.background !== undefined) {
+    // null 表示清除背景填充（回到 backgroundColor）；非法结构明确拒绝，
+    // 不能悄悄丢掉——丢掉的后果是用户看到"画布已经是你说的样子"。
+    const background = args.background === null ? null : readCanvasBackground(args.background);
+    if (args.background !== null && background === null) return null;
+    patch.background = background;
+  }
 
   if (args.backgroundColor !== undefined) {
     if (typeof args.backgroundColor !== 'string') return null;
@@ -375,12 +444,63 @@ function readCanvasPatch(args: Record<string, unknown>): AgentCanvasPatch | null
   return Object.keys(patch).length === 0 ? null : patch;
 }
 
+/**
+ * 模型给的背景结构 → 契约同形的值；任何一处不合法都返回 null。
+ *
+ * 规则与契约 schema 一一对应（类型、角度 0-360、色标 2-8 个且 position 严格递增、
+ * 色值必须是合法十六进制），因为越界的值进文档后只会被 core 拒绝或渲染成透明。
+ */
+function readCanvasBackground(value: unknown): AgentCanvasBackground | null {
+  if (!isRecord(value)) return null;
+  const type = value.type;
+  if (type === 'solid') {
+    const color = typeof value.color === 'string' ? parseCanvasColor(value.color) : null;
+    return color === null ? null : { type: 'solid', color };
+  }
+  const stops = readColorStops(value.stops);
+  if (stops === null) return null;
+  if (type === 'linear-gradient') {
+    const angle = readBoundedNumber(value.angle, 0, 360);
+    return angle === null ? null : { type: 'linear-gradient', angle, stops };
+  }
+  if (type === 'radial-gradient') {
+    if (!isRecord(value.position)) return null;
+    const x = readBoundedNumber(value.position.x, 0, 100);
+    const y = readBoundedNumber(value.position.y, 0, 100);
+    if (x === null || y === null) return null;
+    return { type: 'radial-gradient', position: { x, y }, stops };
+  }
+  return null;
+}
+
+function readColorStops(value: unknown): readonly { color: string; position: number }[] | null {
+  if (!Array.isArray(value) || value.length < 2 || value.length > MAX_GRADIENT_STOPS) return null;
+  const stops: { color: string; position: number }[] = [];
+  for (const [index, item] of value.entries()) {
+    if (!isRecord(item)) return null;
+    const color = typeof item.color === 'string' ? parseCanvasColor(item.color) : null;
+    const position = readBoundedNumber(item.position, 0, 100);
+    if (color === null || position === null) return null;
+    const previous = stops[index - 1];
+    if (previous !== undefined && previous.position >= position) return null;
+    stops.push({ color, position });
+  }
+  return stops;
+}
+
+function readBoundedNumber(value: unknown, min: number, max: number): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max
+    ? value
+    : null;
+}
+
 function buildRouteSystemPrompt(digest: unknown, allowed: readonly AgentActionName[]): string {
   const actionHints = allowed
     .map((action) => {
       if (action === 'generate_screen')
         return '- generate_screen：用户要一屏新内容，或明确要求重新设计';
-      if (action === 'set_canvas') return '- set_canvas：只改画布背景色/背景图，不动组件';
+      if (action === 'set_canvas')
+        return '- set_canvas：只改画布（背景纯色、线性/径向渐变、背景图），不动组件';
       if (action === 'edit_components') return '- edit_components：只改当前选中的组件';
       return '- unsupported：做不到、缺信息，或需要用户先选中组件';
     })
@@ -394,7 +514,9 @@ ${actionHints}
 ${describeDigest(digest)}
 
 约束：
-- 只改背景色/背景图，选 set_canvas；不要因为"改"字就选 generate_screen。
+- 只改背景（纯色、渐变）或背景图，选 set_canvas；不要因为"改"字就选 generate_screen。
+- 画布支持纯色、线性渐变、径向渐变三种背景填充，"改成渐变"是合法需求，不要回答不支持，
+  也不要让用户改用背景图片。
 - 要新内容、新主题、重新设计，才选 generate_screen。
 - 语气模糊、缺少对象（"再大一点""改好看点"）选 unsupported，并在 suggestion 里给出可执行说法。
 - 不确定时选 unsupported，禁止用 generate_screen 试探。`;
@@ -416,8 +538,11 @@ export function describeDigest(digest: unknown): string {
     if (width !== undefined && height !== undefined) {
       const background =
         typeof canvas.backgroundColor === 'string' ? `，底色 ${canvas.backgroundColor}` : '';
+      // 渐变存在与否直接决定"改成渐变"是不是有效指令，提示词里必须说清楚。
+      const fill =
+        typeof canvas.backgroundType === 'string' ? `，填充 ${canvas.backgroundType}` : '';
       const image = canvas.hasBackgroundImage === true ? '，已有背景图' : '';
-      lines.push(`当前画布：${width}×${height}${background}${image}`);
+      lines.push(`当前画布：${width}×${height}${background}${fill}${image}`);
     }
   }
   const componentCount =
@@ -462,6 +587,7 @@ function readCanvasState(value: unknown): AgentCanvasState {
     ...(typeof value.backgroundColor === 'string'
       ? { backgroundColor: value.backgroundColor }
       : {}),
+    ...(isRecord(value.background) ? { background: value.background } : {}),
     ...(typeof value.hasBackgroundImage === 'boolean'
       ? { hasBackgroundImage: value.hasBackgroundImage }
       : {}),

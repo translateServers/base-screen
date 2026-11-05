@@ -33,6 +33,7 @@ import type { ScreenHostDatasetPort } from '@base-screen/contracts';
 import { ScreenHostResourceDataSource } from '@base-screen/contracts';
 import { ScreenHostResourceParameter } from '@base-screen/contracts';
 import type { ScreenHostResourcePort } from '@base-screen/contracts';
+import type { ScreenIntentReferenceCatalogPort } from '@base-screen/contracts';
 import type { ScreenIntentRequest } from '@base-screen/contracts';
 import { ScreenInteractionState } from '@base-screen/core';
 import { ScreenJsonObject } from '@base-screen/contracts';
@@ -694,7 +695,9 @@ export class BaseScreenDesignerElement extends ElementBase {
     setActiveScene(sceneId: string | undefined): void;
     setCanvasBackground(background: ScreenCanvasBackground | null): ScreenParseResult<ScreenDocument>;
     setCanvasBackgroundImage(backgroundImage: string | null, fit?: ScreenCanvasBackgroundImageFit): ScreenParseResult<ScreenDocument>;
+    // (undocumented)
     setIntentHandler(handler: DesignerIntentHandler | undefined): void;
+    setIntentReferenceCatalog(catalog: ScreenIntentReferenceCatalogPort | undefined): void;
     setSceneCatalog(scenes: readonly DesignerSceneDescriptor[] | undefined, activeSceneId?: string): ScreenParseResult<null>;
     setSceneHandler(handler: DesignerSceneHandler | undefined): void;
     // (undocumented)

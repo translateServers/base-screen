@@ -19,6 +19,7 @@ describe('designer workbench structure and layout', () => {
     expect(workbenchCss).toContain('overflow: hidden;');
     expect(baseCss).toContain('grid-row: 1 / 2;');
     expect(workbenchCss).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
+    // 缩略图保留 16:10 比例：封面适配按容器宽高比决策，压扁容器会让正常封面退成 contain。
     expect(workbenchCss).toContain('aspect-ratio: 16 / 10;');
     expect(workbenchCss).toContain('scrollbar-gutter: stable;');
     expect(workbenchCss).toContain('.properties[data-inspector-density="basic"]');

@@ -1,4 +1,9 @@
-import type { ScreenIntentReference, ScreenJsonValue } from '@base-screen/contracts';
+import type {
+  ScreenCanvasBackground,
+  ScreenCanvasBackgroundType,
+  ScreenIntentReference,
+  ScreenJsonValue,
+} from '@base-screen/contracts';
 import type {
   AgentGenerateShape,
   DatasetCatalog,
@@ -119,9 +124,10 @@ export interface AgentComponentEditShape {
   readonly failure?: string;
 }
 
-/** 画布 patch：与 `update-canvas` 的白名单一致，`null` 表示清除背景图。 */
+/** 画布 patch：字段与 `update-canvas` 一致，`null` 表示清除。形态由契约判定。 */
 export interface AgentCanvasPatchShape {
   readonly backgroundColor?: string;
+  readonly background?: ScreenCanvasBackground | null;
   readonly backgroundImage?: string | null;
   readonly backgroundImageFit?: 'cover' | 'contain' | null;
 }
@@ -137,6 +143,7 @@ export interface AgentScreenDigestShape {
     readonly width: number;
     readonly height: number;
     readonly backgroundColor: string;
+    readonly backgroundType?: ScreenCanvasBackgroundType;
     readonly hasBackgroundImage: boolean;
   };
   readonly componentCount: number;
@@ -159,6 +166,7 @@ export interface AgentActInputShape {
   readonly references?: readonly ScreenIntentReference[];
   readonly canvas?: {
     readonly backgroundColor?: string;
+    readonly background?: ScreenCanvasBackground;
     readonly hasBackgroundImage?: boolean;
   };
   readonly context?: AgentScreenDigestShape;

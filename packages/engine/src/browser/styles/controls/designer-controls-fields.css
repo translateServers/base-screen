@@ -6,9 +6,11 @@
   font: var(--designer-font-small);
 }
 
-/* 右栏检查器字段密度：行高 34px、正文档读数；几何网格另行收紧到 28px。 */
+/* 右栏检查器字段密度：行高 30px（与 --designer-control-height 对齐）、正文档读数；
+   几何网格另行收紧到 28px。行距本身已经收到 4px（见 inspector.css），再压就要靠减控件高度，
+   所以这里只把行盒从 34 收到 30——多出来的 4px 是历史遗留的安全余量，控件并不需要。 */
 .inspector-pane .designer-field {
-  min-height: 34px;
+  min-height: 30px;
   color: var(--designer-text-secondary);
   font: var(--designer-font);
 }

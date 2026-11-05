@@ -76,7 +76,8 @@ const canvasGradientStopsSchema = z
     }
   });
 
-const canvasBackgroundSchema = z.union([
+/** 背景形态的权威定义：`SCREEN_CANVAS_BACKGROUND_TYPES` 由它派生，见 `canvas-background.ts`。 */
+export const canvasBackgroundSchema = z.union([
   z.strictObject({ type: z.literal('solid'), color: canvasBackgroundColorSchema }),
   z.strictObject({
     type: z.literal('linear-gradient'),

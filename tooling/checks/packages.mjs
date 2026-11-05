@@ -93,7 +93,9 @@ function assertM0Package(directory, definition) {
   const manifest = readPackage(directory);
   const expectedSideEffects = definition.sideEffects ?? false;
 
-  if (manifest.name !== definition.name || manifest.version !== '0.0.0') {
+  // 版本不在这里断言：版本是 changesets 的单一来源（release 会把它从 0.0.0 抬到基线段），
+  // 在这里钉死一个具体值只会在 release 之后立刻把 M0 门禁变红，且没有额外保护。
+  if (manifest.name !== definition.name) {
     fail('PACKAGE_NAME_MISMATCH', directory);
   }
   if (manifest.private !== true || manifest.type !== 'module') {

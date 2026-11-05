@@ -42,6 +42,12 @@ export {
   screenBlueprintEffectTargetKind,
 } from './document/blueprint-relations.js';
 export {
+  isScreenCanvasBackground,
+  isScreenCanvasPaletteColor,
+  SCREEN_CANVAS_BACKGROUND_TYPES,
+  SCREEN_CANVAS_FIELDS,
+} from './document/canvas-background.js';
+export {
   diagnoseDataSourceCycles,
   screenDataSourceOrder,
 } from './document/data-source-order.js';

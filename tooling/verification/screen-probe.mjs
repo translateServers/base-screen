@@ -354,15 +354,9 @@ function parseArgs(argv) {
     const name = token.startsWith('--') ? token.slice(2) : undefined;
     if (
       name === undefined ||
-      ![
-        'url',
-        'out',
-        'min-contrast',
-        'min-font-px',
-        'timeout',
-        'max-ttv',
-        'baseline',
-      ].includes(name)
+      !['url', 'out', 'min-contrast', 'min-font-px', 'timeout', 'max-ttv', 'baseline'].includes(
+        name,
+      )
     )
       throw new Error(`Unknown argument: ${token}`);
     const value = argv[index + 1];
@@ -381,7 +375,8 @@ async function resolveTimeBudget(args) {
   const limits = [];
   if (args['max-ttv'] !== undefined) {
     const value = Number(args['max-ttv']);
-    if (!Number.isFinite(value) || value <= 0) throw new Error('--max-ttv must be a positive number.');
+    if (!Number.isFinite(value) || value <= 0)
+      throw new Error('--max-ttv must be a positive number.');
     limits.push({ limitMs: value, source: 'max-ttv' });
   }
   if (args.baseline !== undefined) {
@@ -393,9 +388,7 @@ async function resolveTimeBudget(args) {
     limits.push({ limitMs: Math.round(previous * 1.1), source: 'baseline' });
   }
   if (limits.length === 0) return { limitMs: undefined, source: 'none' };
-  return limits.reduce((strictest, item) =>
-    item.limitMs < strictest.limitMs ? item : strictest,
-  );
+  return limits.reduce((strictest, item) => (item.limitMs < strictest.limitMs ? item : strictest));
 }
 
 async function main() {

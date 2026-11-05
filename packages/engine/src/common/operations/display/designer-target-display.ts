@@ -89,15 +89,13 @@ export function computeAngularSize(
 }
 
 /** 最小可读字号：观距决定字高，点间距把毫米换回逻辑像素。 */
-export function computeMinimumLegibleFontPx(
-  profile: ScreenTargetDisplayProfile,
-): number | null {
+export function computeMinimumLegibleFontPx(profile: ScreenTargetDisplayProfile): number | null {
   const distanceM = profile.viewingDistanceM;
   const pitch = profile.pixelPitchMm;
   if (distanceM === undefined || !(distanceM > 0) || pitch === undefined || !(pitch > 0)) {
     return null;
   }
-  const capMm = (distanceM * 1000) * LEGIBLE_CAP_TO_DISTANCE;
+  const capMm = distanceM * 1000 * LEGIBLE_CAP_TO_DISTANCE;
   return (capMm * FONT_SIZE_TO_CAP) / pitch;
 }
 
