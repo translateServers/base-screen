@@ -1,4 +1,4 @@
-import { designerIcon } from '../ui/designer-icons.js';
+import { designerIcon } from '../dom/designer-icons.js';
 
 /**
  * 自绘下拉（设计原型 .select）：触发器 + 自绘弹层，隐藏的原生 select 承担取值与事件。

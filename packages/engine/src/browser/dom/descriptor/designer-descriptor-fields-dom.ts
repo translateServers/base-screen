@@ -2,7 +2,7 @@ import type {
   BaseScreenMaterialEditorField,
   BaseScreenMaterialEditorSection,
 } from '@base-screen/plugin-core';
-import { designerIcon } from '../../ui/designer-icons.js';
+import { designerIcon } from '../../dom/designer-icons.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
 import { createDesignerFieldRow } from '../designer-field-primitives.js';
 import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';

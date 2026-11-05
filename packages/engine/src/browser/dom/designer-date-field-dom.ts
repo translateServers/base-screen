@@ -1,5 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../ui/designer-icons.js';
+import { designerIcon } from '../dom/designer-icons.js';
 
 /**
  * 日期字段：输入框 + 锚定触发器 + 自绘日历弹层（设计原型 .datefield / .cal-popover）。

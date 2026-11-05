@@ -2,7 +2,7 @@ import { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT } from '../../../common/oper
 import { DESIGNER_OPERATION_TEXT } from '../../../common/operations/designer-operation-registry.js';
 import { DESIGNER_TOOLS, getDesignerToolShortcut } from '../../../common/tools/designer-tools.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { designerIcon, designerToolGlyph } from '../../ui/designer-icons.js';
+import { designerIcon, designerToolGlyph } from '../../dom/designer-icons.js';
 import {
   actionButton,
   coordinateEntryField,

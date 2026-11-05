@@ -2,7 +2,7 @@ import type { ScreenJsonValue } from '@base-screen/contracts';
 import type { BaseScreenMaterialPropSchema } from '@base-screen/plugin-core';
 import type { DesignerInspectorContext } from '../../../common/operations/style/designer-inspector.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import type { DesignerIconName } from '../../ui/designer-icons.js';
+import type { DesignerIconName } from '../../dom/designer-icons.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
 import {
   appendDesignerRangeField,

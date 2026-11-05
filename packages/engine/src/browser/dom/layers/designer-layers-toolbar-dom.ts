@@ -1,5 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import type { DesignerIconName } from '../../ui/designer-icons.js';
+import type { DesignerIconName } from '../../dom/designer-icons.js';
 import { createDesignerIconButton } from '../designer-ui-primitives.js';
 
 export type DesignerLayerArrangeAction = 'front' | 'up' | 'down' | 'back';

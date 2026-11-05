@@ -6,7 +6,7 @@ import type {
   BaseScreenBlueprintCanvasTrace,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { type DesignerIconName, designerIcon } from '../../ui/designer-icons.js';
+import { type DesignerIconName, designerIcon } from '../../dom/designer-icons.js';
 import { escapeHtml } from './designer-blueprint-dom-helpers.js';
 import { renderDesignerBlueprintConfiguration } from './designer-blueprint-inspector-configuration.js';
 

@@ -1,5 +1,5 @@
 import type { DesignerPluginCommandItem } from '../../../common/operations/plugin/designer-plugin-commands.js';
-import { designerIcon } from '../../ui/designer-icons.js';
+import { designerIcon } from '../../dom/designer-icons.js';
 import { escapeHtml } from '../designer-html-escape.js';
 import type { DesignerMenuControllerCallbacks } from './designer-menu-model.js';
 

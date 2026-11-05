@@ -1,4 +1,4 @@
-import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
+import { type DesignerIconName, designerIcon } from '../dom/designer-icons.js';
 
 /** Private, stateless DOM primitives for Designer chrome. Never export from the package root. */
 export type DesignerButtonVariant =

@@ -1,7 +1,7 @@
 import type { ScreenDocument, ScreenVariable } from '@base-screen/contracts';
 import { readDesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
+import { type DesignerIconName, designerIcon } from '../dom/designer-icons.js';
 import { createDesignerButton, createDesignerIconButton } from './designer-ui-primitives.js';
 import {
   appendVariableDetails,

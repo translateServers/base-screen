@@ -12,7 +12,7 @@
  *    手动展开在段重建后丢失"，而它在单测里不会红、只会在浏览器里超时。
  */
 
-import { designerIcon } from '../../ui/designer-icons.js';
+import { designerIcon } from '../../dom/designer-icons.js';
 
 /** 6 个 DOM 组（视觉上「数据源 + 宿主连接」合成 1 组 = 5 个视觉组）。 */
 export type DesignerDataGroupKey =

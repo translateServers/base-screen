@@ -15,8 +15,8 @@ import {
   BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import type { DesignerIconName } from '../../ui/designer-icons.js';
-import { designerIcon } from '../../ui/designer-icons.js';
+import type { DesignerIconName } from '../../dom/designer-icons.js';
+import { designerIcon } from '../../dom/designer-icons.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
   createDesignerButton,
