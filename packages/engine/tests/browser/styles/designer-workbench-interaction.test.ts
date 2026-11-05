@@ -357,13 +357,16 @@ describe('designer workbench interaction and accessibility', () => {
     expect(workbenchCss).toContain(
       '[data-error-console-summary][data-error-console-tone="warning"]',
     );
-    // 缩略图保留 16:10 比例：封面适配按容器宽高比决策，压扁容器会让正常封面退成 contain。
-    expect(materialCardsCss).toContain('aspect-ratio: 16 / 10;');
-    // 纵向功能轨和分类列以外，卡片以 72px 为最小宽度自适应列数（默认左栏 3 列、1024 档 2 列）；
-    // min(72px, 100%) 保证最窄面板下卡片不超出内容区。
+    // 缩略图比例与网格下限是「图墙卡片几何」令牌（designer-tokens.css）：物料卡与宿主素材卡
+    // 共用同一份，值只在令牌里出现一次。比例仍锁 16:10——封面适配按容器宽高比决策，压扁容器
+    // 会让正常封面退成 contain。
+    expect(materialCardsCss).toContain('aspect-ratio: var(--designer-card-thumb-aspect);');
     expect(materialCardsCss).toContain(
-      'grid-template-columns: repeat(auto-fill, minmax(min(72px, 100%), 1fr));',
+      'grid-template-columns: repeat(auto-fill, minmax(min(var(--designer-card-min-width), 100%), 1fr));',
     );
+    expect(tokensCss).toContain('--designer-card-min-width: 112px;');
+    expect(tokensCss).toContain('--designer-card-thumb-aspect: 16 / 10;');
+    expect(tokensCss).toContain('--designer-card-gap: var(--designer-space-5);');
     expect(workbenchCss).toContain('.material-library-toolbar {');
     expect(workbenchCss).toContain('grid-template-rows: auto minmax(0, 1fr);');
     expect(materialCardsCss).toContain('overflow: hidden auto;');

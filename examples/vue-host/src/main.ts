@@ -5,6 +5,8 @@ import { registerHostMaterials } from './screen/register';
 import './styles/base.css';
 import './styles/layout.css';
 import './styles/components.css';
+// 公共令牌层（--bs-host-*）：必须先于宿主样式加载，asset-library.css 只做别名。
+import '@base-screen/sdk/host-tokens.css';
 import './styles/asset-library.css';
 import './styles/online-materials.css';
 

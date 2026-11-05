@@ -692,3 +692,23 @@ for (const match of css.matchAll(/var\(\s*(--designer-[a-z0-9-]+)\s*\)/g)) {
 if (unresolvedTokens.size > 0) {
   throw new Error(`DESIGNER_STYLE_TOKEN_UNRESOLVED:${[...unresolvedTokens].sort().join(',')}`);
 }
+
+// 物料分组内联导航的降级阈值有两份载体：controller 常量（JS 决定弹层/内联）与容器查询
+// （CSS 决定布局）。两份漂移时不会报错，只会出现「CSS 已降级但 JS 仍按内联渲染」这种
+// 点不开弹层的错位。历史上这类阈值从不缺一次漏改，所以直接比对数值。
+const groupBreakpoint = /@container material-library \(width < (\d+)px\)/.exec(
+  source('packages/engine/src/browser/styles/base/designer-base-material-groups.css'),
+);
+const groupBreakpointConstant = /MATERIAL_GROUP_INLINE_MIN_WIDTH = (\d+)/.exec(
+  source(
+    'packages/engine/src/browser/controllers/panel/designer-material-group-popover-controller.ts',
+  ),
+);
+if (groupBreakpoint === null || groupBreakpointConstant === null) {
+  throw new Error('DESIGNER_STYLE_MATERIAL_GROUP_BREAKPOINT_MISSING');
+}
+if (groupBreakpoint[1] !== groupBreakpointConstant[1]) {
+  throw new Error(
+    `DESIGNER_STYLE_MATERIAL_GROUP_BREAKPOINT_DRIFT:${groupBreakpoint[1]}!=${groupBreakpointConstant[1]}`,
+  );
+}

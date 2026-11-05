@@ -1,0 +1,136 @@
+/* 宿主公共令牌层（--bs-host-*），由 tooling/build/host-tokens.mjs 从
+   packages/engine/src/browser/styles/designer-tokens.css 生成，勿手改。
+   契约：名字是公共 API，值随视觉调优演进而变；说明见 docs/design/host-public-tokens.md。 */
+
+/* 深色（默认）：与设计器裸 :host 主题一致。这里只声明自定义属性 + color-scheme，
+   不写任何组件样式，也不改宿主元素的既有表现。 */
+:where(.bs-host) {
+  color-scheme: dark;
+
+  --bs-host-surface-workspace: #1e1e1e;
+  --bs-host-surface-panel: #0f0f0f;
+  --bs-host-surface-raised: #080808;
+  --bs-host-surface-control: #161616;
+  --bs-host-surface-control-hover: #2a2a2a;
+  --bs-host-surface-control-active: #323232;
+  --bs-host-surface-overlay: #262626;
+  --bs-host-surface-canvas: #282828;
+  --bs-host-surface-scrim: rgb(0 0 0 / 70%);
+  --bs-host-text-primary: #f5f5f5;
+  --bs-host-text-secondary: #b7b7b7;
+  --bs-host-text-muted: #aeaeae;
+  --bs-host-text-disabled: #7d7d7d;
+  --bs-host-text-on-accent: #1c2b40;
+  --bs-host-border-subtle: rgb(245 245 245 / 10%);
+  --bs-host-border-default: rgb(245 245 245 / 15%);
+  --bs-host-border-strong: rgb(245 245 245 / 16%);
+  --bs-host-accent: #5297fc;
+  --bs-host-accent-surface: #161d27;
+  --bs-host-accent-text: #609ffc;
+  --bs-host-focus-ring: #5297fc;
+  --bs-host-elev-ring: 0 0 0 1px rgb(245 245 245 / 15%);
+  --bs-host-shadow-overlay: 0 12px 32px -12px rgb(0 0 0 / 78%);
+  --bs-host-shadow-float: 0 6px 16px -8px rgb(0 0 0 / 70%);
+  --bs-host-success: #4fcb6f;
+  --bs-host-success-surface: #17261b;
+  --bs-host-warning: #e6b221;
+  --bs-host-warning-surface: #292311;
+  --bs-host-danger: #fc675c;
+  --bs-host-danger-surface: #2b1a18;
+  --bs-host-danger-text: #fd7469;
+  --bs-host-action-primary: var(--bs-host-accent);
+  --bs-host-action-primary-hover: color-mix(in oklab, var(--bs-host-accent), white 14%);
+  --bs-host-action-primary-active: color-mix(in oklab, var(--bs-host-accent), white 20%);
+
+  --bs-host-space-1: 2px;
+  --bs-host-space-2: 4px;
+  --bs-host-space-3: 6px;
+  --bs-host-space-4: 8px;
+  --bs-host-space-5: 12px;
+  --bs-host-space-6: 16px;
+  --bs-host-space-7: 24px;
+  --bs-host-space-8: 32px;
+  --bs-host-radius-1: 2px;
+  --bs-host-radius-2: 4px;
+  --bs-host-radius-3: 6px;
+  --bs-host-radius-4: 8px;
+  --bs-host-radius-5: 12px;
+  --bs-host-radius-pill: 999px;
+  --bs-host-radius-control: var(--bs-host-radius-3);
+  --bs-host-radius-overlay: var(--bs-host-radius-4);
+  --bs-host-control-height: 30px;
+  --bs-host-control-height-compact: 28px;
+  --bs-host-control-padding-inline: 9px;
+  --bs-host-icon-size: 16px;
+  --bs-host-icon-size-xs: 12px;
+  --bs-host-icon-size-sm: 14px;
+  --bs-host-icon-size-lg: 18px;
+  --bs-host-row-height: 40px;
+  --bs-host-row-height-comfortable: 44px;
+  --bs-host-row-height-compact: 32px;
+  --bs-host-column-header-height: 40px;
+  --bs-host-card-min-width: 112px;
+  --bs-host-card-gap: var(--bs-host-space-5);
+  --bs-host-card-thumb-aspect: 16 / 10;
+  --bs-host-font-family: "Geist", "Geist Sans", -apple-system, "Segoe UI", Arial, sans-serif;
+  --bs-host-font-family-mono: "Geist Mono", ui-monospace, "SF Mono", "Roboto Mono", Menlo, Monaco, "Liberation Mono",
+    "DejaVu Sans Mono", "Courier New", monospace;
+  --bs-host-font-size-xs: 11px;
+  --bs-host-font-size-sm: 12px;
+  --bs-host-font-size-base: 13px;
+  --bs-host-font-size-md: 14px;
+  --bs-host-font-size-lg: 15px;
+  --bs-host-font-size-xl: 18px;
+  --bs-host-font: var(--bs-host-font-size-base) / 1.5 var(--bs-host-font-family);
+  --bs-host-font-small: var(--bs-host-font-size-sm) / 1.4 var(--bs-host-font-family);
+  --bs-host-font-numeric: 500 var(--bs-host-font-size-sm) / 1 var(--bs-host-font-family-mono);
+  --bs-host-tracking-ui: -0.01em;
+  --bs-host-tracking-base: normal;
+  --bs-host-motion: 150ms cubic-bezier(0.2, 0, 0, 1);
+  --bs-host-motion-emphasis: 200ms cubic-bezier(0.2, 0, 0, 1);
+  --bs-host-scrollbar-thumb: var(--bs-host-border-strong);
+  --bs-host-scrollbar-thumb-hover: var(--bs-host-text-muted);
+  --bs-host-scrollbar-track: transparent;
+  --bs-host-scrollbar-corner: transparent;
+}
+
+/* 浅色：宿主显式写 theme="light"，或作为 base-screen-designer 的 light DOM 子节点跟随
+   设计器主题。:where() 保持零特异性，宿主任何类选择器都能覆盖单个令牌。 */
+:where(.bs-host[theme="light"], base-screen-designer[theme="light"] .bs-host) {
+  color-scheme: light;
+
+  --bs-host-surface-workspace: #f4f4f4;
+  --bs-host-surface-panel: #fcfcfc;
+  --bs-host-surface-raised: #ffffff;
+  --bs-host-surface-control: #f7f7f7;
+  --bs-host-surface-control-hover: #ececec;
+  --bs-host-surface-control-active: #e7e7e7;
+  --bs-host-surface-overlay: #ffffff;
+  --bs-host-surface-canvas: #efefef;
+  --bs-host-surface-scrim: rgb(23 23 23 / 45%);
+  --bs-host-text-primary: #171717;
+  --bs-host-text-secondary: #4d4d4d;
+  --bs-host-text-muted: #666666;
+  --bs-host-text-disabled: #808080;
+  --bs-host-text-on-accent: #ffffff;
+  --bs-host-border-subtle: rgb(23 23 23 / 10%);
+  --bs-host-border-default: rgb(23 23 23 / 15%);
+  --bs-host-border-strong: rgb(23 23 23 / 16%);
+  --bs-host-accent: #0070f3;
+  --bs-host-accent-surface: #e3eefb;
+  --bs-host-accent-text: #145ec2;
+  --bs-host-focus-ring: #0070f3;
+  --bs-host-elev-ring: 0 0 0 1px rgb(0 0 0 / 8%);
+  --bs-host-shadow-overlay: 0 12px 32px -12px rgb(23 23 23 / 10%);
+  --bs-host-shadow-float: 0 6px 16px -8px rgb(23 23 23 / 8%);
+  --bs-host-success: #1d9746;
+  --bs-host-success-surface: #e1f0e6;
+  --bs-host-warning: #a48025;
+  --bs-host-warning-surface: #f1ede2;
+  --bs-host-danger: #dc2626;
+  --bs-host-danger-surface: #f8e2e2;
+  --bs-host-danger-text: #b52a26;
+  --bs-host-action-primary: color-mix(in srgb, var(--bs-host-accent) 82%, black);
+  --bs-host-action-primary-hover: color-mix(in srgb, var(--bs-host-accent) 86%, black);
+  --bs-host-action-primary-active: color-mix(in srgb, var(--bs-host-accent) 76%, black);
+}

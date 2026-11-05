@@ -296,7 +296,10 @@
   grid-template-columns: 32px minmax(0, 1fr);
 }
 
-/* 窄容器降级：隐藏内联导航，改用工具栏切换按钮。 */
+/* 窄容器降级：隐藏内联导航，改用工具栏切换按钮。
+   264px 是「内联导航 + 卡片」的最小可用组合：导航固定 108px，剩下不足 156px 时
+   内联模式已放不下两张卡片，改用弹层反而更宽裕。改动这个值必须同步
+   MATERIAL_GROUP_INLINE_MIN_WIDTH（designer-styles.mjs 会比对两处）。 */
 @container material-library (width < 264px) {
   .material-library-content[data-material-grouped="true"] {
     grid-template-columns: minmax(0, 1fr);

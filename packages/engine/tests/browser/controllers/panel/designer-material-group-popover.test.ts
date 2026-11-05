@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DesignerMaterialGroupPopoverController } from '../../../../src/browser/controllers/panel/designer-material-group-popover-controller.js';
+import {
+  DesignerMaterialGroupPopoverController,
+  MATERIAL_GROUP_INLINE_MIN_WIDTH,
+} from '../../../../src/browser/controllers/panel/designer-material-group-popover-controller.js';
 import { renderMaterialLibraryGroupNavigation } from '../../../../src/browser/dom/material-library/designer-material-library-group-dom.js';
 import {
   createMaterialGroupLayout,
@@ -40,11 +43,18 @@ function setup(width = 263) {
 }
 
 describe('compact material group popover', () => {
-  it.each([263, 264, 265])('uses the content width breakpoint at %i pixels', (width) => {
+  // 阈值从常量派生：改阈值时只改一处（controller 常量 + CSS 容器查询），测试自动跟随。
+  it.each([
+    MATERIAL_GROUP_INLINE_MIN_WIDTH - 1,
+    MATERIAL_GROUP_INLINE_MIN_WIDTH,
+    MATERIAL_GROUP_INLINE_MIN_WIDTH + 1,
+  ])('uses the content width breakpoint at %i pixels', (width) => {
     const view = setup(width);
     view.controller.toggle();
-    expect(view.overlay.hidden).toBe(width >= 264);
-    expect(view.navigation.parentElement).toBe(width < 264 ? view.mount : view.inline);
+    expect(view.overlay.hidden).toBe(width >= MATERIAL_GROUP_INLINE_MIN_WIDTH);
+    expect(view.navigation.parentElement).toBe(
+      width < MATERIAL_GROUP_INLINE_MIN_WIDTH ? view.mount : view.inline,
+    );
   });
 
   it('clamps the popup to the viewport and designer, flipping above a low trigger', () => {
@@ -152,7 +162,7 @@ describe('compact material group popover', () => {
     roots.scrollTop = 75;
     view.controller.toggle();
     const selected = view.document.activeElement;
-    view.content.rect.width = 264;
+    view.content.rect.width = MATERIAL_GROUP_INLINE_MIN_WIDTH;
     view.sync();
     expect(view.overlay.hidden).toBe(true);
     expect(view.navigation.parentElement).toBe(view.inline);
@@ -162,14 +172,14 @@ describe('compact material group popover', () => {
   });
 
   it('moves focus out of the hidden navigation or trigger when crossing the breakpoint', () => {
-    const view = setup(265);
+    const view = setup(MATERIAL_GROUP_INLINE_MIN_WIDTH + 1);
     const selected = view.navigation.querySelector('[data-material-group="data"]')!;
     selected.focus();
-    view.content.rect.width = 263;
+    view.content.rect.width = MATERIAL_GROUP_INLINE_MIN_WIDTH - 1;
     view.sync();
     expect(view.document.activeElement).toBe(view.trigger);
     expect(view.overlay.hidden).toBe(true);
-    view.content.rect.width = 265;
+    view.content.rect.width = MATERIAL_GROUP_INLINE_MIN_WIDTH + 1;
     view.sync();
     expect(view.document.activeElement).toBe(selected);
   });

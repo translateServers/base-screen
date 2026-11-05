@@ -323,13 +323,15 @@
 
 .material-grid {
   display: grid;
-  /* 72px 是「缩略图 + 两到三字名称」的下限，也是默认左栏排满 3 列的安全上限：
-     内容区约 248px = 72×3 + 8×2 + 余量；1024 档左栏排 2 列。列宽再往下名称就开始截断。 */
-  grid-template-columns: repeat(auto-fill, minmax(min(72px, 100%), 1fr));
+  /* 卡片几何（宽度下限 / 间距 / 缩略图比例）是物料库与宿主素材库共用的公共令牌，
+     见 designer-tokens.css 的「图墙卡片几何」。这里只决定列数：auto-fill 按可用宽度
+     排 1–3 列，卡片本身不再被压窄——默认左栏 2 列、拉到最宽 3 列。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--designer-card-min-width), 100%), 1fr));
   align-content: start;
-  gap: var(--designer-space-4);
+  gap: var(--designer-card-gap);
   margin: 0;
-  padding: var(--designer-space-5) var(--designer-space-3) var(--designer-space-7);
+  /* 左右 12px 与宿主面板内边距（.host-left-panel-view）一致：两个面板来回切时不跳缩进。 */
+  padding: var(--designer-space-5) var(--designer-space-5) var(--designer-space-7);
   overflow: hidden auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;

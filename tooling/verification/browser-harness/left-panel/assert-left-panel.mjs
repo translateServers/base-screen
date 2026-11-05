@@ -1,5 +1,6 @@
 // 左侧面板物料/图层、面板布局与宿主分组（含 Blueprint 跨模式）
 // 由 5 个原 assert 模块合并；调用顺序由 run-browser-harness.mjs 编排。
+import { readFileSync } from 'node:fs';
 import { screenshotDirectory } from '../shared/constants.mjs';
 import { componentCount } from '../shared/harness-utils.mjs';
 
@@ -46,6 +47,12 @@ export async function assertLeftPanelMaterials(designer, page) {
         first !== undefined &&
         second !== undefined &&
         Math.abs(first.getBoundingClientRect().width - second.getBoundingClientRect().width) < 1,
+      // 卡片几何是公共令牌（--designer-card-min-width / --bs-host-card-*）：物料卡与宿主
+      // 素材卡同宽同比例。这里只锁下限，不锁列数——列数随面板宽度自适应。
+      cardMinWidth: first?.getBoundingClientRect().width ?? 0,
+      thumbAspect:
+        (first?.querySelector('.material-thumb')?.getBoundingClientRect().width ?? 0) /
+        (first?.querySelector('.material-thumb')?.getBoundingClientRect().height ?? 1),
       thumbsHaveIcons: cards
         .slice(0, 4)
         .every((card) => card.querySelector('.material-thumb svg') !== null),
@@ -65,6 +72,8 @@ export async function assertLeftPanelMaterials(designer, page) {
     ia.gridDisplay !== 'grid' ||
     new Set(ia.columnValues).size !== 1 ||
     !ia.cardsEqualWidth ||
+    ia.cardMinWidth < 108 ||
+    Math.abs(ia.thumbAspect - 1.6) > 0.02 ||
     !ia.thumbsHaveIcons ||
     !ia.hueSet ||
     !ia.sameCategoryHue
@@ -1797,5 +1806,120 @@ export async function assertBlueprintHostLeftPanelGroups(designer) {
     throw new Error(
       `BROWSER_HARNESS_BLUEPRINT_HOST_LEFT_PANEL_GROUP_FAILED:${JSON.stringify(result)}`,
     );
+  }
+}
+
+// ---- 源模块：assert-host-public-tokens.mjs ----
+// ADR-0095：宿主公共令牌层必须与引擎同源。把生成物注入宿主 document，按深/浅两个主题逐项比对。
+// 只断言「名字存在」不够——值漂了、浅色块漏了某个令牌，肉眼要切主题才看得见。
+const HOST_TOKENS_CSS = readFileSync(
+  new URL('../../../../packages/engine/src/browser/styles/host/host-tokens.css', import.meta.url),
+  'utf8',
+);
+
+const HOST_TOKEN_PROBES = [
+  'surface-panel',
+  'surface-control',
+  'text-primary',
+  'text-muted',
+  'border-default',
+  'accent',
+  'focus-ring',
+  'control-height',
+  'space-4',
+  'radius-3',
+  'font-size-base',
+];
+
+export async function assertHostPublicTokens(designer) {
+  const result = await designer.evaluate(
+    async (element, { cssText, probes }) => {
+      const doc = element.ownerDocument;
+      const style = doc.createElement('style');
+      style.textContent = cssText;
+      doc.head.append(style);
+
+      // 探针挂在 document.body：设计器 light DOM 子节点若未被具名 slot 分配就不渲染，
+      // 未渲染节点读不到自定义属性。主题用探针自身的 theme 属性切换——与宿主动态对话框
+      // 走的是同一条路径；引擎侧则改 <base-screen-designer theme> 读 --designer-*。
+      const probe = doc.createElement('div');
+      probe.className = 'bs-host';
+      doc.body.append(probe);
+
+      const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+      await frame();
+      await frame();
+
+      const readPublic = (name) =>
+        getComputedStyle(probe).getPropertyValue(`--bs-host-${name}`).trim();
+      const readEngine = (name) =>
+        getComputedStyle(element).getPropertyValue(`--designer-${name}`).trim();
+      const capture = (read) => Object.fromEntries(probes.map((name) => [name, read(name)]));
+      const scheme = () => getComputedStyle(probe).getPropertyValue('color-scheme').trim();
+
+      const dark = capture(readPublic);
+      const darkEngine = capture(readEngine);
+      const darkScheme = scheme();
+
+      const previousTheme = element.getAttribute('theme');
+      element.setAttribute('theme', 'light');
+      probe.setAttribute('theme', 'light');
+      await frame();
+      await frame();
+
+      const light = capture(readPublic);
+      const lightEngine = capture(readEngine);
+      const lightScheme = scheme();
+
+      // 跟随设计器主题是便利档：只有当 .bs-host 是设计器的 light DOM 后代时，
+      // `base-screen-designer[theme="light"] .bs-host` 才可能命中。这里断言 DOM 关系成立；
+      // 选择器文本本身由 tooling/checks/host-tokens.mjs 静态守住。
+      const nested = doc.createElement('div');
+      nested.className = 'bs-host';
+      element.append(nested);
+      const followsDesignerTheme =
+        nested.closest('base-screen-designer') === element &&
+        element.getAttribute('theme') === 'light';
+
+      if (previousTheme === null) element.removeAttribute('theme');
+      else element.setAttribute('theme', previousTheme);
+      probe.removeAttribute('theme');
+      nested.remove();
+      probe.remove();
+      style.remove();
+      await frame();
+
+      return {
+        dark,
+        darkEngine,
+        light,
+        lightEngine,
+        darkScheme,
+        lightScheme,
+        followsDesignerTheme,
+      };
+    },
+    { cssText: HOST_TOKENS_CSS, probes: HOST_TOKEN_PROBES },
+  );
+
+  const mismatches = [];
+  for (const name of HOST_TOKEN_PROBES) {
+    if (result.dark[name] !== result.darkEngine[name]) {
+      mismatches.push(`dark:${name}:${result.dark[name]}!=${result.darkEngine[name]}`);
+    }
+    if (result.light[name] !== result.lightEngine[name]) {
+      mismatches.push(`light:${name}:${result.light[name]}!=${result.lightEngine[name]}`);
+    }
+  }
+  if (result.darkScheme !== 'dark') mismatches.push(`dark-scheme:${result.darkScheme}`);
+  if (result.lightScheme !== 'light') mismatches.push(`light-scheme:${result.lightScheme}`);
+  // 浅色块整体失效时，两侧会各自退回深色值而仍然「相等」，必须额外要求主题真的换了值。
+  if (result.light['surface-panel'] === result.dark['surface-panel']) {
+    mismatches.push('light-theme-not-applied');
+  }
+  if (!result.followsDesignerTheme) mismatches.push('designer-theme-anchor');
+
+  if (mismatches.length > 0) {
+    throw new Error(`BROWSER_HARNESS_HOST_PUBLIC_TOKENS_FAILED:${mismatches.join(';')}`);
   }
 }
