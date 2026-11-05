@@ -83,11 +83,10 @@
   framework-agnostic `zustand/vanilla` store consumed through a `shallowRef`-based composable
   in Vue and through `subscribe` in the vanilla app.
 
-  The infrastructure carriers moved out of `examples/` to make that structure honest:
+  The infrastructure carrier moved out of `examples/` to make that structure honest:
   `examples/browser-harness` became `tooling/verification/browser-harness` (it is the repo's
-  own feature matrix and Playwright evidence, not a usage example) and
-  `examples/material-mcp-server` became `tooling/material-mcp-server`. Their gates are
-  unchanged apart from the paths. The minimal-Vanilla/Viewer consumer used by
+  own feature matrix and Playwright evidence, not a usage example). Its gate is
+  unchanged apart from the path. The minimal-Vanilla/Viewer consumer used by
   `pnpm verify:tarball` is now generated inline instead of copied from an example directory,
   so the gate no longer depends on the shape of `examples/`.
 
