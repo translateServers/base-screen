@@ -316,7 +316,7 @@ export function globToRegExp(pattern) {
 }
 
 /**
- * 静态解析根级 tests/*.test.ts 引用的仓库文件（../tooling/**、../skills/** 等）。
+ * 静态解析根级 tests/*.test.ts 引用的仓库文件（../tooling/**、../packages/** 等）。
  * 返回 Map<repo 相对路径, 引用它的根测试文件列表>。
  */
 export function resolveRootTestImports(rootDir = REPO_ROOT) {

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Manage host Base Screen Skills"
-  short_description: "Set up or refresh host dashboard and material Skills"
-  default_prompt: "Use $manage-base-screen-host-skills to take the shortest safe path for setting up or refreshing the host's Base Screen Skills."

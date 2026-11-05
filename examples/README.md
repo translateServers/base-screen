@@ -10,7 +10,6 @@ examples/
 └── vanilla-host/       Vite + 原生 TypeScript SPA
 
 ../tooling/verification/browser-harness/   基座自身特性矩阵 + Playwright 断言（pnpm verify:browser）
-../tooling/material-mcp-server/            面向上层工具链的物料模板 MCP provider
 ```
 
 三个前端是"宿主应用"的三种写法：都是纯静态 SPA，经 HTTP 联调同一个后端，
@@ -750,7 +749,6 @@ cp my-data.db examples/shared-backend/data/datasources/
 ## 相关入口
 
 - [基座特性矩阵](../tooling/verification/browser-harness/cases.html)：人眼逐项验证入口（`pnpm dev:browser-harness`）
-- [物料模板 MCP provider](../tooling/material-mcp-server)：面向上层工具链
 - [仓库分层与检查门禁](../AGENTS.md)：包边界、依赖规则与验证命令
 
 ## 示例智能体：一句话生成大屏

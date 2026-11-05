@@ -1,4 +1,0 @@
-interface:
-  display_name: "创建宿主物料 Skill"
-  short_description: "生成支持受控模板与在线 MCP 校验的物料 Skill"
-  default_prompt: "使用 $create-base-screen-host-material-skill 从宿主快照生成支持受控模板、在线 MCP 校验和离线兜底的物料创建 Skill。"
