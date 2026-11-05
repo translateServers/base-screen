@@ -1,22 +1,14 @@
 import type { DiagnosticCollector, DiagnosticPhase } from '../diagnostics/collector.js';
 import { codePointLength, hasControlCharacter } from '../json/canonical.js';
 import type { ScreenCanvasBackground } from '../types/document.js';
+import { isScreenCanvasPaletteColor, SCREEN_CANVAS_FIELDS } from './canvas-background.js';
 import { isBoundedScreenImageUrl } from './image-url.js';
 import { MAX_BACKGROUND_COLOR_CODE_POINTS, MAX_BACKGROUND_IMAGE_CODE_POINTS } from './limits.js';
 import { canvasSchema } from './schema.js';
 import { checkStrictObjectKeys, isJsonObject } from './strict-object.js';
 import { addZodIssues, type DocumentDiagnosticPath } from './validate-support.js';
 
-const CANVAS_FIELDS = new Set([
-  'width',
-  'height',
-  'backgroundColor',
-  'background',
-  'backgroundImage',
-  'backgroundImageFit',
-]);
-const CANVAS_PALETTE_COLOR_PATTERN =
-  /^(?:transparent|#[0-9A-Fa-f]{3,4}|#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?)$/;
+const CANVAS_FIELDS = new Set<string>(SCREEN_CANVAS_FIELDS);
 
 export function validateCanvas(
   canvas: unknown,
@@ -115,11 +107,7 @@ function validateCanvasBackgroundColors(
         }));
   let clean = true;
   for (const { color, path } of colors) {
-    if (
-      codePointLength(color) <= MAX_BACKGROUND_COLOR_CODE_POINTS &&
-      !hasControlCharacter(color) &&
-      CANVAS_PALETTE_COLOR_PATTERN.test(color)
-    ) {
+    if (isScreenCanvasPaletteColor(color)) {
       continue;
     }
     collector.add(

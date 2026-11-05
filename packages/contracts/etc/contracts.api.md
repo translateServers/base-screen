@@ -29,6 +29,12 @@ export function isBoundedScreenImageUrl(value: unknown, maxCodePoints?: number):
 export function isScreenAuthoringRequest(value: unknown): value is ScreenAuthoringRequest;
 
 // @public
+export function isScreenCanvasBackground(value: unknown): value is ScreenCanvasBackground;
+
+// @public (undocumented)
+export function isScreenCanvasPaletteColor(value: unknown): value is string;
+
+// @public
 export function isScreenComponentId(value: unknown): value is string;
 
 // @public (undocumented)
@@ -217,6 +223,12 @@ export const SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY = "blueprint.actio
 
 // @public (undocumented)
 export const SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY = "blueprint.trigger.material-event";
+
+// @public
+export const SCREEN_CANVAS_BACKGROUND_TYPES: readonly ScreenCanvasBackground['type'][];
+
+// @public
+export const SCREEN_CANVAS_FIELDS: readonly ['width', 'height', 'backgroundColor', 'background', 'backgroundImage', 'backgroundImageFit'];
 
 // @public (undocumented)
 export const SCREEN_DOCUMENT_JSON_SCHEMA: ScreenJsonObject;
