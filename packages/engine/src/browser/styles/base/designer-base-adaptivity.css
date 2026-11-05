@@ -3,6 +3,15 @@
     --left-panel-width: 248px;
     --right-panel-width: 276px;
   }
+
+  /* 这一档状态栏放不下全部片段，原来由所有片段一起收缩，结果连错误反馈（.status-feedback）
+     都被压成省略号——操作结果被截断比少一个读数严重得多。这里改为先撤可再生的读数：
+     画布尺寸在检查器「页面配置」里同样可见，吸附/事件的开关文字由 aria-label 与圆点承载。
+     省下的宽度全部留给反馈与选中读数。 */
+  .status-canvas,
+  .statusbar .status-toggle > span:not(.status-toggle-dot) {
+    display: none;
+  }
 }
 
 @container designer-shell (max-width: 1021px) or (max-height: 637px) {

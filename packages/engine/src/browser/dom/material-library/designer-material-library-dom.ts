@@ -222,6 +222,8 @@ function createMaterialCard(
   });
   card.dataset.materialType = entry.materialType;
   card.dataset.materialItemId = entry.id;
+  // 类型在紧凑卡片里不占布局（.material-type 视觉隐藏），完整标识由卡片自身的悬浮提示承载。
+  card.setAttribute('data-tip', entry.materialType);
   card.draggable = true;
   const thumb = ownerDocument.createElement('span');
   thumb.className = 'material-thumb';
@@ -234,7 +236,8 @@ function createMaterialCard(
   if (cover !== undefined) {
     thumb.appendChild(createMaterialCoverImage(thumb.ownerDocument, cover, thumb));
   }
-  // 名称与类型分层呈现；类型的 data-tip 为窄面板中的完整标识入口，名称沿用卡片可访问名称。
+  // 名称与类型分层呈现；类型视觉上退出卡片布局（见 .material-type），data-tip 保留为
+  // 窄面板与命令面板的完整标识入口，名称沿用卡片可访问名称。
   const meta = ownerDocument.createElement('span');
   meta.className = 'material-card-meta';
   const name = ownerDocument.createElement('span');

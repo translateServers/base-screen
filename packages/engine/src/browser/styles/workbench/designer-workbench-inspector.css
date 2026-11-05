@@ -428,6 +428,13 @@
   gap: var(--designer-space-1);
 }
 
+/* 八个排列动作是两个概念：前四「对齐到边」、后四「分布间距」。原来一排连排，
+   中间没有断点，全是图标只能靠 tooltip 分辨。用 1px 内阴影在第 5 个左侧开一道缝，
+   视觉上分成 4+4，不占布局、不改列宽。 */
+.properties .designer-inspector-batch-arrange-button:nth-child(5) {
+  box-shadow: inset 1px 0 0 var(--designer-border-default);
+}
+
 .properties .designer-inspector-batch-arrange-button {
   width: 100%;
   height: 28px;

@@ -150,9 +150,11 @@
   position: relative;
   min-width: 0;
   /* 渲染可扩展性（ADR-0042）：屏外卡片跳过渲染（layout/paint），仅首次渲染前用估算高度占位；
-     auto 关键字记住最近一次真实渲染尺寸，滚动条高度稳定；不支持 CV 的浏览器静默退回全量渲染。 */
+     auto 关键字记住最近一次真实渲染尺寸，滚动条高度稳定；不支持 CV 的浏览器静默退回全量渲染。
+     84px ≈ 缩略图（16:10）+ 名称行 + 卡片内边距（3 列布局；与 designer-workbench-materials.css
+     的卡片几何同步），估算值偏大会让滚动条在首次渲染后跳一下。 */
   content-visibility: auto;
-  contain-intrinsic-size: auto 140px;
+  contain-intrinsic-size: auto 84px;
 }
 
 .material-card-wrap[hidden] {
