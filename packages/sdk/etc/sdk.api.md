@@ -87,6 +87,9 @@ import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenParseResult } from '@base-screen/contracts';
 import { writeBaseScreenHostResourceDragData } from '@base-screen/engine';
 
+// @public
+export function adoptBaseScreenRuntime(host: BaseScreenRuntimeHost): BaseScreenRuntime;
+
 export { BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT }
 
 export { BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT }
@@ -254,6 +257,31 @@ export interface BaseScreenRuntime {
 
 // @public (undocumented)
 export type BaseScreenRuntimeCatalog = BaseScreenPluginManagerSnapshot['materials'];
+
+// @public
+export interface BaseScreenRuntimeHost {
+    // (undocumented)
+    bindDesigner(element: BaseScreenDesignerElement | null): void;
+    catalog: BaseScreenRuntimeCatalog;
+    // (undocumented)
+    dispose(): Promise<void>;
+    // (undocumented)
+    readonly disposed: boolean;
+    // (undocumented)
+    readonly inspectorControls: BaseScreenRuntime['inspectorControls'];
+    // (undocumented)
+    readonly instanceId: string;
+    // (undocumented)
+    readonly manager: BaseScreenRuntime['manager'];
+    // (undocumented)
+    readonly pluginCatalog: BaseScreenRuntime['pluginCatalog'];
+    // (undocumented)
+    readonly pluginCommandPort: BaseScreenRuntime['pluginCommandPort'];
+    // (undocumented)
+    readonly pluginPanels: BaseScreenRuntime['pluginPanels'];
+    // (undocumented)
+    readonly runtimeContributions: BaseScreenRuntime['runtimeContributions'];
+}
 
 // @public (undocumented)
 export type BaseScreenRuntimePluginCommandPort = ReturnType<typeof createBaseScreenPluginContributionCommandPort>;
