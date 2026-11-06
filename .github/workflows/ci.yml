@@ -47,6 +47,8 @@ jobs:
             ${{ runner.os }}-node-${{ matrix.node }}-
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
       - run: pnpm verify:m0
       - name: Ensure API report changes have Changesets
         env:
