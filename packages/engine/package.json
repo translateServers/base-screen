@@ -23,10 +23,11 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./host-tokens.css": "./dist/host-tokens.css"
   },
   "scripts": {
-    "build": "pnpm run clean && tsc -p tsconfig.build.json && node -e \"const fs=require('node:fs');const walk=(d)=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const f=d+'/'+e.name;if(e.isDirectory())walk(f);else if(/[.]js([.]map)?$/.test(e.name))fs.rmSync(f);}};walk('dist/common/vendor');\" && vite build",
+    "build": "pnpm run clean && tsc -p tsconfig.build.json && node -e \"const fs=require('node:fs');const walk=(d)=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const f=d+'/'+e.name;if(e.isDirectory())walk(f);else if(/[.]js([.]map)?$/.test(e.name))fs.rmSync(f);}};walk('dist/common/vendor');\" && vite build && node ../../tooling/build/host-tokens.mjs --emit",
     "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
     "lint": "biome check src tests && node ../../tooling/checks/designer-ui.mjs && node ../../tooling/checks/designer-styles.mjs",
     "test": "vitest run",

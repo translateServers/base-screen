@@ -86,7 +86,8 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
   const doc = document;
 
   const rail = doc.createElement('div');
-  rail.className = 'asset-library';
+  // bs-host 接入公共令牌层（--bs-host-*）：配色、间距、动效都从那里取，宿主只做别名。
+  rail.className = 'asset-library bs-host';
   rail.slot = baseScreenDesignerLeftPanelSlotName(HOST_ASSET_LIBRARY_GROUP_ID);
   rail.dataset.hostAssetLibrary = '';
 
@@ -363,6 +364,12 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
     pickerSelectedId = matchCurrentAsset(request, assets);
     picker.title.textContent =
       request.target.kind === 'canvas-background' ? '选择画布背景' : '选择图片素材';
+    // 选择器挂在 body 上，不在设计器 light DOM 内，拿不到 base-screen-designer[theme]
+    // 的继承；打开时镜像当前主题，公共令牌层才会切到对应的那一套。
+    picker.dialog.setAttribute(
+      'theme',
+      designer.getAttribute('theme') === 'light' ? 'light' : 'dark',
+    );
     picker.dialog.showModal();
     renderPicker();
   };
@@ -559,7 +566,7 @@ function createPickerDialog(
   readonly cancel: HTMLButtonElement;
 } {
   const dialog = doc.createElement('dialog');
-  dialog.className = 'asset-picker';
+  dialog.className = 'asset-picker bs-host';
   dialog.setAttribute('aria-labelledby', 'asset-picker-title');
 
   const head = el('header', 'asset-picker-head');

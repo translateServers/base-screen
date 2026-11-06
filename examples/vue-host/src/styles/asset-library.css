@@ -1,43 +1,44 @@
 /* 宿主素材库（ADR-0089）：左栏与统一选择器。三端共用同一份样式。
    嵌入设计器左栏时必须沿用设计器的视觉语言：引擎已提供列头与面板内边距，宿主内容不再
-   重复标题和外层留白；配色使用与设计器深色主题一致的本地令牌副本（见设计稿第 7 节）。 */
+   重复标题和外层留白；配色与密度全部取自公共令牌层（--bs-host-*，见
+   docs/design/host-public-tokens.md），本文件不再复制任何颜色字面量——
+   浅色主题曾经因为本地副本只写了深色值而与相邻面板脱节。公共令牌层由入口
+   main 文件统一引入（import '@base-screen/sdk/host-tokens.css'），不在这里重复 @import。 */
 
 .asset-library,
 .asset-picker {
-  --asset-surface-panel: #0f0f0f;
-  --asset-surface-raised: #080808;
-  --asset-surface-canvas: #282828;
-  --asset-surface-control: #161616;
-  --asset-surface-control-hover: #2a2a2a;
-  --asset-surface-control-active: #323232;
-  --asset-surface-workspace: #1e1e1e;
-  --asset-text-primary: #f5f5f5;
-  --asset-text-secondary: #b7b7b7;
-  --asset-text-muted: #aeaeae;
-  --asset-text-disabled: #7d7d7d;
-  --asset-border-subtle: rgb(245 245 245 / 10%);
-  --asset-border-default: rgb(245 245 245 / 15%);
-  --asset-border-strong: rgb(245 245 245 / 16%);
-  --asset-accent: #5297fc;
-  --asset-focus-ring: #5297fc;
-  --asset-warning: #e6b221;
-  --asset-warning-surface: #292311;
-  --asset-elev-ring: 0 0 0 1px rgb(245 245 245 / 15%);
-  --asset-shadow-float: 0 6px 16px -8px rgb(0 0 0 / 70%);
-  --asset-radius-control: 6px;
-  --asset-radius-card: 8px;
-  --asset-radius-overlay: 12px;
-  --asset-font-mono:
-    "Geist Mono", ui-monospace, "SF Mono", "Roboto Mono", Menlo, Monaco, "Liberation Mono",
-    "DejaVu Sans Mono", "Courier New", monospace;
-  --asset-motion: 150ms cubic-bezier(0.2, 0, 0, 1);
-  --asset-space-1: 2px;
-  --asset-space-2: 4px;
-  --asset-space-3: 6px;
-  --asset-space-4: 8px;
-  --asset-space-5: 12px;
-  --asset-space-6: 16px;
-  --asset-space-7: 24px;
+  --asset-surface-panel: var(--bs-host-surface-panel);
+  --asset-surface-raised: var(--bs-host-surface-raised);
+  --asset-surface-canvas: var(--bs-host-surface-canvas);
+  --asset-surface-control: var(--bs-host-surface-control);
+  --asset-surface-control-hover: var(--bs-host-surface-control-hover);
+  --asset-surface-control-active: var(--bs-host-surface-control-active);
+  --asset-surface-workspace: var(--bs-host-surface-workspace);
+  --asset-text-primary: var(--bs-host-text-primary);
+  --asset-text-secondary: var(--bs-host-text-secondary);
+  --asset-text-muted: var(--bs-host-text-muted);
+  --asset-text-disabled: var(--bs-host-text-disabled);
+  --asset-border-subtle: var(--bs-host-border-subtle);
+  --asset-border-default: var(--bs-host-border-default);
+  --asset-border-strong: var(--bs-host-border-strong);
+  --asset-accent: var(--bs-host-accent);
+  --asset-focus-ring: var(--bs-host-focus-ring);
+  --asset-warning: var(--bs-host-warning);
+  --asset-warning-surface: var(--bs-host-warning-surface);
+  --asset-elev-ring: var(--bs-host-elev-ring);
+  --asset-shadow-float: var(--bs-host-shadow-float);
+  --asset-radius-control: var(--bs-host-radius-control);
+  --asset-radius-card: var(--bs-host-radius-4);
+  --asset-radius-overlay: var(--bs-host-radius-5);
+  --asset-font-mono: var(--bs-host-font-family-mono);
+  --asset-motion: var(--bs-host-motion);
+  --asset-space-1: var(--bs-host-space-1);
+  --asset-space-2: var(--bs-host-space-2);
+  --asset-space-3: var(--bs-host-space-3);
+  --asset-space-4: var(--bs-host-space-4);
+  --asset-space-5: var(--bs-host-space-5);
+  --asset-space-6: var(--bs-host-space-6);
+  --asset-space-7: var(--bs-host-space-7);
 }
 
 .asset-library {
@@ -195,15 +196,17 @@
 .asset-grid,
 .asset-picker-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(110px, 100%), 1fr));
   align-content: start;
-  gap: 10px;
   overflow-y: auto;
   scrollbar-color: var(--asset-border-strong) transparent;
   scrollbar-gutter: stable;
 }
 
+/* 左栏卡片与引擎物料卡共用一套几何（--bs-host-card-*，源自 designer-tokens.css 的
+   「图墙卡片几何」）：宽度下限、间距、缩略图比例都同源，两个面板拼在一起不会一大一小。 */
 .asset-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--bs-host-card-min-width), 100%), 1fr));
+  gap: var(--bs-host-card-gap);
   min-height: 0;
   flex: 1;
   padding-bottom: var(--asset-space-1);
@@ -250,9 +253,11 @@
 .asset-thumb {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  /* 与物料卡同比例：封面适配按容器宽高比决策，比例不一致时两栏的裁切行为会不同。 */
+  aspect-ratio: var(--bs-host-card-thumb-aspect);
   overflow: hidden;
-  border-radius: 4px;
+  /* 与物料卡缩略图同圆角（6px），不再是自定的 4px。 */
+  border-radius: var(--bs-host-radius-3);
   background: var(--asset-surface-canvas);
   box-shadow: inset 0 0 0 1px var(--asset-border-subtle);
 }
@@ -274,7 +279,7 @@
 .asset-name {
   overflow: hidden;
   color: var(--asset-text-primary);
-  font-size: 13px;
+  font-size: var(--bs-host-font-size-base);
   font-weight: 600;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -285,7 +290,8 @@
   overflow: hidden;
   color: var(--asset-text-muted);
   font-family: var(--asset-font-mono);
-  font-size: 10px;
+  /* 10px 低于体系最小档（11px）；卡片变宽后 11px 也放得下，与设计器小字档一致。 */
+  font-size: var(--bs-host-font-size-xs);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -430,6 +436,7 @@
   background: var(--asset-surface-panel);
   box-shadow:
     0 0 0 1px var(--asset-border-default),
+    /* 620px 高的对话框超出公共层 overlay 档（32px 级）的适用范围，保留自有的大尺寸阴影配方。 */
     0 24px 64px -24px rgb(0 0 0 / 85%);
   color: var(--asset-text-primary);
   font-size: 13px;
@@ -438,7 +445,7 @@
 }
 
 .asset-picker::backdrop {
-  background: rgb(0 0 0 / 70%);
+  background: var(--bs-host-surface-scrim);
 }
 
 .asset-picker[open] {

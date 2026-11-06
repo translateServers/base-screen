@@ -29,6 +29,8 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
       248,
       336,
       480,
+      // 内联分组导航的降级阈值是 264px 内容宽（designer-base-material-groups.css 的容器查询
+      // 与 MATERIAL_GROUP_INLINE_MIN_WIDTH 成对）。三个点跨过边界验证两侧。
       railGutter + 263,
       railGutter + 264,
       railGutter + 265,

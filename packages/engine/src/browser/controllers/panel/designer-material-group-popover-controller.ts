@@ -1,4 +1,5 @@
 // Kept in sync with the material-library container query; tested at both sides of the boundary.
+// 改这个值必须同时改 designer-base-material-groups.css 的容器查询（designer-styles.mjs 会比对）。
 export const MATERIAL_GROUP_INLINE_MIN_WIDTH = 264;
 
 interface MaterialGroupPopoverSurface {

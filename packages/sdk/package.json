@@ -74,10 +74,11 @@
     "./material": {
       "types": "./dist/material.d.ts",
       "import": "./dist/material.js"
-    }
+    },
+    "./host-tokens.css": "./dist/host-tokens.css"
   },
   "scripts": {
-    "build": "pnpm run clean && tsc -p tsconfig.build.json && vite build",
+    "build": "pnpm run clean && tsc -p tsconfig.build.json && vite build && node -e \"const fs=require('node:fs');fs.copyFileSync(require.resolve('@base-screen/engine/host-tokens.css'),'dist/host-tokens.css')\"",
     "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
     "lint": "biome check src tests",
     "test": "vitest run",

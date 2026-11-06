@@ -51,7 +51,7 @@ lib/api-base.ts  lib/api.ts  lib/asset-model.ts  lib/datasource-model.ts  lib/fo
 lib/render-diagnostics.ts
 screen/host-alarm-controller.ts  screen/host-alarm-style-authoring.ts
 screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
-screen/asset-library.ts  screen/asset-return.ts  screen/blueprint-canvas.ts
+screen/asset-library.ts  screen/asset-return.ts
 screen/datasource-return.ts
 screen/host-intent.ts  screen/host-intent-reference.ts  screen/host-refresh-controller.ts
 screen/host-resource-plugin.ts
@@ -460,10 +460,11 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 
 ### Blueprint 关系
 
-- 编辑页的宿主编排画布是 `src/screen/blueprint-canvas.ts`（三端逐字一致）：消费
-  `base-screen-blueprint-canvas-state`、发 `base-screen-blueprint-canvas-command`，只负责
-  中央图形、拖动、连线、缩放/平移与试运行；语义图、派生规则与历史仍归引擎。文档只持久化
-  `blueprint.relations`（behavior / semantic），运行时规则由关系派生，不写回文档。
+- 编辑页的蓝图中央画布直接用引擎自带的那一份（`data-blueprint-default-canvas`）：主题、下拉与
+  手势跟设计器共用同一套令牌与控件，宿主零额外代码。`BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT`
+  仍是公开的覆盖位（自定义图形/手势时可以接），但示例刻意不覆盖——覆盖是可选能力，不是接入前提。
+  语义图、派生规则、canonical 编辑与历史本来就归引擎，文档只持久化 `blueprint.relations`
+  （behavior / semantic），运行时规则由关系派生，不写回文档。
 - 旧数据兼容：三端 `project-adapter.ts`（编辑）与查看页在读取时都调用 `migrateScreenDocument`，
   仍以 `blueprint.rules` 存储的大屏会按关系模型加载（幂等，保存后落新形态）。
 - 蓝图能力由宿主的 authoring 插件贡献（`host-runtime.ts` 的 `createHostAuthoringRuntime`），

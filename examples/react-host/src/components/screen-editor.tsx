@@ -12,7 +12,6 @@ import {
   HOST_ASSET_LIBRARY_GROUP_ID,
   type HostAssetLibraryHandle,
 } from '../screen/asset-library';
-import { createBlueprintCanvas } from '../screen/blueprint-canvas';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
   createHostAlarmStyleAuthoring,
@@ -81,9 +80,9 @@ export function ScreenEditorPage(): React.ReactElement {
       if (disposed) return;
 
       // 尺寸交给 .stage / .stage > * 的 CSS（占满视口），宿主不再内联写百分比宽高。
+      // 蓝图工作台用引擎自带的中央画布：主题、下拉与手势都跟随设计器同一套令牌与控件，
+      // 宿主不再经 slot 覆盖一份等价实现（覆盖是可选能力，不是接入前提）。
       const element = document.createElement('base-screen-designer') as BaseScreenDesignerElement;
-      // 宿主编排画布作为设计器的 light DOM 子节点，经公开 slot 进入蓝图工作台。
-      element.append(createBlueprintCanvas());
       stage.append(element);
       designer = element;
       runtime.bindDesigner(element);
