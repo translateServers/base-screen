@@ -13,9 +13,10 @@ examples/
 ```
 
 三个前端是"宿主应用"的三种写法：都是纯静态 SPA，经 HTTP 联调同一个后端，
-功能完全对等（见下方矩阵）。它们演示的是**宿主侧**要做什么——文档 CRUD、把
-`<base-screen-designer>` / `<base-screen-viewer>` 嵌进自己的页面、实现项目适配器与
-数据通道、以及宿主自有物料。
+功能完全对等（见下方矩阵），但框架装配方式可以不同：React 编辑页已改用 SDK 组合层与
+`@base-screen/react` 的 `<BaseScreenDesigner>`，Vue / Vanilla 仍用命令式 Custom Element 装配。
+它们演示的是**宿主侧**要做什么——文档 CRUD、把 `<base-screen-designer>` /
+`<base-screen-viewer>` 嵌进自己的页面、实现项目适配器与数据通道、以及宿主自有物料。
 
 ## 三个前端的技术对照
 
@@ -61,33 +62,37 @@ store/screen-session-store.ts  store/screens-store.ts  types.ts
 styles/asset-library.css  styles/online-materials.css
 ```
 
-允许的差异只有三类：
+允许的差异目前有四类：
 
 - **框架绑定**：React 用 `zustand` 的 `create` + selector，Vue / Vanilla 用 `zustand/vanilla`；
 - **实例标识**：`host-runtime.ts` 的 `INSTANCE_ID`（`vanilla-host` / `react-host` / `vue-host`），供观测区分来源；
 - **框架专有文件**：`lib/dom.ts` 与 `lib/navigation.ts`（Vanilla 自实现路由/助手）、
   `screen/register.*`、`screen/metric-value-element.ts`（Vanilla 自定义元素）与
-  `metric-value-material.tsx` / `.ts`（React / Vue 物料定义）。
+  `metric-value-material.tsx` / `.ts`（React / Vue 物料定义）；
+- **组合层装配**：`react-host/src/screen/composition-runtime.ts` 只对同一个 `host-runtime.ts`
+  单例调用 `adoptBaseScreenRuntime(host)`，不新建插件管理器；React 宿主的 Base Screen 依赖收敛为
+  `@base-screen/sdk`、`@base-screen/react` 与实际使用的两个插件包。Vue / Vanilla 编辑页仍用 `ref` + `appendChild`。
 
-渲染层（`components/` `views/`）按各栈习惯编写，但**对外行为与 DOM 契约必须一致**：三端
-`scripts/smoke.mjs` 是同一份断言集合（逐行同构，只有名称/端口/数据库文件不同），哪一端的
-DOM 契约发生漂移，都会在冒烟里当场失败。
+渲染层（`components/` `views/`）按各栈习惯编写，但**对外行为与 DOM 契约必须一致**：React
+组合层组件内部仍创建并挂载 `<base-screen-designer>`，三端 `scripts/smoke.mjs` 是同一份断言集合
+（逐行同构，只有名称/端口/数据库文件不同），哪一端的 DOM 契约发生漂移，都会在冒烟里当场失败。
 
 ## 页面与流程（三端一致）
 
 | 路由 | 页面 | 关键行为 |
 | --- | --- | --- |
 | `#/` | 大屏列表 | 卡片列表、新建（POST 后跳编辑）、删除（二次确认）、空态 / 错误态 / 骨架屏 |
-| `#/screens/:id/edit` | 设计器编辑 | 嵌入 `<base-screen-designer>`；宿主 project adapter 载入与显式保存；保存规格见下 |
+| `#/screens/:id/edit` | 设计器编辑 | React 嵌入 `<BaseScreenDesigner>`、Vue / Vanilla 嵌入 `<base-screen-designer>`；宿主 project adapter 载入与显式保存；保存规格见下 |
 | `#/screens/:id/view` | 只读查看 | 嵌入 `<base-screen-viewer>` 播放 canonical 文档 |
 | `#/assets` | 素材后台管理 | 公共素材列表/搜索/上传/删除；临时素材筛选、绑定大屏与删除保护 |
 
-编辑页的两条铁律（三端代码里都有注释）：
+编辑页的两条行为约束：
 
 1. **先挂载，再 `configure` / `load`**：画布与渲染器在自定义元素 *connected* 时才建立；
-   对还没进 DOM 的设计器调用不会报错，但画布会一直是空的。
-2. **设计器是 DOM 节点，不是框架组件**：用 ref 拿占位容器后 `appendChild`，
-   不要塞进框架的 vnode / 模板。
+   React 由 `BaseScreenDesigner` 的挂载句柄保证顺序，Vue / Vanilla 仍在 effect / 视图函数里显式 `appendChild`。
+2. **自定义元素不由框架虚拟树拥有**：React 组合层组件持有并释放挂载句柄，组件卸载时只释放该句柄；
+   Vue / Vanilla 仍用 ref 拿占位容器后 `appendChild`。三端最终都产出同一个
+   `<base-screen-designer>` DOM 契约，且组件卸载不会释放共享的宿主 runtime。
 
 ### 编辑页保存规格（三端逐条一致）
 
@@ -566,7 +571,9 @@ Custom Element，重建 catalog 并调用 `refreshCatalog`——**不刷新页�
 物料 `type` 使用 `host.online.*` 命名空间（稳定文档身份），`tagName` 是构建产物（每次发布代码
 生成新值）。示例的组件模板是宿主生成的最小 KPI 卡；同一套 `refreshCatalog` 也适用于宿主自己
 构建的 React / Vue / 原生 ESM 包。发布后包会持久化在 `MaterialPackage` 表，刷新页面或三个前端
-之间切换都会重新加载。
+之间切换都会重新加载。React 组合层编辑页继续复用 `HostRuntime.applyOnlineMaterialPackage` /
+`removeOnlineMaterialPackage`，经 `bindDesigner` 对当前设计器调用 `refreshCatalog`；热更新后的
+catalog 不塞进 `mountOptions.catalog`，避免触发组件重挂载。
 
 ## 数据源后台管理
 

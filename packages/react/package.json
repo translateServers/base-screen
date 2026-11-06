@@ -16,7 +16,8 @@
   "dependencies": {
     "@base-screen/contracts": "workspace:^",
     "@base-screen/plugin-core": "workspace:^",
-    "@base-screen/plugin-sdk": "workspace:^"
+    "@base-screen/plugin-sdk": "workspace:^",
+    "@base-screen/sdk": "workspace:^"
   },
   "exports": {
     ".": {

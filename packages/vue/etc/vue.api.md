@@ -4,11 +4,51 @@
 
 ```ts
 
+import { BaseScreenDesignerElement } from '@base-screen/sdk';
+import { BaseScreenDesignerMountOptions } from '@base-screen/sdk';
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import { BaseScreenMountControllerReady } from '@base-screen/sdk';
+import { BaseScreenRuntime } from '@base-screen/sdk';
+import { BaseScreenViewerElement } from '@base-screen/sdk';
+import { BaseScreenViewerMountOptions } from '@base-screen/sdk';
 import { Component } from 'vue';
+import type { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
+
+// @public (undocumented)
+export const BaseScreenDesigner: Component;
+
+// @public (undocumented)
+export interface BaseScreenDesignerProps {
+    // (undocumented)
+    readonly mountOptions: BaseScreenDesignerMountOptions;
+    // (undocumented)
+    readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+    // (undocumented)
+    readonly onMounted?: BaseScreenMountControllerReady<BaseScreenDesignerElement>;
+    readonly remountKey?: string | number;
+    // (undocumented)
+    readonly runtime: BaseScreenRuntime;
+}
+
+// @public (undocumented)
+export const BaseScreenViewer: Component;
+
+// @public (undocumented)
+export interface BaseScreenViewerProps {
+    // (undocumented)
+    readonly mountOptions: BaseScreenViewerMountOptions;
+    // (undocumented)
+    readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+    // (undocumented)
+    readonly onMounted?: BaseScreenMountControllerReady<BaseScreenViewerElement>;
+    // (undocumented)
+    readonly remountKey?: string | number;
+    // (undocumented)
+    readonly runtime: BaseScreenRuntime;
+}
 
 // @public (undocumented)
 export function createVueMaterialDefinition<Props extends object>(options: CreateVueMaterialDefinitionOptions<Props>): ScreenParseResult<BaseScreenMaterialCatalogEntry>;

@@ -4,7 +4,7 @@ import {
   type ScreenDataSource,
   type ScreenDataSourceSource,
   type ScreenJsonValue,
-} from '@base-screen/contracts';
+} from '@base-screen/sdk/contracts';
 import type { Logger } from '../lib/logger';
 
 /** 控制器只要求元素提供这三样能力（便于用假元素做手动 tick 测试）。 */

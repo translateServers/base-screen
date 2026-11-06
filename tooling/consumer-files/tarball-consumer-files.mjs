@@ -1,6 +1,20 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+const COMPOSITION_SMOKE_TYPES = `declare global {
+  interface Window {
+    __compositionSmoke?: {
+      mounted: number;
+      diagnostics: string[];
+      runtimeDisposed(): boolean;
+      unmount(): void;
+      disposeRuntime(): Promise<void>;
+    };
+    __compositionSmokeError?: string;
+  }
+}
+`;
+
 /**
  * 让临时消费者使用 hoisted 链接。
  *
@@ -401,6 +415,9 @@ const productEntry = definition.value;
 import '@base-screen/material/auto-register';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { createBaseScreenRuntime } from '@base-screen/sdk';
+import { BaseScreenDesigner, BaseScreenViewer } from '@base-screen/react';
+import type { ScreenDiagnostic } from '@base-screen/contracts';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
 import { registerProduct } from './bridge';
 
@@ -414,6 +431,7 @@ declare global {
   }
 }
 
+${COMPOSITION_SMOKE_TYPES}
 function model(label: string): BaseScreenMaterialModel {
   return {
     componentId: 'react-product',
@@ -468,6 +486,60 @@ const host = document.querySelector('#app');
 if (host === null) throw new Error('REACT_TARBALL_HOST_MISSING');
 const root = createRoot(host);
 root.render(<App unmount={() => root.unmount()} />);
+
+try {
+  const runtimeResult = await createBaseScreenRuntime({ officialMaterials: false, plugins: [] });
+  if (!runtimeResult.ok) {
+    throw new Error(
+      'REACT_TARBALL_COMPOSITION_RUNTIME_FAILED: ' +
+        (runtimeResult.diagnostics[0]?.message ?? 'unknown'),
+    );
+  }
+  const runtime = runtimeResult.value;
+  const compositionStage = document.createElement('div');
+  compositionStage.id = 'composition-smoke';
+  document.body.append(compositionStage);
+  const compositionRoot = createRoot(compositionStage);
+  const compositionDiagnostics: string[] = [];
+  let compositionMounted = 0;
+  const onCompositionMounted = (): void => {
+    compositionMounted += 1;
+  };
+  const onCompositionDiagnostics = (diagnostics: readonly ScreenDiagnostic[]): void => {
+    compositionDiagnostics.length = 0;
+    for (const item of diagnostics) compositionDiagnostics.push(item.message);
+  };
+  window.__compositionSmoke = {
+    get mounted() {
+      return compositionMounted;
+    },
+    diagnostics: compositionDiagnostics,
+    runtimeDisposed: () => runtime.disposed,
+    unmount: () => compositionRoot.unmount(),
+    disposeRuntime: async () => {
+      const result = await runtime.dispose();
+      if (!result.ok) throw new Error('REACT_TARBALL_COMPOSITION_RUNTIME_DISPOSE_FAILED');
+    },
+  };
+  compositionRoot.render(
+    <>
+      <BaseScreenDesigner
+        runtime={runtime}
+        mountOptions={{}}
+        onMounted={onCompositionMounted}
+        onDiagnostics={onCompositionDiagnostics}
+      />
+      <BaseScreenViewer
+        runtime={runtime}
+        mountOptions={{}}
+        onMounted={onCompositionMounted}
+        onDiagnostics={onCompositionDiagnostics}
+      />
+    </>,
+  );
+} catch (error) {
+  window.__compositionSmokeError = error instanceof Error ? error.message : String(error);
+}
 `,
   );
   writeFileSync(
@@ -635,7 +707,10 @@ onUnmounted(() => {
     `import '@base-screen/sdk/viewer/auto-register';
 import '@base-screen/sdk/designer/auto-register';
 import '@base-screen/material/auto-register';
-import { createApp } from 'vue';
+import { createApp, h } from 'vue';
+import { createBaseScreenRuntime } from '@base-screen/sdk';
+import { BaseScreenDesigner, BaseScreenViewer } from '@base-screen/vue';
+import type { ScreenDiagnostic } from '@base-screen/contracts';
 import App from './App.vue';
 import { registerProduct } from './bridge';
 
@@ -649,6 +724,7 @@ declare global {
   }
 }
 
+${COMPOSITION_SMOKE_TYPES}
 registerProduct();
 
 const app = createApp(App);
@@ -656,6 +732,61 @@ app.mount('#app');
 const consumer = window.__tarballConsumer;
 if (consumer === undefined) throw new Error('VUE_TARBALL_APPLICATION_NOT_READY');
 window.__tarballConsumer = { ...consumer, unmount: () => app.unmount() };
+
+try {
+  const runtimeResult = await createBaseScreenRuntime({ officialMaterials: false, plugins: [] });
+  if (!runtimeResult.ok) {
+    throw new Error(
+      'VUE_TARBALL_COMPOSITION_RUNTIME_FAILED: ' +
+        (runtimeResult.diagnostics[0]?.message ?? 'unknown'),
+    );
+  }
+  const runtime = runtimeResult.value;
+  const compositionStage = document.createElement('div');
+  compositionStage.id = 'composition-smoke';
+  document.body.append(compositionStage);
+  const compositionDiagnostics: string[] = [];
+  let compositionMounted = 0;
+  const onCompositionMounted = (): void => {
+    compositionMounted += 1;
+  };
+  const onCompositionDiagnostics = (diagnostics: readonly ScreenDiagnostic[]): void => {
+    compositionDiagnostics.length = 0;
+    for (const item of diagnostics) compositionDiagnostics.push(item.message);
+  };
+  window.__compositionSmoke = {
+    get mounted() {
+      return compositionMounted;
+    },
+    diagnostics: compositionDiagnostics,
+    runtimeDisposed: () => runtime.disposed,
+    unmount: () => compositionApp.unmount(),
+    disposeRuntime: async () => {
+      const result = await runtime.dispose();
+      if (!result.ok) throw new Error('VUE_TARBALL_COMPOSITION_RUNTIME_DISPOSE_FAILED');
+    },
+  };
+  const compositionApp = createApp({
+    render: () =>
+      h('div', [
+        h(BaseScreenDesigner, {
+          runtime,
+          mountOptions: {},
+          onMounted: onCompositionMounted,
+          onDiagnostics: onCompositionDiagnostics,
+        }),
+        h(BaseScreenViewer, {
+          runtime,
+          mountOptions: {},
+          onMounted: onCompositionMounted,
+          onDiagnostics: onCompositionDiagnostics,
+        }),
+      ]),
+  });
+  compositionApp.mount(compositionStage);
+} catch (error) {
+  window.__compositionSmokeError = error instanceof Error ? error.message : String(error);
+}
 `,
   );
   writeFileSync(
@@ -747,15 +878,67 @@ try {
   if (afterReconnect?.mounts !== 1 || afterReconnect.unmounts !== 0) {
     throw new Error('${framework.toUpperCase()}_TARBALL_RECONNECT_REBUILT');
   }
+  await page.waitForFunction(
+    () =>
+      window.__compositionSmoke?.mounted === 2 ||
+      (window.__compositionSmoke?.diagnostics.length ?? 0) > 0 ||
+      window.__compositionSmokeError !== undefined,
+  );
+  const compositionError = await page.evaluate(() => window.__compositionSmokeError);
+  if (compositionError !== undefined) {
+    throw new Error('${framework.toUpperCase()}_TARBALL_COMPOSITION_SETUP_FAILED: ' + compositionError);
+  }
+  const compositionMounted = await page.evaluate(() => ({
+    mounted: window.__compositionSmoke?.mounted ?? -1,
+    designer: document.querySelector('#composition-smoke base-screen-designer') !== null,
+    viewer: document.querySelector('#composition-smoke base-screen-viewer') !== null,
+    diagnostics: window.__compositionSmoke?.diagnostics ?? ['COMPOSITION_SMOKE_MISSING'],
+    runtimeDisposed: window.__compositionSmoke?.runtimeDisposed() ?? true,
+  }));
+  if (
+    compositionMounted.mounted !== 2 ||
+    !compositionMounted.designer ||
+    !compositionMounted.viewer ||
+    compositionMounted.diagnostics.length > 0 ||
+    compositionMounted.runtimeDisposed
+  ) {
+    throw new Error(
+      '${framework.toUpperCase()}_TARBALL_COMPOSITION_MOUNT_FAILED: ' +
+        JSON.stringify(compositionMounted),
+    );
+  }
+  await page.evaluate(() => window.__compositionSmoke?.unmount());
+  await page.waitForFunction(
+    () =>
+      document.querySelector('#composition-smoke base-screen-designer') === null &&
+      document.querySelector('#composition-smoke base-screen-viewer') === null,
+  );
+  const compositionRuntimeAlive = await page.evaluate(
+    () => window.__compositionSmoke?.runtimeDisposed() === false,
+  );
+  if (!compositionRuntimeAlive) {
+    throw new Error('${framework.toUpperCase()}_TARBALL_COMPONENT_DISPOSED_RUNTIME');
+  }
   await page.evaluate(() => window.__tarballConsumer?.unmount());
   await page.waitForTimeout(0);
   const afterUnmount = await page.evaluate((tag) => ({
     bridge: window.__baseScreenBridge,
     productPresent: document.querySelector(tag) !== null,
+    compositionPresent:
+      document.querySelector(
+        '#composition-smoke base-screen-designer, #composition-smoke base-screen-viewer',
+      ) !== null,
   }), '${productTag}');
-  if (afterUnmount.bridge?.unmounts !== 1 || afterUnmount.productPresent) {
+  if (
+    afterUnmount.bridge?.unmounts !== 1 ||
+    afterUnmount.productPresent ||
+    afterUnmount.compositionPresent
+  ) {
     throw new Error('${framework.toUpperCase()}_TARBALL_FINAL_UNMOUNT_FAILED: ' + JSON.stringify(afterUnmount));
   }
+  await page.evaluate(async () => {
+    await window.__compositionSmoke?.disposeRuntime();
+  });
 } finally {
   await browser.close();
   await server.close();

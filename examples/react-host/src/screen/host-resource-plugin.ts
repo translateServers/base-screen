@@ -1,8 +1,8 @@
 import type {
   BaseScreenMaterialObjectSchema,
   BaseScreenPluginRuntime,
-} from '@base-screen/plugin-core';
-import { definePlugin } from '@base-screen/plugin-sdk';
+} from '@base-screen/sdk/plugin-core';
+import { definePlugin } from '@base-screen/sdk/plugins';
 
 /**
  * 宿主自有的「数据资源类型」声明。

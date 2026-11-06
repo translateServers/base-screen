@@ -4,8 +4,8 @@ import type {
   ScreenParseResult,
   ScreenProjectAdapter,
   ScreenProjectEnvelope,
-} from '@base-screen/contracts';
-import { migrateScreenDocument } from '@base-screen/contracts';
+} from '@base-screen/sdk/contracts';
+import { migrateScreenDocument } from '@base-screen/sdk/contracts';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
 

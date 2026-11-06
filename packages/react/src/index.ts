@@ -13,6 +13,8 @@ import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { type ComponentType, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
+export * from './components.js';
+
 export interface CreateReactMaterialDefinitionOptions<Props extends object> {
   readonly manifest: BaseScreenMaterialManifest;
   readonly component: ComponentType<Props>;

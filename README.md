@@ -59,7 +59,7 @@ pnpm dev:browser-harness  # 浏览器验证矩阵（tooling/verification/browser
 
 ## 在你的应用中使用
 
-接入通常分为四步：注册元素与物料 → 组装物料目录 → 解析文档 → 配置并装载。最小 Viewer 工程：
+底层 API 接入通常分为四步：注册元素与物料 → 组装物料目录 → 解析文档 → 配置并装载。下面的最小 Viewer 工程展示完整控制面；如需减少每个页面重复的装配代码，可使用后面的[组合层](#组合层快速接入)。
 
 ```html
 <body>
@@ -95,6 +95,103 @@ const viewer = document.querySelector('base-screen-viewer')!;
 viewer.configure({ catalog, instanceId: 'my-viewer', mode: 'viewer' });
 viewer.document = parsed.value;
 ```
+
+### 组合层快速接入
+
+`@base-screen/sdk` 提供可选的 `createBaseScreenRuntime()`：一次完成 Designer/Viewer 与官方物料注册、插件激活及授权检查、catalog 合并，以及元素挂载和销毁编排。它只组合现有公共 API，`defineBaseScreen*()`、`configure()`、端口、slot 和元素命令 API 均保持不变。
+
+```ts
+import { createBaseScreenRuntime } from '@base-screen/sdk';
+
+const runtimeResult = await createBaseScreenRuntime({
+  instanceId: 'my-app',
+  // 可选：宿主插件、授权与自有物料；省略时仅注册官方物料。
+  plugins: [],
+  grantedCapabilities: {},
+});
+if (!runtimeResult.ok) {
+  throw new Error(runtimeResult.diagnostics[0]?.message ?? 'Base Screen 初始化失败');
+}
+const runtime = runtimeResult.value;
+
+const mounted = await runtime.mountDesigner(stage, {
+  projectId: 'screen-1',
+  projectAdapter,
+  resourcePort,
+  datasetPort,
+  backButton: true,
+});
+if (!mounted.ok) {
+  throw new Error(mounted.diagnostics[0]?.message ?? '设计器挂载失败');
+}
+
+const designer = mounted.value;
+// 事件与宿主资源清理可登记到句柄，dispose 时逆序释放。
+designer.on('base-screen-project-conflict', onProjectConflict);
+designer.onDispose(() => assetLibrary.dispose());
+
+// 高级能力仍走完整底层元素 API。
+designer.element.refreshCatalog(nextCatalog);
+
+// 页面卸载时只需释放句柄；应用退出时释放共享 runtime。
+await designer.dispose();
+await runtime.dispose();
+```
+
+`mountViewer()` 同样自动注入 catalog 与插件贡献，宿主只需提交已解析或迁移后的 `document`；`projectId` 与 `document` 两种 Designer 模式不能混用。需要自定义插件端口工厂、插件管理器或替换后续挂载的 catalog 时，分别使用 `createBaseScreenRuntime` 的端口选项、`runtime.manager` 与 `runtime.setCatalog()`。`runtime.dispose()` 会卸载全部挂载句柄并释放插件管理器，且可重复调用。
+
+如果宿主已经拥有自己的 `HostRuntime`（manager、catalog、在线物料与插件贡献），用 `adoptBaseScreenRuntime(host)` 把它适配成 `BaseScreenRuntime`，不要再调用 `createBaseScreenRuntime()`：
+
+```ts
+import { adoptBaseScreenRuntime } from '@base-screen/sdk';
+
+const host = await loadHostRuntime();
+const runtime = adoptBaseScreenRuntime(host);
+```
+
+适配器复用同一份 manager/catalog，只补挂载句柄、catalog 替换和销毁编排。React 示例的 `composition-runtime.ts` 因此只剩单例复用与 adopt；`@base-screen/contracts`、`@base-screen/material`、`@base-screen/plugin-core`、`@base-screen/plugin-manager` 与 `@base-screen/plugin-sdk` 也可分别从 `@base-screen/sdk` 的 `contracts`、`material`、`plugin-core`、`plugins` 子入口导入。
+
+### React / Vue 薄封装
+
+`@base-screen/react` 与 `@base-screen/vue` 各提供 `BaseScreenDesigner` / `BaseScreenViewer`。它们只把 SDK 的挂载控制器接到框架生命周期：组件卸载时释放当前句柄，不释放共享 `runtime`；改变 `remountKey` 或框架 `key` 才重新挂载。普通 `mountOptions` 变化只更新后续挂载使用的快照，已连接实例仍通过 `handle.element` 的公开 API 热更新。
+
+```tsx
+import { BaseScreenDesigner } from '@base-screen/react';
+
+<BaseScreenDesigner
+  runtime={runtime}
+  remountKey={screenId}
+  mountOptions={{
+    projectId: screenId,
+    projectAdapter,
+    children: [blueprintCanvas],
+    backButton: true,
+  }}
+  onMounted={(handle) => {
+    handle.on('base-screen-project-conflict', onConflict);
+    return () => assetLibrary.dispose();
+  }}
+  onDiagnostics={setDiagnostics}
+/>;
+```
+
+```vue
+<BaseScreenDesigner
+  :runtime="runtime"
+  :remount-key="screenId"
+  :mount-options="mountOptions"
+  :on-mounted="onMounted"
+  :on-diagnostics="onDiagnostics"
+>
+  <template #fallback="{ diagnostics }">
+    <!-- 宿主自定义失败态；省略时组件渲染诊断消息。 -->
+  </template>
+</BaseScreenDesigner>
+```
+
+`mountOptions.children` 接收真实 DOM `Node`，会在自定义元素连接前进入 light DOM，不是 React/Vue 虚拟子节点；需要框架渲染的 light DOM 时，在 `onMounted` 里用 `handle.element` 挂载子应用，并用 `handle.onDispose()` 登记清理。`onDiagnostics` 与 React 的 `renderFallback` / Vue 的 `#fallback` 用于投影挂载失败诊断；组件不会调用 `runtime.dispose()`。
+
+`pnpm verify:tarball` 的 React/Vue 外部消费者会在真实浏览器里同时挂载并卸载这两个组件，断言自定义元素存在、卸载后移除、挂载诊断为空，且组件卸载不会释放共享 runtime。`examples/react-host` 的编辑页已改用 `BaseScreenDesigner`，并复用宿主原有的插件管理器单例；Vue / Vanilla 编辑页仍保留手动装配作为对照。
 
 按接入方式区分三种集成模式：
 

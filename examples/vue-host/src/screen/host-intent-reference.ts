@@ -2,7 +2,7 @@ import type {
   ScreenIntentReferenceCatalogPort,
   ScreenIntentReferenceOption,
   ScreenParseResult,
-} from '@base-screen/contracts';
+} from '@base-screen/sdk/contracts';
 import type { api as HostApi } from '../lib/api.js';
 import { resolveApiBase } from '../lib/api-base.js';
 import type { HostAssetShape } from '../types.js';

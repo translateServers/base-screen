@@ -1,4 +1,7 @@
-import type { ScreenParseResult } from '@base-screen/contracts';
+import { registerPluginBoardMaterials } from '@base-screen/plugin-board-materials';
+import { registerPluginEcharts } from '@base-screen/plugin-echarts';
+import type { ScreenParseResult } from '@base-screen/sdk/contracts';
+import { defineBaseScreenDesigner } from '@base-screen/sdk/designer';
 import {
   defineBaseScreenChartMaterial,
   defineBaseScreenContainerMaterial,
@@ -8,11 +11,8 @@ import {
   defineBaseScreenRuleMaterial,
   defineBaseScreenTableMaterial,
   defineBaseScreenTextMaterial,
-} from '@base-screen/material';
-import { registerPluginBoardMaterials } from '@base-screen/plugin-board-materials';
-import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
-import { registerPluginEcharts } from '@base-screen/plugin-echarts';
-import { defineBaseScreenDesigner } from '@base-screen/sdk/designer';
+} from '@base-screen/sdk/material';
+import type { BaseScreenMaterialCatalogEntry } from '@base-screen/sdk/plugin-core';
 import { defineBaseScreenViewer } from '@base-screen/sdk/viewer';
 import { METRIC_VALUE_TAG } from './metric-value';
 import { createMetricValueMaterial } from './metric-value-material';

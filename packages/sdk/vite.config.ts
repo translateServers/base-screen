@@ -15,5 +15,6 @@ export default createViteLibraryConfig(packageRoot, {
   renderer: `${packageRoot}src/renderer.ts`,
   engine: `${packageRoot}src/engine.ts`,
   plugins: `${packageRoot}src/plugins.ts`,
+  'plugin-core': `${packageRoot}src/plugin-core.ts`,
   material: `${packageRoot}src/material.ts`,
 });

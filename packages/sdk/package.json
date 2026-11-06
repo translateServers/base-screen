@@ -22,6 +22,7 @@
     "@base-screen/core": "workspace:^",
     "@base-screen/engine": "workspace:^",
     "@base-screen/material": "workspace:^",
+    "@base-screen/plugin-core": "workspace:^",
     "@base-screen/plugin-manager": "workspace:^",
     "@base-screen/plugin-sdk": "workspace:^",
     "@base-screen/renderer": "workspace:^"
@@ -70,6 +71,10 @@
     "./plugins": {
       "types": "./dist/plugins.d.ts",
       "import": "./dist/plugins.js"
+    },
+    "./plugin-core": {
+      "types": "./dist/plugin-core.d.ts",
+      "import": "./dist/plugin-core.js"
     },
     "./material": {
       "types": "./dist/material.d.ts",

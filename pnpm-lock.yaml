@@ -74,27 +74,12 @@ importers:
 
   examples/react-host:
     dependencies:
-      '@base-screen/contracts':
-        specifier: workspace:^
-        version: link:../../packages/contracts
-      '@base-screen/material':
-        specifier: workspace:^
-        version: link:../../packages/material
       '@base-screen/plugin-board-materials':
         specifier: workspace:^
         version: link:../../plugins/plugin-board-materials
-      '@base-screen/plugin-core':
-        specifier: workspace:^
-        version: link:../../packages/plugin-core
       '@base-screen/plugin-echarts':
         specifier: workspace:^
         version: link:../../plugins/plugin-echarts
-      '@base-screen/plugin-manager':
-        specifier: workspace:^
-        version: link:../../packages/plugin-manager
-      '@base-screen/plugin-sdk':
-        specifier: workspace:^
-        version: link:../../packages/plugin-sdk
       '@base-screen/react':
         specifier: workspace:^
         version: link:../../packages/react
@@ -102,17 +87,17 @@ importers:
         specifier: workspace:^
         version: link:../../packages/sdk
       react:
-        specifier: 19.1.0
-        version: 19.1.0
+        specifier: ^19.1.0
+        version: 19.3.1
       react-dom:
-        specifier: 19.1.0
-        version: 19.1.0(react@19.1.0)
+        specifier: ^19.1.0
+        version: 19.3.1(react@19.3.1)
       react-router-dom:
         specifier: ^7.18.4
-        version: 7.18.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+        version: 7.18.4(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       zustand:
         specifier: ^5.0.15
-        version: 5.0.15(@types/react@19.2.18)(react@19.1.0)
+        version: 5.0.15(@types/react@19.2.18)(react@19.3.1)
     devDependencies:
       '@playwright/test':
         specifier: 1.62.1
@@ -372,12 +357,15 @@ importers:
       '@base-screen/plugin-sdk':
         specifier: workspace:^
         version: link:../plugin-sdk
+      '@base-screen/sdk':
+        specifier: workspace:^
+        version: link:../sdk
       react:
         specifier: ^19.1.0
-        version: 19.2.8
+        version: 19.3.1
       react-dom:
         specifier: ^19.1.0
-        version: 19.2.8(react@19.2.8)
+        version: 19.3.1(react@19.3.1)
 
   packages/renderer:
     dependencies:
@@ -405,6 +393,9 @@ importers:
       '@base-screen/material':
         specifier: workspace:^
         version: link:../material
+      '@base-screen/plugin-core':
+        specifier: workspace:^
+        version: link:../plugin-core
       '@base-screen/plugin-manager':
         specifier: workspace:^
         version: link:../plugin-manager
@@ -436,6 +427,9 @@ importers:
       '@base-screen/plugin-sdk':
         specifier: workspace:^
         version: link:../plugin-sdk
+      '@base-screen/sdk':
+        specifier: workspace:^
+        version: link:../sdk
       vue:
         specifier: ^3.5.0
         version: 3.5.40(typescript@7.0.2)
@@ -3896,10 +3890,10 @@ packages:
     peerDependencies:
       react: ^19.1.0
 
-  react-dom@19.2.8:
-    resolution: {integrity: sha512-rVprimfGBG3DR+Tq0IQG2DT5PxKth1WIGDmj5yPmlzr4YBe7uyE+Du4oVqTDXZSHGGGXRtTJEGSSePyQCMBglQ==}
+  react-dom@19.3.1:
+    resolution: {integrity: sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==}
     peerDependencies:
-      react: ^19.2.8
+      react: ^19.3.1
 
   react-is@18.0.0:
     resolution: {integrity: sha512-yUcBYdBBbo3QiPsgYDcfQcIkGZHfxOaoE6HLSnr1sPzMhdyxusbfKOSUbSd/ocGi32dxcj366PsTj+5oggeKKw==}
@@ -3925,8 +3919,8 @@ packages:
     resolution: {integrity: sha512-FS+XFBNvn3GTAWq26joslQgWNoFu08F4kl0J4CgdNKADkdSGXQyTCnKteIAJy96Br6YbpEU1LSzV5dYtjMkMDg==}
     engines: {node: '>=0.10.0'}
 
-  react@19.2.8:
-    resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
+  react@19.3.1:
+    resolution: {integrity: sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw==}
     engines: {node: '>=0.10.0'}
 
   read-yaml-file@1.1.0:
@@ -4016,8 +4010,8 @@ packages:
   scheduler@0.26.0:
     resolution: {integrity: sha512-NlHwttCI/l5gCPR3D1nNXtWABUmBwvZpEQiD4IXSbIDq8BzLIK/7Ir5gTFSGZDUu37K5cMNp0hFtzO38sC7gWA==}
 
-  scheduler@0.27.0:
-    resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
+  scheduler@0.28.0:
+    resolution: {integrity: sha512-juorfCmIkIw8tT+p5BXSm6PJjQF/ycEYmKyzURCIt/RaZIhL+PulbQ9Yu2z1HdOJDdqDTlxA1+xKBmHXJsczAw==}
 
   schema-utils@3.3.0:
     resolution: {integrity: sha512-pN/yOAvcC+5rQ5nERGuwrjLlYvLTbCibnZ1I7B1LaiAz9BRBlE9GMgE/eqV30P7aJQUf7Ddimy/RsbYO/GrVGg==}
@@ -8614,30 +8608,30 @@ snapshots:
       react: 19.1.0
       scheduler: 0.26.0
 
-  react-dom@19.2.8(react@19.2.8):
+  react-dom@19.3.1(react@19.3.1):
     dependencies:
-      react: 19.2.8
-      scheduler: 0.27.0
+      react: 19.3.1
+      scheduler: 0.28.0
 
   react-is@18.0.0: {}
 
-  react-router-dom@7.18.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
+  react-router-dom@7.18.4(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:
-      react: 19.1.0
-      react-dom: 19.1.0(react@19.1.0)
-      react-router: 7.18.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+      react-router: 7.18.4(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
 
-  react-router@7.18.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
+  react-router@7.18.4(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:
       cookie: 1.0.1
-      react: 19.1.0
+      react: 19.3.1
       set-cookie-parser: 2.6.0
     optionalDependencies:
-      react-dom: 19.1.0(react@19.1.0)
+      react-dom: 19.3.1(react@19.3.1)
 
   react@19.1.0: {}
 
-  react@19.2.8: {}
+  react@19.3.1: {}
 
   read-yaml-file@1.1.0:
     dependencies:
@@ -8739,7 +8733,7 @@ snapshots:
 
   scheduler@0.26.0: {}
 
-  scheduler@0.27.0: {}
+  scheduler@0.28.0: {}
 
   schema-utils@3.3.0:
     dependencies:
@@ -9443,3 +9437,8 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.18
       react: 19.1.0
+
+  zustand@5.0.15(@types/react@19.2.18)(react@19.3.1):
+    optionalDependencies:
+      '@types/react': 19.2.18
+      react: 19.3.1

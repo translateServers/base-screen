@@ -91,7 +91,7 @@ describe('test:scope 计划 JSON 契约自洽', () => {
     expect(plan.selection.skipped.length).toBe(0);
   });
 
-  it('包级变更闭包：engine src 变更影响下游 sdk，且引擎文件映射生效', () => {
+  it('包级变更闭包：engine src 变更经 sdk 传递到 React/Vue 桥接包，且引擎文件映射生效', () => {
     const parsed = parseScopeArgs([
       '--dry-run',
       '--json',
@@ -99,11 +99,13 @@ describe('test:scope 计划 JSON 契约自洽', () => {
       'packages/engine/src/common/ui-text/designer-ui-text.ts',
     ]);
     const plan = buildScopePlan(parsed.values, parsed.packages, { root: ROOT, config: CONFIG });
-    expect(plan.closure.affectedPackages).toEqual(['engine', 'sdk']);
+    // react/vue 薄封装单向依赖 sdk，engine 的变更闭包会沿 sdk 继续传递。
+    expect(plan.closure.affectedPackages).toEqual(['engine', 'react', 'sdk', 'vue']);
     expect(plan.closure.engineFileScope.precision).toBe('file');
     expect(plan.closure.engineFileScope.testFiles.length).toBeGreaterThan(0);
-    // 文件级映射生效时 engine 已从 turbo 包级执行中移出
+    // 文件级映射生效时 engine 已从 turbo 包级执行中移出，下游包仍按闭包执行。
     expect(plan.selection.packages).not.toContain('engine');
+    expect(plan.selection.packages).toEqual(expect.arrayContaining(['react', 'sdk', 'vue']));
     expect(validateScopePlan(plan)).toEqual([]);
   });
 
