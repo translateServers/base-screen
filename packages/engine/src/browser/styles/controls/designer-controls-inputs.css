@@ -579,6 +579,12 @@
   overscroll-behavior: contain;
 }
 
+/* 需要内部滚动时去掉底部内边距：滚动容器的裁切边界是 padding box，内边距留在这里会在
+   底边露出下一行的行首，看起来像弹层没盖住内容（可视高度同时按整行夹紧）。 */
+.designer-select-menu[data-floating="true"][data-scroll="true"] {
+  padding-bottom: 0;
+}
+
 .designer-select-menu[hidden] {
   display: none;
 }

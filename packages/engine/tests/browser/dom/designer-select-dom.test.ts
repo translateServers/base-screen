@@ -291,8 +291,9 @@ describe('enhanceDesignerSelect placement', () => {
     expect(menu.style.bottom).toBe('auto');
     expect(menu.style.width).toBe('388.859375px');
     expect(menu.style.left).toBe('370px');
-    expect(menu.style.maxHeight).toBe('320px');
-    expect(menu.style.top).toBe('361.390625px');
+    expect(menu.style.maxHeight).toBe('312px');
+    expect(menu.style.top).toBe('369.390625px');
+    expect(menu.dataset.scroll).toBe('true');
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     expect(optionButtons[0]?.focused).toBe(true);
   });
@@ -308,7 +309,9 @@ describe('enhanceDesignerSelect placement', () => {
     trigger.dispatch('click');
 
     expect(menu.dataset.side).toBe('bottom');
-    expect(menu.style.maxHeight).toBe('238px');
+    // 238px 的可用空间只放得下 8 整行（8 × 28 + 4 = 228），
+    // 对齐整行后底边不会露出第 9 行的行首。
+    expect(menu.style.maxHeight).toBe('228px');
     expect(menu.style.top).toBe('54px');
   });
 
@@ -323,8 +326,9 @@ describe('enhanceDesignerSelect placement', () => {
     trigger.dispatch('click');
 
     expect(menu.dataset.side).toBe('top');
-    expect(menu.style.maxHeight).toBe('188px');
-    expect(menu.style.top).toBe('8px');
+    // 188px 可用高度对齐到 6 整行（6 × 28 + 4 = 172），翻转后与触发器保持 4px 间距。
+    expect(menu.style.maxHeight).toBe('172px');
+    expect(menu.style.top).toBe('24px');
   });
 
   it('reveals the selected option inside the scrollable menu', () => {
@@ -351,7 +355,7 @@ describe('enhanceDesignerSelect placement', () => {
     fixture.trigger.dispatch('click');
 
     expect(fixture.menu.style.left).toBe('370px');
-    expect(fixture.menu.style.top).toBe('361.390625px');
+    expect(fixture.menu.style.top).toBe('369.390625px');
 
     // 面板滚动/展开把触发器带到新位置：下一帧重新贴合，而不是停在旧坐标。
     fixture.trigger.rect.left = 320;
@@ -362,7 +366,7 @@ describe('enhanceDesignerSelect placement', () => {
     expect(fixture.menu.hidden).toBe(false);
     expect(fixture.menu.style.left).toBe('320px');
     expect(fixture.menu.style.width).toBe('300px');
-    expect(fixture.menu.style.top).toBe('276px');
+    expect(fixture.menu.style.top).toBe('284px');
   });
 
   it('stops following once the menu closes', () => {
@@ -381,7 +385,7 @@ describe('enhanceDesignerSelect placement', () => {
 
     fixture.trigger.rect.top = 100;
     viewport.flushFrames();
-    expect(fixture.menu.style.top).toBe('361.390625px');
+    expect(fixture.menu.style.top).toBe('369.390625px');
   });
 
   it('aligns the left edge with the trigger even near the viewport edge', () => {

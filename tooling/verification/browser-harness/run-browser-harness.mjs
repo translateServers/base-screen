@@ -51,6 +51,7 @@ import { assertStaticSourceSwitch } from './dataset/assert-source-switch.mjs';
 import {
   assertBlueprintHostLeftPanelGroups,
   assertHostLeftPanelGroups,
+  assertHostPublicTokens,
   assertLeftPanelContextMenu,
   assertLeftPanelLayers,
   assertLeftPanelMaterials,
@@ -150,6 +151,8 @@ export async function runBrowserHarness(serverPort) {
         await assertLeftPanelContextMenu(page);
         await assertHostLeftPanelGroups(designer);
         await assertBlueprintHostLeftPanelGroups(designer);
+        // 宿主公共令牌层（ADR-0095）：与引擎同源 + 浅色块真的生效。
+        await assertHostPublicTokens(designer);
         await designer.locator('[data-left-panel]').screenshot({
           path: `${screenshotDirectory}/left-panel-${viewport.width}x${viewport.height}.png`,
         });

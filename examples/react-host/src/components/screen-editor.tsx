@@ -12,7 +12,6 @@ import { api } from '../lib/api';
 import { resolveApiBase } from '../lib/api-base';
 import { createLogger } from '../lib/logger';
 import { createHostAssetLibrary, HOST_ASSET_LIBRARY_GROUP_ID } from '../screen/asset-library';
-import { createBlueprintCanvas } from '../screen/blueprint-canvas';
 import { loadReactDesignerRuntime } from '../screen/composition-runtime';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
@@ -33,7 +32,6 @@ const logger = createLogger('screen-editor');
 
 interface EditorSetup {
   readonly runtime: BaseScreenRuntime;
-  readonly blueprintCanvas: ReturnType<typeof createBlueprintCanvas>;
   readonly alarmStyleAuthoring: ReturnType<typeof createHostAlarmStyleAuthoring>;
   readonly datasetPort: ReturnType<typeof createHostDatasetPort>;
   readonly hostCatalogPort: ReturnType<typeof createHostCatalogPort>;
@@ -89,6 +87,12 @@ export function ScreenEditorPage(): ReactElement {
       const runtime = await loadReactDesignerRuntime();
       if (disposed) return;
 
+      // 尺寸交给 .stage / .stage > * 的 CSS（占满视口），宿主不再内联写百分比宽高。
+      // 蓝图工作台用引擎自带的中央画布：主题、下拉与手势都跟随设计器同一套令牌与控件，
+      // 宿主不再经 slot 覆盖一份等价实现（覆盖是可选能力，不是接入前提）。
+      // 告警端口必须在 configure 前注入；首快照最多等 800ms，超时先按基础样式渲染，
+      // 快照到达后由失效 API 补齐。画布与预览共用同一个端口。
+      // 绑定按 screenId 从宿主读取：页面里配过什么，打开就是什么。
       const alarmBindings = await loadAlarmBindings();
       if (disposed) return;
       alarms = createHostAlarmController({
@@ -118,7 +122,6 @@ export function ScreenEditorPage(): ReactElement {
       const datasetPort = createHostDatasetPort({ api, logger });
       setSetup({
         runtime,
-        blueprintCanvas: createBlueprintCanvas(),
         alarmStyleAuthoring,
         datasetPort,
         hostCatalogPort: createHostCatalogPort({
@@ -151,7 +154,6 @@ export function ScreenEditorPage(): ReactElement {
 
   const mountOptions: BaseScreenDesignerMountOptions = {
     projectId: screenId,
-    children: [setup.blueprintCanvas],
     projectAdapter: createRestProjectAdapter(screenId),
     toolMaterialTypes: TOOL_MATERIAL_TYPES,
     resourcePort: setup.resourcePort,

@@ -47,7 +47,7 @@
   position: relative;
   display: grid;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: var(--designer-card-thumb-aspect);
   place-items: center;
   overflow: hidden;
   border: 0;
@@ -130,13 +130,13 @@
   padding: 0 var(--designer-space-1) var(--designer-space-1);
 }
 
-/* 名称用 12px 而非 13px：3 列下名称列只有约 61px，13px 只放得下 4 个字，
-   「ECharts 图表」这类名字会被截成「ECharts …」。12px 多容一个字，且仍在体系的小字档内。 */
+/* 名称与宿主素材卡同名同档（13px）：两列布局下名称列约 108px，13px 能放下 8 个汉字，
+   「ECharts 图表」不再截断；与宿主卡片一致比多挤一列更重要。 */
 .material-name {
   min-width: 0;
   overflow: hidden;
   color: var(--designer-text-primary);
-  font: var(--designer-font-small);
+  font: var(--designer-font);
   font-weight: 600;
   line-height: 1.35;
   text-overflow: ellipsis;

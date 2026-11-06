@@ -86,6 +86,19 @@ function workspaceDependencyDirectories(directory) {
   return readWorkspaceDependencyDirectories(join('packages', directory, 'package.json'));
 }
 
+// 公共入口不只有 JS：host-tokens.css 是唯一允许的非脚本导出（ADR-0095）。
+// ATTW 会把这类入口判为类型解析失败，检查时按入口名排除，其余入口照常校验。
+function nonScriptEntrypoints(directory) {
+  const manifest = JSON.parse(readFileSync(join('packages', directory, 'package.json'), 'utf8'));
+  const exportsField = manifest.exports;
+  if (!exportsField || typeof exportsField !== 'object') {
+    return [];
+  }
+  return Object.entries(exportsField)
+    .filter(([, target]) => typeof target === 'string' && !/\.(?:js|mjs|cjs)$/.test(target))
+    .map(([subpath]) => subpath);
+}
+
 function patchWorkspaceDependencySpecs(
   directory,
   tarball,
@@ -299,7 +312,12 @@ try {
       assertContractsSchemaSingularity(tarball);
     }
     run('pnpm', ['exec', 'publint', tarball], root);
-    run('pnpm', ['exec', 'attw', '--profile', 'esm-only', tarball], root);
+    const attwArgs = ['exec', 'attw', tarball, '--profile', 'esm-only'];
+    const excludedEntrypoints = nonScriptEntrypoints(directory);
+    if (excludedEntrypoints.length > 0) {
+      attwArgs.push('--exclude-entrypoints', ...excludedEntrypoints);
+    }
+    run('pnpm', attwArgs, root);
 
     const installTarball = patchWorkspaceDependencySpecs(directory, tarball);
     packedTarballs.set(directory, installTarball);
