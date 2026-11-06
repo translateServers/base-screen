@@ -46,6 +46,7 @@ jobs:
             ${{ runner.os }}-node-${{ matrix.node }}-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-node-${{ matrix.node }}-
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - run: pnpm verify:m0
       - name: Ensure API report changes have Changesets
         env:
@@ -80,6 +81,7 @@ jobs:
             ${{ runner.os }}-node-22.23.2-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-node-22.23.2-
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - name: Collect package line coverage
         shell: bash
         run: |
