@@ -1,11 +1,11 @@
-import type { ScreenJsonValue, ScreenParseResult } from '@base-screen/contracts';
+import { createReactMaterialDefinition } from '@base-screen/react';
+import type { ScreenJsonValue, ScreenParseResult } from '@base-screen/sdk/contracts';
 import type {
   BaseScreenDataField,
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialModel,
   BaseScreenMaterialTabularDataAdapter,
-} from '@base-screen/plugin-core';
-import { createReactMaterialDefinition } from '@base-screen/react';
+} from '@base-screen/sdk/plugin-core';
 import { METRIC_VALUE_MANIFEST } from './metric-value';
 
 export interface MetricValueProps {

@@ -643,6 +643,7 @@ const EDITORS = {
   'react-host': 'examples/react-host/src/components/screen-editor.tsx',
   'vue-host': 'examples/vue-host/src/components/ScreenEditor.vue',
 } as const;
+const REACT_COMPOSITION_RUNTIME = 'examples/react-host/src/screen/composition-runtime.ts';
 
 /**
  * 三端的书写面必须逐字对等：适配器只有一份（模型调用、文档校验、提案编译都在里面），
@@ -665,14 +666,25 @@ describe('host intent wiring parity', () => {
       const source = readFileSync(EDITORS[host], 'utf8');
       // 三端的绑定写法现在带目录读取函数，断言按结构匹配而不是逐字抄整行。
       const bound = source.search(/setIntentHandler\(\s*createHostIntentHandler\(/);
-      // 提案对着当前文档试算：绑定早于 load 会让第一次提交必被引擎拒绝。
-      const loaded = source.indexOf('await element.load(screenId)');
+      // React 编辑页把 load 交给组合层适配器的 projectId，其余两端仍显式调用 element.load。
+      const loaded =
+        host === 'react-host'
+          ? source.indexOf('projectId: screenId')
+          : source.indexOf('await element.load(screenId)');
       expect(bound, `${host} 未绑定意图处理器`).toBeGreaterThan(-1);
-      expect(loaded, `${host} 未调用 element.load`).toBeGreaterThan(-1);
+      expect(loaded, `${host} 未触发项目加载`).toBeGreaterThan(-1);
       expect(bound, `${host} 必须在 load 之后绑定意图处理器`).toBeGreaterThan(loaded);
       // 智能体要读到设计器当前目录（含在线物料包），而不是后端写死的那几种组件。
       expect(source, `${host} 未把设计器目录交给智能体`).toMatch(/catalog: \(\) =>/);
       expect(source, `${host} 未在卸载时解绑意图处理器`).toContain('setIntentHandler(undefined)');
+      if (host === 'react-host') {
+        const adapter = readFileSync(REACT_COMPOSITION_RUNTIME, 'utf8');
+        expect(source).toContain('<BaseScreenDesigner');
+        expect(adapter).toContain('loadHostRuntime()');
+        expect(adapter).toContain('adoptBaseScreenRuntime(host)');
+        expect(adapter).not.toContain('createBaseScreenRuntime(');
+        expect(adapter).not.toContain('createBaseScreenPluginManager(');
+      }
     }
   });
 });

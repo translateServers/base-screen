@@ -3,7 +3,7 @@ import type {
   ScreenCanvasBackgroundType,
   ScreenIntentReference,
   ScreenJsonValue,
-} from '@base-screen/contracts';
+} from '@base-screen/sdk/contracts';
 import type {
   AgentGenerateShape,
   DatasetCatalog,

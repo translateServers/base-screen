@@ -4,11 +4,66 @@
 
 ```ts
 
+import { BaseScreenDesignerElement } from '@base-screen/sdk';
+import { BaseScreenDesignerMountOptions } from '@base-screen/sdk';
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import { BaseScreenMountControllerReady } from '@base-screen/sdk';
+import { BaseScreenRuntime } from '@base-screen/sdk';
+import { BaseScreenViewerElement } from '@base-screen/sdk';
+import { BaseScreenViewerMountOptions } from '@base-screen/sdk';
 import { ComponentType } from 'react';
+import { CSSProperties } from 'react';
+import { ReactElement } from 'react';
+import { ReactNode } from 'react';
+import type { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
+
+// @public (undocumented)
+export function BaseScreenDesigner(props: BaseScreenDesignerProps): ReactElement;
+
+// @public (undocumented)
+export interface BaseScreenDesignerProps {
+    // (undocumented)
+    readonly className?: string;
+    // (undocumented)
+    readonly mountOptions: BaseScreenDesignerMountOptions;
+    // (undocumented)
+    readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+    // (undocumented)
+    readonly onMounted?: BaseScreenMountControllerReady<BaseScreenDesignerElement>;
+    readonly remountKey?: string | number;
+    // (undocumented)
+    readonly renderFallback?: (diagnostics: readonly ScreenDiagnostic[]) => ReactNode;
+    // (undocumented)
+    readonly runtime: BaseScreenRuntime;
+    // (undocumented)
+    readonly style?: CSSProperties;
+}
+
+// @public (undocumented)
+export function BaseScreenViewer(props: BaseScreenViewerProps): ReactElement;
+
+// @public (undocumented)
+export interface BaseScreenViewerProps {
+    // (undocumented)
+    readonly className?: string;
+    // (undocumented)
+    readonly mountOptions: BaseScreenViewerMountOptions;
+    // (undocumented)
+    readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+    // (undocumented)
+    readonly onMounted?: BaseScreenMountControllerReady<BaseScreenViewerElement>;
+    // (undocumented)
+    readonly remountKey?: string | number;
+    // (undocumented)
+    readonly renderFallback?: (diagnostics: readonly ScreenDiagnostic[]) => ReactNode;
+    // (undocumented)
+    readonly runtime: BaseScreenRuntime;
+    // (undocumented)
+    readonly style?: CSSProperties;
+}
 
 // @public (undocumented)
 export function createReactMaterialDefinition<Props extends object>(options: CreateReactMaterialDefinitionOptions<Props>): ScreenParseResult<BaseScreenMaterialCatalogEntry>;

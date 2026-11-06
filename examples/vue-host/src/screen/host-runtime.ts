@@ -1,6 +1,12 @@
-import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
-import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '@base-screen/contracts';
 import { createPluginBoardRuntime, PLUGIN_BOARD_ID } from '@base-screen/plugin-board-materials';
+import { createPluginEchartsRuntime, PLUGIN_ECHARTS_ID } from '@base-screen/plugin-echarts';
+import type { ScreenDocument, ScreenParseResult } from '@base-screen/sdk/contracts';
+import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '@base-screen/sdk/contracts';
+import {
+  type BaseScreenDesignerElement,
+  createBaseScreenCorePluginCommandPort,
+  createBaseScreenCorePluginDesignReadPort,
+} from '@base-screen/sdk/designer';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialCatalogEntry,
@@ -11,21 +17,16 @@ import type {
   BaseScreenPluginRuntime,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
-} from '@base-screen/plugin-core';
+} from '@base-screen/sdk/plugin-core';
 import {
   createBaseScreenMaterialCatalog,
   parseBaseScreenMaterialManifest,
-} from '@base-screen/plugin-core';
-import { createPluginEchartsRuntime, PLUGIN_ECHARTS_ID } from '@base-screen/plugin-echarts';
+} from '@base-screen/sdk/plugin-core';
 import {
+  type BaseScreenPluginManager,
   createBaseScreenPluginContributionCommandPort,
   createBaseScreenPluginManager,
-} from '@base-screen/plugin-manager';
-import {
-  type BaseScreenDesignerElement,
-  createBaseScreenCorePluginCommandPort,
-  createBaseScreenCorePluginDesignReadPort,
-} from '@base-screen/sdk/designer';
+} from '@base-screen/sdk/plugins';
 import { api } from '../lib/api';
 import type { OnlineMaterialPackageShape } from '../types';
 import { createHostResourceRuntime } from './host-resource-plugin';
@@ -64,6 +65,7 @@ function createHostAuthoringRuntime(): BaseScreenPluginRuntime {
 }
 
 export interface HostRuntime extends OnlineMaterialRuntime {
+  readonly instanceId: string;
   /** catalog 会在在线物料发布/下架后整体替换；设计器重新 configure 时读取最新值。 */
   catalog: BaseScreenMaterialCatalog;
   readonly pluginCatalog: BaseScreenPluginCatalog;
@@ -71,6 +73,9 @@ export interface HostRuntime extends OnlineMaterialRuntime {
   readonly inspectorControls: BaseScreenPluginInspectorControlCatalog;
   readonly runtimeContributions: BaseScreenRuntimeContributionIndex;
   readonly pluginCommandPort: PluginCommandPort;
+  /** 组合层适配器复用同一管理器，避免二次 activate。 */
+  readonly manager: BaseScreenPluginManager;
+  readonly disposed: boolean;
   /** 设计器创建后绑定；命令端口与只读端口都通过它惰性取当前实例。 */
   bindDesigner(element: BaseScreenDesignerElement | null): void;
   dispose(): Promise<void>;
@@ -185,12 +190,17 @@ async function createHostRuntime(): Promise<HostRuntime> {
   };
 
   const runtime: HostRuntime = {
+    instanceId: INSTANCE_ID,
     catalog: buildCatalog(onlineEntries),
     pluginCatalog: snapshot.plugins,
     pluginPanels: snapshot.panels,
     inspectorControls: snapshot.inspectorControls,
     runtimeContributions: snapshot.contributions,
     pluginCommandPort: createBaseScreenPluginContributionCommandPort(manager),
+    manager,
+    get disposed(): boolean {
+      return manager.status === 'disposed';
+    },
     onlineMaterialErrors,
     async applyOnlineMaterialPackage(
       pkg: OnlineMaterialPackageShape,

@@ -1,4 +1,4 @@
-import type { ScreenHostResourceDataSource } from '@base-screen/contracts';
+import type { ScreenHostResourceDataSource } from '@base-screen/sdk/contracts';
 import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
 
 /**

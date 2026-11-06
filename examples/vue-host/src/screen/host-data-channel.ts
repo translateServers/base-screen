@@ -3,7 +3,7 @@ import type {
   ScreenHostResourcePort,
   ScreenJsonValue,
   ScreenParseResult,
-} from '@base-screen/contracts';
+} from '@base-screen/sdk/contracts';
 import { api } from '../lib/api';
 import { resolveApiBase } from '../lib/api-base';
 import { createLogger } from '../lib/logger';

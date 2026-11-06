@@ -12,7 +12,7 @@ import {
   type ScreenJsonObject,
   type ScreenParseResult,
   type ScreenTabularDataset,
-} from '@base-screen/contracts';
+} from '@base-screen/sdk/contracts';
 import type { ApiError, ApiResult, DatasetListQuery, DatasetQueryParams } from '../lib/api';
 import type { Logger } from '../lib/logger';
 

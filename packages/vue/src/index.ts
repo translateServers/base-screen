@@ -17,6 +17,8 @@ import {
   type ReadableStyleSheet,
 } from './global-styles.js';
 
+export * from './components.js';
+
 export interface CreateVueMaterialDefinitionOptions<Props extends object> {
   readonly manifest: BaseScreenMaterialManifest;
   readonly component: Component;

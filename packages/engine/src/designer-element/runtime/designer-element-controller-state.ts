@@ -18,9 +18,9 @@ import { DesignerProjectFeedbackController } from '../../browser/controllers/pro
 import { DesignerProjectWorkspaceController } from '../../browser/controllers/project/designer-project-workspace-controller.js';
 import { DesignerVariablesController } from '../../browser/controllers/variables/designer-variables-controller.js';
 import { DesignerWorkbenchController } from '../../browser/controllers/workbench/designer-workbench-controller.js';
+import { designerIcon } from '../../browser/dom/designer-icons.js';
 import { readDesignerImageNaturalSize } from '../../browser/dom/designer-image-metadata-dom.js';
 import { hasDesignerTextSelection } from '../../browser/dom/designer-text-selection.js';
-import { designerIcon } from '../../browser/dom/designer-icons.js';
 import {
   BASE_SCREEN_METRIC_EVENT,
   createDesignerMetric,

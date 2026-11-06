@@ -11,9 +11,18 @@ const ALLOWED_WORKSPACE_DEPENDENCIES = Object.freeze({
   renderer: ['contracts', 'core', 'plugin-core'],
   engine: ['contracts', 'core', 'renderer', 'plugin-core', 'plugin-manager'],
   material: ['contracts', 'plugin-core', 'plugin-sdk'],
-  react: ['contracts', 'plugin-core', 'plugin-sdk'],
-  vue: ['contracts', 'plugin-core', 'plugin-sdk'],
-  sdk: ['contracts', 'core', 'renderer', 'engine', 'material', 'plugin-manager', 'plugin-sdk'],
+  react: ['contracts', 'plugin-core', 'plugin-sdk', 'sdk'],
+  vue: ['contracts', 'plugin-core', 'plugin-sdk', 'sdk'],
+  sdk: [
+    'contracts',
+    'core',
+    'renderer',
+    'engine',
+    'material',
+    'plugin-core',
+    'plugin-manager',
+    'plugin-sdk',
+  ],
   testing: Object.keys(PACKAGE_DEFINITIONS).filter((directory) => directory !== 'testing'),
 });
 

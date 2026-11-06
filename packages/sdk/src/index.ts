@@ -80,6 +80,33 @@ export {
   writeBaseScreenHostResourceDragData,
 } from './designer.js';
 export {
+  type BaseScreenMountController,
+  type BaseScreenMountControllerReady,
+  type CreateBaseScreenDesignerMountControllerOptions,
+  type CreateBaseScreenViewerMountControllerOptions,
+  createBaseScreenDesignerMountController,
+  createBaseScreenViewerMountController,
+} from './mount-controller.js';
+export {
+  type BaseScreenMountElement,
+  type BaseScreenMountHandle,
+  type CreateBaseScreenMountHandleOptions,
+  createBaseScreenMountHandle,
+} from './mount-handle.js';
+export {
+  type BaseScreenDesignerMountOptions,
+  type BaseScreenRuntime,
+  type BaseScreenRuntimeCatalog,
+  type BaseScreenRuntimePluginCommandPort,
+  type BaseScreenViewerMountOptions,
+  type CreateBaseScreenRuntimeOptions,
+  createBaseScreenRuntime,
+} from './runtime.js';
+export {
+  adoptBaseScreenRuntime,
+  type BaseScreenRuntimeHost,
+} from './runtime-adapter.js';
+export {
   BASE_SCREEN_VIEWER_TAG_NAME,
   BaseScreenViewerElement,
   defineBaseScreenViewer,
