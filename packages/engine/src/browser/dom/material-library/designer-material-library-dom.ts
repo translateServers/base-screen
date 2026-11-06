@@ -26,12 +26,14 @@ export function visibleLibraryMaterials(
     .filter((entry) => entry.manifest.libraryVisible !== false);
 }
 
-// 分类稳定排序：去重后按 localeCompare 排序，保证每次渲染顺序一致。
+// 分类稳定排序：去重后按固定 locale 排序，避免排序结果随运行环境默认 locale 漂移。
+const MATERIAL_CATEGORY_COLLATOR = new Intl.Collator('zh-Hans');
+
 export function materialLibraryCategories(
   materials: readonly MaterialLibraryRenderable[],
 ): readonly string[] {
   return [...new Set(materials.map((entry) => entry.manifest.category))].sort((left, right) =>
-    left.localeCompare(right),
+    MATERIAL_CATEGORY_COLLATOR.compare(left, right),
   );
 }
 
