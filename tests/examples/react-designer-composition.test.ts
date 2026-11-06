@@ -42,7 +42,7 @@ describe('React designer composition migration', () => {
     expect(source).toContain('<BaseScreenDesigner');
     expect(source).toContain('className="stage"');
     expect(source).toContain('projectId: screenId');
-    expect(source).toContain('children: [setup.blueprintCanvas]');
+    expect(source).not.toContain('children: [setup.blueprintCanvas]');
     expect(source).toContain('onMounted={onMounted}');
     expect(source).toContain('onDiagnostics={onDiagnostics}');
     expect(source).toContain('setIntentHandler(undefined)');
