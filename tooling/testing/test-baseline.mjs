@@ -104,12 +104,36 @@ function appendScopedRunRecord(rootDir, record) {
 }
 
 /**
+ * 覆盖率采集直接调用 vitest，绕过了 test 任务的 ^build 依赖；全新检出（CI）时
+ * 包间导入（如 core → contracts）会因 dist 缺失而整包无法加载。先按依赖图构建。
+ */
+function buildCoverageDependencies(rootDir, packageDir) {
+  execFileSync(
+    PNPM,
+    ['exec', 'turbo', 'run', 'build', `--filter=${PACKAGE_DEFINITIONS[packageDir].name}...`],
+    {
+      cwd: rootDir,
+      stdio: 'inherit',
+      // Windows 下 .cmd 垫片受 Node 安全策略限制必须经 shell 启动。
+      shell: process.platform === 'win32',
+    },
+  );
+}
+
+/**
  * 覆盖率对账：对一个包跑 vitest --coverage，从文本报告解析行覆盖率并落盘 metrics。
  */
 function reconcileCoverage(rootDir, packageDir) {
   if (!PACKAGE_DEFINITIONS[packageDir]) {
     console.error(`test:baseline 未知包名：${packageDir}`);
     return { exitCode: EXIT_USAGE, baseline: undefined };
+  }
+  try {
+    buildCoverageDependencies(rootDir, packageDir);
+  } catch (error) {
+    const exitCode = error.status ?? 1;
+    console.error(`test:baseline 构建 ${packageDir} 依赖失败（退出码 ${exitCode}）`);
+    return { exitCode, baseline: undefined };
   }
   const startedAt = Date.now();
   let output = '';
