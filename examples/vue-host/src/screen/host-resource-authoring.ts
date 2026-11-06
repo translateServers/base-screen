@@ -9,7 +9,7 @@ import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
  * 作者 intent。这个模块就是宿主侧的那个「页面入口」——没有它，宿主资源组件只能靠
  * 种子 JSON 或改代码出现在文档里，与「大屏可完全在页面内配置」的演示目标冲突。
  *
- * 三端（vanilla / react / vue）逐字共享，与 `blueprint-canvas.ts` 同一对等约定；
+ * 三端（vanilla / react / vue）逐字共享，与 `asset-library.ts` 同一对等约定；
  * 目录与绑定由根测试 `tests/examples/host-resource-authoring.test.ts` 对着后端指标
  * 接口与物料 manifest 防漂移。
  */
