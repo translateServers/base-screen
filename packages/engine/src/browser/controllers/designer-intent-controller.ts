@@ -15,8 +15,8 @@ import {
   matchDesignerParameterIntent,
 } from '../../common/operations/intent/designer-parameter-intent.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { createIntentReferencePicker } from '../dom/intent/designer-intent-reference-picker-dom.js';
 import { designerIcon } from '../dom/designer-icons.js';
+import { createIntentReferencePicker } from '../dom/intent/designer-intent-reference-picker-dom.js';
 
 /** 一屏里能挂的引用上限：再多也不会被模型用全，只会把输入区撑高。 */
 const INTENT_REFERENCE_LIMIT = 8;
