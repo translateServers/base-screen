@@ -26,7 +26,7 @@ export function visibleLibraryMaterials(
     .filter((entry) => entry.manifest.libraryVisible !== false);
 }
 
-// 分类稳定排序：去重后按固定 locale 排序，避免排序结果随运行环境默认 locale 漂移。
+// 分类稳定排序：去重后按固定比较器排序，保证顺序不随运行环境变化。
 const MATERIAL_CATEGORY_COLLATOR = new Intl.Collator('zh-Hans');
 
 export function materialLibraryCategories(
