@@ -15,6 +15,10 @@ import {
   createDesignerFieldRow,
   createDesignerToggleField,
 } from '../../../../packages/engine/src/browser/dom/designer-field-primitives.ts';
+import {
+  type DesignerIconName,
+  designerIcon,
+} from '../../../../packages/engine/src/browser/dom/designer-icons.ts';
 import { enhanceDesignerSelect } from '../../../../packages/engine/src/browser/dom/designer-select-dom.ts';
 import {
   createDesignerButton,
@@ -31,10 +35,6 @@ import {
   createDesignerBadge,
   createDesignerSection,
 } from '../../../../packages/engine/src/browser/dom/panel/designer-chrome-primitives.ts';
-import {
-  type DesignerIconName,
-  designerIcon,
-} from '../../../../packages/engine/src/browser/dom/designer-icons.ts';
 import { createBaseScreenMaterialCatalog } from '../../../../packages/plugin-core/src/index.ts';
 import { defineBaseScreenElements } from '../../../../packages/sdk/src/index.ts';
 
