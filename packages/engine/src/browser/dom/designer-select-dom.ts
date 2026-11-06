@@ -27,6 +27,9 @@ const SELECT_POPOVER_MARGIN = 8;
 /** 选项很多时的高度上限：超出后在弹层内部滚动，不把所在面板顶穿。 */
 const SELECT_POPOVER_MAX_HEIGHT = 320;
 const SELECT_POPOVER_MIN_HEIGHT = 96;
+/** 选项行高兜底与弹层纵向内边距，与 `.designer-select-option` / `.designer-select-menu` 对齐。 */
+const SELECT_OPTION_HEIGHT = 28;
+const SELECT_MENU_PADDING = 4;
 
 interface AnchorRect {
   readonly left: number;
@@ -164,8 +167,22 @@ export function enhanceDesignerSelect(select: HTMLSelectElement): DesignerSelect
     // 高度取整向下，保证夹紧后的弹层不会超出可用空间一个像素；翻转的 top 用同一个取整值，
     // 才能保证与触发器的 4px 间距不因小数差而漂移。
     const clampedHeight = Math.floor(maxHeight);
-    menu.style.maxHeight = `${clampedHeight}px`;
-    const height = Math.min(naturalHeight, clampedHeight);
+    // 内容超出夹紧高度时把可视高度对齐到整行：滚动容器的裁切边界是 padding box，
+    // 底部内边距留着会在底边露出下一行的行首（看起来像面板没盖住内容）。
+    const scrolls = naturalHeight > clampedHeight;
+    if (scrolls) menu.dataset.scroll = 'true';
+    else delete menu.dataset.scroll;
+    const rowHeight = Math.max(1, optionButtons[0]?.offsetHeight ?? SELECT_OPTION_HEIGHT);
+    const height = scrolls
+      ? Math.min(
+          clampedHeight,
+          Math.max(
+            rowHeight,
+            Math.floor(clampedHeight / rowHeight) * rowHeight + SELECT_MENU_PADDING,
+          ),
+        )
+      : Math.min(naturalHeight, clampedHeight);
+    menu.style.maxHeight = `${scrolls ? height : clampedHeight}px`;
     const top = placeAbove
       ? Math.max(SELECT_POPOVER_MARGIN, rect.top - SELECT_POPOVER_GAP - height)
       : rect.bottom + SELECT_POPOVER_GAP;
