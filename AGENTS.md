@@ -2,8 +2,8 @@
 
 ## 环境搭建与验证
 
-- 使用 Node `22`（见 `.node-version`；该文件只固定 major，精确 patch 以 CI 矩阵为准）和 pnpm `11.18.0`（见 `packageManager`）。通过 `pnpm install --frozen-lockfile` 安装；`.npmrc` 有意强制要求严格 peer 依赖，并禁用了自动安装 peer 依赖。
-- CI 会在 Node 22.23.2 和 24.18.1 上运行 `pnpm verify:m0`，随后运行 `pnpm check:api-changesets`，并以 `git diff --exit-code` 收尾，要求验证未改动任何受跟踪文件。它依次运行 `format:check`、`lint`、`typecheck`、`test`、`check:packages`、`check:api`、`check:engine-import` 和 `verify:tarball`；链中没有会写入文件的 `format` 步骤（格式修正先手动运行 `pnpm format`），也没有独立的 `build` 步骤——各包构建由 Turbo 任务依赖间接触发（`test` 依赖 `^build`，`lint`/`typecheck` 依赖 `^build`）。`pnpm verify:fast` 是同一套门禁减去 `verify:tarball`。
+- 使用 Node `22`（见 `.node-version`；该文件只固定 major，精确 patch 以 CI 固定的 `22.23.2` 为准）和 pnpm `11.18.0`（见 `packageManager`）。通过 `pnpm install --frozen-lockfile` 安装；`.npmrc` 有意强制要求严格 peer 依赖，并禁用了自动安装 peer 依赖。
+- CI 仅在 Node 22.23.2 上运行 `pnpm verify:m0`（本项目不做多 Node 版本矩阵测试），随后运行 `pnpm check:api-changesets`，并以 `git diff --exit-code` 收尾，要求验证未改动任何受跟踪文件。它依次运行 `format:check`、`lint`、`typecheck`、`test`、`check:packages`、`check:api`、`check:engine-import` 和 `verify:tarball`；链中没有会写入文件的 `format` 步骤（格式修正先手动运行 `pnpm format`），也没有独立的 `build` 步骤——各包构建由 Turbo 任务依赖间接触发（`test` 依赖 `^build`，`lint`/`typecheck` 依赖 `^build`）。`pnpm verify:fast` 是同一套门禁减去 `verify:tarball`。
 - 迭代过程中默认使用 `pnpm test:scope` 按需执行受影响测试：`pnpm test:scope --since <ref>` 自动完成变更采集、包依赖闭包、engine 文件级映射与执行；`--dry-run` 只输出计划 JSON，`--json` 供机器读取，计划与报告落盘 `.base-screen/local/scratch/test-scope/`。退出码约定：`0` 全部通过（含「无受影响测试」，计划仍落盘可审计）、`1` 存在测试失败、`2` 参数或环境错误、`3` 闭包计算异常。AI agent 默认按需执行，仅在合并前或门禁场景触发 `verify:fast` / `verify:m0` 全量。其他聚焦检查仍可用：`pnpm --filter @base-screen/contracts test`、`pnpm --filter <package> typecheck`。在交付会影响包、构建产物或公共契约的改动前，先运行 `pnpm verify:m0`。
 - **调试与修复的测试纪律**：排查问题优先静态分析（调用链、DOM/事件流、git 历史）、日志与局部探针，不得仅靠 Playwright 全量脚本定位问题；不得采用「改一处就跑全部测试套件」的迭代模式。修复验证只运行与改动点直接对应的文件/包级用例（如 `pnpm --filter @base-screen/engine exec vitest run <path>`）或最小浏览器场景，全量门禁只在明确的合并/交付节点按需触发。
 - 测试治理工具链按需使用：`pnpm test:audit` 输出无用/重复/过期测试候选报告（落盘可追溯，不自动删除，清理走人工确认 PR 流程）；`pnpm test:tag` 输出标签打标建议（未打标测试默认 unit 且必跑）；`pnpm test:baseline` 采集效率与覆盖率指标基线。
@@ -15,16 +15,15 @@
 
 ## 包边界
 
-- 这是一个 pnpm/Turbo 单体仓库。`packages/` 下固定 12 个包，由 `tooling/checks/packages.mjs` 强制校验：`contracts`、`core`、`renderer`、`engine`、`material`、`plugin-core`、`plugin-manager`、`plugin-sdk`、`react`、`vue`、`sdk` 和 `testing`。
+- 这是一个 pnpm/Turbo 单体仓库。`packages/` 下固定 12 个包，由 `tooling/checks/packages.mjs` 强制校验：`contracts`、`core`、`renderer`、`engine`、`material`、`plugin-core`、`plugin-manager`、`plugin-sdk`、`host-kit`、`react`、`vue` 和 `sdk`。
 - 与 `packages/` 平行存在顶层 `plugins/` 外围插件区，承载带受控第三方依赖、独立于固定包清单交付的能力（现有 `plugins/plugin-echarts`、`plugins/plugin-metrics`、`plugins/plugin-board-materials`、`plugins/plugin-pipeline`）。分区的权威决策见 ADR-0074（外围插件区与依赖分区），兼容策略见 ADR-0075（外围插件兼容策略）。`check-packages.mjs` 的固定包清单约束不扩大到 `plugins/`。
 - 外围插件依赖方向严格单向：`plugins/*` 可依赖 `packages/*` 的公共导出，`packages/*` 绝不依赖 `plugins/*`（含 dev 与 test）。外围插件无运行时特权，走与宿主插件相同的宿主提供/宿主加载/宿主授权通道，不新增信任通道。
 - 新增包、放宽包清单或改变跨包导出时，必须更新包及边界检查。仅当该变更改变长期架构决策、包依赖/所有权或公共兼容策略时，才新增或更新 ADR；只有跨多个独立交付阶段、需要迁移或回滚方案，或用户明确要求时，才创建 Spec。所有包都是私有的、仅 ESM、只发布 `dist`，并通过 `exports` 暴露公共 API；`host-tokens.css` 是唯一的非 JS 公共导出（见 ADR-0095）。
 - 宿主面板的设计令牌只有一份公共面：`--bs-host-*`（`@base-screen/engine/host-tokens.css`，由 `sdk` 转发一份）。值由 `tooling/build/host-tokens.mjs` 从 `designer-tokens.css` 派生并烘焙（解包覆盖位 + 重映射内部标识符），生成物提交仓库，`pnpm check:host-tokens` 守重生成一致、内部名不泄漏、双主题配对与公共名快照。宿主不得自抄调色板，也不得直接引用 `--designer-*`。
 - 派生事实只有一个权威落点，引用而不复制：固定包清单在 `tooling/checks/packages.mjs`，依赖白名单在 `tooling/checks/boundaries.mjs`，工具版本在 manifest 与 lockfile。散文不得复述可由这些来源推导的数量或清单，避免产生两份没有门禁比对的副本。
-- 跨包导入只能使用声明的 `@base-screen/*` 公共导出。`tooling/checks/boundaries.mjs` 会拒绝未声明的依赖、来自 `examples`、`tooling` 或 Nebula 的导入、被禁止的依赖图边，以及对 `testing` 的生产依赖。
+- 跨包导入只能使用声明的 `@base-screen/*` 公共导出。`tooling/checks/boundaries.mjs` 会拒绝未声明的依赖、来自 `examples`、`tooling` 或 Nebula 的导入，以及被禁止的依赖图边。
 - 依赖白名单编码在 `tooling/checks/boundaries.mjs` 中，**按区维护**：`packages/` 区只有 `contracts` 可以使用外部 `zod`，React/Vue 仅作为各自桥接包的 peer 依赖；`plugins/` 区改为逐插件显式申报允许的外部依赖，不接受通配与继承。新增依赖时，必须同时更新该白名单和对应清单。
-- `contracts`、`core`、`plugin-core`、`plugin-manager`、`plugin-sdk` 和 `testing` 使用 `tsc` 构建；它们内部的相对 TypeScript 导入必须使用 `.js` 后缀（`.json` 除外）。浏览器包和桥接包在声明文件生成后使用 Vite。
-- `@base-screen/testing` 消费公共包 API 来提供 fixture 和一致性辅助工具。生产包绝不能导入它。
+- `contracts`、`core`、`plugin-core`、`plugin-manager`、`plugin-sdk` 和 `host-kit` 使用 `tsc` 构建；它们内部的相对 TypeScript 导入必须使用 `.js` 后缀（`.json` 除外）。浏览器包和桥接包在声明文件生成后使用 Vite。
 
 ## 产品定位与宿主边界
 

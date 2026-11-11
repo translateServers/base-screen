@@ -7,7 +7,6 @@ import { defineConfig } from 'vite';
 //    package.json exports 解析到 dist 构建产物，改 src 不生效、也不在 vite 模块图里。
 // 2. watcher.add(packages)：vite 默认只 watch 根目录（tooling/verification/browser-harness），
 //    不改配置则 packages 下的文件变更不会触发 HMR/整页刷新。
-// 不 alias `@base-screen/testing`：它是测试专用包，生产依赖图不允许导入。
 const MONOREPO_PACKAGES = [
   'contracts',
   'core',

@@ -1,3 +1,6 @@
+// 独立测试库：避免并行 e2e 共享 test.db 时 ensureSeed 与告警快照互相污染。
+process.env.DATABASE_URL = 'file:../data/test.alarms.db';
+
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';

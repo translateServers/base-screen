@@ -1,3 +1,6 @@
+// 独立测试库：本 spec 建/删大屏与素材，避免并行 e2e 共享 test.db 时级联删除污染种子。
+process.env.DATABASE_URL = 'file:../data/test.assets.db';
+
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';

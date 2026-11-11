@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { PACKAGE_DEFINITIONS } from './packages.mjs';
 
 const API_REPORT_PATH = /^packages\/([^/]+)\/etc\/[^/]+\.api\.md$/;
@@ -52,7 +53,13 @@ export function requiredChangesetPackages(reportPaths) {
     if (match === null) continue;
     const directory = match[1];
     const definition = PACKAGE_DEFINITIONS[directory];
-    if (definition === undefined) fail('API_REPORT_PACKAGE_UNKNOWN', directory);
+    // 已退役包的 API 报告以删除路径出现在 diff 中，此时没有可标记的包名。
+    if (definition === undefined) {
+      if (existsSync(join('packages', directory, 'package.json'))) {
+        fail('API_REPORT_PACKAGE_UNKNOWN', directory);
+      }
+      continue;
+    }
     required.add(definition.name);
     if (SDK_REEXPORTED_DIRECTORIES.has(directory)) sdkRequired = true;
   }

@@ -18,11 +18,10 @@
     "@base-screen/plugin-core": "workspace:^",
     "@base-screen/plugin-board-materials": "workspace:^",
     "@base-screen/plugin-echarts": "workspace:^",
-    "@base-screen/plugin-manager": "workspace:^",
-    "@base-screen/plugin-sdk": "workspace:^",
     "@base-screen/sdk": "workspace:^",
     "@base-screen/vue": "workspace:^",
-    "vue": "3.5.40",
+    "echarts": "^6.1.0",
+    "vue": "^3.5.40",
     "vue-router": "^5.3.1",
     "zustand": "^5.0.15"
   },

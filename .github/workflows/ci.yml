@@ -14,13 +14,9 @@ concurrency:
 
 jobs:
   verify-m0:
-    name: Node ${{ matrix.node }}
+    name: Node 22.23.2
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        node: ['22.23.2', '24.18.1']
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,7 +24,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: '22.23.2'
       - run: corepack enable pnpm
       - run: corepack install --global pnpm@11.18.0
       - name: Resolve pnpm store path
@@ -43,11 +39,11 @@ jobs:
             ${{ steps.pnpm-store.outputs.path }}
             .turbo
             node_modules/.cache/turbo
-          key: ${{ runner.os }}-node-${{ matrix.node }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.ref_name }}-${{ github.sha }}
+          key: ${{ runner.os }}-node-22.23.2-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.ref_name }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-node-${{ matrix.node }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.ref_name }}-
-            ${{ runner.os }}-node-${{ matrix.node }}-${{ hashFiles('pnpm-lock.yaml') }}-
-            ${{ runner.os }}-node-${{ matrix.node }}-
+            ${{ runner.os }}-node-22.23.2-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.ref_name }}-
+            ${{ runner.os }}-node-22.23.2-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-node-22.23.2-
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Resolve Playwright cache location
@@ -116,7 +112,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          for pkg in contracts core renderer engine material plugin-core plugin-manager plugin-sdk react vue sdk testing; do
+          for pkg in contracts core renderer engine material plugin-core plugin-manager plugin-sdk react vue sdk; do
             pnpm test:baseline --coverage "$pkg"
           done
       - name: Upload coverage metrics

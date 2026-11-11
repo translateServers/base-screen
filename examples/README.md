@@ -177,6 +177,7 @@ pnpm probe:example-screen -- --url "http://127.0.0.1:5173/#/screens/<id>/view" -
 
 ```bash
 pnpm install                 # 仓库根（首次）
+pnpm build                   # 包只发布 dist，起 dev server 前必须先构建
 
 # 终端 1：共享后端（必须先起，三端都连它）
 pnpm dev:shared-backend     # http://127.0.0.1:3000 ，接口文档 /api/docs

@@ -14,6 +14,7 @@ export const PACKAGE_DEFINITIONS = Object.freeze({
   'plugin-core': { build: 'tsc', name: '@base-screen/plugin-core' },
   'plugin-manager': { build: 'tsc', name: '@base-screen/plugin-manager' },
   'plugin-sdk': { build: 'tsc', name: '@base-screen/plugin-sdk' },
+  'host-kit': { build: 'tsc', name: '@base-screen/host-kit' },
   react: { build: 'vite', name: '@base-screen/react' },
   vue: { build: 'vite', name: '@base-screen/vue' },
   sdk: {
@@ -25,7 +26,6 @@ export const PACKAGE_DEFINITIONS = Object.freeze({
       './dist/viewer-auto-register.js',
     ],
   },
-  testing: { build: 'tsc', name: '@base-screen/testing' },
 });
 
 function fail(code, detail) {
