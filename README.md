@@ -254,8 +254,9 @@ tarball** 一起 vendor，并用 pnpm `overrides` 把每个 `@base-screen/*` 钉
 - 框架桥的 peer 依赖：`@base-screen/react` 需要 `react` / `react-dom` `^19.1.0`，`@base-screen/vue`
   需要 `vue` `^3.5.0`。React 18 宿主不用薄封装，改走 imperative 的 `<base-screen-designer>` 元素路径。
 - 宿主面板设计令牌统一引入 `import '@base-screen/sdk/host-tokens.css'`（唯一公共样式面，ADR-0095）。
-- `@base-screen/plugin-echarts` 将 `echarts@6.1.0` 作为受控直接依赖钉版（ADR-0074）。宿主若自带其它
-  版本 echarts，会与之并存而非复用；介意体积时让宿主与插件共用同一版本。
+- `@base-screen/plugin-echarts` 把 `echarts`（`^6.1.0`）声明为 peer 依赖（ADR-0097），由宿主自行安装并与插件
+  共用同一份实例；宿主应显式安装 `echarts`，并使用 `^6.1.0` 范围内的版本。宿主未安装时 pnpm/npm 默认会
+  自动安装一份；宿主安装了范围外版本时包管理器只警告或静默放行，因此不能依赖包管理器保证版本一致（见 ADR-0097）。
 
 **只读展示的最小路径**：只接 Viewer 时从 `@base-screen/sdk/viewer` 子入口注册元素即可，该入口不引入
 Designer（engine），设计器代码不会进入 bundle。实测含 2 个官方物料 + 文档解析器的最小查看器约
