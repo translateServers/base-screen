@@ -8,6 +8,7 @@ const ALLOWED_WORKSPACE_DEPENDENCIES = Object.freeze({
   'plugin-core': ['contracts'],
   'plugin-manager': ['contracts', 'plugin-core'],
   'plugin-sdk': ['contracts', 'plugin-core'],
+  'host-kit': ['contracts'],
   renderer: ['contracts', 'core', 'plugin-core'],
   engine: ['contracts', 'core', 'renderer', 'plugin-core', 'plugin-manager'],
   material: ['contracts', 'plugin-core', 'plugin-sdk'],

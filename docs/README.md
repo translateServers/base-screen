@@ -11,6 +11,8 @@
   （已接受，2026-10-25）
 - [ADR-0091：蓝图关系模型与设计表达](./decisions/ADR-0091-blueprint-relation-model.md)
   （已接受，2026-10-27）
+- [ADR-0096：宿主接入辅助包 host-kit](./decisions/ADR-0096-host-kit-rest-adapters.md)
+  （已接受，2026-11-11）
 
 ## 设计说明
 

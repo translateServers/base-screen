@@ -18,7 +18,6 @@
     "@base-screen/plugin-core": "workspace:^",
     "@base-screen/plugin-board-materials": "workspace:^",
     "@base-screen/plugin-echarts": "workspace:^",
-    "@base-screen/plugin-manager": "workspace:^",
     "@base-screen/plugin-sdk": "workspace:^",
     "@base-screen/sdk": "workspace:^",
     "zustand": "^5.0.15"

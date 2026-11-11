@@ -209,6 +209,58 @@ import { BaseScreenDesigner } from '@base-screen/react';
 数据接入与自定义物料代码即为接入参考。接入真实业务时，替换示例中的宿主适配器
 和端口实现，并只使用包的公开导出。
 
+### 独立仓库接入（tarball 批次）
+
+包内依赖以 `^0.1.0` 这类范围声明，而这些包不在公共 registry，因此独立仓库必须把**同一批次的全部
+tarball** 一起 vendor，并用 pnpm `overrides` 把每个 `@base-screen/*` 钉到本地 tarball，让传递依赖也
+解析到同批次产物。只装单个 SDK tarball 会因传递依赖无处解析而失败。
+
+1. 把发布方提供的整批 tarball 放进宿主仓库，例如 `vendor/base-screen/`。
+2. 在宿主 `package.json` 里把用到的包声明为 `file:` 直依赖：
+
+   ```json
+   {
+     "dependencies": {
+       "@base-screen/sdk": "file:vendor/base-screen/base-screen-sdk.tgz",
+       "@base-screen/contracts": "file:vendor/base-screen/base-screen-contracts.tgz",
+       "@base-screen/material": "file:vendor/base-screen/base-screen-material.tgz",
+       "@base-screen/plugin-core": "file:vendor/base-screen/base-screen-plugin-core.tgz"
+     }
+   }
+   ```
+
+3. 在宿主 `pnpm-workspace.yaml` 里对**批次内每个包**加 overrides（含未直接声明的传递依赖）：
+
+   ```yaml
+   overrides:
+     '@base-screen/contracts': file:vendor/base-screen/base-screen-contracts.tgz
+     '@base-screen/core': file:vendor/base-screen/base-screen-core.tgz
+     '@base-screen/engine': file:vendor/base-screen/base-screen-engine.tgz
+     '@base-screen/material': file:vendor/base-screen/base-screen-material.tgz
+     '@base-screen/plugin-core': file:vendor/base-screen/base-screen-plugin-core.tgz
+     '@base-screen/plugin-manager': file:vendor/base-screen/base-screen-plugin-manager.tgz
+     '@base-screen/plugin-sdk': file:vendor/base-screen/base-screen-plugin-sdk.tgz
+     '@base-screen/renderer': file:vendor/base-screen/base-screen-renderer.tgz
+     '@base-screen/sdk': file:vendor/base-screen/base-screen-sdk.tgz
+     # 用到框架桥或外围插件时同样逐个钉住：@base-screen/vue、@base-screen/plugin-echarts …
+   ```
+
+4. `pnpm install` 后即可按[在你的应用中使用](#在你的应用中使用)装配。升级时整批替换 tarball 并重装，
+   不要混用不同批次。
+
+**环境门槛**：
+
+- 仅 ESM，浏览器运行；集成边界是 Web Components，需要真实 DOM，**不支持 CJS `require` 与 SSR**。
+- 框架桥的 peer 依赖：`@base-screen/react` 需要 `react` / `react-dom` `^19.1.0`，`@base-screen/vue`
+  需要 `vue` `^3.5.0`。React 18 宿主不用薄封装，改走 imperative 的 `<base-screen-designer>` 元素路径。
+- 宿主面板设计令牌统一引入 `import '@base-screen/sdk/host-tokens.css'`（唯一公共样式面，ADR-0095）。
+- `@base-screen/plugin-echarts` 将 `echarts@6.1.0` 作为受控直接依赖钉版（ADR-0074）。宿主若自带其它
+  版本 echarts，会与之并存而非复用；介意体积时让宿主与插件共用同一版本。
+
+**只读展示的最小路径**：只接 Viewer 时从 `@base-screen/sdk/viewer` 子入口注册元素即可，该入口不引入
+Designer（engine），设计器代码不会进入 bundle。实测含 2 个官方物料 + 文档解析器的最小查看器约
+242 KB（gzip 约 61 KB）；完整设计器 + 查看器 + 图表物料会显著更大，按需用子入口与插件裁剪。
+
 ## 核心模型
 
 **文档**保存画布、组件、变量和蓝图关系等可序列化状态；**物料**是可放入画布的可视组件，Manifest 描述
@@ -264,7 +316,7 @@ pnpm dev:react-host         # 终端 2：任选一个前端（vanilla 5173 / rea
 
 ## 包结构
 
-仓库使用 pnpm / Turbo 管理 `packages/` 下的 11 个包，公共入口统一使用 `@base-screen/*`：
+仓库使用 pnpm / Turbo 管理 `packages/` 下的 12 个包，公共入口统一使用 `@base-screen/*`：
 
 | 包 | 职责 |
 | --- | --- |
@@ -276,6 +328,7 @@ pnpm dev:react-host         # 终端 2：任选一个前端（vanilla 5173 / rea
 | `plugin-core` | 物料与插件契约、Manifest 校验和 catalog |
 | `plugin-manager` | 插件预检、加载管理、生命周期和能力授权 |
 | `plugin-sdk` | 面向插件与物料作者的定义、注册和物料包辅助 |
+| `host-kit` | 宿主接入辅助：项目适配器与数据集端口的 REST 实现（可选，ADR-0096） |
 | `react` / `vue` | 将对应框架的组件桥接为物料 |
 | `sdk` | Viewer、Designer、物料与插件的产品级组合入口 |
 

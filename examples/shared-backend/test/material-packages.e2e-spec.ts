@@ -1,3 +1,6 @@
+// 独立测试库：本 spec 建/删物料包与大屏，避免并行 e2e 共享 test.db 时互相污染。
+process.env.DATABASE_URL = 'file:../data/test.material-packages.db';
+
 import { randomUUID } from 'node:crypto';
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';

@@ -1,3 +1,6 @@
+// 独立测试库：本 spec 断言种子屏与告警绑定，避免并行 e2e 共享 test.db 时 ensureSeed 竞态。
+process.env.DATABASE_URL = 'file:../data/test.app.db';
+
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -5,8 +8,8 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
- * e2e 走真实 AppModule（含全局管道/过滤器/拦截器）与真实 SQLite 测试库
- * （DATABASE_URL 见 test/setup-env.ts，迁移由 test/global-setup.ts 应用）。
+ * e2e 走真实 AppModule（含全局管道/过滤器/拦截器）与独立 SQLite 测试库
+ * （DATABASE_URL 见文件顶部，迁移由 test/global-setup.ts 应用）。
  */
 describe('host api (e2e)', () => {
   let app: INestApplication;
