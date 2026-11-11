@@ -338,14 +338,9 @@ describe('包依赖闭包图', () => {
   it('contracts 变更闭包覆盖核心下游', () => {
     const reverse = reverseDependencyGraph(workspaceDependencyGraph(ROOT));
     const closure = downstreamClosure(['contracts'], reverse);
-    for (const expected of ['contracts', 'core', 'engine', 'sdk', 'testing']) {
+    for (const expected of ['contracts', 'core', 'engine', 'sdk']) {
       expect(closure).toContain(expected);
     }
-  });
-
-  it('testing 自身变更不影响他包（testing 被依赖方向为出边）', () => {
-    const reverse = reverseDependencyGraph(workspaceDependencyGraph(ROOT));
-    expect(downstreamClosure(['testing'], reverse)).toEqual(['testing']);
   });
 
   it('变更路径映射到正确的包', () => {

@@ -25,7 +25,6 @@ export const PACKAGE_DEFINITIONS = Object.freeze({
       './dist/viewer-auto-register.js',
     ],
   },
-  testing: { build: 'tsc', name: '@base-screen/testing' },
 });
 
 function fail(code, detail) {

@@ -52,4 +52,10 @@ describe('API report checks', () => {
       missingChangesetPackages(required, new Set(['@base-screen/contracts', '@base-screen/sdk'])),
     ).toEqual(['@base-screen/react']);
   });
+
+  it('ignores reports of packages that no longer exist in the workspace', () => {
+    expect([
+      ...requiredChangesetPackages(['packages/retired-package/etc/retired-package.api.md']),
+    ]).toEqual([]);
+  });
 });

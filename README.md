@@ -264,7 +264,7 @@ pnpm dev:react-host         # 终端 2：任选一个前端（vanilla 5173 / rea
 
 ## 包结构
 
-仓库使用 pnpm / Turbo 管理 `packages/` 下的 12 个包，公共入口统一使用 `@base-screen/*`：
+仓库使用 pnpm / Turbo 管理 `packages/` 下的 11 个包，公共入口统一使用 `@base-screen/*`：
 
 | 包 | 职责 |
 | --- | --- |
@@ -278,7 +278,6 @@ pnpm dev:react-host         # 终端 2：任选一个前端（vanilla 5173 / rea
 | `plugin-sdk` | 面向插件与物料作者的定义、注册和物料包辅助 |
 | `react` / `vue` | 将对应框架的组件桥接为物料 |
 | `sdk` | Viewer、Designer、物料与插件的产品级组合入口 |
-| `testing` | 基于公共 API 的 fixture 与一致性测试辅助，仅用于测试 |
 
 跨包调用只使用声明的公共导出。物料契约由 `plugin-core` 拥有，`renderer` 不依赖具体官方物料，
 `sdk` 负责组合而不实现各包的领域逻辑。仓库分层与依赖规则见 [AGENTS.md](./AGENTS.md)。

@@ -38,17 +38,11 @@ export function collectAllTestFiles(rootDir) {
 }
 
 /**
- * 目录启发式（§5.4）：根级 tests/ → governance；引用 @base-screen/testing → integration；默认 unit。
+ * 目录启发式（§5.4）：根级 tests/ → governance；默认 unit。
  */
-export function suggestTags(repoRelativeFile, source) {
+export function suggestTags(repoRelativeFile) {
   if (repoRelativeFile.startsWith('tests/')) {
     return { tags: ['@layer:governance'], reason: '根级跨包治理测试，天然整层 governance' };
-  }
-  if (source.includes('@base-screen/testing')) {
-    return {
-      tags: ['@layer:integration'],
-      reason: '引用 @base-screen/testing 公共 fixture，属集成层',
-    };
   }
   return { tags: ['@layer:unit'], reason: '默认层：未打标测试归入 unit 且必跑' };
 }
@@ -78,7 +72,7 @@ async function main(argv) {
       tagged += 1;
       continue;
     }
-    const suggestion = suggestTags(file, source);
+    const suggestion = suggestTags(file);
     suggestions.push({ file, suggestedTags: suggestion.tags, reason: suggestion.reason });
   }
   const result = {

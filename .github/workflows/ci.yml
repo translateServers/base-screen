@@ -116,7 +116,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          for pkg in contracts core renderer engine material plugin-core plugin-manager plugin-sdk react vue sdk testing; do
+          for pkg in contracts core renderer engine material plugin-core plugin-manager plugin-sdk react vue sdk; do
             pnpm test:baseline --coverage "$pkg"
           done
       - name: Upload coverage metrics

@@ -23,7 +23,6 @@ const ALLOWED_WORKSPACE_DEPENDENCIES = Object.freeze({
     'plugin-manager',
     'plugin-sdk',
   ],
-  testing: Object.keys(PACKAGE_DEFINITIONS).filter((directory) => directory !== 'testing'),
 });
 
 const FRAMEWORK_ROOTS = new Map([
@@ -155,9 +154,6 @@ function validateManifestDependencies(directory, manifest, graph, pluginPackageN
     }
     const dependencyDirectory = packageDirectoryByName(dependencyName);
     if (dependencyDirectory) {
-      if (dependencyDirectory === 'testing' && directory !== 'testing') {
-        fail('TESTING_DEPENDENCY_FORBIDDEN', `${directory} -> ${dependencyName}`);
-      }
       if (!allowedWorkspaceDependencies.has(dependencyDirectory)) {
         fail('FORBIDDEN_WORKSPACE_DEPENDENCY', `${directory} -> ${dependencyName}`);
       }
