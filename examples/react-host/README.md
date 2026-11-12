@@ -17,7 +17,7 @@ src/
 │   ├── api.ts                  # Result 风格 fetch 封装：统一错误体、GET 幂等重试、AbortSignal
 │   ├── logger.ts / format.ts
 ├── screen/
-│   ├── register.tsx            # 设计器/查看器/官方物料/自有物料注册（公开入口，幂等）
+│   ├── register.tsx            # 自有物料条目，直接交给标准 SDK runtime 注册
 │   ├── metric-value.ts             # 三端共有的「指标读数」manifest
 │   ├── metric-value-material.tsx   # React 物料桥（createReactMaterialDefinition + mapModel + 表格适配）
 │   ├── project-adapter.ts      # 宿主项目适配器：load/save，宿主维护 revision
@@ -34,7 +34,7 @@ src/
 | Vite + React 19 SPA | 与 Vue / Vanilla 两端形态统一（纯前端 + 共享后端），版本与根仓依赖对齐 |
 | react-router-dom（HashRouter） | hash history 免 SPA fallback，三端路由行为对等 |
 | zustand（`create` + selector） | 状态机与另两端同源同一套迁移语义；selector 订阅使组件只在选中切片变化时重渲染 |
-| 命令式挂载设计器 | 设计器是 DOM 节点而非 React 组件：ref 容器 + effect 内 `configure`/`load`；不启用 StrictMode 避免双挂载 |
+| SDK 组合层挂载设计器 | `BaseScreenDesigner` 管理挂载句柄；权威项目状态和分阶段诊断由回调提供，宿主只留业务端口与接线 |
 | 物料样式内联 | React 桥接不传播文档全局样式进 shadow root（Vue 桥接会），物料样式必须自包含 |
 | TypeScript 5.9.3 | 与三个工程及工具链对齐的稳定版本（根仓 TS 7 尚未被该工具链支持） |
 

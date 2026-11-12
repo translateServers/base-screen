@@ -69,6 +69,7 @@ import type {
   DesignerSceneHandler,
 } from '../common/operations/scene/designer-scene.js';
 import { type BaseScreenDesignerLeftPanelGroup } from '../common/operations/workbench/designer-left-panel-groups.js';
+import type { ScreenProjectState } from '../common/project/project-controller.js';
 import { type DesignerToolMaterialTypes } from '../common/tools/designer-tools.js';
 import { type BaseScreenDesignerChangeProposalSummary } from './api/designer-element-change.js';
 import type { BaseScreenDesignerConfiguration } from './api/designer-element-configuration-types.js';
@@ -656,6 +657,11 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   togglePreview(): ScreenParseResult<void> {
     return this.#designerState.runtime.togglePreview(this);
+  }
+
+  /** 返回独立的轻量快照，供首次订阅前及晚订阅时读取当前权威状态。 */
+  getProjectState(): ScreenProjectState {
+    return this.#designerState.runtime.getProjectState(this);
   }
 
   load(projectId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>> {

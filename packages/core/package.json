@@ -2,12 +2,18 @@
   "name": "@base-screen/core",
   "version": "0.1.0",
   "description": "文档命令、事务、历史与 Blueprint 运行时",
-  "private": true,
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+    "url": "git+https://github.com/translateServers/base-screen.git",
+    "directory": "packages/core"
   },
+  "homepage": "https://github.com/translateServers/base-screen#readme",
+  "bugs": "https://github.com/translateServers/base-screen/issues",
   "type": "module",
   "files": [
     "dist"

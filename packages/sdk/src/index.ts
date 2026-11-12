@@ -29,6 +29,7 @@ export {
   BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT,
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   BASE_SCREEN_METRIC_EVENT,
+  BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT,
   BASE_SCREEN_SCENE_CHANGE_EVENT,
   type BaseScreenBlueprintCanvasCommand,
   type BaseScreenBlueprintCanvasCommandEventDetail,
@@ -76,6 +77,7 @@ export {
   type BaseScreenMaterialLibraryState,
   type BaseScreenMaterialLibraryStatus,
   type BaseScreenMetricEventDetail,
+  type BaseScreenProjectStateChangeEventDetail,
   type BaseScreenSceneChangeDetail,
   baseScreenDesignerLeftPanelSlotName,
   type CreateBaseScreenCorePluginCommandPortOptions,
@@ -97,6 +99,8 @@ export {
   parseBaseScreenMaterialLibraryItems,
   parseBaseScreenMaterialLibraryState,
   prepareDesignerScenePreview,
+  type ScreenProjectPhase,
+  type ScreenProjectState,
   writeBaseScreenHostResourceDragData,
 } from './designer.js';
 export {
@@ -127,6 +131,7 @@ export {
   type BaseScreenRuntimePluginCommandPort,
   type BaseScreenSetCatalogOptions,
   type BaseScreenViewerMountOptions,
+  type BaseScreenViewerRuntime,
   type CreateBaseScreenRuntimeOptions,
   createBaseScreenRuntime,
 } from './runtime.js';
@@ -134,6 +139,12 @@ export {
   adoptBaseScreenRuntime,
   type BaseScreenRuntimeHost,
 } from './runtime-adapter.js';
+export type {
+  BaseScreenMountDiagnosticContext,
+  BaseScreenMountDiagnosticsCallback,
+  BaseScreenMountPhase,
+  BaseScreenMountResult,
+} from './runtime-diagnostics.js';
 export {
   BASE_SCREEN_VIEWER_TAG_NAME,
   type BaseScreenViewerConfiguration,

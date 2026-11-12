@@ -89,10 +89,16 @@ const catalog = createBaseScreenMaterialCatalog([text.value, rectangle.value]);
 
 // 3. 解析文档；入参为 Screen Document JSON，解析是 fail-closed 的，请处理返回的诊断
 const parsed = parseScreenDocument(screenDocumentJson);
+if (!parsed.ok) {
+  throw new Error(parsed.diagnostics[0]?.message ?? '文档解析失败');
+}
 
-// 4. 配置实例并装载文档（configure 同样返回结果对象，此处从简）
+// 4. 配置成功后再装载文档
 const viewer = document.querySelector('base-screen-viewer')!;
-viewer.configure({ catalog, instanceId: 'my-viewer', mode: 'viewer' });
+const configured = viewer.configure({ catalog, instanceId: 'my-viewer', mode: 'viewer' });
+if (!configured.ok) {
+  throw new Error(configured.diagnostics[0]?.message ?? 'Viewer 配置失败');
+}
 viewer.document = parsed.value;
 ```
 
@@ -153,7 +159,38 @@ const host = await loadHostRuntime();
 const runtime = adoptBaseScreenRuntime(host);
 ```
 
-适配器复用同一份 manager/catalog，只补挂载句柄、catalog 替换和销毁编排。React / Vue 示例的 `composition-runtime.ts` 因此只剩单例复用与 adopt；`@base-screen/contracts`、`@base-screen/material`、`@base-screen/plugin-core`、`@base-screen/plugin-manager` 与 `@base-screen/plugin-sdk` 也可分别从 `@base-screen/sdk` 的 `contracts`、`material`、`plugin-core`、`plugins` 子入口导入。
+适配器复用同一份 manager/catalog，只补挂载句柄、catalog 替换和销毁编排。它用于已有外部 runtime 的宿主；三端完整示例直接使用标准 `createBaseScreenRuntime()`，不再自建 manager 后再适配。`materials` 可直接接收 React/Vue 桥产出的 catalog 条目并保留表格数据适配器，宿主无需手写注册和构造器静态属性。`@base-screen/contracts`、`@base-screen/material`、`@base-screen/plugin-core`、`@base-screen/plugin-manager` 与 `@base-screen/plugin-sdk` 也可分别从 SDK 的对应子入口导入。
+
+### 轻量 Viewer 组合层
+
+只读页面可从 `@base-screen/sdk/viewer` 导入 `createBaseScreenViewerRuntime()`，复用挂载、目录热刷新与销毁编排：
+
+```ts
+import { parseScreenDocument } from '@base-screen/sdk/contracts';
+import { defineBaseScreenTextMaterial } from '@base-screen/sdk/material';
+import { createBaseScreenViewerRuntime } from '@base-screen/sdk/viewer';
+
+const text = defineBaseScreenTextMaterial();
+if (!text.ok) throw new Error(text.diagnostics[0]?.message);
+const parsed = parseScreenDocument(screenDocumentJson);
+if (!parsed.ok) throw new Error(parsed.diagnostics[0]?.message);
+
+const result = await createBaseScreenViewerRuntime({
+  instanceId: 'my-viewer',
+  materials: [text.value],
+});
+if (!result.ok) throw new Error(result.diagnostics[0]?.message);
+const runtime = result.value;
+const mounted = await runtime.mountViewer(container, { document: parsed.value });
+if (!mounted.ok) throw new Error(mounted.diagnostics[0]?.message);
+
+await mounted.value.dispose();
+await runtime.dispose();
+```
+
+参数默认 `{}`，默认目录为空；没有 `officialMaterials` 选项，也不会静态导入全部官方物料。`materials` 显式接收注册成功的 catalog 条目（如 `text.value`），也可接收 `createMaterialDefinition()` 创建的定义。返回的 `BaseScreenViewerRuntime` 提供 `mountViewer()`、`setCatalog()`、`manager` 与 `dispose()`，可共享给多个 Viewer，不提供 Designer 挂载。React/Vue 的 `BaseScreenViewer` 接受该只读接口，也兼容完整 `createBaseScreenRuntime()` 返回的 runtime；完整入口默认注册 Designer 与官方物料。
+
+轻量入口隔离浏览器 bundle 中的 Designer 代码；SDK 同包的依赖仍会安装，包括 `engine`，不代表减少 npm 安装依赖。
 
 ### React / Vue 薄封装
 
@@ -197,11 +234,13 @@ import { BaseScreenDesigner } from '@base-screen/react';
 
 端口必须在**这一次**挂载的 `mountOptions` 里一次提交（挂载后再赋会被引擎拒绝），而宿主的装配通常是异步的：插件 manager 激活、告警首快照、项目适配器与业务端口都可能晚到。这类「还没就绪」用 `null` 表达，不要用条件渲染把组件藏起来——`runtime={null}` / `:runtime="null"` 时组件不挂载、诊断保持为空、`renderFallback` / `#fallback` 可投影等待态；两者都就绪时自动挂载。宿主因此只写一份装配结果，不再各自发明「早返回 + 占位节点」或 `v-if` 的写法。
 
-`pnpm verify:tarball` 的 React/Vue 外部消费者会在真实浏览器里同时挂载并卸载这两个组件，断言自定义元素存在、卸载后移除、挂载诊断为空，且组件卸载不会释放共享 runtime。`examples/react-host` 与 `examples/vue-host` 的编辑页都已改用 `BaseScreenDesigner`，并复用各自宿主原有的插件管理器单例；Vanilla 编辑页仍保留手动装配作为对照。
+Designer 的 `onProjectState(state)` 在成功挂载后立即投影权威快照，并通知后续保存、dirty、冲突及重载状态；命令式入口可用 `element.getProjectState()` 与 `BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT`。快照只含阶段、dirty 及项目身份/名称/revision，不含完整文档，无需宿主二次读取项目或维护平行状态机。`onDiagnostics(diagnostics, context)` 和 fallback 另外提供失败阶段、实例是否仍可用及恢复方式，目录刷新失败与初始化失败可分别处理；原单参数回调仍有效。
+
+`pnpm verify:tarball` 的 React/Vue 外部消费者会在真实浏览器里同时挂载并卸载这两个组件，断言自定义元素存在、卸载后移除、挂载诊断为空，且组件卸载不会释放共享 runtime。React/Vue 编辑页使用 `BaseScreenDesigner`，Vanilla 使用同一 SDK 的 Designer 挂载控制器；三端共享各自应用内的标准 runtime。
 
 自定义物料使用独立 React root / Vue app；宿主通过 React `createReactMaterialDefinition({ wrapRoot(node, model) { ... } })` 重新包裹 Provider，或 Vue `createVueMaterialDefinition({ configureApp(app) { ... } })` 在 mount 前调用 `app.use()` / `app.provide()`。React 包装随模型更新重新计算；Vue 每次真正创建新 app 时执行配置。Vue 组件公开声明保留 `runtime`、`mountOptions`、回调句柄与 `fallback` 插槽的类型。
 
-可选 `@base-screen/host-kit` HTTP 适配器保留示例 REST 默认协议，同时支持 `mapping.load/save`、`mapping.groups/list/describe/query` 按操作映射请求路径、方法、JSON body 与响应 envelope。响应映射接收 `unknown`，投影后仍经过 canonical 解析；自定义项目映射可保留 opaque revision。数据集参数保留 string、number、boolean，取消与原有错误映射继续生效。
+可选 `@base-screen/host-kit` 的 `createHostProjectAdapter()` / `createHostDatasetPort()` 接受宿主现有业务请求函数和响应映射，统一处理迁移、canonical 解析、取消、冲突与数据集错误归一化。校验后的结果观察回调用于宿主业务快照，不改变端口返回值。`createHttpProjectAdapter()` / `createRestDatasetPort()` 复用同一核心并保留示例 REST 默认协议，支持按操作映射路径、方法、JSON body 和响应。自定义项目映射保留 opaque revision，数据集保留合法标量参数与分页 cursor。
 
 按接入方式区分三种集成模式：
 
@@ -213,19 +252,23 @@ import { BaseScreenDesigner } from '@base-screen/react';
 
 直接文档模式与项目模式应分别使用；绑定项目适配器后，通过项目 API 加载，不再直接赋值 `document`。
 
-**获取包**：`@base-screen/*` 是私有、仅 ESM 的包，不在公共 npm registry 发布。同一 pnpm workspace
-可直接声明 workspace 依赖；独立仓库使用发布方提供的完整同批次包集（tarball），单个 SDK tarball
-不是可独立安装的交付物。可直接运行的宿主工程见[示例总览](./examples/README.md)，其中的配置、
-数据接入与自定义物料代码即为接入参考。接入真实业务时，替换示例中的宿主适配器
-和端口实现，并只使用包的公开导出。
+**获取包**：`packages/` 下的 `@base-screen/*` 核心包已配置为向公共 npm registry 分发；外围插件暂保持私有，不在本轮发布范围。**首次发布尚未执行**，以下安装命令需等对应版本发布后使用：
 
-### 独立仓库接入（tarball 批次）
+```bash
+npm install @base-screen/sdk
+# React 宿主
+npm install @base-screen/sdk @base-screen/react react@^19.1.0 react-dom@^19.1.0
+# Vue 宿主
+npm install @base-screen/sdk @base-screen/vue vue@^3.5.0
+```
 
-包内依赖以 `^0.1.0` 这类范围声明，而这些包不在公共 registry，因此独立仓库必须把**同一批次的全部
-tarball** 一起 vendor，并用 pnpm `overrides` 把每个 `@base-screen/*` 钉到本地 tarball，让传递依赖也
-解析到同批次产物。只装单个 SDK tarball 会因传递依赖无处解析而失败。
+源码中的内部依赖保留 `workspace:^`，由 `pnpm pack` / 发布流程转换为普通 semver 范围；消费者不需要 workspace。可直接运行的宿主工程见[示例总览](./examples/README.md)。接入真实业务时替换示例中的宿主适配器和端口实现，并只使用包的公开导出。
 
-1. 把发布方提供的整批 tarball 放进宿主仓库，例如 `vendor/base-screen/`。
+### 离线验证与预发布接入（tarball 批次）
+
+tarball 用于离线验证或发布前试用。使用 `pnpm pack` 生成的**原始 tgz**，不解包改写依赖再重打包；宿主用同批次 `overrides` 将内部传递依赖解析到本地包，尚未首次发布时单独安装 SDK tgz 不能解析未上架的内部依赖。
+
+1. 把同一批次的原始 tarball 放进宿主仓库，例如 `vendor/base-screen/`（以下文件名仅为示意，以实际打包名称为准）。
 2. 在宿主 `package.json` 里把用到的包声明为 `file:` 直依赖：
 
    ```json
@@ -262,14 +305,12 @@ tarball** 一起 vendor，并用 pnpm `overrides` 把每个 `@base-screen/*` 钉
 
 - 仅 ESM，浏览器运行；集成边界是 Web Components，需要真实 DOM，**不支持 CJS `require` 与 SSR**。
 - 框架桥的 peer 依赖：`@base-screen/react` 需要 `react` / `react-dom` `^19.1.0`，`@base-screen/vue`
-  需要 `vue` `^3.5.0`。React 18 宿主不用薄封装，改走 imperative 的 `<base-screen-designer>` 元素路径。
+  需要 `vue` `^3.5.0`；当前不承诺 React 18 兼容。
 - 宿主面板设计令牌统一引入 `import '@base-screen/sdk/host-tokens.css'`（唯一公共样式面，ADR-0095）。
 - `@base-screen/plugin-echarts` 将 `echarts@6.1.0` 作为受控直接依赖钉版（ADR-0074）。宿主若自带其它
   版本 echarts，会与之并存而非复用；介意体积时让宿主与插件共用同一版本。
 
-**只读展示的最小路径**：只接 Viewer 时从 `@base-screen/sdk/viewer` 子入口注册元素即可，该入口不引入
-Designer（engine），设计器代码不会进入 bundle。实测含 2 个官方物料 + 文档解析器的最小查看器约
-242 KB（gzip 约 61 KB）；完整设计器 + 查看器 + 图表物料会显著更大，按需用子入口与插件裁剪。
+**只读展示的最小路径**：从 `@base-screen/sdk/viewer` 使用 `defineBaseScreenViewer()` 或上述轻量组合层，显式选择所需物料；该入口不引入 Designer 实现。按需使用子入口和插件控制浏览器 bundle，安装依赖与 bundle 隔离是两个层面。
 
 ## 核心模型
 

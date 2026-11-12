@@ -344,8 +344,13 @@ export const api = {
     id: string,
     document: unknown,
     revision: number,
+    signal?: AbortSignal,
   ): Promise<ApiResult<{ screen: ScreenShape }>> =>
-    request(`/screens/${encodeURIComponent(id)}`, { method: 'PUT', body: { document, revision } }),
+    request(`/screens/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: { document, revision },
+      ...(signal === undefined ? {} : { signal }),
+    }),
   deleteScreen: (id: string): Promise<ApiResult<{ ok: true }>> =>
     request(`/screens/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   /**

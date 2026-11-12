@@ -66,6 +66,64 @@ function createRuntime(
 }
 
 describe('Base Screen mount controller', () => {
+  it('publishes the accepted initial project snapshot and removes its subscription on detach', async () => {
+    const target = new EventTarget();
+    let state: import('../src/index.js').ScreenProjectState = {
+      phase: 'ready',
+      dirty: false,
+      project: { projectId: 'first', name: 'Accepted project', revision: 'r1' },
+    };
+    const fake = {
+      ...createFakeElement(),
+      addEventListener: target.addEventListener.bind(target),
+      removeEventListener: target.removeEventListener.bind(target),
+      getProjectState: () => structuredClone(state),
+    };
+    const handle = createBaseScreenMountHandle({
+      element: fake as unknown as BaseScreenDesignerElement,
+      detach: () => {},
+    });
+    const { runtime } = createRuntime(async () => ({ ok: true, value: handle, diagnostics: [] }));
+    const onProjectState = vi.fn();
+    const onMounted = vi.fn(() => expect(onProjectState).toHaveBeenCalledOnce());
+    const controller = createBaseScreenDesignerMountController({
+      runtime,
+      options: {},
+      onProjectState,
+      onMounted,
+    });
+    expect((await controller.attach(createContainer())).ok).toBe(true);
+    expect(onProjectState).toHaveBeenLastCalledWith(state);
+    state = { ...state, phase: 'saving' };
+    target.dispatchEvent(new Event('base-screen-project-state-change'));
+    expect(onProjectState).toHaveBeenLastCalledWith(state);
+    await controller.detach();
+    onProjectState.mockClear();
+    target.dispatchEvent(new Event('base-screen-project-state-change'));
+    expect(onProjectState).not.toHaveBeenCalled();
+  });
+
+  it('releases the mount if the initial project-state consumer throws', async () => {
+    const { fake, handle } = createDesignerHandle();
+    Object.assign(fake, {
+      getProjectState: () => ({ phase: 'ready', dirty: false, project: null }),
+    });
+    const { runtime } = createRuntime(async () => ({ ok: true, value: handle, diagnostics: [] }));
+    const controller = createBaseScreenDesignerMountController({
+      runtime,
+      options: {},
+      onProjectState: () => {
+        throw new Error('consumer failed');
+      },
+    });
+    const result = await controller.attach(createContainer());
+    expect(result.ok).toBe(false);
+    expect(result.mountPhase).toBe('mounted');
+    expect(handle.disposed).toBe(true);
+    expect(fake.unload).toHaveBeenCalledOnce();
+    expect(fake.removeEventListener).toHaveBeenCalledOnce();
+  });
+
   it('forwards mount options, registers cleanup, and detaches without disposing runtime', async () => {
     const { fake, handle } = createDesignerHandle();
     const mountDesigner = vi.fn(async () => ({ ok: true, value: handle, diagnostics: [] }));
@@ -86,7 +144,7 @@ describe('Base Screen mount controller', () => {
     expect(mountDesigner).toHaveBeenCalledWith(container, { projectId: 'screen-1' });
     expect(controller.handle).toBe(handle);
     expect(onMounted).toHaveBeenCalledWith(handle);
-    expect(onDiagnostics).toHaveBeenCalledWith([]);
+    expect(onDiagnostics).toHaveBeenCalledWith([], undefined);
 
     const detached = await controller.detach();
     expect(detached.ok).toBe(true);
@@ -196,6 +254,15 @@ describe('Base Screen mount controller', () => {
     expect(controller.handle).toBe(handle);
     expect(fake.unload).not.toHaveBeenCalled();
     expect(controller.diagnostics).toEqual(failure.diagnostics);
+    expect(controller.diagnosticContext).toEqual({
+      phase: 'catalog',
+      instanceAvailable: true,
+      recovery: 'retry-catalog',
+    });
+    expect(onDiagnostics).toHaveBeenLastCalledWith(
+      failure.diagnostics,
+      controller.diagnosticContext,
+    );
     fake.refreshCatalog.mockReturnValueOnce({ ...failure, diagnostics: [...failure.diagnostics] });
     const published = onDiagnostics.mock.calls.length;
     expect(controller.updateOptions({ catalog }).ok).toBe(false);
@@ -203,7 +270,7 @@ describe('Base Screen mount controller', () => {
     expect(controller.updateOptions({ catalog }).ok).toBe(true);
     expect(fake.refreshCatalog).toHaveBeenCalledTimes(3);
     expect(controller.diagnostics).toEqual([]);
-    expect(onDiagnostics).toHaveBeenLastCalledWith([]);
+    expect(onDiagnostics).toHaveBeenLastCalledWith([], undefined);
   });
 
   it('applies the latest catalog after a pending attach while preserving its initialization snapshot', async () => {
@@ -306,7 +373,11 @@ describe('Base Screen mount controller', () => {
 
     const attached = await controller.attach(createContainer());
     expect(attached.ok).toBe(false);
-    expect(onDiagnostics).toHaveBeenCalledWith(failure.diagnostics);
+    expect(onDiagnostics).toHaveBeenCalledWith(failure.diagnostics, {
+      phase: 'mount',
+      instanceAvailable: false,
+      recovery: 'remount',
+    });
     expect(controller.diagnostics).toEqual(failure.diagnostics);
     expect(controller.handle).toBeUndefined();
   });
@@ -338,6 +409,38 @@ describe('Base Screen mount controller', () => {
     expect(onMounted).not.toHaveBeenCalled();
     expect(fake.unload).toHaveBeenCalledTimes(1);
     expect(fake.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains a late disposal failure with its real phase after detach', async () => {
+    const { fake, handle } = createDesignerHandle();
+    fake.unload.mockImplementation(() => {
+      throw new Error('dispose');
+    });
+    let resolveMount: ((result: DesignerMountResult) => void) | undefined;
+    const { runtime } = createRuntime(
+      () =>
+        new Promise((resolve) => {
+          resolveMount = resolve;
+        }),
+    );
+    const onDiagnostics = vi.fn();
+    const controller = createBaseScreenDesignerMountController({
+      runtime,
+      options: {},
+      onDiagnostics,
+    });
+    const attaching = controller.attach(createContainer());
+    await vi.waitFor(() => expect(resolveMount).toBeDefined());
+    const detaching = controller.detach();
+    resolveMount?.({ ok: true, value: handle, diagnostics: [] });
+    const failed = await attaching;
+    expect(failed.mountPhase).toBe('dispose');
+    expect(onDiagnostics).toHaveBeenCalledWith(failed.diagnostics, {
+      phase: 'dispose',
+      instanceAvailable: false,
+      recovery: 'none',
+    });
+    await detaching;
   });
 
   it('waits for stale mount disposal before a replacement attach can mount', async () => {
@@ -452,6 +555,98 @@ describe('Base Screen mount controller', () => {
       await runtime.dispose();
       vi.unstubAllGlobals();
     }
+  });
+
+  it('publishes context changes even when failure diagnostics are identical', async () => {
+    const diagnostic = {
+      severity: 'error',
+      code: 'PLUGIN_CORE_LIFECYCLE_INVALID',
+      path: [],
+      message: 'same failure',
+    } as const;
+    const mount = vi
+      .fn<BaseScreenRuntime['mountDesigner']>()
+      .mockResolvedValueOnce({ ok: false, diagnostics: [diagnostic], mountPhase: 'configure' })
+      .mockResolvedValueOnce({ ok: false, diagnostics: [diagnostic], mountPhase: 'load' });
+    const { runtime } = createRuntime(mount);
+    const onDiagnostics = vi.fn();
+    const controller = createBaseScreenDesignerMountController({
+      runtime,
+      options: {},
+      onDiagnostics,
+    });
+    await controller.attach(createContainer());
+    await controller.attach(createContainer());
+    expect(onDiagnostics).toHaveBeenCalledTimes(2);
+    expect(controller.diagnosticContext).toEqual({
+      phase: 'load',
+      instanceAvailable: false,
+      recovery: 'remount',
+    });
+  });
+
+  it('retains the mounted callback phase and cleanup diagnostics after a concurrent catalog failure', async () => {
+    const { fake, handle } = createDesignerHandle();
+    let resolveMount: ((result: DesignerMountResult) => void) | undefined;
+    const { runtime } = createRuntime(
+      () =>
+        new Promise((resolve) => {
+          resolveMount = resolve;
+        }),
+    );
+    const controller = createBaseScreenDesignerMountController({
+      runtime,
+      options: {},
+      onMounted: () => {
+        throw new Error('mounted');
+      },
+    });
+    const attaching = controller.attach(createContainer());
+    await vi.waitFor(() => expect(resolveMount).toBeDefined());
+    controller.updateOptions({ catalog: [] as unknown as BaseScreenRuntimeCatalog });
+    fake.refreshCatalog.mockImplementationOnce(() => {
+      throw new Error('catalog');
+    });
+    fake.unload.mockImplementationOnce(() => {
+      throw new Error('cleanup');
+    });
+    resolveMount?.({ ok: true, value: handle, diagnostics: [] });
+    const result = await attaching;
+    expect(result.ok).toBe(false);
+    expect(result.mountPhase).toBe('mounted');
+    expect(result.diagnostics).toHaveLength(3);
+    expect(controller.diagnostics).toEqual(result.diagnostics);
+    expect(controller.diagnosticContext).toEqual({
+      phase: 'mounted',
+      instanceAvailable: false,
+      recovery: 'remount',
+    });
+    expect(controller.handle).toBeUndefined();
+  });
+
+  it('reports disposal failure without retaining the instance and clears context on later success', async () => {
+    const first = createDesignerHandle();
+    const next = createDesignerHandle();
+    const mount = vi
+      .fn<BaseScreenRuntime['mountDesigner']>()
+      .mockResolvedValueOnce({ ok: true, value: first.handle, diagnostics: [] })
+      .mockResolvedValueOnce({ ok: true, value: next.handle, diagnostics: [] });
+    const { runtime } = createRuntime(mount);
+    const controller = createBaseScreenDesignerMountController({ runtime, options: {} });
+    await controller.attach(createContainer());
+    first.fake.unload.mockImplementation(() => {
+      throw new Error('dispose');
+    });
+    expect((await controller.detach()).ok).toBe(false);
+    expect(controller.handle).toBeUndefined();
+    expect(controller.diagnosticContext).toEqual({
+      phase: 'dispose',
+      instanceAvailable: false,
+      recovery: 'none',
+    });
+    await controller.attach(createContainer());
+    expect(controller.diagnosticContext).toBeUndefined();
+    expect(controller.diagnostics).toEqual([]);
   });
 
   it('provides the same lifecycle for Viewer mounts', async () => {

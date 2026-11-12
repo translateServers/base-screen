@@ -9,12 +9,17 @@ import {
   type EchartsSeriesClickPayload,
 } from './chart-adapter.js';
 import { PLUGIN_ECHARTS_TABULAR_DATA_ADAPTER } from './chart-data-adapter.js';
-import { buildPluginEchartsOption } from './chart-option.js';
+import {
+  buildChartFamilyOption,
+  buildPluginEchartsOption,
+  type ChartFamilyKind,
+} from './chart-option.js';
 import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from './manifest.js';
 
 export class PluginEchartsElement extends HTMLElement {
   static readonly manifest = PLUGIN_ECHARTS_MATERIAL_MANIFEST;
 
+  protected chartFamily: ChartFamilyKind | undefined;
   #model: BaseScreenMaterialModel | undefined;
   #handle: EchartsChartHandle | undefined;
   #resizeObserver: ResizeObserver | undefined;
@@ -61,16 +66,20 @@ export class PluginEchartsElement extends HTMLElement {
       handle.render({});
       return;
     }
+    const input = {
+      data: parsed.value,
+      titleText: readString(model.props.titleText),
+      showTooltip: model.props.showTooltip !== false,
+      seriesType: readString(model.props.seriesType, 'line'),
+      textColor: readString(model.style.color, '#f9fafb'),
+      gridColor: readString(model.style.gridColor, '#374151'),
+      seriesColor: readString(model.style.seriesColor, '#38bdf8'),
+      props: model.props,
+    };
     handle.render(
-      buildPluginEchartsOption({
-        data: parsed.value,
-        titleText: readString(model.props.titleText),
-        showTooltip: model.props.showTooltip !== false,
-        seriesType: readString(model.props.seriesType, 'line'),
-        textColor: readString(model.style.color, '#f9fafb'),
-        gridColor: readString(model.style.gridColor, '#374151'),
-        seriesColor: readString(model.style.seriesColor, '#38bdf8'),
-      }),
+      this.chartFamily === undefined
+        ? buildPluginEchartsOption(input)
+        : buildChartFamilyOption(this.chartFamily, input),
     );
   }
 

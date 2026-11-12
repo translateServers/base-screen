@@ -5,6 +5,7 @@ import type {
 } from '@base-screen/plugin-core';
 import {
   PLUGIN_ECHARTS_MATERIAL_MANIFEST,
+  PLUGIN_ECHARTS_MATERIAL_MANIFESTS,
   PLUGIN_ECHARTS_PANEL_TAG_NAME,
   PLUGIN_ECHARTS_SERIES_PICKER_TAG_NAME,
 } from './manifest.js';
@@ -34,11 +35,11 @@ export function createPluginEchartsRuntime(): BaseScreenPluginRuntime {
       dependencies: [],
       capabilities: ['command.execute', 'design.read'],
       contributions: [
-        {
-          kind: 'material',
-          type: PLUGIN_ECHARTS_MATERIAL_MANIFEST.type,
-          tagName: PLUGIN_ECHARTS_MATERIAL_MANIFEST.tagName,
-        },
+        ...PLUGIN_ECHARTS_MATERIAL_MANIFESTS.map((manifest) => ({
+          kind: 'material' as const,
+          type: manifest.type,
+          tagName: manifest.tagName,
+        })),
         {
           kind: 'command',
           id: PLUGIN_ECHARTS_TOGGLE_COMMAND_ID,

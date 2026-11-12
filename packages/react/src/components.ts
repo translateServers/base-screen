@@ -4,12 +4,16 @@ import {
   type BaseScreenDesignerMountOptions,
   type BaseScreenMountController,
   type BaseScreenMountControllerReady,
+  type BaseScreenMountDiagnosticContext,
+  type BaseScreenMountDiagnosticsCallback,
   type BaseScreenMountElement,
   type BaseScreenRuntime,
   type BaseScreenViewerElement,
   type BaseScreenViewerMountOptions,
+  type BaseScreenViewerRuntime,
   createBaseScreenDesignerMountController,
   createBaseScreenViewerMountController,
+  type ScreenProjectState,
 } from '@base-screen/sdk';
 import {
   type CSSProperties,
@@ -30,49 +34,71 @@ export interface BaseScreenDesignerProps {
   /** 强制重挂载；catalog 新引用热刷新，其余非身份配置只保存为后续挂载的初始化快照。 */
   readonly remountKey?: string | number;
   readonly onMounted?: BaseScreenMountControllerReady<BaseScreenDesignerElement>;
-  readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
-  readonly renderFallback?: (diagnostics: readonly ScreenDiagnostic[]) => ReactNode;
+  readonly onProjectState?: (state: ScreenProjectState) => void;
+  readonly onDiagnostics?: BaseScreenMountDiagnosticsCallback;
+  readonly renderFallback?: (
+    diagnostics: readonly ScreenDiagnostic[],
+    context: BaseScreenMountDiagnosticContext | undefined,
+  ) => ReactNode;
   readonly className?: string;
   readonly style?: CSSProperties;
 }
 
 export interface BaseScreenViewerProps {
   /** `null` 表示尚未就绪：不挂载、不保留诊断，等它变为非空后再挂载。 */
-  readonly runtime: BaseScreenRuntime | null;
+  readonly runtime: BaseScreenViewerRuntime | null;
   /** 初始化快照；`null` 表示尚未就绪。文档/项目身份变化重挂载，catalog 新引用热刷新。 */
   readonly mountOptions: BaseScreenViewerMountOptions | null;
   readonly remountKey?: string | number;
   readonly onMounted?: BaseScreenMountControllerReady<BaseScreenViewerElement>;
-  readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
-  readonly renderFallback?: (diagnostics: readonly ScreenDiagnostic[]) => ReactNode;
+  readonly onDiagnostics?: BaseScreenMountDiagnosticsCallback;
+  readonly renderFallback?: (
+    diagnostics: readonly ScreenDiagnostic[],
+    context: BaseScreenMountDiagnosticContext | undefined,
+  ) => ReactNode;
   readonly className?: string;
   readonly style?: CSSProperties;
 }
 
 interface ControllerCallbacks<TElement extends BaseScreenMountElement> {
   readonly onMounted: BaseScreenMountControllerReady<TElement> | undefined;
-  readonly onDiagnostics: ((diagnostics: readonly ScreenDiagnostic[]) => void) | undefined;
+  readonly onDiagnostics: BaseScreenMountDiagnosticsCallback | undefined;
+  readonly onProjectState?: ((state: ScreenProjectState) => void) | undefined;
 }
 
-interface CreateControllerInput<TElement extends BaseScreenMountElement, TOptions> {
-  readonly runtime: BaseScreenRuntime;
+interface CreateControllerInput<
+  TElement extends BaseScreenMountElement,
+  TOptions,
+  TRuntime extends BaseScreenViewerRuntime,
+> {
+  readonly runtime: TRuntime;
   readonly options: TOptions;
   readonly onMounted: BaseScreenMountControllerReady<TElement>;
-  readonly onDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
+  readonly onDiagnostics: BaseScreenMountDiagnosticsCallback;
+  readonly onProjectState: ((state: ScreenProjectState) => void) | undefined;
 }
 
-type CreateController<TElement extends BaseScreenMountElement, TOptions> = (
-  input: CreateControllerInput<TElement, TOptions>,
+type CreateController<
+  TElement extends BaseScreenMountElement,
+  TOptions,
+  TRuntime extends BaseScreenViewerRuntime,
+> = (
+  input: CreateControllerInput<TElement, TOptions, TRuntime>,
 ) => BaseScreenMountController<TElement, TOptions>;
 
-interface UseBaseScreenMountOptions<TElement extends BaseScreenMountElement, TOptions> {
-  readonly runtime: BaseScreenRuntime | null;
+interface UseBaseScreenMountOptions<
+  TElement extends BaseScreenMountElement,
+  TOptions,
+  TRuntime extends BaseScreenViewerRuntime,
+> {
+  readonly runtime: TRuntime | null;
   readonly mountOptions: TOptions | null;
   readonly remountKey: string | number | undefined;
   readonly identity: readonly unknown[];
   readonly onMounted: BaseScreenMountControllerReady<TElement> | undefined;
-  readonly onDiagnostics: ((diagnostics: readonly ScreenDiagnostic[]) => void) | undefined;
-  readonly createController: CreateController<TElement, TOptions>;
+  readonly onDiagnostics: BaseScreenMountDiagnosticsCallback | undefined;
+  readonly onProjectState?: ((state: ScreenProjectState) => void) | undefined;
+  readonly createController: CreateController<TElement, TOptions, TRuntime>;
 }
 
 /** 未就绪不是错误：诊断清空，回调不会被调用。 */
@@ -81,21 +107,28 @@ const EMPTY_DIAGNOSTICS: readonly ScreenDiagnostic[] = Object.freeze([]);
 function useBaseScreenMount<
   TElement extends BaseScreenMountElement,
   TOptions extends { readonly catalog?: unknown },
+  TRuntime extends BaseScreenViewerRuntime,
 >(
-  options: UseBaseScreenMountOptions<TElement, TOptions>,
+  options: UseBaseScreenMountOptions<TElement, TOptions, TRuntime>,
 ): {
   readonly containerRef: RefObject<HTMLDivElement | null>;
   readonly diagnostics: readonly ScreenDiagnostic[];
+  readonly diagnosticContext: BaseScreenMountDiagnosticContext | undefined;
 } {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [diagnostics, setDiagnostics] = useState<readonly ScreenDiagnostic[]>([]);
+  const [diagnosticState, setDiagnosticState] = useState<{
+    diagnostics: readonly ScreenDiagnostic[];
+    context: BaseScreenMountDiagnosticContext | undefined;
+  }>({ diagnostics: EMPTY_DIAGNOSTICS, context: undefined });
   const callbacksRef = useRef<ControllerCallbacks<TElement>>({
     onMounted: options.onMounted,
     onDiagnostics: options.onDiagnostics,
+    onProjectState: options.onProjectState,
   });
   callbacksRef.current = {
     onMounted: options.onMounted,
     onDiagnostics: options.onDiagnostics,
+    onProjectState: options.onProjectState,
   };
   const createControllerRef = useRef(options.createController);
   createControllerRef.current = options.createController;
@@ -108,27 +141,36 @@ function useBaseScreenMount<
     const mountOptions = options.mountOptions;
     // 还没就绪（宿主仍在准备 runtime / 端口）：不建控制器，上一轮诊断也作废。
     if (container === null || runtime === null || mountOptions === null) {
-      setDiagnostics(EMPTY_DIAGNOSTICS);
+      setDiagnosticState({ diagnostics: EMPTY_DIAGNOSTICS, context: undefined });
       return;
     }
+    let cancelled = false;
     const controller = createControllerRef.current({
       runtime,
       options: mountOptions,
-      onMounted: (handle) => callbacksRef.current.onMounted?.(handle),
-      onDiagnostics: (next) => {
-        setDiagnostics(next);
-        callbacksRef.current.onDiagnostics?.(next);
+      onMounted: (handle) => {
+        if (!cancelled) return callbacksRef.current.onMounted?.(handle);
+      },
+      onProjectState:
+        options.onProjectState === undefined
+          ? undefined
+          : (state) => {
+              if (!cancelled) callbacksRef.current.onProjectState?.(state);
+            },
+      onDiagnostics: (next, context) => {
+        if (cancelled) return;
+        setDiagnosticState({ diagnostics: next, context });
+        callbacksRef.current.onDiagnostics?.(next, context);
       },
     });
     controllerRef.current = controller;
-    let cancelled = false;
     void detachRef.current.then(() => {
       if (!cancelled) return controller.attach(container);
     });
     return () => {
       cancelled = true;
       controllerRef.current = null;
-      setDiagnostics(EMPTY_DIAGNOSTICS);
+      setDiagnosticState({ diagnostics: EMPTY_DIAGNOSTICS, context: undefined });
       const previous = detachRef.current;
       const detached = controller.detach();
       detachRef.current = Promise.all([previous, detached]);
@@ -141,15 +183,25 @@ function useBaseScreenMount<
     controllerRef.current?.updateOptions(mountOptions);
   }, [options.mountOptions, options.mountOptions?.catalog]);
 
-  return { containerRef, diagnostics };
+  return {
+    containerRef,
+    diagnostics: diagnosticState.diagnostics,
+    diagnosticContext: diagnosticState.context,
+  };
 }
 
 function renderMountDiagnostics(
   diagnostics: readonly ScreenDiagnostic[],
-  renderFallback: ((diagnostics: readonly ScreenDiagnostic[]) => ReactNode) | undefined,
+  context: BaseScreenMountDiagnosticContext | undefined,
+  renderFallback:
+    | ((
+        diagnostics: readonly ScreenDiagnostic[],
+        context: BaseScreenMountDiagnosticContext | undefined,
+      ) => ReactNode)
+    | undefined,
 ): ReactNode {
   if (diagnostics.length === 0) return null;
-  if (renderFallback !== undefined) return renderFallback(diagnostics);
+  if (renderFallback !== undefined) return renderFallback(diagnostics, context);
   return createElement(
     'div',
     { role: 'alert' },
@@ -175,18 +227,20 @@ export function BaseScreenDesigner(props: BaseScreenDesignerProps): ReactElement
     onMounted,
     onDiagnostics,
     identity: [mountOptions?.projectId, mountOptions?.document, mountOptions?.element],
+    onProjectState: props.onProjectState,
     createController: (input) =>
       createBaseScreenDesignerMountController({
         runtime: input.runtime,
         options: input.options,
         onMounted: input.onMounted,
+        ...(input.onProjectState === undefined ? {} : { onProjectState: input.onProjectState }),
         onDiagnostics: input.onDiagnostics,
       }),
   });
   return createElement(
     'div',
     { ref: mounted.containerRef, className, style },
-    renderMountDiagnostics(mounted.diagnostics, renderFallback),
+    renderMountDiagnostics(mounted.diagnostics, mounted.diagnosticContext, renderFallback),
   );
 }
 
@@ -224,6 +278,6 @@ export function BaseScreenViewer(props: BaseScreenViewerProps): ReactElement {
   return createElement(
     'div',
     { ref: mounted.containerRef, className, style },
-    renderMountDiagnostics(mounted.diagnostics, renderFallback),
+    renderMountDiagnostics(mounted.diagnostics, mounted.diagnosticContext, renderFallback),
   );
 }

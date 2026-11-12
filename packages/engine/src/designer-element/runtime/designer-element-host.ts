@@ -48,6 +48,7 @@ import { type BaseScreenMaterialLibraryGrouping } from '../../common/operations/
 import { type BaseScreenMaterialLibraryItem } from '../../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../../common/operations/material-library/material-library-state.js';
 import { type BaseScreenDesignerLeftPanelGroup } from '../../common/operations/workbench/designer-left-panel-groups.js';
+import type { ScreenProjectState } from '../../common/project/project-controller.js';
 import { type DesignerToolMaterialTypes } from '../../common/tools/designer-tools.js';
 import type { BaseScreenDesignerConfiguration } from '../api/designer-element-configuration-types.js';
 
@@ -134,6 +135,7 @@ export interface DesignerElementHost extends HTMLElement {
   exportDocument(): ScreenParseResult<string>;
   importDocument(document: unknown): ScreenParseResult<ScreenDocument>;
   togglePreview(): ScreenParseResult<void>;
+  getProjectState(): ScreenProjectState;
   load(projectId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   listProjects(
     query?: string,

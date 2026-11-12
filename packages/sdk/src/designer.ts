@@ -21,6 +21,7 @@ export {
   BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT,
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   BASE_SCREEN_METRIC_EVENT,
+  BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT,
   BASE_SCREEN_SCENE_CHANGE_EVENT,
   type BaseScreenBlueprintCanvasCommand,
   type BaseScreenBlueprintCanvasCommandEventDetail,
@@ -68,6 +69,7 @@ export {
   type BaseScreenMaterialLibraryState,
   type BaseScreenMaterialLibraryStatus,
   type BaseScreenMetricEventDetail,
+  type BaseScreenProjectStateChangeEventDetail,
   type BaseScreenSceneChangeDetail,
   baseScreenDesignerLeftPanelSlotName,
   type CreateBaseScreenCorePluginCommandPortOptions,
@@ -88,6 +90,8 @@ export {
   parseBaseScreenMaterialLibraryItems,
   parseBaseScreenMaterialLibraryState,
   prepareDesignerScenePreview,
+  type ScreenProjectPhase,
+  type ScreenProjectState,
   writeBaseScreenHostResourceDragData,
 } from '@base-screen/engine';
 

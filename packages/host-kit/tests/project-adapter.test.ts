@@ -1,6 +1,10 @@
 import { parseScreenDocument } from '@base-screen/contracts';
-import { describe, expect, it } from 'vitest';
-import { createHttpProjectAdapter } from '../src/index.js';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  createHostProjectAdapter,
+  createHttpProjectAdapter,
+  type HostKitOperationResult,
+} from '../src/index.js';
 
 const DOCUMENT = {
   canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
@@ -37,6 +41,156 @@ function routingFetch(handler: (call: Call) => { ok: boolean; status: number; bo
 }
 
 const SCREEN = { id: 'p1', name: '演示', revision: 3, document: DOCUMENT };
+
+describe('createHostProjectAdapter', () => {
+  const envelope = {
+    projectId: 'p1',
+    revision: 'etag:abc/+',
+    name: '业务项目',
+    description: null,
+    metadata: {},
+    document: DOCUMENT,
+  };
+  const ok = <T>(data: T): HostKitOperationResult<T> => ({ ok: true, data });
+
+  it('复用业务函数并保留 opaque revision，读取仍迁移并校验', async () => {
+    const migrated = vi.fn((input: unknown) => {
+      const parsed = parseScreenDocument(input);
+      return parsed.ok
+        ? { ok: true as const, document: parsed.value, decisions: [], diagnostics: [] }
+        : {
+            ok: false as const,
+            document: undefined,
+            decisions: [],
+            diagnostics: parsed.diagnostics,
+          };
+    });
+    const adapter = createHostProjectAdapter({
+      migrate: migrated,
+      load: {
+        execute: async (_request, signal) => {
+          expect(signal).toBeInstanceOf(AbortSignal);
+          return ok({ saved: envelope });
+        },
+        response: (payload) => payload.saved,
+      },
+      save: {
+        execute: async (request) => {
+          expect(request.revision).toBe('etag:abc/+');
+          return ok(envelope);
+        },
+      },
+    });
+    const loaded = await adapter.load({ projectId: 'p1', signal: new AbortController().signal });
+    expect(loaded).toMatchObject({ ok: true, value: envelope });
+    expect(migrated).toHaveBeenCalledTimes(1);
+    if (!loaded.ok) throw new Error('加载失败');
+    expect(
+      await adapter.save({ ...loaded.value, signal: new AbortController().signal }),
+    ).toMatchObject({ ok: true, value: envelope });
+    expect(migrated).toHaveBeenCalledTimes(1);
+  });
+
+  it('保存 observer 无法通过 request.document 修改调用者文档', async () => {
+    const parsed = parseScreenDocument(DOCUMENT);
+    if (!parsed.ok) throw new Error('文档无效');
+    const observer = vi.fn();
+    const adapter = createHostProjectAdapter({
+      load: { execute: async () => ok(envelope) },
+      save: { execute: async (request) => ok({ ...envelope, document: request.document }) },
+      onSaveResult: (event) => {
+        observer(event);
+        expect('signal' in event.request).toBe(false);
+        Object.assign(event.request.document.canvas, { width: 1 });
+      },
+    });
+    const result = await adapter.save({
+      projectId: 'p1',
+      revision: 'opaque',
+      document: parsed.value,
+      signal: new AbortController().signal,
+    });
+    expect(observer).toHaveBeenCalledTimes(1);
+    expect(parsed.value.canvas.width).toBe(1920);
+    expect(result).toMatchObject({ ok: true, value: { document: { canvas: { width: 1920 } } } });
+  });
+
+  it('业务冲突错误与无效保存信封都经过统一处理', async () => {
+    const parsed = parseScreenDocument(DOCUMENT);
+    if (!parsed.ok) throw new Error('文档无效');
+    for (const code of ['REVISION_CONFLICT', 'OTHER']) {
+      const adapter = createHostProjectAdapter({
+        load: { execute: async () => ok(envelope) },
+        save: {
+          execute: async () => ({ ok: false, error: { code, message: 'stale', status: 409 } }),
+        },
+      });
+      expect(
+        await adapter.save({
+          projectId: 'p1',
+          revision: 'opaque',
+          document: parsed.value,
+          signal: new AbortController().signal,
+        }),
+      ).toMatchObject({
+        ok: false,
+        diagnostics: [{ code: 'PROJECT_CONFLICT', path: ['revision'] }],
+      });
+    }
+    const invalid = createHostProjectAdapter({
+      load: { execute: async () => ok(envelope) },
+      save: { execute: async () => ok({ ...envelope, document: null }) },
+    });
+    expect(
+      (
+        await invalid.save({
+          projectId: 'p1',
+          revision: 'opaque',
+          document: parsed.value,
+          signal: new AbortController().signal,
+        })
+      ).ok,
+    ).toBe(false);
+  });
+
+  it('取消桥接、异步失败与观察抛错都不泄漏异常', async () => {
+    const controller = new AbortController();
+    const observed = vi.fn();
+    const adapter = createHostProjectAdapter({
+      load: {
+        execute: async (_request, signal) => {
+          controller.abort();
+          expect(signal.aborted).toBe(true);
+          throw new DOMException('cancelled', 'AbortError');
+        },
+      },
+      save: {
+        execute: async () => {
+          throw new Error('offline');
+        },
+      },
+      onLoadResult: observed,
+      onSaveResult: () => {
+        throw new Error('日志错误');
+      },
+    });
+    expect(await adapter.load({ projectId: 'p1', signal: controller.signal })).toEqual({
+      ok: false,
+      diagnostics: [],
+    });
+    expect(observed).not.toHaveBeenCalled();
+    const parsed = parseScreenDocument(DOCUMENT);
+    if (!parsed.ok) throw new Error('文档无效');
+    expect(
+      await adapter.save({
+        projectId: 'p1',
+        revision: 'opaque',
+        document: parsed.value,
+        signal: new AbortController().signal,
+      }),
+    ).toMatchObject({ ok: false, diagnostics: [{ code: 'PROJECT_UNAVAILABLE' }] });
+  });
+});
 
 describe('createHttpProjectAdapter', () => {
   it('loads, migrates and builds an envelope', async () => {

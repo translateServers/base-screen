@@ -1,5 +1,9 @@
 import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
-import type { BaseScreenDesignerElement } from '@base-screen/engine';
+import {
+  BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT,
+  type BaseScreenDesignerElement,
+  type ScreenProjectState,
+} from '@base-screen/engine';
 import type { BaseScreenViewerElement } from '@base-screen/renderer';
 import type { BaseScreenMountElement, BaseScreenMountHandle } from './mount-handle.js';
 import type {
@@ -7,8 +11,15 @@ import type {
   BaseScreenRuntime,
   BaseScreenRuntimeCatalog,
   BaseScreenViewerMountOptions,
+  BaseScreenViewerRuntime,
 } from './runtime.js';
-import { runtimeFailure, runtimeSuccess } from './runtime-diagnostics.js';
+import {
+  type BaseScreenMountDiagnosticContext,
+  type BaseScreenMountDiagnosticsCallback,
+  type BaseScreenMountResult,
+  runtimeFailure,
+  runtimeSuccess,
+} from './runtime-diagnostics.js';
 import { setBaseScreenMountCatalogOwnership } from './runtime-mounts.js';
 
 export type BaseScreenMountControllerReady<TElement extends BaseScreenMountElement> = (
@@ -18,9 +29,10 @@ export type BaseScreenMountControllerReady<TElement extends BaseScreenMountEleme
 export interface BaseScreenMountController<TElement extends BaseScreenMountElement, TOptions> {
   readonly handle: BaseScreenMountHandle<TElement> | undefined;
   readonly diagnostics: readonly ScreenDiagnostic[];
+  readonly diagnosticContext: BaseScreenMountDiagnosticContext | undefined;
   /** 保存后续 attach 的初始化快照；只有 catalog 新引用会热刷新当前实例，失败可显式重试。 */
   updateOptions(options: TOptions): ScreenParseResult<null>;
-  attach(container: Element): Promise<ScreenParseResult<BaseScreenMountHandle<TElement>>>;
+  attach(container: Element): Promise<BaseScreenMountResult<BaseScreenMountHandle<TElement>>>;
   /** 释放当前句柄；若 attach 仍在等待，Promise 落地后会立即释放并失败关闭。 */
   detach(): Promise<ScreenParseResult<null>>;
 }
@@ -28,15 +40,17 @@ export interface BaseScreenMountController<TElement extends BaseScreenMountEleme
 export interface CreateBaseScreenDesignerMountControllerOptions {
   readonly runtime: BaseScreenRuntime;
   readonly options: BaseScreenDesignerMountOptions;
+  /** 挂载成功后先订阅再读取当前快照，随后转发同一权威项目会话的变化。 */
+  readonly onProjectState?: (state: ScreenProjectState) => void;
   readonly onMounted?: BaseScreenMountControllerReady<BaseScreenDesignerElement>;
-  readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+  readonly onDiagnostics?: BaseScreenMountDiagnosticsCallback;
 }
 
 export interface CreateBaseScreenViewerMountControllerOptions {
-  readonly runtime: BaseScreenRuntime;
+  readonly runtime: BaseScreenViewerRuntime;
   readonly options: BaseScreenViewerMountOptions;
   readonly onMounted?: BaseScreenMountControllerReady<BaseScreenViewerElement>;
-  readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+  readonly onDiagnostics?: BaseScreenMountDiagnosticsCallback;
 }
 
 interface ControllerRequest<
@@ -53,9 +67,9 @@ interface ControllerRequest<
   readonly mount: (
     container: Element,
     options: TOptions,
-  ) => Promise<ScreenParseResult<BaseScreenMountHandle<TElement>>>;
+  ) => Promise<BaseScreenMountResult<BaseScreenMountHandle<TElement>>>;
   readonly onMounted?: BaseScreenMountControllerReady<TElement>;
-  readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+  readonly onDiagnostics?: BaseScreenMountDiagnosticsCallback;
 }
 
 function createMountController<
@@ -66,15 +80,17 @@ function createMountController<
   let handle: BaseScreenMountHandle<TElement> | undefined;
   let appliedCatalog: BaseScreenRuntimeCatalog | undefined;
   let diagnostics: readonly ScreenDiagnostic[] = [];
+  let diagnosticContext: BaseScreenMountDiagnosticContext | undefined;
   let lifecycleDiagnostics: readonly ScreenDiagnostic[] = [];
+  let lifecycleContext: BaseScreenMountDiagnosticContext | undefined;
   let catalogDiagnostics: readonly ScreenDiagnostic[] = [];
   let generation = 0;
   let diagnosticsPublished = false;
   let pending: Promise<unknown> = Promise.resolve();
 
   const enqueue = <T>(
-    operation: () => Promise<ScreenParseResult<T>>,
-  ): Promise<ScreenParseResult<T>> => {
+    operation: () => Promise<BaseScreenMountResult<T>>,
+  ): Promise<BaseScreenMountResult<T>> => {
     const result = pending.then(operation);
     pending = result.then(
       () => undefined,
@@ -83,11 +99,27 @@ function createMountController<
     return result;
   };
 
-  const publishDiagnostics = (next: readonly ScreenDiagnostic[]): void => {
+  const publishDiagnostics = (
+    next: readonly ScreenDiagnostic[],
+    context: BaseScreenMountDiagnosticContext | undefined = lifecycleContext,
+  ): void => {
     lifecycleDiagnostics = next;
+    lifecycleContext = next.length === 0 ? undefined : context;
     const combined = [...lifecycleDiagnostics, ...catalogDiagnostics];
+    const nextContext: BaseScreenMountDiagnosticContext | undefined =
+      lifecycleContext ??
+      (catalogDiagnostics.length > 0
+        ? {
+            phase: 'catalog',
+            instanceAvailable: handle !== undefined,
+            recovery: handle !== undefined ? 'retry-catalog' : 'remount',
+          }
+        : undefined);
     const unchanged =
       diagnosticsPublished &&
+      nextContext?.phase === diagnosticContext?.phase &&
+      nextContext?.instanceAvailable === diagnosticContext?.instanceAvailable &&
+      nextContext?.recovery === diagnosticContext?.recovery &&
       combined.length === diagnostics.length &&
       combined.every((item, index) => {
         const previous = diagnostics[index];
@@ -101,9 +133,10 @@ function createMountController<
         );
       });
     diagnostics = combined;
+    diagnosticContext = nextContext;
     if (unchanged) return;
     diagnosticsPublished = true;
-    request.onDiagnostics?.(diagnostics);
+    request.onDiagnostics?.(diagnostics, diagnosticContext);
   };
   const refreshCatalog = (): ScreenParseResult<null> => {
     if (handle === undefined) return runtimeSuccess(null);
@@ -135,20 +168,50 @@ function createMountController<
     publishDiagnostics(lifecycleDiagnostics);
     return result.ok ? runtimeSuccess(null) : result;
   };
-  const releaseHandle = async (): Promise<ScreenParseResult<null>> => {
+  const disposeHandle = async (
+    active: BaseScreenMountHandle<TElement>,
+  ): Promise<BaseScreenMountResult<null>> => {
+    try {
+      const result = await active.dispose();
+      return result.ok ? result : { ...result, mountPhase: 'dispose' };
+    } catch {
+      return {
+        ...runtimeFailure<null>(
+          'PLUGIN_CORE_LIFECYCLE_INVALID',
+          'Base Screen mount disposal threw an error.',
+          ['controller', 'dispose'],
+        ),
+        mountPhase: 'dispose',
+      };
+    }
+  };
+  const releaseHandle = async (publish = true): Promise<BaseScreenMountResult<null>> => {
     const active = handle;
     handle = undefined;
-    if (active === undefined) return runtimeSuccess(null);
-    const result = await active.dispose();
-    if (!result.ok) publishDiagnostics(result.diagnostics);
+    const result = active === undefined ? runtimeSuccess(null) : await disposeHandle(active);
+    catalogDiagnostics = [];
+    if (publish) {
+      publishDiagnostics(
+        result.ok ? [] : result.diagnostics,
+        result.ok
+          ? undefined
+          : {
+              phase: 'dispose',
+              instanceAvailable: false,
+              recovery: 'none',
+            },
+      );
+    }
     return result;
   };
-  const staleFailure = <T>(): ScreenParseResult<T> =>
-    runtimeFailure(
+  const staleFailure = <T>(): BaseScreenMountResult<T> => ({
+    ...runtimeFailure<T>(
       'PLUGIN_CORE_LIFECYCLE_INVALID',
       'Base Screen mount controller was detached while attaching.',
       ['controller'],
-    );
+    ),
+    mountPhase: 'mount',
+  });
 
   return Object.freeze({
     get handle(): BaseScreenMountHandle<TElement> | undefined {
@@ -157,46 +220,68 @@ function createMountController<
     get diagnostics(): readonly ScreenDiagnostic[] {
       return diagnostics;
     },
+    get diagnosticContext(): BaseScreenMountDiagnosticContext | undefined {
+      return diagnosticContext;
+    },
     updateOptions(options: TOptions): ScreenParseResult<null> {
       currentOptions = { ...options };
       return refreshCatalog();
     },
-    attach(container: Element): Promise<ScreenParseResult<BaseScreenMountHandle<TElement>>> {
+    attach(container: Element): Promise<BaseScreenMountResult<BaseScreenMountHandle<TElement>>> {
       const currentGeneration = ++generation;
       return enqueue(async () => {
         if (currentGeneration !== generation) return staleFailure();
-        const released = await releaseHandle();
-        if (!released.ok) return released;
+        const released = await releaseHandle(false);
+        if (!released.ok) {
+          publishDiagnostics(released.diagnostics, {
+            phase: 'dispose',
+            instanceAvailable: false,
+            recovery: 'none',
+          });
+          return released;
+        }
         if (currentGeneration !== generation) return staleFailure();
 
         // 固定本次初始化快照；等待项目加载期间只补齐最新 catalog，不重新 configure/load。
         const mountOptions = currentOptions;
         const mountCatalog = request.readCatalog(mountOptions);
-        let mounted: ScreenParseResult<BaseScreenMountHandle<TElement>>;
+        let mounted: BaseScreenMountResult<BaseScreenMountHandle<TElement>>;
         try {
           mounted = await request.mount(container, mountOptions);
         } catch {
-          mounted = runtimeFailure(
-            'PLUGIN_CORE_LIFECYCLE_INVALID',
-            'Base Screen mount request threw an error.',
-            ['controller', 'mount'],
-          );
+          mounted = {
+            ...runtimeFailure(
+              'PLUGIN_CORE_LIFECYCLE_INVALID',
+              'Base Screen mount request threw an error.',
+              ['controller', 'mount'],
+            ),
+            mountPhase: 'mount',
+          };
         }
         if (currentGeneration !== generation) {
-          const disposal = mounted.ok ? await mounted.value.dispose() : mounted;
+          const disposal = mounted.ok ? await disposeHandle(mounted.value) : mounted;
           const stale = staleFailure<BaseScreenMountHandle<TElement>>();
           if (!disposal.ok) {
-            const failed = {
-              ok: false as const,
-              diagnostics: [...stale.diagnostics, ...disposal.diagnostics],
+            const failed: BaseScreenMountResult<BaseScreenMountHandle<TElement>> = {
+              ok: false,
+              diagnostics: [...disposal.diagnostics, ...stale.diagnostics],
+              mountPhase: disposal.mountPhase ?? 'mount',
             };
-            publishDiagnostics(failed.diagnostics);
+            publishDiagnostics(failed.diagnostics, {
+              phase: failed.mountPhase ?? 'mount',
+              instanceAvailable: false,
+              recovery: 'none',
+            });
             return failed;
           }
           return stale;
         }
         if (!mounted.ok) {
-          publishDiagnostics(mounted.diagnostics);
+          publishDiagnostics(mounted.diagnostics, {
+            phase: mounted.mountPhase ?? 'mount',
+            instanceAvailable: false,
+            recovery: 'remount',
+          });
           return mounted;
         }
 
@@ -210,21 +295,31 @@ function createMountController<
           const cleanup = request.onMounted?.(active);
           if (typeof cleanup === 'function') active.onDispose(cleanup);
         } catch {
-          await releaseHandle();
-          const failed = runtimeFailure<BaseScreenMountHandle<TElement>>(
+          const catalogFailures = catalogDiagnostics;
+          const disposal = await releaseHandle(false);
+          const primary = runtimeFailure<BaseScreenMountHandle<TElement>>(
             'PLUGIN_CORE_LIFECYCLE_INVALID',
             'Base Screen mounted callback threw an error.',
             ['controller', 'onMounted'],
           );
-          publishDiagnostics(failed.diagnostics);
+          const failed: BaseScreenMountResult<BaseScreenMountHandle<TElement>> = {
+            ok: false,
+            diagnostics: [...primary.diagnostics, ...catalogFailures, ...disposal.diagnostics],
+            mountPhase: 'mounted',
+          };
+          publishDiagnostics(failed.diagnostics, {
+            phase: 'mounted',
+            instanceAvailable: false,
+            recovery: 'remount',
+          });
           return failed;
         }
-        return refreshed.ok ? mounted : refreshed;
+        return refreshed.ok ? mounted : { ...refreshed, mountPhase: 'catalog' };
       });
     },
     detach(): Promise<ScreenParseResult<null>> {
       generation += 1;
-      return enqueue(releaseHandle);
+      return enqueue(() => releaseHandle());
     },
   });
 }
@@ -234,7 +329,16 @@ export function createBaseScreenDesignerMountController(
 ): BaseScreenMountController<BaseScreenDesignerElement, BaseScreenDesignerMountOptions> {
   return createMountController({
     options: options.options,
-    ...(options.onMounted !== undefined ? { onMounted: options.onMounted } : {}),
+    onMounted: (handle) => {
+      if (options.onProjectState !== undefined) {
+        const publish = (): void => {
+          if (!handle.disposed) options.onProjectState?.(handle.element.getProjectState());
+        };
+        handle.on(BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT, publish);
+        publish();
+      }
+      return options.onMounted?.(handle);
+    },
     ...(options.onDiagnostics !== undefined ? { onDiagnostics: options.onDiagnostics } : {}),
     readCatalog: (mountOptions) => mountOptions.catalog ?? options.runtime.catalog,
     readElementCatalog: (element) => element.catalog,

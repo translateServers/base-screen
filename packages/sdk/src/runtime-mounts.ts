@@ -1,10 +1,6 @@
 import type { ScreenParseResult } from '@base-screen/contracts';
-import { BaseScreenDesignerElement } from '@base-screen/engine';
+import type { BaseScreenDesignerElement } from '@base-screen/engine';
 import { BaseScreenViewerElement } from '@base-screen/renderer';
-import {
-  BASE_SCREEN_OFFICIAL_GROUP_MATERIAL_TYPE,
-  BASE_SCREEN_OFFICIAL_TOOL_MATERIAL_TYPES,
-} from './material.js';
 import {
   type BaseScreenMountElement,
   type BaseScreenMountHandle,
@@ -17,11 +13,14 @@ import type {
   BaseScreenViewerMountOptions,
 } from './runtime.js';
 import {
+  type BaseScreenMountPhase,
+  type BaseScreenMountResult,
   collectDiagnostics,
   collectFailureDiagnostics,
   nullResult,
   runtimeFailure,
   runtimeSuccess,
+  withMountPhase,
 } from './runtime-diagnostics.js';
 
 interface MountCatalogOwnership {
@@ -52,6 +51,7 @@ interface MountContext<TElement extends BaseScreenMountElement> {
   readonly container: Element;
   readonly children: readonly Node[];
   readonly configure: () => ScreenParseResult<null>;
+  readonly initializePhase: 'load' | 'document';
   readonly initialize: (
     handle: BaseScreenMountHandle<TElement>,
   ) => Promise<ScreenParseResult<null>>;
@@ -64,14 +64,15 @@ interface MountContext<TElement extends BaseScreenMountElement> {
 async function disposeFailedMount<TValue, TElement extends BaseScreenMountElement>(
   handle: BaseScreenMountHandle<TElement>,
   failures: readonly ScreenParseResult<unknown>[],
-): Promise<ScreenParseResult<TValue>> {
+  phase: BaseScreenMountPhase,
+): Promise<BaseScreenMountResult<TValue>> {
   const disposal = await handle.dispose();
-  return { ok: false, diagnostics: collectDiagnostics([...failures, disposal]) };
+  return { ok: false, diagnostics: collectDiagnostics([...failures, disposal]), mountPhase: phase };
 }
 
 async function mountWithHandle<TElement extends BaseScreenMountElement>(
   context: MountContext<TElement>,
-): Promise<ScreenParseResult<BaseScreenMountHandle<TElement>>> {
+): Promise<BaseScreenMountResult<BaseScreenMountHandle<TElement>>> {
   let handleReference: BaseScreenMountHandle<TElement> | undefined;
   const handle = createBaseScreenMountHandle({
     element: context.element,
@@ -87,13 +88,17 @@ async function mountWithHandle<TElement extends BaseScreenMountElement>(
     if (context.children.length > 0) context.element.append(...context.children);
     context.container.append(context.element);
   } catch {
-    return disposeFailedMount(handle, [
-      runtimeFailure<null>(
-        'PLUGIN_CORE_LIFECYCLE_INVALID',
-        'Base Screen element could not be appended to the host container.',
-        ['mount', 'container'],
-      ),
-    ]);
+    return disposeFailedMount(
+      handle,
+      [
+        runtimeFailure<null>(
+          'PLUGIN_CORE_LIFECYCLE_INVALID',
+          'Base Screen element could not be appended to the host container.',
+          ['mount', 'container'],
+        ),
+      ],
+      'mount',
+    );
   }
 
   let configured: ScreenParseResult<null>;
@@ -106,7 +111,7 @@ async function mountWithHandle<TElement extends BaseScreenMountElement>(
       ['mount', 'configure'],
     );
   }
-  if (!configured.ok) return disposeFailedMount(handle, [configured]);
+  if (!configured.ok) return disposeFailedMount(handle, [configured], 'configure');
 
   let initialized: ScreenParseResult<null>;
   try {
@@ -118,25 +123,37 @@ async function mountWithHandle<TElement extends BaseScreenMountElement>(
       ['mount', 'initialize'],
     );
   }
-  if (!initialized.ok) return disposeFailedMount(handle, [initialized]);
+  if (!initialized.ok) return disposeFailedMount(handle, [initialized], context.initializePhase);
   if (context.isDisposed() || handle.disposed) {
-    return disposeFailedMount(handle, [
-      runtimeFailure<null>(
-        'PLUGIN_CORE_LIFECYCLE_INVALID',
-        'Base Screen runtime was disposed while mounting.',
-        ['runtime'],
-      ),
-    ]);
+    return disposeFailedMount(
+      handle,
+      [
+        runtimeFailure<null>(
+          'PLUGIN_CORE_LIFECYCLE_INVALID',
+          'Base Screen runtime was disposed while mounting.',
+          ['runtime'],
+        ),
+      ],
+      'mount',
+    );
   }
   return runtimeSuccess(handle);
 }
 
 function createDesignerElement(
   provided: BaseScreenDesignerElement | undefined,
+  create: (() => BaseScreenDesignerElement) | undefined,
 ): ScreenParseResult<BaseScreenDesignerElement> {
   if (provided !== undefined) return runtimeSuccess(provided);
+  if (create === undefined) {
+    return runtimeFailure(
+      'PLUGIN_CORE_LIFECYCLE_INVALID',
+      'This runtime only supports Viewer mounts.',
+      ['designer'],
+    );
+  }
   try {
-    return runtimeSuccess(new BaseScreenDesignerElement());
+    return runtimeSuccess(create());
   } catch {
     return runtimeFailure(
       'PLUGIN_CORE_LIFECYCLE_INVALID',
@@ -169,6 +186,9 @@ export interface BaseScreenRuntimeMountContext {
   readonly inspectorControls: BaseScreenRuntime['inspectorControls'];
   readonly runtimeContributions: BaseScreenRuntime['runtimeContributions'];
   readonly pluginCommandPort: BaseScreenRuntime['pluginCommandPort'];
+  readonly createDesignerElement?: () => BaseScreenDesignerElement;
+  readonly toolMaterialTypes?: Readonly<Record<string, string>>;
+  readonly groupMaterialType?: string;
   readonly bindDesigner: (element: BaseScreenDesignerElement) => ScreenParseResult<null>;
   readonly releaseDesigner: (element: BaseScreenDesignerElement) => void;
   readonly isDisposed: () => boolean;
@@ -220,7 +240,7 @@ export function createBaseScreenRuntimeMounts(
   const mountDesigner = async (
     container: Element,
     mountOptions: BaseScreenDesignerMountOptions,
-  ): Promise<ScreenParseResult<BaseScreenMountHandle<BaseScreenDesignerElement>>> => {
+  ): Promise<BaseScreenMountResult<BaseScreenMountHandle<BaseScreenDesignerElement>>> => {
     if (context.isDisposed()) {
       return runtimeFailure(
         'PLUGIN_CORE_LIFECYCLE_INVALID',
@@ -257,7 +277,7 @@ export function createBaseScreenRuntimeMounts(
         ['projectAdapter'],
       );
     }
-    const elementResult = createDesignerElement(providedElement);
+    const elementResult = createDesignerElement(providedElement, context.createDesignerElement);
     if (!elementResult.ok) return elementResult;
     const element = elementResult.value;
     if (designerHandle !== undefined) {
@@ -279,12 +299,13 @@ export function createBaseScreenRuntimeMounts(
         element.configure({
           catalog: activeCatalog,
           toolMaterialTypes: Object.fromEntries(
-            Object.entries(BASE_SCREEN_OFFICIAL_TOOL_MATERIAL_TYPES).filter(([, type]) =>
+            Object.entries(context.toolMaterialTypes ?? {}).filter(([, type]) =>
               activeCatalog.has(type),
             ),
           ),
-          ...(activeCatalog.has(BASE_SCREEN_OFFICIAL_GROUP_MATERIAL_TYPE)
-            ? { groupMaterialType: BASE_SCREEN_OFFICIAL_GROUP_MATERIAL_TYPE }
+          ...(context.groupMaterialType !== undefined &&
+          activeCatalog.has(context.groupMaterialType)
+            ? { groupMaterialType: context.groupMaterialType }
             : {}),
           runtimeContributions: context.runtimeContributions,
           pluginCatalog: context.pluginCatalog,
@@ -293,6 +314,7 @@ export function createBaseScreenRuntimeMounts(
           pluginCommandPort: context.pluginCommandPort,
           ...configuration,
         }),
+      initializePhase: projectId !== undefined ? 'load' : 'document',
       initialize: async () => {
         if (projectId !== undefined) {
           try {
@@ -339,7 +361,7 @@ export function createBaseScreenRuntimeMounts(
   const mountViewer = async (
     container: Element,
     mountOptions: BaseScreenViewerMountOptions,
-  ): Promise<ScreenParseResult<BaseScreenMountHandle<BaseScreenViewerElement>>> => {
+  ): Promise<BaseScreenMountResult<BaseScreenMountHandle<BaseScreenViewerElement>>> => {
     if (context.isDisposed()) {
       return runtimeFailure(
         'PLUGIN_CORE_LIFECYCLE_INVALID',
@@ -370,6 +392,7 @@ export function createBaseScreenRuntimeMounts(
           instanceId: `${context.instanceId}:viewer:${viewerSequence}`,
           ...configuration,
         }),
+      initializePhase: 'document',
       initialize: async () => {
         if (initialDocument === undefined) return runtimeSuccess(null);
         try {
@@ -398,8 +421,14 @@ export function createBaseScreenRuntimeMounts(
   };
 
   return {
-    mountDesigner,
-    mountViewer,
+    async mountDesigner(container, options) {
+      const result = await mountDesigner(container, options);
+      return withMountPhase(result, result.mountPhase ?? 'mount');
+    },
+    async mountViewer(container, options) {
+      const result = await mountViewer(container, options);
+      return withMountPhase(result, result.mountPhase ?? 'mount');
+    },
     get designer(): BaseScreenDesignerElement | undefined {
       return designerHandle?.element;
     },

@@ -20,6 +20,7 @@ import { BASE_SCREEN_HOST_RESOURCE_DRAG_MIME } from '@base-screen/engine';
 import { BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_METRIC_EVENT } from '@base-screen/engine';
+import { BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_SCENE_CHANGE_EVENT } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasCommandEventDetail } from '@base-screen/engine';
@@ -68,6 +69,7 @@ import { BaseScreenMaterialLibraryItem } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryState } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryStatus } from '@base-screen/engine';
 import { BaseScreenMetricEventDetail } from '@base-screen/engine';
+import { BaseScreenProjectStateChangeEventDetail } from '@base-screen/engine';
 import { BaseScreenSceneChangeDetail } from '@base-screen/engine';
 import { createBaseScreenCorePluginCommandPort } from '@base-screen/engine';
 import { CreateBaseScreenCorePluginCommandPortOptions } from '@base-screen/engine';
@@ -88,6 +90,8 @@ import { parseBaseScreenMaterialLibraryItems } from '@base-screen/engine';
 import { parseBaseScreenMaterialLibraryState } from '@base-screen/engine';
 import { prepareDesignerScenePreview } from '@base-screen/engine';
 import type { ScreenParseResult } from '@base-screen/contracts';
+import { ScreenProjectPhase } from '@base-screen/engine';
+import { ScreenProjectState } from '@base-screen/engine';
 import { writeBaseScreenHostResourceDragData } from '@base-screen/engine';
 
 export { BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT }
@@ -124,6 +128,8 @@ export { BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT }
 export { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT }
 
 export { BASE_SCREEN_METRIC_EVENT }
+
+export { BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT }
 
 export { BASE_SCREEN_SCENE_CHANGE_EVENT }
 
@@ -221,6 +227,8 @@ export { BaseScreenMaterialLibraryStatus }
 
 export { BaseScreenMetricEventDetail }
 
+export { BaseScreenProjectStateChangeEventDetail }
+
 export { BaseScreenSceneChangeDetail }
 
 export { createBaseScreenCorePluginCommandPort }
@@ -261,6 +269,10 @@ export { parseBaseScreenMaterialLibraryItems }
 export { parseBaseScreenMaterialLibraryState }
 
 export { prepareDesignerScenePreview }
+
+export { ScreenProjectPhase }
+
+export { ScreenProjectState }
 
 export { writeBaseScreenHostResourceDragData }
 

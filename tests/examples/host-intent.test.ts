@@ -669,11 +669,8 @@ describe('host intent wiring parity', () => {
       const source = readFileSync(EDITORS[host], 'utf8');
       // 三端的绑定写法现在带目录读取函数，断言按结构匹配而不是逐字抄整行。
       const bound = source.search(/setIntentHandler\(\s*createHostIntentHandler\(/);
-      // React / Vue 编辑页把 load 交给组合层适配器的 projectId，vanilla 仍显式调用 element.load。
-      const loaded =
-        host === 'vanilla-host'
-          ? source.indexOf('await element.load(screenId)')
-          : source.indexOf('projectId: screenId');
+      // 三端都把项目加载交给 SDK 组合层，处理器只在挂载成功后接线。
+      const loaded = source.indexOf('projectId: screenId');
       expect(bound, `${host} 未绑定意图处理器`).toBeGreaterThan(-1);
       expect(loaded, `${host} 未触发项目加载`).toBeGreaterThan(-1);
       expect(bound, `${host} 必须在 load 之后绑定意图处理器`).toBeGreaterThan(loaded);
@@ -684,7 +681,7 @@ describe('host intent wiring parity', () => {
         const adapter = readFileSync(COMPOSITION_RUNTIMES[host], 'utf8');
         expect(source).toContain('<BaseScreenDesigner');
         expect(adapter).toContain('loadHostRuntime()');
-        expect(adapter).toContain('adoptBaseScreenRuntime(host)');
+        expect(adapter).not.toContain('adoptBaseScreenRuntime(');
         expect(adapter).not.toContain('createBaseScreenRuntime(');
         expect(adapter).not.toContain('createBaseScreenPluginManager(');
       }

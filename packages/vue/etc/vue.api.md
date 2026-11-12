@@ -11,20 +11,25 @@ import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
 import { BaseScreenMountControllerReady } from '@base-screen/sdk';
+import { BaseScreenMountDiagnosticContext } from '@base-screen/sdk';
+import { BaseScreenMountDiagnosticsCallback } from '@base-screen/sdk';
 import { BaseScreenRuntime } from '@base-screen/sdk';
 import { BaseScreenViewerElement } from '@base-screen/sdk';
 import { BaseScreenViewerMountOptions } from '@base-screen/sdk';
+import { BaseScreenViewerRuntime } from '@base-screen/sdk';
 import { Component } from 'vue';
 import { DefineSetupFnComponent } from 'vue';
 import { PublicProps } from 'vue';
 import type { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
+import { ScreenProjectState } from '@base-screen/sdk';
 import { SlotsType } from 'vue';
 
 // @public (undocumented)
 export const BaseScreenDesigner: DefineSetupFnComponent<BaseScreenDesignerProps, {}, SlotsType<{
 fallback: {
 diagnostics: readonly ScreenDiagnostic[];
+context: BaseScreenMountDiagnosticContext | undefined;
 };
 }>, BaseScreenDesignerProps & {}, PublicProps>;
 
@@ -32,9 +37,11 @@ diagnostics: readonly ScreenDiagnostic[];
 export interface BaseScreenDesignerProps {
     readonly mountOptions: BaseScreenDesignerMountOptions | null;
     // (undocumented)
-    readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+    readonly onDiagnostics?: BaseScreenMountDiagnosticsCallback;
     // (undocumented)
     readonly onMounted?: BaseScreenMountControllerReady<BaseScreenDesignerElement>;
+    // (undocumented)
+    readonly onProjectState?: (state: ScreenProjectState) => void;
     readonly remountKey?: string | number;
     readonly runtime: BaseScreenRuntime | null;
 }
@@ -43,6 +50,7 @@ export interface BaseScreenDesignerProps {
 export const BaseScreenViewer: DefineSetupFnComponent<BaseScreenViewerProps, {}, SlotsType<{
 fallback: {
 diagnostics: readonly ScreenDiagnostic[];
+context: BaseScreenMountDiagnosticContext | undefined;
 };
 }>, BaseScreenViewerProps & {}, PublicProps>;
 
@@ -50,12 +58,12 @@ diagnostics: readonly ScreenDiagnostic[];
 export interface BaseScreenViewerProps {
     readonly mountOptions: BaseScreenViewerMountOptions | null;
     // (undocumented)
-    readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+    readonly onDiagnostics?: BaseScreenMountDiagnosticsCallback;
     // (undocumented)
     readonly onMounted?: BaseScreenMountControllerReady<BaseScreenViewerElement>;
     // (undocumented)
     readonly remountKey?: string | number;
-    readonly runtime: BaseScreenRuntime | null;
+    readonly runtime: BaseScreenViewerRuntime | null;
 }
 
 // @public (undocumented)

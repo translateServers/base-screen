@@ -15,9 +15,7 @@ import { join } from 'node:path';
  * `page.route` 按 REST 契约履约 `/api/**`，把前端与后端解耦，让失败原因始终落在
  * "包 ABI 或前端接入"上。
  */
-export function writeHostAppVueTarballConsumerFiles(consumer, tarballSpec, root) {
-  // 与 bridge/vanilla 消费者同一原因：Windows 无符号链接权限时 isolated 布局会静默失败。
-  writeFileSync(join(consumer, 'pnpm-workspace.yaml'), 'nodeLinker: hoisted\n');
+export function writeHostAppVueTarballConsumerFiles(consumer, packageSpec, root) {
   const example = join(root, 'examples', 'vue-host');
   // 复制除安装/构建产物外的全部工程文件（含 SFC、vite 配置、样式）。
   cpSync(example, consumer, {
@@ -26,10 +24,10 @@ export function writeHostAppVueTarballConsumerFiles(consumer, tarballSpec, root)
   });
 
   const manifest = JSON.parse(readFileSync(join(consumer, 'package.json'), 'utf8'));
-  // 仓库内是 workspace 协议，外部消费者必须换成真实 tarball。
+  // 保留真实示例的直接依赖；传递依赖由 workspace overrides 固定到同批原始 tarball。
   for (const name of Object.keys(manifest.dependencies ?? {})) {
     if (name.startsWith('@base-screen/')) {
-      manifest.dependencies[name] = tarballSpec(name.replace('@base-screen/', ''));
+      manifest.dependencies[name] = packageSpec(name.slice('@base-screen/'.length));
     }
   }
   // 浏览器验证脚本需要 Playwright；示例本身不带它（仓库内由根 devDependencies 提供）。
@@ -126,6 +124,7 @@ if (url === undefined) throw new Error('VUE_HOST_TARBALL_SERVER_URL_MISSING');
 
 const browser = await chromium.launch();
 const puts = [];
+let screenReads = 0;
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
@@ -146,6 +145,7 @@ try {
       });
     }
     if (path === '/api/screens/' + SEED_ID && request.method() === 'GET') {
+      screenReads += 1;
       return json({ screen: screenShape(revision) });
     }
     if (path === '/api/screens/' + SEED_ID && request.method() === 'PUT') {
@@ -200,7 +200,7 @@ try {
       viewerRegistered: customElements.get('base-screen-viewer') !== undefined,
       materialRegistered: customElements.get('host-app-metric-value') !== undefined,
       componentCount: designer?.document?.components.length ?? 0,
-      revision: designer?.document === null ? null : true,
+      project: designer?.getProjectState(),
     };
   });
   if (!designerState.registered || !designerState.viewerRegistered || !designerState.materialRegistered) {
@@ -208,6 +208,10 @@ try {
   }
   if (designerState.componentCount !== 3) {
     throw new Error('VUE_HOST_TARBALL_DOCUMENT_FAILED: ' + JSON.stringify(designerState));
+  }
+
+  if (screenReads !== 1 || designerState.project?.phase !== 'ready' || designerState.project?.project?.name !== SCREEN_NAME || designerState.project?.project?.revision !== '1') {
+    throw new Error('VUE_HOST_TARBALL_PROJECT_STATE_FAILED: ' + JSON.stringify({ screenReads, designerState }));
   }
 
   // 3) host-resource 数据通道 + SFC 物料：指标读数渲染出存根指标数值。
@@ -227,9 +231,9 @@ try {
   const saved = await page.evaluate(async () => {
     const designer = document.querySelector('base-screen-designer');
     const result = await designer.save();
-    return { ok: result.ok === true, revision: result.ok ? result.value.revision : null };
+    return { ok: result.ok === true, revision: result.ok ? result.value.revision : null, project: designer.getProjectState() };
   });
-  if (!saved.ok || saved.revision !== '2') {
+  if (!saved.ok || saved.revision !== '2' || saved.project.phase !== 'ready' || saved.project.project?.revision !== '2' || saved.project.dirty) {
     throw new Error('VUE_HOST_TARBALL_SAVE_FAILED: ' + JSON.stringify(saved));
   }
   if (puts.length !== 1 || puts[0].revision !== 1) {

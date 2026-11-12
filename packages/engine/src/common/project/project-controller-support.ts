@@ -17,6 +17,21 @@ export type ScreenProjectPhase =
   | 'error'
   | 'disposed';
 
+export const BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT = 'base-screen-project-state-change';
+
+/** 当前项目的轻量只读快照；本地文档或无项目时 project 为 null。 */
+export interface ScreenProjectState {
+  readonly phase: ScreenProjectPhase;
+  readonly dirty: boolean;
+  readonly project: {
+    readonly projectId: string;
+    readonly name: string;
+    readonly revision: string;
+  } | null;
+}
+
+export type BaseScreenProjectStateChangeEventDetail = ScreenProjectState;
+
 export interface ScreenProjectScheduler {
   wait(delayMs: number, signal: AbortSignal): Promise<void>;
 }

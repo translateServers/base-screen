@@ -2,17 +2,25 @@
   "name": "@base-screen/engine",
   "version": "0.1.0",
   "description": "Designer 会话、画布交互、检查器和工作台编排",
-  "private": true,
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+    "url": "git+https://github.com/translateServers/base-screen.git",
+    "directory": "packages/engine"
   },
+  "homepage": "https://github.com/translateServers/base-screen#readme",
+  "bugs": "https://github.com/translateServers/base-screen/issues",
   "type": "module",
   "files": [
     "dist"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/host-tokens.css"
+  ],
   "dependencies": {
     "@base-screen/contracts": "workspace:^",
     "@base-screen/core": "workspace:^",

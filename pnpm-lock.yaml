@@ -50,6 +50,9 @@ importers:
       react-dom:
         specifier: 19.1.0
         version: 19.1.0(react@19.1.0)
+      semver:
+        specifier: 7.8.5
+        version: 7.8.5
       turbo:
         specifier: 2.10.8
         version: 2.10.8
@@ -74,6 +77,9 @@ importers:
 
   examples/react-host:
     dependencies:
+      '@base-screen/host-kit':
+        specifier: workspace:^
+        version: link:../../packages/host-kit
       '@base-screen/plugin-board-materials':
         specifier: workspace:^
         version: link:../../plugins/plugin-board-materials
@@ -193,6 +199,9 @@ importers:
       '@base-screen/contracts':
         specifier: workspace:^
         version: link:../../packages/contracts
+      '@base-screen/host-kit':
+        specifier: workspace:^
+        version: link:../../packages/host-kit
       '@base-screen/material':
         specifier: workspace:^
         version: link:../../packages/material
@@ -227,6 +236,9 @@ importers:
 
   examples/vue-host:
     dependencies:
+      '@base-screen/host-kit':
+        specifier: workspace:^
+        version: link:../../packages/host-kit
       '@base-screen/plugin-board-materials':
         specifier: workspace:^
         version: link:../../plugins/plugin-board-materials

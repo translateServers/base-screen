@@ -8,4 +8,4 @@
 
 `configure()` 接收 `catalog` 与可选的宿主端口（`resourcePort` / `datasetPort` / `hostCatalogPort` /
 `conditionalStylePort` 等）；端口在渲染器创建时捕获，之后再赋值会被拒绝。契约与解析归
-`@base-screen/contracts`。接入见根 [README](../../README.md#在你的应用中使用)。
+`@base-screen/contracts`。接入见根 [README](https://github.com/translateServers/base-screen/blob/master/README.md#在你的应用中使用)。

@@ -2,8 +2,10 @@
 import type {
   BaseScreenDesignerElement,
   BaseScreenDesignerMountOptions,
+  BaseScreenMountDiagnosticContext,
   BaseScreenMountHandle,
   BaseScreenRuntime,
+  ScreenProjectState,
 } from '@base-screen/sdk';
 import type { ScreenDiagnostic } from '@base-screen/sdk/contracts';
 import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from '@base-screen/sdk/designer';
@@ -28,7 +30,6 @@ import { createHostIntentHandler } from '../screen/host-intent';
 import { createHostIntentReferenceCatalog } from '../screen/host-intent-reference';
 import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
-import { screenSessionStore } from '../store/screen-session-store';
 
 interface DesignerStage {
   readonly screenId: string;
@@ -44,9 +45,15 @@ const stage = shallowRef<DesignerStage | null>(null);
 // shallowRef：不代理设计器实例（自定义元素内部状态无需 Vue 响应式）。
 const designer = shallowRef<BaseScreenDesignerElement | null>(null);
 
-let unsubscribeSession: (() => void) | undefined;
 let alarms: ReturnType<typeof createHostAlarmController> | undefined;
 let disposed = false;
+let lastError: string | undefined;
+
+function notifyError(message: string): void {
+  if (disposed || message === lastError) return;
+  lastError = message;
+  showToast(message, 'error');
+}
 
 // 保存由用户显式触发（顶栏「保存」/ Ctrl+S，经宿主 project adapter）；宿主不订阅文档变化，
 // 也不在离开前隐式落盘——未保存的改动随页面卸载丢弃。三端逐条对等。
@@ -71,13 +78,6 @@ onMounted(() => {
     showToast('缺少大屏 ID。', 'error');
     return;
   }
-  screenSessionStore.getState().begin(screenId);
-  // 会话状态仍由 store 这台状态机持有，但宿主不再渲染状态文案（基座顶栏已显示项目名与
-  // 保存状态），只在 error 变化的那一次把它转成 toast。
-  unsubscribeSession = screenSessionStore.subscribe((state, previous) => {
-    if (state.error !== null && state.error !== previous.error) showToast(state.error, 'error');
-  });
-
   void (async () => {
     // 1) 插件 manager 激活（全站单例；失败时清缓存供下次重试）
     const runtime = await loadVueDesignerRuntime();
@@ -129,9 +129,6 @@ onMounted(() => {
         }),
         conditionalStylePort: controller.port,
         hostConditionalStyleAuthoring: alarmStyleAuthoring,
-        // 组合的编辑期形态：多个原子物料成组后整体移动/缩放/旋转。缺了这行，顶栏「编辑 → 成组」
-        // 与图层面板的成组按钮都不可用。
-        groupMaterialType: 'base.container',
         // 返回按钮由基座顶栏渲染，宿主只负责点击后跳回自己的路由。
         backButton: true,
         hostResourceSelectionButton: true,
@@ -140,16 +137,15 @@ onMounted(() => {
     };
   })().catch((error: unknown) => {
     if (disposed) return;
+    alarms?.stop();
     logger.error('editor bootstrap failed', error);
-    screenSessionStore.getState().failedToLoad('设计器初始化失败，请返回列表重试。');
+    notifyError('设计器初始化失败，请返回列表重试。');
   });
 });
 
 onBeforeUnmount(() => {
   disposed = true;
-  unsubscribeSession?.();
   alarms?.stop();
-  screenSessionStore.getState().reset();
   logger.debug('edit view released');
 });
 
@@ -171,11 +167,6 @@ function onDesignerMounted(
   handle.on(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, () => {
     void router.push('/');
   });
-  // 冲突面板由引擎渲染；宿主只把冲突转成 toast，不参与重试或落盘。
-  handle.on('base-screen-project-conflict', () => {
-    screenSessionStore.getState().conflicted();
-  });
-
   // 右栏书写面接到示例智能体；catalog 读函数而非快照——在线物料上下架会整体替换它。
   element.setIntentHandler(
     createHostIntentHandler({
@@ -184,37 +175,44 @@ function onDesignerMounted(
       catalog: () => current.runtime.catalog,
     }),
   );
+  handle.onDispose(() => element.setIntentHandler(undefined));
   element.setIntentReferenceCatalog(createHostIntentReferenceCatalog({ api, screenId, logger }));
+  handle.onDispose(() => element.setIntentReferenceCatalog(undefined));
   const assetLibrary = createHostAssetLibrary({ designer: element, screenId });
+  handle.onDispose(() => assetLibrary.dispose());
   element.append(assetLibrary.element);
 
-  // 组合层不把 load 结果投影给宿主，这里读一次元数据只为把屏名与 revision 交给会话状态机。
-  void (async () => {
-    const result = await api.getScreen(screenId);
-    if (designer.value !== element) return;
-    if (!result.ok) {
-      logger.warn('editor screen metadata unavailable', result.error);
-      screenSessionStore.getState().failedToLoad('大屏加载失败，请返回列表重试。');
-      return;
-    }
-    screenSessionStore
-      .getState()
-      .loaded(result.data.screen.name, String(result.data.screen.revision));
-  })();
-
   return () => {
-    element.setIntentHandler(undefined);
-    element.setIntentReferenceCatalog(undefined);
-    assetLibrary.dispose();
     if (designer.value === element) designer.value = null;
   };
 }
 
-/** 挂载失败诊断由组合层投影出来；宿主只负责记日志并让会话状态机进入终态。 */
-function onDiagnostics(diagnostics: readonly ScreenDiagnostic[]): void {
-  if (diagnostics.length === 0) return;
-  logger.error('designer composition failed', diagnostics);
-  screenSessionStore.getState().failedToLoad('设计器配置失败，请查看控制台日志。');
+/** 初始状态和后续保存/重载状态均来自同一项目会话，不补请求或维护平行状态机。 */
+function onProjectState(state: ScreenProjectState): void {
+  if (disposed) return;
+  if (state.phase === 'conflict') {
+    notifyError('文档已被其他会话更新，请刷新页面重新加载。');
+  } else if (state.phase === 'ready') {
+    lastError = undefined;
+  }
+}
+
+function onDiagnostics(
+  diagnostics: readonly ScreenDiagnostic[],
+  context: BaseScreenMountDiagnosticContext | undefined,
+): void {
+  if (disposed) return;
+  if (diagnostics.length === 0) {
+    lastError = undefined;
+    return;
+  }
+  logger.error('designer composition failed', { diagnostics, context });
+  if (context?.instanceAvailable) {
+    notifyError('物料目录更新失败，当前设计器仍可继续使用。');
+  } else {
+    alarms?.stop();
+    notifyError('设计器加载失败，请查看控制台日志。');
+  }
 }
 </script>
 
@@ -232,6 +230,7 @@ function onDiagnostics(diagnostics: readonly ScreenDiagnostic[]): void {
     :runtime="stage?.runtime ?? null"
     :mount-options="stage?.mountOptions ?? null"
     :on-mounted="onDesignerMounted"
+    :on-project-state="onProjectState"
     :on-diagnostics="onDiagnostics"
   />
 </template>

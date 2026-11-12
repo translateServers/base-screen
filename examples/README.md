@@ -14,7 +14,7 @@ examples/
 
 三个前端是"宿主应用"的三种写法：都是纯静态 SPA，经 HTTP 联调同一个后端，
 功能完全对等（见下方矩阵），但框架装配方式可以不同：React / Vue 编辑页已改用 SDK 组合层与
-各自桥接包的 `<BaseScreenDesigner>`，Vanilla 仍用命令式 Custom Element 装配。
+各自桥接包的 `<BaseScreenDesigner>`，Vanilla 使用同一 SDK 的 Designer 挂载控制器。
 它们演示的是**宿主侧**要做什么——文档 CRUD、把 `<base-screen-designer>` /
 `<base-screen-viewer>` 嵌进自己的页面、实现项目适配器与数据通道、以及宿主自有物料。
 
@@ -25,7 +25,7 @@ examples/
 | 构建 | Vite 8 + `@vitejs/plugin-react` | Vite 8 + `@vitejs/plugin-vue` | Vite 8 |
 | 路由 | `react-router-dom`（HashRouter） | `vue-router`（hash history） | 自实现 hash 路由（约 60 行） |
 | 视图组织 | 函数组件 + hooks | SFC + composables | DOM 构建助手 + 视图模块 |
-| 基座嵌入 | `@base-screen/react` 的 `<BaseScreenDesigner>` | `@base-screen/vue` 的 `<BaseScreenDesigner>` | 命令式 `<base-screen-designer>` 元素 |
+| 基座嵌入 | `@base-screen/react` 的 `<BaseScreenDesigner>` | `@base-screen/vue` 的 `<BaseScreenDesigner>` | SDK Designer 挂载控制器 |
 | 状态管理 | zustand `create` + selector hook | zustand `vanilla` store + composable 桥接 | zustand `vanilla` store + `subscribe` |
 | 自有物料 | `createReactMaterialDefinition`（样式内联） | `createVueMaterialDefinition`（SFC + 应用样式表） | 自定义元素 + manifest |
 | 类型检查 | `tsc --noEmit` | `vue-tsc --noEmit` | `tsc --noEmit` |
@@ -36,11 +36,11 @@ examples/
 | store | 状态机 | 迁移 |
 | --- | --- | --- |
 | `store/screens-store.ts` | 列表 | `idle → loading → ready` / `loading → error`（可重试）；动作 `load` / `create` / `remove` |
-| `store/screen-session-store.ts` | 当前大屏会话（编辑页与查看页共用） | `idle → loading → ready → dirty → saving → saved`，分支 `saving → failed`（可重试）、`saving → conflict`（须重载）、`loading → error`（终态） |
+| `store/screen-session-store.ts` | 查看页加载状态 | `idle → loading → ready` / `loading → error`；编辑页直接消费基座项目状态，不再维护平行状态机 |
 
 绑定方式按各栈习惯选择，store 语义完全相同：React 用 `zustand` 的 `create` + selector（只在选中切片变化时重渲染）；
 Vue / Vanilla 用框架无关的 `zustand/vanilla`，分别经 composable 的 `shallowRef` 快照与 `subscribe` 消费。
-状态文案（"正在保存…"/"已保存（版本 N）"/冲突提示）也由 store 生成，三端不再各自拼字符串。
+查看页的加载文案由 store 生成；编辑页的项目名与保存状态由基座顶栏呈现，`onProjectState` 直接接收同一权威快照并把冲突转换为提示，无需再次读取整屏数据。
 
 Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状态。
 
@@ -71,10 +71,7 @@ styles/asset-library.css  styles/online-materials.css
   `screen/register.*`、`screen/metric-value-element.ts`（Vanilla 自定义元素）、
   `metric-value-material.tsx` / `.ts`（React / Vue 物料定义）与
   `screen/composition-runtime.ts`（React / Vue 的 runtime 适配）；
-- **组合层装配**：`react-host` / `vue-host` 的 `src/screen/composition-runtime.ts` 都只对同一个
-  `host-runtime.ts` 单例调用 `adoptBaseScreenRuntime(host)`，不新建插件管理器；两端的 Base Screen 依赖收敛为
-  `@base-screen/sdk`、各自的桥接包（`@base-screen/react` / `@base-screen/vue`）与实际使用的两个插件包。
-  Vanilla 编辑页仍用 `ref` + `appendChild`。
+- **组合层装配**：三端 `host-runtime.ts` 都通过标准 `createBaseScreenRuntime()` 完成官方/自有物料、插件、Blueprint 授权和默认命令端口装配；在线物料业务只负责加载条目并通过 `setCatalog()` 提交。React/Vue 的 `composition-runtime.ts` 直接返回同一单例，不再 adopt 或二次 activate。项目与数据集端口通过独立的 `@base-screen/host-kit` 复用已有 API，宿主只保留业务映射与告警快照。
 
 渲染层（`components/` `views/`）按各栈习惯编写，但**对外行为与 DOM 契约必须一致**：组合层组件内部
 仍创建并挂载 `<base-screen-designer>`，三端 `scripts/smoke.mjs` 是同一份断言集合
@@ -92,9 +89,9 @@ styles/asset-library.css  styles/online-materials.css
 编辑页的三条行为约束：
 
 1. **先挂载，再 `configure` / `load`**：画布与渲染器在自定义元素 *connected* 时才建立；
-   React / Vue 由 `BaseScreenDesigner` 的挂载句柄保证顺序，Vanilla 仍在视图函数里显式 `appendChild`。
+   三端均由 SDK 挂载句柄保证顺序；Vanilla 显式调用控制器 `attach(stage)`。
 2. **自定义元素不由框架虚拟树拥有**：React / Vue 的组合层组件持有并释放挂载句柄，组件卸载时只释放该句柄；
-   Vanilla 用 ref 拿占位容器后 `appendChild`。三端最终都产出同一个
+   Vanilla 持有并释放 SDK 挂载控制器。三端最终都产出同一个
    `<base-screen-designer>` DOM 契约，且组件卸载不会释放共享的宿主 runtime。
 3. **未就绪交给组件，不靠条件渲染**：端口与项目适配器必须一次提交，宿主装配又是异步的（插件激活、告警首快照）；
    React / Vue 把未就绪表达为 `runtime` / `mountOptions` 传 `null`，组件不挂载，宿主不写占位节点。
@@ -106,8 +103,7 @@ styles/asset-library.css  styles/online-materials.css
 
 - **显式保存**：宿主不订阅 `base-screen-change` / `base-screen-dirty-change`，也没有空闲定时器、
   重试或离开前 flush；未保存的改动随页面卸载丢弃。保存状态（未保存/保存中/已保存）由引擎顶栏显示。
-- **冲突**：收到 `base-screen-project-conflict` 后由引擎渲染冲突面板（继续编辑 / 重新加载），
-  宿主只把冲突转成 toast；revision 已过期时再次保存仍会冲突，需要走「重新加载」。
+- **冲突**：引擎渲染冲突面板（继续编辑 / 重新加载），宿主通过 `onProjectState` 的 `conflict` 阶段转成 toast；revision 已过期时再次保存仍会冲突，需要走「重新加载」。挂载诊断携带失败阶段、实例可用性和恢复方式，运行中目录刷新失败保留设计器，不进入加载失败终态。
 - **导航**：顶栏返回、编辑页右下角「数据源」「素材」入口只做路由跳转，不隐式落盘。
 
 ## REST 契约（由 shared-backend 实现，三端共用）

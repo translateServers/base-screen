@@ -5,10 +5,15 @@ import type {
   ScreenProjectSnapshot,
   ScreenProjectSummary,
 } from '@base-screen/contracts';
+import type { ScreenProjectState } from '../../common/project/project-controller.js';
 import {
   type DesignerElementHost,
   getDesignerElementState,
 } from '../runtime/designer-element-state.js';
+
+export function getProjectState(element: DesignerElementHost): ScreenProjectState {
+  return getDesignerElementState(element).session.getProjectState();
+}
 
 export function load(
   element: DesignerElementHost,

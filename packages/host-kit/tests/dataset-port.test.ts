@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { createRestDatasetPort } from '../src/index.js';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  createHostDatasetPort,
+  createRestDatasetPort,
+  type HostKitOperationResult,
+} from '../src/index.js';
 
 const ENTRY = { datasetId: 'orders', name: '订单数据', description: null };
 const DEFINITION = {
@@ -43,6 +47,187 @@ function routingFetch(handler: (call: Call) => { ok: boolean; status: number; bo
 }
 
 const signal = () => new AbortController().signal;
+
+describe('createHostDatasetPort', () => {
+  const ok = <T>(data: T): HostKitOperationResult<T> => ({ ok: true, data });
+  const operations = {
+    list: { execute: async () => ok({ items: [ENTRY], nextCursor: 'opaque:2' }) },
+    describe: { execute: async () => ok(DEFINITION) },
+    query: { execute: async () => ok(TABULAR) },
+  };
+
+  it('复用类型化业务 API、映射信封并缓存分组直到 60 秒', async () => {
+    vi.useFakeTimers();
+    try {
+      const groups = vi.fn(async () => ok({ folders: [{ id: 'sales', name: '销售' }] }));
+      const port = createHostDatasetPort({
+        ...operations,
+        groups: { execute: groups, response: (payload) => payload.folders },
+        list: {
+          execute: async (request, nativeSignal) => {
+            expect(request.cursor).toBe('opaque:1');
+            expect(nativeSignal).toBeInstanceOf(AbortSignal);
+            return ok({ catalog: { items: [ENTRY], nextCursor: 'opaque:2' } });
+          },
+          response: (payload) => payload.catalog,
+        },
+      });
+      expect(port.queryScope).toBe('dataset');
+      await port.groups?.({ signal: signal() });
+      await port.groups?.({ signal: signal() });
+      expect(groups).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(60_000);
+      await port.groups?.({ signal: signal() });
+      expect(groups).toHaveBeenCalledTimes(2);
+      expect(
+        await port.list({ query: '', limit: 10, cursor: 'opaque:1', signal: signal() }),
+      ).toMatchObject({ ok: true, value: { nextCursor: 'opaque:2' } });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('按次转发查询执行上下文，缺省和并发请求互不串值', async () => {
+    const execute = vi.fn(
+      async (
+        _request: unknown,
+        _signal: AbortSignal,
+        context?: import('@base-screen/contracts').ScreenResourceExecutionContext,
+      ) => {
+        await Promise.resolve();
+        return ok({ ...TABULAR, rows: [{ amount: context?.projectId === 'first' ? 1 : 2 }] });
+      },
+    );
+    const port = createHostDatasetPort({ ...operations, query: { execute } });
+    const context = {
+      instanceId: 'designer:first',
+      mode: 'design',
+      trigger: 'manual',
+      traceId: 'trace-first',
+      projectId: 'first',
+      documentRevision: 'r1',
+    } as const;
+    const request = { datasetId: 'orders', dataSourceId: 'orders-1', params: {} };
+    const results = await Promise.all([
+      port.query(request, { signal: signal(), context }),
+      port.query(request, { signal: signal() }),
+    ]);
+    expect(execute.mock.calls[0]?.[2]).toBe(context);
+    expect(execute.mock.calls[1]?.[2]).toBeUndefined();
+    expect(results[0]).toMatchObject({ ok: true, value: { rows: [{ amount: 1 }] } });
+    expect(results[1]).toMatchObject({ ok: true, value: { rows: [{ amount: 2 }] } });
+  });
+
+  it('observer 只接收校验结果的隔离副本，抛错不会污染返回值', async () => {
+    const observed = vi.fn();
+    const port = createHostDatasetPort({
+      ...operations,
+      onQueryResult: (event) => {
+        observed(event);
+        if (event.result.ok) Object.assign(event.result.value.rows[0] ?? {}, { amount: 999 });
+        throw new Error('业务观察失败');
+      },
+    });
+    const result = await port.query(
+      { datasetId: 'orders', dataSourceId: 'ds', params: {} },
+      { signal: signal() },
+    );
+    expect(result).toMatchObject({ ok: true, value: { rows: [{ amount: 1 }] } });
+    expect(observed).toHaveBeenCalledTimes(1);
+  });
+
+  it('query observer 无法通过 request.params 修改调用者参数', async () => {
+    const params = { filter: { enabled: true } };
+    const observer = vi.fn();
+    const port = createHostDatasetPort({
+      ...operations,
+      onQueryResult: (event) => {
+        observer(event);
+        expect('signal' in event.request).toBe(false);
+        Object.assign(event.request.params.filter ?? {}, { enabled: false });
+      },
+    });
+    await port.query({ datasetId: 'orders', dataSourceId: 'ds', params }, { signal: signal() });
+    expect(observer).toHaveBeenCalledTimes(1);
+    expect(params.filter.enabled).toBe(true);
+  });
+
+  it('异步 observer 拒绝不会成为未处理异常', async () => {
+    const port = createHostDatasetPort({
+      ...operations,
+      onQueryResult: async () => {
+        throw new Error('异步业务观察失败');
+      },
+    });
+    expect(
+      await port.query(
+        { datasetId: 'orders', dataSourceId: 'ds', params: {} },
+        { signal: signal() },
+      ),
+    ).toMatchObject({ ok: true, value: { rows: [{ amount: 1 }] } });
+  });
+
+  it('observer 能看到无效响应和业务错误，取消不通知', async () => {
+    const observed = vi.fn();
+    let mode = 'invalid';
+    const controller = new AbortController();
+    const port = createHostDatasetPort({
+      ...operations,
+      query: {
+        execute: async (_request, nativeSignal) => {
+          if (mode === 'cancel') {
+            controller.abort();
+            expect(nativeSignal.aborted).toBe(true);
+          }
+          return mode === 'invalid'
+            ? ok(null)
+            : {
+                ok: false,
+                error: {
+                  code: mode === 'cancel' ? 'ABORTED' : 'INVALID_REQUEST',
+                  message: 'bad',
+                  status: 422,
+                },
+              };
+        },
+      },
+      onQueryResult: observed,
+    });
+    const query = () =>
+      port.query(
+        { datasetId: 'orders', dataSourceId: 'ds', params: {} },
+        { signal: controller.signal },
+      );
+    expect(await query()).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'HOST_DATASET_INVALID' }],
+    });
+    mode = 'error';
+    expect(await query()).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'HOST_DATASET_PARAMETER_INVALID' }],
+    });
+    expect(observed.mock.calls[1]?.[0]).toMatchObject({ error: { code: 'INVALID_REQUEST' } });
+    mode = 'cancel';
+    expect(await query()).toEqual({ ok: false, diagnostics: [] });
+    expect(observed).toHaveBeenCalledTimes(2);
+  });
+
+  it('业务函数拒绝 Promise 时归一为端口诊断', async () => {
+    const port = createHostDatasetPort({
+      ...operations,
+      describe: {
+        execute: async () => {
+          throw new Error('offline');
+        },
+      },
+    });
+    expect(await port.describe({ datasetId: 'orders', signal: signal() })).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'HOST_DATASET_UNAVAILABLE' }],
+    });
+  });
+});
 
 describe('createRestDatasetPort', () => {
   it('opts into dataset query scope', () => {

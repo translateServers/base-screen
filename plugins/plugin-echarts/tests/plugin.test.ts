@@ -5,8 +5,11 @@ import {
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import { PLUGIN_ECHARTS_TABULAR_DATA_ADAPTER } from '../src/chart-data-adapter.js';
-import { buildPluginEchartsOption } from '../src/chart-option.js';
-import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from '../src/manifest.js';
+import { buildChartFamilyOption, buildPluginEchartsOption } from '../src/chart-option.js';
+import {
+  PLUGIN_ECHARTS_MATERIAL_MANIFEST,
+  PLUGIN_ECHARTS_MATERIAL_MANIFESTS,
+} from '../src/manifest.js';
 import { createPluginEchartsRuntime, PLUGIN_ECHARTS_ID } from '../src/plugin.js';
 
 const chartData: BaseScreenChartData = {
@@ -33,6 +36,67 @@ describe('plugin-echarts material manifest', () => {
     expect(parseBaseScreenMaterialManifest(PLUGIN_ECHARTS_MATERIAL_MANIFEST).ok).toBe(true);
   });
 
+  it('保留十个图表家族稳定身份和完整数据契约', () => {
+    expect(PLUGIN_ECHARTS_MATERIAL_MANIFESTS.map((manifest) => manifest.type)).toEqual([
+      'plugin.echarts',
+      ...[
+        'line',
+        'area',
+        'bar',
+        'hbar',
+        'pie',
+        'donut',
+        'gauge',
+        'radar',
+        'scatter',
+        'heatmap',
+      ].map((kind) => `plugin.chart.${kind}`),
+    ]);
+    for (const manifest of PLUGIN_ECHARTS_MATERIAL_MANIFESTS) {
+      expect(parseBaseScreenMaterialManifest(manifest).ok, manifest.type).toBe(true);
+      expect(manifest.staticData?.kind).toBe('tabular');
+    }
+  });
+
+  it.each([
+    'line',
+    'area',
+    'bar',
+    'hbar',
+    'pie',
+    'donut',
+    'gauge',
+    'radar',
+    'scatter',
+    'heatmap',
+  ] as const)('家族%s生成对应图形而非回退折线', (kind) => {
+    const option = buildChartFamilyOption(kind, {
+      data: chartData,
+      titleText: '',
+      showTooltip: true,
+      seriesType: 'line',
+      ...OPTION_BASE,
+      props: { showLegend: false },
+    });
+    const series = option.series as Array<Record<string, unknown>>;
+    const expected =
+      kind === 'hbar' ? 'bar' : kind === 'area' ? 'line' : kind === 'donut' ? 'pie' : kind;
+    expect(series[0]?.type).toBe(expected);
+    expect(option.legend).toBeUndefined();
+    if (kind === 'hbar') expect(option.yAxis).toMatchObject({ type: 'category', inverse: true });
+    if (kind === 'scatter')
+      expect(series[0]?.data).toEqual([
+        [0, 1],
+        [1, 2],
+      ]);
+    if (kind === 'heatmap')
+      expect(series[0]?.data).toEqual([
+        [0, 0, 1],
+        [1, 0, 2],
+      ]);
+    if (kind === 'gauge') expect(series[0]?.data).toEqual([{ value: 2, name: '' }]);
+  });
+
   it('does not collide with the core library material type', () => {
     expect(PLUGIN_ECHARTS_MATERIAL_MANIFEST.type).not.toBe('base.echarts');
   });
@@ -54,12 +118,14 @@ describe('plugin-echarts runtime', () => {
   it('carries the out-moved capability on four bearing surfaces', () => {
     const runtime = createPluginEchartsRuntime();
     expect(runtime.manifest.capabilities).toEqual(['command.execute', 'design.read']);
-    expect(runtime.manifest.contributions.map((item) => item.kind)).toEqual([
-      'material',
-      'command',
-      'inspectorControl',
-      'panel',
-    ]);
+    expect(runtime.manifest.contributions.filter((item) => item.kind === 'material')).toHaveLength(
+      11,
+    );
+    expect(
+      runtime.manifest.contributions
+        .filter((item) => item.kind !== 'material')
+        .map((item) => item.kind),
+    ).toEqual(['command', 'inspectorControl', 'panel']);
     expect(runtime.commands && Object.keys(runtime.commands)).toEqual([
       'base-screen.echarts.toggle-series-type',
     ]);

@@ -2,8 +2,10 @@ import { BaseScreenDesigner } from '@base-screen/react';
 import {
   type BaseScreenDesignerElement,
   type BaseScreenDesignerMountOptions,
+  type BaseScreenMountDiagnosticContext,
   type BaseScreenMountHandle,
   type BaseScreenRuntime,
+  type ScreenProjectState,
 } from '@base-screen/sdk';
 import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from '@base-screen/sdk/designer';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
@@ -25,7 +27,6 @@ import { createHostIntentHandler } from '../screen/host-intent';
 import { createHostIntentReferenceCatalog } from '../screen/host-intent-reference';
 import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
-import { useScreenSessionStore } from '../store/screen-session-store';
 import { showToast } from './toast';
 
 const logger = createLogger('screen-editor');
@@ -55,19 +56,18 @@ export function ScreenEditorPage(): ReactElement {
   const navigate = useNavigate();
   const [setup, setSetup] = useState<EditorSetup | null>(null);
   const designerRef = useRef<BaseScreenDesignerElement | null>(null);
-  const disposedRef = useRef(false);
+  const lastErrorRef = useRef<string | undefined>(undefined);
+  const notifyError = (message: string): void => {
+    if (message === lastErrorRef.current) return;
+    lastErrorRef.current = message;
+    showToast(message, 'error');
+  };
 
   useEffect(() => {
     if (screenId === undefined) return;
-    const session = useScreenSessionStore.getState();
-    session.begin(screenId);
     setSetup(null);
     designerRef.current = null;
-    disposedRef.current = false;
-
-    const unsubscribeSession = useScreenSessionStore.subscribe((state, previous) => {
-      if (state.error !== null && state.error !== previous.error) showToast(state.error, 'error');
-    });
+    lastErrorRef.current = undefined;
 
     let alarms: ReturnType<typeof createHostAlarmController> | undefined;
     let disposed = false;
@@ -137,18 +137,16 @@ export function ScreenEditorPage(): ReactElement {
       });
     })().catch((error: unknown) => {
       if (disposed) return;
+      alarms?.stop();
       logger.error('editor bootstrap failed', error);
-      useScreenSessionStore.getState().failedToLoad('设计器初始化失败，请返回列表重试。');
+      notifyError('设计器初始化失败，请返回列表重试。');
     });
 
     return () => {
       disposed = true;
-      disposedRef.current = true;
-      unsubscribeSession();
       alarms?.stop();
       setSetup(null);
       designerRef.current = null;
-      useScreenSessionStore.getState().reset();
       logger.debug('edit view released');
     };
   }, [screenId]);
@@ -166,7 +164,6 @@ export function ScreenEditorPage(): ReactElement {
           hostCatalogPort: setup.hostCatalogPort,
           conditionalStylePort: setup.conditionalStylePort,
           hostConditionalStyleAuthoring: setup.alarmStyleAuthoring,
-          groupMaterialType: 'base.container',
           backButton: true,
           hostResourceSelectionButton: true,
           leftPanelGroups: [{ id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' }],
@@ -179,9 +176,6 @@ export function ScreenEditorPage(): ReactElement {
     designerRef.current = element;
 
     handle.on(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, () => navigate('/'));
-    handle.on('base-screen-project-conflict', () => {
-      useScreenSessionStore.getState().conflicted();
-    });
 
     element.setIntentHandler(
       createHostIntentHandler({
@@ -190,35 +184,40 @@ export function ScreenEditorPage(): ReactElement {
         catalog: () => setup.runtime.catalog,
       }),
     );
+    handle.onDispose(() => element.setIntentHandler(undefined));
     element.setIntentReferenceCatalog(createHostIntentReferenceCatalog({ api, screenId, logger }));
+    handle.onDispose(() => element.setIntentReferenceCatalog(undefined));
     const assetLibrary = createHostAssetLibrary({ designer: element, screenId });
+    handle.onDispose(() => assetLibrary.dispose());
     element.append(assetLibrary.element);
 
-    void (async () => {
-      const result = await api.getScreen(screenId);
-      if (disposedRef.current) return;
-      if (!result.ok) {
-        logger.warn('editor screen metadata unavailable', result.error);
-        useScreenSessionStore.getState().failedToLoad('大屏加载失败，请返回列表重试。');
-        return;
-      }
-      useScreenSessionStore
-        .getState()
-        .loaded(result.data.screen.name, String(result.data.screen.revision));
-    })();
-
     return () => {
-      element.setIntentHandler(undefined);
-      element.setIntentReferenceCatalog(undefined);
-      assetLibrary.dispose();
-      designerRef.current = null;
+      if (designerRef.current === element) designerRef.current = null;
     };
   };
 
-  const onDiagnostics = (diagnostics: readonly { readonly message: string }[]): void => {
-    if (diagnostics.length === 0) return;
-    logger.error('designer composition failed', diagnostics);
-    useScreenSessionStore.getState().failedToLoad('设计器配置失败，请查看控制台日志。');
+  const onProjectState = (state: ScreenProjectState): void => {
+    if (state.phase === 'conflict') {
+      notifyError('文档已被其他会话更新，请刷新页面重新加载。');
+    } else if (state.phase === 'ready') {
+      lastErrorRef.current = undefined;
+    }
+  };
+
+  const onDiagnostics = (
+    diagnostics: readonly { readonly message: string }[],
+    context: BaseScreenMountDiagnosticContext | undefined,
+  ): void => {
+    if (diagnostics.length === 0) {
+      lastErrorRef.current = undefined;
+      return;
+    }
+    logger.error('designer composition failed', { diagnostics, context });
+    notifyError(
+      context?.instanceAvailable
+        ? '物料目录更新失败，当前设计器仍可继续使用。'
+        : '设计器加载失败，请查看控制台日志。',
+    );
   };
 
   return (
@@ -227,6 +226,7 @@ export function ScreenEditorPage(): ReactElement {
       runtime={setup?.runtime ?? null}
       mountOptions={mountOptions}
       onMounted={onMounted}
+      onProjectState={onProjectState}
       onDiagnostics={onDiagnostics}
     />
   );

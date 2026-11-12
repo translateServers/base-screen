@@ -45,6 +45,10 @@ import {
   type BaseScreenDesignerBackRequestEventDetail,
 } from '../../common/operations/workbench/designer-navigation.js';
 import { DesignerProjectGateway } from '../../common/project/designer-project-gateway.js';
+import {
+  BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT,
+  type BaseScreenProjectStateChangeEventDetail,
+} from '../../common/project/project-controller.js';
 import { DesignerSession } from '../../common/session/designer-session.js';
 import { BASE_SCREEN_GUARD_CHANGE_EVENT } from '../../common/validation/designer-guard.js';
 import { getDesignerGeometryDocument } from './designer-element-geometry.js';
@@ -116,6 +120,16 @@ export function initializeDesignerElementControllers(
       element.toggleAttribute('data-project-busy', phase === 'saving' || phase === 'publishing');
       state.projectFeedbackController.render(phase);
       state.runtime.renderControls(element);
+      element.dispatchEvent(
+        new CustomEvent<BaseScreenProjectStateChangeEventDetail>(
+          BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT,
+          {
+            bubbles: true,
+            composed: true,
+            detail: state.session.getProjectState(),
+          },
+        ),
+      );
     },
     onDirtyChange: (dirty, revision) => {
       state.runtime.renderControls(element);

@@ -1,9 +1,19 @@
-import { BarChart, LineChart, PieChart } from 'echarts/charts';
+import {
+  BarChart,
+  GaugeChart,
+  HeatmapChart,
+  LineChart,
+  PieChart,
+  RadarChart,
+  ScatterChart,
+} from 'echarts/charts';
 import {
   GridComponent,
   LegendComponent,
+  RadarComponent,
   TitleComponent,
   TooltipComponent,
+  VisualMapComponent,
 } from 'echarts/components';
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -17,6 +27,12 @@ echarts.use([
   LineChart,
   BarChart,
   PieChart,
+  GaugeChart,
+  RadarChart,
+  ScatterChart,
+  HeatmapChart,
+  RadarComponent,
+  VisualMapComponent,
   GridComponent,
   LegendComponent,
   TitleComponent,

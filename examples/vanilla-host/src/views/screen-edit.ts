@@ -1,7 +1,9 @@
 import {
-  BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT,
   type BaseScreenDesignerElement,
-} from '@base-screen/sdk/designer';
+  type BaseScreenMountHandle,
+  createBaseScreenDesignerMountController,
+} from '@base-screen/sdk';
+import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from '@base-screen/sdk/designer';
 import { showToast } from '../components/toast';
 import { api } from '../lib/api';
 import { resolveApiBase } from '../lib/api-base';
@@ -9,11 +11,7 @@ import { el } from '../lib/dom';
 import { createLogger } from '../lib/logger';
 import { goToList } from '../lib/navigation';
 import type { Route, ViewModule } from '../router';
-import {
-  createHostAssetLibrary,
-  HOST_ASSET_LIBRARY_GROUP_ID,
-  type HostAssetLibraryHandle,
-} from '../screen/asset-library';
+import { createHostAssetLibrary, HOST_ASSET_LIBRARY_GROUP_ID } from '../screen/asset-library';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
   createHostAlarmStyleAuthoring,
@@ -27,16 +25,12 @@ import { createHostIntentReferenceCatalog } from '../screen/host-intent-referenc
 import { loadHostRuntime } from '../screen/host-runtime';
 import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
-import { screenSessionStore } from '../store/screen-session-store';
 
 const logger = createLogger('screen-edit');
 
 /**
- * 编辑页。清理函数在插件运行时激活前就交给路由：激活是异步的，若等它完成再返回
- * cleanup，加载期间换路由会把设计器和监听留在页面上。
- *
- * 保存是显式的：引擎顶栏「保存」（Ctrl+S）经宿主 project adapter 落盘；宿主不订阅
- * 文档变化、也不在离开前隐式保存——未保存的改动随页面卸载丢弃。三端逐条对等。
+ * Vanilla 同样通过 SDK 组合层挂载；路由只拥有页面资源与挂载句柄，不释放应用 runtime。
+ * 保存由用户显式触发，页面卸载不隐式落盘。
  */
 export const screenEditView: ViewModule = {
   mount(container, route: Route): () => void {
@@ -45,21 +39,19 @@ export const screenEditView: ViewModule = {
       return () => {};
     }
     const screenId = route.id;
-    const session = screenSessionStore.getState();
-    session.begin(screenId);
-    const unsubscribe = screenSessionStore.subscribe((state, previous) => {
-      if (state.error !== null && state.error !== previous.error) showToast(state.error, 'error');
-    });
-
     const stage = el('div', { class: 'stage' });
     container.append(stage);
 
     let designer: BaseScreenDesignerElement | undefined;
     let alarms: ReturnType<typeof createHostAlarmController> | undefined;
-    // 素材库左栏 + 统一选择桥（ADR-0089）：宿主自己的上传/目录/删除保护。
-    let assetLibrary: HostAssetLibraryHandle | undefined;
-    let detach: (() => void) | undefined;
+    let controller: ReturnType<typeof createBaseScreenDesignerMountController> | undefined;
     let disposed = false;
+    let lastError: string | undefined;
+    const notifyError = (message: string): void => {
+      if (disposed || message === lastError) return;
+      lastError = message;
+      showToast(message, 'error');
+    };
 
     const loadAlarmBindings = async (): Promise<HostAlarmBindings> => {
       const result = await api.getScreenAlarmBindings(screenId);
@@ -78,28 +70,17 @@ export const screenEditView: ViewModule = {
     void (async () => {
       const runtime = await loadHostRuntime();
       if (disposed) return;
-
-      // 1) 先创建并挂载设计器：画布与渲染器在元素 connected 时才建立。
-      // 蓝图工作台用引擎自带的中央画布：主题、下拉与手势都跟随设计器同一套令牌与控件，
-      // 宿主不再经 slot 覆盖一份等价实现（覆盖是可选能力，不是接入前提）。
-      const element = document.createElement('base-screen-designer') as BaseScreenDesignerElement;
-      stage.append(element);
-      designer = element;
-      runtime.bindDesigner(element);
-
-      // 告警端口必须在 configure 前注入；首快照最多等 800ms，超时先按基础样式渲染。
-      // 绑定按 screenId 从宿主读取：页面里配过什么，打开就是什么。
       const alarmBindings = await loadAlarmBindings();
       if (disposed) return;
-      alarms = createHostAlarmController({
+      const alarmController = createHostAlarmController({
         apiBase: resolveApiBase(),
         bindings: alarmBindings,
-        onInvalidate: (componentIds) => element.refreshConditionalStyles(componentIds),
+        onInvalidate: (componentIds) => designer?.refreshConditionalStyles(componentIds),
       });
-      await alarms.ready(800);
+      alarms = alarmController;
+      await alarmController.ready(800);
       if (disposed) return;
 
-      // 宿主条件样式的作者口：引擎在组件检查器渲染通用表单，保存后热更新端口。
       const alarmStyleAuthoring = createHostAlarmStyleAuthoring({
         initialBindings: alarmBindings,
         save: async (bindings) => {
@@ -111,113 +92,88 @@ export const screenEditView: ViewModule = {
           }
           return { ok: true, bindings: parsed };
         },
-        onSaved: (bindings) => alarms?.setBindings(bindings),
+        onSaved: (bindings) => alarmController.setBindings(bindings),
       });
-
-      // 2) 挂载后再 configure / load；数据通道必须在 configure 内提交。
-      // 数据集与来源目录通道同理一并提交，否则设计器的数据源面板与变量面板会退化。
       const datasetPort = createHostDatasetPort({ api, logger });
-      const configured = element.configure({
-        catalog: runtime.catalog,
-        pluginCatalog: runtime.pluginCatalog,
-        pluginPanels: runtime.pluginPanels,
-        inspectorControls: runtime.inspectorControls,
-        runtimeContributions: runtime.runtimeContributions,
-        pluginCommandPort: runtime.pluginCommandPort,
-        projectAdapter: createRestProjectAdapter(screenId),
-        toolMaterialTypes: TOOL_MATERIAL_TYPES,
-        resourcePort: createHostResourcePort(),
-        datasetPort,
-        hostCatalogPort: createHostCatalogPort({
-          clock: () => new Date(),
-          noticeSource: () => datasetPort.snapshot().alarms,
-          logger,
-        }),
-        conditionalStylePort: alarms.port,
-        hostConditionalStyleAuthoring: alarmStyleAuthoring,
-        // 组合的编辑期形态：多个原子物料成组后整体移动/缩放/旋转。
-        groupMaterialType: 'base.container',
-        backButton: true,
-        hostResourceSelectionButton: true,
-        leftPanelGroups: [{ id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' }],
+      controller = createBaseScreenDesignerMountController({
+        runtime,
+        options: {
+          projectId: screenId,
+          projectAdapter: createRestProjectAdapter(screenId),
+          toolMaterialTypes: TOOL_MATERIAL_TYPES,
+          resourcePort: createHostResourcePort(),
+          datasetPort,
+          hostCatalogPort: createHostCatalogPort({
+            clock: () => new Date(),
+            noticeSource: () => datasetPort.snapshot().alarms,
+            logger,
+          }),
+          conditionalStylePort: alarmController.port,
+          hostConditionalStyleAuthoring: alarmStyleAuthoring,
+          backButton: true,
+          hostResourceSelectionButton: true,
+          leftPanelGroups: [{ id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' }],
+        },
+        onProjectState: (state) => {
+          if (disposed) return;
+          if (state.phase === 'conflict') {
+            notifyError('文档已被其他会话更新，请刷新页面重新加载。');
+          } else if (state.phase === 'ready') {
+            lastError = undefined;
+          }
+        },
+        onDiagnostics: (diagnostics, context) => {
+          if (disposed) return;
+          if (diagnostics.length === 0) {
+            lastError = undefined;
+            return;
+          }
+          logger.error('designer composition failed', { diagnostics, context });
+          if (context?.instanceAvailable) {
+            notifyError('物料目录更新失败，当前设计器仍可继续使用。');
+          } else {
+            alarmController.stop();
+            notifyError('设计器加载失败，请查看控制台日志。');
+          }
+        },
+        onMounted: (handle: BaseScreenMountHandle<BaseScreenDesignerElement>) => {
+          const element = handle.element;
+          designer = element;
+          handle.onDispose(() => {
+            if (designer === element) designer = undefined;
+          });
+          handle.on(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, goToList);
+          element.setIntentHandler(
+            createHostIntentHandler({
+              designer: element,
+              screenId,
+              catalog: () => runtime.catalog,
+            }),
+          );
+          handle.onDispose(() => element.setIntentHandler(undefined));
+          element.setIntentReferenceCatalog(
+            createHostIntentReferenceCatalog({ api, screenId, logger }),
+          );
+          handle.onDispose(() => element.setIntentReferenceCatalog(undefined));
+          const assetLibrary = createHostAssetLibrary({ designer: element, screenId });
+          handle.onDispose(() => assetLibrary.dispose());
+          element.append(assetLibrary.element);
+        },
       });
-      if (!configured.ok) {
-        logger.error('designer configure failed', configured.diagnostics);
-        session.failedToLoad('设计器配置失败，请查看控制台日志。');
-        element.remove();
-        designer = undefined;
-        runtime.bindDesigner(null);
-        unsubscribe();
-        return;
-      }
-
-      const onBack = (): void => {
-        goToList();
-      };
-      element.addEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
-
-      // 保存由用户显式触发（顶栏「保存」/ Ctrl+S，经宿主 project adapter）；冲突面板由引擎
-      // 渲染，宿主只把冲突转成 toast。宿主不订阅文档变化，也不在离开前隐式落盘。
-      const onConflict = (): void => {
-        screenSessionStore.getState().conflicted();
-      };
-      element.addEventListener('base-screen-project-conflict', onConflict);
-
-      detach = (): void => {
-        element.removeEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
-        element.removeEventListener('base-screen-project-conflict', onConflict);
-        element.setIntentHandler(undefined);
-        element.setIntentReferenceCatalog(undefined);
-        runtime.bindDesigner(null);
-      };
-
-      const loaded = await element.load(screenId);
-      if (!loaded.ok) {
-        logger.error('designer load failed', loaded.diagnostics);
-        screenSessionStore.getState().failedToLoad('大屏加载失败，请返回列表重试。');
-        return;
-      }
-      screenSessionStore.getState().loaded(loaded.value.name, loaded.value.revision);
-
-      // 示例接线：把右栏书写面接到示例智能体（整屏 `POST /agent/candidate`、选中组件
-      // `POST /agent/edit`）。必须在 load 成功之后绑定——
-      // 提案要对着当前文档试算，文档没到时提交只会被引擎拒绝。解绑在 detach 里做，
-      // 页面走了之后不会再有请求回来改一块已经不在的设计器。
-      element.setIntentHandler(
-        createHostIntentHandler({
-          designer: element,
-          screenId,
-          // 读函数而不是快照：在线物料包上下架会整体替换 runtime.catalog。
-          catalog: () => runtime.catalog,
-        }),
-      );
-      // 引用目录：素材 + 数据集拍平成一份清单交给引擎，选择器与 chip 都在引擎侧，
-      // 三端只需要这一行。宿主不接的话输入区不会出现引用入口。
-      element.setIntentReferenceCatalog(
-        createHostIntentReferenceCatalog({ api, screenId, logger }),
-      );
-
-      assetLibrary = createHostAssetLibrary({ designer: element, screenId });
-      element.append(assetLibrary.element);
+      await controller.attach(stage);
     })().catch((error: unknown) => {
       if (disposed) return;
+      alarms?.stop();
       logger.error('editor bootstrap failed', error);
-      screenSessionStore.getState().failedToLoad('设计器初始化失败，请返回列表重试。');
+      notifyError('设计器初始化失败，请返回列表重试。');
     });
 
-    // 3) 清理：先阻断异步 bootstrap 的后续步骤，再拆监听。
     return () => {
       disposed = true;
-      detach?.();
-      unsubscribe();
-      assetLibrary?.dispose();
-      assetLibrary = undefined;
       alarms?.stop();
-      alarms = undefined;
-      designer?.remove();
+      void controller?.detach();
       designer = undefined;
       stage.remove();
-      screenSessionStore.getState().reset();
       logger.debug('edit view released');
     };
   },

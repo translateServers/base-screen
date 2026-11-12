@@ -13,6 +13,7 @@
     "verify": "node scripts/smoke.mjs"
   },
   "dependencies": {
+    "@base-screen/host-kit": "workspace:^",
     "@base-screen/plugin-board-materials": "workspace:^",
     "@base-screen/plugin-echarts": "workspace:^",
     "@base-screen/sdk": "workspace:^",

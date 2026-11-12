@@ -1,5 +1,10 @@
-import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
-import { nullResult, runtimeDiagnostic } from './runtime-diagnostics.js';
+import type { ScreenDiagnostic } from '@base-screen/contracts';
+import {
+  type BaseScreenMountResult,
+  nullResult,
+  runtimeDiagnostic,
+  withMountPhase,
+} from './runtime-diagnostics.js';
 
 /** Designer 与 Viewer 都由宿主追加到 DOM，并通过 `unload()` 终结实例。 */
 export interface BaseScreenMountElement extends Element {
@@ -18,7 +23,7 @@ export interface BaseScreenMountHandle<TElement extends BaseScreenMountElement> 
   ): () => void;
   /** 登记宿主自有资源清理；已经 dispose 时立即执行。 */
   onDispose(cleanup: () => void): () => void;
-  dispose(): Promise<ScreenParseResult<null>>;
+  dispose(): Promise<BaseScreenMountResult<null>>;
 }
 
 export interface CreateBaseScreenMountHandleOptions<TElement extends BaseScreenMountElement> {
@@ -31,7 +36,7 @@ export function createBaseScreenMountHandle<TElement extends BaseScreenMountElem
 ): BaseScreenMountHandle<TElement> {
   const cleanups: Array<() => void> = [];
   let disposed = false;
-  let disposePromise: Promise<ScreenParseResult<null>> | undefined;
+  let disposePromise: Promise<BaseScreenMountResult<null>> | undefined;
 
   const registerCleanup = (cleanup: () => void): (() => void) => {
     if (disposed) {
@@ -66,7 +71,7 @@ export function createBaseScreenMountHandle<TElement extends BaseScreenMountElem
     },
     dispose() {
       disposed = true;
-      disposePromise ??= Promise.resolve().then((): ScreenParseResult<null> => {
+      disposePromise ??= Promise.resolve().then((): BaseScreenMountResult<null> => {
         const diagnostics: ScreenDiagnostic[] = [];
         for (const cleanup of [...cleanups].reverse()) {
           try {
@@ -98,7 +103,7 @@ export function createBaseScreenMountHandle<TElement extends BaseScreenMountElem
             );
           }
         }
-        return nullResult(diagnostics);
+        return withMountPhase(nullResult(diagnostics), 'dispose');
       });
       return disposePromise;
     },

@@ -19,7 +19,7 @@ src/
 │   ├── dom.ts                 # 最小 DOM 构建助手
 │   ├── format.ts / navigation.ts
 ├── screen/
-│   ├── register.ts            # 设计器/查看器/官方物料/自有物料注册（公开入口，幂等）
+│   ├── register.ts            # 自有物料条目，直接交给标准 SDK runtime 注册
 │   ├── metric-value.ts            # 三端共有的「指标读数」manifest（host-resource 能力 + 表格适配）
 │   ├── metric-value-element.ts    # Vanilla 自定义元素实现 + tabularDataAdapter
 │   ├── project-adapter.ts     # 宿主项目适配器：load/save，宿主维护 revision
@@ -48,7 +48,7 @@ pnpm dev:vanilla-host                               # 终端 2：本前端 :5173
 ```
 
 - 列表页 `#/`：新建 / 编辑 / 查看 / 删除
-- 编辑页 `#/screens/:id/edit`：`<base-screen-designer>` 嵌入，保存走宿主 project adapter
+- 编辑页 `#/screens/:id/edit`：SDK Designer 挂载控制器嵌入 `<base-screen-designer>`，权威项目状态与分阶段诊断经回调提供；保存走宿主 project adapter
   （顶栏「保存」显式触发；revision 乐观锁，冲突时 toast 提示）；逐条规格见
   [../README.md](../README.md) 的「编辑页保存规格」
 - 查看页 `#/screens/:id/view`：`<base-screen-viewer>` 只读播放

@@ -7,124 +7,117 @@ import {
   type ScreenProjectAdapter,
   type ScreenProjectEnvelope,
 } from '@base-screen/contracts';
+import { createHostKitHttp, type HostKitHttpMapping, type HostKitHttpOptions } from './http.js';
 import {
-  createHostKitHttp,
-  type HostKitHttpMapping,
-  type HostKitHttpOptions,
-  type HostKitHttpRequest,
-  toAbortSignal,
-} from './http.js';
+  createHttpOperation,
+  executeHostKitOperation,
+  type HostKitOperation,
+  type HostKitOperationObserver,
+  observeHostKitOperation,
+} from './operation.js';
+
+type LoadRequest = Parameters<ScreenProjectAdapter['load']>[0];
+type SaveRequest = Parameters<ScreenProjectAdapter['save']>[0];
+
+export interface HostProjectAdapterOptions<LoadPayload = unknown, SavePayload = unknown> {
+  readonly load: HostKitOperation<LoadRequest, LoadPayload>;
+  readonly save: HostKitOperation<SaveRequest, SavePayload>;
+  /** 读取时的文档迁移；默认 one-way、幂等、失败关闭。 */
+  readonly migrate?: (input: unknown) => ScreenMigrationResult;
+  readonly onLoadResult?: HostKitOperationObserver<LoadRequest, ScreenProjectEnvelope>;
+  readonly onSaveResult?: HostKitOperationObserver<SaveRequest, ScreenProjectEnvelope>;
+}
 
 export interface HttpProjectAdapterOptions extends HostKitHttpOptions {
-  /** 读取时的文档迁移；默认 `migrateScreenDocument`（one-way、幂等、失败关闭）。 */
   readonly migrate?: (input: unknown) => ScreenMigrationResult;
   /** 请求可改路径、方法与 JSON body；响应投影为 canonical envelope，随后统一校验。 */
   readonly mapping?: {
-    readonly load?: HostKitHttpMapping<Parameters<ScreenProjectAdapter['load']>[0]>;
-    readonly save?: HostKitHttpMapping<Parameters<ScreenProjectAdapter['save']>[0]>;
+    readonly load?: HostKitHttpMapping<LoadRequest>;
+    readonly save?: HostKitHttpMapping<SaveRequest>;
   };
 }
 
-/**
- * 默认对接示例 REST：GET /screens/:id，PUT /screens/:id { document, revision }。
- * 宿主可按操作映射既有后端；opaque revision 仅在默认示例请求中转成数字。
- * 读取先迁移文档，存取响应均校验完整 envelope；publish 明确不支持。
- */
-export function createHttpProjectAdapter(options: HttpProjectAdapterOptions): ScreenProjectAdapter {
-  const http = createHostKitHttp(options);
+/** 宿主提供业务回调与映射，官方负责迁移、契约校验、取消与冲突映射。 */
+export function createHostProjectAdapter<LoadPayload, SavePayload>(
+  options: HostProjectAdapterOptions<LoadPayload, SavePayload>,
+): ScreenProjectAdapter {
   const migrate = options.migrate ?? migrateScreenDocument;
+
+  async function execute<Request extends LoadRequest, Payload>(
+    operation: HostKitOperation<Request, Payload>,
+    request: Request,
+    save: boolean,
+    observer: HostKitOperationObserver<Request, ScreenProjectEnvelope> | undefined,
+  ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
+    if (request.signal.aborted) return cancelled();
+    const response = await executeHostKitOperation(operation, request, request.signal);
+    if (request.signal.aborted || (!response.ok && response.error.code === 'ABORTED')) {
+      return cancelled();
+    }
+    let result: ScreenParseResult<ScreenProjectEnvelope>;
+    if (!response.ok) {
+      result = failure(
+        save && (response.error.code === 'REVISION_CONFLICT' || response.error.status === 409)
+          ? 'PROJECT_CONFLICT'
+          : 'PROJECT_UNAVAILABLE',
+        save ? ['revision'] : [],
+        response.error.message,
+      );
+    } else {
+      try {
+        const envelope = operation.response
+          ? operation.response(response.data, request)
+          : response.data;
+        if (request.signal.aborted) return cancelled();
+        if (save) {
+          result = parseScreenProjectEnvelope(envelope);
+        } else if (envelope === null || typeof envelope !== 'object' || !('document' in envelope)) {
+          result = failure('PROJECT_UNAVAILABLE', [], '项目信封格式无效。');
+        } else {
+          const migrated = migrate(envelope.document);
+          if (request.signal.aborted) return cancelled();
+          result = migrated.ok
+            ? parseScreenProjectEnvelope({ ...envelope, document: migrated.document })
+            : { ok: false, diagnostics: migrated.diagnostics };
+        }
+      } catch {
+        result = failure('PROJECT_UNAVAILABLE', [], '项目信封格式无效。');
+      }
+    }
+    if (request.signal.aborted) return cancelled();
+    observeHostKitOperation(observer, request, result, response.ok ? undefined : response.error);
+    return result;
+  }
+
   return {
     capabilities: { publish: false },
-    async load(request): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-      if (request.signal.aborted) return cancelled();
-      const mapping = options.mapping?.load;
-      let mapped: HostKitHttpRequest;
-      try {
-        mapped = mapping?.request?.(request) ?? {
-          path: `/screens/${encodeURIComponent(request.projectId)}`,
-        };
-      } catch {
-        return request.signal.aborted
-          ? cancelled()
-          : failure('PROJECT_UNAVAILABLE', [], '项目请求映射失败。');
-      }
-      if (request.signal.aborted) return cancelled();
-      const result = await http.request<unknown>(mapped.path, {
-        ...mapped,
-        ...abortOption(request.signal),
-      });
-      if (request.signal.aborted || (!result.ok && result.error.code === 'ABORTED'))
-        return cancelled();
-      if (!result.ok) return failure('PROJECT_UNAVAILABLE', [], result.error.message);
-      try {
-        const envelope = mapping?.response
-          ? mapping.response(result.data, request)
-          : toDefaultEnvelope(result.data);
-        if (request.signal.aborted) return cancelled();
-        if (envelope === null || typeof envelope !== 'object' || !('document' in envelope)) {
-          return failure('PROJECT_UNAVAILABLE', [], '项目信封格式无效。');
-        }
-        const migrated = migrate(envelope.document);
-        if (request.signal.aborted) return cancelled();
-        if (!migrated.ok) return { ok: false, diagnostics: migrated.diagnostics };
-        return parseScreenProjectEnvelope({ ...envelope, document: migrated.document });
-      } catch {
-        return request.signal.aborted
-          ? cancelled()
-          : failure('PROJECT_UNAVAILABLE', [], '项目信封格式无效。');
-      }
-    },
-    async save(request): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-      if (request.signal.aborted) return cancelled();
-      const mapping = options.mapping?.save;
-      let mapped: HostKitHttpRequest;
-      try {
-        mapped = mapping?.request?.(request) ?? {
-          path: `/screens/${encodeURIComponent(request.projectId)}`,
-          method: 'PUT',
-          body: { document: request.document, revision: Number(request.revision) },
-        };
-      } catch {
-        return request.signal.aborted
-          ? cancelled()
-          : failure('PROJECT_UNAVAILABLE', [], '项目请求映射失败。');
-      }
-      if (request.signal.aborted) return cancelled();
-      const result = await http.request<unknown>(mapped.path, {
-        ...mapped,
-        ...abortOption(request.signal),
-      });
-      if (request.signal.aborted || (!result.ok && result.error.code === 'ABORTED'))
-        return cancelled();
-      if (!result.ok) {
-        return failure(
-          result.error.code === 'REVISION_CONFLICT' || result.error.status === 409
-            ? 'PROJECT_CONFLICT'
-            : 'PROJECT_UNAVAILABLE',
-          ['revision'],
-          result.error.message,
-        );
-      }
-      try {
-        const envelope = mapping?.response
-          ? mapping.response(result.data, request)
-          : toDefaultEnvelope(result.data);
-        if (request.signal.aborted) return cancelled();
-        return parseScreenProjectEnvelope(envelope);
-      } catch {
-        return request.signal.aborted
-          ? cancelled()
-          : failure('PROJECT_UNAVAILABLE', [], '项目信封格式无效。');
-      }
-    },
+    load: (request) => execute(options.load, request, false, options.onLoadResult),
+    save: (request) => execute(options.save, request, true, options.onSaveResult),
   };
 }
 
-function abortOption(signal: Parameters<ScreenProjectAdapter['load']>[0]['signal']): {
-  signal?: AbortSignal;
-} {
-  const bridged = toAbortSignal(signal);
-  return bridged === undefined ? {} : { signal: bridged };
+/** 默认示例 REST；自定义映射保留 opaque revision，所有操作复用业务回调核心。 */
+export function createHttpProjectAdapter(options: HttpProjectAdapterOptions): ScreenProjectAdapter {
+  const http = createHostKitHttp(options);
+  return createHostProjectAdapter({
+    ...(options.migrate === undefined ? {} : { migrate: options.migrate }),
+    load: createHttpOperation(
+      http,
+      options.mapping?.load,
+      (request) => ({ path: `/screens/${encodeURIComponent(request.projectId)}` }),
+      toDefaultEnvelope,
+    ),
+    save: createHttpOperation(
+      http,
+      options.mapping?.save,
+      (request) => ({
+        path: `/screens/${encodeURIComponent(request.projectId)}`,
+        method: 'PUT',
+        body: { document: request.document, revision: Number(request.revision) },
+      }),
+      toDefaultEnvelope,
+    ),
+  });
 }
 
 function toDefaultEnvelope(payload: unknown): unknown {

@@ -2,12 +2,18 @@
   "name": "@base-screen/sdk",
   "version": "0.1.0",
   "description": "Viewer、Designer、物料与插件的产品级组合入口",
-  "private": true,
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+    "url": "git+https://github.com/translateServers/base-screen.git",
+    "directory": "packages/sdk"
   },
+  "homepage": "https://github.com/translateServers/base-screen#readme",
+  "bugs": "https://github.com/translateServers/base-screen/issues",
   "type": "module",
   "files": [
     "dist"
@@ -15,7 +21,8 @@
   "sideEffects": [
     "./dist/auto-register.js",
     "./dist/designer-auto-register.js",
-    "./dist/viewer-auto-register.js"
+    "./dist/viewer-auto-register.js",
+    "./dist/host-tokens.css"
   ],
   "dependencies": {
     "@base-screen/contracts": "workspace:^",

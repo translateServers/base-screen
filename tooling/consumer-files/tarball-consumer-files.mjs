@@ -16,37 +16,17 @@ const COMPOSITION_SMOKE_TYPES = `declare global {
 `;
 
 /**
- * 让临时消费者使用 hoisted 链接。
- *
- * pnpm 11 的 isolated 布局依赖符号链接；Windows 未开 Developer Mode（或受限环境）时
- * 链接会被静默跳过，安装日志显示成功、node 却解析不到包，门禁因此假失败。
- * hoisted 用真实目录展开依赖，不改变「从 tarball 安装」这一被验证的语义。
+ * 写入桥接包 tarball 消费者工程。
  */
-export function writeHoistedInstallConfig(consumer) {
-  writeFileSync(join(consumer, 'pnpm-workspace.yaml'), 'nodeLinker: hoisted\n');
-}
-
-export function writeTarballConsumerFiles(consumer, framework, tarballSpec) {
-  writeHoistedInstallConfig(consumer);
+export function writeTarballConsumerFiles(consumer, framework, packageSpec) {
   const isReact = framework === 'react';
   const productTag = `base-screen-${framework}-product`;
-  const workspaceDependencies = [
-    'contracts',
-    'core',
-    'engine',
-    'material',
-    'plugin-core',
-    'plugin-manager',
-    'plugin-sdk',
-    'renderer',
-    'sdk',
-    framework,
-  ];
+  const workspaceDependencies = ['contracts', 'material', 'plugin-core', 'sdk', framework];
   const dependencies = {
     ...Object.fromEntries(
       workspaceDependencies.map((directory) => [
         `@base-screen/${directory}`,
-        tarballSpec(directory),
+        packageSpec(directory),
       ]),
     ),
     ...(isReact ? { react: '19.1.0', 'react-dom': '19.1.0' } : { vue: '3.5.0' }),
@@ -119,14 +99,13 @@ export function writeTarballConsumerFiles(consumer, framework, tarballSpec) {
  *
  * 早期实现复制了 `examples/host-quickstart` 的源码，但那让门禁与一个示例目录耦合：
  * 示例被重构/移动时消费者会静默失效。这里把最小 Viewer 工程完整写成模板字符串，
- * 依赖仍然只声明 contracts / material / plugin-core / sdk，并由下方断言守住这一点。
+ * 依赖只声明实际导入的 contracts / material / sdk，并由下方断言守住这一点。
  */
-export function writeVanillaTarballConsumerFiles(consumer, tarballSpec) {
-  writeHoistedInstallConfig(consumer);
+export function writeVanillaTarballConsumerFiles(consumer, packageSpec) {
   const dependencies = Object.fromEntries(
-    ['contracts', 'material', 'plugin-core', 'sdk'].map((directory) => [
+    ['contracts', 'material', 'sdk'].map((directory) => [
       `@base-screen/${directory}`,
-      tarballSpec(directory),
+      packageSpec(directory),
     ]),
   );
   writeFileSync(
@@ -240,6 +219,7 @@ base-screen-viewer {
 `,
   );
   writeFileSync(join(consumer, 'src', 'vite-env.d.ts'), '/// <reference types="vite/client" />\n');
+  writeFileSync(join(consumer, 'vite.config.mjs'), viewerOnlyViteConfigSource());
   writeFileSync(join(consumer, 'browser.mjs'), vanillaBrowserVerifierSource());
 }
 
@@ -253,8 +233,12 @@ import {
   defineBaseScreenRectangleMaterial,
   defineBaseScreenTextMaterial,
 } from '@base-screen/material';
-import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { type BaseScreenViewerElement, defineBaseScreenViewer } from '@base-screen/sdk/viewer';
+import {
+  createBaseScreenViewerRuntime,
+  type BaseScreenViewerElement,
+  defineBaseScreenViewer,
+} from '@base-screen/sdk/viewer';
+import '@base-screen/sdk/host-tokens.css';
 import './style.css';
 
 const viewerDefinition = defineBaseScreenViewer();
@@ -264,7 +248,6 @@ if (!viewerDefinition.ok || !textDefinition.ok || !rectangleDefinition.ok) {
   throw new Error('Base Screen Custom Element registration failed.');
 }
 
-const catalog = createBaseScreenMaterialCatalog([textDefinition.value, rectangleDefinition.value]);
 const parsed = parseScreenDocument({
   canvas: { width: 640, height: 360, backgroundColor: '#111827' },
   components: [
@@ -311,15 +294,23 @@ viewer.addEventListener('base-screen-diagnostic', (event) => {
   console.error('Base Screen diagnostic', detail.diagnostics);
 });
 
-const configured = viewer.configure({
-  catalog,
+const runtimeResult = await createBaseScreenViewerRuntime({
+  materials: [textDefinition.value, rectangleDefinition.value],
   instanceId: 'base-screen-vanilla-consumer',
-  mode: 'viewer',
 });
-if (!configured.ok) {
-  throw new Error(\`Viewer configuration failed: \${formatDiagnostics(configured.diagnostics)}\`);
+if (!runtimeResult.ok) {
+  throw new Error(\`Viewer runtime failed: \${formatDiagnostics(runtimeResult.diagnostics)}\`);
 }
-viewer.document = parsed.value;
+const runtime = runtimeResult.value;
+const container = viewer.parentElement;
+if (container === null) throw new Error('Missing Viewer container.');
+const mounted = await runtime.mountViewer(container, { element: viewer, document: parsed.value });
+if (!mounted.ok) {
+  throw new Error(\`Viewer mount failed: \${formatDiagnostics(mounted.diagnostics)}\`);
+}
+window.addEventListener('pagehide', () => {
+  void runtime.dispose();
+}, { once: true });
 
 function formatDiagnostics(diagnostics: readonly ScreenDiagnostic[]): string {
   return diagnostics.map((item) => \`\${item.code}@\${item.path.join('.')}\`).join(', ');
@@ -807,9 +798,11 @@ import type {
   BaseScreenDesignerElement,
   BaseScreenDesignerMountOptions,
   BaseScreenMountHandle,
+  BaseScreenMountDiagnosticContext,
   BaseScreenRuntime,
   BaseScreenViewerElement,
   BaseScreenViewerMountOptions,
+  ScreenProjectState,
 } from '@base-screen/sdk';
 import { BaseScreenDesigner, BaseScreenViewer } from '@base-screen/vue';
 
@@ -829,6 +822,9 @@ export type ComponentContracts = [
   Assert<Equal<Parameters<NonNullable<Viewer['$props']['onMounted']>>[0], BaseScreenMountHandle<BaseScreenViewerElement>>>,
   Assert<Equal<Parameters<Designer['$slots']['fallback']>[0]['diagnostics'], readonly ScreenDiagnostic[]>>,
   Assert<Equal<Parameters<Viewer['$slots']['fallback']>[0]['diagnostics'], readonly ScreenDiagnostic[]>>,
+  Assert<Equal<Parameters<NonNullable<Designer['$props']['onProjectState']>>[0], ScreenProjectState>>,
+  Assert<Equal<Parameters<NonNullable<Designer['$props']['onDiagnostics']>>[1], BaseScreenMountDiagnosticContext | undefined>>,
+  Assert<Equal<Parameters<Designer['$slots']['fallback']>[0]['context'], BaseScreenMountDiagnosticContext | undefined>>,
 ];
 
 // @ts-expect-error runtime 和 mountOptions 都是必填项。
@@ -979,6 +975,104 @@ try {
   await server.close();
 }
 `;
+}
+
+function viewerOnlyViteConfigSource() {
+  return `export default {
+  plugins: [{
+    name: 'assert-viewer-only-published-bundle',
+    generateBundle(_options, bundle) {
+      let hasHostTokens = false;
+      for (const output of Object.values(bundle)) {
+        if (output.type === 'asset') {
+          if (output.fileName.endsWith('.css') && String(output.source).includes('--bs-host-text-primary')) {
+            hasHostTokens = true;
+          }
+          continue;
+        }
+        for (const [id, module] of Object.entries(output.modules)) {
+          const normalized = id.replaceAll('\\\\', '/');
+          if (module.renderedLength > 0 && /(?:packages|@base-screen)\\/engine\\//.test(normalized)) {
+            this.error('VIEWER_ONLY_ENGINE_MODULE_RETAINED: ' + normalized);
+          }
+        }
+        if (output.code.includes('base-screen-designer')) {
+          this.error('VIEWER_ONLY_DESIGNER_CODE_RETAINED');
+        }
+      }
+      if (!hasHostTokens) this.error('VIEWER_ONLY_HOST_TOKENS_CSS_MISSING');
+    },
+  }],
+};
+`;
+}
+
+export function writeViewerOnlyTarballConsumerFiles(consumer, framework, tarballSpec) {
+  writeTarballConsumerFiles(consumer, framework, tarballSpec);
+  if (framework !== 'vue') throw new Error('VIEWER_ONLY_FRAMEWORK_UNSUPPORTED');
+  writeFileSync(join(consumer, 'vite.config.ts'), viewerOnlyViteConfigSource());
+  writeFileSync(join(consumer, 'src', 'vite-env.d.ts'), '/// <reference types="vite/client" />\n');
+  writeFileSync(
+    join(consumer, 'src', 'main.ts'),
+    `import { createApp, h } from 'vue';
+import { BaseScreenViewer } from '@base-screen/vue';
+import { createBaseScreenViewerRuntime } from '@base-screen/sdk/viewer';
+import '@base-screen/sdk/host-tokens.css';
+
+const result = await createBaseScreenViewerRuntime({ instanceId: 'vue-viewer-only' });
+if (!result.ok) throw new Error('VIEWER_ONLY_RUNTIME_FAILED');
+const runtime = result.value;
+const stage = document.querySelector('#app');
+if (stage === null) throw new Error('VIEWER_ONLY_STAGE_MISSING');
+const diagnostics: string[] = [];
+const app = createApp({
+  render: () => h(BaseScreenViewer, {
+    runtime,
+    mountOptions: {
+      document: {
+        canvas: { width: 640, height: 360, backgroundColor: '#111827' },
+        components: [], variables: [], blueprint: { relations: [] },
+      },
+    },
+    onDiagnostics: (items) => { diagnostics.splice(0, diagnostics.length, ...items.map(item => item.message)); },
+  }),
+});
+app.mount(stage);
+Object.assign(window, { __viewerOnly: {
+  diagnostics,
+  unmount: () => app.unmount(),
+  disposed: () => runtime.disposed,
+  dispose: () => runtime.dispose(),
+} });
+`,
+  );
+  writeFileSync(
+    join(consumer, 'browser.mjs'),
+    `import { chromium } from '@playwright/test';
+import { preview } from 'vite';
+const server = await preview({ preview: { host: '127.0.0.1', port: 0 } });
+const url = server.resolvedUrls?.local[0];
+if (url === undefined) throw new Error('VIEWER_ONLY_URL_MISSING');
+const browser = await chromium.launch();
+try {
+  const page = await browser.newPage();
+  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.locator('base-screen-viewer').waitFor();
+  const state = await page.evaluate(() => ({
+    designer: customElements.get('base-screen-designer') !== undefined,
+    diagnostics: window.__viewerOnly.diagnostics,
+  }));
+  if (state.designer || state.diagnostics.length > 0) throw new Error('VIEWER_ONLY_MOUNT_FAILED: ' + JSON.stringify(state));
+  await page.evaluate(() => window.__viewerOnly.unmount());
+  await page.waitForFunction(() => document.querySelector('base-screen-viewer') === null);
+  if (await page.evaluate(() => window.__viewerOnly.disposed())) throw new Error('VIEWER_ONLY_COMPONENT_DISPOSED_SHARED_RUNTIME');
+  await page.evaluate(() => window.__viewerOnly.dispose());
+} finally {
+  await browser.close();
+  await server.close();
+}
+`,
+  );
 }
 
 function vanillaBrowserVerifierSource() {

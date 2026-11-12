@@ -10,15 +10,19 @@ import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
 import { BaseScreenMountControllerReady } from '@base-screen/sdk';
+import { BaseScreenMountDiagnosticContext } from '@base-screen/sdk';
+import { BaseScreenMountDiagnosticsCallback } from '@base-screen/sdk';
 import { BaseScreenRuntime } from '@base-screen/sdk';
 import { BaseScreenViewerElement } from '@base-screen/sdk';
 import { BaseScreenViewerMountOptions } from '@base-screen/sdk';
+import { BaseScreenViewerRuntime } from '@base-screen/sdk';
 import { ComponentType } from 'react';
 import { CSSProperties } from 'react';
 import { ReactElement } from 'react';
 import { ReactNode } from 'react';
 import type { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
+import { ScreenProjectState } from '@base-screen/sdk';
 
 // @public (undocumented)
 export function BaseScreenDesigner(props: BaseScreenDesignerProps): ReactElement;
@@ -29,12 +33,14 @@ export interface BaseScreenDesignerProps {
     readonly className?: string;
     readonly mountOptions: BaseScreenDesignerMountOptions | null;
     // (undocumented)
-    readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+    readonly onDiagnostics?: BaseScreenMountDiagnosticsCallback;
     // (undocumented)
     readonly onMounted?: BaseScreenMountControllerReady<BaseScreenDesignerElement>;
+    // (undocumented)
+    readonly onProjectState?: (state: ScreenProjectState) => void;
     readonly remountKey?: string | number;
     // (undocumented)
-    readonly renderFallback?: (diagnostics: readonly ScreenDiagnostic[]) => ReactNode;
+    readonly renderFallback?: (diagnostics: readonly ScreenDiagnostic[], context: BaseScreenMountDiagnosticContext | undefined) => ReactNode;
     readonly runtime: BaseScreenRuntime | null;
     // (undocumented)
     readonly style?: CSSProperties;
@@ -49,14 +55,14 @@ export interface BaseScreenViewerProps {
     readonly className?: string;
     readonly mountOptions: BaseScreenViewerMountOptions | null;
     // (undocumented)
-    readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+    readonly onDiagnostics?: BaseScreenMountDiagnosticsCallback;
     // (undocumented)
     readonly onMounted?: BaseScreenMountControllerReady<BaseScreenViewerElement>;
     // (undocumented)
     readonly remountKey?: string | number;
     // (undocumented)
-    readonly renderFallback?: (diagnostics: readonly ScreenDiagnostic[]) => ReactNode;
-    readonly runtime: BaseScreenRuntime | null;
+    readonly renderFallback?: (diagnostics: readonly ScreenDiagnostic[], context: BaseScreenMountDiagnosticContext | undefined) => ReactNode;
+    readonly runtime: BaseScreenViewerRuntime | null;
     // (undocumented)
     readonly style?: CSSProperties;
 }

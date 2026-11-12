@@ -1,13 +1,19 @@
 import type { ScreenDocument, ScreenProjectAdapter } from '@base-screen/contracts';
+import {
+  BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+  BaseScreenTextMaterialElement,
+} from '@base-screen/material';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   BaseScreenDesignerElement,
   BaseScreenRuntime,
   BaseScreenViewerElement,
+  BaseScreenViewerRuntime,
 } from '../src/index.js';
 import { createBaseScreenRuntime } from '../src/index.js';
+import { createBaseScreenViewerRuntime } from '../src/viewer.js';
 
-const runtimes: BaseScreenRuntime[] = [];
+const runtimes: BaseScreenViewerRuntime[] = [];
 
 function installCustomElements(): Map<string, CustomElementConstructor> {
   const registrations = new Map<string, CustomElementConstructor>();
@@ -79,6 +85,61 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+describe('createBaseScreenViewerRuntime', () => {
+  it('registers only Viewer and explicitly selected materials', async () => {
+    const registrations = installCustomElements();
+    const created = await createBaseScreenViewerRuntime({
+      materials: [
+        {
+          manifest: BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+          constructor: BaseScreenTextMaterialElement,
+        },
+      ],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    runtimes.push(created.value);
+    expect([...registrations.keys()].sort()).toEqual(
+      [BASE_SCREEN_TEXT_MATERIAL_MANIFEST.tagName, 'base-screen-viewer'].sort(),
+    );
+    expect(created.value.catalog.list()).toHaveLength(1);
+    expect('mountDesigner' in created.value).toBe(false);
+    expect('bindDesigner' in created.value).toBe(false);
+  });
+
+  it('refreshes inherited Viewer catalogs and disposes tracked mounts', async () => {
+    installCustomElements();
+    const created = await createBaseScreenViewerRuntime();
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const runtime = created.value;
+    runtimes.push(runtime);
+    const inherited = createFakeElement();
+    const independent = createFakeElement();
+    const first = await runtime.mountViewer(createContainer(), {
+      element: inherited as unknown as BaseScreenViewerElement,
+    });
+    const second = await runtime.mountViewer(createContainer(), {
+      element: independent as unknown as BaseScreenViewerElement,
+      catalog: runtime.catalog,
+    });
+    expect(first.ok && second.ok).toBe(true);
+    const empty = { get: () => undefined, has: () => false, list: () => [] };
+    expect(runtime.setCatalog(empty).ok).toBe(true);
+    expect(runtime.catalog).toBe(empty);
+    expect(inherited.catalog).toBe(empty);
+    expect(independent.catalog).not.toBe(empty);
+    const disposed = runtime.dispose();
+    expect(runtime.disposed).toBe(true);
+    expect(runtime.dispose()).toBe(disposed);
+    expect((await disposed).ok).toBe(true);
+    expect(runtime.manager.status).toBe('disposed');
+    expect(inherited.unload).toHaveBeenCalledOnce();
+    expect(independent.unload).toHaveBeenCalledOnce();
+    expect((await runtime.mountViewer(createContainer(), {})).ok).toBe(false);
+  });
+});
+
 describe('createBaseScreenRuntime', () => {
   it('fails closed when Custom Elements are unavailable', async () => {
     vi.unstubAllGlobals();
@@ -102,6 +163,56 @@ describe('createBaseScreenRuntime', () => {
     expect(secondDisposal.ok).toBe(true);
     expect(runtime.disposed).toBe(true);
     expect(runtime.manager.status).toBe('disposed');
+  });
+
+  it('accepts bridge catalog entries and preserves their dataset adapters without host registration glue', async () => {
+    const registrations = installCustomElements();
+    class HostMetric extends BaseScreenTextMaterialElement {
+      static override readonly manifest = {
+        ...BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+        type: 'host.metric',
+        tagName: 'host-metric',
+      };
+    }
+    const adapter = {
+      adapt: () => ({ ok: true as const, value: null, diagnostics: [] }),
+    };
+    const entry = {
+      manifest: HostMetric.manifest,
+      constructor: HostMetric,
+      tabularDataAdapter: adapter,
+    };
+    const runtime = await createRuntime({ officialMaterials: false, materials: [entry] });
+    expect(registrations.get('host-metric')).toBe(HostMetric);
+    expect(runtime.catalog.get('host.metric')?.tabularDataAdapter).toBe(adapter);
+    expect(runtime.catalog.list()).toHaveLength(1);
+  });
+
+  it('rejects a bridge entry with a conflicting adapter before registering product elements', async () => {
+    const registrations = installCustomElements();
+    class HostMetric extends BaseScreenTextMaterialElement {
+      static override readonly manifest = {
+        ...BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+        type: 'host.metric',
+        tagName: 'host-metric',
+      };
+      static readonly tabularDataAdapter = {
+        adapt: () => ({ ok: true as const, value: null, diagnostics: [] }),
+      };
+    }
+    const result = await createBaseScreenRuntime({
+      officialMaterials: false,
+      materials: [
+        {
+          manifest: HostMetric.manifest,
+          constructor: HostMetric,
+          tabularDataAdapter: { adapt: HostMetric.tabularDataAdapter.adapt },
+        },
+      ],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics[0]?.code).toBe('PLUGIN_CORE_IDENTITY_CONFLICT');
+    expect(registrations.size).toBe(0);
   });
 
   it('does not publish a runtime when any plugin activation fails', async () => {
@@ -192,8 +303,59 @@ describe('createBaseScreenRuntime', () => {
       element: fake as unknown as BaseScreenDesignerElement,
     });
     expect(mounted.ok).toBe(false);
+    expect(mounted.mountPhase).toBe('configure');
     expect(fake.unload).toHaveBeenCalledTimes(1);
     expect(fake.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['configure', 'load', 'document', 'mount'] as const)(
+    'preserves the %s failure phase when cleanup also fails',
+    async (phase) => {
+      installCustomElements();
+      const runtime = await createRuntime({ officialMaterials: false });
+      const fake = createFakeElement();
+      fake.unload.mockImplementation(() => {
+        throw new Error('cleanup');
+      });
+      const container = createContainer();
+      if (phase === 'configure')
+        fake.configure.mockImplementationOnce(() => {
+          throw new Error('configure');
+        });
+      if (phase === 'load') fake.load.mockRejectedValueOnce(new Error('load'));
+      if (phase === 'document')
+        Object.defineProperty(fake, 'document', {
+          set() {
+            throw new Error('document');
+          },
+        });
+      if (phase === 'mount')
+        vi.mocked(container.append).mockImplementationOnce(() => {
+          throw new Error('mount');
+        });
+      const result = await runtime.mountDesigner(container, {
+        element: fake as unknown as BaseScreenDesignerElement,
+        ...(phase === 'load'
+          ? { projectId: 'screen', projectAdapter: {} as ScreenProjectAdapter }
+          : {}),
+        ...(phase === 'document' ? { document: {} as ScreenDocument } : {}),
+      });
+      expect(result.ok).toBe(false);
+      expect(result.mountPhase).toBe(phase);
+      expect(result.diagnostics).toHaveLength(2);
+    },
+  );
+
+  it('marks pre-mount validation and disposed-runtime failures as mount', async () => {
+    installCustomElements();
+    const runtime = await createRuntime({ officialMaterials: false });
+    const invalid = await runtime.mountDesigner(createContainer(), { projectId: 'screen' });
+    expect(invalid.ok).toBe(false);
+    expect(invalid.mountPhase).toBe('mount');
+    await runtime.dispose();
+    const disposed = await runtime.mountViewer(createContainer(), {});
+    expect(disposed.ok).toBe(false);
+    expect(disposed.mountPhase).toBe('mount');
   });
 
   it('provides official tool and group defaults and respects explicit overrides', async () => {

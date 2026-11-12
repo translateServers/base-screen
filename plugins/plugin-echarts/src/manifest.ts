@@ -2,6 +2,7 @@ import {
   type BaseScreenMaterialEditorDescriptor,
   type BaseScreenMaterialManifest,
   type BaseScreenMaterialObjectSchema,
+  type BaseScreenMaterialPropSchema,
   parseBaseScreenMaterialEditorDescriptor,
 } from '@base-screen/plugin-core';
 
@@ -93,6 +94,80 @@ export const PLUGIN_ECHARTS_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   },
   designCapabilities: { resize: true, rotate: true, children: false },
 };
+
+const CHART_FAMILY_IDENTITIES = [
+  ['line', '折线图', 640, 320],
+  ['area', '面积图', 640, 320],
+  ['bar', '柱状图', 560, 320],
+  ['hbar', '条形图', 560, 320],
+  ['pie', '饼图', 420, 300],
+  ['donut', '环形图', 420, 300],
+  ['gauge', '仪表盘', 320, 260],
+  ['radar', '雷达图', 420, 320],
+  ['scatter', '散点图', 560, 320],
+  ['heatmap', '热力图', 560, 320],
+] as const;
+
+/** 已交付图表家族的稳定身份与角色；与通用图表共享渲染器，不在宿主复制实现。 */
+export const PLUGIN_ECHARTS_MATERIAL_MANIFESTS: readonly BaseScreenMaterialManifest[] = [
+  PLUGIN_ECHARTS_MATERIAL_MANIFEST,
+  ...CHART_FAMILY_IDENTITIES.map(([kind, name, width, height]): BaseScreenMaterialManifest => {
+    const extra: Record<string, BaseScreenMaterialPropSchema> =
+      kind === 'gauge'
+        ? {
+            min: { kind: 'number' },
+            max: { kind: 'number' },
+            unit: { kind: 'string' },
+            decimals: { kind: 'number', minimum: 0, maximum: 4 },
+          }
+        : {};
+    const { editorDescriptor: _descriptor, ...base } = PLUGIN_ECHARTS_MATERIAL_MANIFEST;
+    return {
+      ...base,
+      type: `plugin.chart.${kind}`,
+      tagName: `base-screen-plugin-chart-${kind}`,
+      name,
+      keywords: ['图表', name],
+      defaultSize: { width, height },
+      defaultProps: {
+        titleText: '',
+        showTooltip: true,
+        showLegend: true,
+        ...(kind === 'gauge' ? { min: 0, max: 100, unit: '', decimals: 1 } : {}),
+      },
+      defaultStyle: {
+        backgroundColor: 'transparent',
+        color: '#94a3b8',
+        gridColor: '#1e3a5f',
+        seriesColor: '#36cfc9',
+        opacity: 1,
+      },
+      propsSchema: {
+        kind: 'object',
+        properties: {
+          titleText: { kind: 'string' },
+          showTooltip: { kind: 'boolean' },
+          showLegend: { kind: 'boolean' },
+          ...extra,
+        },
+        required: ['titleText', 'showTooltip', 'showLegend', ...Object.keys(extra)],
+      },
+      propertyPanel: [
+        { prop: 'titleText', label: '标题', control: 'text' },
+        { prop: 'showTooltip', label: '提示框', control: 'boolean' },
+        { prop: 'showLegend', label: '图例', control: 'boolean' },
+        ...(kind === 'gauge'
+          ? [
+              { prop: 'min', label: '最小值', control: 'number' as const },
+              { prop: 'max', label: '最大值', control: 'number' as const },
+              { prop: 'unit', label: '单位', control: 'text' as const },
+              { prop: 'decimals', label: '小数位', control: 'number' as const },
+            ]
+          : []),
+      ],
+    };
+  }),
+];
 
 function parseEchartsEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
   const parsed = parseBaseScreenMaterialEditorDescriptor(

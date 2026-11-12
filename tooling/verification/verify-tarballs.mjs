@@ -10,12 +10,16 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative } from 'node:path';
+import { satisfies, validRange } from 'semver';
 import { PACKAGE_DEFINITIONS } from '../checks/packages.mjs';
+
+const EXAMPLE_PLUGIN_DIRECTORIES = ['plugin-board-materials', 'plugin-echarts'];
+
 import { writeHostAppVueTarballConsumerFiles } from '../consumer-files/host-app-vue-consumer-files.mjs';
 import {
-  writeHoistedInstallConfig,
   writeTarballConsumerFiles,
   writeVanillaTarballConsumerFiles,
+  writeViewerOnlyTarballConsumerFiles,
 } from '../consumer-files/tarball-consumer-files.mjs';
 
 function run(command, args, cwd) {
@@ -66,9 +70,10 @@ function assertContractsSchemaSingularity(tarball) {
 }
 
 function packageDirectoryByName(name) {
-  return Object.entries(PACKAGE_DEFINITIONS).find(
-    ([, definition]) => definition.name === name,
-  )?.[0];
+  return (
+    Object.entries(PACKAGE_DEFINITIONS).find(([, definition]) => definition.name === name)?.[0] ??
+    EXAMPLE_PLUGIN_DIRECTORIES.find((directory) => name === `@base-screen/${directory}`)
+  );
 }
 
 function readWorkspaceDependencyDirectories(manifestPath) {
@@ -88,8 +93,8 @@ function workspaceDependencyDirectories(directory) {
 
 // 公共入口不只有 JS：host-tokens.css 是唯一允许的非脚本导出（ADR-0095）。
 // ATTW 会把这类入口判为类型解析失败，检查时按入口名排除，其余入口照常校验。
-function nonScriptEntrypoints(directory) {
-  const manifest = JSON.parse(readFileSync(join('packages', directory, 'package.json'), 'utf8'));
+function nonScriptEntrypoints(tarball) {
+  const manifest = readTarballManifest(tarball);
   const exportsField = manifest.exports;
   if (!exportsField || typeof exportsField !== 'object') {
     return [];
@@ -99,47 +104,60 @@ function nonScriptEntrypoints(directory) {
     .map(([subpath]) => subpath);
 }
 
-function patchWorkspaceDependencySpecs(
-  directory,
-  tarball,
-  manifestFile = join('packages', directory, 'package.json'),
-) {
-  const dependencies = readWorkspaceDependencyDirectories(manifestFile);
-  if (dependencies.length === 0) {
-    return tarball;
+function readTarballManifest(tarball) {
+  const cwd = dirname(tarball);
+  return JSON.parse(
+    execFileSync('tar', ['-xOf', tarOperand(cwd, tarball), 'package/package.json'], {
+      cwd,
+      encoding: 'utf8',
+    }),
+  );
+}
+
+function assertTarballDependencySpecs(directory, tarball) {
+  const manifest = readTarballManifest(tarball);
+  if (
+    ['engine', 'sdk'].includes(directory) &&
+    !manifest.sideEffects?.includes('./dist/host-tokens.css')
+  ) {
+    throw new Error(`TARBALL_CSS_SIDE_EFFECT_MISSING: ${directory}`);
   }
-  const working = mkdtempSync(join(temporaryRoot, `patch-${directory}-`));
-  const tarballDir = dirname(tarball);
-  const args = ['-xzf', tarOperand(tarballDir, tarball), '-C', tarOperand(tarballDir, working)];
-  execFileSync('tar', args, { cwd: tarballDir });
-  const manifestPath = join(working, 'package', 'package.json');
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  let changed = false;
   for (const dependencyType of ['dependencies', 'peerDependencies', 'optionalDependencies']) {
-    const entries = manifest[dependencyType];
-    if (!entries) {
-      continue;
-    }
-    for (const name of Object.keys(entries)) {
+    for (const [name, spec] of Object.entries(manifest[dependencyType] ?? {})) {
       const dependencyDirectory = packageDirectoryByName(name);
-      if (dependencyDirectory === undefined) {
-        continue;
+      if (/^(?:workspace:|link:|file:)/.test(spec)) {
+        throw new Error(`TARBALL_SOURCE_DEPENDENCY_SPEC: ${directory} -> ${name}@${spec}`);
       }
-      const dependencyTarball = packedTarballs.get(dependencyDirectory);
-      if (!dependencyTarball) {
-        throw new Error(`TARBALL_DEPENDENCY_NOT_PACKED: ${directory} -> ${name}`);
+      if (dependencyDirectory === undefined) continue;
+      const dependency = readTarballManifest(packedTarballs.get(dependencyDirectory));
+      if (validRange(spec) === null || !satisfies(dependency.version, spec)) {
+        throw new Error(
+          `TARBALL_DEPENDENCY_RANGE_INVALID: ${directory} -> ${name}@${spec}, packed ${dependency.version}`,
+        );
       }
-      entries[name] = `file:${dependencyTarball.replace(/\\/g, '/')}`;
-      changed = true;
+      const region = PACKAGE_DEFINITIONS[directory] === undefined ? 'plugins' : 'packages';
+      const source = JSON.parse(
+        readFileSync(join(root, region, directory, 'package.json'), 'utf8'),
+      );
+      const original = source[dependencyType]?.[name];
+      const prefix = { 'workspace:^': '^', 'workspace:~': '~', 'workspace:*': '' }[original];
+      if (prefix !== undefined && spec !== `${prefix}${dependency.version}`) {
+        throw new Error(`TARBALL_WORKSPACE_CONVERSION_INVALID: ${directory} -> ${name}@${spec}`);
+      }
     }
   }
-  if (!changed) {
-    return tarball;
-  }
-  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  const patched = join(dirname(tarball), `${directory}-patched.tgz`);
-  execFileSync('tar', ['-czf', tarOperand(working, patched), 'package'], { cwd: working });
-  return patched;
+}
+
+function writeConsumerWorkspaceConfig(consumer) {
+  const overrides = [...packedTarballs].map(([directory, tarball]) => {
+    const manifest = readTarballManifest(tarball);
+    return `  '${manifest.name}': 'file:${tarball.replace(/\\/g, '/')}'`;
+  });
+  const linker = process.platform === 'win32' ? 'nodeLinker: hoisted\n' : '';
+  writeFileSync(
+    join(consumer, 'pnpm-workspace.yaml'),
+    `${linker}overrides:\n${overrides.join('\n')}\n`,
+  );
 }
 
 function packageBuildOrder() {
@@ -177,6 +195,10 @@ function tarballSpec(directory) {
   return `file:${tarball.replace(/\\/g, '/')}`;
 }
 
+function consumerPackageSpec(directory) {
+  return readTarballManifest(packedTarballs.get(directory)).version;
+}
+
 function assertConsumerIsolation(consumer, name, requiredPackages, forbiddenPackages) {
   const code = name.toUpperCase();
   const lockfile = readFileSync(join(consumer, 'pnpm-lock.yaml'), 'utf8');
@@ -205,7 +227,8 @@ function assertConsumerIsolation(consumer, name, requiredPackages, forbiddenPack
 
 function verifyBridgeTarballConsumer(framework) {
   const consumer = mkdtempSync(join(temporaryRoot, `${framework}-vite-consumer-`));
-  writeTarballConsumerFiles(consumer, framework, tarballSpec);
+  writeConsumerWorkspaceConfig(consumer);
+  writeTarballConsumerFiles(consumer, framework, consumerPackageSpec);
   run('pnpm', ['install', '--strict-peer-dependencies'], consumer);
   assertConsumerIsolation(
     consumer,
@@ -231,23 +254,30 @@ function verifyBridgeTarballConsumer(framework) {
 
 function verifyVanillaTarballConsumer() {
   const consumer = mkdtempSync(join(temporaryRoot, 'vanilla-vite-consumer-'));
-  writeVanillaTarballConsumerFiles(consumer, tarballSpec);
+  writeConsumerWorkspaceConfig(consumer);
+  writeVanillaTarballConsumerFiles(consumer, consumerPackageSpec);
   run('pnpm', ['install', '--strict-peer-dependencies'], consumer);
   assertConsumerIsolation(
     consumer,
     'vanilla',
-    [
-      'contracts',
-      'core',
-      'engine',
-      'material',
-      'plugin-core',
-      'plugin-manager',
-      'plugin-sdk',
-      'renderer',
-      'sdk',
-    ],
+    ['contracts', 'material', 'sdk'],
     ['react', 'react-dom', 'vue'],
+  );
+  run('pnpm', ['run', 'typecheck'], consumer);
+  run('pnpm', ['run', 'build'], consumer);
+  run('pnpm', ['run', 'verify'], consumer);
+}
+
+function verifyViewerOnlyTarballConsumer() {
+  const consumer = mkdtempSync(join(temporaryRoot, 'vue-viewer-only-consumer-'));
+  writeConsumerWorkspaceConfig(consumer);
+  writeViewerOnlyTarballConsumerFiles(consumer, 'vue', consumerPackageSpec);
+  run('pnpm', ['install', '--strict-peer-dependencies'], consumer);
+  assertConsumerIsolation(
+    consumer,
+    'vue-viewer-only',
+    ['contracts', 'material', 'plugin-core', 'plugin-sdk', 'sdk', 'vue'],
+    ['react', 'react-dom'],
   );
   run('pnpm', ['run', 'typecheck'], consumer);
   run('pnpm', ['run', 'build'], consumer);
@@ -264,13 +294,15 @@ function verifyVanillaTarballConsumer() {
  */
 function verifyHostAppVueTarballConsumer() {
   const consumer = mkdtempSync(join(temporaryRoot, 'host-app-vue-consumer-'));
-  writeHostAppVueTarballConsumerFiles(consumer, tarballSpec, root);
+  writeConsumerWorkspaceConfig(consumer);
+  writeHostAppVueTarballConsumerFiles(consumer, consumerPackageSpec, root);
   run('pnpm', ['install', '--strict-peer-dependencies'], consumer);
   assertConsumerIsolation(
     consumer,
     'vue-host',
     [
       'contracts',
+      'host-kit',
       'material',
       'plugin-core',
       'plugin-sdk',
@@ -292,37 +324,37 @@ const temporaryRoot = mkdtempSync(join(tmpdir(), 'base-screen-tarballs-'));
 const packedTarballs = new Map();
 // 外围插件不在 packages 固定清单里，但 Vue 宿主会消费它们；外部消费者改写
 // `@base-screen/plugin-*` 依赖时必须能解析到同批次 tarball。
-const PLUGIN_TARBALL_DIRECTORIES = ['plugin-board-materials', 'plugin-echarts'];
-
 try {
-  for (const directory of packageBuildOrder()) {
-    const definition = PACKAGE_DEFINITIONS[directory];
-    const packageDirectory = join(root, 'packages', directory);
+  for (const [directory, packageDirectory] of [
+    ...packageBuildOrder().map((directory) => [directory, join(root, 'packages', directory)]),
+    ...EXAMPLE_PLUGIN_DIRECTORIES.map((directory) => [directory, join(root, 'plugins', directory)]),
+  ]) {
     const packageTarballs = join(temporaryRoot, directory);
     mkdirSync(packageTarballs, { recursive: true });
     run('pnpm', ['pack', '--pack-destination', packageTarballs], packageDirectory);
     const tarballName = readdirSync(packageTarballs).find((name) => name.endsWith('.tgz'));
-    if (!tarballName) {
-      throw new Error(`TARBALL_MISSING: ${directory}`);
-    }
-    const tarball = join(packageTarballs, tarballName);
-    packedTarballs.set(directory, tarball);
+    if (!tarballName) throw new Error(`TARBALL_MISSING: ${directory}`);
+    packedTarballs.set(directory, join(packageTarballs, tarballName));
+  }
+
+  for (const [directory, tarball] of packedTarballs) {
     assertTarballContents(tarball);
-    if (directory === 'contracts') {
-      assertContractsSchemaSingularity(tarball);
-    }
+    assertTarballDependencySpecs(directory, tarball);
+    if (directory === 'contracts') assertContractsSchemaSingularity(tarball);
+    if (PACKAGE_DEFINITIONS[directory] === undefined) continue;
     run('pnpm', ['exec', 'publint', tarball], root);
     const attwArgs = ['exec', 'attw', tarball, '--profile', 'esm-only'];
-    const excludedEntrypoints = nonScriptEntrypoints(directory);
-    if (excludedEntrypoints.length > 0) {
+    const excludedEntrypoints = nonScriptEntrypoints(tarball);
+    if (excludedEntrypoints.length > 0)
       attwArgs.push('--exclude-entrypoints', ...excludedEntrypoints);
-    }
     run('pnpm', attwArgs, root);
+  }
 
-    const installTarball = patchWorkspaceDependencySpecs(directory, tarball);
-    packedTarballs.set(directory, installTarball);
+  for (const directory of packageBuildOrder()) {
+    const definition = PACKAGE_DEFINITIONS[directory];
+    const tarball = tarballSpec(directory);
     const consumer = mkdtempSync(join(temporaryRoot, `${directory}-consumer-`));
-    writeHoistedInstallConfig(consumer);
+    writeConsumerWorkspaceConfig(consumer);
     writeFileSync(
       join(consumer, 'package.json'),
       `${JSON.stringify(
@@ -331,7 +363,7 @@ try {
           private: true,
           type: 'module',
           packageManager: 'pnpm@11.18.0',
-          dependencies: { [definition.name]: `file:${installTarball.replace(/\\/g, '/')}` },
+          dependencies: { [definition.name]: consumerPackageSpec(directory) },
         },
         null,
         2,
@@ -521,26 +553,8 @@ if (controller.phase !== 'ready' || controller.dirty) {
     run('node', [smoke], consumer);
   }
 
-  for (const directory of PLUGIN_TARBALL_DIRECTORIES) {
-    const pluginDirectory = join(root, 'plugins', directory);
-    const packageTarballs = join(temporaryRoot, directory);
-    mkdirSync(packageTarballs, { recursive: true });
-    run('pnpm', ['pack', '--pack-destination', packageTarballs], pluginDirectory);
-    const tarballName = readdirSync(packageTarballs).find((name) => name.endsWith('.tgz'));
-    if (!tarballName) {
-      throw new Error(`TARBALL_MISSING: ${directory}`);
-    }
-    const tarball = join(packageTarballs, tarballName);
-    assertTarballContents(tarball);
-    const installTarball = patchWorkspaceDependencySpecs(
-      directory,
-      tarball,
-      join(pluginDirectory, 'package.json'),
-    );
-    packedTarballs.set(directory, installTarball);
-  }
-
   verifyVanillaTarballConsumer();
+  verifyViewerOnlyTarballConsumer();
   verifyBridgeTarballConsumer('react');
   verifyBridgeTarballConsumer('vue');
   verifyHostAppVueTarballConsumer();

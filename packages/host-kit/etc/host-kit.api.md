@@ -5,18 +5,54 @@
 ```ts
 
 import type { ScreenAbortSignal } from '@base-screen/contracts';
+import { ScreenDatasetDefinition } from '@base-screen/contracts';
+import { ScreenDatasetEntries } from '@base-screen/contracts';
 import { ScreenHostDatasetPort } from '@base-screen/contracts';
 import { ScreenMigrationResult } from '@base-screen/contracts';
+import type { ScreenParseResult } from '@base-screen/contracts';
 import { ScreenProjectAdapter } from '@base-screen/contracts';
+import { ScreenProjectEnvelope } from '@base-screen/contracts';
+import type { ScreenResourceExecutionContext } from '@base-screen/contracts';
+import { ScreenTabularDataset } from '@base-screen/contracts';
+
+// @public
+export function createHostDatasetPort<GroupsPayload, ListPayload, DescribePayload, QueryPayload>(options: HostDatasetPortOptions<GroupsPayload, ListPayload, DescribePayload, QueryPayload>): ScreenHostDatasetPort;
 
 // @public
 export function createHostKitHttp(options: HostKitHttpOptions): HostKitHttp;
+
+// @public
+export function createHostProjectAdapter<LoadPayload, SavePayload>(options: HostProjectAdapterOptions<LoadPayload, SavePayload>): ScreenProjectAdapter;
 
 // @public
 export function createHttpProjectAdapter(options: HttpProjectAdapterOptions): ScreenProjectAdapter;
 
 // @public
 export function createRestDatasetPort(options: RestDatasetPortOptions): ScreenHostDatasetPort;
+
+// @public (undocumented)
+type DescribeRequest = Parameters<ScreenHostDatasetPort['describe']>[0];
+
+// @public (undocumented)
+type GroupsRequest = Parameters<NonNullable<ScreenHostDatasetPort['groups']>>[0];
+
+// @public (undocumented)
+export interface HostDatasetPortOptions<GroupsPayload = unknown, ListPayload = unknown, DescribePayload = unknown, QueryPayload = unknown> {
+    // (undocumented)
+    readonly describe: HostKitOperation<DescribeRequest, DescribePayload>;
+    // (undocumented)
+    readonly groups?: HostKitOperation<GroupsRequest, GroupsPayload>;
+    // (undocumented)
+    readonly list: HostKitOperation<ListRequest, ListPayload>;
+    // (undocumented)
+    readonly onDescribeResult?: HostKitOperationObserver<DescribeRequest, ScreenDatasetDefinition>;
+    // (undocumented)
+    readonly onListResult?: HostKitOperationObserver<ListRequest, ScreenDatasetEntries>;
+    // (undocumented)
+    readonly onQueryResult?: HostKitOperationObserver<QueryRequest, ScreenTabularDataset>;
+    // (undocumented)
+    readonly query: HostKitOperation<QueryRequest, QueryPayload>;
+}
 
 // @public (undocumented)
 export interface HostKitHttp {
@@ -76,24 +112,84 @@ export type HostKitHttpResult<T> = {
     readonly error: HostKitHttpError;
 };
 
+// @public
+export interface HostKitOperation<Request, Payload = unknown> {
+    // (undocumented)
+    readonly execute: (request: Request, signal: AbortSignal, context?: ScreenResourceExecutionContext) => Promise<HostKitOperationResult<Payload>>;
+    // (undocumented)
+    readonly response?: (payload: Payload, request: Request) => unknown;
+}
+
+// @public
+export interface HostKitOperationError {
+    // (undocumented)
+    readonly code: string;
+    // (undocumented)
+    readonly message: string;
+    // (undocumented)
+    readonly status?: number;
+}
+
+// @public
+export type HostKitOperationObserver<Request, Value> = (event: {
+    readonly request: Omit<Request, 'signal'>;
+    readonly result: ScreenParseResult<Value>;
+    readonly error?: HostKitOperationError;
+}) => void;
+
+// @public (undocumented)
+export type HostKitOperationResult<Payload> = {
+    readonly ok: true;
+    readonly data: Payload;
+} | {
+    readonly ok: false;
+    readonly error: HostKitOperationError;
+};
+
+// @public (undocumented)
+export interface HostProjectAdapterOptions<LoadPayload = unknown, SavePayload = unknown> {
+    // (undocumented)
+    readonly load: HostKitOperation<LoadRequest, LoadPayload>;
+    readonly migrate?: (input: unknown) => ScreenMigrationResult;
+    // (undocumented)
+    readonly onLoadResult?: HostKitOperationObserver<LoadRequest, ScreenProjectEnvelope>;
+    // (undocumented)
+    readonly onSaveResult?: HostKitOperationObserver<SaveRequest, ScreenProjectEnvelope>;
+    // (undocumented)
+    readonly save: HostKitOperation<SaveRequest, SavePayload>;
+}
+
 // @public (undocumented)
 export interface HttpProjectAdapterOptions extends HostKitHttpOptions {
     readonly mapping?: {
-        readonly load?: HostKitHttpMapping<Parameters<ScreenProjectAdapter['load']>[0]>;
-        readonly save?: HostKitHttpMapping<Parameters<ScreenProjectAdapter['save']>[0]>;
+        readonly load?: HostKitHttpMapping<LoadRequest>;
+        readonly save?: HostKitHttpMapping<SaveRequest>;
     };
+    // (undocumented)
     readonly migrate?: (input: unknown) => ScreenMigrationResult;
 }
 
 // @public (undocumented)
+type ListRequest = Parameters<ScreenHostDatasetPort['list']>[0];
+
+// @public (undocumented)
+type LoadRequest = Parameters<ScreenProjectAdapter['load']>[0];
+
+// @public (undocumented)
+type QueryRequest = Parameters<ScreenHostDatasetPort['query']>[0];
+
+// @public (undocumented)
 export interface RestDatasetPortOptions extends HostKitHttpOptions {
     readonly mapping?: {
-        readonly groups?: HostKitHttpMapping<Parameters<NonNullable<ScreenHostDatasetPort['groups']>>[0]>;
-        readonly list?: HostKitHttpMapping<Parameters<ScreenHostDatasetPort['list']>[0]>;
-        readonly describe?: HostKitHttpMapping<Parameters<ScreenHostDatasetPort['describe']>[0]>;
-        readonly query?: HostKitHttpMapping<Parameters<ScreenHostDatasetPort['query']>[0]>;
+        readonly groups?: HostKitHttpMapping<GroupsRequest>;
+        readonly list?: HostKitHttpMapping<ListRequest>;
+        readonly describe?: HostKitHttpMapping<DescribeRequest>;
+        readonly query?: HostKitHttpMapping<QueryRequest>;
     };
 }
+
+// @public (undocumented)
+type SaveRequest = Parameters<ScreenProjectAdapter['save']>[0];
 
 // @public
 export function toAbortSignal(source: ScreenAbortSignal | undefined): AbortSignal | undefined;

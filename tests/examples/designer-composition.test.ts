@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const SDK_ADAPTER = 'packages/sdk/src/runtime-adapter.ts';
+const SDK_RUNTIME = 'packages/sdk/src/runtime.ts';
 const SDK_RUNTIME_MOUNTS = 'packages/sdk/src/runtime-mounts.ts';
+const SDK_RUNTIME_LIFECYCLE = 'packages/sdk/src/runtime-lifecycle.ts';
 const HOST_RUNTIMES = [
   'examples/vanilla-host/src/screen/host-runtime.ts',
   'examples/react-host/src/screen/host-runtime.ts',
@@ -30,6 +31,7 @@ const HOSTS: readonly CompositionHost[] = [
     editor: 'examples/react-host/src/components/screen-editor.tsx',
     adapter: 'examples/react-host/src/screen/composition-runtime.ts',
     baseScreenDependencies: [
+      '@base-screen/host-kit',
       '@base-screen/plugin-board-materials',
       '@base-screen/plugin-echarts',
       '@base-screen/react',
@@ -41,6 +43,7 @@ const HOSTS: readonly CompositionHost[] = [
     editor: 'examples/vue-host/src/components/ScreenEditor.vue',
     adapter: 'examples/vue-host/src/screen/composition-runtime.ts',
     baseScreenDependencies: [
+      '@base-screen/host-kit',
       '@base-screen/plugin-board-materials',
       '@base-screen/plugin-echarts',
       '@base-screen/sdk',
@@ -64,19 +67,50 @@ describe('designer composition migration', () => {
   });
 
   it.each(HOSTS)(
-    'adapts the single host runtime without activating a second manager ($host)',
+    'returns the standard host runtime without a second manager or adoption ($host)',
     ({ adapter }) => {
       const source = read(adapter);
-      const sdkAdapter = read(SDK_ADAPTER);
-      expect(source).toContain('loadHostRuntime()');
-      expect(source).toContain('adoptBaseScreenRuntime(host)');
+      expect(source).toContain('return loadHostRuntime()');
+      expect(source).not.toContain('adoptBaseScreenRuntime');
       expect(source).not.toContain('createBaseScreenRuntime(');
       expect(source).not.toContain('createBaseScreenPluginManager(');
       expect(source).not.toContain('createBaseScreenMountHandle');
-      expect(sdkAdapter).toContain('createBaseScreenRuntimeMounts');
-      expect(sdkAdapter).toContain('host.dispose()');
     },
   );
+
+  it.each(HOST_RUNTIMES)('assembles the full host through the standard SDK entry (%s)', (path) => {
+    const source = read(path);
+    expect(source).toContain('HostRuntime extends BaseScreenRuntime, OnlineMaterialRuntime');
+    expect(source.match(/createBaseScreenRuntime\(/g)).toHaveLength(1);
+    expect(source).toContain('materials: registerHostMaterials()');
+    expect(source).toContain('createPluginBoardRuntime()');
+    expect(source).toContain('createPluginEchartsRuntime()');
+    expect(source).toContain('createHostResourceRuntime()');
+    expect(source).toContain("[PLUGIN_BOARD_ID]: ['command.execute', 'design.read']");
+    expect(source).toContain("[PLUGIN_ECHARTS_ID]: ['command.execute', 'design.read']");
+    expect(source).toContain('blueprintCapabilities: SCREEN_BLUEPRINT_CAPABILITY_IDS');
+    expect(source).toContain('base.setCatalog(buildCatalog(next))');
+    expect(source).not.toContain('createBaseScreenPluginManager');
+    expect(source).not.toContain('createBaseScreenCorePluginCommandPort');
+    expect(source).not.toContain('createBaseScreenCorePluginDesignReadPort');
+    expect(read(SDK_RUNTIME)).toContain('createBaseScreenRuntimeLifecycle');
+    expect(read(SDK_RUNTIME_LIFECYCLE)).toContain('createBaseScreenRuntimeMounts');
+  });
+
+  it.each([
+    'examples/vanilla-host/src/screen/register.ts',
+    'examples/react-host/src/screen/register.tsx',
+    'examples/vue-host/src/screen/register.ts',
+  ])('provides host material entries instead of a parallel registration plan (%s)', (path) => {
+    const source = read(path);
+    expect(source).toContain('readonly BaseScreenMaterialCatalogEntry[]');
+    expect(source).not.toContain('defineBaseScreenDesigner');
+    expect(source).not.toContain('defineBaseScreenViewer');
+    expect(source).not.toContain('defineBaseScreenTextMaterial');
+    expect(source).not.toContain('registerPluginBoardMaterials');
+    expect(source).not.toContain('registerPluginEcharts');
+    expect(source).not.toContain('customElements.define');
+  });
 
   it.each(HOSTS)(
     'mounts through the designer component and keeps the load ordering ($host)',

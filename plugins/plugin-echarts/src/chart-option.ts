@@ -1,5 +1,17 @@
 import type { BaseScreenChartData } from '@base-screen/plugin-core';
 
+export type ChartFamilyKind =
+  | 'line'
+  | 'area'
+  | 'bar'
+  | 'hbar'
+  | 'pie'
+  | 'donut'
+  | 'gauge'
+  | 'radar'
+  | 'scatter'
+  | 'heatmap';
+
 export interface PluginEchartsOptionInput {
   readonly data: BaseScreenChartData;
   readonly titleText: string;
@@ -8,6 +20,7 @@ export interface PluginEchartsOptionInput {
   readonly textColor: string;
   readonly gridColor: string;
   readonly seriesColor: string;
+  readonly props?: Readonly<Record<string, unknown>>;
 }
 
 /** 多系列时的备用色板：首个系列用作者选的图形色，其余取同明度的邻近色相。 */
@@ -204,6 +217,156 @@ function buildPieOption(input: PluginEchartsOptionInput): Record<string, unknown
     };
   }
   return option;
+}
+
+export function buildChartFamilyOption(
+  kind: ChartFamilyKind,
+  input: PluginEchartsOptionInput,
+): Record<string, unknown> {
+  let option: Record<string, unknown>;
+  if (kind === 'line' || kind === 'area' || kind === 'bar') {
+    option = buildCartesianOption(input, kind);
+  } else if (kind === 'pie' || kind === 'donut') {
+    option = buildPieOption(input);
+    if (kind === 'pie' && Array.isArray(option.series)) {
+      const series = option.series[0];
+      if (series !== null && typeof series === 'object') Object.assign(series, { radius: '68%' });
+    }
+  } else if (kind === 'hbar') {
+    option = buildCartesianOption(input, 'bar');
+    const category = option.xAxis;
+    option.xAxis = option.yAxis;
+    option.yAxis = {
+      ...(category !== null && typeof category === 'object' ? category : {}),
+      inverse: true,
+    };
+  } else {
+    const first = input.data.series[0];
+    const categories = first?.points.map((point) => formatCategory(point.x)) ?? [];
+    const tooltip = { show: input.showTooltip, trigger: 'item' };
+    const frame = buildCartesianOption(input, 'line');
+    option = {
+      backgroundColor: 'transparent',
+      animation: false,
+      textStyle: { color: input.textColor },
+      tooltip,
+    };
+    if (kind === 'gauge') {
+      const props = input.props ?? {};
+      const min = finiteNumber(props.min, 0);
+      const max = Math.max(min + 1, finiteNumber(props.max, 100));
+      const unit = typeof props.unit === 'string' ? props.unit : '';
+      const decimals = Math.trunc(Math.max(0, Math.min(4, finiteNumber(props.decimals, 1))));
+      const raw = first?.points.at(-1)?.y ?? 0;
+      option.series = [
+        {
+          type: 'gauge',
+          min,
+          max,
+          startAngle: 210,
+          endAngle: -30,
+          radius: '92%',
+          center: ['50%', '58%'],
+          progress: { show: true, width: 10, itemStyle: { color: input.seriesColor } },
+          axisLine: { lineStyle: { width: 10, color: [[1, input.gridColor]] } },
+          axisTick: { show: false },
+          splitLine: { show: false },
+          axisLabel: { show: false },
+          detail: {
+            formatter: `{value}${unit}`,
+            color: input.textColor,
+            fontSize: 24,
+            offsetCenter: [0, '38%'],
+          },
+          data: [{ value: Number(raw.toFixed(decimals)), name: input.titleText }],
+        },
+      ];
+    } else if (kind === 'radar') {
+      const max =
+        input.data.series.reduce(
+          (value, entry) => entry.points.reduce((bound, point) => Math.max(bound, point.y), value),
+          1,
+        ) * 1.1;
+      option.radar = {
+        indicator: categories.map((name) => ({ name, max })),
+        center: ['50%', '54%'],
+        radius: '64%',
+        splitLine: { lineStyle: { color: input.gridColor } },
+        splitArea: { show: false },
+        axisName: { color: input.textColor },
+      };
+      option.series = [
+        {
+          type: 'radar',
+          data: input.data.series.map((entry, index) => ({
+            name: entry.label,
+            value: entry.points.map((point) => point.y),
+            itemStyle: { color: seriesColorAt(input.seriesColor, index) },
+            areaStyle: { opacity: 0.15 },
+          })),
+        },
+      ];
+    } else if (kind === 'scatter') {
+      option = {
+        ...frame,
+        tooltip,
+        xAxis: {
+          type: 'value',
+          axisLabel: { color: input.textColor },
+          splitLine: { lineStyle: { color: input.gridColor } },
+        },
+        series: input.data.series.map((entry, index) => ({
+          type: 'scatter',
+          name: entry.label,
+          symbolSize: 8,
+          itemStyle: { color: seriesColorAt(input.seriesColor, index) },
+          data: entry.points.map((point, offset) => [
+            typeof point.x === 'number' ? point.x : offset,
+            point.y,
+          ]),
+        })),
+      };
+    } else {
+      const points = input.data.series.flatMap((entry, row) =>
+        entry.points.map((point, column) => [column, row, point.y]),
+      );
+      const max = input.data.series.reduce(
+        (value, entry) => entry.points.reduce((bound, point) => Math.max(bound, point.y), value),
+        1,
+      );
+      option = {
+        ...frame,
+        tooltip,
+        grid: { left: 64, right: 24, top: 40, bottom: 56 },
+        xAxis: { type: 'category', data: categories, axisLabel: { color: input.textColor } },
+        yAxis: {
+          type: 'category',
+          data: input.data.series.map((entry) => entry.label),
+          axisLabel: { color: input.textColor },
+        },
+        visualMap: {
+          min: 0,
+          max,
+          orient: 'horizontal',
+          left: 'center',
+          bottom: 0,
+          textStyle: { color: input.textColor },
+          inRange: { color: ['#0f2235', input.seriesColor] },
+        },
+        series: [{ type: 'heatmap', data: points }],
+      };
+    }
+    if (input.titleText !== '')
+      option.title = { text: input.titleText, textStyle: { color: input.textColor } };
+    if (input.data.series.length > 1 && kind === 'radar')
+      option.legend = { textStyle: { color: input.textColor } };
+  }
+  if (input.props?.showLegend === false) delete option.legend;
+  return option;
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 function normalizeSeriesType(value: string): 'line' | 'bar' | 'area' | 'pie' {

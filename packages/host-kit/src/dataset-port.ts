@@ -3,159 +3,184 @@ import {
   parseScreenDatasetEntries,
   parseScreenDatasetGroups,
   parseScreenTabularDataset,
+  type ScreenAbortSignal,
+  type ScreenDatasetDefinition,
+  type ScreenDatasetEntries,
   type ScreenDatasetGroup,
   type ScreenDiagnostic,
   type ScreenHostDatasetPort,
   type ScreenJsonObject,
   type ScreenParseResult,
+  type ScreenResourceExecutionContext,
+  type ScreenTabularDataset,
 } from '@base-screen/contracts';
 import {
   createHostKitHttp,
-  type HostKitHttpError,
   type HostKitHttpMapping,
   type HostKitHttpOptions,
-  type HostKitHttpRequest,
-  toAbortSignal,
   toHostKitSearch,
 } from './http.js';
+import {
+  createHttpOperation,
+  executeHostKitOperation,
+  type HostKitOperation,
+  type HostKitOperationError,
+  type HostKitOperationObserver,
+  observeHostKitOperation,
+} from './operation.js';
+
+type GroupsRequest = Parameters<NonNullable<ScreenHostDatasetPort['groups']>>[0];
+type ListRequest = Parameters<ScreenHostDatasetPort['list']>[0];
+type DescribeRequest = Parameters<ScreenHostDatasetPort['describe']>[0];
+type QueryRequest = Parameters<ScreenHostDatasetPort['query']>[0];
+
+export interface HostDatasetPortOptions<
+  GroupsPayload = unknown,
+  ListPayload = unknown,
+  DescribePayload = unknown,
+  QueryPayload = unknown,
+> {
+  readonly groups?: HostKitOperation<GroupsRequest, GroupsPayload>;
+  readonly list: HostKitOperation<ListRequest, ListPayload>;
+  readonly describe: HostKitOperation<DescribeRequest, DescribePayload>;
+  readonly query: HostKitOperation<QueryRequest, QueryPayload>;
+  readonly onListResult?: HostKitOperationObserver<ListRequest, ScreenDatasetEntries>;
+  readonly onDescribeResult?: HostKitOperationObserver<DescribeRequest, ScreenDatasetDefinition>;
+  readonly onQueryResult?: HostKitOperationObserver<QueryRequest, ScreenTabularDataset>;
+}
 
 export interface RestDatasetPortOptions extends HostKitHttpOptions {
   /** 按操作映射既有后端；响应投影后仍由对应 contracts 解析器校验。 */
   readonly mapping?: {
-    readonly groups?: HostKitHttpMapping<
-      Parameters<NonNullable<ScreenHostDatasetPort['groups']>>[0]
-    >;
-    readonly list?: HostKitHttpMapping<Parameters<ScreenHostDatasetPort['list']>[0]>;
-    readonly describe?: HostKitHttpMapping<Parameters<ScreenHostDatasetPort['describe']>[0]>;
-    readonly query?: HostKitHttpMapping<Parameters<ScreenHostDatasetPort['query']>[0]>;
+    readonly groups?: HostKitHttpMapping<GroupsRequest>;
+    readonly list?: HostKitHttpMapping<ListRequest>;
+    readonly describe?: HostKitHttpMapping<DescribeRequest>;
+    readonly query?: HostKitHttpMapping<QueryRequest>;
   };
 }
 
 const GROUPS_TTL_MS = 60_000;
 
-/**
- * 默认对接 GET /datasets*；宿主可按操作映射请求与响应，无需重写端口。
- * 分组缓存 60s；list 仅剥除示例响应的 groups，保留 nextCursor；query 不下发组件身份。
- * 取消返回空诊断，HTTP 错误归一化，未知响应必须通过相应契约解析器。
- * fetch 与鉴权仍归宿主，不做重试或业务降级。
- */
-export function createRestDatasetPort(options: RestDatasetPortOptions): ScreenHostDatasetPort {
-  const http = createHostKitHttp(options);
+/** 业务回调核心：所有响应严格校验，取消返回空诊断，分组缓存 60s。 */
+export function createHostDatasetPort<GroupsPayload, ListPayload, DescribePayload, QueryPayload>(
+  options: HostDatasetPortOptions<GroupsPayload, ListPayload, DescribePayload, QueryPayload>,
+): ScreenHostDatasetPort {
   let groupsCache:
     | { readonly at: number; readonly value: readonly ScreenDatasetGroup[] }
     | undefined;
 
-  async function execute<Request, Value>(
+  async function execute<Request extends object, Payload, Value>(
+    operation: HostKitOperation<Request, Payload>,
     request: Request,
-    signal: Parameters<ScreenHostDatasetPort['list']>[0]['signal'],
-    mapping: HostKitHttpMapping<Request> | undefined,
-    defaultRequest: HostKitHttpRequest,
+    signal: ScreenAbortSignal,
     parse: (payload: unknown) => ScreenParseResult<Value>,
-    defaultResponse: (payload: unknown) => unknown = (payload) => payload,
+    observer?: HostKitOperationObserver<Request, Value>,
+    context?: ScreenResourceExecutionContext,
   ): Promise<ScreenParseResult<Value>> {
     if (signal.aborted) return cancelled();
-    let mapped: HostKitHttpRequest;
-    try {
-      mapped = mapping?.request?.(request) ?? defaultRequest;
-    } catch {
-      return signal.aborted ? cancelled() : failure('HOST_DATASET_INVALID', '数据集请求映射失败。');
+    const response = await executeHostKitOperation(operation, request, signal, context);
+    if (signal.aborted || (!response.ok && response.error.code === 'ABORTED')) return cancelled();
+    let result: ScreenParseResult<Value>;
+    if (!response.ok) {
+      result = failure(mapDatasetError(response.error), response.error.message);
+    } else {
+      try {
+        const parsed = parse(
+          operation.response ? operation.response(response.data, request) : response.data,
+        );
+        result = parsed.ok ? parsed : failure('HOST_DATASET_INVALID', '数据集响应格式无效。');
+      } catch {
+        result = failure('HOST_DATASET_INVALID', '数据集响应格式无效。');
+      }
     }
     if (signal.aborted) return cancelled();
-    const response = await http.request<unknown>(mapped.path, {
-      ...mapped,
-      ...signalOption(signal),
-    });
-    if (isCancelled(response.ok ? undefined : response.error, signal)) return cancelled();
-    if (!response.ok) return failure(mapDatasetError(response.error), response.error.message);
-    try {
-      const parsed = parse(
-        mapping?.response
-          ? mapping.response(response.data, request)
-          : defaultResponse(response.data),
-      );
-      if (signal.aborted) return cancelled();
-      return parsed.ok ? parsed : failure('HOST_DATASET_INVALID', '数据集响应格式无效。');
-    } catch {
-      return signal.aborted ? cancelled() : failure('HOST_DATASET_INVALID', '数据集响应格式无效。');
-    }
+    observeHostKitOperation(observer, request, result, response.ok ? undefined : response.error);
+    return result;
   }
 
+  const groups = options.groups;
   return {
     queryScope: 'dataset',
-
-    async groups(request) {
-      if (request.signal.aborted) return cancelled();
-      const cached = groupsCache;
-      if (cached !== undefined && Date.now() - cached.at < GROUPS_TTL_MS) {
-        return { ok: true, value: cached.value, diagnostics: [] };
-      }
-      const result = await execute(
+    ...(groups === undefined
+      ? {}
+      : {
+          async groups(
+            request: GroupsRequest,
+          ): Promise<ScreenParseResult<readonly ScreenDatasetGroup[]>> {
+            if (request.signal.aborted) return cancelled();
+            const cached = groupsCache;
+            if (cached !== undefined && Date.now() - cached.at < GROUPS_TTL_MS) {
+              return { ok: true, value: cached.value, diagnostics: [] };
+            }
+            const result = await execute(groups, request, request.signal, parseScreenDatasetGroups);
+            if (result.ok) groupsCache = { at: Date.now(), value: result.value };
+            return result;
+          },
+        }),
+    list: (request) =>
+      execute(
+        options.list,
         request,
         request.signal,
-        options.mapping?.groups,
-        { path: `/datasets${toHostKitSearch({ limit: 1 })}` },
-        parseScreenDatasetGroups,
-        (payload) => {
-          if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
-            return undefined;
-          }
-          return 'groups' in payload ? payload.groups : [];
-        },
-      );
-      if (result.ok) groupsCache = { at: Date.now(), value: result.value };
-      return result;
-    },
-
-    async list(request) {
-      return execute(
-        request,
-        request.signal,
-        options.mapping?.list,
-        {
-          path: `/datasets${toHostKitSearch({
-            query: request.query,
-            limit: request.limit,
-            groupId: request.groupId,
-            cursor: request.cursor,
-          })}`,
-        },
         parseScreenDatasetEntries,
-        (payload) => {
-          if (payload === null || typeof payload !== 'object' || !('items' in payload)) {
-            return undefined;
-          }
-          return {
-            items: payload.items,
-            ...('nextCursor' in payload ? { nextCursor: payload.nextCursor } : {}),
-          };
-        },
-      );
-    },
-
-    async describe(request) {
-      return execute(
+        options.onListResult,
+      ),
+    describe: (request) =>
+      execute(
+        options.describe,
         request,
         request.signal,
-        options.mapping?.describe,
-        { path: `/datasets/${encodeURIComponent(request.datasetId)}` },
         parseScreenDatasetDefinition,
-      );
-    },
-
-    async query(request, queryOptions) {
-      return execute(
+        options.onDescribeResult,
+      ),
+    query: (request, queryOptions) =>
+      execute(
+        options.query,
         request,
         queryOptions.signal,
-        options.mapping?.query,
-        {
-          path: `/datasets/${encodeURIComponent(request.datasetId)}/query${toHostKitSearch(
-            toQueryParams(request.params),
-          )}`,
-        },
         parseScreenTabularDataset,
-      );
-    },
+        options.onQueryResult,
+        queryOptions.context,
+      ),
   };
+}
+
+/** 默认示例 REST；映射与 HTTP 仅负责传输，统一复用业务回调核心。 */
+export function createRestDatasetPort(options: RestDatasetPortOptions): ScreenHostDatasetPort {
+  const http = createHostKitHttp(options);
+  return createHostDatasetPort({
+    groups: createHttpOperation<GroupsRequest>(
+      http,
+      options.mapping?.groups,
+      () => ({ path: `/datasets${toHostKitSearch({ limit: 1 })}` }),
+      (payload) => {
+        if (payload === null || typeof payload !== 'object' || Array.isArray(payload))
+          return undefined;
+        return 'groups' in payload ? payload.groups : [];
+      },
+    ),
+    list: createHttpOperation(
+      http,
+      options.mapping?.list,
+      (request) => ({
+        path: `/datasets${toHostKitSearch({ query: request.query, limit: request.limit, groupId: request.groupId, cursor: request.cursor })}`,
+      }),
+      (payload) => {
+        if (payload === null || typeof payload !== 'object' || !('items' in payload))
+          return undefined;
+        return {
+          items: payload.items,
+          ...('nextCursor' in payload ? { nextCursor: payload.nextCursor } : {}),
+        };
+      },
+    ),
+    describe: createHttpOperation(http, options.mapping?.describe, (request) => ({
+      path: `/datasets/${encodeURIComponent(request.datasetId)}`,
+    })),
+    query: createHttpOperation(http, options.mapping?.query, (request) => ({
+      path: `/datasets/${encodeURIComponent(request.datasetId)}/query${toHostKitSearch(toQueryParams(request.params))}`,
+    })),
+  });
 }
 
 /** params 已按定义求值；URL 保留所有合法标量，不下发对象或数组。 */
@@ -169,21 +194,8 @@ function toQueryParams(params: ScreenJsonObject): Record<string, string | number
   return result;
 }
 
-function signalOption(signal: Parameters<ScreenHostDatasetPort['list']>[0]['signal']): {
-  signal?: AbortSignal;
-} {
-  const bridged = toAbortSignal(signal);
-  return bridged === undefined ? {} : { signal: bridged };
-}
-
-function isCancelled(
-  error: HostKitHttpError | undefined,
-  signal: { readonly aborted: boolean } | undefined,
-): boolean {
-  return error?.code === 'ABORTED' || signal?.aborted === true;
-}
-
-function mapDatasetError(error: HostKitHttpError): ScreenDiagnostic['code'] {
+function mapDatasetError(error: HostKitOperationError): ScreenDiagnostic['code'] {
+  if (error.code === 'HOST_KIT_MAPPING') return 'HOST_DATASET_INVALID';
   if (error.code === 'UNKNOWN_DATASET' || error.status === 404) return 'HOST_DATASET_UNAVAILABLE';
   if (error.status === 400 || error.status === 422) return 'HOST_DATASET_PARAMETER_INVALID';
   return 'HOST_DATASET_UNAVAILABLE';
@@ -193,7 +205,6 @@ function failure(code: ScreenDiagnostic['code'], message: string): ScreenParseRe
   return { ok: false, diagnostics: [{ severity: 'error', code, path: [], message }] };
 }
 
-/** 取消：空诊断表示这次请求不算失败也不算成功。 */
 function cancelled(): ScreenParseResult<never> {
   return { ok: false, diagnostics: [] };
 }

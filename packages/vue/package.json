@@ -2,12 +2,18 @@
   "name": "@base-screen/vue",
   "version": "0.0.1",
   "description": "将 Vue 组件桥接为 Base Screen 物料",
-  "private": true,
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+    "url": "git+https://github.com/translateServers/base-screen.git",
+    "directory": "packages/vue"
   },
+  "homepage": "https://github.com/translateServers/base-screen#readme",
+  "bugs": "https://github.com/translateServers/base-screen/issues",
   "type": "module",
   "files": [
     "dist"

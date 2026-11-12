@@ -159,7 +159,6 @@ function applySaveResult(
   if (state.project?.revision !== submitted.revision) {
     return failScreenProject('PROJECT_ABORTED', 'Project operation was superseded.');
   }
-  state.project = parsed.value;
   const current = state.options.getDocument();
   // 保存成功后的三种落点，按「本地文档是否还是提交时的那份」和「服务端返回的是否同一内容」区分：
   // 只有服务端归一化出不同内容时才需要真的替换文档，也只有那条路径会重渲染并重置选区与历史。
@@ -174,6 +173,7 @@ function applySaveResult(
     if (!replacement.ok) return finishScreenProjectError(state, pending, replacement);
     state.baselineDocument = state.options.getDocument() ?? parsed.value.document;
   }
+  state.project = parsed.value;
   state.phase = 'ready';
   updateScreenProjectDirty(state);
   notifyScreenProjectChange(state);

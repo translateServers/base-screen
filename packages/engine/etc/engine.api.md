@@ -101,6 +101,9 @@ export const BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT: 'base-screen-material-li
 // @public
 export const BASE_SCREEN_METRIC_EVENT = "base-screen-metric";
 
+// @public (undocumented)
+export const BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT = "base-screen-project-state-change";
+
 // @public
 export const BASE_SCREEN_SCENE_CHANGE_EVENT = "base-screen-scene-change";
 
@@ -563,6 +566,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     getAuthoringEditorContext(): ScreenAuthoringEditorContext;
     // (undocumented)
     getDocument(): ScreenDocument | undefined;
+    getProjectState(): ScreenProjectState;
     // (undocumented)
     getVariable(id: string): ScreenVariableHandle | undefined;
     // (undocumented)
@@ -968,6 +972,9 @@ export interface BaseScreenMetricEventDetail {
 }
 
 // @public (undocumented)
+export type BaseScreenProjectStateChangeEventDetail = ScreenProjectState;
+
+// @public (undocumented)
 export interface BaseScreenSceneChangeDetail {
     // (undocumented)
     readonly label: string;
@@ -1306,6 +1313,8 @@ export class ScreenProjectController {
     // (undocumented)
     establishDocumentBaseline(document: ScreenDocument): ScreenParseResult<void>;
     // (undocumented)
+    getProjectState(): ScreenProjectState;
+    // (undocumented)
     load(projectId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
     // (undocumented)
     notifyDocumentChanged(): void;
@@ -1358,6 +1367,20 @@ export type ScreenProjectPhase = 'unloaded' | 'loading' | 'ready' | 'saving' | '
 export interface ScreenProjectScheduler {
     // (undocumented)
     wait(delayMs: number, signal: AbortSignal): Promise<void>;
+}
+
+// @public
+export interface ScreenProjectState {
+    // (undocumented)
+    readonly dirty: boolean;
+    // (undocumented)
+    readonly phase: ScreenProjectPhase;
+    // (undocumented)
+    readonly project: {
+        readonly projectId: string;
+        readonly name: string;
+        readonly revision: string;
+    } | null;
 }
 
 // @public (undocumented)

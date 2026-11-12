@@ -7,11 +7,14 @@ export {
   createBaseScreenCorePluginDesignReadPort,
 } from './common/operations/plugin/designer-plugin-design-read-port.js';
 export {
+  BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT,
+  type BaseScreenProjectStateChangeEventDetail,
   ScreenProjectController,
   type ScreenProjectControllerChange,
   type ScreenProjectControllerOptions,
   type ScreenProjectPhase,
   type ScreenProjectScheduler,
+  type ScreenProjectState,
 } from './common/project/project-controller.js';
 export {
   type BaseScreenDesignerConfiguration,

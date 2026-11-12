@@ -20,6 +20,7 @@ import { BASE_SCREEN_HOST_RESOURCE_DRAG_MIME } from '@base-screen/engine';
 import { BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_METRIC_EVENT } from '@base-screen/engine';
+import { BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_SCENE_CHANGE_EVENT } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasCommandEventDetail } from '@base-screen/engine';
@@ -59,6 +60,7 @@ import { BaseScreenHostResourceSelectionCurrent } from '@base-screen/engine';
 import { BaseScreenHostResourceSelectionRequest } from '@base-screen/engine';
 import { BaseScreenHostResourceSelectionRequestEventDetail } from '@base-screen/engine';
 import { BaseScreenHostResourceSelectionTarget } from '@base-screen/engine';
+import { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import { BaseScreenMaterialCatalogRefreshResult } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryAction } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryActionEventDetail } from '@base-screen/engine';
@@ -68,10 +70,11 @@ import { BaseScreenMaterialLibraryItem } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryState } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryStatus } from '@base-screen/engine';
 import { BaseScreenMetricEventDetail } from '@base-screen/engine';
-import { BaseScreenPluginManager } from '@base-screen/plugin-manager';
+import type { BaseScreenPluginManager } from '@base-screen/plugin-manager';
 import { BaseScreenPluginManagerOptions } from '@base-screen/plugin-manager';
-import { BaseScreenPluginManagerSnapshot } from '@base-screen/plugin-manager';
+import type { BaseScreenPluginManagerSnapshot } from '@base-screen/plugin-manager';
 import type { BaseScreenPluginRuntime } from '@base-screen/plugin-core';
+import { BaseScreenProjectStateChangeEventDetail } from '@base-screen/engine';
 import { BaseScreenSceneChangeDetail } from '@base-screen/engine';
 import { BaseScreenViewerConfiguration } from '@base-screen/renderer';
 import { BaseScreenViewerElement } from '@base-screen/renderer';
@@ -79,7 +82,7 @@ import { createBaseScreenCorePluginCommandPort } from '@base-screen/engine';
 import { CreateBaseScreenCorePluginCommandPortOptions } from '@base-screen/engine';
 import { createBaseScreenCorePluginDesignReadPort } from '@base-screen/engine';
 import { CreateBaseScreenCorePluginDesignReadPortOptions } from '@base-screen/engine';
-import { createBaseScreenPluginContributionCommandPort } from '@base-screen/plugin-manager';
+import type { createBaseScreenPluginContributionCommandPort } from '@base-screen/plugin-manager';
 import { CreatePluginRegistrationOptions } from '@base-screen/plugin-sdk';
 import { DesignerGuardSnapshot } from '@base-screen/engine';
 import { DesignerSceneDescriptor } from '@base-screen/engine';
@@ -106,6 +109,8 @@ import { ScreenComponentTextTarget } from '@base-screen/contracts';
 import type { ScreenDiagnostic } from '@base-screen/contracts';
 import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenParseResult } from '@base-screen/contracts';
+import { ScreenProjectPhase } from '@base-screen/engine';
+import { ScreenProjectState } from '@base-screen/engine';
 import { writeBaseScreenHostResourceDragData } from '@base-screen/engine';
 
 // @public
@@ -156,6 +161,8 @@ export const BASE_SCREEN_OFFICIAL_TOOL_MATERIAL_TYPES: Readonly<{
     ellipse: string;
     image: string;
 }>;
+
+export { BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT }
 
 export { BASE_SCREEN_SCENE_CHANGE_EVENT }
 
@@ -276,8 +283,10 @@ export { BaseScreenMetricEventDetail }
 // @public (undocumented)
 export interface BaseScreenMountController<TElement extends BaseScreenMountElement, TOptions> {
     // (undocumented)
-    attach(container: Element): Promise<ScreenParseResult<BaseScreenMountHandle<TElement>>>;
+    attach(container: Element): Promise<BaseScreenMountResult<BaseScreenMountHandle<TElement>>>;
     detach(): Promise<ScreenParseResult<null>>;
+    // (undocumented)
+    readonly diagnosticContext: BaseScreenMountDiagnosticContext | undefined;
     // (undocumented)
     readonly diagnostics: readonly ScreenDiagnostic[];
     // (undocumented)
@@ -288,6 +297,19 @@ export interface BaseScreenMountController<TElement extends BaseScreenMountEleme
 // @public (undocumented)
 export type BaseScreenMountControllerReady<TElement extends BaseScreenMountElement> = (handle: BaseScreenMountHandle<TElement>) => void | (() => void);
 
+// @public (undocumented)
+export interface BaseScreenMountDiagnosticContext {
+    // (undocumented)
+    readonly instanceAvailable: boolean;
+    // (undocumented)
+    readonly phase: BaseScreenMountPhase;
+    // (undocumented)
+    readonly recovery: 'remount' | 'retry-catalog' | 'none';
+}
+
+// @public (undocumented)
+export type BaseScreenMountDiagnosticsCallback = (diagnostics: readonly ScreenDiagnostic[], context: BaseScreenMountDiagnosticContext | undefined) => void;
+
 // @public
 export interface BaseScreenMountElement extends Element {
     // (undocumented)
@@ -297,7 +319,7 @@ export interface BaseScreenMountElement extends Element {
 // @public (undocumented)
 export interface BaseScreenMountHandle<TElement extends BaseScreenMountElement> {
     // (undocumented)
-    dispose(): Promise<ScreenParseResult<null>>;
+    dispose(): Promise<BaseScreenMountResult<null>>;
     // (undocumented)
     readonly disposed: boolean;
     readonly element: TElement;
@@ -306,31 +328,20 @@ export interface BaseScreenMountHandle<TElement extends BaseScreenMountElement> 
 }
 
 // @public (undocumented)
-export interface BaseScreenRuntime {
+export type BaseScreenMountPhase = 'mount' | 'configure' | 'load' | 'document' | 'catalog' | 'mounted' | 'dispose';
+
+// @public
+export type BaseScreenMountResult<T> = ScreenParseResult<T> & {
+    readonly mountPhase?: BaseScreenMountPhase;
+};
+
+export { BaseScreenProjectStateChangeEventDetail }
+
+// @public (undocumented)
+export interface BaseScreenRuntime extends BaseScreenViewerRuntime {
     bindDesigner(element: BaseScreenDesignerElement | null): ScreenParseResult<null>;
     // (undocumented)
-    readonly catalog: BaseScreenRuntimeCatalog;
-    dispose(): Promise<ScreenParseResult<null>>;
-    // (undocumented)
-    readonly disposed: boolean;
-    // (undocumented)
-    readonly inspectorControls: BaseScreenPluginManagerSnapshot['inspectorControls'];
-    // (undocumented)
-    readonly instanceId: string;
-    readonly manager: BaseScreenPluginManager;
-    // (undocumented)
-    mountDesigner(container: Element, options: BaseScreenDesignerMountOptions): Promise<ScreenParseResult<BaseScreenMountHandle<BaseScreenDesignerElement>>>;
-    // (undocumented)
-    mountViewer(container: Element, options: BaseScreenViewerMountOptions): Promise<ScreenParseResult<BaseScreenMountHandle<BaseScreenViewerElement>>>;
-    // (undocumented)
-    readonly pluginCatalog: BaseScreenPluginManagerSnapshot['plugins'];
-    // (undocumented)
-    readonly pluginCommandPort: BaseScreenRuntimePluginCommandPort;
-    // (undocumented)
-    readonly pluginPanels: BaseScreenPluginManagerSnapshot['panels'];
-    // (undocumented)
-    readonly runtimeContributions: BaseScreenPluginManagerSnapshot['contributions'];
-    setCatalog(catalog: BaseScreenRuntimeCatalog, options?: BaseScreenSetCatalogOptions): ScreenParseResult<null>;
+    mountDesigner(container: Element, options: BaseScreenDesignerMountOptions): Promise<BaseScreenMountResult<BaseScreenMountHandle<BaseScreenDesignerElement>>>;
 }
 
 // @public (undocumented)
@@ -364,6 +375,24 @@ export interface BaseScreenRuntimeHost {
 // @public (undocumented)
 export type BaseScreenRuntimePluginCommandPort = ReturnType<typeof createBaseScreenPluginContributionCommandPort>;
 
+// @public
+interface BaseScreenRuntimeRegistrationOptions {
+    // (undocumented)
+    readonly activation?: BaseScreenPluginManagerOptions['activation'];
+    // (undocumented)
+    readonly createCommandPort?: BaseScreenPluginManagerOptions['createCommandPort'];
+    // (undocumented)
+    readonly createDesignReadPort?: BaseScreenPluginManagerOptions['createDesignReadPort'];
+    // (undocumented)
+    readonly grantedCapabilities?: BaseScreenPluginManagerOptions['grantedCapabilities'];
+    // (undocumented)
+    readonly instanceId?: string;
+    // (undocumented)
+    readonly materials?: readonly (RuntimeMaterial | BaseScreenMaterialCatalogEntry)[];
+    // (undocumented)
+    readonly plugins?: CreatePluginRegistrationOptions['plugins'];
+}
+
 export { BaseScreenSceneChangeDetail }
 
 // @public (undocumented)
@@ -382,6 +411,31 @@ export type BaseScreenViewerMountOptions = Omit<BaseScreenViewerConfiguration, '
     readonly children?: readonly Node[];
     readonly element?: BaseScreenViewerElement;
 };
+
+// @public
+export interface BaseScreenViewerRuntime {
+    // (undocumented)
+    readonly catalog: BaseScreenRuntimeCatalog;
+    dispose(): Promise<ScreenParseResult<null>>;
+    // (undocumented)
+    readonly disposed: boolean;
+    // (undocumented)
+    readonly inspectorControls: BaseScreenPluginManagerSnapshot['inspectorControls'];
+    // (undocumented)
+    readonly instanceId: string;
+    readonly manager: BaseScreenPluginManager;
+    // (undocumented)
+    mountViewer(container: Element, options: BaseScreenViewerMountOptions): Promise<BaseScreenMountResult<BaseScreenMountHandle<BaseScreenViewerElement>>>;
+    // (undocumented)
+    readonly pluginCatalog: BaseScreenPluginManagerSnapshot['plugins'];
+    // (undocumented)
+    readonly pluginCommandPort: BaseScreenRuntimePluginCommandPort;
+    // (undocumented)
+    readonly pluginPanels: BaseScreenPluginManagerSnapshot['panels'];
+    // (undocumented)
+    readonly runtimeContributions: BaseScreenPluginManagerSnapshot['contributions'];
+    setCatalog(catalog: BaseScreenRuntimeCatalog, options?: BaseScreenSetCatalogOptions): ScreenParseResult<null>;
+}
 
 // @public
 export function createBaseScreenBlueprintCapabilityPlugin(options: CreateBaseScreenBlueprintCapabilityPluginOptions): ScreenParseResult<BaseScreenBlueprintCapabilityPlugin>;
@@ -407,9 +461,10 @@ export function createBaseScreenDesignerMountController(options: CreateBaseScree
 // @public (undocumented)
 export interface CreateBaseScreenDesignerMountControllerOptions {
     // (undocumented)
-    readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+    readonly onDiagnostics?: BaseScreenMountDiagnosticsCallback;
     // (undocumented)
     readonly onMounted?: BaseScreenMountControllerReady<BaseScreenDesignerElement>;
+    readonly onProjectState?: (state: ScreenProjectState) => void;
     // (undocumented)
     readonly options: BaseScreenDesignerMountOptions;
     // (undocumented)
@@ -431,20 +486,9 @@ export interface CreateBaseScreenMountHandleOptions<TElement extends BaseScreenM
 export function createBaseScreenRuntime(options?: CreateBaseScreenRuntimeOptions): Promise<ScreenParseResult<BaseScreenRuntime>>;
 
 // @public (undocumented)
-export interface CreateBaseScreenRuntimeOptions {
-    // (undocumented)
-    readonly activation?: BaseScreenPluginManagerOptions['activation'];
+export interface CreateBaseScreenRuntimeOptions extends BaseScreenRuntimeRegistrationOptions {
     readonly blueprintCapabilities?: readonly ScreenBlueprintCapabilityId[];
-    readonly createCommandPort?: BaseScreenPluginManagerOptions['createCommandPort'];
-    readonly createDesignReadPort?: BaseScreenPluginManagerOptions['createDesignReadPort'];
-    // (undocumented)
-    readonly grantedCapabilities?: BaseScreenPluginManagerOptions['grantedCapabilities'];
-    // (undocumented)
-    readonly instanceId?: string;
-    readonly materials?: CreatePluginRegistrationOptions['materials'];
     readonly officialMaterials?: boolean;
-    // (undocumented)
-    readonly plugins?: CreatePluginRegistrationOptions['plugins'];
 }
 
 // @public (undocumented)
@@ -453,13 +497,13 @@ export function createBaseScreenViewerMountController(options: CreateBaseScreenV
 // @public (undocumented)
 export interface CreateBaseScreenViewerMountControllerOptions {
     // (undocumented)
-    readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
+    readonly onDiagnostics?: BaseScreenMountDiagnosticsCallback;
     // (undocumented)
     readonly onMounted?: BaseScreenMountControllerReady<BaseScreenViewerElement>;
     // (undocumented)
     readonly options: BaseScreenViewerMountOptions;
     // (undocumented)
-    readonly runtime: BaseScreenRuntime;
+    readonly runtime: BaseScreenViewerRuntime;
 }
 
 // @public (undocumented)
@@ -499,6 +543,9 @@ export { parseBaseScreenMaterialLibraryState }
 
 export { prepareDesignerScenePreview }
 
+// @public (undocumented)
+type RuntimeMaterial = NonNullable<CreatePluginRegistrationOptions['materials']>[number];
+
 export { SCREEN_AUTHORING_REQUEST_EVENT }
 
 export { ScreenAuthoringEditorContext }
@@ -512,6 +559,10 @@ export { ScreenAuthoringRequestEventDetail }
 export { ScreenComponentTextCommitRequest }
 
 export { ScreenComponentTextTarget }
+
+export { ScreenProjectPhase }
+
+export { ScreenProjectState }
 
 export { writeBaseScreenHostResourceDragData }
 

@@ -1,12 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { api as reactApi } from '../../examples/react-host/src/lib/api';
 import { createHostDatasetPort as createReactDatasetPort } from '../../examples/react-host/src/screen/host-dataset-port';
+import { createRestProjectAdapter as createReactProjectAdapter } from '../../examples/react-host/src/screen/project-adapter';
 import { DATASET_DEFINITIONS } from '../../examples/shared-backend/src/datasets/dataset-definitions';
 import { parametersToDefinitions } from '../../examples/shared-backend/src/datasources/datasource.types';
+import { api as vanillaApi } from '../../examples/vanilla-host/src/lib/api';
 import { createHostDatasetPort as createVanillaDatasetPort } from '../../examples/vanilla-host/src/screen/host-dataset-port';
+import { createRestProjectAdapter as createVanillaProjectAdapter } from '../../examples/vanilla-host/src/screen/project-adapter';
+import { api as vueApi } from '../../examples/vue-host/src/lib/api';
 import { createHostDatasetPort as createVueDatasetPort } from '../../examples/vue-host/src/screen/host-dataset-port';
+import { createRestProjectAdapter as createVueProjectAdapter } from '../../examples/vue-host/src/screen/project-adapter';
 import {
   parseScreenDatasetDefinition,
   parseScreenDatasetEntries,
+  parseScreenDocument,
   parseScreenTabularDataset,
 } from '../../packages/contracts/src/index.js';
 
@@ -134,6 +141,137 @@ describe('三端数据集参数映射', () => {
     );
     expect(result.ok).toBe(true);
     expect(sent).toEqual([{ enabled: 'true', archived: 'false', count: 0, region: '华东' }]);
+  });
+});
+
+describe('三端项目身份守卫', () => {
+  it.each([
+    ['vanilla', createVanillaProjectAdapter, vanillaApi],
+    ['react', createReactProjectAdapter, reactApi],
+    ['vue', createVueProjectAdapter, vueApi],
+  ] as const)('%s 拒绝其他项目的 load/save 且不调用业务 API', async (_host, createAdapter, api) => {
+    const load = vi.spyOn(api, 'getScreen');
+    const save = vi.spyOn(api, 'updateScreen');
+    try {
+      const document = parseScreenDocument({
+        canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
+        components: [],
+        variables: [],
+        blueprint: { relations: [] },
+      });
+      if (!document.ok) throw new Error('测试文档无效');
+      const adapter = createAdapter('allowed');
+      const request = {
+        projectId: 'other',
+        revision: '3',
+        document: document.value,
+        signal: new AbortController().signal,
+      };
+      for (const result of [await adapter.load(request), await adapter.save(request)]) {
+        expect(result).toMatchObject({
+          ok: false,
+          diagnostics: [{ code: 'PROJECT_UNAVAILABLE', path: ['projectId'] }],
+        });
+      }
+      expect(load).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+      const controller = new AbortController();
+      controller.abort();
+      expect(await adapter.save({ ...request, signal: controller.signal })).toEqual({
+        ok: false,
+        diagnostics: [],
+      });
+    } finally {
+      load.mockRestore();
+      save.mockRestore();
+    }
+  });
+});
+
+describe('三端宿主数据集业务快照', () => {
+  it.each([
+    ['vanilla', createVanillaDatasetPort],
+    ['react', createReactDatasetPort],
+    ['vue', createVueDatasetPort],
+  ] as const)('%s 保留告警、故障参数与取消前快照', async (_host, createPort) => {
+    let mode = 'success';
+    const sent: unknown[] = [];
+    const port = createPort({
+      api: {
+        listDatasets: async () => ({ ok: true, data: { groups: [], items: [] } }),
+        describeDataset: async () => ({ ok: true, data: null }),
+        queryDataset: async (_datasetId, params) => {
+          sent.push(params);
+          if (mode === 'cancel')
+            return { ok: false, error: { code: 'ABORTED', message: 'cancelled', status: 0 } };
+          return {
+            ok: true,
+            data:
+              mode === 'invalid'
+                ? { fields: [], rows: 'invalid' }
+                : {
+                    fields: [
+                      { id: 'level', label: '等级', valueType: 'string' },
+                      { id: 'deviceName', label: '设备', valueType: 'string' },
+                      { id: 'message', label: '消息', valueType: 'string' },
+                    ],
+                    rows: [{ level: 'high', deviceName: '设备一', message: '温度告警' }],
+                  },
+          };
+        },
+      },
+      logger: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+      failCode: () => '500',
+    });
+    const query = () =>
+      port.query(
+        { datasetId: 'monitor.alarms', dataSourceId: 'alarms', params: { enabled: false } },
+        { signal: new AbortController().signal },
+      );
+    expect((await query()).ok).toBe(true);
+    expect(sent).toEqual([{ enabled: 'false', fail: '500' }]);
+    expect(port.snapshot()).toMatchObject({
+      alarms: [{ level: 'high', deviceName: '设备一', message: '温度告警' }],
+      lastOutcome: { ok: true },
+    });
+    mode = 'invalid';
+    expect(await query()).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'HOST_DATASET_INVALID' }],
+    });
+    expect(port.snapshot().lastOutcome).toMatchObject({ ok: false, code: 'HOST_DATASET_INVALID' });
+    const beforeCancel = port.snapshot();
+    mode = 'cancel';
+    expect(await query()).toEqual({ ok: false, diagnostics: [] });
+    expect(port.snapshot()).toEqual(beforeCancel);
+  });
+
+  it.each([
+    ['vanilla', createVanillaDatasetPort],
+    ['react', createReactDatasetPort],
+    ['vue', createVueDatasetPort],
+  ] as const)('%s 目录剥除 groups 并保留业务 API 返回的 nextCursor', async (_host, createPort) => {
+    const port = createPort({
+      api: {
+        listDatasets: async () => ({
+          ok: true,
+          data: {
+            groups: [],
+            items: [{ datasetId: 'orders', name: '订单', description: null }],
+            nextCursor: 'opaque:2/+',
+          },
+        }),
+        describeDataset: async () => ({ ok: true, data: null }),
+        queryDataset: async () => ({ ok: true, data: null }),
+      },
+      logger: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+    });
+    expect(
+      await port.list({ query: '', limit: 10, signal: new AbortController().signal }),
+    ).toMatchObject({
+      ok: true,
+      value: { items: [{ datasetId: 'orders' }], nextCursor: 'opaque:2/+' },
+    });
   });
 });
 

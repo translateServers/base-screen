@@ -1,5 +1,9 @@
 import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
-import type { BaseScreenDesignerElement } from '@base-screen/engine';
+import { BaseScreenDesignerElement } from '@base-screen/engine';
+import {
+  BASE_SCREEN_OFFICIAL_GROUP_MATERIAL_TYPE,
+  BASE_SCREEN_OFFICIAL_TOOL_MATERIAL_TYPES,
+} from './material.js';
 import type { BaseScreenRuntime, BaseScreenRuntimeCatalog } from './runtime.js';
 import {
   nullResult,
@@ -73,6 +77,9 @@ export function adoptBaseScreenRuntime(host: BaseScreenRuntimeHost): BaseScreenR
     }
   };
   const mounts = createBaseScreenRuntimeMounts({
+    createDesignerElement: () => new BaseScreenDesignerElement(),
+    toolMaterialTypes: BASE_SCREEN_OFFICIAL_TOOL_MATERIAL_TYPES,
+    groupMaterialType: BASE_SCREEN_OFFICIAL_GROUP_MATERIAL_TYPE,
     instanceId: host.instanceId,
     readCatalog: () => host.catalog,
     pluginCatalog: host.pluginCatalog,

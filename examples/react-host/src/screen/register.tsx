@@ -1,65 +1,12 @@
-import { registerPluginBoardMaterials } from '@base-screen/plugin-board-materials';
-import { registerPluginEcharts } from '@base-screen/plugin-echarts';
-import type { ScreenParseResult } from '@base-screen/sdk/contracts';
-import { defineBaseScreenDesigner } from '@base-screen/sdk/designer';
-import {
-  defineBaseScreenChartMaterial,
-  defineBaseScreenContainerMaterial,
-  defineBaseScreenEllipseMaterial,
-  defineBaseScreenImageMaterial,
-  defineBaseScreenRectangleMaterial,
-  defineBaseScreenRuleMaterial,
-  defineBaseScreenTableMaterial,
-  defineBaseScreenTextMaterial,
-} from '@base-screen/sdk/material';
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/sdk/plugin-core';
-import { defineBaseScreenViewer } from '@base-screen/sdk/viewer';
-import { METRIC_VALUE_TAG } from './metric-value';
 import { createMetricValueMaterial } from './metric-value-material';
 
 let cached: readonly BaseScreenMaterialCatalogEntry[] | undefined;
 
-/**
- * 同步注册入口（幂等）：设计器 / 查看器自定义元素、官方全量物料、宿主自有指标读数、
- * 两个外围插件物料。必须先于 `loadHostRuntime()`：manager preflight 会按 tagName
- * 从 `customElements` 反查构造函数，元素没注册会把整个插件判为失败。
- */
+/** 框架桥产物直接交给标准 runtime，注册、适配器与授权不再由宿主重复装配。 */
 export function registerHostMaterials(): readonly BaseScreenMaterialCatalogEntry[] {
-  if (cached !== undefined) return cached;
-
-  requireDefinition('HOST_DESIGNER_DEFINITION_FAILED', defineBaseScreenDesigner());
-  requireDefinition('HOST_VIEWER_DEFINITION_FAILED', defineBaseScreenViewer());
-
-  const official = [
-    defineBaseScreenTextMaterial(),
-    defineBaseScreenRectangleMaterial(),
-    defineBaseScreenEllipseMaterial(),
-    defineBaseScreenImageMaterial(),
-    defineBaseScreenRuleMaterial(),
-    defineBaseScreenContainerMaterial(),
-    defineBaseScreenChartMaterial(),
-    defineBaseScreenTableMaterial(),
-  ].map((definition, index) =>
-    requireDefinition(`HOST_OFFICIAL_MATERIAL_${index}_FAILED`, definition),
-  );
-
-  const metric: BaseScreenMaterialCatalogEntry = createMetricValueMaterial();
-  if (customElements.get(METRIC_VALUE_TAG) === undefined) {
-    customElements.define(METRIC_VALUE_TAG, metric.constructor);
-  }
-
-  registerPluginBoardMaterials();
-  registerPluginEcharts();
-
-  cached = Object.freeze([...official, metric]);
+  cached ??= Object.freeze([createMetricValueMaterial()]);
   return cached;
-}
-
-function requireDefinition<T>(code: string, result: ScreenParseResult<T>): T {
-  if (!result.ok) {
-    throw new Error(`${code}:${result.diagnostics[0]?.code ?? 'UNKNOWN'}`);
-  }
-  return result.value;
 }
 
 /** 设计器工具条映射的官方物料类型。 */

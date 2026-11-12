@@ -2,12 +2,18 @@
   "name": "@base-screen/contracts",
   "version": "0.1.0",
   "description": "Screen Document、宿主契约、严格解析、诊断、序列化与 JSON Schema",
-  "private": true,
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+    "url": "git+https://github.com/translateServers/base-screen.git",
+    "directory": "packages/contracts"
   },
+  "homepage": "https://github.com/translateServers/base-screen#readme",
+  "bugs": "https://github.com/translateServers/base-screen/issues",
   "type": "module",
   "files": [
     "dist"

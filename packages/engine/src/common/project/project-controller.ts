@@ -21,14 +21,18 @@ import {
   isConsistentScreenProjectAdapter,
   type ScreenProjectControllerOptions,
   type ScreenProjectPhase,
+  type ScreenProjectState,
   serializeScreenProjectDocument,
 } from './project-controller-support.js';
 
-export type {
-  ScreenProjectControllerChange,
-  ScreenProjectControllerOptions,
-  ScreenProjectPhase,
-  ScreenProjectScheduler,
+export {
+  BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT,
+  type BaseScreenProjectStateChangeEventDetail,
+  type ScreenProjectControllerChange,
+  type ScreenProjectControllerOptions,
+  type ScreenProjectPhase,
+  type ScreenProjectScheduler,
+  type ScreenProjectState,
 } from './project-controller-support.js';
 
 export class ScreenProjectController {
@@ -52,6 +56,18 @@ export class ScreenProjectController {
 
   get dirty(): boolean {
     return this.#state.dirty;
+  }
+
+  getProjectState(): ScreenProjectState {
+    const { phase, dirty, project } = this.#state;
+    return {
+      phase,
+      dirty,
+      project:
+        project === undefined
+          ? null
+          : { projectId: project.projectId, name: project.name, revision: project.revision },
+    };
   }
 
   bindAdapter(adapter: ScreenProjectAdapter | undefined): ScreenParseResult<void> {
@@ -94,8 +110,10 @@ export class ScreenProjectController {
   }
 
   notifyDocumentChanged(): void {
-    updateScreenProjectDirty(this.#state);
-    notifyScreenProjectChange(this.#state);
+    const state = this.#state;
+    const dirty = state.dirty;
+    updateScreenProjectDirty(state);
+    if (state.dirty !== dirty) notifyScreenProjectChange(state);
   }
 
   load(projectId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>> {

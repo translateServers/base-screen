@@ -17,10 +17,10 @@
   "packageManager": "pnpm@11.18.0",
   "repository": {
     "type": "git",
-    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+    "url": "git+https://github.com/translateServers/base-screen.git"
   },
-  "homepage": "https://gitee.com/nebula_78/base-screen#readme",
-  "bugs": "https://gitee.com/nebula_78/base-screen/issues",
+  "homepage": "https://github.com/translateServers/base-screen#readme",
+  "bugs": "https://github.com/translateServers/base-screen/issues",
   "engines": {
     "node": ">=22.20.0"
   },
@@ -62,7 +62,8 @@
     "verify:nebula-import": "node tooling/verification/verify-nebula-import.mjs",
     "verify:m0": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:packages && pnpm check:host-tokens && pnpm check:api && pnpm check:engine-import && pnpm verify:tarball",
     "changeset": "changeset",
-    "version-packages": "changeset version"
+    "version-packages": "changeset version",
+    "release:check": "pnpm build && pnpm verify:m0 && pnpm check:api-changesets"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
@@ -79,6 +80,7 @@
     "publint": "0.3.22",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "semver": "7.8.5",
     "turbo": "2.10.8",
     "typescript": "7.0.2",
     "vite": "8.2.0",

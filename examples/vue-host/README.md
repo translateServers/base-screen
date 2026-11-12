@@ -23,9 +23,9 @@ src/
 │   ├── api.ts                  # Result 风格 fetch 封装：统一错误体、GET 幂等重试、AbortSignal
 │   ├── logger.ts / format.ts / toast.ts
 ├── screen/
-│   ├── register.ts             # 同步元素注册：设计器/查看器/官方全量物料/自有物料/插件元素
-│   ├── composition-runtime.ts  # 把宿主 runtime 适配成 SDK 组合层 runtime（复用同一 manager）
-│   ├── host-runtime.ts         # 插件 manager 激活 + catalog 合并 + 插件命令端口
+│   ├── register.ts             # 自有物料条目，直接消费框架桥产物
+│   ├── composition-runtime.ts  # 返回应用内同一份标准 runtime
+│   ├── host-runtime.ts         # 官方 runtime 组合 + 宿主在线物料业务
 │   ├── host-resource-plugin.ts # 三个 dataResourceType 贡献（demo_metric/series/ranking）
 │   ├── metric-value.ts             # 三端共有的「指标读数」manifest
 │   ├── metric-value-material.ts    # Vue 桥（createVueMaterialDefinition + mapModel + 表格适配）

@@ -4,19 +4,123 @@
 
 ```ts
 
+import { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
+import type { BaseScreenPluginManager } from '@base-screen/plugin-manager';
+import { BaseScreenPluginManagerOptions } from '@base-screen/plugin-manager';
+import type { BaseScreenPluginManagerSnapshot } from '@base-screen/plugin-manager';
 import { BaseScreenViewerConfiguration } from '@base-screen/renderer';
 import { BaseScreenViewerElement } from '@base-screen/renderer';
+import type { createBaseScreenPluginContributionCommandPort } from '@base-screen/plugin-manager';
+import { CreatePluginRegistrationOptions } from '@base-screen/plugin-sdk';
+import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenParseResult } from '@base-screen/contracts';
 
 // @public (undocumented)
 export const BASE_SCREEN_VIEWER_TAG_NAME: 'base-screen-viewer';
+
+// @public
+interface BaseScreenMountElement extends Element {
+    // (undocumented)
+    unload(): void;
+}
+
+// @public (undocumented)
+interface BaseScreenMountHandle<TElement extends BaseScreenMountElement> {
+    // (undocumented)
+    dispose(): Promise<BaseScreenMountResult<null>>;
+    // (undocumented)
+    readonly disposed: boolean;
+    readonly element: TElement;
+    on(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): () => void;
+    onDispose(cleanup: () => void): () => void;
+}
+
+// @public (undocumented)
+type BaseScreenMountPhase = 'mount' | 'configure' | 'load' | 'document' | 'catalog' | 'mounted' | 'dispose';
+
+// @public
+type BaseScreenMountResult<T> = ScreenParseResult<T> & {
+    readonly mountPhase?: BaseScreenMountPhase;
+};
+
+// @public (undocumented)
+export type BaseScreenRuntimeCatalog = BaseScreenPluginManagerSnapshot['materials'];
+
+// @public (undocumented)
+type BaseScreenRuntimePluginCommandPort = ReturnType<typeof createBaseScreenPluginContributionCommandPort>;
+
+// @public
+interface BaseScreenRuntimeRegistrationOptions {
+    // (undocumented)
+    readonly activation?: BaseScreenPluginManagerOptions['activation'];
+    // (undocumented)
+    readonly createCommandPort?: BaseScreenPluginManagerOptions['createCommandPort'];
+    // (undocumented)
+    readonly createDesignReadPort?: BaseScreenPluginManagerOptions['createDesignReadPort'];
+    // (undocumented)
+    readonly grantedCapabilities?: BaseScreenPluginManagerOptions['grantedCapabilities'];
+    // (undocumented)
+    readonly instanceId?: string;
+    // (undocumented)
+    readonly materials?: readonly (RuntimeMaterial | BaseScreenMaterialCatalogEntry)[];
+    // (undocumented)
+    readonly plugins?: CreatePluginRegistrationOptions['plugins'];
+}
+
+// @public (undocumented)
+export interface BaseScreenSetCatalogOptions {
+    readonly target?: 'mounted-and-future' | 'future-mounts';
+}
 
 export { BaseScreenViewerConfiguration }
 
 export { BaseScreenViewerElement }
 
 // @public (undocumented)
+export type BaseScreenViewerMountOptions = Omit<BaseScreenViewerConfiguration, 'catalog'> & {
+    readonly catalog?: BaseScreenRuntimeCatalog;
+    readonly document?: ScreenDocument;
+    readonly children?: readonly Node[];
+    readonly element?: BaseScreenViewerElement;
+};
+
+// @public
+export interface BaseScreenViewerRuntime {
+    // (undocumented)
+    readonly catalog: BaseScreenRuntimeCatalog;
+    dispose(): Promise<ScreenParseResult<null>>;
+    // (undocumented)
+    readonly disposed: boolean;
+    // (undocumented)
+    readonly inspectorControls: BaseScreenPluginManagerSnapshot['inspectorControls'];
+    // (undocumented)
+    readonly instanceId: string;
+    readonly manager: BaseScreenPluginManager;
+    // (undocumented)
+    mountViewer(container: Element, options: BaseScreenViewerMountOptions): Promise<BaseScreenMountResult<BaseScreenMountHandle<BaseScreenViewerElement>>>;
+    // (undocumented)
+    readonly pluginCatalog: BaseScreenPluginManagerSnapshot['plugins'];
+    // (undocumented)
+    readonly pluginCommandPort: BaseScreenRuntimePluginCommandPort;
+    // (undocumented)
+    readonly pluginPanels: BaseScreenPluginManagerSnapshot['panels'];
+    // (undocumented)
+    readonly runtimeContributions: BaseScreenPluginManagerSnapshot['contributions'];
+    setCatalog(catalog: BaseScreenRuntimeCatalog, options?: BaseScreenSetCatalogOptions): ScreenParseResult<null>;
+}
+
+// @public (undocumented)
+export function createBaseScreenViewerRuntime(options?: CreateBaseScreenViewerRuntimeOptions): Promise<ScreenParseResult<BaseScreenViewerRuntime>>;
+
+// @public
+export interface CreateBaseScreenViewerRuntimeOptions extends BaseScreenRuntimeRegistrationOptions {
+}
+
+// @public (undocumented)
 export function defineBaseScreenViewer(): ScreenParseResult<CustomElementConstructor>;
+
+// @public (undocumented)
+type RuntimeMaterial = NonNullable<CreatePluginRegistrationOptions['materials']>[number];
 
 // (No @packageDocumentation comment for this package)
 

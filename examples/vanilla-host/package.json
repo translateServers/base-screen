@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@base-screen/contracts": "workspace:^",
+    "@base-screen/host-kit": "workspace:^",
     "@base-screen/material": "workspace:^",
     "@base-screen/plugin-core": "workspace:^",
     "@base-screen/plugin-board-materials": "workspace:^",
