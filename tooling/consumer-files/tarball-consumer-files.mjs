@@ -29,7 +29,7 @@ export function writeTarballConsumerFiles(consumer, framework, packageSpec) {
         packageSpec(directory),
       ]),
     ),
-    ...(isReact ? { react: '19.1.0', 'react-dom': '19.1.0' } : { vue: '3.5.0' }),
+    ...(isReact ? { react: '^19.1.0', 'react-dom': '^19.1.0' } : { vue: '^3.5.0' }),
   };
   const devDependencies = {
     '@playwright/test': '1.62.1',

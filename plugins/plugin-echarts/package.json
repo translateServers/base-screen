@@ -18,8 +18,13 @@
   "dependencies": {
     "@base-screen/contracts": "workspace:^",
     "@base-screen/plugin-core": "workspace:^",
-    "@base-screen/plugin-sdk": "workspace:^",
-    "echarts": "6.1.0"
+    "@base-screen/plugin-sdk": "workspace:^"
+  },
+  "peerDependencies": {
+    "echarts": "^6.1.0"
+  },
+  "devDependencies": {
+    "echarts": "^6.1.0"
   },
   "exports": {
     ".": {

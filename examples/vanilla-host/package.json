@@ -21,6 +21,7 @@
     "@base-screen/plugin-echarts": "workspace:^",
     "@base-screen/plugin-sdk": "workspace:^",
     "@base-screen/sdk": "workspace:^",
+    "echarts": "^6.1.0",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

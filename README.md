@@ -307,8 +307,9 @@ tarball 用于离线验证或发布前试用。使用 `pnpm pack` 生成的**原
 - 框架桥的 peer 依赖：`@base-screen/react` 需要 `react` / `react-dom` `^19.1.0`，`@base-screen/vue`
   需要 `vue` `^3.5.0`；当前不承诺 React 18 兼容。
 - 宿主面板设计令牌统一引入 `import '@base-screen/sdk/host-tokens.css'`（唯一公共样式面，ADR-0095）。
-- `@base-screen/plugin-echarts` 将 `echarts@6.1.0` 作为受控直接依赖钉版（ADR-0074）。宿主若自带其它
-  版本 echarts，会与之并存而非复用；介意体积时让宿主与插件共用同一版本。
+- `@base-screen/plugin-echarts` 把 `echarts`（`^6.1.0`）声明为 peer 依赖（ADR-0097），由宿主自行安装并与插件
+  共用同一份实例；宿主应显式安装 `echarts`，并使用 `^6.1.0` 范围内的版本。宿主未安装时 pnpm/npm 默认会
+  自动安装一份；宿主安装了范围外版本时包管理器只警告或静默放行，因此不能依赖包管理器保证版本一致（见 ADR-0097）。
 
 **只读展示的最小路径**：从 `@base-screen/sdk/viewer` 使用 `defineBaseScreenViewer()` 或上述轻量组合层，显式选择所需物料；该入口不引入 Designer 实现。按需使用子入口和插件控制浏览器 bundle，安装依赖与 bundle 隔离是两个层面。
 

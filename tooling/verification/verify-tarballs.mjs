@@ -21,6 +21,7 @@ import {
   writeVanillaTarballConsumerFiles,
   writeViewerOnlyTarballConsumerFiles,
 } from '../consumer-files/tarball-consumer-files.mjs';
+import { assertSingleCopy, readConsumerRange } from './single-copy.mjs';
 
 function run(command, args, cwd) {
   const executable = process.platform === 'win32' && command === 'pnpm' ? 'pnpm.cmd' : command;
@@ -314,6 +315,8 @@ function verifyHostAppVueTarballConsumer() {
     ],
     ['react', 'react-dom'],
   );
+  // echarts 是宿主声明、插件 peer 的共享依赖：宿主与插件必须只用同一份实例（ADR-0097）。
+  assertSingleCopy(consumer, 'echarts', readConsumerRange(consumer, 'echarts'));
   run('pnpm', ['run', 'typecheck'], consumer);
   run('pnpm', ['run', 'build'], consumer);
   run('pnpm', ['run', 'verify'], consumer);
