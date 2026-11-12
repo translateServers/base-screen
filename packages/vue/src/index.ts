@@ -24,6 +24,8 @@ export interface CreateVueMaterialDefinitionOptions<Props extends object> {
   readonly component: Component;
   readonly mapModel?: (model: BaseScreenMaterialModel) => Props;
   readonly eventProps?: Readonly<Record<string, string>>;
+  /** 每次创建 app 后、mount 前调用，用于安装宿主插件与 provide。 */
+  readonly configureApp?: (app: App) => void;
 }
 
 // 原生 CSS 交互门控（ADR-0036）：与 React 桥接一致，非交互模式下桥接渲染的原生控件
@@ -67,7 +69,6 @@ export function createVueMaterialDefinition<Props extends object>(
     connectedCallback(): void {
       this.#disconnectScheduled = false;
       if (this.#app === undefined) {
-        this.#modelRef = shallowRef(this.#model);
         // 组件库（如 vue-echarts）和宿主项目样式依赖注入到 document 的全局样式，
         // 但物料被挂载在宿主页的 shadow root 内，全局样式无法穿透。桥接层在挂载
         // 组件之前把文档中的全部可读全局规则传播进宿主 shadow root，使组件库
@@ -102,9 +103,10 @@ export function createVueMaterialDefinition<Props extends object>(
     }
 
     #mountApp(): void {
-      this.#app = createApp({
+      const modelRef = shallowRef(this.#model);
+      const app = createApp({
         render: () => {
-          const model = this.#modelRef?.value;
+          const model = modelRef.value;
           if (model === undefined) {
             return null;
           }
@@ -115,7 +117,17 @@ export function createVueMaterialDefinition<Props extends object>(
           return h(options.component, props);
         },
       });
-      this.#app.mount(this);
+      let mountStarted = false;
+      try {
+        options.configureApp?.(app);
+        mountStarted = true;
+        app.mount(this);
+        this.#modelRef = modelRef;
+        this.#app = app;
+      } catch (error) {
+        if (mountStarted) app.unmount();
+        throw error;
+      }
     }
 
     disconnectedCallback(): void {

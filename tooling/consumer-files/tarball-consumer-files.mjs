@@ -801,7 +801,42 @@ try {
   writeFileSync(
     join(consumer, 'src', 'global-components.typecheck.ts'),
     `import type { GlobalComponents } from 'vue';
+import type { ScreenDiagnostic } from '@base-screen/contracts';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type {
+  BaseScreenDesignerElement,
+  BaseScreenDesignerMountOptions,
+  BaseScreenMountHandle,
+  BaseScreenRuntime,
+  BaseScreenViewerElement,
+  BaseScreenViewerMountOptions,
+} from '@base-screen/sdk';
+import { BaseScreenDesigner, BaseScreenViewer } from '@base-screen/vue';
+
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends
+  (<Value>() => Value extends Right ? 1 : 2) ? true : false;
+type Assert<Value extends true> = Value;
+type Designer = InstanceType<typeof BaseScreenDesigner>;
+type Viewer = InstanceType<typeof BaseScreenViewer>;
+
+// 在最低 Vue peer 版本下验证 tarball 声明，而不是复用工作区的新版 Vue 类型。
+export type ComponentContracts = [
+  Assert<Equal<Designer['$props']['runtime'], BaseScreenRuntime>>,
+  Assert<Equal<Designer['$props']['mountOptions'], BaseScreenDesignerMountOptions>>,
+  Assert<Equal<Viewer['$props']['mountOptions'], BaseScreenViewerMountOptions>>,
+  Assert<Equal<Parameters<NonNullable<Designer['$props']['onMounted']>>[0], BaseScreenMountHandle<BaseScreenDesignerElement>>>,
+  Assert<Equal<Parameters<NonNullable<Viewer['$props']['onMounted']>>[0], BaseScreenMountHandle<BaseScreenViewerElement>>>,
+  Assert<Equal<Parameters<Designer['$slots']['fallback']>[0]['diagnostics'], readonly ScreenDiagnostic[]>>,
+  Assert<Equal<Parameters<Viewer['$slots']['fallback']>[0]['diagnostics'], readonly ScreenDiagnostic[]>>,
+];
+
+// @ts-expect-error runtime 和 mountOptions 都是必填项。
+const missingRequiredProps: Designer['$props'] = {};
+// @ts-expect-error 挂载回调必须接收 Viewer 句柄。
+const wrongCallback: Viewer['$props']['onMounted'] = (_handle: string) => {};
+void missingRequiredProps;
+void wrongCallback;
 
 type ProductProps = InstanceType<GlobalComponents['${productTag}']>['$props'];
 

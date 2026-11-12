@@ -4,6 +4,7 @@
 
 ```ts
 
+import { App } from 'vue';
 import { BaseScreenDesignerElement } from '@base-screen/sdk';
 import { BaseScreenDesignerMountOptions } from '@base-screen/sdk';
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
@@ -14,15 +15,21 @@ import { BaseScreenRuntime } from '@base-screen/sdk';
 import { BaseScreenViewerElement } from '@base-screen/sdk';
 import { BaseScreenViewerMountOptions } from '@base-screen/sdk';
 import { Component } from 'vue';
+import { DefineSetupFnComponent } from 'vue';
+import { PublicProps } from 'vue';
 import type { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
+import { SlotsType } from 'vue';
 
 // @public (undocumented)
-export const BaseScreenDesigner: Component;
+export const BaseScreenDesigner: DefineSetupFnComponent<BaseScreenDesignerProps, {}, SlotsType<{
+fallback: {
+diagnostics: readonly ScreenDiagnostic[];
+};
+}>, BaseScreenDesignerProps & {}, PublicProps>;
 
 // @public (undocumented)
 export interface BaseScreenDesignerProps {
-    // (undocumented)
     readonly mountOptions: BaseScreenDesignerMountOptions;
     // (undocumented)
     readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
@@ -34,11 +41,14 @@ export interface BaseScreenDesignerProps {
 }
 
 // @public (undocumented)
-export const BaseScreenViewer: Component;
+export const BaseScreenViewer: DefineSetupFnComponent<BaseScreenViewerProps, {}, SlotsType<{
+fallback: {
+diagnostics: readonly ScreenDiagnostic[];
+};
+}>, BaseScreenViewerProps & {}, PublicProps>;
 
 // @public (undocumented)
 export interface BaseScreenViewerProps {
-    // (undocumented)
     readonly mountOptions: BaseScreenViewerMountOptions;
     // (undocumented)
     readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
@@ -57,6 +67,7 @@ export function createVueMaterialDefinition<Props extends object>(options: Creat
 export interface CreateVueMaterialDefinitionOptions<Props extends object> {
     // (undocumented)
     readonly component: Component;
+    readonly configureApp?: (app: App) => void;
     // (undocumented)
     readonly eventProps?: Readonly<Record<string, string>>;
     // (undocumented)

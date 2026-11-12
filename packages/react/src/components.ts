@@ -24,8 +24,9 @@ import {
 
 export interface BaseScreenDesignerProps {
   readonly runtime: BaseScreenRuntime;
+  /** 初始化快照；文档/项目身份变化重挂载，catalog 新引用热刷新，其余配置在下次挂载生效。 */
   readonly mountOptions: BaseScreenDesignerMountOptions;
-  /** 改变该值会释放当前句柄并重新挂载；普通 options 变化只更新后续 attach 的快照。 */
+  /** 强制重挂载；catalog 新引用热刷新，其余非身份配置只保存为后续挂载的初始化快照。 */
   readonly remountKey?: string | number;
   readonly onMounted?: BaseScreenMountControllerReady<BaseScreenDesignerElement>;
   readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
@@ -36,6 +37,7 @@ export interface BaseScreenDesignerProps {
 
 export interface BaseScreenViewerProps {
   readonly runtime: BaseScreenRuntime;
+  /** 初始化快照；文档/项目身份变化重挂载，catalog 新引用热刷新，其余配置在下次挂载生效。 */
   readonly mountOptions: BaseScreenViewerMountOptions;
   readonly remountKey?: string | number;
   readonly onMounted?: BaseScreenMountControllerReady<BaseScreenViewerElement>;
@@ -70,7 +72,10 @@ interface UseBaseScreenMountOptions<TElement extends BaseScreenMountElement, TOp
   readonly createController: CreateController<TElement, TOptions>;
 }
 
-function useBaseScreenMount<TElement extends BaseScreenMountElement, TOptions>(
+function useBaseScreenMount<
+  TElement extends BaseScreenMountElement,
+  TOptions extends { readonly catalog?: unknown },
+>(
   options: UseBaseScreenMountOptions<TElement, TOptions>,
 ): {
   readonly containerRef: RefObject<HTMLDivElement | null>;
@@ -91,7 +96,7 @@ function useBaseScreenMount<TElement extends BaseScreenMountElement, TOptions>(
   const createControllerRef = useRef(options.createController);
   createControllerRef.current = options.createController;
   const controllerRef = useRef<BaseScreenMountController<TElement, TOptions> | null>(null);
-  controllerRef.current?.updateOptions(optionsRef.current);
+  const detachRef = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => {
     const container = containerRef.current;
@@ -105,13 +110,23 @@ function useBaseScreenMount<TElement extends BaseScreenMountElement, TOptions>(
       },
     });
     controllerRef.current = controller;
-    void controller.attach(container);
+    let cancelled = false;
+    void detachRef.current.then(() => {
+      if (!cancelled) return controller.attach(container);
+    });
     return () => {
+      cancelled = true;
       controllerRef.current = null;
       setDiagnostics([]);
-      void controller.detach();
+      const previous = detachRef.current;
+      const detached = controller.detach();
+      detachRef.current = Promise.all([previous, detached]);
     };
   }, [options.runtime, options.remountKey, ...options.identity]);
+
+  useEffect(() => {
+    controllerRef.current?.updateOptions(options.mountOptions);
+  }, [options.mountOptions, options.mountOptions.catalog]);
 
   return { containerRef, diagnostics };
 }
@@ -146,12 +161,7 @@ export function BaseScreenDesigner(props: BaseScreenDesignerProps): ReactElement
     remountKey,
     onMounted,
     onDiagnostics,
-    identity: [
-      mountOptions.projectId,
-      mountOptions.document,
-      mountOptions.catalog,
-      mountOptions.element,
-    ],
+    identity: [mountOptions.projectId, mountOptions.document, mountOptions.element],
     createController: (input) =>
       createBaseScreenDesignerMountController({
         runtime,
@@ -188,9 +198,6 @@ export function BaseScreenViewer(props: BaseScreenViewerProps): ReactElement {
       mountOptions.projectId,
       mountOptions.document,
       mountOptions.documentRevision,
-      mountOptions.instanceId,
-      mountOptions.mode,
-      mountOptions.catalog,
       mountOptions.element,
     ],
     createController: (input) =>

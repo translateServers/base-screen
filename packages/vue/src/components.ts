@@ -12,7 +12,6 @@ import {
   createBaseScreenViewerMountController,
 } from '@base-screen/sdk';
 import {
-  type Component,
   defineComponent,
   h,
   onBeforeUnmount,
@@ -20,14 +19,16 @@ import {
   type PropType,
   type Ref,
   ref,
+  type SlotsType,
   type VNode,
   watch,
 } from 'vue';
 
 export interface BaseScreenDesignerProps {
   readonly runtime: BaseScreenRuntime;
+  /** 初始化快照；文档/项目身份变化重挂载，catalog 新引用热刷新，其余配置在下次挂载生效。 */
   readonly mountOptions: BaseScreenDesignerMountOptions;
-  /** 改变该值会释放当前句柄并重新挂载；普通 options 变化只更新后续 attach 的快照。 */
+  /** 强制重挂载；catalog 新引用热刷新，其余非身份配置只保存为后续挂载的初始化快照。 */
   readonly remountKey?: string | number;
   readonly onMounted?: BaseScreenMountControllerReady<BaseScreenDesignerElement>;
   readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
@@ -35,6 +36,7 @@ export interface BaseScreenDesignerProps {
 
 export interface BaseScreenViewerProps {
   readonly runtime: BaseScreenRuntime;
+  /** 初始化快照；文档/项目身份变化重挂载，catalog 新引用热刷新，其余配置在下次挂载生效。 */
   readonly mountOptions: BaseScreenViewerMountOptions;
   readonly remountKey?: string | number;
   readonly onMounted?: BaseScreenMountControllerReady<BaseScreenViewerElement>;
@@ -62,17 +64,18 @@ interface UseBaseScreenMountOptions<TElement extends BaseScreenMountElement, TOp
 interface BaseScreenMountState {
   readonly containerRef: Ref<HTMLElement | null>;
   readonly diagnostics: Ref<readonly ScreenDiagnostic[]>;
-  updateOptions(): void;
 }
 
-function useBaseScreenMount<TElement extends BaseScreenMountElement, TOptions>(
-  options: UseBaseScreenMountOptions<TElement, TOptions>,
-): BaseScreenMountState {
+function useBaseScreenMount<
+  TElement extends BaseScreenMountElement,
+  TOptions extends { readonly catalog?: unknown },
+>(options: UseBaseScreenMountOptions<TElement, TOptions>): BaseScreenMountState {
   const containerRef = ref<HTMLElement | null>(null);
   const diagnostics = ref<readonly ScreenDiagnostic[]>([]);
   let controller: BaseScreenMountController<TElement, TOptions> | undefined;
   let generation = 0;
   let disposed = false;
+  let detaching: Promise<unknown> = Promise.resolve();
 
   const publishDiagnostics = (next: readonly ScreenDiagnostic[]): void => {
     if (disposed) return;
@@ -82,9 +85,10 @@ function useBaseScreenMount<TElement extends BaseScreenMountElement, TOptions>(
   const detachCurrent = (): void => {
     const active = controller;
     controller = undefined;
-    if (active !== undefined) void active.detach();
+    if (active !== undefined) detaching = Promise.all([detaching, active.detach()]);
   };
   const attach = async (token: number): Promise<void> => {
+    await detaching;
     if (token !== generation || disposed) return;
     const container = containerRef.value;
     if (container === null) return;
@@ -114,6 +118,13 @@ function useBaseScreenMount<TElement extends BaseScreenMountElement, TOptions>(
     },
     { flush: 'post' },
   );
+  watch(
+    [options.mountOptions, () => options.mountOptions().catalog],
+    () => {
+      controller?.updateOptions(options.mountOptions());
+    },
+    { flush: 'post' },
+  );
   onBeforeUnmount(() => {
     disposed = true;
     generation += 1;
@@ -123,7 +134,6 @@ function useBaseScreenMount<TElement extends BaseScreenMountElement, TOptions>(
   return {
     containerRef,
     diagnostics,
-    updateOptions: () => controller?.updateOptions(options.mountOptions()),
   };
 }
 
@@ -142,25 +152,15 @@ const remountKeyProp = {
   default: undefined,
 };
 
-const BaseScreenDesignerComponent = defineComponent({
-  name: 'BaseScreenDesigner',
-  props: {
-    runtime: { type: Object as PropType<BaseScreenRuntime>, required: true },
-    mountOptions: {
-      type: Object as PropType<BaseScreenDesignerMountOptions>,
-      required: true,
-    },
-    remountKey: remountKeyProp,
-    onMounted: {
-      type: Function as PropType<BaseScreenMountControllerReady<BaseScreenDesignerElement>>,
-      default: undefined,
-    },
-    onDiagnostics: {
-      type: Function as PropType<(diagnostics: readonly ScreenDiagnostic[]) => void>,
-      default: undefined,
-    },
-  },
-  setup(props, { slots }) {
+// setup-function 重载的公共声明在 Vue 3.5 的最低 peer 版本中同样有效，
+// 避免暴露随 Vue patch 增加泛型参数的 options-object 推断结果。
+const BaseScreenDesignerComponent = defineComponent<
+  BaseScreenDesignerProps,
+  {},
+  string,
+  SlotsType<{ fallback: { diagnostics: readonly ScreenDiagnostic[] } }>
+>(
+  (props, { slots }) => {
     const mounted = useBaseScreenMount({
       runtime: () => props.runtime,
       mountOptions: () => props.mountOptions,
@@ -170,7 +170,6 @@ const BaseScreenDesignerComponent = defineComponent({
       identity: [
         () => props.mountOptions.projectId,
         () => props.mountOptions.document,
-        () => props.mountOptions.catalog,
         () => props.mountOptions.element,
       ],
       createController: (input) =>
@@ -182,7 +181,6 @@ const BaseScreenDesignerComponent = defineComponent({
         }),
     });
     return () => {
-      mounted.updateOptions();
       return h(
         'div',
         { ref: mounted.containerRef },
@@ -192,29 +190,37 @@ const BaseScreenDesignerComponent = defineComponent({
       );
     };
   },
-});
-
-export const BaseScreenDesigner: Component = BaseScreenDesignerComponent;
-
-const BaseScreenViewerComponent = defineComponent({
-  name: 'BaseScreenViewer',
-  props: {
-    runtime: { type: Object as PropType<BaseScreenRuntime>, required: true },
-    mountOptions: {
-      type: Object as PropType<BaseScreenViewerMountOptions>,
-      required: true,
-    },
-    remountKey: remountKeyProp,
-    onMounted: {
-      type: Function as PropType<BaseScreenMountControllerReady<BaseScreenViewerElement>>,
-      default: undefined,
-    },
-    onDiagnostics: {
-      type: Function as PropType<(diagnostics: readonly ScreenDiagnostic[]) => void>,
-      default: undefined,
+  {
+    name: 'BaseScreenDesigner',
+    slots: Object as SlotsType<{ fallback: { diagnostics: readonly ScreenDiagnostic[] } }>,
+    props: {
+      runtime: { type: Object as PropType<BaseScreenRuntime>, required: true },
+      mountOptions: {
+        type: Object as PropType<BaseScreenDesignerMountOptions>,
+        required: true,
+      },
+      remountKey: remountKeyProp,
+      onMounted: {
+        type: Function as PropType<BaseScreenMountControllerReady<BaseScreenDesignerElement>>,
+        default: undefined,
+      },
+      onDiagnostics: {
+        type: Function as PropType<(diagnostics: readonly ScreenDiagnostic[]) => void>,
+        default: undefined,
+      },
     },
   },
-  setup(props, { slots }) {
+);
+
+export const BaseScreenDesigner = BaseScreenDesignerComponent;
+
+const BaseScreenViewerComponent = defineComponent<
+  BaseScreenViewerProps,
+  {},
+  string,
+  SlotsType<{ fallback: { diagnostics: readonly ScreenDiagnostic[] } }>
+>(
+  (props, { slots }) => {
     const mounted = useBaseScreenMount({
       runtime: () => props.runtime,
       mountOptions: () => props.mountOptions,
@@ -225,9 +231,6 @@ const BaseScreenViewerComponent = defineComponent({
         () => props.mountOptions.projectId,
         () => props.mountOptions.document,
         () => props.mountOptions.documentRevision,
-        () => props.mountOptions.instanceId,
-        () => props.mountOptions.mode,
-        () => props.mountOptions.catalog,
         () => props.mountOptions.element,
       ],
       createController: (input) =>
@@ -239,7 +242,6 @@ const BaseScreenViewerComponent = defineComponent({
         }),
     });
     return () => {
-      mounted.updateOptions();
       return h(
         'div',
         { ref: mounted.containerRef },
@@ -249,6 +251,26 @@ const BaseScreenViewerComponent = defineComponent({
       );
     };
   },
-});
+  {
+    name: 'BaseScreenViewer',
+    slots: Object as SlotsType<{ fallback: { diagnostics: readonly ScreenDiagnostic[] } }>,
+    props: {
+      runtime: { type: Object as PropType<BaseScreenRuntime>, required: true },
+      mountOptions: {
+        type: Object as PropType<BaseScreenViewerMountOptions>,
+        required: true,
+      },
+      remountKey: remountKeyProp,
+      onMounted: {
+        type: Function as PropType<BaseScreenMountControllerReady<BaseScreenViewerElement>>,
+        default: undefined,
+      },
+      onDiagnostics: {
+        type: Function as PropType<(diagnostics: readonly ScreenDiagnostic[]) => void>,
+        default: undefined,
+      },
+    },
+  },
+);
 
-export const BaseScreenViewer: Component = BaseScreenViewerComponent;
+export const BaseScreenViewer = BaseScreenViewerComponent;

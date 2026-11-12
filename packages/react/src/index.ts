@@ -10,7 +10,7 @@ import type {
   BaseScreenMaterialModel,
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
-import { type ComponentType, createElement } from 'react';
+import { type ComponentType, createElement, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
 export * from './components.js';
@@ -20,6 +20,8 @@ export interface CreateReactMaterialDefinitionOptions<Props extends object> {
   readonly component: ComponentType<Props>;
   readonly mapModel?: (model: BaseScreenMaterialModel) => Props;
   readonly eventProps?: Readonly<Record<string, string>>;
+  /** 每次渲染时包装物料根节点；Provider 和宿主 Store 由调用方持有。 */
+  readonly wrapRoot?: (node: ReactNode, model: BaseScreenMaterialModel) => ReactNode;
 }
 
 // 原生 CSS 交互门控（ADR-0036）：非交互模式下桥接渲染的原生控件（button 等）不再接收
@@ -91,7 +93,10 @@ export function createReactMaterialDefinition<Props extends object>(
           : options.mapModel(this.#model)),
         ...this.createEventProps(),
       } as Props;
-      this.#root.render(createElement(options.component, props));
+      const node = createElement(options.component, props);
+      this.#root.render(
+        options.wrapRoot === undefined ? node : options.wrapRoot(node, this.#model),
+      );
     }
 
     private ensureInteractiveStyleSheet(): void {

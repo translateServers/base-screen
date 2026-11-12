@@ -27,7 +27,6 @@ export function BaseScreenDesigner(props: BaseScreenDesignerProps): ReactElement
 export interface BaseScreenDesignerProps {
     // (undocumented)
     readonly className?: string;
-    // (undocumented)
     readonly mountOptions: BaseScreenDesignerMountOptions;
     // (undocumented)
     readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
@@ -49,7 +48,6 @@ export function BaseScreenViewer(props: BaseScreenViewerProps): ReactElement;
 export interface BaseScreenViewerProps {
     // (undocumented)
     readonly className?: string;
-    // (undocumented)
     readonly mountOptions: BaseScreenViewerMountOptions;
     // (undocumented)
     readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
@@ -78,6 +76,7 @@ export interface CreateReactMaterialDefinitionOptions<Props extends object> {
     readonly manifest: BaseScreenMaterialManifest;
     // (undocumented)
     readonly mapModel?: (model: BaseScreenMaterialModel) => Props;
+    readonly wrapRoot?: (node: ReactNode, model: BaseScreenMaterialModel) => ReactNode;
 }
 
 // (No @packageDocumentation comment for this package)
