@@ -1,6 +1,7 @@
 import type {
   ScreenDocument,
   ScreenHostCatalogPort,
+  ScreenHostDatasetPort,
   ScreenHostResourcePort,
 } from '@base-screen/contracts';
 import type {
@@ -119,6 +120,7 @@ function createHarness(options: {
   getDocument?: () => ScreenDocument | undefined;
   getResourcePort?: () => ScreenHostResourcePort | undefined;
   getHostCatalogPort?: () => ScreenHostCatalogPort | undefined;
+  getDatasetPort?: () => ScreenHostDatasetPort | undefined;
   getConditionalStylePort?: () => BaseScreenConditionalStylePort | undefined;
 }): {
   controller: DesignerPreviewController;
@@ -135,6 +137,7 @@ function createHarness(options: {
     getDocument: options.getDocument ?? (() => documentValue()),
     getResourcePort: options.getResourcePort ?? (() => stableResourcePort),
     getHostCatalogPort: options.getHostCatalogPort ?? (() => stableVariablePort),
+    getDatasetPort: options.getDatasetPort ?? (() => undefined),
     getConditionalStylePort: options.getConditionalStylePort ?? (() => undefined),
     getRuntimeContributions: () => undefined,
     isViewerRegistered: () => true,
@@ -248,6 +251,41 @@ describe('DesignerPreviewController nested viewer configure (RB3)', () => {
     };
     expect(configuration.resourcePort).toBe(stableResourcePort);
     expect(configuration.hostCatalogPort).toBe(stableVariablePort);
+  });
+
+  it('passes dataset ports and reconfigures only when their identity changes', () => {
+    const first: ScreenHostDatasetPort = {
+      list: async () => ({ ok: true, value: { items: [] }, diagnostics: [] }),
+      describe: async () => ({ ok: false, diagnostics: [] }),
+      query: async () => ({ ok: false, diagnostics: [] }),
+    };
+    const second = { ...first };
+    let current: ScreenHostDatasetPort | undefined = first;
+    const { controller, viewer } = createHarness({
+      getCatalog: () => stableCatalog,
+      getDatasetPort: () => current,
+    });
+
+    controller.toggle();
+    expect(viewer.configureCalls[0]![0]).toMatchObject({ datasetPort: first });
+    controller.sync(documentValue());
+    expect(viewer.configureCalls).toHaveLength(1);
+    expect(viewer.unloadCalls).toBe(0);
+
+    current = second;
+    controller.sync(documentValue());
+    expect(viewer.configureCalls[1]![0]).toMatchObject({ datasetPort: second });
+    expect(viewer.unloadCalls).toBe(1);
+
+    current = undefined;
+    controller.sync(documentValue());
+    expect(viewer.configureCalls[2]![0]).not.toHaveProperty('datasetPort');
+    expect(viewer.unloadCalls).toBe(2);
+
+    current = first;
+    controller.sync(documentValue());
+    expect(viewer.configureCalls[3]![0]).toMatchObject({ datasetPort: first });
+    expect(viewer.unloadCalls).toBe(3);
   });
 
   it('refreshData forwards to the nested viewer', () => {

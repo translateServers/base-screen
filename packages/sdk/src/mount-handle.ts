@@ -65,8 +65,8 @@ export function createBaseScreenMountHandle<TElement extends BaseScreenMountElem
       return registerCleanup(cleanup);
     },
     dispose() {
-      disposePromise ??= (async (): Promise<ScreenParseResult<null>> => {
-        disposed = true;
+      disposed = true;
+      disposePromise ??= Promise.resolve().then((): ScreenParseResult<null> => {
         const diagnostics: ScreenDiagnostic[] = [];
         for (const cleanup of [...cleanups].reverse()) {
           try {
@@ -99,7 +99,7 @@ export function createBaseScreenMountHandle<TElement extends BaseScreenMountElem
           }
         }
         return nullResult(diagnostics);
-      })();
+      });
       return disposePromise;
     },
   };

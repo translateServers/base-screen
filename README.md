@@ -138,7 +138,11 @@ await designer.dispose();
 await runtime.dispose();
 ```
 
-`mountViewer()` 同样自动注入 catalog 与插件贡献，宿主只需提交已解析或迁移后的 `document`；`projectId` 与 `document` 两种 Designer 模式不能混用。需要自定义插件端口工厂、插件管理器或替换后续挂载的 catalog 时，分别使用 `createBaseScreenRuntime` 的端口选项、`runtime.manager` 与 `runtime.setCatalog()`。`runtime.dispose()` 会卸载全部挂载句柄并释放插件管理器，且可重复调用。
+`mountViewer()` 同样自动注入 catalog 与插件贡献，宿主只需提交已解析或迁移后的 `document`；`projectId` 与 `document` 两种 Designer 模式不能混用。Designer 挂载会按目录中存在的官方物料补齐文本、矩形、椭圆、图片工具与成组角色，宿主可用 `toolMaterialTypes`、`groupMaterialType` 覆盖；空的工具映射可关闭工具。一个 runtime 对应一个 Designer 编辑会话，重复挂载第二个 Designer 会返回诊断；并行编辑应使用独立 runtime，多个 Viewer 可共享。
+
+`runtime.setCatalog(nextCatalog)` 默认热刷新仍使用运行时默认目录的 SDK 挂载，保留编辑文档、选区和历史；独立指定目录的挂载不受影响。任一刷新失败时保留运行时默认值，并回滚此前成功刷新的实例，回滚失败也会返回诊断。显式传入 `{ target: 'future-mounts' }` 则只改变后续挂载。宿主手动绑定的元素仍通过 `element.refreshCatalog()` 更新。端口和其他初始化配置需要在显式重挂载时生效。`runtime.dispose()` 会卸载全部挂载句柄并释放插件管理器，且可重复调用。
+
+蓝图能力可以通过 `createBaseScreenRuntime({ blueprintCapabilities: [...] })` 一次显式声明并授权；省略时不开放任何能力。已有 manager 的宿主使用 `createBaseScreenBlueprintCapabilityPlugin({ id, capabilities })`（根入口或 `sdk/plugins`），把返回的 `plugin` 与 `grantedCapabilities` 放入 manager 配置；贡献、授权列表及空生命周期由组合层统一生成。能力词汇仍以 contracts 的 `SCREEN_BLUEPRINT_CAPABILITY_IDS` 为准。
 
 如果宿主已经拥有自己的 `HostRuntime`（manager、catalog、在线物料与插件贡献），用 `adoptBaseScreenRuntime(host)` 把它适配成 `BaseScreenRuntime`，不要再调用 `createBaseScreenRuntime()`：
 

@@ -1,6 +1,12 @@
+import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
 import type { BaseScreenDesignerElement } from '@base-screen/engine';
 import type { BaseScreenRuntime, BaseScreenRuntimeCatalog } from './runtime.js';
-import { runtimeFailure, runtimeSuccess } from './runtime-diagnostics.js';
+import {
+  nullResult,
+  runtimeDiagnostic,
+  runtimeFailure,
+  runtimeSuccess,
+} from './runtime-diagnostics.js';
 import { createBaseScreenRuntimeMounts } from './runtime-mounts.js';
 
 /**
@@ -30,6 +36,42 @@ export interface BaseScreenRuntimeHost {
  * 再委托宿主释放自己的 manager。
  */
 export function adoptBaseScreenRuntime(host: BaseScreenRuntimeHost): BaseScreenRuntime {
+  let disposed = false;
+  let boundDesigner: BaseScreenDesignerElement | undefined;
+  let disposePromise: Promise<ScreenParseResult<null>> | undefined;
+  const bindDesigner = (element: BaseScreenDesignerElement | null): ScreenParseResult<null> => {
+    if (disposed || host.disposed) {
+      return runtimeFailure(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        'Base Screen host runtime is already disposed.',
+        ['host'],
+      );
+    }
+    if (mounts.designer !== undefined && mounts.designer !== element) {
+      return runtimeFailure(
+        'PLUGIN_CORE_SESSION_INVALID',
+        'Dispose the mounted Designer handle before changing its binding.',
+        ['designer'],
+      );
+    }
+    if (element !== null && boundDesigner !== undefined && boundDesigner !== element) {
+      return runtimeFailure(
+        'PLUGIN_CORE_SESSION_INVALID',
+        'A runtime supports one Designer session. Release the current Designer or create a separate runtime.',
+        ['designer'],
+      );
+    }
+    try {
+      host.bindDesigner(element);
+      boundDesigner = element ?? undefined;
+      return runtimeSuccess(null);
+    } catch {
+      return runtimeFailure('PLUGIN_CORE_LIFECYCLE_INVALID', 'Host Designer binding failed.', [
+        'host',
+        'designer',
+      ]);
+    }
+  };
   const mounts = createBaseScreenRuntimeMounts({
     instanceId: host.instanceId,
     readCatalog: () => host.catalog,
@@ -38,9 +80,17 @@ export function adoptBaseScreenRuntime(host: BaseScreenRuntimeHost): BaseScreenR
     inspectorControls: host.inspectorControls,
     runtimeContributions: host.runtimeContributions,
     pluginCommandPort: host.pluginCommandPort,
-    bindDesigner: (element) => host.bindDesigner(element),
-    releaseDesigner: () => host.bindDesigner(null),
-    isDisposed: () => host.disposed,
+    bindDesigner,
+    releaseDesigner: (element) => {
+      if (boundDesigner === element) {
+        try {
+          host.bindDesigner(null);
+        } finally {
+          boundDesigner = undefined;
+        }
+      }
+    },
+    isDisposed: () => disposed || host.disposed,
   });
 
   return Object.freeze({
@@ -55,35 +105,57 @@ export function adoptBaseScreenRuntime(host: BaseScreenRuntimeHost): BaseScreenR
     runtimeContributions: host.runtimeContributions,
     pluginCommandPort: host.pluginCommandPort,
     get disposed(): boolean {
-      return host.disposed;
+      return disposed || host.disposed;
     },
-    bindDesigner: (element) => host.bindDesigner(element),
-    setCatalog(catalog) {
-      if (host.disposed) {
+    bindDesigner,
+    setCatalog(catalog, options = {}) {
+      if (disposed || host.disposed) {
         return runtimeFailure(
           'PLUGIN_CORE_LIFECYCLE_INVALID',
           'Base Screen host runtime is already disposed.',
           ['host'],
         );
       }
+      if (options.target !== 'future-mounts') {
+        const refreshed = mounts.refreshCatalog(host.catalog, catalog);
+        if (!refreshed.ok) return refreshed;
+      }
       host.catalog = catalog;
       return runtimeSuccess(null);
     },
     mountDesigner: mounts.mountDesigner,
     mountViewer: mounts.mountViewer,
-    async dispose() {
-      const mounted = await mounts.disposeAll();
-      if (!mounted.ok) return mounted;
-      try {
-        await host.dispose();
-        return runtimeSuccess(null);
-      } catch {
-        return runtimeFailure(
-          'PLUGIN_CORE_LIFECYCLE_INVALID',
-          'Base Screen host runtime disposal failed.',
-          ['host'],
-        );
-      }
+    dispose() {
+      disposed = true;
+      disposePromise ??= Promise.resolve().then(async (): Promise<ScreenParseResult<null>> => {
+        const mounted = await mounts.disposeAll();
+        const diagnostics: ScreenDiagnostic[] = [...mounted.diagnostics];
+        try {
+          host.bindDesigner(null);
+        } catch {
+          diagnostics.push(
+            runtimeDiagnostic('PLUGIN_CORE_LIFECYCLE_INVALID', 'Host Designer unbinding failed.', [
+              'host',
+              'designer',
+            ]),
+          );
+        } finally {
+          boundDesigner = undefined;
+        }
+        try {
+          await host.dispose();
+        } catch {
+          diagnostics.push(
+            runtimeDiagnostic(
+              'PLUGIN_CORE_LIFECYCLE_INVALID',
+              'Base Screen host runtime disposal failed.',
+              ['host'],
+            ),
+          );
+        }
+        return nullResult(diagnostics);
+      });
+      return disposePromise;
     },
   } satisfies BaseScreenRuntime);
 }

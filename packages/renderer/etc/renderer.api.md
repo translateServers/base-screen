@@ -134,6 +134,7 @@ export class BaseScreenViewerElement extends ElementBase {
     // (undocumented)
     get hostCatalogPort(): ScreenHostCatalogPort | undefined;
     set hostCatalogPort(value: ScreenHostCatalogPort | undefined);
+    refreshCatalog(catalog: BaseScreenMaterialCatalog): ScreenParseResult<null>;
     refreshConditionalStyles(componentIds?: readonly string[]): void;
     // (undocumented)
     refreshData(componentId?: string): void;

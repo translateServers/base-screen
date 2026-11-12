@@ -1,3 +1,7 @@
+import type {
+  BaseScreenMaterialCatalog,
+  BaseScreenMaterialConstructor,
+} from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { relationsFromRules } from '../__fixtures__/blueprint-relations.js';
 import {
@@ -20,6 +24,72 @@ afterEach(() => {
 });
 
 describe('BaseScreenViewerElement refresh and variable behavior', () => {
+  it('refreshes catalog without resetting the document, mounted material or in-flight resource', async () => {
+    const resources = createDeferredResourcePort();
+    const catalog = createHostResourceCatalog();
+    const screen = document([component('a', hostSource('orders'))]);
+    const { viewer, mount } = await createViewerHarness({
+      catalog,
+      document: screen,
+      resourcePort: resources.port,
+    });
+    await flush();
+    const element = mount.children[0];
+    const next = createHostResourceCatalog();
+    expect(viewer.refreshCatalog(next).ok).toBe(true);
+    expect(viewer.catalog).toBe(next);
+    expect(viewer.document).toBe(screen);
+    expect(mount.children[0]).toBe(element);
+    expect(resources.requests).toHaveLength(1);
+    expect(resources.requests[0]?.aborted).toBe(false);
+    viewer.unload();
+  });
+
+  it('rejects an incompatible catalog before changing mounted material and restores render failures', async () => {
+    const resources = createDeferredResourcePort();
+    const catalog = createHostResourceCatalog();
+    const screen = document([component('a', hostSource('orders'))]);
+    const { viewer, mount } = await createViewerHarness({
+      catalog,
+      document: screen,
+      resourcePort: resources.port,
+    });
+    await flush();
+    const original = mount.children[0];
+    const missing: BaseScreenMaterialCatalog = {
+      get: () => undefined,
+      has: () => false,
+      list: () => [],
+    };
+    expect(viewer.refreshCatalog(missing).ok).toBe(false);
+    expect(viewer.catalog).toBe(catalog);
+    expect(mount.children[0]).toBe(original);
+    const entry = catalog.get('base.test')!;
+    class BrokenMaterial {
+      constructor() {
+        throw new Error('broken material');
+      }
+    }
+    const brokenEntry = {
+      ...entry,
+      constructor: BrokenMaterial as unknown as BaseScreenMaterialConstructor,
+    };
+    const broken: BaseScreenMaterialCatalog = {
+      get: () => brokenEntry,
+      has: () => true,
+      list: () => [brokenEntry],
+    };
+    const failed = viewer.refreshCatalog(broken);
+    expect(failed.ok).toBe(false);
+    expect(failed.diagnostics.some((item) => item.code === 'PLUGIN_CORE_RENDER_FAILED')).toBe(true);
+    expect(viewer.catalog).toBe(catalog);
+    expect(viewer.document).toBe(screen);
+    expect(mount.children).toHaveLength(1);
+    expect(mount.children[0]?.model?.componentId).toBe('a');
+    expect(resources.requests).toHaveLength(1);
+    expect(viewer.refreshCatalog(createHostResourceCatalog()).ok).toBe(true);
+    viewer.unload();
+  });
   it('starts every current resource exactly once after host variables resolve', async () => {
     const variables = createVariablePort({ region: 'north' }, true);
     const resources = createDeferredResourcePort();
@@ -64,6 +134,73 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
         ?.request.params,
     ).toEqual({ region: 'north' });
   });
+
+  it.each(['initial', 'replacement'] as const)(
+    'keeps component requests deferred while refreshing the catalog during %s document variables',
+    async (mode) => {
+      const variables = createVariablePort({ region: 'north' }, true);
+      const resources = createDeferredResourcePort();
+      const catalog = createHostResourceCatalog();
+      const screen = document(
+        [
+          component(
+            'b',
+            hostSource('orders', { region: { kind: 'variable', variableId: 'region' } }),
+          ),
+        ],
+        [hostVariable('region', 'region')],
+      );
+      const { viewer, mount } = await createViewerHarness({
+        catalog,
+        document:
+          mode === 'initial'
+            ? screen
+            : document(
+                [component('old')],
+                [
+                  {
+                    id: 'region',
+                    name: 'region',
+                    initialValue: 'south',
+                    controlled: false,
+                    value: { kind: 'inline', value: 'south' },
+                  },
+                ],
+              ),
+        resourcePort: resources.port,
+        variablePort: variables.port,
+      });
+      if (mode === 'replacement') viewer.document = screen;
+      expect(variables.requests).toHaveLength(1);
+      expect(resources.requests).toHaveLength(0);
+      const mountedBefore = [...mount.children];
+
+      expect(viewer.refreshCatalog({} as BaseScreenMaterialCatalog).ok).toBe(false);
+      expect(
+        viewer.refreshCatalog({ get: () => undefined, has: () => false, list: () => [] }).ok,
+      ).toBe(false);
+      expect(viewer.catalog).toBe(catalog);
+      const next = createHostResourceCatalog();
+      expect(viewer.refreshCatalog(next).ok).toBe(true);
+      expect(viewer.catalog).toBe(next);
+      expect(viewer.document).toBe(screen);
+      await flush();
+      expect(variables.requests).toHaveLength(1);
+      expect(variables.requests[0]!.aborted).toBe(false);
+      expect(resources.requests).toHaveLength(0);
+      expect(mount.children).toEqual(mountedBefore);
+
+      variables.requests[0]!.resolveRequest({ ok: true, value: 'north', diagnostics: [] });
+      await flush();
+      expect(variables.requests).toHaveLength(1);
+      expect(resources.requests).toHaveLength(1);
+      expect(resources.requests[0]!.request.params).toEqual({ region: 'north' });
+      expect(resources.requests[0]!.request.dataSourceId).toBe('data-source-b');
+      expect(mount.children).toHaveLength(1);
+      expect(mount.children[0]?.model?.componentId).toBe('b');
+      viewer.unload();
+    },
+  );
 
   it('refreshData() refreshes all current resources without remounting materials', async () => {
     const variables = createVariablePort({ region: 'north' });

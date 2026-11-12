@@ -1,5 +1,6 @@
 import type {
   ScreenHostCatalogPort,
+  ScreenHostDatasetPort,
   ScreenHostResourcePort,
   ScreenProjectAdapter,
 } from '@base-screen/contracts';
@@ -9,8 +10,16 @@ import {
   type BaseScreenRuntimeContributionIndex,
   createBaseScreenMaterialCatalog,
 } from '@base-screen/plugin-core';
+import { createBaseScreenRenderer } from '@base-screen/renderer';
 import { describe, expect, it, vi } from 'vitest';
+import { createRenderer } from '../../../src/designer-element/runtime/designer-element-rendering.js';
+import { getDesignerElementState } from '../../../src/designer-element/runtime/designer-element-state.js';
 import { BaseScreenDesignerElement } from '../../../src/index.js';
+
+vi.mock('@base-screen/renderer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@base-screen/renderer')>()),
+  createBaseScreenRenderer: vi.fn(() => ({ render: vi.fn(() => ({ ok: true })), clear: vi.fn() })),
+}));
 
 function catalog(): BaseScreenMaterialCatalog {
   return {
@@ -87,6 +96,53 @@ function hostCatalogPort(): ScreenHostCatalogPort {
 }
 
 describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
+  it('passes the same host data ports to the canvas and ghost renderers', () => {
+    const designer = new BaseScreenDesignerElement();
+    const resource = resourcePort();
+    const hostCatalog = hostCatalogPort();
+    const datasets: ScreenHostDatasetPort = {
+      list: async () => ({ ok: true, value: { items: [] }, diagnostics: [] }),
+      describe: async () => ({ ok: false, diagnostics: [] }),
+      query: async () => ({ ok: false, diagnostics: [] }),
+    };
+    expect(
+      designer.configure({
+        catalog: catalog(),
+        resourcePort: resource,
+        hostCatalogPort: hostCatalog,
+        datasetPort: datasets,
+      }).ok,
+    ).toBe(true);
+    const state = getDesignerElementState(designer);
+    const content = {};
+    const ghost = {};
+    state.canvas = {
+      querySelector: (selector: string) => {
+        if (selector === '[data-canvas-content]') return content;
+        if (selector === '[data-canvas-ghost-root]') return ghost;
+        return null;
+      },
+    } as never;
+    vi.mocked(createBaseScreenRenderer).mockClear();
+
+    createRenderer(designer);
+
+    expect(createBaseScreenRenderer).toHaveBeenCalledTimes(2);
+    for (const [configuration] of vi.mocked(createBaseScreenRenderer).mock.calls) {
+      expect(configuration).toMatchObject({
+        catalog: designer.catalog,
+        mode: 'design',
+        executionMode: 'design',
+      });
+      expect(configuration.resourcePort).toBe(resource);
+      expect(configuration.hostCatalogPort).toBe(hostCatalog);
+      expect(configuration.datasetPort).toBe(datasets);
+    }
+    expect(vi.mocked(createBaseScreenRenderer).mock.calls[0]![0].root).toBe(content);
+    expect(vi.mocked(createBaseScreenRenderer).mock.calls[1]![0].root).toBe(ghost);
+    expect(state.renderer).not.toBe(state.ghostRenderer);
+  });
+
   it('accepts a complete atomic configuration and exposes its ports', () => {
     const designer = new BaseScreenDesignerElement();
     const result = designer.configure({ catalog: catalog() });

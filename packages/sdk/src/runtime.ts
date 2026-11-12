@@ -1,4 +1,9 @@
-import type { ScreenDiagnostic, ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
+import type {
+  ScreenBlueprintCapabilityId,
+  ScreenDiagnostic,
+  ScreenDocument,
+  ScreenParseResult,
+} from '@base-screen/contracts';
 import {
   type BaseScreenDesignerConfiguration,
   BaseScreenDesignerElement,
@@ -39,6 +44,7 @@ import {
 import { type BaseScreenViewerConfiguration, BaseScreenViewerElement } from '@base-screen/renderer';
 import { BASE_SCREEN_DESIGNER_TAG_NAME } from './designer.js';
 import { type BaseScreenMountHandle } from './mount-handle.js';
+import { createBaseScreenBlueprintCapabilityPlugin } from './plugins.js';
 import {
   collectDiagnostics,
   collectFailureDiagnostics,
@@ -49,6 +55,16 @@ import {
 } from './runtime-diagnostics.js';
 import { createBaseScreenRuntimeMounts } from './runtime-mounts.js';
 import { BASE_SCREEN_VIEWER_TAG_NAME } from './viewer.js';
+
+export {
+  BASE_SCREEN_OFFICIAL_GROUP_MATERIAL_TYPE,
+  BASE_SCREEN_OFFICIAL_TOOL_MATERIAL_TYPES,
+} from './material.js';
+
+export interface BaseScreenSetCatalogOptions {
+  /** 默认同步使用运行时目录的挂载；future-mounts 只替换后续挂载的默认值。 */
+  readonly target?: 'mounted-and-future' | 'future-mounts';
+}
 
 export type BaseScreenRuntimeCatalog = BaseScreenPluginManagerSnapshot['materials'];
 export type BaseScreenRuntimePluginCommandPort = ReturnType<
@@ -74,6 +90,8 @@ export interface CreateBaseScreenRuntimeOptions {
   readonly materials?: CreatePluginRegistrationOptions['materials'];
   readonly plugins?: CreatePluginRegistrationOptions['plugins'];
   readonly grantedCapabilities?: BaseScreenPluginManagerOptions['grantedCapabilities'];
+  /** 显式授权这些内建蓝图能力；省略时不声明也不授权任何蓝图能力。 */
+  readonly blueprintCapabilities?: readonly ScreenBlueprintCapabilityId[];
   readonly activation?: BaseScreenPluginManagerOptions['activation'];
   /** 高级逃逸口：覆盖默认的 Designer 命令端口工厂。 */
   readonly createCommandPort?: BaseScreenPluginManagerOptions['createCommandPort'];
@@ -111,10 +129,13 @@ export interface BaseScreenRuntime {
   readonly runtimeContributions: BaseScreenPluginManagerSnapshot['contributions'];
   readonly pluginCommandPort: BaseScreenRuntimePluginCommandPort;
   readonly disposed: boolean;
-  /** 宿主自行挂载元素时，把当前 Designer 接入默认插件读/写端口。 */
-  bindDesigner(element: BaseScreenDesignerElement | null): void;
-  /** 替换后续挂载使用的 catalog；已挂载实例的 `refreshCatalog` 仍由宿主显式调用。 */
-  setCatalog(catalog: BaseScreenRuntimeCatalog): ScreenParseResult<null>;
+  /** 一个 runtime 对应一个 Designer 会话；绑定不同实例前必须释放当前实例。 */
+  bindDesigner(element: BaseScreenDesignerElement | null): ScreenParseResult<null>;
+  /** 热刷新使用运行时默认目录的挂载；失败保留默认值并回滚已刷新的实例。 */
+  setCatalog(
+    catalog: BaseScreenRuntimeCatalog,
+    options?: BaseScreenSetCatalogOptions,
+  ): ScreenParseResult<null>;
   mountDesigner(
     container: Element,
     options: BaseScreenDesignerMountOptions,
@@ -223,7 +244,18 @@ export async function createBaseScreenRuntime(
     officialMaterials = created.value;
   }
   const materials: RuntimeMaterial[] = [...officialMaterials, ...(options.materials ?? [])];
+  const instanceId = options.instanceId ?? 'base-screen';
   const plugins: RuntimePlugin[] = [...(options.plugins ?? [])];
+  let grantedCapabilities = options.grantedCapabilities ?? {};
+  if (options.blueprintCapabilities !== undefined) {
+    const blueprint = createBaseScreenBlueprintCapabilityPlugin({
+      id: `${instanceId}-blueprint`,
+      capabilities: options.blueprintCapabilities,
+    });
+    if (!blueprint.ok) return blueprint;
+    plugins.push(blueprint.value.plugin);
+    grantedCapabilities = { ...grantedCapabilities, ...blueprint.value.grantedCapabilities };
+  }
   const registration = createPluginRegistration({
     registry,
     materials,
@@ -237,43 +269,46 @@ export async function createBaseScreenRuntime(
   const registered = registration.value.define();
   if (!registered.ok) return registered;
 
-  const instanceId = options.instanceId ?? 'base-screen';
-  const boundDesigners = new Set<BaseScreenDesignerElement>();
-  let preferredDesigner: BaseScreenDesignerElement | undefined;
-  const readDesigner = (): BaseScreenDesignerElement | undefined => {
-    if (preferredDesigner !== undefined && boundDesigners.has(preferredDesigner)) {
-      return preferredDesigner;
-    }
-    const remaining = [...boundDesigners];
-    preferredDesigner = remaining[remaining.length - 1];
-    return preferredDesigner;
-  };
+  let disposed = false;
+  let designer: BaseScreenDesignerElement | undefined;
+  const readDesigner = (): BaseScreenDesignerElement | undefined => designer;
   const unbindDesigner = (element: BaseScreenDesignerElement): void => {
-    if (!boundDesigners.delete(element)) return;
-    if (preferredDesigner === element) {
-      const remaining = [...boundDesigners];
-      preferredDesigner = remaining[remaining.length - 1];
-    }
+    if (designer === element) designer = undefined;
   };
   const clearDesigners = (): void => {
-    boundDesigners.clear();
-    preferredDesigner = undefined;
+    designer = undefined;
   };
-  const bindDesigner = (element: BaseScreenDesignerElement | null): void => {
-    if (disposed) return;
-    if (element === null) {
-      clearDesigners();
-      return;
+  const bindDesigner = (element: BaseScreenDesignerElement | null): ScreenParseResult<null> => {
+    if (disposed) {
+      return runtimeFailure(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        'Base Screen runtime is already disposed.',
+        ['runtime'],
+      );
     }
-    boundDesigners.add(element);
-    preferredDesigner = element;
+    if (mounts.designer !== undefined && mounts.designer !== element) {
+      return runtimeFailure(
+        'PLUGIN_CORE_SESSION_INVALID',
+        'Dispose the mounted Designer handle before changing its binding.',
+        ['designer'],
+      );
+    }
+    if (element !== null && designer !== undefined && designer !== element) {
+      return runtimeFailure(
+        'PLUGIN_CORE_SESSION_INVALID',
+        'A runtime supports one Designer session. Release the current Designer or create a separate runtime.',
+        ['designer'],
+      );
+    }
+    designer = element ?? undefined;
+    return runtimeSuccess(null);
   };
 
   const manager = createBaseScreenPluginManager({
     instanceId,
     standaloneMaterialTagNames: registered.value.standaloneMaterialTagNames,
     plugins: registered.value.plugins,
-    grantedCapabilities: options.grantedCapabilities ?? {},
+    grantedCapabilities,
     registry: {
       get: (tagName) => registry.get(tagName) as ManagerMaterialConstructor,
     },
@@ -326,16 +361,22 @@ export async function createBaseScreenRuntime(
 
   const pluginCommandPort = createBaseScreenPluginContributionCommandPort(manager);
   let currentCatalog = snapshot.materials;
-  let disposed = false;
   let disposePromise: Promise<ScreenParseResult<null>> | undefined;
 
-  const setCatalog = (catalog: BaseScreenRuntimeCatalog): ScreenParseResult<null> => {
+  const setCatalog = (
+    catalog: BaseScreenRuntimeCatalog,
+    updateOptions: BaseScreenSetCatalogOptions = {},
+  ): ScreenParseResult<null> => {
     if (disposed) {
       return runtimeFailure(
         'PLUGIN_CORE_LIFECYCLE_INVALID',
         'Base Screen runtime is already disposed.',
         ['runtime'],
       );
+    }
+    if (updateOptions.target !== 'future-mounts') {
+      const refreshed = mounts.refreshCatalog(currentCatalog, catalog);
+      if (!refreshed.ok) return refreshed;
     }
     currentCatalog = catalog;
     return runtimeSuccess(null);
@@ -357,12 +398,12 @@ export async function createBaseScreenRuntime(
 
   const dispose = (): Promise<ScreenParseResult<null>> => {
     disposed = true;
-    disposePromise ??= (async (): Promise<ScreenParseResult<null>> => {
+    disposePromise ??= Promise.resolve().then(async (): Promise<ScreenParseResult<null>> => {
       const results: ScreenParseResult<unknown>[] = [await mounts.disposeAll()];
       clearDesigners();
       results.push(await manager.dispose());
       return nullResult(collectFailureDiagnostics(results));
-    })();
+    });
     return disposePromise;
   };
 

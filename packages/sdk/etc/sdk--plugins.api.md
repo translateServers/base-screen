@@ -4,6 +4,29 @@
 
 ```ts
 
+import type { BaseScreenPluginManagerOptions } from '@base-screen/plugin-manager';
+import type { BaseScreenPluginRuntime } from '@base-screen/plugin-core';
+import type { ScreenBlueprintCapabilityId } from '@base-screen/contracts';
+import type { ScreenParseResult } from '@base-screen/contracts';
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCapabilityPlugin {
+    // (undocumented)
+    readonly grantedCapabilities: NonNullable<BaseScreenPluginManagerOptions['grantedCapabilities']>;
+    // (undocumented)
+    readonly plugin: BaseScreenPluginRuntime;
+}
+
+// @public
+export function createBaseScreenBlueprintCapabilityPlugin(options: CreateBaseScreenBlueprintCapabilityPluginOptions): ScreenParseResult<BaseScreenBlueprintCapabilityPlugin>;
+
+// @public (undocumented)
+export interface CreateBaseScreenBlueprintCapabilityPluginOptions {
+    readonly capabilities: readonly ScreenBlueprintCapabilityId[];
+    // (undocumented)
+    readonly id: string;
+}
+
 
 export * from "@base-screen/plugin-manager";
 export * from "@base-screen/plugin-sdk";

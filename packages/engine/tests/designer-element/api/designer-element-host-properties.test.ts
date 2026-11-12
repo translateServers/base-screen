@@ -3,7 +3,7 @@ import type {
   ScreenHostDatasetPort,
   ScreenHostResourcePort,
 } from '@base-screen/contracts';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   readConditionalStylePort,
   readDatasetCatalogPort,
@@ -66,6 +66,7 @@ function adapterWith(
 }
 
 describe('designer-element host properties api', () => {
+  afterEach(() => vi.restoreAllMocks());
   it('projects a valid adapter onto every downstream port', () => {
     const designer = createDesigner();
 
@@ -129,6 +130,101 @@ describe('designer-element host properties api', () => {
 
     // 未参与这次写入的 port 不受影响
     expect(state.designerHostAdapter).toBeUndefined();
+  });
+
+  it.each([false, true])(
+    'rejects malformed dataset ports before checking initialization (%s)',
+    (initialized) => {
+      const designer = createDesigner();
+      const state = getDesignerElementState(designer);
+      writeDatasetCatalogPort(designer, datasetPort);
+      if (initialized) state.renderer = {} as never;
+      const diagnostics = vi.spyOn(state.runtime, 'emitDiagnostics').mockImplementation(() => {});
+      const render = vi.spyOn(state.runtime, 'renderInteraction').mockImplementation(() => {});
+
+      for (const invalid of [
+        null,
+        {},
+        { ...datasetPort, query: undefined },
+        { ...datasetPort, groups: true },
+        { ...datasetPort, queryScope: 'component' },
+      ]) {
+        writeDatasetCatalogPort(designer, invalid as never);
+        expect(readDatasetCatalogPort(designer)).toBe(datasetPort);
+        expect(diagnostics).toHaveBeenLastCalledWith(designer, [
+          expect.objectContaining({
+            code: 'PLUGIN_CORE_LIFECYCLE_INVALID',
+            message: 'Dataset port must provide list(), describe() and query().',
+          }),
+        ]);
+      }
+      expect(render).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps initialized dataset ports stable and allows replacement after unload', () => {
+    const designer = createDesigner();
+    const state = getDesignerElementState(designer);
+    writeDatasetCatalogPort(designer, datasetPort);
+    state.renderer = {
+      resetBlueprintVisibility: () => undefined,
+      dispose: () => undefined,
+    } as never;
+    const diagnostics = vi.spyOn(state.runtime, 'emitDiagnostics').mockImplementation(() => {});
+    const render = vi.spyOn(state.runtime, 'renderInteraction').mockImplementation(() => {});
+    const replacement = { ...datasetPort };
+
+    writeDatasetCatalogPort(designer, replacement);
+    writeDatasetCatalogPort(designer, undefined);
+    expect(readDatasetCatalogPort(designer)).toBe(datasetPort);
+    expect(diagnostics).toHaveBeenCalledTimes(2);
+    expect(render).not.toHaveBeenCalled();
+
+    writeDatasetCatalogPort(designer, datasetPort);
+    expect(diagnostics).toHaveBeenCalledTimes(2);
+    expect(render).toHaveBeenCalledOnce();
+
+    designer.unload();
+    writeDatasetCatalogPort(designer, replacement);
+    expect(readDatasetCatalogPort(designer)).toBe(replacement);
+    writeDatasetCatalogPort(designer, undefined);
+    expect(readDatasetCatalogPort(designer)).toBeUndefined();
+  });
+
+  it('rejects adding a dataset port after initialization', () => {
+    const designer = createDesigner();
+    const state = getDesignerElementState(designer);
+    state.renderer = {} as never;
+    const diagnostics = vi.spyOn(state.runtime, 'emitDiagnostics').mockImplementation(() => {});
+
+    writeDatasetCatalogPort(designer, datasetPort);
+    expect(readDatasetCatalogPort(designer)).toBeUndefined();
+    expect(diagnostics).toHaveBeenCalledWith(designer, [
+      expect.objectContaining({
+        code: 'PLUGIN_CORE_LIFECYCLE_INVALID',
+        message: 'Dataset port cannot change after initialization. Call unload first.',
+      }),
+    ]);
+  });
+
+  it('rejects adapter dataset replacement and removal atomically after initialization', () => {
+    const designer = createDesigner();
+    const state = getDesignerElementState(designer);
+    writeDesignerHostAdapter(designer, adapterWith());
+    const original = readDesignerHostAdapter(designer);
+    state.renderer = {} as never;
+    const diagnostics = vi.spyOn(state.runtime, 'emitDiagnostics').mockImplementation(() => {});
+
+    writeDesignerHostAdapter(designer, adapterWith({ datasets: { ...datasetPort } }));
+    writeDesignerHostAdapter(designer, undefined);
+    expect(diagnostics).toHaveBeenCalledTimes(2);
+    expect(readDesignerHostAdapter(designer)).toBe(original);
+    expect(readDatasetCatalogPort(designer)).toBe(datasetPort);
+    expect(readResourcePort(designer)).toBe(resourcePort);
+
+    writeDesignerHostAdapter(designer, adapterWith());
+    expect(diagnostics).toHaveBeenCalledTimes(2);
+    expect(readDatasetCatalogPort(designer)).toBe(datasetPort);
   });
 
   it('clears a single port without touching its siblings', () => {

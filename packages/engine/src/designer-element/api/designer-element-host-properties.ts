@@ -8,7 +8,7 @@ import type {
   ScreenProjectPreviewPort,
   ScreenProjectSnapshotPort,
 } from '@base-screen/contracts';
-import { validateScreenDesignerHostAdapter } from '@base-screen/contracts';
+import { isScreenHostDatasetPort, validateScreenDesignerHostAdapter } from '@base-screen/contracts';
 import type {
   BaseScreenConditionalStylePort,
   BaseScreenHostConditionalStyleAuthoringPort,
@@ -40,6 +40,17 @@ export function writeDesignerHostAdapter(
   const elementState = getDesignerElementState(element);
 
   if (value === undefined) {
+    if (
+      elementState.renderer !== undefined &&
+      (elementState.resourcePort !== undefined ||
+        elementState.hostCatalogPort !== undefined ||
+        elementState.datasetPort !== undefined)
+    ) {
+      elementState.runtime.emitDiagnostics(element, [
+        lifecycleDiagnostic('Host ports cannot change after initialization. Call unload first.'),
+      ]);
+      return;
+    }
     elementState.designerHostAdapter = undefined;
     element.projectCatalogPort = undefined;
     element.projectPreviewPort = undefined;
@@ -57,10 +68,11 @@ export function writeDesignerHostAdapter(
   if (
     elementState.renderer !== undefined &&
     (parsed.value.resources !== elementState.resourcePort ||
-      parsed.value.hostCatalog !== elementState.hostCatalogPort)
+      parsed.value.hostCatalog !== elementState.hostCatalogPort ||
+      parsed.value.datasets !== elementState.datasetPort)
   ) {
     elementState.runtime.emitDiagnostics(element, [
-      lifecycleDiagnostic('Resource port cannot change after initialization. Call unload first.'),
+      lifecycleDiagnostic('Host ports cannot change after initialization. Call unload first.'),
     ]);
     return;
   }
@@ -178,6 +190,18 @@ export function writeDatasetCatalogPort(
 ) {
   const elementState = getDesignerElementState(element);
 
+  if (value !== undefined && !isScreenHostDatasetPort(value)) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic('Dataset port must provide list(), describe() and query().'),
+    ]);
+    return;
+  }
+  if (elementState.renderer !== undefined && value !== elementState.datasetPort) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic('Dataset port cannot change after initialization. Call unload first.'),
+    ]);
+    return;
+  }
   elementState.datasetPort = value;
   elementState.runtime.renderInteraction(element);
 }

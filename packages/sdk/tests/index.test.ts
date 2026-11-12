@@ -1,13 +1,18 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type {
   BaseScreenBlueprintCanvasState,
+  BaseScreenDesignerConfiguration,
   BaseScreenDesignerWorkbenchMode,
+  BaseScreenHostResourceSelectionRequestEventDetail,
+  BaseScreenViewerConfiguration,
 } from '../src/index.js';
 import {
   BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT,
   BASE_SCREEN_DESIGNER_TAG_NAME,
   BASE_SCREEN_HOST_RESOURCE_DRAG_MIME,
+  BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT,
   BASE_SCREEN_VIEWER_TAG_NAME,
+  createBaseScreenBlueprintCapabilityPlugin,
   defineBaseScreenDesigner,
   defineBaseScreenElements,
   defineBaseScreenViewer,
@@ -66,6 +71,46 @@ describe('SDK product element registration', () => {
     ).toBe(true);
     expectTypeOf<BaseScreenDesignerWorkbenchMode>().toEqualTypeOf<'canvas' | 'blueprint'>();
     expectTypeOf<BaseScreenBlueprintCanvasState['active']>().toEqualTypeOf<boolean>();
+  });
+
+  it('exposes the same host configuration and resource-selection types from product entries', () => {
+    expectTypeOf<BaseScreenDesignerConfiguration>().toEqualTypeOf<
+      import('../src/designer.js').BaseScreenDesignerConfiguration
+    >();
+    expectTypeOf<BaseScreenViewerConfiguration>().toEqualTypeOf<
+      import('../src/viewer.js').BaseScreenViewerConfiguration
+    >();
+    expectTypeOf<BaseScreenHostResourceSelectionRequestEventDetail>().toEqualTypeOf<
+      import('../src/designer.js').BaseScreenHostResourceSelectionRequestEventDetail
+    >();
+    expect(BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT).toBe(
+      'base-screen-host-resource-selection-request',
+    );
+  });
+
+  it('builds Blueprint contribution and grant lists from a single explicit capability input', () => {
+    const result = createBaseScreenBlueprintCapabilityPlugin({
+      id: 'host-blueprint',
+      capabilities: ['blueprint.value.variable'],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.plugin.manifest.contributions).toEqual([
+      {
+        kind: 'blueprintCapability',
+        id: 'blueprint.value.variable',
+        name: 'blueprint.value.variable',
+      },
+    ]);
+    expect(result.value.grantedCapabilities).toEqual({
+      'host-blueprint': ['blueprint.value.variable'],
+    });
+    expect(
+      createBaseScreenBlueprintCapabilityPlugin({
+        id: 'duplicate',
+        capabilities: ['blueprint.value.variable', 'blueprint.value.variable'],
+      }).ok,
+    ).toBe(false);
   });
 
   it('defines Viewer and Designer idempotently through the explicit SDK API', () => {

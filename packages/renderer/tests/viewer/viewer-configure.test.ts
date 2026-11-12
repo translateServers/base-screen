@@ -86,6 +86,17 @@ afterEach(() => {
 });
 
 describe('BaseScreenViewerElement configure validation (RB3)', () => {
+  it('requires configuration and validates catalog before a document-free refresh', async () => {
+    const viewer = await createViewer();
+    expect(viewer.refreshCatalog(catalog()).ok).toBe(false);
+    const previous = catalog();
+    expect(viewer.configure({ catalog: previous }).ok).toBe(true);
+    expect(viewer.refreshCatalog({} as BaseScreenMaterialCatalog).ok).toBe(false);
+    expect(viewer.catalog).toBe(previous);
+    const next = catalog();
+    expect(viewer.refreshCatalog(next).ok).toBe(true);
+    expect(viewer.catalog).toBe(next);
+  });
   it('rejects an invalid catalog before committing any state (zero side effects)', async () => {
     const viewer = await createViewer();
     viewer.resourcePort = resourcePort();

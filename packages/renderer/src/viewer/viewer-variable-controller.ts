@@ -55,6 +55,10 @@ export class ViewerVariableController {
     this.#host = host;
   }
 
+  get hasDeferredDocument(): boolean {
+    return this.#deferred !== undefined;
+  }
+
   refreshData(componentIdOrOptions?: string | BaseScreenViewerRefreshOptions): void {
     const options =
       typeof componentIdOrOptions === 'string'

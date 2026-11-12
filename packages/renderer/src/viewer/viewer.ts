@@ -33,6 +33,7 @@ import {
   type BaseScreenViewerRefreshOptions,
   parseBaseScreenViewerConfiguration,
 } from './viewer-configuration.js';
+import { isBaseScreenMaterialCatalog } from './viewer-configuration-guards.js';
 import { ViewerDataSourceScheduler } from './viewer-data-source-scheduler.js';
 import { lifecycleFailure } from './viewer-lifecycle.js';
 import { ViewerVariableController } from './viewer-variable-controller.js';
@@ -142,6 +143,65 @@ export class BaseScreenViewerElement extends ElementBase {
       return;
     }
     this.#catalog = value;
+  }
+
+  /** 热刷新物料目录，保留文档、变量与当前实例；失败恢复此前目录。 */
+  refreshCatalog(catalog: BaseScreenMaterialCatalog): ScreenParseResult<null> {
+    const previous = this.#catalog;
+    if (previous === undefined || !isBaseScreenMaterialCatalog(catalog)) {
+      return lifecycleFailure(
+        'Viewer must have a configured catalog before refreshing a valid catalog.',
+      );
+    }
+    if (previous === catalog) return { ok: true, value: null, diagnostics: [] };
+    const renderer = this.#renderer;
+    const document = this.#document;
+    if (renderer === undefined) {
+      if (document !== undefined)
+        return lifecycleFailure(
+          'Catalog refresh requires an initialized renderer while a document is loaded.',
+        );
+      this.#catalog = catalog;
+      return { ok: true, value: null, diagnostics: [] };
+    }
+    if (document !== undefined) {
+      const validated = renderer.validateCatalog(document, catalog);
+      if (!validated.ok) return validated;
+    }
+    // 沿用变量运行时已排队的渲染，避免派生值落定前用旧变量启动组件请求。
+    const deferred = this.#variableRuntime.hasDeferredDocument;
+    try {
+      const updated = renderer.setCatalog(catalog);
+      if (!updated.ok) return updated;
+      const rendered =
+        document === undefined || deferred
+          ? { ok: true as const, value: null, diagnostics: [] }
+          : renderer.render(document);
+      if (rendered.ok && !rendered.diagnostics.some((item) => item.severity === 'error')) {
+        this.#catalog = catalog;
+        return rendered;
+      }
+      const restored = renderer.setCatalog(previous);
+      const rerendered =
+        restored.ok && document !== undefined && !deferred ? renderer.render(document) : restored;
+      return { ok: false, diagnostics: [...rendered.diagnostics, ...rerendered.diagnostics] };
+    } catch {
+      const failed = lifecycleFailure('Viewer catalog refresh failed.');
+      try {
+        const restored = renderer.setCatalog(previous);
+        const rendered =
+          restored.ok && document !== undefined && !deferred ? renderer.render(document) : restored;
+        return { ok: false, diagnostics: [...failed.diagnostics, ...rendered.diagnostics] };
+      } catch {
+        return {
+          ok: false,
+          diagnostics: [
+            ...failed.diagnostics,
+            ...lifecycleFailure('Viewer catalog rollback failed.').diagnostics,
+          ],
+        };
+      }
+    }
   }
 
   get datasetPort(): ScreenHostDatasetPort | undefined {

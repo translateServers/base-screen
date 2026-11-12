@@ -262,6 +262,7 @@ export function initializeDesignerElementControllers(
     getDocument: () => state.session.document,
     getResourcePort: () => state.resourcePort,
     getHostCatalogPort: () => state.hostCatalogPort,
+    getDatasetPort: () => state.datasetPort,
     getConditionalStylePort: () => state.conditionalStylePort,
     getRuntimeContributions: () => state.runtimeContributions,
     isViewerRegistered: () =>

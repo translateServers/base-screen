@@ -2,6 +2,10 @@ import type { ScreenParseResult } from '@base-screen/contracts';
 import { BaseScreenDesignerElement } from '@base-screen/engine';
 import { BaseScreenViewerElement } from '@base-screen/renderer';
 import {
+  BASE_SCREEN_OFFICIAL_GROUP_MATERIAL_TYPE,
+  BASE_SCREEN_OFFICIAL_TOOL_MATERIAL_TYPES,
+} from './material.js';
+import {
   type BaseScreenMountElement,
   type BaseScreenMountHandle,
   createBaseScreenMountHandle,
@@ -20,6 +24,24 @@ import {
   runtimeSuccess,
 } from './runtime-diagnostics.js';
 
+interface MountCatalogOwnership {
+  inherited: boolean;
+  catalog: BaseScreenRuntimeCatalog;
+}
+const mountCatalogOwnership = new WeakMap<object, MountCatalogOwnership>();
+
+/** 仅供 SDK 控制器同步目录归属，不属于发布入口。 */
+export function setBaseScreenMountCatalogOwnership(
+  handle: object,
+  catalog: BaseScreenRuntimeCatalog | undefined,
+  appliedCatalog: BaseScreenRuntimeCatalog,
+): void {
+  const ownership = mountCatalogOwnership.get(handle);
+  if (ownership === undefined) return;
+  ownership.inherited = catalog === undefined;
+  ownership.catalog = appliedCatalog;
+}
+
 interface DisposableMountHandle {
   readonly disposed: boolean;
   dispose(): Promise<ScreenParseResult<null>>;
@@ -33,7 +55,7 @@ interface MountContext<TElement extends BaseScreenMountElement> {
   readonly initialize: (
     handle: BaseScreenMountHandle<TElement>,
   ) => Promise<ScreenParseResult<null>>;
-  readonly register: (handle: DisposableMountHandle) => void;
+  readonly register: (handle: BaseScreenMountHandle<TElement>) => void;
   readonly unregister: (handle: DisposableMountHandle) => void;
   readonly onDetach: () => void;
   readonly isDisposed: () => boolean;
@@ -147,7 +169,7 @@ export interface BaseScreenRuntimeMountContext {
   readonly inspectorControls: BaseScreenRuntime['inspectorControls'];
   readonly runtimeContributions: BaseScreenRuntime['runtimeContributions'];
   readonly pluginCommandPort: BaseScreenRuntime['pluginCommandPort'];
-  readonly bindDesigner: (element: BaseScreenDesignerElement) => void;
+  readonly bindDesigner: (element: BaseScreenDesignerElement) => ScreenParseResult<null>;
   readonly releaseDesigner: (element: BaseScreenDesignerElement) => void;
   readonly isDisposed: () => boolean;
 }
@@ -155,6 +177,11 @@ export interface BaseScreenRuntimeMountContext {
 export interface BaseScreenRuntimeMounts {
   readonly mountDesigner: BaseScreenRuntime['mountDesigner'];
   readonly mountViewer: BaseScreenRuntime['mountViewer'];
+  readonly designer: BaseScreenDesignerElement | undefined;
+  refreshCatalog(
+    previous: BaseScreenRuntimeCatalog,
+    next: BaseScreenRuntimeCatalog,
+  ): ScreenParseResult<null>;
   disposeAll(): Promise<ScreenParseResult<null>>;
 }
 
@@ -162,7 +189,33 @@ export function createBaseScreenRuntimeMounts(
   context: BaseScreenRuntimeMountContext,
 ): BaseScreenRuntimeMounts {
   const handles = new Set<DisposableMountHandle>();
+  const elements = new Map<
+    DisposableMountHandle,
+    BaseScreenDesignerElement | BaseScreenViewerElement
+  >();
+  let designerHandle: BaseScreenMountHandle<BaseScreenDesignerElement> | undefined;
   let viewerSequence = 0;
+
+  const refreshElement = (
+    element: BaseScreenDesignerElement | BaseScreenViewerElement,
+    catalog: BaseScreenRuntimeCatalog,
+  ): ScreenParseResult<unknown> => {
+    try {
+      return element.refreshCatalog(catalog);
+    } catch {
+      return runtimeFailure(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        'Base Screen catalog refresh threw an error.',
+        ['catalog'],
+      );
+    }
+  };
+  const unregister = (handle: DisposableMountHandle): void => {
+    handles.delete(handle);
+    elements.delete(handle);
+    mountCatalogOwnership.delete(handle);
+    if (designerHandle === handle) designerHandle = undefined;
+  };
 
   const mountDesigner = async (
     container: Element,
@@ -207,7 +260,16 @@ export function createBaseScreenRuntimeMounts(
     const elementResult = createDesignerElement(providedElement);
     if (!elementResult.ok) return elementResult;
     const element = elementResult.value;
-    context.bindDesigner(element);
+    if (designerHandle !== undefined) {
+      return runtimeFailure(
+        'PLUGIN_CORE_SESSION_INVALID',
+        'Designer is already mounted by this runtime.',
+        ['designer'],
+      );
+    }
+    const bound = context.bindDesigner(element);
+    if (!bound.ok) return bound;
+    const activeCatalog = catalog ?? context.readCatalog();
 
     return mountWithHandle({
       element,
@@ -215,7 +277,15 @@ export function createBaseScreenRuntimeMounts(
       children,
       configure: () =>
         element.configure({
-          catalog: catalog ?? context.readCatalog(),
+          catalog: activeCatalog,
+          toolMaterialTypes: Object.fromEntries(
+            Object.entries(BASE_SCREEN_OFFICIAL_TOOL_MATERIAL_TYPES).filter(([, type]) =>
+              activeCatalog.has(type),
+            ),
+          ),
+          ...(activeCatalog.has(BASE_SCREEN_OFFICIAL_GROUP_MATERIAL_TYPE)
+            ? { groupMaterialType: BASE_SCREEN_OFFICIAL_GROUP_MATERIAL_TYPE }
+            : {}),
           runtimeContributions: context.runtimeContributions,
           pluginCatalog: context.pluginCatalog,
           pluginPanels: context.pluginPanels,
@@ -251,8 +321,16 @@ export function createBaseScreenRuntimeMounts(
         }
         return runtimeSuccess(null);
       },
-      register: (handle) => handles.add(handle),
-      unregister: (handle) => handles.delete(handle),
+      register: (handle) => {
+        handles.add(handle);
+        elements.set(handle, element);
+        designerHandle = handle;
+        mountCatalogOwnership.set(handle, {
+          inherited: catalog === undefined,
+          catalog: catalog ?? context.readCatalog(),
+        });
+      },
+      unregister,
       onDetach: () => context.releaseDesigner(element),
       isDisposed: context.isDisposed,
     });
@@ -305,8 +383,15 @@ export function createBaseScreenRuntimeMounts(
         }
         return runtimeSuccess(null);
       },
-      register: (handle) => handles.add(handle),
-      unregister: (handle) => handles.delete(handle),
+      register: (handle) => {
+        handles.add(handle);
+        elements.set(handle, element);
+        mountCatalogOwnership.set(handle, {
+          inherited: catalog === undefined,
+          catalog: catalog ?? context.readCatalog(),
+        });
+      },
+      unregister,
       onDetach: () => undefined,
       isDisposed: context.isDisposed,
     });
@@ -315,6 +400,42 @@ export function createBaseScreenRuntimeMounts(
   return {
     mountDesigner,
     mountViewer,
+    get designer(): BaseScreenDesignerElement | undefined {
+      return designerHandle?.element;
+    },
+    refreshCatalog(_previous, next): ScreenParseResult<null> {
+      const refreshed: {
+        handle: DisposableMountHandle;
+        element: BaseScreenDesignerElement | BaseScreenViewerElement;
+        previous: BaseScreenRuntimeCatalog;
+      }[] = [];
+      for (const [handle, element] of elements) {
+        const ownership = mountCatalogOwnership.get(handle);
+        const previous = element.catalog;
+        if (
+          handle.disposed ||
+          ownership?.inherited !== true ||
+          previous === undefined ||
+          previous !== ownership.catalog ||
+          previous === next
+        )
+          continue;
+        const result = refreshElement(element, next);
+        if (!result.ok) {
+          const failures: ScreenParseResult<unknown>[] = [result];
+          for (const applied of refreshed.reverse()) {
+            const rollback = refreshElement(applied.element, applied.previous);
+            failures.push(rollback);
+            const ownership = mountCatalogOwnership.get(applied.handle);
+            if (rollback.ok && ownership !== undefined) ownership.catalog = applied.previous;
+          }
+          return { ok: false, diagnostics: collectFailureDiagnostics(failures) };
+        }
+        ownership.catalog = next;
+        refreshed.push({ handle, element, previous });
+      }
+      return runtimeSuccess(null);
+    },
     async disposeAll(): Promise<ScreenParseResult<null>> {
       const results: ScreenParseResult<unknown>[] = [];
       for (const handle of [...handles]) results.push(await handle.dispose());

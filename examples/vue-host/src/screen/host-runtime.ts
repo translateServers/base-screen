@@ -14,7 +14,6 @@ import type {
   BaseScreenPluginCatalog,
   BaseScreenPluginInspectorControlCatalog,
   BaseScreenPluginPanelCatalog,
-  BaseScreenPluginRuntime,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
 } from '@base-screen/sdk/plugin-core';
@@ -24,6 +23,7 @@ import {
 } from '@base-screen/sdk/plugin-core';
 import {
   type BaseScreenPluginManager,
+  createBaseScreenBlueprintCapabilityPlugin,
   createBaseScreenPluginContributionCommandPort,
   createBaseScreenPluginManager,
 } from '@base-screen/sdk/plugins';
@@ -44,25 +44,6 @@ const INSTANCE_ID = 'vue-host';
  * 标成不可用、编译也会按能力缺失失败关闭。能力词汇只从 contracts 取，宿主不另抄一份。
  */
 const HOST_AUTHORING_PLUGIN_ID = `${INSTANCE_ID}-authoring`;
-const HOST_AUTHORING_CAPABILITIES = [...SCREEN_BLUEPRINT_CAPABILITY_IDS];
-
-function createHostAuthoringRuntime(): BaseScreenPluginRuntime {
-  return {
-    manifest: {
-      id: HOST_AUTHORING_PLUGIN_ID,
-      dependencies: [],
-      capabilities: HOST_AUTHORING_CAPABILITIES,
-      contributions: HOST_AUTHORING_CAPABILITIES.map((id) => ({
-        kind: 'blueprintCapability' as const,
-        id,
-        name: id,
-      })),
-    },
-    activate() {},
-    deactivate() {},
-    dispose() {},
-  };
-}
 
 export interface HostRuntime extends OnlineMaterialRuntime {
   readonly instanceId: string;
@@ -99,6 +80,13 @@ export function loadHostRuntime(): Promise<HostRuntime> {
 }
 
 async function createHostRuntime(): Promise<HostRuntime> {
+  const authoring = createBaseScreenBlueprintCapabilityPlugin({
+    id: HOST_AUTHORING_PLUGIN_ID,
+    capabilities: SCREEN_BLUEPRINT_CAPABILITY_IDS,
+  });
+  if (!authoring.ok) {
+    throw new Error(`HOST_AUTHORING_PLUGIN_INVALID:${authoring.diagnostics[0]?.code}`);
+  }
   const baseEntries = registerHostMaterials();
   let designer: BaseScreenDesignerElement | undefined;
 
@@ -107,13 +95,13 @@ async function createHostRuntime(): Promise<HostRuntime> {
     // 官方物料由宿主自己的 catalog 承载；manager 只负责插件贡献的物料。
     standaloneMaterialTagNames: [],
     plugins: [
-      createHostAuthoringRuntime(),
+      authoring.value.plugin,
       createPluginBoardRuntime(),
       createPluginEchartsRuntime(),
       createHostResourceRuntime(),
     ],
     grantedCapabilities: {
-      [HOST_AUTHORING_PLUGIN_ID]: HOST_AUTHORING_CAPABILITIES,
+      ...authoring.value.grantedCapabilities,
       [PLUGIN_BOARD_ID]: ['command.execute', 'design.read'],
       [PLUGIN_ECHARTS_ID]: ['command.execute', 'design.read'],
     },

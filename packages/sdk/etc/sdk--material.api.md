@@ -4,6 +4,17 @@
 
 ```ts
 
+// @public (undocumented)
+export const BASE_SCREEN_OFFICIAL_GROUP_MATERIAL_TYPE: string;
+
+// @public
+export const BASE_SCREEN_OFFICIAL_TOOL_MATERIAL_TYPES: Readonly<{
+    text: string;
+    rectangle: string;
+    ellipse: string;
+    image: string;
+}>;
+
 
 export * from "@base-screen/material";
 

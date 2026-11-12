@@ -4,11 +4,14 @@
 
 ```ts
 
+import { BaseScreenViewerConfiguration } from '@base-screen/renderer';
 import { BaseScreenViewerElement } from '@base-screen/renderer';
 import type { ScreenParseResult } from '@base-screen/contracts';
 
 // @public (undocumented)
 export const BASE_SCREEN_VIEWER_TAG_NAME: 'base-screen-viewer';
+
+export { BaseScreenViewerConfiguration }
 
 export { BaseScreenViewerElement }
 

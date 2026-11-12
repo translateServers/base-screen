@@ -1,6 +1,7 @@
 import type {
   ScreenDocument,
   ScreenHostCatalogPort,
+  ScreenHostDatasetPort,
   ScreenHostResourcePort,
   ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
@@ -18,6 +19,7 @@ export interface DesignerPreviewCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;
   readonly getHostCatalogPort: () => ScreenHostCatalogPort | undefined;
+  readonly getDatasetPort: () => ScreenHostDatasetPort | undefined;
   readonly getConditionalStylePort: () => BaseScreenConditionalStylePort | undefined;
   readonly getRuntimeContributions: () => BaseScreenRuntimeContributionIndex | undefined;
   readonly isViewerRegistered: () => boolean;
@@ -101,12 +103,14 @@ export class DesignerPreviewController {
     if (catalog === undefined) return;
     const resourcePort = this.callbacks.getResourcePort();
     const hostCatalogPort = this.callbacks.getHostCatalogPort();
+    const datasetPort = this.callbacks.getDatasetPort();
     const conditionalStylePort = this.callbacks.getConditionalStylePort();
     const runtimeContributions = this.callbacks.getRuntimeContributions();
     const configuration: BaseScreenViewerConfiguration = {
       catalog,
       ...(resourcePort === undefined ? {} : { resourcePort }),
       ...(hostCatalogPort === undefined ? {} : { hostCatalogPort }),
+      ...(datasetPort === undefined ? {} : { datasetPort }),
       ...(conditionalStylePort === undefined ? {} : { conditionalStylePort }),
       ...(runtimeContributions === undefined ? {} : { runtimeContributions }),
     };
@@ -115,6 +119,7 @@ export class DesignerPreviewController {
       this.#lastConfiguration.catalog !== configuration.catalog ||
       this.#lastConfiguration.resourcePort !== configuration.resourcePort ||
       this.#lastConfiguration.hostCatalogPort !== configuration.hostCatalogPort ||
+      this.#lastConfiguration.datasetPort !== configuration.datasetPort ||
       this.#lastConfiguration.conditionalStylePort !== configuration.conditionalStylePort ||
       this.#lastConfiguration.runtimeContributions !== configuration.runtimeContributions;
     if (configChanged) {

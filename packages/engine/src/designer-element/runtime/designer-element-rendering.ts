@@ -399,6 +399,9 @@ export function createRenderer(element: DesignerElementHost): void {
     // base-screen-material-event 同形同语义。
     onMaterialEvent: (event) => elementState.runtime.forwardNativeMaterialEvent(element, event),
     resourcePort: elementState.resourcePort,
+    ...(elementState.hostCatalogPort === undefined
+      ? {}
+      : { hostCatalogPort: elementState.hostCatalogPort }),
     ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
     ...(elementState.conditionalStylePort === undefined
       ? {}
@@ -431,6 +434,9 @@ function createGhostRenderer(elementState: DesignerElementState): void {
     interactive: false,
     onMaterialEvent: () => {},
     resourcePort: elementState.resourcePort,
+    ...(elementState.hostCatalogPort === undefined
+      ? {}
+      : { hostCatalogPort: elementState.hostCatalogPort }),
     ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
     ...(elementState.conditionalStylePort === undefined
       ? {}

@@ -7,15 +7,19 @@
 import { BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME } from '@base-screen/engine';
+import { BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT } from '@base-screen/engine';
+import { BASE_SCREEN_CHANGE_STATE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT } from '@base-screen/engine';
+import { BASE_SCREEN_GUARD_CHANGE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_HOST_RESOURCE_DRAG_MIME } from '@base-screen/engine';
 import { BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT } from '@base-screen/engine';
+import { BASE_SCREEN_METRIC_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_SCENE_CHANGE_EVENT } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasCommandEventDetail } from '@base-screen/engine';
@@ -30,7 +34,13 @@ import { BaseScreenBlueprintCanvasSelection } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasState } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasStateEventDetail } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasTrace } from '@base-screen/engine';
+import { BaseScreenCanvasPresentationChangeEventDetail } from '@base-screen/engine';
+import { BaseScreenCanvasScaleMode } from '@base-screen/engine';
 import { BaseScreenDesignerBackRequestEventDetail } from '@base-screen/engine';
+import { BaseScreenDesignerChangeProposalSummary } from '@base-screen/engine';
+import { BaseScreenDesignerChangeStateDetail } from '@base-screen/engine';
+import { BaseScreenDesignerChangeUnitSummary } from '@base-screen/engine';
+import { BaseScreenDesignerConfiguration } from '@base-screen/engine';
 import { BaseScreenDesignerElement } from '@base-screen/engine';
 import { BaseScreenDesignerLeftPanelGroup } from '@base-screen/engine';
 import { BaseScreenDesignerLeftPanelGroupChangeEventDetail } from '@base-screen/engine';
@@ -49,6 +59,7 @@ import { BaseScreenHostResourceSelectionCurrent } from '@base-screen/engine';
 import { BaseScreenHostResourceSelectionRequest } from '@base-screen/engine';
 import { BaseScreenHostResourceSelectionRequestEventDetail } from '@base-screen/engine';
 import { BaseScreenHostResourceSelectionTarget } from '@base-screen/engine';
+import { BaseScreenMaterialCatalogRefreshResult } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryAction } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryActionEventDetail } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryGroup } from '@base-screen/engine';
@@ -56,11 +67,13 @@ import { BaseScreenMaterialLibraryGrouping } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryItem } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryState } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryStatus } from '@base-screen/engine';
+import { BaseScreenMetricEventDetail } from '@base-screen/engine';
 import { BaseScreenSceneChangeDetail } from '@base-screen/engine';
 import { createBaseScreenCorePluginCommandPort } from '@base-screen/engine';
 import { CreateBaseScreenCorePluginCommandPortOptions } from '@base-screen/engine';
 import { createBaseScreenCorePluginDesignReadPort } from '@base-screen/engine';
 import { CreateBaseScreenCorePluginDesignReadPortOptions } from '@base-screen/engine';
+import { DesignerGuardSnapshot } from '@base-screen/engine';
 import { DesignerSceneDescriptor } from '@base-screen/engine';
 import { DesignerSceneHandler } from '@base-screen/engine';
 import { DesignerScenePlan } from '@base-screen/engine';
@@ -83,6 +96,10 @@ export { BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT }
 
 export { BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME }
 
+export { BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT }
+
+export { BASE_SCREEN_CHANGE_STATE_EVENT }
+
 export { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT }
 
 export { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT }
@@ -98,11 +115,15 @@ export const BASE_SCREEN_DESIGNER_TAG_NAME: 'base-screen-designer';
 
 export { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT }
 
+export { BASE_SCREEN_GUARD_CHANGE_EVENT }
+
 export { BASE_SCREEN_HOST_RESOURCE_DRAG_MIME }
 
 export { BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT }
 
 export { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT }
+
+export { BASE_SCREEN_METRIC_EVENT }
 
 export { BASE_SCREEN_SCENE_CHANGE_EVENT }
 
@@ -132,7 +153,19 @@ export { BaseScreenBlueprintCanvasStateEventDetail }
 
 export { BaseScreenBlueprintCanvasTrace }
 
+export { BaseScreenCanvasPresentationChangeEventDetail }
+
+export { BaseScreenCanvasScaleMode }
+
 export { BaseScreenDesignerBackRequestEventDetail }
+
+export { BaseScreenDesignerChangeProposalSummary }
+
+export { BaseScreenDesignerChangeStateDetail }
+
+export { BaseScreenDesignerChangeUnitSummary }
+
+export { BaseScreenDesignerConfiguration }
 
 export { BaseScreenDesignerElement }
 
@@ -170,6 +203,8 @@ export { BaseScreenHostResourceSelectionRequestEventDetail }
 
 export { BaseScreenHostResourceSelectionTarget }
 
+export { BaseScreenMaterialCatalogRefreshResult }
+
 export { BaseScreenMaterialLibraryAction }
 
 export { BaseScreenMaterialLibraryActionEventDetail }
@@ -184,6 +219,8 @@ export { BaseScreenMaterialLibraryState }
 
 export { BaseScreenMaterialLibraryStatus }
 
+export { BaseScreenMetricEventDetail }
+
 export { BaseScreenSceneChangeDetail }
 
 export { createBaseScreenCorePluginCommandPort }
@@ -196,6 +233,8 @@ export { CreateBaseScreenCorePluginDesignReadPortOptions }
 
 // @public (undocumented)
 export function defineBaseScreenDesigner(): ScreenParseResult<CustomElementConstructor>;
+
+export { DesignerGuardSnapshot }
 
 export { DesignerSceneDescriptor }
 
