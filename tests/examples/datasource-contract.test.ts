@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { createHostDatasetPort as createReactDatasetPort } from '../../examples/react-host/src/screen/host-dataset-port';
 import { DATASET_DEFINITIONS } from '../../examples/shared-backend/src/datasets/dataset-definitions';
 import { parametersToDefinitions } from '../../examples/shared-backend/src/datasources/datasource.types';
+import { createHostDatasetPort as createVanillaDatasetPort } from '../../examples/vanilla-host/src/screen/host-dataset-port';
+import { createHostDatasetPort as createVueDatasetPort } from '../../examples/vue-host/src/screen/host-dataset-port';
 import {
   parseScreenDatasetDefinition,
   parseScreenDatasetEntries,
@@ -94,6 +97,43 @@ describe('A37 · 数据集定义（Definition）', () => {
       parameters: [],
     });
     expect(parsed.ok).toBe(false);
+  });
+});
+
+describe('三端数据集参数映射', () => {
+  it.each([
+    ['vanilla', createVanillaDatasetPort],
+    ['react', createReactDatasetPort],
+    ['vue', createVueDatasetPort],
+  ] as const)('%s 保留 true/false 参数并过滤非标量值', async (_host, createPort) => {
+    const sent: unknown[] = [];
+    const port = createPort({
+      api: {
+        listDatasets: async () => ({ ok: true, data: { groups: [], items: [] } }),
+        describeDataset: async () => ({ ok: true, data: null }),
+        queryDataset: async (_datasetId, params) => {
+          sent.push(params);
+          return {
+            ok: true,
+            data: {
+              fields: [{ id: 'ok', label: '在线', valueType: 'boolean' }],
+              rows: [{ ok: true }],
+            },
+          };
+        },
+      },
+      logger: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+    });
+    const result = await port.query(
+      {
+        datasetId: 'custom.flags',
+        dataSourceId: 'flags',
+        params: { enabled: true, archived: false, count: 0, region: '华东', nested: {}, rows: [] },
+      },
+      { signal: new AbortController().signal },
+    );
+    expect(result.ok).toBe(true);
+    expect(sent).toEqual([{ enabled: 'true', archived: 'false', count: 0, region: '华东' }]);
   });
 });
 

@@ -27,6 +27,7 @@ describe('createHostKitHttp', () => {
     });
     const result = await http.request<{ hello: number }>('/screens');
     expect(result).toEqual({ ok: true, data: { hello: 1 } });
+    if (result.ok) expect(result.data.hello).toBe(1);
   });
 
   it('maps the unified error body to code/message/status', async () => {
@@ -82,6 +83,12 @@ describe('createHostKitHttp', () => {
 });
 
 describe('toHostKitSearch', () => {
+  it('preserves false, true and zero scalar values', () => {
+    expect(toHostKitSearch({ enabled: false, visible: true, count: 0 })).toBe(
+      '?enabled=false&visible=true&count=0',
+    );
+  });
+
   it('drops undefined and empty values', () => {
     expect(toHostKitSearch({ a: '1', b: undefined, c: '', d: 2 })).toBe('?a=1&d=2');
     expect(toHostKitSearch({ a: undefined })).toBe('');

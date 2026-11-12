@@ -1,3 +1,4 @@
+import { parseScreenDocument } from '@base-screen/contracts';
 import { describe, expect, it } from 'vitest';
 import { createHttpProjectAdapter } from '../src/index.js';
 
@@ -118,6 +119,215 @@ describe('createHttpProjectAdapter', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.revision).toBe('4');
   });
+
+  it('reuses custom backend requests and envelopes without coercing opaque revisions', async () => {
+    const envelope = {
+      projectId: 'p/1',
+      revision: 'etag:abc/+',
+      name: '已有项目',
+      description: '说明',
+      document: DOCUMENT,
+      metadata: { owner: 'host' },
+    };
+    const { fetch, calls } = routingFetch(() => ({
+      ok: true,
+      status: 200,
+      body: { result: envelope },
+    }));
+    const unwrap = (payload: unknown) => {
+      if (payload === null || typeof payload !== 'object' || !('result' in payload)) {
+        throw new Error('响应格式无效');
+      }
+      return payload.result;
+    };
+    const adapter = createHttpProjectAdapter({
+      baseUrl: 'http://x/existing',
+      fetch,
+      mapping: {
+        load: {
+          request: ({ projectId }) => ({
+            path: '/lookup',
+            method: 'POST',
+            body: { key: projectId },
+          }),
+          response: unwrap,
+        },
+        save: {
+          request: ({ projectId, revision, document }) => ({
+            path: `/project/${encodeURIComponent(projectId)}`,
+            method: 'PATCH',
+            body: { etag: revision, content: document },
+          }),
+          response: unwrap,
+        },
+      },
+    });
+    const loaded = await adapter.load({ projectId: 'p/1', signal: new AbortController().signal });
+    expect(loaded).toMatchObject({ ok: true, value: envelope });
+    const document = parseScreenDocument(DOCUMENT);
+    if (!document.ok) throw new Error('测试文档无效');
+    expect(
+      await adapter.save({
+        projectId: 'p/1',
+        revision: 'etag:abc/+',
+        document: document.value,
+        signal: new AbortController().signal,
+      }),
+    ).toMatchObject({ ok: true, value: envelope });
+    expect(calls).toEqual([
+      { url: 'http://x/existing/lookup', method: 'POST', body: { key: 'p/1' } },
+      {
+        url: 'http://x/existing/project/p%2F1',
+        method: 'PATCH',
+        body: { etag: 'etag:abc/+', content: document.value },
+      },
+    ]);
+  });
+
+  it('validates default and mapped save envelopes instead of trusting HTTP JSON', async () => {
+    const document = parseScreenDocument(DOCUMENT);
+    if (!document.ok) throw new Error('测试文档无效');
+    for (const body of [
+      null,
+      {},
+      { screen: { ...SCREEN, revision: {} } },
+      { screen: { ...SCREEN, document: null } },
+    ]) {
+      const { fetch } = routingFetch(() => ({ ok: true, status: 200, body }));
+      const adapter = createHttpProjectAdapter({ baseUrl: 'http://x/api', fetch });
+      expect(
+        (await adapter.load({ projectId: 'p1', signal: new AbortController().signal })).ok,
+      ).toBe(false);
+      expect(
+        (
+          await adapter.save({
+            projectId: 'p1',
+            revision: '3',
+            document: document.value,
+            signal: new AbortController().signal,
+          })
+        ).ok,
+      ).toBe(false);
+    }
+    const { fetch } = routingFetch(() => ({ ok: true, status: 200, body: {} }));
+    const adapter = createHttpProjectAdapter({
+      baseUrl: 'http://x/api',
+      fetch,
+      mapping: {
+        load: {
+          response: () => {
+            throw new Error('无效 envelope');
+          },
+        },
+        save: { response: () => ({ projectId: 'p1', revision: 3, document: DOCUMENT }) },
+      },
+    });
+    expect((await adapter.load({ projectId: 'p1', signal: new AbortController().signal })).ok).toBe(
+      false,
+    );
+    expect(
+      (
+        await adapter.save({
+          projectId: 'p1',
+          revision: '3',
+          document: document.value,
+          signal: new AbortController().signal,
+        })
+      ).ok,
+    ).toBe(false);
+  });
+
+  it('bridges cancellation for custom project requests', async () => {
+    const controller = new AbortController();
+    const adapter = createHttpProjectAdapter({
+      baseUrl: 'http://x/api',
+      fetch: async (_input, init) => {
+        expect(init?.signal?.aborted).toBe(false);
+        controller.abort();
+        expect(init?.signal?.aborted).toBe(true);
+        throw new DOMException('aborted', 'AbortError');
+      },
+      mapping: { load: { request: () => ({ path: '/custom', method: 'POST' }) } },
+    });
+    expect(await adapter.load({ projectId: 'p1', signal: controller.signal })).toEqual({
+      ok: false,
+      diagnostics: [],
+    });
+  });
+
+  it.each(['load', 'save'] as const)(
+    '%s returns diagnostics for a throwing request mapper',
+    async (operation) => {
+      const { fetch, calls } = routingFetch(() => ({
+        ok: true,
+        status: 200,
+        body: { screen: SCREEN },
+      }));
+      const project = parseScreenDocument(DOCUMENT);
+      if (!project.ok) throw new Error('测试文档无效');
+      const adapter = createHttpProjectAdapter({
+        baseUrl: 'http://x/api',
+        fetch,
+        mapping: {
+          [operation]: {
+            request: () => {
+              throw new Error('请求投影失败');
+            },
+          },
+        },
+      });
+      const request = {
+        projectId: 'p1',
+        revision: '3',
+        document: project.value,
+        signal: new AbortController().signal,
+      };
+      expect(await adapter[operation](request)).toMatchObject({
+        ok: false,
+        diagnostics: [{ code: 'PROJECT_UNAVAILABLE' }],
+      });
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  it.each(['load', 'save'] as const)(
+    '%s treats cancellation during request or response projection as empty diagnostics',
+    async (operation) => {
+      const project = parseScreenDocument(DOCUMENT);
+      if (!project.ok) throw new Error('测试文档无效');
+      for (const stage of ['request', 'response'] as const) {
+        for (const throws of [false, true]) {
+          const controller = new AbortController();
+          const { fetch, calls } = routingFetch(() => ({
+            ok: true,
+            status: 200,
+            body: { screen: SCREEN },
+          }));
+          const adapter = createHttpProjectAdapter({
+            baseUrl: 'http://x/api',
+            fetch,
+            mapping: {
+              [operation]: {
+                [stage]: () => {
+                  controller.abort();
+                  if (throws) throw new Error('取消中的投影');
+                  return stage === 'request' ? { path: '/custom' } : null;
+                },
+              },
+            },
+          });
+          const request = {
+            projectId: 'p1',
+            revision: '3',
+            document: project.value,
+            signal: controller.signal,
+          };
+          expect(await adapter[operation](request)).toEqual({ ok: false, diagnostics: [] });
+          expect(calls).toHaveLength(stage === 'request' ? 0 : 1);
+        }
+      }
+    },
+  );
 
   it('declares publish unsupported', () => {
     const adapter = createHttpProjectAdapter({ baseUrl: 'http://x/api' });

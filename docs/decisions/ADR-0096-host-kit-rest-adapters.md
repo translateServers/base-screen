@@ -25,8 +25,8 @@
 新增固定包 `@base-screen/host-kit`（`packages/` 区，仅依赖 `@base-screen/contracts`，零第三方依赖，
 使用可注入的全局 `fetch`）。提供：
 
-- `createHttpProjectAdapter({ baseUrl, fetch?, migrate? })`：项目会话适配器；
-- `createRestDatasetPort({ baseUrl, fetch? })`：数据集端口，内置上述四条硬规矩与错误码映射、
+- `createHttpProjectAdapter({ baseUrl, fetch?, migrate?, mapping? })`：项目会话适配器；
+- `createRestDatasetPort({ baseUrl, fetch?, mapping? })`：数据集端口，内置上述四条硬规矩与错误码映射、
   `queryScope: 'dataset'`；
 - `createHostKitHttp` / `toHostKitSearch` / `toAbortSignal`：最小 JSON HTTP 客户端与桥接工具。
 
@@ -39,7 +39,7 @@ extras 不进 host-kit——宿主需要时在端口外再包一层。host-kit �
 ### 3. 可选辅助，不改变既有公共契约
 
 host-kit 是可选 helper，不是接入前提。`defineBaseScreen*()`、`configure()`、端口契约与元素 API 均
-不变；宿主可直接实现端口而不使用 host-kit。包清单由 `tooling/checks/packages.mjs` 固定为 13 个，
+不变；宿主可直接实现端口而不使用 host-kit。包清单由 `tooling/checks/packages.mjs` 固定，
 依赖白名单在 `tooling/checks/boundaries.mjs` 登记 `host-kit: ['contracts']`。
 
 ## 后果
@@ -47,4 +47,4 @@ host-kit 是可选 helper，不是接入前提。`defineBaseScreen*()`、`config
 - 宿主接入的端口样板有了单一上游落点，硬规矩由公共代码与单测保证，不再靠散文手抄。
 - host-kit 成为新的公共契约面：其 helper 签名与错误映射受 API 报告与 changeset 治理。
 - 示例宿主可逐步迁移到 host-kit（迁移与否不强制），迁移后共享文件仍逐字一致。
-- 后端契约不同的宿主注入自定义 `fetch` 或自行实现端口；host-kit 不承诺覆盖任意后端形状。
+- 后端协议不同的宿主可按操作提供 `mapping`，用 request 映射 URL/method/body、用 response 把 unknown JSON 投影为 canonical envelope；投影后仍由 contracts 严格解析。默认 REST 行为保持兼容，自定义映射可保留 opaque revision。鉴权通过 fetch 注入或宿主端口实现，不增加新的网络策略。

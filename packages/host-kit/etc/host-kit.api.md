@@ -20,8 +20,7 @@ export function createRestDatasetPort(options: RestDatasetPortOptions): ScreenHo
 
 // @public (undocumented)
 export interface HostKitHttp {
-    // (undocumented)
-    request<T>(path: string, options?: HostKitHttpRequestOptions): Promise<HostKitHttpResult<T>>;
+    request<T = unknown>(path: string, options?: HostKitHttpRequestOptions): Promise<HostKitHttpResult<T>>;
 }
 
 // @public
@@ -34,10 +33,28 @@ export interface HostKitHttpError {
     readonly status: number;
 }
 
+// @public
+export interface HostKitHttpMapping<Request> {
+    // (undocumented)
+    readonly request?: (request: Request) => HostKitHttpRequest;
+    // (undocumented)
+    readonly response?: (payload: unknown, request: Request) => unknown;
+}
+
 // @public (undocumented)
 export interface HostKitHttpOptions {
     readonly baseUrl: string;
     readonly fetch?: typeof fetch;
+}
+
+// @public
+export interface HostKitHttpRequest {
+    // (undocumented)
+    readonly body?: unknown;
+    // (undocumented)
+    readonly method?: NonNullable<HostKitHttpRequestOptions['method']>;
+    // (undocumented)
+    readonly path: string;
 }
 
 // @public (undocumented)
@@ -61,17 +78,28 @@ export type HostKitHttpResult<T> = {
 
 // @public (undocumented)
 export interface HttpProjectAdapterOptions extends HostKitHttpOptions {
+    readonly mapping?: {
+        readonly load?: HostKitHttpMapping<Parameters<ScreenProjectAdapter['load']>[0]>;
+        readonly save?: HostKitHttpMapping<Parameters<ScreenProjectAdapter['save']>[0]>;
+    };
     readonly migrate?: (input: unknown) => ScreenMigrationResult;
 }
 
 // @public (undocumented)
-export type RestDatasetPortOptions = HostKitHttpOptions;
+export interface RestDatasetPortOptions extends HostKitHttpOptions {
+    readonly mapping?: {
+        readonly groups?: HostKitHttpMapping<Parameters<NonNullable<ScreenHostDatasetPort['groups']>>[0]>;
+        readonly list?: HostKitHttpMapping<Parameters<ScreenHostDatasetPort['list']>[0]>;
+        readonly describe?: HostKitHttpMapping<Parameters<ScreenHostDatasetPort['describe']>[0]>;
+        readonly query?: HostKitHttpMapping<Parameters<ScreenHostDatasetPort['query']>[0]>;
+    };
+}
 
 // @public
 export function toAbortSignal(source: ScreenAbortSignal | undefined): AbortSignal | undefined;
 
 // @public
-export function toHostKitSearch(params: Readonly<Record<string, string | number | undefined>>): string;
+export function toHostKitSearch(params: Readonly<Record<string, string | number | boolean | undefined>>): string;
 
 // (No @packageDocumentation comment for this package)
 

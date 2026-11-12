@@ -17,6 +17,19 @@ export interface HostKitHttpRequestOptions {
   readonly signal?: AbortSignal;
 }
 
+/** 映射只描述 JSON 请求；鉴权由宿主注入的 fetch 负责，取消信号由适配器传递。 */
+export interface HostKitHttpRequest {
+  readonly path: string;
+  readonly method?: NonNullable<HostKitHttpRequestOptions['method']>;
+  readonly body?: unknown;
+}
+
+/** 响应投影接收未知 JSON，结果仍须通过该操作的契约解析器；校验失败可直接抛错。 */
+export interface HostKitHttpMapping<Request> {
+  readonly request?: (request: Request) => HostKitHttpRequest;
+  readonly response?: (payload: unknown, request: Request) => unknown;
+}
+
 export interface HostKitHttpOptions {
   /** API 基址（含前缀），例如 `http://127.0.0.1:3000/api`；末尾斜杠会被去掉。 */
   readonly baseUrl: string;
@@ -25,7 +38,11 @@ export interface HostKitHttpOptions {
 }
 
 export interface HostKitHttp {
-  request<T>(path: string, options?: HostKitHttpRequestOptions): Promise<HostKitHttpResult<T>>;
+  /** T 是宿主对后端的类型承诺；适配器使用 unknown 并经契约解析。 */
+  request<T = unknown>(
+    path: string,
+    options?: HostKitHttpRequestOptions,
+  ): Promise<HostKitHttpResult<T>>;
 }
 
 const NETWORK_ERROR: HostKitHttpError = {
@@ -42,7 +59,7 @@ export function createHostKitHttp(options: HostKitHttpOptions): HostKitHttp {
   const doFetch = options.fetch ?? fetch;
   const base = options.baseUrl.replace(/\/+$/, '');
   return {
-    async request<T>(
+    async request<T = unknown>(
       path: string,
       requestOptions: HostKitHttpRequestOptions = {},
     ): Promise<HostKitHttpResult<T>> {
@@ -82,7 +99,7 @@ function toHttpError(payload: unknown, status: number): HostKitHttpError {
 
 /** query string：`undefined` 与空串不落进 URL（后端 `forbidNonWhitelisted` 对空值也校验）。 */
 export function toHostKitSearch(
-  params: Readonly<Record<string, string | number | undefined>>,
+  params: Readonly<Record<string, string | number | boolean | undefined>>,
 ): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

@@ -200,11 +200,12 @@ async function list(
   return parsed;
 }
 
-/** `params` 已是纯值：只做 string/number 补齐，不再校验取值域（基座已按定义校验）。 */
+/** `params` 已是纯值：布尔值映射为 URL 字符串，不再校验取值域（基座已按定义校验）。 */
 function toQueryParams(params: ScreenJsonObject): Record<string, string | number> {
   const result: Record<string, string | number> = {};
   for (const [key, value] of Object.entries(params)) {
     if (typeof value === 'string' || typeof value === 'number') result[key] = value;
+    if (typeof value === 'boolean') result[key] = String(value);
   }
   return result;
 }
