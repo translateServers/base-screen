@@ -5,7 +5,7 @@ import {
   type ScreenDocument,
   type ScreenJsonValue,
   type ScreenResourceObserver,
-} from '@base-screen/contracts';
+} from '@base-screen/sdk/contracts';
 import type { BaseScreenViewerElement } from '@base-screen/sdk/viewer';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';

@@ -227,18 +227,9 @@ importers:
 
   examples/vue-host:
     dependencies:
-      '@base-screen/contracts':
-        specifier: workspace:^
-        version: link:../../packages/contracts
-      '@base-screen/material':
-        specifier: workspace:^
-        version: link:../../packages/material
       '@base-screen/plugin-board-materials':
         specifier: workspace:^
         version: link:../../plugins/plugin-board-materials
-      '@base-screen/plugin-core':
-        specifier: workspace:^
-        version: link:../../packages/plugin-core
       '@base-screen/plugin-echarts':
         specifier: workspace:^
         version: link:../../plugins/plugin-echarts

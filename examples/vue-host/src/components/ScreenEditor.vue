@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import {
-  BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT,
-  type BaseScreenDesignerElement,
-} from '@base-screen/sdk/designer';
-import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
+import type {
+  BaseScreenDesignerElement,
+  BaseScreenDesignerMountOptions,
+  BaseScreenMountHandle,
+  BaseScreenRuntime,
+} from '@base-screen/sdk';
+import type { ScreenDiagnostic } from '@base-screen/sdk/contracts';
+import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from '@base-screen/sdk/designer';
+import { BaseScreenDesigner } from '@base-screen/vue';
+import { onBeforeUnmount, onMounted, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../lib/api';
 import { resolveApiBase } from '../lib/api-base';
 import { createLogger } from '../lib/logger';
 import { showToast } from '../lib/toast';
-import {
-  createHostAssetLibrary,
-  HOST_ASSET_LIBRARY_GROUP_ID,
-  type HostAssetLibraryHandle,
-} from '../screen/asset-library';
+import { createHostAssetLibrary, HOST_ASSET_LIBRARY_GROUP_ID } from '../screen/asset-library';
+import { loadVueDesignerRuntime } from '../screen/composition-runtime';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
   createHostAlarmStyleAuthoring,
@@ -24,35 +26,48 @@ import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
 import { createHostIntentHandler } from '../screen/host-intent';
 import { createHostIntentReferenceCatalog } from '../screen/host-intent-reference';
-import { type HostRuntime, loadHostRuntime } from '../screen/host-runtime';
 import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
 import { screenSessionStore } from '../store/screen-session-store';
 
+interface DesignerStage {
+  readonly screenId: string;
+  readonly runtime: BaseScreenRuntime;
+  readonly mountOptions: BaseScreenDesignerMountOptions;
+}
+
 const route = useRoute();
 const router = useRouter();
-const stage = ref<HTMLDivElement | null>(null);
+const logger = createLogger('screen-editor');
+// 装配就绪的快照：端口必须在 configure 时一次提交，备齐后组件才会挂载（未就绪传 null）。
+const stage = shallowRef<DesignerStage | null>(null);
 // shallowRef：不代理设计器实例（自定义元素内部状态无需 Vue 响应式）。
 const designer = shallowRef<BaseScreenDesignerElement | null>(null);
-const logger = createLogger('screen-editor');
 
-let onBack: (() => void) | undefined;
-let onConflict: (() => void) | undefined;
 let unsubscribeSession: (() => void) | undefined;
-let runtime: HostRuntime | undefined;
 let alarms: ReturnType<typeof createHostAlarmController> | undefined;
-// 素材库左栏 + 统一选择桥（ADR-0089）：宿主自己的上传/目录/删除保护。
-let assetLibrary: HostAssetLibraryHandle | undefined;
-// 运行时的激活是异步的；await 期间路由可能已经切走，configure 必须能被取消。
 let disposed = false;
 
 // 保存由用户显式触发（顶栏「保存」/ Ctrl+S，经宿主 project adapter）；宿主不订阅文档变化，
 // 也不在离开前隐式落盘——未保存的改动随页面卸载丢弃。三端逐条对等。
 
+async function loadAlarmBindings(screenId: string): Promise<HostAlarmBindings> {
+  const result = await api.getScreenAlarmBindings(screenId);
+  if (!result.ok) {
+    logger.warn('alarm bindings unavailable', result.error);
+    return {};
+  }
+  const parsed = parseHostAlarmBindings(result.data.bindings);
+  if (parsed === undefined) {
+    logger.warn('alarm bindings malformed', result.data.bindings);
+    return {};
+  }
+  return parsed;
+}
+
 onMounted(() => {
   const screenId = route.params.screenId;
-  const container = stage.value;
-  if (typeof screenId !== 'string' || container === null) {
+  if (typeof screenId !== 'string') {
     showToast('缺少大屏 ID。', 'error');
     return;
   }
@@ -63,49 +78,25 @@ onMounted(() => {
     if (state.error !== null && state.error !== previous.error) showToast(state.error, 'error');
   });
 
-  const loadAlarmBindings = async (id: string): Promise<HostAlarmBindings> => {
-    const result = await api.getScreenAlarmBindings(id);
-    if (!result.ok) {
-      logger.warn('alarm bindings unavailable', result.error);
-      return {};
-    }
-    const parsed = parseHostAlarmBindings(result.data.bindings);
-    if (parsed === undefined) {
-      logger.warn('alarm bindings malformed', result.data.bindings);
-      return {};
-    }
-    return parsed;
-  };
-
   void (async () => {
-    // 插件元素注册与 manager 激活都在这条 Promise 里；失败时清缓存供下次重试。
-    const host = await loadHostRuntime();
+    // 1) 插件 manager 激活（全站单例；失败时清缓存供下次重试）
+    const runtime = await loadVueDesignerRuntime();
     if (disposed) return;
-    runtime = host;
 
-    // 设计器是 DOM 节点而非 Vue 组件：创建后 appendChild，再 configure / load。
-    // 顺序不可颠倒——画布与渲染器在元素 connected 时才建立。尺寸交给 .stage 与 .stage > *
-    // 的 CSS（占满视口），宿主不再内联写百分比宽高。
-    const element = document.createElement('base-screen-designer') as BaseScreenDesignerElement;
-    // 蓝图工作台用引擎自带的中央画布：主题、下拉与手势都跟随设计器同一套令牌与控件，
-    // 宿主不再经 slot 覆盖一份等价实现（覆盖是可选能力，不是接入前提）。
-    container.append(element);
-    designer.value = element;
-    host.bindDesigner(element);
-
-    // 告警端口必须在 configure 前注入；首快照最多等 800ms，超时先按基础样式渲染。
-    // 绑定按 screenId 从宿主读取：页面里配过什么，打开就是什么。
+    // 2) 告警端口：必须在 configure 前注入，首快照最多等 800ms（超时先按基础样式渲染，
+    //    快照到达后由失效 API 补齐）。绑定按 screenId 从宿主读取。
     const alarmBindings = await loadAlarmBindings(screenId);
     if (disposed) return;
-    alarms = createHostAlarmController({
+    const controller = createHostAlarmController({
       apiBase: resolveApiBase(),
       bindings: alarmBindings,
-      onInvalidate: (componentIds) => element.refreshConditionalStyles(componentIds),
+      onInvalidate: (componentIds) => designer.value?.refreshConditionalStyles(componentIds),
     });
-    await alarms.ready(800);
+    alarms = controller;
+    await controller.ready(800);
     if (disposed) return;
 
-    // 宿主条件样式的作者口：引擎在组件检查器渲染通用表单，保存后热更新端口。
+    // 3) 宿主条件样式的作者口：引擎在组件检查器渲染通用表单，保存后热更新端口。
     const alarmStyleAuthoring = createHostAlarmStyleAuthoring({
       initialBindings: alarmBindings,
       save: async (bindings) => {
@@ -117,86 +108,36 @@ onMounted(() => {
         }
         return { ok: true, bindings: parsed };
       },
-      onSaved: (bindings) => alarms?.setBindings(bindings),
+      onSaved: (bindings) => controller.setBindings(bindings),
     });
-
-    // 宿主数据通道必须在 configure 内提交：renderer 在 configure 时建立，
-    // 之后再赋 `resourcePort` 会被按「初始化后不可更换端口」拒绝。
     // 数据集与来源目录通道同理一并提交，否则设计器的数据源面板与变量面板会退化。
     const datasetPort = createHostDatasetPort({ api, logger });
-    const configured = element.configure({
-      catalog: host.catalog,
-      pluginCatalog: host.pluginCatalog,
-      pluginPanels: host.pluginPanels,
-      inspectorControls: host.inspectorControls,
-      runtimeContributions: host.runtimeContributions,
-      pluginCommandPort: host.pluginCommandPort,
-      projectAdapter: createRestProjectAdapter(screenId),
-      toolMaterialTypes: TOOL_MATERIAL_TYPES,
-      resourcePort: createHostResourcePort(),
-      datasetPort,
-      hostCatalogPort: createHostCatalogPort({
-        clock: () => new Date(),
-        noticeSource: () => datasetPort.snapshot().alarms,
-        logger,
-      }),
-      conditionalStylePort: alarms.port,
-      hostConditionalStyleAuthoring: alarmStyleAuthoring,
-      // 组合的编辑期形态：多个原子物料成组后整体移动/缩放/旋转。缺了这行，顶栏「编辑 → 成组」
-      // 与图层面板的成组按钮都不可用。
-      groupMaterialType: 'base.container',
-      // 返回按钮由基座顶栏渲染，宿主只负责点击后跳回自己的路由。
-      backButton: true,
-      hostResourceSelectionButton: true,
-      leftPanelGroups: [{ id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' }],
-    });
-    if (!configured.ok) {
-      logger.error('designer configure failed', configured.diagnostics);
-      screenSessionStore.getState().failedToLoad('设计器配置失败，请查看控制台日志。');
-      element.remove();
-      designer.value = null;
-      host.bindDesigner(null);
-      unsubscribeSession?.();
-      unsubscribeSession = undefined;
-      return;
-    }
 
-    onBack = (): void => {
-      void router.push('/');
+    stage.value = {
+      screenId,
+      runtime,
+      mountOptions: {
+        projectId: screenId,
+        projectAdapter: createRestProjectAdapter(screenId),
+        toolMaterialTypes: TOOL_MATERIAL_TYPES,
+        resourcePort: createHostResourcePort(),
+        datasetPort,
+        hostCatalogPort: createHostCatalogPort({
+          clock: () => new Date(),
+          noticeSource: () => datasetPort.snapshot().alarms,
+          logger,
+        }),
+        conditionalStylePort: controller.port,
+        hostConditionalStyleAuthoring: alarmStyleAuthoring,
+        // 组合的编辑期形态：多个原子物料成组后整体移动/缩放/旋转。缺了这行，顶栏「编辑 → 成组」
+        // 与图层面板的成组按钮都不可用。
+        groupMaterialType: 'base.container',
+        // 返回按钮由基座顶栏渲染，宿主只负责点击后跳回自己的路由。
+        backButton: true,
+        hostResourceSelectionButton: true,
+        leftPanelGroups: [{ id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' }],
+      },
     };
-    element.addEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
-
-    // 冲突面板由引擎渲染；宿主只把冲突转成 toast，不参与重试或落盘。
-    onConflict = (): void => {
-      screenSessionStore.getState().conflicted();
-    };
-    element.addEventListener('base-screen-project-conflict', onConflict);
-
-    const loaded = await element.load(screenId);
-    if (!loaded.ok) {
-      logger.error('designer load failed', loaded.diagnostics);
-      screenSessionStore.getState().failedToLoad('大屏加载失败，请返回列表重试。');
-      return;
-    }
-    screenSessionStore.getState().loaded(loaded.value.name, loaded.value.revision);
-
-    // 示例接线：把右栏书写面接到示例智能体（整屏 `POST /agent/candidate`、选中组件
-    // `POST /agent/edit`）。必须在 load 成功之后绑定——
-    // 提案要对着当前文档试算，文档没到时提交只会被引擎拒绝。解绑在卸载里做，
-    // 页面走了之后不会再有请求回来改一块已经不在的设计器。
-    element.setIntentHandler(
-      createHostIntentHandler({
-        designer: element,
-        screenId,
-        // 读函数而不是快照：在线物料包上下架会整体替换 host.catalog。
-        catalog: () => host.catalog,
-      }),
-    );
-    // 引用目录：素材 + 数据集拍平成一份清单交给引擎，选择器与 chip 都在引擎侧。
-    element.setIntentReferenceCatalog(createHostIntentReferenceCatalog({ api, screenId, logger }));
-
-    assetLibrary = createHostAssetLibrary({ designer: element, screenId });
-    element.append(assetLibrary.element);
   })().catch((error: unknown) => {
     if (disposed) return;
     logger.error('editor bootstrap failed', error);
@@ -206,28 +147,91 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   disposed = true;
-  const element = designer.value;
-  if (element !== null && onBack !== undefined) {
-    element.removeEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
-  }
-  if (element !== null && onConflict !== undefined) {
-    element.removeEventListener('base-screen-project-conflict', onConflict);
-  }
-  alarms?.stop();
-  alarms = undefined;
-  assetLibrary?.dispose();
-  assetLibrary = undefined;
   unsubscribeSession?.();
-  element?.setIntentHandler(undefined);
-  element?.setIntentReferenceCatalog(undefined);
-  element?.remove();
-  designer.value = null;
-  runtime?.bindDesigner(null);
+  alarms?.stop();
   screenSessionStore.getState().reset();
   logger.debug('edit view released');
 });
+
+/**
+ * 挂载就绪：组合层已完成 configure 与项目 load，这里只做宿主侧接线。
+ * 顺序由组合层保证（load 在前），因此意图处理器可以安全绑在这里——提案要对着当前文档试算。
+ * 返回的清理函数由挂载句柄在 dispose 时执行，路由切换与页面卸载都覆盖。
+ */
+function onDesignerMounted(
+  handle: BaseScreenMountHandle<BaseScreenDesignerElement>,
+): (() => void) | undefined {
+  const current = stage.value;
+  if (current === null) return undefined;
+  const element = handle.element;
+  const { screenId } = current;
+  designer.value = element;
+
+  // handle.on 登记的事件监听随句柄释放自动移除，宿主不再手写 add/remove 配对。
+  handle.on(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, () => {
+    void router.push('/');
+  });
+  // 冲突面板由引擎渲染；宿主只把冲突转成 toast，不参与重试或落盘。
+  handle.on('base-screen-project-conflict', () => {
+    screenSessionStore.getState().conflicted();
+  });
+
+  // 右栏书写面接到示例智能体；catalog 读函数而非快照——在线物料上下架会整体替换它。
+  element.setIntentHandler(
+    createHostIntentHandler({
+      designer: element,
+      screenId,
+      catalog: () => current.runtime.catalog,
+    }),
+  );
+  element.setIntentReferenceCatalog(createHostIntentReferenceCatalog({ api, screenId, logger }));
+  const assetLibrary = createHostAssetLibrary({ designer: element, screenId });
+  element.append(assetLibrary.element);
+
+  // 组合层不把 load 结果投影给宿主，这里读一次元数据只为把屏名与 revision 交给会话状态机。
+  void (async () => {
+    const result = await api.getScreen(screenId);
+    if (designer.value !== element) return;
+    if (!result.ok) {
+      logger.warn('editor screen metadata unavailable', result.error);
+      screenSessionStore.getState().failedToLoad('大屏加载失败，请返回列表重试。');
+      return;
+    }
+    screenSessionStore
+      .getState()
+      .loaded(result.data.screen.name, String(result.data.screen.revision));
+  })();
+
+  return () => {
+    element.setIntentHandler(undefined);
+    element.setIntentReferenceCatalog(undefined);
+    assetLibrary.dispose();
+    if (designer.value === element) designer.value = null;
+  };
+}
+
+/** 挂载失败诊断由组合层投影出来；宿主只负责记日志并让会话状态机进入终态。 */
+function onDiagnostics(diagnostics: readonly ScreenDiagnostic[]): void {
+  if (diagnostics.length === 0) return;
+  logger.error('designer composition failed', diagnostics);
+  screenSessionStore.getState().failedToLoad('设计器配置失败，请查看控制台日志。');
+}
 </script>
 
 <template>
-  <div ref="stage" class="stage" />
+  <!--
+    组合层组件内部创建并挂载 `<base-screen-designer>`，宿主只给挂载点：尺寸交给
+    `.stage` 与 `.stage > *` 的 CSS（占满视口）；`class` 会透传到组件根节点，
+    因此与 React 端是同一套布局契约。
+
+    装配未就绪时 `runtime` / `mountOptions` 都是 null：组件自己不挂载，也不需要宿主
+    写 `v-if` 或占位节点——根节点一直是那个 `.stage`。
+  -->
+  <BaseScreenDesigner
+    class="stage"
+    :runtime="stage?.runtime ?? null"
+    :mount-options="stage?.mountOptions ?? null"
+    :on-mounted="onDesignerMounted"
+    :on-diagnostics="onDiagnostics"
+  />
 </template>

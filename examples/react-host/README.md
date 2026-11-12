@@ -47,7 +47,9 @@ pnpm dev:react-host                                 # 终端 2：本前端 :5174
 ```
 
 - 列表页 `/`：新建 / 编辑 / 查看 / 删除
-- 编辑页 `/screens/:id/edit`：`<base-screen-designer>` 嵌入，保存走宿主 project adapter
+- 编辑页 `/screens/:id/edit`：嵌入 `@base-screen/react` 的 `<BaseScreenDesigner>` 薄封装，
+  挂载 / `configure` / `load` / 销毁由 SDK 挂载控制器编排；装配未就绪时把 `runtime` 与
+  `mountOptions` 传 `null`，组件自己不挂载。保存走宿主 project adapter
   （顶栏「保存」显式触发；revision 乐观锁，冲突时 toast 提示）；逐条规格见
   [../README.md](../README.md) 的「编辑页保存规格」
 - 查看页 `/screens/:id/view`：`<base-screen-viewer>` 只读播放

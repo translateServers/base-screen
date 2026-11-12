@@ -153,11 +153,11 @@ const host = await loadHostRuntime();
 const runtime = adoptBaseScreenRuntime(host);
 ```
 
-适配器复用同一份 manager/catalog，只补挂载句柄、catalog 替换和销毁编排。React 示例的 `composition-runtime.ts` 因此只剩单例复用与 adopt；`@base-screen/contracts`、`@base-screen/material`、`@base-screen/plugin-core`、`@base-screen/plugin-manager` 与 `@base-screen/plugin-sdk` 也可分别从 `@base-screen/sdk` 的 `contracts`、`material`、`plugin-core`、`plugins` 子入口导入。
+适配器复用同一份 manager/catalog，只补挂载句柄、catalog 替换和销毁编排。React / Vue 示例的 `composition-runtime.ts` 因此只剩单例复用与 adopt；`@base-screen/contracts`、`@base-screen/material`、`@base-screen/plugin-core`、`@base-screen/plugin-manager` 与 `@base-screen/plugin-sdk` 也可分别从 `@base-screen/sdk` 的 `contracts`、`material`、`plugin-core`、`plugins` 子入口导入。
 
 ### React / Vue 薄封装
 
-`@base-screen/react` 与 `@base-screen/vue` 各提供 `BaseScreenDesigner` / `BaseScreenViewer`。它们把 SDK 挂载控制器接到框架生命周期：组件卸载时释放当前句柄，不释放共享 `runtime`。`runtime`、`remountKey`、框架 `key`、文档/项目身份或预创建的 `element` 改变时重挂载；Viewer 的 `documentRevision` 也属于身份。仅 `catalog` 新引用走 `refreshCatalog()` 热更新，失败保留当前实例并通过 `onDiagnostics` 报告，可重新提交配置重试。其他 `mountOptions` 只更新后续挂载的初始化快照；需要立即重新配置时改变 `remountKey`。热更新在框架提交后的生命周期中执行。
+`@base-screen/react` 与 `@base-screen/vue` 各提供 `BaseScreenDesigner` / `BaseScreenViewer`。它们把 SDK 挂载控制器接到框架生命周期：组件卸载时释放当前句柄，不释放共享 `runtime`。`runtime`、`remountKey`、框架 `key`、文档/项目身份或预创建的 `element` 改变时重挂载；Viewer 的 `documentRevision` 也属于身份。仅 `catalog` 新引用走 `refreshCatalog()` 热更新，失败保留当前实例并通过 `onDiagnostics` 报告，可重新提交配置重试。其他 `mountOptions` 只更新后续挂载的初始化快照；需要立即重新配置时改变 `remountKey`。热更新在框架提交后的生命周期中执行。`runtime` 或 `mountOptions` 传 `null` 表示尚未就绪：组件不挂载、诊断保持为空，两者都就绪后自动挂载，任一退回 `null` 则释放句柄（不释放共享 `runtime`）。
 
 ```tsx
 import { BaseScreenDesigner } from '@base-screen/react';
@@ -195,7 +195,9 @@ import { BaseScreenDesigner } from '@base-screen/react';
 
 `mountOptions.children` 接收真实 DOM `Node`，会在自定义元素连接前进入 light DOM，不是 React/Vue 虚拟子节点；需要框架渲染的 light DOM 时，在 `onMounted` 里用 `handle.element` 挂载子应用，并用 `handle.onDispose()` 登记清理。`onDiagnostics` 与 React 的 `renderFallback` / Vue 的 `#fallback` 用于投影挂载失败诊断；组件不会调用 `runtime.dispose()`。
 
-`pnpm verify:tarball` 的 React/Vue 外部消费者会在真实浏览器里同时挂载并卸载这两个组件，断言自定义元素存在、卸载后移除、挂载诊断为空，且组件卸载不会释放共享 runtime。`examples/react-host` 的编辑页已改用 `BaseScreenDesigner`，并复用宿主原有的插件管理器单例；Vue / Vanilla 编辑页仍保留手动装配作为对照。
+端口必须在**这一次**挂载的 `mountOptions` 里一次提交（挂载后再赋会被引擎拒绝），而宿主的装配通常是异步的：插件 manager 激活、告警首快照、项目适配器与业务端口都可能晚到。这类「还没就绪」用 `null` 表达，不要用条件渲染把组件藏起来——`runtime={null}` / `:runtime="null"` 时组件不挂载、诊断保持为空、`renderFallback` / `#fallback` 可投影等待态；两者都就绪时自动挂载。宿主因此只写一份装配结果，不再各自发明「早返回 + 占位节点」或 `v-if` 的写法。
+
+`pnpm verify:tarball` 的 React/Vue 外部消费者会在真实浏览器里同时挂载并卸载这两个组件，断言自定义元素存在、卸载后移除、挂载诊断为空，且组件卸载不会释放共享 runtime。`examples/react-host` 与 `examples/vue-host` 的编辑页都已改用 `BaseScreenDesigner`，并复用各自宿主原有的插件管理器单例；Vanilla 编辑页仍保留手动装配作为对照。
 
 自定义物料使用独立 React root / Vue app；宿主通过 React `createReactMaterialDefinition({ wrapRoot(node, model) { ... } })` 重新包裹 Provider，或 Vue `createVueMaterialDefinition({ configureApp(app) { ... } })` 在 mount 前调用 `app.use()` / `app.provide()`。React 包装随模型更新重新计算；Vue 每次真正创建新 app 时执行配置。Vue 组件公开声明保留 `runtime`、`mountOptions`、回调句柄与 `fallback` 插槽的类型。
 

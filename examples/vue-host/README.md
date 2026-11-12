@@ -24,6 +24,7 @@ src/
 │   ├── logger.ts / format.ts / toast.ts
 ├── screen/
 │   ├── register.ts             # 同步元素注册：设计器/查看器/官方全量物料/自有物料/插件元素
+│   ├── composition-runtime.ts  # 把宿主 runtime 适配成 SDK 组合层 runtime（复用同一 manager）
 │   ├── host-runtime.ts         # 插件 manager 激活 + catalog 合并 + 插件命令端口
 │   ├── host-resource-plugin.ts # 三个 dataResourceType 贡献（demo_metric/series/ranking）
 │   ├── metric-value.ts             # 三端共有的「指标读数」manifest
@@ -43,6 +44,7 @@ src/
 | vue-router（hash history） | 免 SPA fallback，三端路由行为对等 |
 | zustand（`zustand/vanilla`）+ composable 桥接 | store 不依赖 Vue，与另两端同源同一套迁移语义；composable 用 `shallowRef` 同步快照，组件照常模板消费 |
 | `shallowRef` 持有设计器 | 自定义元素内部状态无需 Vue 响应式代理（引擎内部持有自己的状态，代理只会增加开销） |
+| 编辑页用 `@base-screen/vue` 薄封装 | 与 React 端同一条路径：`BaseScreenDesigner` 负责挂载/配置/加载/销毁，宿主订阅句柄事件而不是自己 `appendChild`；装配未就绪时 `runtime` / `mountOptions` 传 `null`，组件不挂载，宿主不需要 `v-if` 与占位节点 |
 | 物料样式写在应用样式表 | Vue 桥接会把文档全局样式规则传播进设计器 shadow root，SFC 物料样式随 `src/styles/components.css` 生效（React 桥接无此能力，故那边用内联样式） |
 | 外围插件作为物料来源 | 大屏四件套 / 胶囊进度 / 滚动字幕来自 `plugin-board-materials`，图表来自 `plugin-echarts`；宿主只注册元素并合并 manager 的 snapshot，不在示例里重写一套图表与动效 |
 | vue-tsc + TypeScript 5.9.3 | SFC 类型检查；版本与仓库其余工程及工具链对齐（根仓 TS 7 尚未被该工具链支持） |
@@ -56,7 +58,8 @@ pnpm dev:vue-host                                   # 终端 2：本前端 :5175
 ```
 
 - 列表页 `/`：新建 / 编辑 / 查看 / 删除
-- 编辑页 `/screens/:id/edit`：`<base-screen-designer>` 嵌入，保存走宿主 project adapter
+- 编辑页 `/screens/:id/edit`：嵌入 `@base-screen/vue` 的 `<BaseScreenDesigner>` 薄封装，
+  挂载 / `configure` / `load` / 销毁由 SDK 挂载控制器编排，宿主只留端口接线与显式保存
   （顶栏「保存」显式触发；revision 乐观锁，冲突时 toast 提示）；逐条规格见
   [../README.md](../README.md) 的「编辑页保存规格」
 - 查看页 `/screens/:id/view`：`<base-screen-viewer>` 只读播放
