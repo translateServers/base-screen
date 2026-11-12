@@ -822,9 +822,9 @@ type Viewer = InstanceType<typeof BaseScreenViewer>;
 
 // 在最低 Vue peer 版本下验证 tarball 声明，而不是复用工作区的新版 Vue 类型。
 export type ComponentContracts = [
-  Assert<Equal<Designer['$props']['runtime'], BaseScreenRuntime>>,
-  Assert<Equal<Designer['$props']['mountOptions'], BaseScreenDesignerMountOptions>>,
-  Assert<Equal<Viewer['$props']['mountOptions'], BaseScreenViewerMountOptions>>,
+  Assert<Equal<Designer['$props']['runtime'], BaseScreenRuntime | null>>,
+  Assert<Equal<Designer['$props']['mountOptions'], BaseScreenDesignerMountOptions | null>>,
+  Assert<Equal<Viewer['$props']['mountOptions'], BaseScreenViewerMountOptions | null>>,
   Assert<Equal<Parameters<NonNullable<Designer['$props']['onMounted']>>[0], BaseScreenMountHandle<BaseScreenDesignerElement>>>,
   Assert<Equal<Parameters<NonNullable<Viewer['$props']['onMounted']>>[0], BaseScreenMountHandle<BaseScreenViewerElement>>>,
   Assert<Equal<Parameters<Designer['$slots']['fallback']>[0]['diagnostics'], readonly ScreenDiagnostic[]>>,

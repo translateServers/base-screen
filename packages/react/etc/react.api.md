@@ -27,7 +27,7 @@ export function BaseScreenDesigner(props: BaseScreenDesignerProps): ReactElement
 export interface BaseScreenDesignerProps {
     // (undocumented)
     readonly className?: string;
-    readonly mountOptions: BaseScreenDesignerMountOptions;
+    readonly mountOptions: BaseScreenDesignerMountOptions | null;
     // (undocumented)
     readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
     // (undocumented)
@@ -35,8 +35,7 @@ export interface BaseScreenDesignerProps {
     readonly remountKey?: string | number;
     // (undocumented)
     readonly renderFallback?: (diagnostics: readonly ScreenDiagnostic[]) => ReactNode;
-    // (undocumented)
-    readonly runtime: BaseScreenRuntime;
+    readonly runtime: BaseScreenRuntime | null;
     // (undocumented)
     readonly style?: CSSProperties;
 }
@@ -48,7 +47,7 @@ export function BaseScreenViewer(props: BaseScreenViewerProps): ReactElement;
 export interface BaseScreenViewerProps {
     // (undocumented)
     readonly className?: string;
-    readonly mountOptions: BaseScreenViewerMountOptions;
+    readonly mountOptions: BaseScreenViewerMountOptions | null;
     // (undocumented)
     readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
     // (undocumented)
@@ -57,8 +56,7 @@ export interface BaseScreenViewerProps {
     readonly remountKey?: string | number;
     // (undocumented)
     readonly renderFallback?: (diagnostics: readonly ScreenDiagnostic[]) => ReactNode;
-    // (undocumented)
-    readonly runtime: BaseScreenRuntime;
+    readonly runtime: BaseScreenRuntime | null;
     // (undocumented)
     readonly style?: CSSProperties;
 }

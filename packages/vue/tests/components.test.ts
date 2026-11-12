@@ -21,13 +21,13 @@ describe('Vue composition components', () => {
   });
 
   it('exposes the runtime and mount option contracts', () => {
-    expectTypeOf<BaseScreenDesignerProps['runtime']>().toEqualTypeOf<BaseScreenRuntime>();
+    expectTypeOf<BaseScreenDesignerProps['runtime']>().toEqualTypeOf<BaseScreenRuntime | null>();
     expectTypeOf<
       BaseScreenDesignerProps['mountOptions']
-    >().toEqualTypeOf<BaseScreenDesignerMountOptions>();
+    >().toEqualTypeOf<BaseScreenDesignerMountOptions | null>();
     expectTypeOf<
       BaseScreenViewerProps['mountOptions']
-    >().toEqualTypeOf<BaseScreenViewerMountOptions>();
+    >().toEqualTypeOf<BaseScreenViewerMountOptions | null>();
   });
 
   it.each([BaseScreenDesigner, BaseScreenViewer])(
@@ -180,6 +180,76 @@ describe('Vue composition components', () => {
       await nextTick();
       expect(mount).toHaveBeenCalledTimes(2);
       expect(onDiagnostics).toHaveBeenCalledExactlyOnceWith([]);
+    } finally {
+      app.unmount();
+    }
+  });
+
+  it('mounts only once runtime and mount options are ready, and releases when they go back', async () => {
+    class HostNode {
+      parent: HostNode | null = null;
+    }
+    const renderer = createRenderer<HostNode, HostNode>({
+      createElement: () => new HostNode(),
+      createText: () => new HostNode(),
+      createComment: () => new HostNode(),
+      setText: () => {},
+      setElementText: () => {},
+      parentNode: (node) => node.parent,
+      nextSibling: () => null,
+      patchProp: () => {},
+      insert: (node, parent) => {
+        node.parent = parent;
+      },
+      remove: () => {},
+    });
+    const disposed = vi.fn();
+    const handle = {
+      element: {},
+      onDispose: vi.fn(),
+      dispose: vi.fn(async () => {
+        disposed();
+        return { ok: true as const, value: null, diagnostics: [] };
+      }),
+    } as unknown as BaseScreenMountHandle<BaseScreenDesignerElement>;
+    const mount = vi.fn(async () => ({ ok: true, value: handle, diagnostics: [] }));
+    const runtime = { catalog: [], mountDesigner: mount } as unknown as BaseScreenRuntime;
+    const runtimeRef = shallowRef<BaseScreenRuntime | null>(null);
+    const optionsRef = shallowRef<BaseScreenDesignerMountOptions | null>(null);
+    const onMounted = vi.fn();
+    const onDiagnostics = vi.fn();
+    const app = renderer.createApp({
+      render: () =>
+        h(BaseScreenDesigner, {
+          runtime: runtimeRef.value,
+          mountOptions: optionsRef.value,
+          onMounted,
+          onDiagnostics,
+        }),
+    });
+    const flush = async () => {
+      await nextTick();
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    };
+    app.mount(new HostNode());
+    try {
+      // 宿主还在准备 runtime 与端口：组件不挂载，也不报告诊断。
+      await flush();
+      expect(mount).not.toHaveBeenCalled();
+      expect(onDiagnostics).not.toHaveBeenCalled();
+      // 只有 runtime 到位还不够——端口随 mountOptions 一起提交。
+      runtimeRef.value = runtime;
+      await flush();
+      expect(mount).not.toHaveBeenCalled();
+      // 两者齐备即挂载，不需要宿主再套一层 v-if。
+      optionsRef.value = { projectId: 'ready' };
+      await flush();
+      expect(mount).toHaveBeenCalledOnce();
+      expect(onMounted).toHaveBeenCalledOnce();
+      // 退回未就绪：释放句柄（runtime 本身不释放）。
+      optionsRef.value = null;
+      await flush();
+      expect(disposed).toHaveBeenCalledOnce();
     } finally {
       app.unmount();
     }

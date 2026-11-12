@@ -30,14 +30,13 @@ diagnostics: readonly ScreenDiagnostic[];
 
 // @public (undocumented)
 export interface BaseScreenDesignerProps {
-    readonly mountOptions: BaseScreenDesignerMountOptions;
+    readonly mountOptions: BaseScreenDesignerMountOptions | null;
     // (undocumented)
     readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
     // (undocumented)
     readonly onMounted?: BaseScreenMountControllerReady<BaseScreenDesignerElement>;
     readonly remountKey?: string | number;
-    // (undocumented)
-    readonly runtime: BaseScreenRuntime;
+    readonly runtime: BaseScreenRuntime | null;
 }
 
 // @public (undocumented)
@@ -49,15 +48,14 @@ diagnostics: readonly ScreenDiagnostic[];
 
 // @public (undocumented)
 export interface BaseScreenViewerProps {
-    readonly mountOptions: BaseScreenViewerMountOptions;
+    readonly mountOptions: BaseScreenViewerMountOptions | null;
     // (undocumented)
     readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
     // (undocumented)
     readonly onMounted?: BaseScreenMountControllerReady<BaseScreenViewerElement>;
     // (undocumented)
     readonly remountKey?: string | number;
-    // (undocumented)
-    readonly runtime: BaseScreenRuntime;
+    readonly runtime: BaseScreenRuntime | null;
 }
 
 // @public (undocumented)

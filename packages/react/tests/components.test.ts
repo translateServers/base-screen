@@ -60,13 +60,13 @@ describe('React composition components', () => {
   });
 
   it('exposes the runtime and mount option contracts', () => {
-    expectTypeOf<BaseScreenDesignerProps['runtime']>().toEqualTypeOf<BaseScreenRuntime>();
+    expectTypeOf<BaseScreenDesignerProps['runtime']>().toEqualTypeOf<BaseScreenRuntime | null>();
     expectTypeOf<
       BaseScreenDesignerProps['mountOptions']
-    >().toEqualTypeOf<BaseScreenDesignerMountOptions>();
+    >().toEqualTypeOf<BaseScreenDesignerMountOptions | null>();
     expectTypeOf<
       BaseScreenViewerProps['mountOptions']
-    >().toEqualTypeOf<BaseScreenViewerMountOptions>();
+    >().toEqualTypeOf<BaseScreenViewerMountOptions | null>();
   });
 
   it.each([BaseScreenDesigner, BaseScreenViewer])(
@@ -188,6 +188,65 @@ describe('React composition components', () => {
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
       expect(mount).toHaveBeenCalledTimes(2);
       expect(onDiagnostics).toHaveBeenCalledExactlyOnceWith([]);
+    } finally {
+      for (const slot of hooks.slots) slot.cleanup?.();
+      hooks.slots = [];
+    }
+  });
+
+  it('mounts only once runtime and mount options are ready, and releases when they go back', async () => {
+    hooks.cursor = 0;
+    hooks.slots = [];
+    hooks.pending = [];
+    const disposed = vi.fn();
+    const handle = {
+      element: {},
+      onDispose: vi.fn(),
+      dispose: vi.fn(async () => {
+        disposed();
+        return { ok: true as const, value: null, diagnostics: [] };
+      }),
+    } as unknown as BaseScreenMountHandle<BaseScreenDesignerElement>;
+    const mount = vi.fn(async () => ({ ok: true, value: handle, diagnostics: [] }));
+    const runtime = { catalog: [], mountDesigner: mount } as unknown as BaseScreenRuntime;
+    const onMounted = vi.fn();
+    const onDiagnostics = vi.fn();
+    const render = (
+      nextRuntime: BaseScreenRuntime | null,
+      mountOptions: BaseScreenDesignerMountOptions | null,
+    ) => {
+      hooks.cursor = 0;
+      const node = BaseScreenDesigner({
+        runtime: nextRuntime,
+        mountOptions,
+        onMounted,
+        onDiagnostics,
+      });
+      (node.props as { ref: { current: unknown } }).ref.current = {};
+    };
+    const commit = async () => {
+      for (const effect of hooks.pending.splice(0)) effect();
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    };
+    try {
+      // 宿主还在准备 runtime 与端口：组件不挂载，也不报告诊断。
+      render(null, null);
+      await commit();
+      expect(mount).not.toHaveBeenCalled();
+      expect(onDiagnostics).not.toHaveBeenCalled();
+      // 只有 runtime 到位还不够——端口随 mountOptions 一起提交。
+      render(runtime, null);
+      await commit();
+      expect(mount).not.toHaveBeenCalled();
+      // 两者齐备即挂载，不需要宿主再套一层条件渲染。
+      render(runtime, { projectId: 'ready' });
+      await commit();
+      expect(mount).toHaveBeenCalledOnce();
+      expect(onMounted).toHaveBeenCalledOnce();
+      // 退回未就绪：释放句柄（runtime 本身不释放）。
+      render(null, null);
+      await commit();
+      expect(disposed).toHaveBeenCalledOnce();
     } finally {
       for (const slot of hooks.slots) slot.cleanup?.();
       hooks.slots = [];

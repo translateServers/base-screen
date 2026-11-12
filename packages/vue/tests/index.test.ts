@@ -84,11 +84,13 @@ describe('Vue material bridge', () => {
   it('preserves public component props, callback inference and fallback slot types', () => {
     type Designer = InstanceType<typeof BaseScreenDesigner>;
     type Viewer = InstanceType<typeof BaseScreenViewer>;
-    expectTypeOf<Designer['$props']['runtime']>().toEqualTypeOf<BaseScreenRuntime>();
+    expectTypeOf<Designer['$props']['runtime']>().toEqualTypeOf<BaseScreenRuntime | null>();
     expectTypeOf<
       Designer['$props']['mountOptions']
-    >().toEqualTypeOf<BaseScreenDesignerMountOptions>();
-    expectTypeOf<Viewer['$props']['mountOptions']>().toEqualTypeOf<BaseScreenViewerMountOptions>();
+    >().toEqualTypeOf<BaseScreenDesignerMountOptions | null>();
+    expectTypeOf<
+      Viewer['$props']['mountOptions']
+    >().toEqualTypeOf<BaseScreenViewerMountOptions | null>();
     expectTypeOf<Parameters<Designer['$slots']['fallback']>[0]['diagnostics']>().toEqualTypeOf<
       readonly ScreenDiagnostic[]
     >();

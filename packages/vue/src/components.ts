@@ -25,9 +25,10 @@ import {
 } from 'vue';
 
 export interface BaseScreenDesignerProps {
-  readonly runtime: BaseScreenRuntime;
-  /** 初始化快照；文档/项目身份变化重挂载，catalog 新引用热刷新，其余配置在下次挂载生效。 */
-  readonly mountOptions: BaseScreenDesignerMountOptions;
+  /** `null` 表示尚未就绪：不挂载、不保留诊断，等它变为非空后再挂载。 */
+  readonly runtime: BaseScreenRuntime | null;
+  /** 初始化快照；`null` 表示尚未就绪。文档/项目身份变化重挂载，catalog 新引用热刷新。 */
+  readonly mountOptions: BaseScreenDesignerMountOptions | null;
   /** 强制重挂载；catalog 新引用热刷新，其余非身份配置只保存为后续挂载的初始化快照。 */
   readonly remountKey?: string | number;
   readonly onMounted?: BaseScreenMountControllerReady<BaseScreenDesignerElement>;
@@ -35,23 +36,25 @@ export interface BaseScreenDesignerProps {
 }
 
 export interface BaseScreenViewerProps {
-  readonly runtime: BaseScreenRuntime;
-  /** 初始化快照；文档/项目身份变化重挂载，catalog 新引用热刷新，其余配置在下次挂载生效。 */
-  readonly mountOptions: BaseScreenViewerMountOptions;
+  /** `null` 表示尚未就绪：不挂载、不保留诊断，等它变为非空后再挂载。 */
+  readonly runtime: BaseScreenRuntime | null;
+  /** 初始化快照；`null` 表示尚未就绪。文档/项目身份变化重挂载，catalog 新引用热刷新。 */
+  readonly mountOptions: BaseScreenViewerMountOptions | null;
   readonly remountKey?: string | number;
   readonly onMounted?: BaseScreenMountControllerReady<BaseScreenViewerElement>;
   readonly onDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
 }
 
 interface CreateControllerInput<TElement extends BaseScreenMountElement, TOptions> {
+  readonly runtime: BaseScreenRuntime;
   readonly options: TOptions;
   readonly onMounted: BaseScreenMountControllerReady<TElement>;
   readonly onDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
 }
 
 interface UseBaseScreenMountOptions<TElement extends BaseScreenMountElement, TOptions> {
-  readonly runtime: () => BaseScreenRuntime;
-  readonly mountOptions: () => TOptions;
+  readonly runtime: () => BaseScreenRuntime | null;
+  readonly mountOptions: () => TOptions | null;
   readonly remountKey: () => string | number | undefined;
   readonly identity: readonly (() => unknown)[];
   readonly onMounted: () => BaseScreenMountControllerReady<TElement> | undefined;
@@ -60,6 +63,9 @@ interface UseBaseScreenMountOptions<TElement extends BaseScreenMountElement, TOp
     input: CreateControllerInput<TElement, TOptions>,
   ) => BaseScreenMountController<TElement, TOptions>;
 }
+
+/** 未就绪不是错误：诊断清空，回调不会被调用。 */
+const EMPTY_DIAGNOSTICS: readonly ScreenDiagnostic[] = Object.freeze([]);
 
 interface BaseScreenMountState {
   readonly containerRef: Ref<HTMLElement | null>;
@@ -91,9 +97,17 @@ function useBaseScreenMount<
     await detaching;
     if (token !== generation || disposed) return;
     const container = containerRef.value;
+    const runtime = options.runtime();
+    const mountOptions = options.mountOptions();
     if (container === null) return;
+    // 还没就绪（宿主仍在准备 runtime / 端口）：不建控制器，上一轮诊断也作废。
+    if (runtime === null || mountOptions === null) {
+      diagnostics.value = EMPTY_DIAGNOSTICS;
+      return;
+    }
     const current = options.createController({
-      options: options.mountOptions(),
+      runtime,
+      options: mountOptions,
       onMounted: (handle) => options.onMounted()?.(handle),
       onDiagnostics: publishDiagnostics,
     });
@@ -111,7 +125,12 @@ function useBaseScreenMount<
 
   onVueMounted(scheduleAttach);
   watch(
-    [options.runtime, options.remountKey, ...options.identity],
+    [
+      options.runtime,
+      options.remountKey,
+      () => options.mountOptions() !== null,
+      ...options.identity,
+    ],
     () => {
       detachCurrent();
       scheduleAttach();
@@ -119,9 +138,11 @@ function useBaseScreenMount<
     { flush: 'post' },
   );
   watch(
-    [options.mountOptions, () => options.mountOptions().catalog],
+    [options.mountOptions, () => options.mountOptions()?.catalog],
     () => {
-      controller?.updateOptions(options.mountOptions());
+      const mountOptions = options.mountOptions();
+      if (mountOptions === null) return;
+      controller?.updateOptions(mountOptions);
     },
     { flush: 'post' },
   );
@@ -168,13 +189,13 @@ const BaseScreenDesignerComponent = defineComponent<
       onMounted: () => props.onMounted,
       onDiagnostics: () => props.onDiagnostics,
       identity: [
-        () => props.mountOptions.projectId,
-        () => props.mountOptions.document,
-        () => props.mountOptions.element,
+        () => props.mountOptions?.projectId,
+        () => props.mountOptions?.document,
+        () => props.mountOptions?.element,
       ],
       createController: (input) =>
         createBaseScreenDesignerMountController({
-          runtime: props.runtime,
+          runtime: input.runtime,
           options: input.options,
           onMounted: input.onMounted,
           onDiagnostics: input.onDiagnostics,
@@ -194,9 +215,13 @@ const BaseScreenDesignerComponent = defineComponent<
     name: 'BaseScreenDesigner',
     slots: Object as SlotsType<{ fallback: { diagnostics: readonly ScreenDiagnostic[] } }>,
     props: {
-      runtime: { type: Object as PropType<BaseScreenRuntime>, required: true },
+      // `null` 列入 type 数组：required 的 prop 也会跑类型断言，只有显式列出才接受「未就绪」。
+      runtime: {
+        type: [Object, null] as unknown as PropType<BaseScreenRuntime | null>,
+        required: true,
+      },
       mountOptions: {
-        type: Object as PropType<BaseScreenDesignerMountOptions>,
+        type: [Object, null] as unknown as PropType<BaseScreenDesignerMountOptions | null>,
         required: true,
       },
       remountKey: remountKeyProp,
@@ -228,14 +253,14 @@ const BaseScreenViewerComponent = defineComponent<
       onMounted: () => props.onMounted,
       onDiagnostics: () => props.onDiagnostics,
       identity: [
-        () => props.mountOptions.projectId,
-        () => props.mountOptions.document,
-        () => props.mountOptions.documentRevision,
-        () => props.mountOptions.element,
+        () => props.mountOptions?.projectId,
+        () => props.mountOptions?.document,
+        () => props.mountOptions?.documentRevision,
+        () => props.mountOptions?.element,
       ],
       createController: (input) =>
         createBaseScreenViewerMountController({
-          runtime: props.runtime,
+          runtime: input.runtime,
           options: input.options,
           onMounted: input.onMounted,
           onDiagnostics: input.onDiagnostics,
@@ -255,9 +280,13 @@ const BaseScreenViewerComponent = defineComponent<
     name: 'BaseScreenViewer',
     slots: Object as SlotsType<{ fallback: { diagnostics: readonly ScreenDiagnostic[] } }>,
     props: {
-      runtime: { type: Object as PropType<BaseScreenRuntime>, required: true },
+      // `null` 列入 type 数组：required 的 prop 也会跑类型断言，只有显式列出才接受「未就绪」。
+      runtime: {
+        type: [Object, null] as unknown as PropType<BaseScreenRuntime | null>,
+        required: true,
+      },
       mountOptions: {
-        type: Object as PropType<BaseScreenViewerMountOptions>,
+        type: [Object, null] as unknown as PropType<BaseScreenViewerMountOptions | null>,
         required: true,
       },
       remountKey: remountKeyProp,
