@@ -3,7 +3,7 @@
    重复标题和外层留白；配色与密度全部取自公共令牌层（--bs-host-*，见
    docs/design/host-public-tokens.md），本文件不再复制任何颜色字面量——
    浅色主题曾经因为本地副本只写了深色值而与相邻面板脱节。公共令牌层由入口
-   main 文件统一引入（import '@base-screen/sdk/host-tokens.css'），不在这里重复 @import。 */
+   main 文件统一引入（import 'base-screen/host-tokens.css'），不在这里重复 @import。 */
 
 .asset-library,
 .asset-picker {

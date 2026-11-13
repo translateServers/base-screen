@@ -4,11 +4,11 @@ import type {
   BaseScreenHostResourceSelection,
   BaseScreenHostResourceSelectionRequest,
   BaseScreenHostResourceSelectionRequestEventDetail,
-} from '@base-screen/sdk/designer';
+} from 'base-screen/designer';
 import {
   BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT,
   baseScreenDesignerLeftPanelSlotName,
-} from '@base-screen/sdk/designer';
+} from 'base-screen/designer';
 import { api } from '../lib/api';
 import { resolveApiBase } from '../lib/api-base';
 import {

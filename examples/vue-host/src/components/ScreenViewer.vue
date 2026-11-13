@@ -5,8 +5,8 @@ import {
   type ScreenDocument,
   type ScreenJsonValue,
   type ScreenResourceObserver,
-} from '@base-screen/sdk/contracts';
-import type { BaseScreenViewerElement } from '@base-screen/sdk/viewer';
+} from 'base-screen/contracts';
+import type { BaseScreenViewerElement } from 'base-screen/viewer';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useScreenSessionStore } from '../composables/use-stores';

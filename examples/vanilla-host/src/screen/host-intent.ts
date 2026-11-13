@@ -4,15 +4,15 @@ import type {
   ScreenDataSource,
   ScreenDocument,
   ScreenJsonValue,
-} from '@base-screen/sdk/contracts';
+} from 'base-screen/contracts';
 import {
   isScreenCanvasBackground,
   isScreenCanvasPaletteColor,
   parseScreenDocument,
-} from '@base-screen/sdk/contracts';
-import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
-import type { DesignerChangeProposalInput, DesignerIntentHandler } from '@base-screen/sdk/engine';
-import type { BaseScreenMaterialCatalog } from '@base-screen/sdk/plugin-core';
+} from 'base-screen/contracts';
+import type { BaseScreenDesignerElement } from 'base-screen/designer';
+import type { DesignerChangeProposalInput, DesignerIntentHandler } from 'base-screen/engine';
+import type { BaseScreenMaterialCatalog } from 'base-screen/plugin-core';
 import {
   type AgentCanvasPatchShape,
   type AgentCatalogShape,

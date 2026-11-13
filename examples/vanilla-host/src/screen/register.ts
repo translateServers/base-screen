@@ -1,4 +1,4 @@
-import type { BaseScreenMaterialCatalogEntry } from '@base-screen/sdk/plugin-core';
+import type { BaseScreenMaterialCatalogEntry } from 'base-screen/plugin-core';
 import { METRIC_VALUE_MANIFEST } from './metric-value';
 import { MetricValueElement, metricValueAdapter } from './metric-value-element';
 

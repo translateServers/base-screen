@@ -13,11 +13,9 @@
     "verify": "node scripts/smoke.mjs"
   },
   "dependencies": {
-    "@base-screen/host-kit": "workspace:^",
     "@base-screen/plugin-board-materials": "workspace:^",
     "@base-screen/plugin-echarts": "workspace:^",
-    "@base-screen/react": "workspace:^",
-    "@base-screen/sdk": "workspace:^",
+    "base-screen": "workspace:^",
     "echarts": "^6.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

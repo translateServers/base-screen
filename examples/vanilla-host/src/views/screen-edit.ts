@@ -2,8 +2,8 @@ import {
   type BaseScreenDesignerElement,
   type BaseScreenMountHandle,
   createBaseScreenDesignerMountController,
-} from '@base-screen/sdk';
-import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from '@base-screen/sdk/designer';
+} from 'base-screen';
+import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from 'base-screen/designer';
 import { showToast } from '../components/toast';
 import { api } from '../lib/api';
 import { resolveApiBase } from '../lib/api-base';

@@ -1,9 +1,9 @@
-import type { ScreenJsonValue, ScreenParseResult } from '@base-screen/contracts';
+import type { ScreenJsonValue, ScreenParseResult } from 'base-screen/contracts';
 import type {
   BaseScreenDataField,
   BaseScreenMaterialModel,
   BaseScreenMaterialTabularDataAdapter,
-} from '@base-screen/plugin-core';
+} from 'base-screen/plugin-core';
 import { METRIC_VALUE_MANIFEST } from './metric-value';
 
 /**

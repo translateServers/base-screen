@@ -4,8 +4,8 @@ import {
   type ScreenDocument,
   type ScreenJsonValue,
   type ScreenResourceObserver,
-} from '@base-screen/contracts';
-import type { BaseScreenViewerElement } from '@base-screen/sdk/viewer';
+} from 'base-screen/contracts';
+import type { BaseScreenViewerElement } from 'base-screen/viewer';
 import { showToast } from '../components/toast';
 import { api } from '../lib/api';
 import { resolveApiBase } from '../lib/api-base';

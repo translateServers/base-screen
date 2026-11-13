@@ -77,21 +77,15 @@ importers:
 
   examples/react-host:
     dependencies:
-      '@base-screen/host-kit':
-        specifier: workspace:^
-        version: link:../../packages/host-kit
       '@base-screen/plugin-board-materials':
         specifier: workspace:^
         version: link:../../plugins/plugin-board-materials
       '@base-screen/plugin-echarts':
         specifier: workspace:^
         version: link:../../plugins/plugin-echarts
-      '@base-screen/react':
+      base-screen:
         specifier: workspace:^
-        version: link:../../packages/react
-      '@base-screen/sdk':
-        specifier: workspace:^
-        version: link:../../packages/sdk
+        version: link:../../packages/base-screen
       echarts:
         specifier: ^6.1.0
         version: 6.1.0
@@ -199,30 +193,15 @@ importers:
 
   examples/vanilla-host:
     dependencies:
-      '@base-screen/contracts':
-        specifier: workspace:^
-        version: link:../../packages/contracts
-      '@base-screen/host-kit':
-        specifier: workspace:^
-        version: link:../../packages/host-kit
-      '@base-screen/material':
-        specifier: workspace:^
-        version: link:../../packages/material
       '@base-screen/plugin-board-materials':
         specifier: workspace:^
         version: link:../../plugins/plugin-board-materials
-      '@base-screen/plugin-core':
-        specifier: workspace:^
-        version: link:../../packages/plugin-core
       '@base-screen/plugin-echarts':
         specifier: workspace:^
         version: link:../../plugins/plugin-echarts
-      '@base-screen/plugin-sdk':
+      base-screen:
         specifier: workspace:^
-        version: link:../../packages/plugin-sdk
-      '@base-screen/sdk':
-        specifier: workspace:^
-        version: link:../../packages/sdk
+        version: link:../../packages/base-screen
       echarts:
         specifier: ^6.1.0
         version: 6.1.0
@@ -242,21 +221,15 @@ importers:
 
   examples/vue-host:
     dependencies:
-      '@base-screen/host-kit':
-        specifier: workspace:^
-        version: link:../../packages/host-kit
       '@base-screen/plugin-board-materials':
         specifier: workspace:^
         version: link:../../plugins/plugin-board-materials
       '@base-screen/plugin-echarts':
         specifier: workspace:^
         version: link:../../plugins/plugin-echarts
-      '@base-screen/sdk':
+      base-screen:
         specifier: workspace:^
-        version: link:../../packages/sdk
-      '@base-screen/vue':
-        specifier: workspace:^
-        version: link:../../packages/vue
+        version: link:../../packages/base-screen
       echarts:
         specifier: ^6.1.0
         version: 6.1.0

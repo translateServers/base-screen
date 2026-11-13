@@ -1,11 +1,11 @@
-import { createReactMaterialDefinition } from '@base-screen/react';
-import type { ScreenJsonValue, ScreenParseResult } from '@base-screen/sdk/contracts';
+import type { ScreenJsonValue, ScreenParseResult } from 'base-screen/contracts';
 import type {
   BaseScreenDataField,
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialModel,
   BaseScreenMaterialTabularDataAdapter,
-} from '@base-screen/sdk/plugin-core';
+} from 'base-screen/plugin-core';
+import { createReactMaterialDefinition } from 'base-screen/react';
 import { METRIC_VALUE_MANIFEST } from './metric-value';
 
 export interface MetricValueProps {
@@ -14,7 +14,7 @@ export interface MetricValueProps {
 }
 
 /**
- * React 自有物料：普通函数组件经 `@base-screen/react` 桥接为 Base Screen 物料。
+ * React 自有物料：普通函数组件经 `base-screen/react` 桥接为 Base Screen 物料。
  * mapModel 把全量 model（含 dataState 投影值）映射为组件 props。
  *
  * 原子物料：只呈现「数值 + 单位」。标题交给文档层的 `base.text`，底座与边框交给

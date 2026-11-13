@@ -4,8 +4,8 @@ import {
   type ScreenDocument,
   type ScreenJsonValue,
   type ScreenResourceObserver,
-} from '@base-screen/sdk/contracts';
-import type { BaseScreenViewerElement } from '@base-screen/sdk/viewer';
+} from 'base-screen/contracts';
+import type { BaseScreenViewerElement } from 'base-screen/viewer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';

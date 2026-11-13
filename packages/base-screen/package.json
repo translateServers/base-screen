@@ -133,7 +133,7 @@
     "./host-tokens.css": "./dist/host-tokens.css"
   },
   "scripts": {
-    "build": "pnpm run clean && tsc -p tsconfig.build.json && vite build && node ../../tooling/build/rollup-dts.mjs && node -e \"const fs=require('node:fs');fs.copyFileSync(require.resolve('@base-screen/engine/host-tokens.css'),'dist/host-tokens.css')\"",
+    "build": "pnpm run clean && tsc -p tsconfig.build.json && vite build && node ../../tooling/build/vendor-types.mjs && node -e \"const fs=require('node:fs');fs.copyFileSync(require.resolve('@base-screen/engine/host-tokens.css'),'dist/host-tokens.css')\"",
     "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
     "lint": "biome check src",
     "typecheck": "tsc --noEmit -p tsconfig.json"

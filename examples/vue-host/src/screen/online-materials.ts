@@ -1,12 +1,12 @@
-import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/sdk/contracts';
-import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
+import type { ScreenDiagnostic, ScreenParseResult } from 'base-screen/contracts';
+import type { BaseScreenDesignerElement } from 'base-screen/designer';
 import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialConstructor,
   type BaseScreenMaterialManifest,
   parseBaseScreenMaterialManifest,
-} from '@base-screen/sdk/plugin-core';
-import { createMaterialDefinition } from '@base-screen/sdk/plugins';
+} from 'base-screen/plugin-core';
+import { createMaterialDefinition } from 'base-screen/plugins';
 import { api } from '../lib/api';
 import type { OnlineMaterialPackageShape } from '../types';
 

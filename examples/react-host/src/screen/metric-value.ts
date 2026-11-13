@@ -1,4 +1,4 @@
-import type { BaseScreenMaterialManifest } from '@base-screen/sdk/plugin-core';
+import type { BaseScreenMaterialManifest } from 'base-screen/plugin-core';
 
 /**
  * 三端共有的宿主自有物料「指标读数」manifest：React / Vue / Vanilla 三个前端

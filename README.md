@@ -252,25 +252,26 @@ Designer 的 `onProjectState(state)` 在成功挂载后立即投影权威快照�
 
 直接文档模式与项目模式应分别使用；绑定项目适配器后，通过项目 API 加载，不再直接赋值 `document`。
 
-**获取包**：`packages/` 下的 `@base-screen/*` 核心包已配置为向公共 npm registry 分发；外围插件暂保持私有，不在本轮发布范围。**首次发布尚未执行**，以下安装命令需等对应版本发布后使用：
-
-宿主真正需要直接安装的只有聚合包 `@base-screen/sdk`：它的 `dependencies` 已经带上 contracts、core、engine、renderer、material、plugin-core、plugin-manager、plugin-sdk 这 8 个内部包，宿主不必逐个安装。
+**获取包**：核心能力走单包分发，宿主只安装一个 `base-screen`，内部实现按子路径引入；外围插件暂保持私有，不在本轮发布范围。**首次发布尚未执行**，以下命令需等对应版本发布后使用：
 
 ```bash
-# 必需：聚合入口（Viewer / Designer / 标准 runtime）
-npm install @base-screen/sdk
+# 核心：一个包，按子路径引入（/viewer、/designer、/contracts、/engine、/host-kit…）
+npm install base-screen
 
-# 必需：以框架组件方式使用，二选一
-npm install @base-screen/react react@^19.1.0 react-dom@^19.1.0
-npm install @base-screen/vue vue@^3.5.0
-
-# 可选：只在用到对应能力时才装
-npm install @base-screen/host-kit                        # 宿主侧 REST 项目/数据集适配器
-npm install @base-screen/plugin-echarts echarts@^6.1.0   # ECharts 图表族
-npm install @base-screen/plugin-board-materials          # 看板物料
+# 以框架组件方式使用时，带上框架本身即可（对应子路径是 base-screen/react、base-screen/vue）
+npm install base-screen react@^19.1.0 react-dom@^19.1.0
+npm install base-screen vue@^3.5.0
 ```
 
-外部宿主的依赖按普通 npm 包写版本范围（如 `"@base-screen/sdk": "^0.1.0"`）；`workspace:^` 只用于本仓库内部，打包时已转成 semver，不要抄进宿主项目。可直接运行的宿主工程见[示例总览](./examples/README.md)：三个前端是同一 workspace 的成员，为了演示宿主适配器和外围插件才直连 5 个包，最小宿主只需要上面两项。接入真实业务时替换示例中的宿主适配器和端口实现，并只使用包的公开导出。
+宿主不再需要逐个安装 `@base-screen/*`：contracts、core、engine、renderer、material、plugin-* 与 host-kit 都已内联进 `base-screen` 的产物，`zod` 作为唯一运行时依赖随包解析。框架桥接包 `@base-screen/react` / `@base-screen/vue` 仍可单独安装，功能与 `base-screen/react`、`base-screen/vue` 等价，二选一即可、不要混用。
+
+```ts
+import { createBaseScreenViewerRuntime } from 'base-screen/viewer';
+import { createHttpProjectAdapter } from 'base-screen/host-kit';
+import { BaseScreenDesigner } from 'base-screen/react';
+```
+
+可直接运行的宿主工程见[示例总览](./examples/README.md)，三个前端已经全部按这种方式引入。接入真实业务时替换示例中的宿主适配器和端口实现，并只使用包的公开导出。
 
 ### 离线验证与预发布接入（tarball 批次）
 

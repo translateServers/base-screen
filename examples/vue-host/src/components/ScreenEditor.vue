@@ -6,10 +6,10 @@ import type {
   BaseScreenMountHandle,
   BaseScreenRuntime,
   ScreenProjectState,
-} from '@base-screen/sdk';
-import type { ScreenDiagnostic } from '@base-screen/sdk/contracts';
-import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from '@base-screen/sdk/designer';
-import { BaseScreenDesigner } from '@base-screen/vue';
+} from 'base-screen';
+import type { ScreenDiagnostic } from 'base-screen/contracts';
+import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from 'base-screen/designer';
+import { BaseScreenDesigner } from 'base-screen/vue';
 import { onBeforeUnmount, onMounted, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../lib/api';

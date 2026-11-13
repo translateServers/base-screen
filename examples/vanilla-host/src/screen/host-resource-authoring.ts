@@ -1,5 +1,5 @@
-import type { ScreenHostResourceDataSource } from '@base-screen/sdk/contracts';
-import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
+import type { ScreenHostResourceDataSource } from 'base-screen/contracts';
+import type { BaseScreenDesignerElement } from 'base-screen/designer';
 
 /**
  * 宿主资源作者面（host-resource authoring surface）。

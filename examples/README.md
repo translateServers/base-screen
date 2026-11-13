@@ -192,20 +192,22 @@ pnpm dev:vue-host           # http://127.0.0.1:5175
 前端 dev server 通过 Vite `proxy` 把 `/api` 转发到 `3000`，因此**前后端可以分开启停**；
 构建产物是纯静态站点，同样支持独立部署（API 地址运行时解析，见各前端 `src/lib/api-base.ts`）。
 
-### 依赖数量：示例为什么直连 5 个包
+### 依赖声明：核心只有一个包
 
-三个前端都是本仓库 workspace 的成员（`workspace:^` 由 pnpm 链接到 `packages/` 源码），并且为了把能力演示全，直连了 5 个包。**外部宿主不需要这样装**：聚合包 `@base-screen/sdk` 已经包含 8 个内部包，示例里多出来的 3 个都是可选能力。
+基座走单包分发：核心能力全部由 `base-screen` 提供，内部实现按子路径引入，宿主不再逐个安装
+`@base-screen/*`。三个前端就是这么引的：
 
-| 依赖 | 是否必需 | 说明 |
+| 依赖 | 性质 | 说明 |
 | --- | --- | --- |
-| `@base-screen/sdk` | 必需 | 聚合入口，带 contracts / core / engine / renderer / material / plugin-core / plugin-manager / plugin-sdk |
-| `@base-screen/vue`（或 `react`） | 必需 | 框架桥接，`vue` / `react` 是它的 peer |
-| `@base-screen/host-kit` | 可选 | 只有用它的 REST 项目 / 数据集适配器才需要 |
-| `@base-screen/plugin-echarts` | 可选 | ECharts 图表族，`echarts` 由宿主提供 |
-| `@base-screen/plugin-board-materials` | 可选 | 看板物料包 |
+| `base-screen` | 必需 | 核心单包：`/viewer`、`/designer`、`/contracts`、`/engine`、`/host-kit`、`/react`、`/vue` 等子路径 |
+| `vue` / `react` | 必需 | 框架本身，是 `base-screen` 对应桥接入口的 peer |
+| `@base-screen/plugin-echarts` | 可选 | ECharts 图表族，`echarts` 由宿主提供（外围插件仍为仓库内私有包，不随核心发布） |
+| `@base-screen/plugin-board-materials` | 可选 | 看板物料包，同上 |
 
-最小宿主只装 `@base-screen/sdk` 加一个框架桥接包。`workspace:` 协议只在 pnpm workspace 内有效，
-宿主项目按版本号声明即可（如 `"@base-screen/sdk": "^0.1.0"`）。
+示例里的插件依赖是仓库内的 `workspace:^` 引用，用来演示外围插件如何合并进 catalog；外部宿主只需要
+`npm install base-screen`，再用 `import { ... } from 'base-screen/viewer'` 按需引入。框架桥接包
+（`@base-screen/react` / `@base-screen/vue`）仍可单独安装，与 `base-screen/react`、`base-screen/vue`
+等价，二选一即可，不要在同一工程里混用两种入口。
 
 ## 冒烟验证
 

@@ -1,10 +1,10 @@
-import { createHostProjectAdapter } from '@base-screen/host-kit';
 import type {
   ScreenDocument,
   ScreenParseResult,
   ScreenProjectAdapter,
   ScreenProjectEnvelope,
-} from '@base-screen/sdk/contracts';
+} from 'base-screen/contracts';
+import { createHostProjectAdapter } from 'base-screen/host-kit';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
 

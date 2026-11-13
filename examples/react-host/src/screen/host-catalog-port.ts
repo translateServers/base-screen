@@ -6,7 +6,7 @@ import type {
   ScreenHostCatalogSummary,
   ScreenJsonValue,
   ScreenParseResult,
-} from '@base-screen/sdk/contracts';
+} from 'base-screen/contracts';
 import type { Logger } from '../lib/logger';
 import type { DatasetAlertRow } from './host-dataset-port';
 

@@ -1,8 +1,8 @@
-import type { ScreenJsonObject } from '@base-screen/sdk/contracts';
+import type { ScreenJsonObject } from 'base-screen/contracts';
 import type {
   BaseScreenConditionalStylePort,
   BaseScreenConditionalStyleRequest,
-} from '@base-screen/sdk/plugin-core';
+} from 'base-screen/plugin-core';
 
 export type HostAlarmLevel = 'warning' | 'critical' | 'info';
 export type HostAlarmStatus = 'connecting' | 'live' | 'reconnecting' | 'offline';

@@ -1,10 +1,10 @@
-import { createHostDatasetPort as createDatasetPort } from '@base-screen/host-kit';
 import type {
   ScreenDatasetGroup,
   ScreenHostDatasetPort,
   ScreenJsonObject,
   ScreenTabularDataset,
-} from '@base-screen/sdk/contracts';
+} from 'base-screen/contracts';
+import { createHostDatasetPort as createDatasetPort } from 'base-screen/host-kit';
 import type { ApiResult, DatasetListQuery, DatasetQueryParams } from '../lib/api';
 import type { Logger } from '../lib/logger';
 

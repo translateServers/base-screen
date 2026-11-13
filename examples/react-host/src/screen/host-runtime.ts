@@ -8,19 +8,16 @@ import {
   PLUGIN_ECHARTS_ID,
   registerPluginEcharts,
 } from '@base-screen/plugin-echarts';
-import { type BaseScreenRuntime, createBaseScreenRuntime } from '@base-screen/sdk';
-import {
-  SCREEN_BLUEPRINT_CAPABILITY_IDS,
-  type ScreenParseResult,
-} from '@base-screen/sdk/contracts';
+import { type BaseScreenRuntime, createBaseScreenRuntime } from 'base-screen';
+import { SCREEN_BLUEPRINT_CAPABILITY_IDS, type ScreenParseResult } from 'base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialCatalogEntry,
-} from '@base-screen/sdk/plugin-core';
+} from 'base-screen/plugin-core';
 import {
   createBaseScreenMaterialCatalog,
   parseBaseScreenMaterialManifest,
-} from '@base-screen/sdk/plugin-core';
+} from 'base-screen/plugin-core';
 import { api } from '../lib/api';
 import type { OnlineMaterialPackageShape } from '../types';
 import { createHostResourceRuntime } from './host-resource-plugin';

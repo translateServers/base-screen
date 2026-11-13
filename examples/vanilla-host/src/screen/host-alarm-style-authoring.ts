@@ -1,9 +1,9 @@
-import type { ScreenDiagnostic, ScreenJsonObject } from '@base-screen/sdk/contracts';
+import type { ScreenDiagnostic, ScreenJsonObject } from 'base-screen/contracts';
 import type {
   BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenHostConditionalStyleBinding,
   BaseScreenHostConditionalStyleSource,
-} from '@base-screen/sdk/plugin-core';
+} from 'base-screen/plugin-core';
 import type { HostAlarmBindings, HostAlarmLevel } from './host-alarm-controller';
 
 /**

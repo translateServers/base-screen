@@ -1,4 +1,4 @@
-import type { BaseScreenMaterialCatalogEntry } from '@base-screen/sdk/plugin-core';
+import type { BaseScreenMaterialCatalogEntry } from 'base-screen/plugin-core';
 import { createMetricValueMaterial } from './metric-value-material';
 
 let cached: readonly BaseScreenMaterialCatalogEntry[] | undefined;

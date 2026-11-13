@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 宿主自有的 Vue 物料组件：普通 SFC，`@base-screen/vue` 桥接把设计器写入的
+ * 宿主自有的 Vue 物料组件：普通 SFC，`base-screen/vue` 桥接把设计器写入的
  * model 映射成 props，组件本身不需要知道 Base Screen 的存在。
  *
  * 原子物料：只呈现「数值 + 单位」。描述这块卡是什么的标题交给文档层的 `base.text`，

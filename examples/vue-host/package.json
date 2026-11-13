@@ -13,11 +13,9 @@
     "verify": "node scripts/smoke.mjs"
   },
   "dependencies": {
-    "@base-screen/host-kit": "workspace:^",
     "@base-screen/plugin-board-materials": "workspace:^",
     "@base-screen/plugin-echarts": "workspace:^",
-    "@base-screen/sdk": "workspace:^",
-    "@base-screen/vue": "workspace:^",
+    "base-screen": "workspace:^",
     "echarts": "^6.1.0",
     "vue": "^3.5.40",
     "vue-router": "^5.3.1",

@@ -2,7 +2,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialManifest,
   BaseScreenMaterialObjectSchema,
-} from '@base-screen/sdk/plugin-core';
+} from 'base-screen/plugin-core';
 import type {
   AgentCatalogMaterialShape,
   AgentCatalogPropShape,
