@@ -1,0 +1,42 @@
+{
+  "name": "@base-screen/plugin-materials",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/translateServers/base-screen.git",
+    "directory": "plugins/plugin-materials"
+  },
+  "homepage": "https://github.com/translateServers/base-screen#readme",
+  "bugs": "https://github.com/translateServers/base-screen/issues",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@base-screen/contracts": "workspace:^",
+    "@base-screen/plugin-core": "workspace:^",
+    "@base-screen/plugin-sdk": "workspace:^"
+  },
+  "peerDependencies": {
+    "echarts": "^6.1.0"
+  },
+  "devDependencies": {
+    "echarts": "^6.1.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "pnpm run clean && tsc -p tsconfig.build.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
+    "lint": "biome check src tests",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

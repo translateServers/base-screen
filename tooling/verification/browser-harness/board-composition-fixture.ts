@@ -99,7 +99,7 @@ export async function applyHostScriptFilter(
 /**
  * 宿主自营插件：只贡献一个 `dataProcessor`，没有物料、没有面板、没有 DOM。
  *
- * 与 `plugin-pipeline` 的 `topBy` 的区别在配置语义：那个处理器的参数是文档字段，
+ * 与统一物料插件的 `topBy` 的区别在配置语义：那个处理器的参数是文档字段，
  * 这个处理器的参数是**宿主资产标识**——这正是"用户可编写过滤器"的承载形态。
  */
 export function createBoardCompositionRuntime(): BaseScreenPluginRuntime {

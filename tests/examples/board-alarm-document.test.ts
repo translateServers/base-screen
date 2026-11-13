@@ -12,10 +12,10 @@ import {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '../../packages/plugin-core/src/index.js';
-import { PLUGIN_BOARD_BORDER_BOX_MANIFEST } from '../../plugins/plugin-board-materials/src/border-box.js';
-import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-board-materials/src/digital-flop.js';
-import { BOARD_ALARM_LEVEL_COLORS } from '../../plugins/plugin-board-materials/src/identity.js';
-import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-board-materials/src/scroll-board.js';
+import { PLUGIN_BOARD_BORDER_BOX_MANIFEST } from '../../plugins/plugin-materials/src/board/border-box.js';
+import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-materials/src/board/digital-flop.js';
+import { BOARD_ALARM_LEVEL_COLORS } from '../../plugins/plugin-materials/src/board/identity.js';
+import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-materials/src/board/scroll-board.js';
 
 /**
  * 实时告警演示种子的三层校验（与 `board-monitor-document.test.ts` 同标准）：

@@ -14,14 +14,14 @@ import {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '../../packages/plugin-core/src/index.js';
-import { PLUGIN_BOARD_BORDER_BOX_MANIFEST } from '../../plugins/plugin-board-materials/src/border-box.js';
-import { PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST } from '../../plugins/plugin-board-materials/src/capsule-progress.js';
-import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-board-materials/src/digital-flop.js';
-import { PLUGIN_BOARD_PIPELINE_MANIFEST } from '../../plugins/plugin-board-materials/src/pipeline.js';
-import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-board-materials/src/scroll-board.js';
-import { PLUGIN_BOARD_STATUS_GRID_MANIFEST } from '../../plugins/plugin-board-materials/src/status-grid.js';
-import { PLUGIN_BOARD_WATER_LEVEL_MANIFEST } from '../../plugins/plugin-board-materials/src/water-level.js';
-import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from '../../plugins/plugin-echarts/src/manifest.js';
+import { PLUGIN_BOARD_BORDER_BOX_MANIFEST } from '../../plugins/plugin-materials/src/board/border-box.js';
+import { PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST } from '../../plugins/plugin-materials/src/board/capsule-progress.js';
+import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-materials/src/board/digital-flop.js';
+import { PLUGIN_BOARD_PIPELINE_MANIFEST } from '../../plugins/plugin-materials/src/board/pipeline.js';
+import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-materials/src/board/scroll-board.js';
+import { PLUGIN_BOARD_STATUS_GRID_MANIFEST } from '../../plugins/plugin-materials/src/board/status-grid.js';
+import { PLUGIN_BOARD_WATER_LEVEL_MANIFEST } from '../../plugins/plugin-materials/src/board/water-level.js';
+import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from '../../plugins/plugin-materials/src/echarts/manifest.js';
 
 /**
  * 生产监控种子的三层校验。缺任何一层都会出现"canonical 能解析、画布却空白/绑错列"：

@@ -17,12 +17,12 @@ import {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '../../packages/plugin-core/src/index.js';
-import { PLUGIN_BOARD_BORDER_BOX_MANIFEST } from '../../plugins/plugin-board-materials/src/border-box.js';
-import { PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST } from '../../plugins/plugin-board-materials/src/capsule-progress.js';
-import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-board-materials/src/digital-flop.js';
-import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-board-materials/src/scroll-board.js';
-import { PLUGIN_BOARD_WATER_LEVEL_MANIFEST } from '../../plugins/plugin-board-materials/src/water-level.js';
-import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from '../../plugins/plugin-echarts/src/manifest.js';
+import { PLUGIN_BOARD_BORDER_BOX_MANIFEST } from '../../plugins/plugin-materials/src/board/border-box.js';
+import { PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST } from '../../plugins/plugin-materials/src/board/capsule-progress.js';
+import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-materials/src/board/digital-flop.js';
+import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-materials/src/board/scroll-board.js';
+import { PLUGIN_BOARD_WATER_LEVEL_MANIFEST } from '../../plugins/plugin-materials/src/board/water-level.js';
+import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from '../../plugins/plugin-materials/src/echarts/manifest.js';
 
 /**
  * 真实空气质量案例的三层校验（与生产监控种子同口径）：

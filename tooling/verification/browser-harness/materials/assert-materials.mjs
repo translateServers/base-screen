@@ -734,7 +734,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     // 外围插件贡献的物料也进目录与物料库，故与官方/宿主物料同列断言。
     'plugin.echarts',
     'base.table',
-    // plugin-board-materials 贡献的四个大屏物料。
+    // plugin-materials 贡献的大屏物料。
     'board.digital-flop',
     'board.scroll-board',
     'board.water-level',
@@ -1718,7 +1718,7 @@ export async function assertAuthoringMaterialVisuals(page, designer) {
  * 投影回文档，物料写 `max-content` 只是让浏览器可测量（该控制器读的就是物料元素自身的
  * computed width）。除此之外，物料在 `renderMaterial()` 里写宿主元素的 `width`/`height`
  * 都会覆盖渲染器写入的像素尺寸——最常见的 `100%/100%` 会让组件撑满整个画布。这个 bug 已在
- * `plugin-echarts` 与 `plugin-board-materials` 的四个物料上各出现一次，所以由这条覆盖全目录
+ * `plugin-materials` 的图表与大屏物料上各出现过一次，所以由这条覆盖全目录
  * 的断言兜底，而不是逐个物料写断言：新增物料不遵守就在这里失败。
  *
  * 覆盖所有 catalog 条目（含 `libraryVisible: false` 的容器类物料），并把全部违规一次性报出，

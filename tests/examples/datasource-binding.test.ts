@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseScreenDocument } from '../../packages/contracts/src/index.js';
 import { validateScreenHostResourceBinding } from '../../packages/core/src/index.js';
-import { PLUGIN_BOARD_STATUS_GRID_MANIFEST } from '../../plugins/plugin-board-materials/src/status-grid.js';
+import { PLUGIN_BOARD_STATUS_GRID_MANIFEST } from '../../plugins/plugin-materials/src/board/status-grid.js';
 
 /**
  * A39：`custom.*` 数据源能被文档与绑定校验接受。

@@ -30,21 +30,13 @@ const HOSTS: readonly CompositionHost[] = [
     host: 'react-host',
     editor: 'examples/react-host/src/components/screen-editor.tsx',
     adapter: 'examples/react-host/src/screen/composition-runtime.ts',
-    baseScreenDependencies: [
-      '@base-screen/plugin-board-materials',
-      '@base-screen/plugin-echarts',
-      'base-screen',
-    ],
+    baseScreenDependencies: ['@base-screen/plugin-materials', 'base-screen'],
   },
   {
     host: 'vue-host',
     editor: 'examples/vue-host/src/components/ScreenEditor.vue',
     adapter: 'examples/vue-host/src/screen/composition-runtime.ts',
-    baseScreenDependencies: [
-      '@base-screen/plugin-board-materials',
-      '@base-screen/plugin-echarts',
-      'base-screen',
-    ],
+    baseScreenDependencies: ['@base-screen/plugin-materials', 'base-screen'],
   },
 ];
 
@@ -79,11 +71,9 @@ describe('designer composition migration', () => {
     expect(source).toContain('HostRuntime extends BaseScreenRuntime, OnlineMaterialRuntime');
     expect(source.match(/createBaseScreenRuntime\(/g)).toHaveLength(1);
     expect(source).toContain('materials: registerHostMaterials()');
-    expect(source).toContain('createPluginBoardRuntime()');
-    expect(source).toContain('createPluginEchartsRuntime()');
+    expect(source).toContain('createPluginMaterialsRuntime()');
     expect(source).toContain('createHostResourceRuntime()');
-    expect(source).toContain("[PLUGIN_BOARD_ID]: ['command.execute', 'design.read']");
-    expect(source).toContain("[PLUGIN_ECHARTS_ID]: ['command.execute', 'design.read']");
+    expect(source).toContain("[PLUGIN_MATERIALS_ID]: ['command.execute', 'design.read']");
     expect(source).toContain('blueprintCapabilities: SCREEN_BLUEPRINT_CAPABILITY_IDS');
     expect(source).toContain('base.setCatalog(buildCatalog(next))');
     expect(source).not.toContain('createBaseScreenPluginManager');
@@ -103,8 +93,7 @@ describe('designer composition migration', () => {
     expect(source).not.toContain('defineBaseScreenDesigner');
     expect(source).not.toContain('defineBaseScreenViewer');
     expect(source).not.toContain('defineBaseScreenTextMaterial');
-    expect(source).not.toContain('registerPluginBoardMaterials');
-    expect(source).not.toContain('registerPluginEcharts');
+    expect(source).not.toContain('registerPluginMaterials');
     expect(source).not.toContain('customElements.define');
   });
 

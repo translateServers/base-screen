@@ -13,7 +13,7 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
  * 用来演示复合作者面。把它们改名规避清单等于把门禁变成摆设，而直接打破 harness 又不是
  * 本门禁的职权。因此描述性文案 prop 的禁令分三层：官方物料与插件物料由本脚本 R2 把守，
  * 宿主示例由 R3 把守（连 `label` 一起禁），大屏组件插件另有
- * `plugins/plugin-board-materials/tests/plugin.test.ts` 的清单断言。
+ * `plugins/plugin-materials/tests/board/plugin.test.ts` 的清单断言。
  */
 
 /** 只描述"这个组件是什么"的 prop 名：需要标题时由文档层另放一个 `base.text` 组合。 */
@@ -45,7 +45,7 @@ const HOST_FORBIDDEN_TEXT_PROPS = [...FORBIDDEN_TEXT_PROPS, 'label'];
  * 删掉的。
  */
 const CHART_FURNITURE_EXEMPTIONS = [
-  'plugins/plugin-echarts/src/manifest.ts',
+  'plugins/plugin-materials/src/echarts/manifest.ts',
   'tooling/verification/browser-harness/semantic-chart-material.ts',
   'tooling/verification/browser-harness/hosted-material-package.ts',
   'tooling/verification/browser-harness/inspector-control-fixture.ts',
@@ -175,7 +175,7 @@ for (const glob of HOST_MATERIAL_GLOBS) {
 if (failures.length > 0) {
   throw new Error(
     `MATERIAL_ATOMICITY_CHECK_FAILED:\n  ${[...new Set(failures)].join('\n  ')}\n` +
-      '依据：AGENTS.md「物料原子化（组件制作约定）」与 plugins/plugin-board-materials 的 title 断言。',
+      '依据：AGENTS.md「物料原子化（组件制作约定）」与 plugins/plugin-materials 的 title 断言。',
   );
 }
 

@@ -13,8 +13,7 @@
     "verify": "node scripts/smoke.mjs"
   },
   "dependencies": {
-    "@base-screen/plugin-board-materials": "workspace:^",
-    "@base-screen/plugin-echarts": "workspace:^",
+    "@base-screen/plugin-materials": "workspace:^",
     "base-screen": "workspace:^",
     "echarts": "^6.1.0",
     "zustand": "^5.0.15"

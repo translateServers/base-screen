@@ -63,7 +63,7 @@ const PLUGIN_ALLOWED_WORKSPACE_DEPENDENCIES = Object.freeze([
   'plugin-sdk',
 ]);
 const PLUGIN_ALLOWED_EXTERNAL_DEPENDENCIES = Object.freeze({
-  'plugin-echarts': ['echarts'],
+  'plugin-materials': ['echarts'],
 });
 
 function fail(code, detail) {

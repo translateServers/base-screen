@@ -14,7 +14,7 @@ async function waitForDocument(page) {
   await page.waitForFunction(() => window.baseScreenHarness.designer.document !== undefined);
 }
 
-// 插件贡献的物料必须真的进入设计器目录并渲染出元素——这是 plugin-echarts 此前
+// 插件贡献的物料必须真的进入设计器目录并渲染出元素——这是图表物料此前
 // 声明了但从未生效的那一环。同时断言它不是宿主自营物料，避免断言被目录里的副本蒙对。
 export async function assertPluginMaterialRenders(designer, page) {
   await waitForDocument(page);
@@ -237,15 +237,15 @@ export async function assertPluginBlueprintCapability(page) {
   if (!state.granted) {
     throw new Error('BROWSER_HARNESS_PLUGIN_BLUEPRINT_CAPABILITY_NOT_GRANTED');
   }
-  // 该能力应归属外围插件，而不是宿主自营 fixture——否则断言不能证明插件通道。
-  if (state.owner.join() !== 'base-screen.metrics') {
+  // 该能力应归属统一物料插件，而不是宿主自营 fixture——否则断言不能证明插件通道。
+  if (state.owner.join() !== 'base-screen.materials') {
     throw new Error(
       `BROWSER_HARNESS_PLUGIN_BLUEPRINT_CAPABILITY_OWNER_FAILED:${JSON.stringify(state)}`,
     );
   }
 }
 
-// 大屏组件插件（plugin-board-materials）：零第三方依赖的渲染类插件，四个物料 + 自有
+// 统一物料插件（plugin-materials）的大屏组件部分：原生 DOM 渲染，四个物料 + 自有
 // 检查器控件 + 一条事务命令。这里覆盖三条只有真实插件才成立的性质：
 //   1. 物料真的渲染出各自的 DOM 结构（不是只有自定义元素壳）；
 //   2. 插件自有的检查器控件被授权实例化，且写回可撤销；
@@ -503,7 +503,7 @@ export async function assertBoardInspectorControl(designer, page) {
   const initial = await readControl();
   if (
     !initial.controlRendered ||
-    initial.owner !== 'base-screen.board-materials' ||
+    initial.owner !== 'base-screen.materials' ||
     initial.pressed.join() !== 'plain'
   ) {
     throw new Error(`BROWSER_HARNESS_BOARD_CONTROL_FAILED:${JSON.stringify(initial)}`);

@@ -46,7 +46,7 @@ src/
 | `shallowRef` 持有设计器 | 自定义元素内部状态无需 Vue 响应式代理（引擎内部持有自己的状态，代理只会增加开销） |
 | 编辑页用 `@base-screen/vue` 薄封装 | 与 React 端同一条路径：`BaseScreenDesigner` 负责挂载/配置/加载/销毁，宿主订阅句柄事件而不是自己 `appendChild`；装配未就绪时 `runtime` / `mountOptions` 传 `null`，组件不挂载，宿主不需要 `v-if` 与占位节点 |
 | 物料样式写在应用样式表 | Vue 桥接会把文档全局样式规则传播进设计器 shadow root，SFC 物料样式随 `src/styles/components.css` 生效（React 桥接无此能力，故那边用内联样式） |
-| 外围插件作为物料来源 | 大屏四件套 / 胶囊进度 / 滚动字幕来自 `plugin-board-materials`，图表来自 `plugin-echarts`；宿主只注册元素并合并 manager 的 snapshot，不在示例里重写一套图表与动效 |
+| 外围插件作为物料来源 | 大屏四件套 / 胶囊进度 / 滚动字幕与图表都来自同一个 `plugin-materials`；宿主只注册元素并合并 manager 的 snapshot，不在示例里重写一套图表与动效 |
 | vue-tsc + TypeScript 5.9.3 | SFC 类型检查；版本与仓库其余工程及工具链对齐（根仓 TS 7 尚未被该工具链支持） |
 
 ## 运行

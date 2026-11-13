@@ -21,7 +21,7 @@ import {
   createBaseScreenMaterialCatalog,
   validateBaseScreenMaterialStyle,
 } from '../../packages/plugin-core/src/index.js';
-import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-board-materials/src/digital-flop.js';
+import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-materials/src/board/digital-flop.js';
 
 /**
  * 宿主适配器 + 基座作者面纯逻辑的三层校验：

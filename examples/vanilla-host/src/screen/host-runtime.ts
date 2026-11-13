@@ -1,13 +1,10 @@
 import {
-  createPluginBoardRuntime,
-  PLUGIN_BOARD_ID,
-  registerPluginBoardMaterials,
-} from '@base-screen/plugin-board-materials';
-import {
-  createPluginEchartsRuntime,
-  PLUGIN_ECHARTS_ID,
-  registerPluginEcharts,
-} from '@base-screen/plugin-echarts';
+  createPluginMaterialsRuntime,
+  PLUGIN_MATERIALS_ID,
+  PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
+  PLUGIN_PIPELINE_ACTION_CAPABILITY,
+  registerPluginMaterials,
+} from '@base-screen/plugin-materials';
 import { type BaseScreenRuntime, createBaseScreenRuntime } from 'base-screen';
 import { SCREEN_BLUEPRINT_CAPABILITY_IDS, type ScreenParseResult } from 'base-screen/contracts';
 import type {
@@ -44,20 +41,20 @@ export function loadHostRuntime(): Promise<HostRuntime> {
 }
 
 async function createHostRuntime(): Promise<HostRuntime> {
-  // 两个外围插件目前只提供 runtime 与幂等注册入口，元素由插件自身定义。
-  registerPluginBoardMaterials();
-  registerPluginEcharts();
+  // 物料插件只提供 runtime 与幂等注册入口，元素由插件自身定义。
+  registerPluginMaterials();
   const created = await createBaseScreenRuntime({
     instanceId: INSTANCE_ID,
     materials: registerHostMaterials(),
-    plugins: [
-      createPluginBoardRuntime(),
-      createPluginEchartsRuntime(),
-      createHostResourceRuntime(),
-    ],
+    plugins: [createPluginMaterialsRuntime(), createHostResourceRuntime()],
     grantedCapabilities: {
-      [PLUGIN_BOARD_ID]: ['command.execute', 'design.read'],
-      [PLUGIN_ECHARTS_ID]: ['command.execute', 'design.read'],
+      // 统一物料插件同时承载物料、资源类型、处理器与蓝图动作，四项能力都要显式批准。
+      [PLUGIN_MATERIALS_ID]: [
+        'command.execute',
+        'design.read',
+        PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
+        PLUGIN_PIPELINE_ACTION_CAPABILITY,
+      ],
     },
     blueprintCapabilities: SCREEN_BLUEPRINT_CAPABILITY_IDS,
   });

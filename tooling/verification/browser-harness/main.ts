@@ -60,30 +60,19 @@ import {
 } from '../../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../../packages/vue/src/index.ts';
 import {
-  createPluginBoardRuntime,
+  createPluginMaterialsRuntime,
   PLUGIN_BOARD_BORDER_BOX_TYPE,
   PLUGIN_BOARD_CYCLE_BORDER_COMMAND_ID,
-  PLUGIN_BOARD_ID,
   PLUGIN_BOARD_WATER_LEVEL_TYPE,
-  registerPluginBoardMaterials,
-} from '../../../plugins/plugin-board-materials/src/index.ts';
-import {
-  createPluginEchartsRuntime,
-  registerPluginEcharts,
-} from '../../../plugins/plugin-echarts/src/index.ts';
-import {
-  createPluginMetricsRuntime,
+  PLUGIN_MATERIALS_ID,
   PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
-  PLUGIN_METRICS_ID,
   PLUGIN_METRICS_RESOURCE_TYPE_ID,
-} from '../../../plugins/plugin-metrics/src/index.ts';
-import {
-  createPluginPipelineRuntime,
-  PLUGIN_PIPELINE_ID,
+  PLUGIN_PIPELINE_ACTION_CAPABILITY,
   PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
   PLUGIN_PIPELINE_SPOTLIGHT_EVENT,
   PLUGIN_PIPELINE_TOP_BY_PROCESSOR_ID,
-} from '../../../plugins/plugin-pipeline/src/index.ts';
+  registerPluginMaterials,
+} from '../../../plugins/plugin-materials/src/index.ts';
 import {
   applyHostScriptFilter,
   BOARD_COMPOSITION_PLUGIN_ID,
@@ -121,8 +110,7 @@ if (harnessSearch.has('designer') || harnessSearch.has('case') || harnessSearch.
 const productElements = defineBaseScreenElements();
 // 面板标签必须在 manager 激活前注册：preflight 会按贡献声明的 tagName 查询宿主 registry。
 defineHarnessPluginPanel();
-registerPluginEcharts();
-registerPluginBoardMaterials();
+registerPluginMaterials();
 defineHarnessInspectorFixtures();
 const officialMaterials = [
   defineBaseScreenTextMaterial(),
@@ -145,8 +133,8 @@ if (!productElements.ok || officialMaterials.some((definition) => !definition.ok
 }
 
 // 贡献身份跨插件唯一（manager 的 preflight 强制），因此同一个蓝图能力不能被两个插件
-// 同时声明。这里把其中一个让给外围插件 plugin-metrics：既避免冲突，也让"能力由插件
-// 而非宿主提供"这条通道真正被演示；union 仍覆盖全部能力 id，授权面不变。
+// 同时声明。这里把其中一个让给统一物料插件：既避免冲突，也让"能力由插件而非宿主提供"
+// 这条通道真正被演示；union 仍覆盖全部能力 id，授权面不变。
 const designerAuthoringCapabilities = SCREEN_BLUEPRINT_CAPABILITY_IDS.filter(
   (id) => id !== PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
 );
@@ -287,21 +275,19 @@ const pluginManager = createBaseScreenPluginManager({
     .map((definition) => definition.value.manifest.tagName),
   plugins: [
     designerAuthoringPlugin,
-    createPluginEchartsRuntime(),
-    createPluginMetricsRuntime(),
-    createPluginBoardRuntime(),
-    createPluginPipelineRuntime(),
+    createPluginMaterialsRuntime(),
     createBoardCompositionRuntime(),
   ],
   grantedCapabilities: {
     'browser-harness-authoring': designerAuthoringPluginCapabilities,
-    'base-screen.echarts': ['command.execute', 'design.read'],
-    // 大屏组件插件要读选区并提交事务，因此同样需要这两个端口能力。
-    [PLUGIN_BOARD_ID]: ['command.execute', 'design.read'],
-    // 声明者即批准者只在此处是宿主自营插件；蓝图能力仍需宿主支持表认可才生效。
-    [PLUGIN_METRICS_ID]: [PLUGIN_METRICS_BLUEPRINT_CAPABILITY],
-    // ADR-0076：运行期插件。动作能力必须显式批准，动作才进入可执行集合。
-    [PLUGIN_PIPELINE_ID]: ['data.process', 'blueprint.action.execute'],
+    // 统一物料插件既要读选区（检查器控件联动）也要提交事务（命令面板换样式），
+    // 还承载原 metrics / pipeline 的蓝图能力与动作执行能力。
+    [PLUGIN_MATERIALS_ID]: [
+      'command.execute',
+      'design.read',
+      PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
+      PLUGIN_PIPELINE_ACTION_CAPABILITY,
+    ],
     // 组合路径模板：宿主自营的脚本过滤器处理器。
     [BOARD_COMPOSITION_PLUGIN_ID]: ['data.process'],
   },
@@ -358,8 +344,8 @@ const pluginChecks: ReadonlyArray<readonly [string, boolean]> = [
   // 外围插件的贡献必须真的进入快照：preflight 会因能力未授权、tag 未注册或依赖缺失
   // 静默把整个插件排除，只断言宿主自营插件会漏掉这种"声明了但从未生效"。
   [
-    'echarts-plugin-catalogued',
-    pluginManager.snapshot.plugins.get('base-screen.echarts') !== undefined,
+    'materials-plugin-catalogued',
+    pluginManager.snapshot.plugins.get(PLUGIN_MATERIALS_ID) !== undefined,
   ],
   [
     'echarts-material-catalogued',
@@ -376,9 +362,8 @@ const pluginChecks: ReadonlyArray<readonly [string, boolean]> = [
       PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
     ),
   ],
-  // 大屏组件插件：四个物料都要进快照，检查器控件要进授权目录（注册≠授权），
+  // 统一物料插件：8 个板级物料仍要进快照，检查器控件要进授权目录（注册≠授权），
   // 命令要出现在插件记录里——任一项失败都说明插件被 preflight 整体排除。
-  ['board-plugin-catalogued', pluginManager.snapshot.plugins.get(PLUGIN_BOARD_ID) !== undefined],
   [
     'board-materials-catalogued',
     [
@@ -397,9 +382,27 @@ const pluginChecks: ReadonlyArray<readonly [string, boolean]> = [
   [
     'board-command-catalogued',
     pluginManager.snapshot.plugins
-      .get(PLUGIN_BOARD_ID)
+      .get(PLUGIN_MATERIALS_ID)
       ?.contributions.some(
         (item) => item.kind === 'command' && item.id === PLUGIN_BOARD_CYCLE_BORDER_COMMAND_ID,
+      ) === true,
+  ],
+  // 物料插件与设计器 chrome 解耦：不声明 panel，命令也不进任何 context.* 菜单。
+  [
+    'materials-plugin-has-no-panel',
+    pluginManager.snapshot.plugins
+      .get(PLUGIN_MATERIALS_ID)
+      ?.contributions.every((item) => item.kind !== 'panel') === true,
+  ],
+  [
+    'materials-plugin-has-no-context-menu',
+    pluginManager.snapshot.plugins
+      .get(PLUGIN_MATERIALS_ID)
+      ?.contributions.every(
+        (item) =>
+          item.kind !== 'command' ||
+          item.menus === undefined ||
+          item.menus.every((menu) => !menu.startsWith('context.')),
       ) === true,
   ],
   ['no-activation-failures', pluginManager.snapshot.failures.length === 0],
@@ -546,7 +549,7 @@ const materialLibraryGrouping = {
     {
       id: 'board',
       label: '大屏',
-      // 外围插件 plugin-board-materials 贡献的全部可见物料；分组必须覆盖目录中每个可见物料。
+      // 外围插件 plugin-materials 贡献的全部可见物料；分组必须覆盖目录中每个可见物料。
       materialTypes: [
         'board.digital-flop',
         'board.scroll-board',

@@ -10,10 +10,10 @@ import {
 import type { ScreenDatasetField } from '../../packages/contracts/src/index.js';
 import { validateScreenHostResourceBinding } from '../../packages/core/src/index.js';
 import type { BaseScreenMaterialManifest } from '../../packages/plugin-core/src/index.js';
-import { PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST } from '../../plugins/plugin-board-materials/src/capsule-progress.js';
-import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-board-materials/src/digital-flop.js';
-import { PLUGIN_BOARD_WATER_LEVEL_MANIFEST } from '../../plugins/plugin-board-materials/src/water-level.js';
-import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from '../../plugins/plugin-echarts/src/manifest.js';
+import { PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST } from '../../plugins/plugin-materials/src/board/capsule-progress.js';
+import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-materials/src/board/digital-flop.js';
+import { PLUGIN_BOARD_WATER_LEVEL_MANIFEST } from '../../plugins/plugin-materials/src/board/water-level.js';
+import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from '../../plugins/plugin-materials/src/echarts/manifest.js';
 
 /**
  * 宿主资源作者面的三层校验（对齐 `board-alarm-document.test.ts` 的防漂移标准）：

@@ -13,7 +13,7 @@ import { basename, dirname, join, relative } from 'node:path';
 import { satisfies, validRange } from 'semver';
 import { PACKAGE_DEFINITIONS } from '../checks/packages.mjs';
 
-const EXAMPLE_PLUGIN_DIRECTORIES = ['plugin-board-materials', 'plugin-echarts'];
+const EXAMPLE_PLUGIN_DIRECTORIES = ['plugin-materials'];
 
 import { writeHostAppVueTarballConsumerFiles } from '../consumer-files/host-app-vue-consumer-files.mjs';
 import {
@@ -364,8 +364,7 @@ function verifyHostAppVueTarballConsumer() {
       'material',
       'plugin-core',
       'plugin-sdk',
-      'plugin-board-materials',
-      'plugin-echarts',
+      'plugin-materials',
       'plugin-manager',
       'sdk',
       'vue',

@@ -6,7 +6,7 @@
 
 const PROCESSOR_ID = 'topBy';
 const ACTION_ID = 'plugin.pipeline.spotlight';
-const SPOTLIGHT_EVENT = 'base-screen-plugin-pipeline-spotlight';
+const SPOTLIGHT_EVENT = 'base-screen-plugin-materials-spotlight';
 const RULE_ID = 'plugin-action-demo';
 
 async function waitForDocument(page) {

@@ -428,7 +428,7 @@ const COMPOSITE_CARD_NAME = '组合底座';
  *
  * 这张卡不是某个"卡片物料"，而是四个原子物料的组合——底座 `base.container` 作 shell，
  * 标题与读数是 `base.text`，中间一条 `base.rule`。`props`/`style` 只写增量，基座负责与
- * manifest 默认值合并后过 schema，因此不需要像 `plugin-board-materials` 那样先 insert
+ * manifest 默认值合并后过 schema，因此不需要像 `plugin-materials` 那样先 insert
  * 再整体 patch 一遍。shell 物料 `libraryVisible: false`，不可从物料库插入，但按
  * `designCapabilities.children` 作为组合外壳是允许的。
  */

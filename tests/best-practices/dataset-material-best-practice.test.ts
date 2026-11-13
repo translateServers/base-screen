@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ScreenDatasetField } from '../../packages/contracts/src/index.js';
 import { validateScreenHostResourceBinding } from '../../packages/core/src/index.js';
-import { PLUGIN_BOARD_PIPELINE_MANIFEST } from '../../plugins/plugin-board-materials/src/pipeline.js';
+import { PLUGIN_BOARD_PIPELINE_MANIFEST } from '../../plugins/plugin-materials/src/board/pipeline.js';
 import {
   hostedDatasetRankingManifest,
   hostedMaterialPackage,

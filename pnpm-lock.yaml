@@ -77,12 +77,9 @@ importers:
 
   examples/react-host:
     dependencies:
-      '@base-screen/plugin-board-materials':
+      '@base-screen/plugin-materials':
         specifier: workspace:^
-        version: link:../../plugins/plugin-board-materials
-      '@base-screen/plugin-echarts':
-        specifier: workspace:^
-        version: link:../../plugins/plugin-echarts
+        version: link:../../plugins/plugin-materials
       base-screen:
         specifier: workspace:^
         version: link:../../packages/base-screen
@@ -193,12 +190,9 @@ importers:
 
   examples/vanilla-host:
     dependencies:
-      '@base-screen/plugin-board-materials':
+      '@base-screen/plugin-materials':
         specifier: workspace:^
-        version: link:../../plugins/plugin-board-materials
-      '@base-screen/plugin-echarts':
-        specifier: workspace:^
-        version: link:../../plugins/plugin-echarts
+        version: link:../../plugins/plugin-materials
       base-screen:
         specifier: workspace:^
         version: link:../../packages/base-screen
@@ -221,12 +215,9 @@ importers:
 
   examples/vue-host:
     dependencies:
-      '@base-screen/plugin-board-materials':
+      '@base-screen/plugin-materials':
         specifier: workspace:^
-        version: link:../../plugins/plugin-board-materials
-      '@base-screen/plugin-echarts':
-        specifier: workspace:^
-        version: link:../../plugins/plugin-echarts
+        version: link:../../plugins/plugin-materials
       base-screen:
         specifier: workspace:^
         version: link:../../packages/base-screen
@@ -440,19 +431,7 @@ importers:
         specifier: ^3.5.0
         version: 3.5.40(typescript@7.0.2)
 
-  plugins/plugin-board-materials:
-    dependencies:
-      '@base-screen/contracts':
-        specifier: workspace:^
-        version: link:../../packages/contracts
-      '@base-screen/plugin-core':
-        specifier: workspace:^
-        version: link:../../packages/plugin-core
-      '@base-screen/plugin-sdk':
-        specifier: workspace:^
-        version: link:../../packages/plugin-sdk
-
-  plugins/plugin-echarts:
+  plugins/plugin-materials:
     dependencies:
       '@base-screen/contracts':
         specifier: workspace:^
@@ -467,27 +446,6 @@ importers:
       echarts:
         specifier: ^6.1.0
         version: 6.1.0
-
-  plugins/plugin-metrics:
-    dependencies:
-      '@base-screen/plugin-core':
-        specifier: workspace:^
-        version: link:../../packages/plugin-core
-      '@base-screen/plugin-sdk':
-        specifier: workspace:^
-        version: link:../../packages/plugin-sdk
-
-  plugins/plugin-pipeline:
-    dependencies:
-      '@base-screen/contracts':
-        specifier: workspace:^
-        version: link:../../packages/contracts
-      '@base-screen/plugin-core':
-        specifier: workspace:^
-        version: link:../../packages/plugin-core
-      '@base-screen/plugin-sdk':
-        specifier: workspace:^
-        version: link:../../packages/plugin-sdk
 
 packages:
 

@@ -19,7 +19,7 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  * 一行命令就能被 `POST /api/demo/alarms/raise { key: 'alarm.open' }` 换色。反过来说，
  * **文档里没有告警 key、阈值或样式规则**——告警判定与视觉映射都归宿主。
  *
- * 等级色板的单一来源是 `plugin-board-materials` 的 `BOARD_ALARM_LEVEL_COLORS`。后端
+ * 等级色板的单一来源是 `plugin-materials` 的 `BOARD_ALARM_LEVEL_COLORS`。后端
  * 不 import 插件包（CJS 宿主不依赖 ESM 插件），所以这里写同值字面量，由根测试
  * `tests/examples/board-alarm-document.test.ts` 逐色比对，避免两处各改一半。
  *

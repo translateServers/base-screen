@@ -201,8 +201,7 @@ pnpm dev:vue-host           # http://127.0.0.1:5175
 | --- | --- | --- |
 | `base-screen` | 必需 | 核心单包：`/viewer`、`/designer`、`/contracts`、`/engine`、`/host-kit`、`/react`、`/vue` 等子路径 |
 | `vue` / `react` | 必需 | 框架本身，是 `base-screen` 对应桥接入口的 peer |
-| `@base-screen/plugin-echarts` | 可选 | ECharts 图表族，`echarts` 由宿主提供（外围插件仍为仓库内私有包，不随核心发布） |
-| `@base-screen/plugin-board-materials` | 可选 | 看板物料包，同上 |
+| `@base-screen/plugin-materials` | 可选 | 统一物料包：看板物料 + ECharts 图表族，`echarts` 由宿主提供（外围插件仍为仓库内私有包，不随核心发布） |
 
 示例里的插件依赖是仓库内的 `workspace:^` 引用，用来演示外围插件如何合并进 catalog；外部宿主只需要
 `npm install base-screen`，再用 `import { ... } from 'base-screen/viewer'` 按需引入。框架桥接包
@@ -252,10 +251,10 @@ M 段是**宿主资源作者面**闭环：编辑页右下角打开作者面，�
 它演示三件事：
 
 1. **外围插件就是物料来源**：大屏四件套（`board.border-box` / `digital-flop` /
-   `scroll-board` / `water-level`）与两个新物料（`board.capsule-progress` /
-   `board.marquee`）来自 `@base-screen/plugin-board-materials`；图表来自
-   `@base-screen/plugin-echarts`（line / bar / area / pie）。宿主只做两件事：
-   注册元素、把 manager 的 snapshot 合进 catalog。
+   `scroll-board` / `water-level`）与其余看板物料（`board.capsule-progress` /
+   `board.marquee` 等）以及图表（line / bar / area / pie）都来自同一个
+   `@base-screen/plugin-materials`。宿主只做两件事：注册元素、把 manager 的
+   snapshot 合进 catalog。
 2. **插件贡献必须被授权**：三个 `dataResourceType`（`demo_metric` / `demo_series` /
    `demo_ranking`）由宿主自有插件声明，`runtimeContributions` 同时交给设计器与
    查看器；漏掉声明时 host-resource 组件会被渲染器直接丢弃（画布空白）。
@@ -727,9 +726,9 @@ cp my-data.db examples/shared-backend/data/datasources/
 | A12 | 三端 smoke（C/E 段）+ 根测试 | 屏上联动走蓝图；HTTP 层 400 由后端 e2e 断言 |
 | A13 | 三端 smoke（E 段） | 成功后注入 500：保留上一帧 + 角标 + 离线 chip（连续两次采样） |
 | A14 | 三端 smoke（D 段） | LINE-C：0 格 + 空文案 + 无角标 + 仍在线 |
-| A15 | `plugins/plugin-board-materials/tests/values.test.ts` | 越界读数不改数：`clampPercent(120)=100`（液面）但对 `formatWaterLevelLabel(120,1)` 断言文本 `120.0%`。PRD 原写 `gauge`，本轮 `gauge` 未实现，由 `water-level` 承载同一条规则 |
+| A15 | `plugins/plugin-materials/tests/board/values.test.ts` | 越界读数不改数：`clampPercent(120)=100`（液面）但对 `formatWaterLevelLabel(120,1)` 断言文本 `120.0%`。PRD 原写 `gauge`，本轮 `gauge` 未实现，由 `water-level` 承载同一条规则 |
 | A15b | `tests/examples/host-catalog-port.test.ts` | 来源求值抛错时端口返回失败诊断而非 reject；渲染器把实例记为 error、变量沿用 `initialValue`，整屏照常渲染 |
-| A16 / A17 | `plugins/plugin-board-materials/tests/{status-grid,pipeline}.test.ts` + `tests/best-practices/dataset-material-best-practice.test.ts` | 字段不存在、角色不存在、字段数越界 → `HOST_DATASET_BINDING_INVALID`；根测试只做**正向**校验，负例在物料测试与 best-practices 里 |
+| A16 / A17 | `plugins/plugin-materials/tests/board/{status-grid,pipeline}.test.ts` + `tests/best-practices/dataset-material-best-practice.test.ts` | 字段不存在、角色不存在、字段数越界 → `HOST_DATASET_BINDING_INVALID`；根测试只做**正向**校验，负例在物料测试与 best-practices 里 |
 | A18 | `tests/best-practices/dataset-material-best-practice.test.ts`（`dataset binding value type gate`） | 角色 `valueTypes` 不含字段实际类型 → 拒绝：把 `stages` 的 `throughput`(number) 换成 date 字段必须失败，换回 number 必须通过（对照组排除"因别的原因失败"） |
 | A19 | 根测试 `tests/examples/board-monitor-document.test.ts` + 后端 `screens.service.spec` | 四种 dataSource 各 ≥1（含 6 个 `variable` 组件）、6 个变量、3 条种子 |
 | A20 | `pnpm verify:examples` | 三端各自跑同一组断言，且 tile/节点/行数/请求串完全一致 |
