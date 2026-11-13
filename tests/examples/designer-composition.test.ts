@@ -16,7 +16,7 @@ interface CompositionHost {
   readonly editor: string;
   /** 组合层适配器：复用宿主 runtime，不新建 manager。 */
   readonly adapter: string;
-  /** Base Screen 依赖面：只有 sdk、框架桥与实际使用的插件包。 */
+  /** Base Screen 依赖面：只有单包 base-screen 与实际使用的外围插件。 */
   readonly baseScreenDependencies: readonly string[];
 }
 
@@ -31,11 +31,9 @@ const HOSTS: readonly CompositionHost[] = [
     editor: 'examples/react-host/src/components/screen-editor.tsx',
     adapter: 'examples/react-host/src/screen/composition-runtime.ts',
     baseScreenDependencies: [
-      '@base-screen/host-kit',
       '@base-screen/plugin-board-materials',
       '@base-screen/plugin-echarts',
-      '@base-screen/react',
-      '@base-screen/sdk',
+      'base-screen',
     ],
   },
   {
@@ -43,11 +41,9 @@ const HOSTS: readonly CompositionHost[] = [
     editor: 'examples/vue-host/src/components/ScreenEditor.vue',
     adapter: 'examples/vue-host/src/screen/composition-runtime.ts',
     baseScreenDependencies: [
-      '@base-screen/host-kit',
       '@base-screen/plugin-board-materials',
       '@base-screen/plugin-echarts',
-      '@base-screen/sdk',
-      '@base-screen/vue',
+      'base-screen',
     ],
   },
 ];
@@ -119,7 +115,7 @@ describe('designer composition migration', () => {
       expect(source).toContain('<BaseScreenDesigner');
       // 挂载点沿用同一套布局契约：class 透传到组合层组件根节点，尺寸交给 .stage。
       expect(source).toMatch(/(className|class)="stage"/);
-      expect(source).toMatch(/from '@base-screen\/(react|vue)'/);
+      expect(source).toMatch(/from 'base-screen\/(react|vue)'/);
       // 项目会话模式：load 由组合层按 projectId 触发，宿主不再自己调 element.load()。
       expect(source).toContain('projectId: screenId');
       expect(source).not.toContain('children: [setup.blueprintCanvas]');
@@ -140,7 +136,7 @@ describe('designer composition migration', () => {
       read(`examples/${host.host}/package.json`),
     );
     const baseScreenDependencies = Object.keys(manifest.dependencies ?? {})
-      .filter((name) => name.startsWith('@base-screen/'))
+      .filter((name) => name === 'base-screen' || name.startsWith('@base-screen/'))
       .sort();
     expect(baseScreenDependencies).toEqual([...host.baseScreenDependencies].sort());
   });

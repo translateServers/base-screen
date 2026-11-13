@@ -99,13 +99,16 @@ describe('test:scope 计划 JSON 契约自洽', () => {
       'packages/engine/src/common/ui-text/designer-ui-text.ts',
     ]);
     const plan = buildScopePlan(parsed.values, parsed.packages, { root: ROOT, config: CONFIG });
-    // react/vue 薄封装单向依赖 sdk，engine 的变更闭包会沿 sdk 继续传递。
-    expect(plan.closure.affectedPackages).toEqual(['engine', 'react', 'sdk', 'vue']);
+    // react/vue 薄封装单向依赖 sdk，engine 的变更闭包会沿 sdk 继续传递；
+    // base-screen 作为单包把 engine 等内部包内联，因此同样在闭包里。
+    expect(plan.closure.affectedPackages).toEqual(['base-screen', 'engine', 'react', 'sdk', 'vue']);
     expect(plan.closure.engineFileScope.precision).toBe('file');
     expect(plan.closure.engineFileScope.testFiles.length).toBeGreaterThan(0);
     // 文件级映射生效时 engine 已从 turbo 包级执行中移出，下游包仍按闭包执行。
     expect(plan.selection.packages).not.toContain('engine');
-    expect(plan.selection.packages).toEqual(expect.arrayContaining(['react', 'sdk', 'vue']));
+    expect(plan.selection.packages).toEqual(
+      expect.arrayContaining(['base-screen', 'react', 'sdk', 'vue']),
+    );
     expect(validateScopePlan(plan)).toEqual([]);
   });
 
