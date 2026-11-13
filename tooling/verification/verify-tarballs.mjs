@@ -226,6 +226,63 @@ function assertConsumerIsolation(consumer, name, requiredPackages, forbiddenPack
   }
 }
 
+/**
+ * 单包分发承诺：宿主只装 `base-screen` 一个包，内部实现已内联。
+ * 这里盯三件事——运行时依赖里不能再出现 `@base-screen/*`、安装后不能出现
+ * `@base-screen` scope 目录、子路径在纯净工程里能真实加载。
+ */
+function verifySinglePackageConsumer() {
+  const consumer = mkdtempSync(join(temporaryRoot, 'single-package-consumer-'));
+  writeConsumerWorkspaceConfig(consumer);
+  writeFileSync(
+    join(consumer, 'package.json'),
+    `${JSON.stringify(
+      {
+        name: 'single-package-consumer',
+        private: true,
+        type: 'module',
+        packageManager: 'pnpm@11.18.0',
+        dependencies: { 'base-screen': tarballSpec('base-screen') },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  run('pnpm', ['install', '--strict-peer-dependencies'], consumer);
+
+  const lockfile = readFileSync(join(consumer, 'pnpm-lock.yaml'), 'utf8');
+  if (lockfile.includes('workspace:') || lockfile.includes('link:')) {
+    throw new Error('SINGLE_PACKAGE_TARBALL_WORKSPACE_LINK_FOUND');
+  }
+  if (existsSync(join(consumer, 'node_modules', '@base-screen'))) {
+    throw new Error('SINGLE_PACKAGE_EXTRA_PACKAGE_INSTALLED: @base-screen');
+  }
+
+  const installed = JSON.parse(
+    readFileSync(join(consumer, 'node_modules', 'base-screen', 'package.json'), 'utf8'),
+  );
+  const leaked = Object.keys(installed.dependencies ?? {}).filter((name) =>
+    name.startsWith('@base-screen/'),
+  );
+  if (leaked.length > 0) {
+    throw new Error(`SINGLE_PACKAGE_RUNTIME_DEPENDENCY: ${leaked.join(', ')}`);
+  }
+
+  writeFileSync(
+    join(consumer, 'smoke.mjs'),
+    `import { parseScreenDocument } from 'base-screen/contracts';
+import { createHttpProjectAdapter, toHostKitSearch } from 'base-screen/host-kit';
+
+if (typeof parseScreenDocument !== 'function') throw new Error('SINGLE_PACKAGE_CONTRACTS_MISSING');
+if (typeof createHttpProjectAdapter !== 'function') throw new Error('SINGLE_PACKAGE_HOST_KIT_MISSING');
+if (typeof toHostKitSearch !== 'function') throw new Error('SINGLE_PACKAGE_HELPER_MISSING');
+const parsed = parseScreenDocument({});
+if (typeof parsed.ok !== 'boolean') throw new Error('SINGLE_PACKAGE_PARSE_RESULT_INVALID');
+`,
+  );
+  run('node', ['smoke.mjs'], consumer);
+}
+
 function verifyBridgeTarballConsumer(framework) {
   const consumer = mkdtempSync(join(temporaryRoot, `${framework}-vite-consumer-`));
   writeConsumerWorkspaceConfig(consumer);
@@ -556,6 +613,7 @@ if (controller.phase !== 'ready' || controller.dirty) {
     run('node', [smoke], consumer);
   }
 
+  verifySinglePackageConsumer();
   verifyVanillaTarballConsumer();
   verifyViewerOnlyTarballConsumer();
   verifyBridgeTarballConsumer('react');

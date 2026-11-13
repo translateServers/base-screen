@@ -74,7 +74,7 @@ import {
   defineBaseScreenTextMaterial,
 } from '@base-screen/material';
 import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { defineBaseScreenViewer } from '@base-screen/sdk/viewer';
+import { defineBaseScreenViewer } from 'base-screen/viewer';
 
 // 1. 注册 <base-screen-viewer> 与官方物料
 const viewerDefinition = defineBaseScreenViewer();
@@ -104,10 +104,10 @@ viewer.document = parsed.value;
 
 ### 组合层快速接入
 
-`@base-screen/sdk` 提供可选的 `createBaseScreenRuntime()`：一次完成 Designer/Viewer 与官方物料注册、插件激活及授权检查、catalog 合并，以及元素挂载和销毁编排。它只组合现有公共 API，`defineBaseScreen*()`、`configure()`、端口、slot 和元素命令 API 均保持不变。
+`base-screen` 提供可选的 `createBaseScreenRuntime()`：一次完成 Designer/Viewer 与官方物料注册、插件激活及授权检查、catalog 合并，以及元素挂载和销毁编排。它只组合现有公共 API，`defineBaseScreen*()`、`configure()`、端口、slot 和元素命令 API 均保持不变。
 
 ```ts
-import { createBaseScreenRuntime } from '@base-screen/sdk';
+import { createBaseScreenRuntime } from 'base-screen';
 
 const runtimeResult = await createBaseScreenRuntime({
   instanceId: 'my-app',
@@ -153,7 +153,7 @@ await runtime.dispose();
 如果宿主已经拥有自己的 `HostRuntime`（manager、catalog、在线物料与插件贡献），用 `adoptBaseScreenRuntime(host)` 把它适配成 `BaseScreenRuntime`，不要再调用 `createBaseScreenRuntime()`：
 
 ```ts
-import { adoptBaseScreenRuntime } from '@base-screen/sdk';
+import { adoptBaseScreenRuntime } from 'base-screen';
 
 const host = await loadHostRuntime();
 const runtime = adoptBaseScreenRuntime(host);
@@ -163,12 +163,12 @@ const runtime = adoptBaseScreenRuntime(host);
 
 ### 轻量 Viewer 组合层
 
-只读页面可从 `@base-screen/sdk/viewer` 导入 `createBaseScreenViewerRuntime()`，复用挂载、目录热刷新与销毁编排：
+只读页面可从 `base-screen/viewer` 导入 `createBaseScreenViewerRuntime()`，复用挂载、目录热刷新与销毁编排：
 
 ```ts
-import { parseScreenDocument } from '@base-screen/sdk/contracts';
-import { defineBaseScreenTextMaterial } from '@base-screen/sdk/material';
-import { createBaseScreenViewerRuntime } from '@base-screen/sdk/viewer';
+import { parseScreenDocument } from 'base-screen/contracts';
+import { defineBaseScreenTextMaterial } from 'base-screen/material';
+import { createBaseScreenViewerRuntime } from 'base-screen/viewer';
 
 const text = defineBaseScreenTextMaterial();
 if (!text.ok) throw new Error(text.diagnostics[0]?.message);
@@ -273,54 +273,31 @@ import { BaseScreenDesigner } from 'base-screen/react';
 
 可直接运行的宿主工程见[示例总览](./examples/README.md)，三个前端已经全部按这种方式引入。接入真实业务时替换示例中的宿主适配器和端口实现，并只使用包的公开导出。
 
-### 离线验证与预发布接入（tarball 批次）
+### 离线验证与预发布接入（原始 tarball）
 
-tarball 用于离线验证或发布前试用。使用 `pnpm pack` 生成的**原始 tgz**，不解包改写依赖再重打包；宿主用同批次 `overrides` 将内部传递依赖解析到本地包，尚未首次发布时单独安装 SDK tgz 不能解析未上架的内部依赖。
+tarball 用于离线验证或发布前试用，使用 `pnpm pack` 生成的**原始 tgz**，不解包改写依赖再重打包。单包分发之后只需要一个文件，也不再需要 `overrides`：内部实现已经内联，运行时依赖只有 `zod`，由包管理器正常解析。
 
-1. 把同一批次的原始 tarball 放进宿主仓库，例如 `vendor/base-screen/`（以下文件名仅为示意，以实际打包名称为准）。
-2. 在宿主 `package.json` 里把用到的包声明为 `file:` 直依赖：
+```json
+{
+  "dependencies": {
+    "base-screen": "file:vendor/base-screen/base-screen-0.1.0.tgz"
+  }
+}
+```
 
-   ```json
-   {
-     "dependencies": {
-       "@base-screen/sdk": "file:vendor/base-screen/base-screen-sdk.tgz",
-       "@base-screen/contracts": "file:vendor/base-screen/base-screen-contracts.tgz",
-       "@base-screen/material": "file:vendor/base-screen/base-screen-material.tgz",
-       "@base-screen/plugin-core": "file:vendor/base-screen/base-screen-plugin-core.tgz"
-     }
-   }
-   ```
-
-3. 在宿主 `pnpm-workspace.yaml` 里对**批次内每个包**加 overrides（含未直接声明的传递依赖）：
-
-   ```yaml
-   overrides:
-     '@base-screen/contracts': file:vendor/base-screen/base-screen-contracts.tgz
-     '@base-screen/core': file:vendor/base-screen/base-screen-core.tgz
-     '@base-screen/engine': file:vendor/base-screen/base-screen-engine.tgz
-     '@base-screen/material': file:vendor/base-screen/base-screen-material.tgz
-     '@base-screen/plugin-core': file:vendor/base-screen/base-screen-plugin-core.tgz
-     '@base-screen/plugin-manager': file:vendor/base-screen/base-screen-plugin-manager.tgz
-     '@base-screen/plugin-sdk': file:vendor/base-screen/base-screen-plugin-sdk.tgz
-     '@base-screen/renderer': file:vendor/base-screen/base-screen-renderer.tgz
-     '@base-screen/sdk': file:vendor/base-screen/base-screen-sdk.tgz
-     # 用到框架桥或外围插件时同样逐个钉住：@base-screen/vue、@base-screen/plugin-echarts …
-   ```
-
-4. `pnpm install` 后即可按[在你的应用中使用](#在你的应用中使用)装配。升级时整批替换 tarball 并重装，
-   不要混用不同批次。
+`pnpm install` 后按[在你的应用中使用](#在你的应用中使用)装配；升级时替换该 tarball 并重装即可。需要框架桥接包或外围插件时，再单独安装对应包。
 
 **环境门槛**：
 
 - 仅 ESM，浏览器运行；集成边界是 Web Components，需要真实 DOM，**不支持 CJS `require` 与 SSR**。
-- 框架桥的 peer 依赖：`@base-screen/react` 需要 `react` / `react-dom` `^19.1.0`，`@base-screen/vue`
-  需要 `vue` `^3.5.0`；当前不承诺 React 18 兼容。
-- 宿主面板设计令牌统一引入 `import '@base-screen/sdk/host-tokens.css'`（唯一公共样式面，ADR-0095）。
+- 框架桥接入口的 peer：`base-screen/react` 需要 `react` / `react-dom` `^19.1.0`，`base-screen/vue` 需要
+  `vue` `^3.5.0`；两者都是可选 peer，未使用的框架不会被安装。当前不承诺 React 18 兼容。
+- 宿主面板设计令牌统一引入 `import 'base-screen/host-tokens.css'`（唯一公共样式面，ADR-0095）。
 - `@base-screen/plugin-echarts` 把 `echarts`（`^6.1.0`）声明为 peer 依赖（ADR-0097），由宿主自行安装并与插件
   共用同一份实例；宿主应显式安装 `echarts`，并使用 `^6.1.0` 范围内的版本。宿主未安装时 pnpm/npm 默认会
   自动安装一份；宿主安装了范围外版本时包管理器只警告或静默放行，因此不能依赖包管理器保证版本一致（见 ADR-0097）。
 
-**只读展示的最小路径**：从 `@base-screen/sdk/viewer` 使用 `defineBaseScreenViewer()` 或上述轻量组合层，显式选择所需物料；该入口不引入 Designer 实现。按需使用子入口和插件控制浏览器 bundle，安装依赖与 bundle 隔离是两个层面。
+**只读展示的最小路径**：从 `base-screen/viewer` 使用 `defineBaseScreenViewer()` 或上述轻量组合层，显式选择所需物料；该入口不引入 Designer 实现。按需使用子入口和插件控制浏览器 bundle，安装依赖与 bundle 隔离是两个层面。
 
 ## 核心模型
 
@@ -377,7 +354,7 @@ pnpm dev:react-host         # 终端 2：任选一个前端（vanilla 5173 / rea
 
 ## 包结构
 
-仓库使用 pnpm / Turbo 管理 `packages/` 下的 12 个包，公共入口统一使用 `@base-screen/*`：
+仓库使用 pnpm / Turbo 管理 `packages/` 下的 12 个包。**发布面是一个单包 `base-screen`**：这些包全部标记 `private`，作为构建输入内联进它的产物，宿主只需安装 `base-screen` 并按子路径引入；框架桥接包 `@base-screen/react` / `@base-screen/vue` 也可单独安装。
 
 | 包 | 职责 |
 | --- | --- |
@@ -390,11 +367,12 @@ pnpm dev:react-host         # 终端 2：任选一个前端（vanilla 5173 / rea
 | `plugin-manager` | 插件预检、加载管理、生命周期和能力授权 |
 | `plugin-sdk` | 面向插件与物料作者的定义、注册和物料包辅助 |
 | `host-kit` | 宿主接入辅助：项目适配器与数据集端口的 REST 实现（可选，ADR-0096） |
-| `react` / `vue` | 将对应框架的组件桥接为物料 |
-| `sdk` | Viewer、Designer、物料与插件的产品级组合入口 |
+| `react` / `vue` | 将对应框架的组件桥接为物料（也作为薄封装单独发布） |
+| `sdk` | Viewer、Designer、物料与插件的产品级组合入口（内联进 `base-screen`） |
 
 跨包调用只使用声明的公共导出。物料契约由 `plugin-core` 拥有，`renderer` 不依赖具体官方物料，
-`sdk` 负责组合而不实现各包的领域逻辑。仓库分层与依赖规则见 [AGENTS.md](./AGENTS.md)。
+`sdk` 负责组合而不实现各包的领域逻辑。发布物里的类型声明按目录内置到 `base-screen/dist/_internal/`，
+入口之间共享同一类型 identity。仓库分层与依赖规则见 [AGENTS.md](./AGENTS.md)。
 
 ## 延伸阅读
 
