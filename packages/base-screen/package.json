@@ -1,6 +1,6 @@
 {
   "name": "base-screen",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "大屏设计器基座：Viewer / Designer / 物料 / 插件 / 宿主接入辅助，单包分发、按子路径引入",
   "license": "MIT",
   "publishConfig": {
@@ -130,7 +130,11 @@
       "types": "./dist/vue.d.ts",
       "import": "./dist/vue.js"
     },
-    "./host-tokens.css": "./dist/host-tokens.css"
+    "./host-tokens.css": "./dist/host-tokens.css",
+    "./screen-document.schema.json": {
+      "import": "./dist/_internal/contracts/screen-document.schema.json",
+      "default": "./dist/_internal/contracts/screen-document.schema.json"
+    }
   },
   "scripts": {
     "build": "pnpm run clean && tsc -p tsconfig.build.json && vite build && node ../../tooling/build/vendor-types.mjs && node -e \"const fs=require('node:fs');fs.copyFileSync(require.resolve('@base-screen/engine/host-tokens.css'),'dist/host-tokens.css')\"",
