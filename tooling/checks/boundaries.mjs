@@ -27,8 +27,9 @@ const ALLOWED_WORKSPACE_DEPENDENCIES = Object.freeze({
   renderer: ['contracts', 'core', 'plugin-core'],
   engine: ['contracts', 'core', 'renderer', 'plugin-core', 'plugin-manager'],
   material: ['contracts', 'plugin-core', 'plugin-sdk'],
-  react: ['contracts', 'plugin-core', 'plugin-sdk', 'sdk'],
-  vue: ['contracts', 'plugin-core', 'plugin-sdk', 'sdk'],
+  // 薄封装只依赖已发布的单包：内部包不发布，桥接包若直连它们会装不上。
+  react: ['base-screen'],
+  vue: ['base-screen'],
   sdk: [
     'contracts',
     'core',
@@ -162,11 +163,21 @@ function collectImports(source) {
   return imports;
 }
 
+function runtimeDependencyEntries(manifest) {
+  // 依赖环只看运行时边：base-screen 把桥接包列为 devDependencies（构建期内联），
+  // 桥接包运行时又依赖 base-screen，这条 dev 边不构成发布拓扑上的环。
+  return Object.entries({
+    ...manifest.dependencies,
+    ...manifest.peerDependencies,
+    ...manifest.optionalDependencies,
+  });
+}
+
 function validateManifestDependencies(directory, manifest, graph, pluginPackageNames) {
   const allowedWorkspaceDependencies = new Set(ALLOWED_WORKSPACE_DEPENDENCIES[directory]);
-  const dependencies = [];
+  const runtimeDependencies = [];
 
-  for (const [dependencyName] of dependencyEntries(manifest)) {
+  const validate = (dependencyName, collectForGraph) => {
     if (pluginPackageNames.has(dependencyName)) {
       fail('PLUGIN_DEPENDENCY_FORBIDDEN', `${directory} -> ${dependencyName}`);
     }
@@ -175,8 +186,8 @@ function validateManifestDependencies(directory, manifest, graph, pluginPackageN
       if (!allowedWorkspaceDependencies.has(dependencyDirectory)) {
         fail('FORBIDDEN_WORKSPACE_DEPENDENCY', `${directory} -> ${dependencyName}`);
       }
-      dependencies.push(dependencyDirectory);
-      continue;
+      if (collectForGraph) runtimeDependencies.push(dependencyDirectory);
+      return;
     }
 
     const framework = frameworkRoot(dependencyName);
@@ -188,15 +199,18 @@ function validateManifestDependencies(directory, manifest, graph, pluginPackageN
       if (!allowed) {
         fail('FORBIDDEN_EXTERNAL_DEPENDENCY', `${directory} -> ${dependencyName}`);
       }
-      continue;
+      return;
     }
 
     if (!ALLOWED_EXTERNAL_DEPENDENCIES[directory]?.includes(dependencyName)) {
       fail('FORBIDDEN_EXTERNAL_DEPENDENCY', `${directory} -> ${dependencyName}`);
     }
-  }
+  };
 
-  graph.set(directory, dependencies);
+  for (const [dependencyName] of runtimeDependencyEntries(manifest)) validate(dependencyName, true);
+  for (const dependencyName of Object.keys(manifest.devDependencies ?? {})) validate(dependencyName, false);
+
+  graph.set(directory, runtimeDependencies);
 }
 
 // 外围插件：workspace 依赖限制在稳定契约面，外部依赖必须逐插件显式申报（ADR-0074 决策 2、6）。

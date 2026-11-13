@@ -23,8 +23,12 @@ function collectExternalPackages(manifest: PackageManifest): readonly string[] {
 export function createViteLibraryConfig(
   packageRoot: string,
   entries: string | Record<string, string> = join(packageRoot, 'src/index.ts'),
+  options: { readonly extraExternal?: readonly string[] } = {},
 ): UserConfig {
-  const externalPackages = collectExternalPackages(readManifest(packageRoot));
+  const externalPackages = [
+    ...collectExternalPackages(readManifest(packageRoot)),
+    ...(options.extraExternal ?? []),
+  ];
 
   return defineConfig({
     build: {

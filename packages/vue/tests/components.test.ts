@@ -7,7 +7,7 @@ import type {
   BaseScreenViewerElement,
   BaseScreenViewerMountOptions,
   BaseScreenViewerRuntime,
-} from '@base-screen/sdk';
+} from 'base-screen';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { createRenderer, h, nextTick, shallowRef } from 'vue';
 import {
@@ -149,7 +149,7 @@ describe('Vue composition components', () => {
     let runtime: BaseScreenViewerRuntime | undefined;
     let unmount: (() => void) | undefined;
     try {
-      const { createBaseScreenViewerRuntime } = await import('@base-screen/sdk/viewer');
+      const { createBaseScreenViewerRuntime } = await import('base-screen/viewer');
       const result = await createBaseScreenViewerRuntime();
       if (!result.ok) throw new Error('Viewer runtime 创建失败');
       runtime = result.value;
@@ -414,12 +414,12 @@ describe('Vue composition components', () => {
       remove: () => {},
     });
     const target = new EventTarget();
-    const state: import('@base-screen/sdk').ScreenProjectState = {
+    const state: import('base-screen').ScreenProjectState = {
       phase: 'ready',
       dirty: false,
       project: { projectId: 'first', name: 'Project', revision: 'r1' },
     };
-    const { createBaseScreenMountHandle } = await import('@base-screen/sdk');
+    const { createBaseScreenMountHandle } = await import('base-screen');
     const handle = createBaseScreenMountHandle({
       element: Object.assign(target, {
         getProjectState: () => structuredClone(state),

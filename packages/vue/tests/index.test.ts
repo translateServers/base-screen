@@ -1,5 +1,5 @@
-import type { ScreenDiagnostic } from '@base-screen/contracts';
-import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type { ScreenDiagnostic } from 'base-screen/contracts';
+import type { BaseScreenMaterialModel } from 'base-screen/plugin-core';
 import type {
   BaseScreenDesignerElement,
   BaseScreenDesignerMountOptions,
@@ -7,7 +7,7 @@ import type {
   BaseScreenRuntime,
   BaseScreenViewerElement,
   BaseScreenViewerMountOptions,
-} from '@base-screen/sdk';
+} from 'base-screen';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { defineComponent, h, inject, nextTick, onUnmounted } from 'vue';
 

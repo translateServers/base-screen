@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "将 React 组件桥接为 Base Screen 物料",
   "license": "MIT",
   "publishConfig": {
@@ -20,10 +20,7 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@base-screen/contracts": "workspace:^",
-    "@base-screen/plugin-core": "workspace:^",
-    "@base-screen/plugin-sdk": "workspace:^",
-    "@base-screen/sdk": "workspace:^"
+    "base-screen": "workspace:^"
   },
   "exports": {
     ".": {

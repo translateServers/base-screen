@@ -3,7 +3,11 @@
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "outDir": "dist",
-    "rootDir": "."
+    "rootDir": ".",
+    "paths": {
+      "base-screen": ["./src/index.ts"],
+      "base-screen/*": ["./src/*.ts"]
+    }
   },
   "include": ["src/**/*.ts"]
 }

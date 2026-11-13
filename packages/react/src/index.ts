@@ -2,14 +2,14 @@ import {
   parseScreenJsonValue,
   type ScreenJsonValue,
   type ScreenParseResult,
-} from '@base-screen/contracts';
+} from 'base-screen/contracts';
 import type {
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialConstructor,
   BaseScreenMaterialManifest,
   BaseScreenMaterialModel,
-} from '@base-screen/plugin-core';
-import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+} from 'base-screen/plugin-core';
+import { createMaterialDefinition } from 'base-screen/plugin-sdk';
 import { type ComponentType, createElement, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 

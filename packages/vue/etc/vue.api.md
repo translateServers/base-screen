@@ -5,24 +5,24 @@
 ```ts
 
 import { App } from 'vue';
-import { BaseScreenDesignerElement } from '@base-screen/sdk';
-import { BaseScreenDesignerMountOptions } from '@base-screen/sdk';
-import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
-import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
-import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
-import { BaseScreenMountControllerReady } from '@base-screen/sdk';
-import { BaseScreenMountDiagnosticContext } from '@base-screen/sdk';
-import { BaseScreenMountDiagnosticsCallback } from '@base-screen/sdk';
-import { BaseScreenRuntime } from '@base-screen/sdk';
-import { BaseScreenViewerElement } from '@base-screen/sdk';
-import { BaseScreenViewerMountOptions } from '@base-screen/sdk';
-import { BaseScreenViewerRuntime } from '@base-screen/sdk';
+import { BaseScreenDesignerElement } from 'base-screen';
+import { BaseScreenDesignerMountOptions } from 'base-screen';
+import type { BaseScreenMaterialCatalogEntry } from 'base-screen/plugin-core';
+import type { BaseScreenMaterialManifest } from 'base-screen/plugin-core';
+import type { BaseScreenMaterialModel } from 'base-screen/plugin-core';
+import { BaseScreenMountControllerReady } from 'base-screen';
+import { BaseScreenMountDiagnosticContext } from 'base-screen';
+import { BaseScreenMountDiagnosticsCallback } from 'base-screen';
+import { BaseScreenRuntime } from 'base-screen';
+import { BaseScreenViewerElement } from 'base-screen';
+import { BaseScreenViewerMountOptions } from 'base-screen';
+import { BaseScreenViewerRuntime } from 'base-screen';
 import { Component } from 'vue';
 import { DefineSetupFnComponent } from 'vue';
 import { PublicProps } from 'vue';
-import type { ScreenDiagnostic } from '@base-screen/contracts';
-import { ScreenParseResult } from '@base-screen/contracts';
-import { ScreenProjectState } from '@base-screen/sdk';
+import type { ScreenDiagnostic } from 'base-screen/contracts';
+import { ScreenParseResult } from 'base-screen/contracts';
+import { ScreenProjectState } from 'base-screen';
 import { SlotsType } from 'vue';
 
 // @public (undocumented)

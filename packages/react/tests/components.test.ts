@@ -7,7 +7,7 @@ import type {
   BaseScreenViewerElement,
   BaseScreenViewerMountOptions,
   BaseScreenViewerRuntime,
-} from '@base-screen/sdk';
+} from 'base-screen';
 import { createElement } from 'react';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
@@ -157,7 +157,7 @@ describe('React composition components', () => {
     });
     let runtime: BaseScreenViewerRuntime | undefined;
     try {
-      const { createBaseScreenViewerRuntime } = await import('@base-screen/sdk/viewer');
+      const { createBaseScreenViewerRuntime } = await import('base-screen/viewer');
       const result = await createBaseScreenViewerRuntime();
       if (!result.ok) throw new Error('Viewer runtime 创建失败');
       runtime = result.value;
@@ -364,12 +364,12 @@ describe('React composition components', () => {
     hooks.slots = [];
     hooks.pending = [];
     const target = new EventTarget();
-    const state: import('@base-screen/sdk').ScreenProjectState = {
+    const state: import('base-screen').ScreenProjectState = {
       phase: 'ready',
       dirty: false,
       project: { projectId: 'first', name: 'Project', revision: 'r1' },
     };
-    const { createBaseScreenMountHandle } = await import('@base-screen/sdk');
+    const { createBaseScreenMountHandle } = await import('base-screen');
     const handle = createBaseScreenMountHandle({
       element: Object.assign(target, {
         getProjectState: () => structuredClone(state),

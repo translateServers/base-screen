@@ -73,7 +73,14 @@ function createExtractorConfig(entry, packageJsonPath, reportTempFolder) {
       projectFolder: entry.packageFolder,
       mainEntryPointFilePath: entry.entryPointFilePath,
       compiler: {
-        tsconfigFilePath: join(entry.packageFolder, 'tsconfig.build.json'),
+        // 单包把内部实现内联后，自身也是被内联方的依赖来源：构建期指向 src，
+        // 而 API 分析必须分析产物声明，因此这类包用 tsconfig.api.json 覆盖 paths。
+        tsconfigFilePath: join(
+          entry.packageFolder,
+          existsSync(join(entry.packageFolder, 'tsconfig.api.json'))
+            ? 'tsconfig.api.json'
+            : 'tsconfig.build.json',
+        ),
         // The regular package typecheck remains strict; Vue's peer types require newer TS than AE bundles.
         skipLibCheck: entry.directory === 'vue' || entry.exportPath === './vue',
       },

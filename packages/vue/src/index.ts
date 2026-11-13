@@ -2,14 +2,14 @@ import {
   parseScreenJsonValue,
   type ScreenJsonValue,
   type ScreenParseResult,
-} from '@base-screen/contracts';
+} from 'base-screen/contracts';
 import type {
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialConstructor,
   BaseScreenMaterialManifest,
   BaseScreenMaterialModel,
-} from '@base-screen/plugin-core';
-import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+} from 'base-screen/plugin-core';
+import { createMaterialDefinition } from 'base-screen/plugin-sdk';
 import { type App, type Component, createApp, h, type ShallowRef, shallowRef } from 'vue';
 import {
   collectGlobalRules,

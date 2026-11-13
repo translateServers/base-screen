@@ -1,4 +1,4 @@
-import type { ScreenDiagnostic } from '@base-screen/contracts';
+import type { ScreenDiagnostic } from 'base-screen/contracts';
 import {
   type BaseScreenDesignerElement,
   type BaseScreenDesignerMountOptions,
@@ -14,7 +14,7 @@ import {
   createBaseScreenDesignerMountController,
   createBaseScreenViewerMountController,
   type ScreenProjectState,
-} from '@base-screen/sdk';
+} from 'base-screen';
 import {
   defineComponent,
   h,

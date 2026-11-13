@@ -1,4 +1,4 @@
-import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialModel } from 'base-screen/plugin-core';
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 

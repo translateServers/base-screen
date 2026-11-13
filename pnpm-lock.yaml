@@ -382,18 +382,9 @@ importers:
 
   packages/react:
     dependencies:
-      '@base-screen/contracts':
+      base-screen:
         specifier: workspace:^
-        version: link:../contracts
-      '@base-screen/plugin-core':
-        specifier: workspace:^
-        version: link:../plugin-core
-      '@base-screen/plugin-sdk':
-        specifier: workspace:^
-        version: link:../plugin-sdk
-      '@base-screen/sdk':
-        specifier: workspace:^
-        version: link:../sdk
+        version: link:../base-screen
       react:
         specifier: ^19.1.0
         version: 19.3.1
@@ -442,18 +433,9 @@ importers:
 
   packages/vue:
     dependencies:
-      '@base-screen/contracts':
+      base-screen:
         specifier: workspace:^
-        version: link:../contracts
-      '@base-screen/plugin-core':
-        specifier: workspace:^
-        version: link:../plugin-core
-      '@base-screen/plugin-sdk':
-        specifier: workspace:^
-        version: link:../plugin-sdk
-      '@base-screen/sdk':
-        specifier: workspace:^
-        version: link:../sdk
+        version: link:../base-screen
       vue:
         specifier: ^3.5.0
         version: 3.5.40(typescript@7.0.2)

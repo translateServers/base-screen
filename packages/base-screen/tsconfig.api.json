@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "paths": {
+      "base-screen": ["./dist/index.d.ts"],
+      "base-screen/*": ["./dist/*.d.ts"]
+    }
+  }
+}

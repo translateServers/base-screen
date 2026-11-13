@@ -50,10 +50,10 @@ interface BaseScreenConditionalStyleRequest {
 
 // @public (undocumented)
 export const BaseScreenDesigner: DefineSetupFnComponent<BaseScreenDesignerProps, {}, SlotsType<{
-    fallback: {
-        diagnostics: readonly ScreenDiagnostic[];
-        context: BaseScreenMountDiagnosticContext | undefined;
-    };
+fallback: {
+diagnostics: readonly ScreenDiagnostic[];
+context: BaseScreenMountDiagnosticContext | undefined;
+};
 }>, BaseScreenDesignerProps & {}, PublicProps>;
 
 // @public
@@ -1261,10 +1261,10 @@ interface BaseScreenSetCatalogOptions {
 
 // @public (undocumented)
 export const BaseScreenViewer: DefineSetupFnComponent<BaseScreenViewerProps, {}, SlotsType<{
-    fallback: {
-        diagnostics: readonly ScreenDiagnostic[];
-        context: BaseScreenMountDiagnosticContext | undefined;
-    };
+fallback: {
+diagnostics: readonly ScreenDiagnostic[];
+context: BaseScreenMountDiagnosticContext | undefined;
+};
 }>, BaseScreenViewerProps & {}, PublicProps>;
 
 // @public (undocumented)
