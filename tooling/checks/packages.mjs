@@ -2,28 +2,41 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 export const PACKAGE_DEFINITIONS = Object.freeze({
-  contracts: { build: 'tsc', name: '@base-screen/contracts' },
-  core: { build: 'tsc', name: '@base-screen/core' },
-  renderer: { build: 'vite', name: '@base-screen/renderer' },
+  'base-screen': {
+    build: 'vite',
+    name: 'base-screen',
+    sideEffects: [
+      './dist/auto-register.js',
+      './dist/designer-auto-register.js',
+      './dist/viewer-auto-register.js',
+      './dist/host-tokens.css',
+    ],
+  },
+  contracts: { build: 'tsc', name: '@base-screen/contracts', private: true },
+  core: { build: 'tsc', name: '@base-screen/core', private: true },
+  renderer: { build: 'vite', name: '@base-screen/renderer', private: true },
   engine: {
     build: 'vite',
     name: '@base-screen/engine',
+    private: true,
     sideEffects: ['./dist/host-tokens.css'],
   },
   material: {
     build: 'vite',
     name: '@base-screen/material',
+    private: true,
     sideEffects: ['./dist/auto-register.js'],
   },
-  'plugin-core': { build: 'tsc', name: '@base-screen/plugin-core' },
-  'plugin-manager': { build: 'tsc', name: '@base-screen/plugin-manager' },
-  'plugin-sdk': { build: 'tsc', name: '@base-screen/plugin-sdk' },
-  'host-kit': { build: 'tsc', name: '@base-screen/host-kit' },
+  'plugin-core': { build: 'tsc', name: '@base-screen/plugin-core', private: true },
+  'plugin-manager': { build: 'tsc', name: '@base-screen/plugin-manager', private: true },
+  'plugin-sdk': { build: 'tsc', name: '@base-screen/plugin-sdk', private: true },
+  'host-kit': { build: 'tsc', name: '@base-screen/host-kit', private: true },
   react: { build: 'vite', name: '@base-screen/react' },
   vue: { build: 'vite', name: '@base-screen/vue' },
   sdk: {
     build: 'vite',
     name: '@base-screen/sdk',
+    private: true,
     sideEffects: [
       './dist/auto-register.js',
       './dist/designer-auto-register.js',
@@ -106,14 +119,27 @@ function assertPublishablePackage(directory, definition, region = 'packages') {
   if (manifest.name !== definition.name) {
     fail('PACKAGE_NAME_MISMATCH', `${region}/${directory}`);
   }
-  if (manifest.private === true || manifest.type !== 'module') {
-    fail('PUBLISH_CONFIGURATION_FORBIDDEN', directory);
+  if (manifest.type !== 'module') {
+    fail('PACKAGE_TYPE_INVALID', `${region}/${directory}`);
   }
-  if (
-    manifest.publishConfig?.access !== 'public' ||
-    manifest.publishConfig?.registry !== 'https://registry.npmjs.org/'
-  ) {
-    fail('PUBLISH_CONFIGURATION_INVALID', directory);
+  if (definition.private === true) {
+    // 内部包只是 base-screen 的构建输入，出现在 npm 上会让单包分发表意不清。
+    if (manifest.private !== true) {
+      fail('INTERNAL_PACKAGE_MUST_BE_PRIVATE', `${region}/${directory}`);
+    }
+    if (manifest.publishConfig !== undefined) {
+      fail('INTERNAL_PACKAGE_PUBLISH_CONFIG_FORBIDDEN', `${region}/${directory}`);
+    }
+  } else {
+    if (manifest.private === true) {
+      fail('PUBLISH_CONFIGURATION_FORBIDDEN', `${region}/${directory}`);
+    }
+    if (
+      manifest.publishConfig?.access !== 'public' ||
+      manifest.publishConfig?.registry !== 'https://registry.npmjs.org/'
+    ) {
+      fail('PUBLISH_CONFIGURATION_INVALID', `${region}/${directory}`);
+    }
   }
   if (manifest.license !== 'MIT') {
     fail('PACKAGE_LICENSE_MISMATCH', directory);

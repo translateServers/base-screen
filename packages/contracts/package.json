@@ -1,12 +1,9 @@
 {
   "name": "@base-screen/contracts",
   "version": "0.1.0",
+  "private": true,
   "description": "Screen Document、宿主契约、严格解析、诊断、序列化与 JSON Schema",
   "license": "MIT",
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/translateServers/base-screen.git",

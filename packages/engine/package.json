@@ -1,12 +1,9 @@
 {
   "name": "@base-screen/engine",
   "version": "0.1.0",
+  "private": true,
   "description": "Designer 会话、画布交互、检查器和工作台编排",
   "license": "MIT",
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/translateServers/base-screen.git",

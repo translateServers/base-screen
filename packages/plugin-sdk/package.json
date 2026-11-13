@@ -1,12 +1,9 @@
 {
   "name": "@base-screen/plugin-sdk",
   "version": "0.1.0",
+  "private": true,
   "description": "面向插件与物料作者的定义、注册和物料包辅助",
   "license": "MIT",
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/translateServers/base-screen.git",

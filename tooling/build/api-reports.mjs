@@ -75,7 +75,7 @@ function createExtractorConfig(entry, packageJsonPath, reportTempFolder) {
       compiler: {
         tsconfigFilePath: join(entry.packageFolder, 'tsconfig.build.json'),
         // The regular package typecheck remains strict; Vue's peer types require newer TS than AE bundles.
-        skipLibCheck: entry.directory === 'vue',
+        skipLibCheck: entry.directory === 'vue' || entry.exportPath === './vue',
       },
       apiReport: {
         enabled: true,

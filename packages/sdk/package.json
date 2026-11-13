@@ -1,12 +1,9 @@
 {
   "name": "@base-screen/sdk",
   "version": "0.1.0",
+  "private": true,
   "description": "Viewer、Designer、物料与插件的产品级组合入口",
   "license": "MIT",
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/translateServers/base-screen.git",

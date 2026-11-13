@@ -1,12 +1,9 @@
 {
   "name": "@base-screen/renderer",
   "version": "0.1.0",
+  "private": true,
   "description": "物料模型与 DOM 渲染，保持纯展示职责",
   "license": "MIT",
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/translateServers/base-screen.git",

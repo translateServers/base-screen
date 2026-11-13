@@ -1,0 +1,141 @@
+{
+  "name": "base-screen",
+  "version": "0.1.0",
+  "description": "大屏设计器基座：Viewer / Designer / 物料 / 插件 / 宿主接入辅助，单包分发、按子路径引入",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/translateServers/base-screen.git",
+    "directory": "packages/base-screen"
+  },
+  "homepage": "https://github.com/translateServers/base-screen#readme",
+  "bugs": "https://github.com/translateServers/base-screen/issues",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "./dist/auto-register.js",
+    "./dist/designer-auto-register.js",
+    "./dist/viewer-auto-register.js",
+    "./dist/host-tokens.css"
+  ],
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "vue": "^3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@base-screen/contracts": "workspace:^",
+    "@base-screen/core": "workspace:^",
+    "@base-screen/engine": "workspace:^",
+    "@base-screen/host-kit": "workspace:^",
+    "@base-screen/material": "workspace:^",
+    "@base-screen/plugin-core": "workspace:^",
+    "@base-screen/plugin-manager": "workspace:^",
+    "@base-screen/plugin-sdk": "workspace:^",
+    "@base-screen/react": "workspace:^",
+    "@base-screen/renderer": "workspace:^",
+    "@base-screen/sdk": "workspace:^",
+    "@base-screen/vue": "workspace:^"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./auto-register": {
+      "types": "./dist/auto-register.d.ts",
+      "import": "./dist/auto-register.js"
+    },
+    "./viewer": {
+      "types": "./dist/viewer.d.ts",
+      "import": "./dist/viewer.js"
+    },
+    "./viewer/auto-register": {
+      "types": "./dist/viewer-auto-register.d.ts",
+      "import": "./dist/viewer-auto-register.js"
+    },
+    "./designer": {
+      "types": "./dist/designer.d.ts",
+      "import": "./dist/designer.js"
+    },
+    "./designer/auto-register": {
+      "types": "./dist/designer-auto-register.d.ts",
+      "import": "./dist/designer-auto-register.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "import": "./dist/contracts.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./renderer": {
+      "types": "./dist/renderer.d.ts",
+      "import": "./dist/renderer.js"
+    },
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "import": "./dist/engine.js"
+    },
+    "./material": {
+      "types": "./dist/material.d.ts",
+      "import": "./dist/material.js"
+    },
+    "./plugin-core": {
+      "types": "./dist/plugin-core.d.ts",
+      "import": "./dist/plugin-core.js"
+    },
+    "./plugin-manager": {
+      "types": "./dist/plugin-manager.d.ts",
+      "import": "./dist/plugin-manager.js"
+    },
+    "./plugin-sdk": {
+      "types": "./dist/plugin-sdk.d.ts",
+      "import": "./dist/plugin-sdk.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins.d.ts",
+      "import": "./dist/plugins.js"
+    },
+    "./host-kit": {
+      "types": "./dist/host-kit.d.ts",
+      "import": "./dist/host-kit.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "import": "./dist/vue.js"
+    },
+    "./host-tokens.css": "./dist/host-tokens.css"
+  },
+  "scripts": {
+    "build": "pnpm run clean && tsc -p tsconfig.build.json && vite build && node ../../tooling/build/rollup-dts.mjs && node -e \"const fs=require('node:fs');fs.copyFileSync(require.resolve('@base-screen/engine/host-tokens.css'),'dist/host-tokens.css')\"",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
+    "lint": "biome check src",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

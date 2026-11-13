@@ -3,6 +3,21 @@ import { join, posix } from 'node:path';
 import { PACKAGE_DEFINITIONS } from './packages.mjs';
 
 const ALLOWED_WORKSPACE_DEPENDENCIES = Object.freeze({
+  // 单包分发：base-screen 把内部包作为构建期依赖内联，宿主只需要安装这一个包。
+  'base-screen': [
+    'contracts',
+    'core',
+    'renderer',
+    'engine',
+    'material',
+    'plugin-core',
+    'plugin-manager',
+    'plugin-sdk',
+    'host-kit',
+    'react',
+    'vue',
+    'sdk',
+  ],
   contracts: [],
   core: ['contracts'],
   'plugin-core': ['contracts'],
@@ -34,6 +49,8 @@ const FRAMEWORK_ROOTS = new Map([
 
 const ALLOWED_EXTERNAL_DEPENDENCIES = Object.freeze({
   contracts: ['zod'],
+  // 单包分发把 contracts 内联进来，zod 仍是运行时依赖；框架本身是可选 peer。
+  'base-screen': ['zod'],
 });
 
 // ADR-0074：外围插件分区。packages 区维持零第三方依赖；plugins 区逐插件显式申报，
@@ -165,6 +182,7 @@ function validateManifestDependencies(directory, manifest, graph, pluginPackageN
     const framework = frameworkRoot(dependencyName);
     if (framework) {
       const allowed =
+        directory === 'base-screen' ||
         (directory === 'react' && (framework === 'react' || framework === 'react-dom')) ||
         (directory === 'vue' && framework === 'vue');
       if (!allowed) {
