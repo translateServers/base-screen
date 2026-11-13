@@ -1,9 +1,5 @@
 {
-  "allowEmptyPackages": [
-    "base-screen",
-    "vue",
-    "plugin-sdk"
-  ],
+  "allowEmptyPackages": ["base-screen", "vue", "plugin-sdk"],
   "engineFileMapping": {
     "enabled": true,
     "package": "engine"
@@ -34,12 +30,7 @@
       "reason": "Turbo 任务图变更，门禁语义可能受影响"
     }
   ],
-  "nonGatePrefixes": [
-    "examples/",
-    "harness/",
-    "tooling/",
-    "plugins/"
-  ],
+  "nonGatePrefixes": ["examples/", "harness/", "tooling/", "plugins/"],
   "auditThresholds": {
     "noSelectionDays": 90,
     "duplicateJaccard": 0.85,
