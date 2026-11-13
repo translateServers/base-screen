@@ -333,3 +333,24 @@
   - `BaseScreenRenderer` gains `prepareDataSources` / `refreshDataSource` / `readDataSourceValue` /
     `isDataSourceSettled` / `evaluateValueRef` and an `onDataSourceSettled` option so the viewer can prime a
     document's variable instances and render once, instead of fetching twice.
+
+- 061fa02: Add a single source for canvas background capability.
+
+  Canvas background was described in five places (contract schema, Core patch whitelist, designer palette,
+  agent rules/tool schema, three host compilers). When the contract grew gradients, the last two went silent
+  instead of failing: the agent answered "画布只支持纯色" for a capability that already shipped.
+
+  - `SCREEN_CANVAS_FIELDS` and `SCREEN_CANVAS_BACKGROUND_TYPES` are now public. The field list is referenced
+    by `core` instead of being copied, and the type list is derived from the zod background schema so a new
+    background form cannot appear in only one of them.
+  - `isScreenCanvasPaletteColor` / `isScreenCanvasBackground` expose the palette and gradient rules (stops,
+    ascending positions, angle/position bounds) so hosts validate with the contract instead of hand-written
+    regexes that accepted values the renderer cannot draw (`#12345`).
+
+- 061fa02: Prepare the core packages for public npm distribution with explicit public registry metadata and GitHub repository links. Peripheral plugins remain private and outside this release scope.
+
+  Preserve the public host-token stylesheet during tree shaking. Mark Vue component factories as pure so Viewer-only consumers can remove Designer code.
+
+  Add `createBaseScreenViewerRuntime` to the SDK Viewer entry with explicit material selection and no Designer registration. Full and Viewer runtimes share plugin activation, catalog transactions, tracked mounts and disposal. React and Vue Viewer components accept either runtime while Designer components retain their full runtime requirement.
+
+  Verify original packed archives, converted internal semver ranges and isolated consumer imports without rewriting published manifests. Add Viewer-only production-bundle and browser lifecycle coverage and fix the documented result handling.

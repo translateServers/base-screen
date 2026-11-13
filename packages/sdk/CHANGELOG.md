@@ -124,6 +124,79 @@
   渲染仍遵守渲染盒不变式：物料只写自身内部样式，宽高由渲染器按 canonical `component.size` 写入。
   `@base-screen/sdk` 的自动注册随其生效。不改变 canonical 文档契约与物料 ABI。
 
+- 061fa02: Reduce host integration protocol and lifecycle boilerplate while retaining the full element API.
+
+  Engine exposes an isolated, lightweight authoritative project snapshot and change event. Designer mount controllers and framework components project the accepted initial snapshot and subsequent state through `onProjectState`, without a duplicate project read or host state machine. Failed normalized-document commits retain the previous project revision.
+
+  Mount diagnostics carry the actual failure phase, instance availability and recovery mode through controllers, framework callbacks and fallback rendering. Existing one-argument diagnostics callbacks remain supported. Catalog refresh failures retain the active instance; configuration, project load and teardown failures have distinct contexts.
+
+  Standard runtimes accept framework bridge catalog entries directly, preserving tabular data adapters through the existing registration and authorization plan. Full host examples use one standard runtime and tracked mounts, with online-material changes committed through `setCatalog`.
+
+  Host-kit adds transport-neutral project and dataset adapters over existing host business callbacks. REST adapters reuse the same migration, contract validation, cancellation and error handling. Validated-result observers receive isolated request data, results and errors; observer mutations or failures cannot alter the port result. Host-owned business requests, authorization, persistence, asset management and alarm transports remain outside Engine. Query operations also receive their per-request execution context, preserving host tracing and project revision audit without shared state.
+
+  Restore the ten stable `plugin.chart.*` chart-family identities already consumed by the production host, including their manifests, dataset adapters and ECharts options, so upgrading the host does not silently remove existing charts.
+
+- 061fa02: Add a public host token layer (`--bs-host-*`) for host-owned panels.
+
+  Hosts that render their own content into a named designer slot (for example the left-panel
+  `leftPanelGroups` slots) had no consumable design tokens: `designer-tokens.css` is injected into the
+  engine shadow root via `?inline`, and no package exported any CSS. Every host therefore copied the
+  palette by hand — the three example hosts shipped an identical dark-only copy, so their panel stayed
+  dark after the workbench switched to `theme="light"`.
+
+  - `@base-screen/engine/host-tokens.css` and `@base-screen/sdk/host-tokens.css` publish a baked token
+    layer with the public prefix `--bs-host-`: 33 theme pairs (surfaces, text, borders, accent, focus
+    ring, elevation, semantic colours, primary action, scrollbar, modal scrim) plus 47 shared geometry
+    and typography tokens (space, radius, control height, icon size, row height, card geometry, font, tracking,
+    motion). Card geometry (`--bs-host-card-min-width` / `-gap` / `-thumb-aspect`) is shared with the material
+    library, so a host asset card and a built-in material card have the same width and thumbnail ratio.
+  - The file is generated from `designer-tokens.css` by `tooling/build/host-tokens.mjs`; token values are
+    never hand-written. Generation unwraps the `--base-screen-designer-*` override hooks to their baked
+    fallbacks and remaps internal `var(--designer-*)` references, so no engine-internal name leaks into
+    the public layer.
+  - Tokens are scoped with zero-specificity `:where(.bs-host)` and
+    `:where(.bs-host[theme="light"], base-screen-designer[theme="light"] .bs-host)`, so hosts can override
+    a single token from any class selector. The layer only declares custom properties plus `color-scheme`.
+  - `pnpm check:host-tokens` guards the layer: regeneration must be byte-identical, every source token
+    must exist, no internal name may leak, theme tokens must be declared in both blocks, and the public
+    name set must match a compatibility snapshot (removing or renaming a token requires editing it).
+
+  Name stability is the contract; values are visual tuning. The public layer does not add new spacing or
+  type steps and does not raise the 30/28px control geometry to a 44px target — doing so would make host
+  panels looser than the adjacent built-in panels.
+
+- 061fa02: Prepare the core packages for public npm distribution with explicit public registry metadata and GitHub repository links. Peripheral plugins remain private and outside this release scope.
+
+  Preserve the public host-token stylesheet during tree shaking. Mark Vue component factories as pure so Viewer-only consumers can remove Designer code.
+
+  Add `createBaseScreenViewerRuntime` to the SDK Viewer entry with explicit material selection and no Designer registration. Full and Viewer runtimes share plugin activation, catalog transactions, tracked mounts and disposal. React and Vue Viewer components accept either runtime while Designer components retain their full runtime requirement.
+
+  Verify original packed archives, converted internal semver ranges and isolated consumer imports without rewriting published manifests. Add Viewer-only production-bundle and browser lifecycle coverage and fix the documented result handling.
+
+- 061fa02: Add an optional product composition layer for host integration.
+
+  `createBaseScreenRuntime()` registers the product elements and official materials, activates plugins through one
+  authorization plan, and exposes the merged catalog and contribution surfaces. `mountDesigner()` and `mountViewer()`
+  append, configure, initialize, and release elements through a tracked handle while preserving the full element API.
+  `createBaseScreenDesignerMountController()` and `createBaseScreenViewerMountController()` add a framework-agnostic
+  attach/detach lifecycle for thin host bindings, including option snapshots, diagnostics, and async detach races.
+  `adoptBaseScreenRuntime()` projects an already-active host manager and catalog into the same runtime shape without
+  re-activating plugins, while `@base-screen/sdk/plugin-core` re-exports plugin contracts so hosts do not need a direct
+  `@base-screen/plugin-core` dependency.
+
+  Designer mounts infer official tool and group roles from the active catalog and honor explicit overrides. Each runtime
+  owns at most one Designer session; a second mount fails without replacing the first session's plugin binding.
+  `setCatalog()` refreshes inherited mounted catalogs by default, rolls back earlier updates on failure, and supports an
+  explicit `future-mounts` target. Viewer `refreshCatalog()` preserves document and data state. Mount controllers keep
+  other options as initialization snapshots and serialize pending attach/detach operations.
+
+  Explicit `blueprintCapabilities` and `createBaseScreenBlueprintCapabilityPlugin()` derive contributions and grants
+  from one capability list. SDK entrypoints expose the public configuration and host event types needed by consumers.
+  Designer main, ghost, and preview renderers receive the same host data ports, and initialized dataset ports cannot be
+  silently replaced. Disposal is idempotent under reentrant cleanup and still releases the host when unbinding fails.
+
+  The existing `defineBaseScreen*()`, `configure()`, port, slot, command, and manual lifecycle APIs remain available.
+
 ### Patch Changes
 
 - b9d0b80: Add the agent-fusion change flow to the designer: transaction provenance, ghost-draft proposals with

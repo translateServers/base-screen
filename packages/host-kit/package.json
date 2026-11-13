@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/host-kit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "宿主接入辅助：项目适配器与数据集端口的 REST 实现，内置契约硬规矩与错误码映射",
   "license": "MIT",
   "publishConfig": {
