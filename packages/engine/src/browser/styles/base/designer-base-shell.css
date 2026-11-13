@@ -129,3 +129,114 @@
 .small-screen-warning {
   display: none;
 }
+
+/* 首帧骨架：尺寸完全由 `.designer` 栅格与面板宽度变量决定，只填充占位块，
+   不改变行高、列宽或滚动条轨道，避免被完整工作区替换时发生布局位移。 */
+.designer[data-designer-skeleton] {
+  pointer-events: none;
+}
+
+.designer[data-designer-skeleton] .designer-skeleton-topbar,
+.designer[data-designer-skeleton] .designer-skeleton-status {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-5);
+  padding: 0 var(--designer-space-6);
+  overflow: hidden;
+  background: var(--designer-surface-panel);
+}
+
+.designer[data-designer-skeleton] .designer-skeleton-topbar {
+  justify-content: space-between;
+}
+
+.designer[data-designer-skeleton] .designer-skeleton-status {
+  justify-content: flex-end;
+  padding: 0 var(--designer-space-5);
+}
+
+.designer[data-designer-skeleton] .rail,
+.designer[data-designer-skeleton] .properties {
+  display: flex;
+  flex-direction: column;
+  gap: var(--designer-space-4);
+  padding: var(--designer-space-5);
+  overflow: hidden;
+  background: var(--designer-surface-panel);
+}
+
+.designer[data-designer-skeleton] .designer-skeleton-workspace {
+  display: grid;
+  place-items: center;
+  padding: var(--designer-space-7);
+  overflow: hidden;
+  background: var(--designer-surface-canvas);
+}
+
+.designer-skeleton-block {
+  flex: none;
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-border-default);
+  animation: designer-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.designer-skeleton-block[data-skeleton-size="brand"] {
+  width: 120px;
+  height: 20px;
+}
+
+.designer-skeleton-block[data-skeleton-size="tools"] {
+  width: min(320px, 30%);
+  height: 28px;
+  margin-left: auto;
+}
+
+.designer-skeleton-block[data-skeleton-size="actions"] {
+  width: 160px;
+  height: 28px;
+}
+
+.designer-skeleton-block[data-skeleton-size="tabs"] {
+  width: 100%;
+  height: 32px;
+}
+
+.designer-skeleton-block[data-skeleton-size="heading"] {
+  width: 60%;
+  height: 18px;
+}
+
+.designer-skeleton-block[data-skeleton-size="row"] {
+  width: 100%;
+  height: 14px;
+}
+
+.designer-skeleton-block[data-skeleton-size="status"] {
+  width: 240px;
+  height: 12px;
+}
+
+.designer-skeleton-block[data-skeleton-size="stage"] {
+  width: min(78%, 960px);
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--designer-radius-4);
+}
+
+@keyframes designer-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .designer-skeleton-block {
+    animation: none;
+    opacity: 0.6;
+  }
+}

@@ -114,6 +114,12 @@ export interface DesignerElementState {
   backButton: boolean;
   hostResourceSelectionButton: boolean;
   renderer: BaseScreenRenderer | undefined;
+  /** 曾以骨架形态先挂载：完整初始化时把面板内容与画布渲染拆到后续帧。 */
+  skeletonShown: boolean;
+  /** 首帧后仍需补齐的面板内容与画布渲染；断连时保留标记，重连后继续。 */
+  deferredPanelHydration: boolean;
+  deferredCanvasHydration: boolean;
+  deferredHydrationFrame: number | undefined;
   /** 幽灵草案渲染器：同一物料目录、只读挂载到叠加层，与主画布互不影响。 */
   ghostRenderer: BaseScreenRenderer | undefined;
   canvas: HTMLDivElement | undefined;
@@ -198,6 +204,10 @@ export function createDesignerElementState(
   state.resolvedMaterialLibraryItems = [];
   state.backButton = false;
   state.hostResourceSelectionButton = false;
+  state.skeletonShown = false;
+  state.deferredPanelHydration = false;
+  state.deferredCanvasHydration = false;
+  state.deferredHydrationFrame = undefined;
   state.instanceId = createScreenAuthoringInstanceId();
   state.pendingAuthoringRequests = new Map<
     string,

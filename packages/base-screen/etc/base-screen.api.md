@@ -2057,6 +2057,9 @@ interface CreatePluginRegistrationOptions {
 export function defineBaseScreenDesigner(): ScreenParseResult<CustomElementConstructor>;
 
 // @public (undocumented)
+export function mountBaseScreenDesignerSkeleton(container: Element): ScreenParseResult<BaseScreenDesignerElement>;
+
+// @public (undocumented)
 export function defineBaseScreenElements(): ScreenParseResult<null>;
 
 // @public (undocumented)

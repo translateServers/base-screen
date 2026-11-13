@@ -37,6 +37,9 @@ export function initialize(element: DesignerElementHost): void {
     return;
   }
   const shadow = element.shadowRoot ?? element.attachShadow({ mode: 'open' });
+  // 若骨架已经先画过，完整初始化只同步搭壳与控制台，物料库与画布渲染拆到后续帧。
+  const deferHydration = elementState.skeletonShown;
+  elementState.skeletonShown = false;
   // 优先挂共享构造样式表（多实例单一 CSSOM 副本）；环境不支持时回退 style 元素。
   const styleFallback = adoptDesignerStyleSheets(shadow)
     ? []
@@ -50,12 +53,15 @@ export function initialize(element: DesignerElementHost): void {
       elementState.materialLibraryState,
       elementState.materialLibraryGrouping,
       elementState.leftPanelGroups,
+      deferHydration,
     ),
   );
   attachDesignerCanvasHint(shadow, element.ownerDocument);
-  elementState.panelController.refreshMaterialLibrary(
-    shadow.querySelector<HTMLElement>('.designer'),
-  );
+  if (!deferHydration) {
+    elementState.panelController.refreshMaterialLibrary(
+      shadow.querySelector<HTMLElement>('.designer'),
+    );
+  }
   elementState.viewportElement = shadow.querySelector<HTMLDivElement>('[data-viewport]')!;
   elementState.canvas = shadow.querySelector<HTMLDivElement>('[data-canvas]')!;
   elementState.selection = shadow.querySelector<HTMLDivElement>('[data-selection]')!;
@@ -192,10 +198,102 @@ export function initialize(element: DesignerElementHost): void {
   elementState.surfaceRouter.connect(shadow, elementState.surfaceBindings);
   elementState.blueprintWorkbenchController.connect(shadow);
   elementState.runtime.connectWindowGuards(element);
-  if (elementState.session.document !== undefined) {
+  if (deferHydration) {
+    scheduleDeferredHydration(element);
+  } else if (elementState.session.document !== undefined) {
     elementState.runtime.renderDocument(element, elementState.session.document);
     elementState.runtime.renderInteraction(element);
   }
+  element.setAttribute('data-designer-state', 'ready');
+}
+
+/**
+ * 骨架先画过的场景：物料库（左栏）与画布文档分两帧补齐。第一帧先出面板内容，
+ * 第二帧再挂物料，避免大文档的物料挂载与取数阻塞首屏。
+ */
+export function scheduleDeferredHydration(element: DesignerElementHost): void {
+  const elementState = getDesignerElementState(element);
+
+  elementState.deferredPanelHydration = true;
+  elementState.deferredCanvasHydration = elementState.session.document !== undefined;
+  if (elementState.deferredCanvasHydration) {
+    element.setAttribute('data-designer-canvas-state', 'pending');
+  }
+  scheduleHydrationFrame(element);
+}
+
+export function resumeDeferredHydration(element: DesignerElementHost): void {
+  const elementState = getDesignerElementState(element);
+
+  if (!elementState.deferredPanelHydration && !elementState.deferredCanvasHydration) return;
+  scheduleHydrationFrame(element);
+}
+
+export function cancelDeferredHydration(element: DesignerElementHost): void {
+  const elementState = getDesignerElementState(element);
+  const frame = elementState.deferredHydrationFrame;
+
+  if (frame === undefined) return;
+  cancelHydrationFrame(frame);
+  elementState.deferredHydrationFrame = undefined;
+}
+
+function scheduleHydrationFrame(element: DesignerElementHost): void {
+  const elementState = getDesignerElementState(element);
+
+  if (elementState.deferredHydrationFrame !== undefined) return;
+  elementState.deferredHydrationFrame = requestHydrationFrame(() => {
+    elementState.deferredHydrationFrame = undefined;
+    if (!element.isConnected) return;
+    if (elementState.deferredPanelHydration) {
+      hydrateDeferredPanels(element);
+      if (elementState.deferredCanvasHydration) scheduleHydrationFrame(element);
+      return;
+    }
+    if (elementState.deferredCanvasHydration) hydrateDeferredCanvas(element);
+  });
+}
+
+function hydrateDeferredPanels(element: DesignerElementHost): void {
+  const elementState = getDesignerElementState(element);
+  const layout = element.shadowRoot?.querySelector<HTMLElement>('.designer') ?? null;
+
+  elementState.deferredPanelHydration = false;
+  if (layout === null) return;
+  populateMaterialLibrary(
+    layout,
+    elementState.resolvedMaterialLibraryItems,
+    elementState.materialLibraryState,
+    elementState.materialLibraryGrouping,
+  );
+  elementState.panelController.refreshMaterialLibrary(layout);
+}
+
+function hydrateDeferredCanvas(element: DesignerElementHost): void {
+  const elementState = getDesignerElementState(element);
+  const document = elementState.session.document;
+
+  if (document === undefined) {
+    elementState.deferredCanvasHydration = false;
+    return;
+  }
+  elementState.runtime.renderDocument(element, document);
+  elementState.runtime.renderInteraction(element);
+}
+
+function requestHydrationFrame(callback: () => void): number {
+  if (typeof globalThis.requestAnimationFrame === 'function') {
+    return globalThis.requestAnimationFrame(callback);
+  }
+  return globalThis.setTimeout(callback, 0) as unknown as number;
+}
+
+function cancelHydrationFrame(frame: number): void {
+  if (typeof globalThis.cancelAnimationFrame === 'function') {
+    globalThis.cancelAnimationFrame(frame);
+    return;
+  }
+  globalThis.clearTimeout(frame);
 }
 
 export function renderDocument(
@@ -223,6 +321,8 @@ export function renderDocument(
     elementState.guardController.schedule(document);
     elementState.targetDisplayController.setDocument(document);
   }
+  elementState.deferredCanvasHydration = false;
+  element.setAttribute('data-designer-canvas-state', 'ready');
   return rendered.ok
     ? { ok: true, value: undefined, diagnostics: rendered.diagnostics }
     : { ok: false, diagnostics: rendered.diagnostics };

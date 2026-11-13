@@ -242,6 +242,9 @@ export { CreateBaseScreenCorePluginDesignReadPortOptions }
 // @public (undocumented)
 export function defineBaseScreenDesigner(): ScreenParseResult<CustomElementConstructor>;
 
+// @public (undocumented)
+export function mountBaseScreenDesignerSkeleton(container: Element): ScreenParseResult<BaseScreenDesignerElement>;
+
 export { DesignerGuardSnapshot }
 
 export { DesignerSceneDescriptor }

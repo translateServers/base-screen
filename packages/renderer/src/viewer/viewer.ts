@@ -36,6 +36,7 @@ import {
 import { isBaseScreenMaterialCatalog } from './viewer-configuration-guards.js';
 import { ViewerDataSourceScheduler } from './viewer-data-source-scheduler.js';
 import { lifecycleFailure } from './viewer-lifecycle.js';
+import { createViewerSkeleton, createViewerSkeletonStyle } from './viewer-skeleton.js';
 import { ViewerVariableController } from './viewer-variable-controller.js';
 import {
   applyVariableWriteGuard,
@@ -71,6 +72,9 @@ export class BaseScreenViewerElement extends ElementBase {
   #observer: ScreenResourceObserver | undefined;
   #renderer: BaseScreenRenderer | undefined;
   #mount: HTMLDivElement | undefined;
+  #skeleton: HTMLDivElement | undefined;
+  #skeletonStyle: HTMLStyleElement | undefined;
+  #rendered = false;
   #projectId: string | undefined;
   #documentRevision: string | undefined;
   readonly #variableHandles = new ViewerVariableHandles({
@@ -88,6 +92,7 @@ export class BaseScreenViewerElement extends ElementBase {
       this.writeBlueprintVariables(variables, true);
     },
     emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
+    onRenderSettled: () => this.markRendered(),
   });
   readonly #scheduler = new ViewerDataSourceScheduler({
     readRenderer: () => this.#renderer,
@@ -305,13 +310,21 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#renderer?.resetBlueprintVisibility();
     this.#document = value;
     this.compileBlueprint();
+    if (value !== undefined) this.ensureSkeleton();
     this.initialize();
     this.#variableRuntime.start(undefined, false, true);
     // 新文档的策略集合：resume 会清掉挂起标记并按当前文档重建定时器。
     this.#scheduler.resume();
+    if (value === undefined) {
+      this.clearSkeleton();
+    } else if (this.#blueprintPlan === undefined) {
+      // 蓝图编译失败时不会再有渲染，骨架不能永久停在加载态。
+      this.markRendered();
+    }
   }
 
   connectedCallback(): void {
+    this.ensureSkeleton();
     this.initialize();
     this.#variableRuntime.start(undefined, false, true);
     this.#scheduler.resume();
@@ -330,6 +343,7 @@ export class BaseScreenViewerElement extends ElementBase {
     this.disposeRenderer();
     this.#document = undefined;
     this.compileBlueprint();
+    this.#rendered = false;
   }
 
   refreshData(componentId?: string): void;
@@ -396,11 +410,44 @@ export class BaseScreenViewerElement extends ElementBase {
     });
   }
 
+  /**
+   * 首帧骨架：元素已上屏但 catalog/文档还没到时先铺满查看区，避免白屏。
+   * 已经渲染过文档（例如热更新后重连）不再重置为加载态。
+   */
+  private ensureSkeleton(): void {
+    if (this.#rendered || this.#skeleton !== undefined) return;
+    const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
+    if (this.#skeletonStyle === undefined) {
+      this.#skeletonStyle = createViewerSkeletonStyle(this.ownerDocument);
+      shadow.appendChild(this.#skeletonStyle);
+    }
+    this.#skeleton = createViewerSkeleton(this.ownerDocument);
+    shadow.appendChild(this.#skeleton);
+    this.setAttribute('data-viewer-state', 'loading');
+    this.setAttribute('aria-busy', 'true');
+  }
+
+  /** 首次渲染落定（成功或失败）后撤掉骨架，之后的重渲染不再回到加载态。 */
+  private markRendered(): void {
+    this.#rendered = true;
+    this.clearSkeleton();
+    if (!this.isConnected) return;
+    this.setAttribute('data-viewer-state', 'ready');
+    this.removeAttribute('aria-busy');
+  }
+
+  private clearSkeleton(): void {
+    this.#skeleton?.remove();
+    this.#skeleton = undefined;
+  }
+
   private disposeRenderer(): void {
     this.#renderer?.dispose();
     this.#renderer = undefined;
     this.#mount?.remove();
     this.#mount = undefined;
+    // 骨架挂在 Shadow Root 上，与挂载根相互独立，重连时由 ensureSkeleton 重建。
+    this.clearSkeleton();
   }
 
   private compileBlueprint(): void {

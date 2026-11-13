@@ -24,6 +24,31 @@
     box-shadow var(--designer-motion);
 }
 
+.material-card-skeleton {
+  pointer-events: none;
+}
+
+.material-card-skeleton-thumb,
+.material-card-skeleton-meta {
+  background: var(--designer-border-default);
+  animation: designer-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.material-card-skeleton-meta {
+  display: block;
+  width: 70%;
+  height: var(--designer-space-5);
+  border-radius: var(--designer-radius-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .material-card-skeleton-thumb,
+  .material-card-skeleton-meta {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
 .material-card:hover:not(:disabled) {
   background-color: var(--designer-surface-control-hover);
   box-shadow:

@@ -1,4 +1,6 @@
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { cancelDeferredHydration, resumeDeferredHydration } from './designer-element-rendering.js';
+import { initializeDesignerSkeleton } from './designer-element-skeleton.js';
 import { type DesignerElementHost, getDesignerElementState } from './designer-element-state.js';
 
 export function connectedCallback(element: DesignerElementHost): void {
@@ -7,12 +9,15 @@ export function connectedCallback(element: DesignerElementHost): void {
   // 首连由 initialize 完成全部接线；重连（initialize 因 renderer 已存在早退）时
   // 由 reconnectSurfaces 幂等重挂并重新注入面板引用（disconnect 时已被 release 释放）。
   const reconnected = elementState.renderer !== undefined;
+  // catalog 未到达时先画骨架，宿主无需等待运行时/项目数据即可把元素放进页面。
+  initializeDesignerSkeleton(element);
   elementState.runtime.initialize(element);
   if (reconnected) elementState.runtime.reconnectSurfaces(element);
   if (elementState.renderer !== undefined && elementState.session.document !== undefined) {
     elementState.runtime.renderDocument(element, elementState.session.document);
     elementState.runtime.renderInteraction(element);
   }
+  if (reconnected) resumeDeferredHydration(element);
   if (element.shadowRoot !== null)
     elementState.blueprintWorkbenchController.connect(element.shadowRoot);
   elementState.runtime.connectWindowGuards(element);
@@ -21,6 +26,7 @@ export function connectedCallback(element: DesignerElementHost): void {
 export function disconnectedCallback(element: DesignerElementHost): void {
   const elementState = getDesignerElementState(element);
 
+  cancelDeferredHydration(element);
   elementState.eventSystem.disconnectWindowGuards();
   elementState.blueprintWorkbenchController.disconnect();
   elementState.runtime.cancelGesture(element);

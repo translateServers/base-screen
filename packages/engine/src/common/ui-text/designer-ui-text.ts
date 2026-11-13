@@ -7,6 +7,7 @@ export const DESIGNER_UI_TEXT = {
   materials: '素材',
   layers: '图层',
   appearance: '样式',
+  loading: '正在加载设计器',
   data: {
     // `data: '数据'` 只服务检查器搜索面包屑的路径段（designer-inspector-search-dom.ts:311）；
     // 页签按钮的文案来自 inspectorUi.dataSource，与本键无关。
