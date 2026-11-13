@@ -1,6 +1,6 @@
 {
   "name": "base-screen",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "大屏设计器基座：Viewer / Designer / 物料 / 插件 / 宿主接入辅助，单包分发、按子路径引入",
   "license": "MIT",
   "publishConfig": {
