@@ -192,6 +192,21 @@ pnpm dev:vue-host           # http://127.0.0.1:5175
 前端 dev server 通过 Vite `proxy` 把 `/api` 转发到 `3000`，因此**前后端可以分开启停**；
 构建产物是纯静态站点，同样支持独立部署（API 地址运行时解析，见各前端 `src/lib/api-base.ts`）。
 
+### 依赖数量：示例为什么直连 5 个包
+
+三个前端都是本仓库 workspace 的成员（`workspace:^` 由 pnpm 链接到 `packages/` 源码），并且为了把能力演示全，直连了 5 个包。**外部宿主不需要这样装**：聚合包 `@base-screen/sdk` 已经包含 8 个内部包，示例里多出来的 3 个都是可选能力。
+
+| 依赖 | 是否必需 | 说明 |
+| --- | --- | --- |
+| `@base-screen/sdk` | 必需 | 聚合入口，带 contracts / core / engine / renderer / material / plugin-core / plugin-manager / plugin-sdk |
+| `@base-screen/vue`（或 `react`） | 必需 | 框架桥接，`vue` / `react` 是它的 peer |
+| `@base-screen/host-kit` | 可选 | 只有用它的 REST 项目 / 数据集适配器才需要 |
+| `@base-screen/plugin-echarts` | 可选 | ECharts 图表族，`echarts` 由宿主提供 |
+| `@base-screen/plugin-board-materials` | 可选 | 看板物料包 |
+
+最小宿主只装 `@base-screen/sdk` 加一个框架桥接包。`workspace:` 协议只在 pnpm workspace 内有效，
+宿主项目按版本号声明即可（如 `"@base-screen/sdk": "^0.1.0"`）。
+
 ## 冒烟验证
 
 冒烟脚本会自己拉起"已构建的后端"与"前端 preview"，因此**必须先构建**：
