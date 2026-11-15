@@ -1555,9 +1555,6 @@ export interface CreateBaseScreenCorePluginDesignReadPortOptions {
 export function defineBaseScreenDesigner(): ScreenParseResult<CustomElementConstructor>;
 
 // @public (undocumented)
-export function mountBaseScreenDesignerSkeleton(container: Element): ScreenParseResult<BaseScreenDesignerElement>;
-
-// @public (undocumented)
 const DESIGNER_TOOLS: readonly [{
     readonly id: 'select';
     readonly label: '选择';
@@ -1811,6 +1808,9 @@ type IntentFailure = Extract<ScreenParseResult<null>, {
 type IntentSuccess = Extract<ScreenParseResult<null>, {
     ok: true;
 }>;
+
+// @public
+export function mountBaseScreenDesignerSkeleton(container: Element): ScreenParseResult<BaseScreenDesignerElement>;
 
 // @public (undocumented)
 export function parseBaseScreenBlueprintCanvasCommand(input: unknown): ScreenParseResult<BaseScreenBlueprintCanvasCommand>;

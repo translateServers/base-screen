@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { BaseScreenDesigner } from '@base-screen/vue';
 import type {
   BaseScreenDesignerElement,
   BaseScreenDesignerMountOptions,
@@ -9,7 +10,6 @@ import type {
 } from 'base-screen';
 import type { ScreenDiagnostic } from 'base-screen/contracts';
 import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from 'base-screen/designer';
-import { BaseScreenDesigner } from 'base-screen/vue';
 import { onBeforeUnmount, onMounted, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../lib/api';

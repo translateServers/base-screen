@@ -79,23 +79,30 @@ const datasetPort = createRestDatasetPort({ baseUrl: 'https://api.example.com' }
 
 ## 框架组件
 
+框架组件由独立薄封装包提供，与 `base-screen` 一起安装：
+
+```bash
+npm install base-screen @base-screen/react react@^19.1.0 react-dom@^19.1.0
+npm install base-screen @base-screen/vue vue@^3.5.0
+```
+
 ```tsx
-import { BaseScreenViewer, BaseScreenDesigner } from 'base-screen/react';
+import { BaseScreenViewer, BaseScreenDesigner } from '@base-screen/react';
 ```
 
 ```vue
 <script setup lang="ts">
-import { BaseScreenViewer, BaseScreenDesigner } from 'base-screen/vue';
+import { BaseScreenViewer, BaseScreenDesigner } from '@base-screen/vue';
 </script>
 ```
 
-`@base-screen/react` 与 `@base-screen/vue` 也可以单独安装，功能与 `base-screen/react`、
-`base-screen/vue` 完全等价：二选一即可，不要在同一工程里混用两种入口。
+`base-screen` 本身不含框架绑定，也不提供 `base-screen/react` 这类入口；框架组件只在
+`@base-screen/react` / `@base-screen/vue` 中提供，不要在同一工程里混用两种桥接包。
 
 ## 运行环境
 
 - 仅 ESM，面向浏览器；集成边界是 Web Components，需要真实 DOM，**不支持 CJS `require` 与 SSR**。
-- 运行时依赖只有 `zod`；`react` / `react-dom` / `vue` 是可选 peer，不用对应子路径就不会被安装。
+- 运行时依赖只有 `zod`；`react` / `react-dom` / `vue` 是可选 peer，仅在安装框架桥接包时才需要。
 - 设计令牌是唯一的非 JS 公共导出，用 `import 'base-screen/host-tokens.css'` 引入。
 - 需要现代浏览器（`target: baseline-widely-available`）。
 

@@ -2057,9 +2057,6 @@ interface CreatePluginRegistrationOptions {
 export function defineBaseScreenDesigner(): ScreenParseResult<CustomElementConstructor>;
 
 // @public (undocumented)
-export function mountBaseScreenDesignerSkeleton(container: Element): ScreenParseResult<BaseScreenDesignerElement>;
-
-// @public (undocumented)
 export function defineBaseScreenElements(): ScreenParseResult<null>;
 
 // @public (undocumented)
@@ -2325,6 +2322,9 @@ type IntentFailure = Extract<ScreenParseResult<null>, {
 type IntentSuccess = Extract<ScreenParseResult<null>, {
     ok: true;
 }>;
+
+// @public
+export function mountBaseScreenDesignerSkeleton(container: Element): ScreenParseResult<BaseScreenDesignerElement>;
 
 // @public (undocumented)
 export function parseBaseScreenBlueprintCanvasCommand(input: unknown): ScreenParseResult<BaseScreenBlueprintCanvasCommand>;

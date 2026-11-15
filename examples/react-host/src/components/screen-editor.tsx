@@ -1,3 +1,4 @@
+import { BaseScreenDesigner } from '@base-screen/react';
 import {
   type BaseScreenDesignerElement,
   type BaseScreenDesignerMountOptions,
@@ -7,7 +8,6 @@ import {
   type ScreenProjectState,
 } from 'base-screen';
 import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from 'base-screen/designer';
-import { BaseScreenDesigner } from 'base-screen/react';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';

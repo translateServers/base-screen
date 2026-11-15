@@ -8,6 +8,7 @@ export const PACKAGE_DEFINITIONS = Object.freeze({
     sideEffects: [
       './dist/auto-register.js',
       './dist/designer-auto-register.js',
+      './dist/material-auto-register.js',
       './dist/viewer-auto-register.js',
       './dist/host-tokens.css',
     ],

@@ -1,3 +1,4 @@
+import { createVueMaterialDefinition } from '@base-screen/vue';
 import type { ScreenJsonValue, ScreenParseResult } from 'base-screen/contracts';
 import type {
   BaseScreenDataField,
@@ -5,7 +6,6 @@ import type {
   BaseScreenMaterialModel,
   BaseScreenMaterialTabularDataAdapter,
 } from 'base-screen/plugin-core';
-import { createVueMaterialDefinition } from 'base-screen/vue';
 import MetricValue from '../components/MetricValue.vue';
 import { METRIC_VALUE_MANIFEST } from './metric-value';
 
