@@ -151,6 +151,10 @@ describe('viewer skeleton', () => {
     expect(skeleton.removed).toBe(true);
     expect(skeleton.parent).toBeUndefined();
     expect(shadow.children.some((child) => child === skeleton)).toBe(false);
+    // 骨架样式也必须撤掉，挂载根要回到 Shadow Root 的第一个元素位置。
+    expect(
+      shadow.children.some((child) => child.attributes.get('data-viewer-skeleton-style')),
+    ).toBe(false);
     expect(viewer.getAttribute('data-viewer-state')).toBe('ready');
     expect(viewer.getAttribute('aria-busy')).toBeNull();
   });

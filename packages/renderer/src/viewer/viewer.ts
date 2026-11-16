@@ -439,6 +439,10 @@ export class BaseScreenViewerElement extends ElementBase {
   private clearSkeleton(): void {
     this.#skeleton?.remove();
     this.#skeleton = undefined;
+    // 样式节点一并撤掉：骨架消失后 Shadow Root 的第一个元素必须是渲染挂载根，
+    // 否则宿主/验证脚本按 firstElementChild 取挂载根会拿到骨架样式。
+    this.#skeletonStyle?.remove();
+    this.#skeletonStyle = undefined;
   }
 
   private disposeRenderer(): void {

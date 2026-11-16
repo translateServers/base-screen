@@ -97,21 +97,37 @@ export class DesignerBlueprintWorkbenchController {
 
   connect(root: ShadowRoot): void {
     if (this.#root === root) {
+      // 同一个 ShadowRoot 可能先承载首帧骨架、随后才换成完整工作台：
+      // 只比较 root 身份会漏掉新挂上的槽位与默认画布宿主，蓝图能力就永久不可用。
+      this.bindSlot(
+        root.querySelector<HTMLSlotElement>('[data-blueprint-canvas-slot]') ?? undefined,
+      );
+      this.#defaultCanvasHost =
+        root.querySelector<HTMLElement>('[data-blueprint-default-canvas]') ?? undefined;
+      this.mountDefaultCanvas();
+      this.#panels.connect(root);
       this.resolveCanvas();
       this.render();
       return;
     }
     this.disconnect();
     this.#root = root;
-    this.#slot = root.querySelector<HTMLSlotElement>('[data-blueprint-canvas-slot]') ?? undefined;
+    this.bindSlot(root.querySelector<HTMLSlotElement>('[data-blueprint-canvas-slot]') ?? undefined);
     this.#defaultCanvasHost =
       root.querySelector<HTMLElement>('[data-blueprint-default-canvas]') ?? undefined;
     this.mountDefaultCanvas();
     this.#panels.connect(root);
     this.#bridge.connect(this.callbacks.getHost());
-    this.#slot?.addEventListener('slotchange', this.#onSlotChange);
     this.resolveCanvas();
     this.render();
+  }
+
+  /** 槽位会随骨架→工作台的替换而更换，监听必须跟着换到新槽位，否则画布增删无人响应。 */
+  private bindSlot(slot: HTMLSlotElement | undefined): void {
+    if (this.#slot === slot) return;
+    this.#slot?.removeEventListener('slotchange', this.#onSlotChange);
+    this.#slot = slot;
+    this.#slot?.addEventListener('slotchange', this.#onSlotChange);
   }
 
   disconnect(): void {

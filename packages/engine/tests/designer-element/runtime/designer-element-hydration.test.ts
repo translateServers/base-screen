@@ -265,7 +265,7 @@ describe('catalog-only injection', () => {
     return createBaseScreenMaterialCatalog([entry]);
   }
 
-  it('initializes the designer when the catalog arrives through the setter', () => {
+  it('initializes the designer when the catalog arrives through the setter', async () => {
     const initialize = vi
       .spyOn(designerElementRuntime, 'initialize')
       .mockImplementation(() => undefined);
@@ -274,6 +274,10 @@ describe('catalog-only injection', () => {
 
     designer.catalog = catalog();
 
+    // 宿主会在同一个同步片里继续注入插件目录与端口；初始化必须让过这一片，
+    // 否则它们会被「初始化后不可变更」判定丢弃。
+    expect(initialize).not.toHaveBeenCalled();
+    await Promise.resolve();
     expect(initialize).toHaveBeenCalledWith(designer);
     expect(designer.catalog).toBeDefined();
   });
