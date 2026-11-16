@@ -30,13 +30,13 @@ const HOSTS: readonly CompositionHost[] = [
     host: 'react-host',
     editor: 'examples/react-host/src/components/screen-editor.tsx',
     adapter: 'examples/react-host/src/screen/composition-runtime.ts',
-    baseScreenDependencies: ['@base-screen/plugin-materials', 'base-screen'],
+    baseScreenDependencies: ['@base-screen/plugin-materials', '@base-screen/react', 'base-screen'],
   },
   {
     host: 'vue-host',
     editor: 'examples/vue-host/src/components/ScreenEditor.vue',
     adapter: 'examples/vue-host/src/screen/composition-runtime.ts',
-    baseScreenDependencies: ['@base-screen/plugin-materials', 'base-screen'],
+    baseScreenDependencies: ['@base-screen/plugin-materials', '@base-screen/vue', 'base-screen'],
   },
 ];
 
@@ -73,8 +73,12 @@ describe('designer composition migration', () => {
     expect(source).toContain('materials: registerHostMaterials()');
     expect(source).toContain('createPluginMaterialsRuntime()');
     expect(source).toContain('createHostResourceRuntime()');
-    expect(source).toContain("[PLUGIN_MATERIALS_ID]: ['command.execute', 'design.read']");
-    expect(source).toContain('blueprintCapabilities: SCREEN_BLUEPRINT_CAPABILITY_IDS');
+    expect(source).toContain('[PLUGIN_MATERIALS_ID]: [');
+    expect(source).toContain("'command.execute'");
+    expect(source).toContain("'design.read'");
+    // 蓝图能力由 union 派生并让出已由物料插件声明的身份；授权面仍覆盖其余能力。
+    expect(source).toContain('const HOST_BLUEPRINT_CAPABILITIES = SCREEN_BLUEPRINT_CAPABILITY_IDS');
+    expect(source).toContain('blueprintCapabilities: HOST_BLUEPRINT_CAPABILITIES');
     expect(source).toContain('base.setCatalog(buildCatalog(next))');
     expect(source).not.toContain('createBaseScreenPluginManager');
     expect(source).not.toContain('createBaseScreenCorePluginCommandPort');
@@ -104,7 +108,7 @@ describe('designer composition migration', () => {
       expect(source).toContain('<BaseScreenDesigner');
       // 挂载点沿用同一套布局契约：class 透传到组合层组件根节点，尺寸交给 .stage。
       expect(source).toMatch(/(className|class)="stage"/);
-      expect(source).toMatch(/from 'base-screen\/(react|vue)'/);
+      expect(source).toMatch(/from '@base-screen\/(react|vue)'/);
       // 项目会话模式：load 由组合层按 projectId 触发，宿主不再自己调 element.load()。
       expect(source).toContain('projectId: screenId');
       expect(source).not.toContain('children: [setup.blueprintCanvas]');

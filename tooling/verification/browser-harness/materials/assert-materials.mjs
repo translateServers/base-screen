@@ -5,6 +5,20 @@ import { expect } from '@playwright/test';
 import { screenshotDirectory } from '../shared/constants.mjs';
 import { rectWithin } from '../shared/layout-assertions.mjs';
 
+// 与通用图表共享渲染器的图表家族；目录顺序与插件注册顺序一致。
+const PLUGIN_CHART_FAMILY = [
+  'plugin.chart.line',
+  'plugin.chart.area',
+  'plugin.chart.bar',
+  'plugin.chart.hbar',
+  'plugin.chart.pie',
+  'plugin.chart.donut',
+  'plugin.chart.gauge',
+  'plugin.chart.radar',
+  'plugin.chart.scatter',
+  'plugin.chart.heatmap',
+];
+
 // ---- 源模块：assert-material-group-navigation.mjs ----
 export async function assertMaterialGroupNavigation(browser, baseUrl) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -138,9 +152,9 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
       accessibility.transition !== '0s' ||
       accessibility.glyphWidth !== 16 ||
       accessibility.height !== 28 ||
-      // data 分组含子孙：base.chart + plugin.echarts（charts）、
-      // harness.semantic-chart（advanced）、base.table（tables），共 4 个。
-      !accessibility.title.endsWith('（4 个素材）') ||
+      // data 分组含子孙：base.chart + 插件图表家族（charts）、
+      // harness.semantic-chart（advanced）、base.table（tables），共 14 个。
+      !accessibility.title.endsWith('（14 个素材）') ||
       accessibility.description !== accessibility.title ||
       accessibility.countWidth !== 24
     ) {
@@ -733,6 +747,8 @@ async function assertMaterialLibraryGrouping(page, designer) {
     'harness.semantic-chart',
     // 外围插件贡献的物料也进目录与物料库，故与官方/宿主物料同列断言。
     'plugin.echarts',
+    // 与通用图表共享渲染器的图表家族（plugin.chart.*）。
+    ...PLUGIN_CHART_FAMILY,
     'base.table',
     // plugin-materials 贡献的大屏物料。
     'board.digital-flop',
@@ -822,7 +838,14 @@ async function assertMaterialLibraryGrouping(page, designer) {
   if (
     dataGroup.selected !== 'true' ||
     dataGroup.children.join(',') !== 'charts,tables' ||
-    dataGroup.visible.join(',') !== 'base.chart,harness.semantic-chart,plugin.echarts,base.table' ||
+    dataGroup.visible.join(',') !==
+      [
+        'base.chart',
+        'harness.semantic-chart',
+        'plugin.echarts',
+        ...PLUGIN_CHART_FAMILY,
+        'base.table',
+      ].join(',') ||
     dataGroup.gridTop !== rootState.gridTop
   ) {
     throw new Error(
@@ -881,7 +904,10 @@ async function assertMaterialLibraryGrouping(page, designer) {
     sibling: element.shadowRoot.querySelector('[data-material-group="tables"]') !== null,
   }));
   if (
-    chartsGroup.visible.join(',') !== 'base.chart,harness.semantic-chart,plugin.echarts' ||
+    chartsGroup.visible.join(',') !==
+      ['base.chart', 'harness.semantic-chart', 'plugin.echarts', ...PLUGIN_CHART_FAMILY].join(
+        ',',
+      ) ||
     chartsGroup.parent !== 'true' ||
     !chartsGroup.sibling
   ) {
@@ -921,7 +947,29 @@ async function assertMaterialLibraryGrouping(page, designer) {
     !dynamic.sameCanvas ||
     dynamic.groups.join(',') !== 'bridges,best-practices,board,foundation,data' ||
     dynamic.cards.join(',') !==
-      'harness.react-button,harness.vue-button,harness.dataset-ranking,board.digital-flop,board.scroll-board,board.water-level,board.border-box,board.capsule-progress,board.marquee,board.pipeline,board.status-grid,base.text,base.rectangle,base.ellipse,base.image,base.rule,base.chart,harness.semantic-chart,plugin.echarts,base.table'
+      [
+        'harness.react-button',
+        'harness.vue-button',
+        'harness.dataset-ranking',
+        'board.digital-flop',
+        'board.scroll-board',
+        'board.water-level',
+        'board.border-box',
+        'board.capsule-progress',
+        'board.marquee',
+        'board.pipeline',
+        'board.status-grid',
+        'base.text',
+        'base.rectangle',
+        'base.ellipse',
+        'base.image',
+        'base.rule',
+        'base.chart',
+        'harness.semantic-chart',
+        'plugin.echarts',
+        ...PLUGIN_CHART_FAMILY,
+        'base.table',
+      ].join(',')
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_UPDATE_FAILED:${JSON.stringify(dynamic)}`);
   }

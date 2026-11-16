@@ -21,6 +21,15 @@ const MONOREPO_PACKAGES = [
   'sdk',
 ] as const;
 
+// 产品包 `base-screen` 的裸导入与子路径：React/Vue 桥接源码仍以 `base-screen/*`
+// 引用契约与插件包，dev server 下同样要落到源码，否则会去找尚未构建的 dist。
+const PRODUCT_ALIASES = [
+  ['base-screen/contracts', 'contracts'],
+  ['base-screen/plugin-core', 'plugin-core'],
+  ['base-screen/plugin-sdk', 'plugin-sdk'],
+  ['base-screen', 'sdk'],
+] as const;
+
 export default defineConfig({
   define: {
     __VUE_OPTIONS_API__: true,
@@ -28,12 +37,17 @@ export default defineConfig({
     __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
   },
   resolve: {
-    alias: Object.fromEntries(
-      MONOREPO_PACKAGES.map((name) => [
-        `@base-screen/${name}`,
-        resolve(import.meta.dirname, `../../../packages/${name}/src/index.ts`),
-      ]),
-    ),
+    alias: [
+      // 子路径必须先于裸包匹配；用精确正则避免 `base-screen` 吞掉子路径。
+      ...PRODUCT_ALIASES.map(([specifier, packageName]) => ({
+        find: new RegExp(`^${specifier}$`),
+        replacement: resolve(import.meta.dirname, `../../../packages/${packageName}/src/index.ts`),
+      })),
+      ...MONOREPO_PACKAGES.map((name) => ({
+        find: new RegExp(`^@base-screen/${name}$`),
+        replacement: resolve(import.meta.dirname, `../../../packages/${name}/src/index.ts`),
+      })),
+    ],
   },
   plugins: [
     {

@@ -1266,13 +1266,20 @@ export async function assertPanelLayout(designer, page) {
   };
 
   const dragged = await readPanel();
-  const expectedDraggedRight = Math.max(
-    288,
-    Math.min(360, Math.round(layoutBox.width - 380 - 10 - 360)),
-  );
+  // 面板宽度按容器预算夹紧：两侧手柄 10px + 画布下限 360px。窄栏档下左侧拖到 380
+  // 只能落在预算上限，右侧受剩余预算挤压只能停在检查器下限，期望值必须按同一账推导，
+  // 不能写死完整档的 380 / 360。
+  const contentWidth = Math.round(layoutBox.width) - 2;
+  const maxLeftFor = (rightWidth) =>
+    Math.max(200, Math.min(480, contentWidth - rightWidth - 10 - 360));
+  const maxInspectorFor = (leftWidth) =>
+    Math.max(276, Math.min(480, contentWidth - leftWidth - 10 - 360));
+  const initial = await readPanel();
+  const expectedDraggedLeft = Math.min(380, maxLeftFor(initial.right));
+  const expectedDraggedRight = Math.min(360, maxInspectorFor(expectedDraggedLeft));
   const collapsedLeft = { ...(await collapseEvaluate('left')), ...(await readPanel()) };
   if (
-    dragged.left !== 380 ||
+    dragged.left !== expectedDraggedLeft ||
     dragged.right !== expectedDraggedRight ||
     collapsedLeft.leftState !== 'true' ||
     collapsedLeft.left !== 48 ||
@@ -1311,7 +1318,7 @@ export async function assertPanelLayout(designer, page) {
     underThreshold.leftState !== 'true' ||
     underThreshold.left !== 48 ||
     expandedLeft.leftState !== 'false' ||
-    expandedLeft.left !== 380 ||
+    expandedLeft.left !== expectedDraggedLeft ||
     underThresholdRight.rightState !== 'true' ||
     underThresholdRight.right !== 48 ||
     expandedRight.rightState !== 'false' ||
@@ -1330,13 +1337,15 @@ export async function assertPanelLayout(designer, page) {
   const inspectorMinimum = await readPanel();
   await dragTo('right', layoutBox.x + layoutBox.width - 1 - 480 - 2.5);
   const inspectorMaximum = await readPanel();
-  const expectedInspectorMaximum = Math.max(
-    288,
-    Math.min(480, Math.round(layoutBox.width - 380 - 10 - 360)),
-  );
-  if (inspectorMinimum.right !== 288 || inspectorMaximum.right !== expectedInspectorMaximum) {
+  // 检查器下限是 276（窄栏档默认值），不是旧的 288；上限再受左栏与画布预算挤压。
+  const inspectorCeiling = maxInspectorFor(expectedDraggedLeft);
+  const expectedInspectorMinimum = Math.max(276, Math.min(288, inspectorCeiling));
+  if (
+    inspectorMinimum.right !== expectedInspectorMinimum ||
+    inspectorMaximum.right !== inspectorCeiling
+  ) {
     throw new Error(
-      `BROWSER_HARNESS_INSPECTOR_WIDTH_RANGE_FAILED:${JSON.stringify({ inspectorMinimum, inspectorMaximum })}`,
+      `BROWSER_HARNESS_INSPECTOR_WIDTH_RANGE_FAILED:${JSON.stringify({ inspectorMinimum, inspectorMaximum, expectedInspectorMinimum, inspectorCeiling })}`,
     );
   }
   // 拖回默认宽度，恢复后续断言的现场。
@@ -1349,13 +1358,14 @@ export async function assertPanelLayout(designer, page) {
       right: Math.round(root.querySelector('.properties').getBoundingClientRect().width),
     };
   });
+  const expectedRestoredLeft = Math.min(defaultWidths.left, maxLeftFor(inspectorCeiling));
   const expectedRestoredRight = Math.max(
-    288,
-    Math.min(defaultWidths.right, Math.round(layoutBox.width - defaultWidths.left - 10 - 360)),
+    276,
+    Math.min(defaultWidths.right, contentWidth - expectedRestoredLeft - 10 - 360),
   );
-  if (restored.left !== defaultWidths.left || restored.right !== expectedRestoredRight) {
+  if (restored.left !== expectedRestoredLeft || restored.right !== expectedRestoredRight) {
     throw new Error(
-      `BROWSER_HARNESS_PANEL_WIDTH_RESTORE_FAILED:${JSON.stringify({ restored, defaultWidths, expectedRestoredRight })}`,
+      `BROWSER_HARNESS_PANEL_WIDTH_RESTORE_FAILED:${JSON.stringify({ restored, defaultWidths, expectedRestoredLeft, expectedRestoredRight })}`,
     );
   }
 
@@ -1401,9 +1411,9 @@ export async function assertPanelLayout(designer, page) {
     leftInitial.controls !== 'designer-left-panel' ||
     !leftInitial.label ||
     !leftInitial.focused ||
-    leftStep.value !== Math.min(480, leftInitial.value + 8) ||
-    leftLargeStep.value !== Math.min(480, leftStep.value + 32) ||
-    leftEnd.value !== 480 ||
+    leftStep.value !== Math.min(leftInitial.maximum, leftInitial.value + 8) ||
+    leftLargeStep.value !== Math.min(leftInitial.maximum, leftStep.value + 32) ||
+    leftEnd.value !== leftEnd.maximum ||
     leftExpandedByKeyboard.state !== 'false' ||
     leftExpandedByKeyboard.value !== 200 ||
     leftExpandedByKeyboard.width !== 200
