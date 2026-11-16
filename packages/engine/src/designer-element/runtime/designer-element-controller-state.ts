@@ -1,5 +1,5 @@
 import { DesignerBlueprintWorkbenchController } from '../../browser/controllers/blueprint/designer-blueprint-workbench-controller.js';
-import { DesignerDatasetController } from '../../browser/controllers/dataset/designer-dataset-controller.js';
+import { DesignerDatasetPanelController } from '../../browser/controllers/dataset/designer-dataset-panel-controller.js';
 import { DesignerCanvasRuntimeController } from '../../browser/controllers/designer-canvas-runtime-controller.js';
 import { DesignerCommandPaletteController } from '../../browser/controllers/designer-command-palette-controller.js';
 import { DesignerImportController } from '../../browser/controllers/designer-import-controller.js';
@@ -294,7 +294,7 @@ export function initializeDesignerElementControllers(
     report: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
     restoreSnapshot: (snapshotId) => element.restoreSnapshot(snapshotId),
   });
-  state.datasetController = new DesignerDatasetController({
+  state.datasetController = new DesignerDatasetPanelController({
     getCatalogPort: () => state.datasetPort,
     getDocument: () => state.session.document,
     getInteraction: () => state.session.interaction,
@@ -429,6 +429,10 @@ export function initializeDesignerElementControllers(
     // 状态栏「事件」开关：把设计态画布交互模式应用到渲染器（原地重渲染，不重建）。
     onNativeEventsChange: (enabled) => state.runtime.applyNativeEvents(element, enabled),
     onLeftPanelGroupChange: syncActiveLeftPanelGroup,
+    // 数据面板整块按需加载：页签真正被选中时才发起，避免首屏解析面板代码。
+    onInspectorTabChange: (tab) => {
+      if (tab === 'data') state.datasetController.ensureLoaded();
+    },
   });
   state.blueprintWorkbenchController = new DesignerBlueprintWorkbenchController({
     getHost: () => element,

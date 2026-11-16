@@ -21,7 +21,7 @@ import type {
 } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer } from '@base-screen/renderer';
 import { DesignerBlueprintWorkbenchController } from '../../browser/controllers/blueprint/designer-blueprint-workbench-controller.js';
-import { DesignerDatasetController } from '../../browser/controllers/dataset/designer-dataset-controller.js';
+import type { DesignerDatasetPanelController } from '../../browser/controllers/dataset/designer-dataset-panel-controller.js';
 import type { DesignerAutoWidthController } from '../../browser/controllers/designer-auto-width-controller.js';
 import { DesignerCanvasRuntimeController } from '../../browser/controllers/designer-canvas-runtime-controller.js';
 import { DesignerChangeController } from '../../browser/controllers/designer-change-controller.js';
@@ -179,7 +179,7 @@ export interface DesignerElementState {
   projectFeedbackController: DesignerProjectFeedbackController;
   previewController: DesignerPreviewController;
   projectWorkspaceController: DesignerProjectWorkspaceController;
-  datasetController: DesignerDatasetController;
+  datasetController: DesignerDatasetPanelController;
   importController: DesignerImportController;
   panelController: DesignerPanelController;
   viewportController: DesignerViewportController;
