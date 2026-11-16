@@ -38,6 +38,7 @@ import { DesignerPresentationLockController } from '../../browser/controllers/de
 import { DesignerPreviewController } from '../../browser/controllers/designer-preview-controller.js';
 import { DesignerSceneController } from '../../browser/controllers/designer-scene-controller.js';
 import { DesignerScrollContinuityController } from '../../browser/controllers/designer-scroll-continuity-controller.js';
+import { DesignerSizeTierController } from '../../browser/controllers/designer-size-tier-controller.js';
 import { DesignerTargetDisplayController } from '../../browser/controllers/designer-target-display-controller.js';
 import { DesignerTextEditController } from '../../browser/controllers/designer-text-edit-controller.js';
 import { DesignerTooltipController } from '../../browser/controllers/designer-tooltip-controller.js';
@@ -181,6 +182,7 @@ export interface DesignerElementState {
   panelController: DesignerPanelController;
   viewportController: DesignerViewportController;
   workbenchController: DesignerWorkbenchController;
+  sizeTierController: DesignerSizeTierController;
   commandPaletteController: DesignerCommandPaletteController;
   coordinateEntryController: DesignerCoordinateEntryController;
   sizeEntryController: DesignerSizeEntryController;
@@ -234,6 +236,7 @@ export function createDesignerElementState(
   state.targetDisplayController = new DesignerTargetDisplayController();
   state.presentationLockController = new DesignerPresentationLockController();
   state.scrollContinuityController = new DesignerScrollContinuityController();
+  state.sizeTierController = new DesignerSizeTierController();
   state.autoWidthController = createDesignerAutoWidthController(element, state);
   initializeDesignerElementControllers(element, state);
   initializeDesignerElementOperations(element, state);

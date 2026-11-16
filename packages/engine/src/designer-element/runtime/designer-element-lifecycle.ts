@@ -46,9 +46,11 @@ export function disconnectSurfaces(element: DesignerElementHost): void {
 
   elementState.autoWidthController.clear();
   elementState.tooltipController.disconnect();
+  elementState.sizeTierController.disconnect();
   elementState.coordinateEntryController.disconnect();
   elementState.sizeEntryController.disconnect();
   elementState.workbenchController.disconnect();
+  elementState.workbenchController.disposeLayout();
   elementState.gestureController.disconnect();
   elementState.viewportController.disconnect();
   elementState.surfaceRouter.disconnect();
@@ -95,12 +97,14 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
 
   const shadow = element.shadowRoot;
   if (shadow === null || shadow === undefined) return;
+  elementState.sizeTierController.connect(element);
   const canvas = shadow.querySelector<HTMLDivElement>('[data-canvas]');
   const viewport = shadow.querySelector<HTMLDivElement>('[data-viewport]');
   if (canvas !== null && viewport !== null) {
     elementState.canvas = canvas;
     elementState.viewportElement = viewport;
     elementState.workbenchController.connect(canvas);
+    elementState.workbenchController.reconnectLayout();
     elementState.gestureController.connect(canvas);
     elementState.gestureController.connectViewport(viewport);
     elementState.viewportController.connect(viewport, canvas);

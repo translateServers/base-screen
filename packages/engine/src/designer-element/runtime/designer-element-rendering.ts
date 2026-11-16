@@ -189,6 +189,8 @@ export function initialize(element: DesignerElementHost): void {
     shadow.querySelector<HTMLElement>('[data-project-conflict]')!,
   );
   elementState.workbenchController.initialize();
+  // 档位属性先于 ready 写入：宿主在收到 ready 时即可读到 data-size-tier。
+  elementState.sizeTierController.connect(element);
   elementState.runtime.createRenderer(element);
   elementState.gestureController.connect(elementState.canvas);
   elementState.gestureController.connectViewport(elementState.viewportElement);

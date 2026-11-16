@@ -57,12 +57,10 @@
   --right-panel-width: 336px;
   --designer-topbar-height: 48px;
   position: relative;
-  container-name: designer-shell;
-  container-type: size;
   display: grid;
   grid-template-columns: var(--left-panel-width) 5px minmax(360px, 1fr) 5px var(--right-panel-width);
   grid-template-rows: 48px minmax(0, 1fr) 30px;
-  min-height: 640px;
+  /* 不设 min-height：高度完全由宿主决定，容器查询才能在高度不足时切到提示档。 */
   height: 100%;
   overflow: hidden;
   background: var(--designer-surface-workspace);

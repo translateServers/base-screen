@@ -13,6 +13,9 @@
         background: #0b1016;
       }
 
+      /* 默认页是「设计器 + viewer」对照布局，设计器被第二栏挤到约 972px，属于窄栏档。
+         性能测量请统一用 ?designer（单栏，1440 视口下为 1408×868），避免把并排布局
+         造成的窄宽度当成设计器自身性能数据。 */
       body {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 420px;

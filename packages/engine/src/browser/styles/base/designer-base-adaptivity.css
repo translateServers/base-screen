@@ -1,4 +1,12 @@
-@media (min-width: 1024px) and (max-width: 1279px) {
+/* 尺寸分档按容器（:host 的内容盒）而不是视口判定，宿主把设计器放进侧栏挤窄的区域时
+   也能走对档位。栅格宽度账（每档都恰好用尽下限，不留夹缝）：
+   完整档 336 + 5 + 360 + 5 + 336 = 1042；窄栏档 248 + 5 + 360 + 5 + 276 = 894。
+   这两笔是 .designer 的内容盒宽度，容器查询量的是 :host 内容盒，需要再加上 .designer
+   自身的两条 1px 边框：完整档 1044、窄栏档 896。因此窄栏档查询取 1043（= 1044 − 1），
+   降级档宽度取 895（= 896 − 1），高度取 639（= 640 − 1）。
+   控制器侧夹紧常量与文案（896 × 640）共用同一份推导，
+   由 tooling/checks/designer-styles.mjs 做一致性比对。 */
+@container designer-shell (max-width: 1043px) {
   .designer {
     --left-panel-width: 248px;
     --right-panel-width: 276px;
@@ -14,15 +22,9 @@
   }
 }
 
-@container designer-shell (max-width: 1021px) or (max-height: 637px) {
-  :host {
-    min-width: 0;
-    min-height: 0;
-  }
-
+@container designer-shell (max-width: 895px) or (max-height: 639px) {
   .designer {
     display: block;
-    min-height: 0;
   }
 
   .designer > :not(.small-screen-warning) {
