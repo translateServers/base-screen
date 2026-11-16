@@ -73,11 +73,26 @@ class FakeRoot {
 class FakeTextArea extends FakeElement {
   value = '';
   placeholder = '';
-  scrollHeight = 36;
+  visible = true;
+  scrollHeightReads = 0;
+  #scrollHeight = 36;
   readonly style: Record<string, string> = {};
 
   constructor(private readonly composer: FakeElement | null) {
     super();
+  }
+
+  get scrollHeight(): number {
+    this.scrollHeightReads += 1;
+    return this.#scrollHeight;
+  }
+
+  set scrollHeight(value: number) {
+    this.#scrollHeight = value;
+  }
+
+  checkVisibility(): boolean {
+    return this.visible;
   }
 
   override closest(selector: string): FakeElement | null {
@@ -140,6 +155,49 @@ function confirmTarget(action: string): Element {
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('designer intent controller', () => {
+  it('does not probe scrollHeight while the composer has no layout box', () => {
+    const { controller, input } = harness();
+    // 右栏停在检查器页签：输入区 computed display 为 none，此时量高度会强制整棵树布局。
+    input.visible = false;
+    input.scrollHeightReads = 0;
+    input.style.height = '';
+
+    controller.onInput();
+
+    expect(input.scrollHeightReads).toBe(0);
+    expect(input.style.height).toBe('');
+  });
+
+  it('keeps the original auto-grow once the composer is laid out', () => {
+    const { controller, input } = harness();
+    input.visible = true;
+    input.scrollHeightReads = 0;
+    input.scrollHeight = 36;
+
+    controller.onInput();
+
+    expect(input.scrollHeightReads).toBe(1);
+    expect(input.style.height).toBe('36px');
+  });
+
+  it('measures again after the composer becomes visible', () => {
+    const { controller, input } = harness();
+    input.visible = false;
+    input.scrollHeightReads = 0;
+    input.style.height = '';
+
+    controller.onInput();
+    expect(input.scrollHeightReads).toBe(0);
+
+    // 切到智能体页签：同一个输入框，此后再量一次就能拿到真实高度。
+    input.visible = true;
+    input.scrollHeight = 72;
+    controller.onInput();
+
+    expect(input.scrollHeightReads).toBe(1);
+    expect(input.style.height).toBe('72px');
+  });
+
   it('keeps a failure on the status line with the host reason and a retry action', async () => {
     const { controller, input, status } = harness();
     const handler = vi.fn(async () => ({
