@@ -45,6 +45,11 @@ export class DesignerPanelController {
     this.#inspector.dispose();
   }
 
+  /** 工作台切换到蓝图时立即收起仅属于画布模式的弹层。 */
+  dismissTransientSurfaces(): void {
+    this.#materials.dismissTransientSurfaces();
+  }
+
   onPointerDown(event: PointerEvent): void {
     this.#inspector.onPointerDown(event);
   }

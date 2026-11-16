@@ -18,6 +18,8 @@ export interface DesignerBlueprintWorkbenchCallbacks {
   readonly canRedo: () => boolean;
   readonly getLeftPanelGroups: () => readonly BaseScreenDesignerLeftPanelGroup[] | undefined;
   readonly setWorkbenchAuthoringMode: (mode: BaseScreenDesignerWorkbenchMode) => void;
+  /** 模式切换在异步加载完成前先收起仅属于画布模式的弹层。 */
+  readonly dismissTransientSurfaces?: () => void;
   readonly expandLeftPanel: () => void;
   readonly onActiveLeftPanelGroupChange: () => void;
   readonly executeCommand: (command: ScreenDocumentCommand) => ScreenParseResult<ScreenDocument>;

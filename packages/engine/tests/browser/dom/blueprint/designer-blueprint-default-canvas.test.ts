@@ -18,8 +18,8 @@ function readSource(file: string): string {
 const canvas = readSource(
   '../../../../src/browser/dom/blueprint/designer-blueprint-default-canvas.ts',
 );
-const controller = readSource(
-  '../../../../src/browser/controllers/blueprint/designer-blueprint-workbench-controller.ts',
+const panel = readSource(
+  '../../../../src/browser/controllers/blueprint/designer-blueprint-workbench-panel.ts',
 );
 const markup = readSource('../../../../src/browser/dom/workspace/designer-workspace-markup.ts');
 const css = readSource(
@@ -63,9 +63,9 @@ describe('engine default blueprint canvas', () => {
 
   it('mounts the default canvas only when no host canvas is assigned', () => {
     expect(markup).toContain('data-blueprint-default-canvas');
-    expect(controller).toContain('createDesignerBlueprintDefaultCanvas');
-    expect(controller).toContain('assigned ?? fallback');
-    expect(controller).toContain('fallback.hidden = assigned !== undefined');
+    expect(panel).toContain('createDesignerBlueprintDefaultCanvas');
+    expect(panel).toContain('assigned ?? fallback');
+    expect(panel).toContain('fallback.hidden = assigned !== undefined');
   });
 
   it('keeps the 24px port hit area, far-zoom labels and shared canvas grid tokens', () => {

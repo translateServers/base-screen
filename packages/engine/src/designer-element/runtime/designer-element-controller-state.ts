@@ -26,7 +26,6 @@ import {
   createDesignerMetric,
   type DesignerMetricName,
 } from '../../common/observability/designer-metrics.js';
-import { insertDesignerBlueprintVariableNode } from '../../common/operations/blueprint/designer-blueprint-model.js';
 import {
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
   type BaseScreenCanvasPresentationChangeEventDetail,
@@ -219,19 +218,7 @@ export function initializeDesignerElementControllers(
     getHostCatalogPort: () => state.hostCatalogPort,
     getOverlayHost,
     executeCommand: (command) => element.executeCommand(command),
-    addToBlueprint: (variableId) => {
-      const document = state.session.document;
-      if (document === undefined) return;
-      const blueprint = insertDesignerBlueprintVariableNode(document, variableId);
-      if (blueprint !== null) {
-        const result = element.executeCommand({ type: 'replace-blueprint', blueprint });
-        if (!result.ok) {
-          state.runtime.report(element, result);
-          return;
-        }
-      }
-      element.setWorkbenchMode('blueprint', { focus: { kind: 'variable', id: variableId } });
-    },
+    addToBlueprint: (variableId) => state.blueprintWorkbenchController.addVariableNode(variableId),
     report: (result) => state.runtime.report(element, result),
   });
   state.layersController = new DesignerLayersController({
@@ -445,6 +432,7 @@ export function initializeDesignerElementControllers(
     canRedo: () => state.session.canRedo,
     getLeftPanelGroups: () => state.leftPanelGroups,
     setWorkbenchAuthoringMode: (mode) => state.workbenchController.setAuthoringMode(mode),
+    dismissTransientSurfaces: () => state.panelController.dismissTransientSurfaces(),
     expandLeftPanel: () => state.workbenchController.expandLeftPanel(),
     onActiveLeftPanelGroupChange: syncActiveLeftPanelGroup,
     executeCommand: (command) => state.runtime.executeDesignerCommand(element, command),

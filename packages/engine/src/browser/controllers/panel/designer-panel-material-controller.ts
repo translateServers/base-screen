@@ -40,6 +40,10 @@ export class DesignerPanelMaterialController {
     }
   }
 
+  dismissTransientSurfaces(): void {
+    this.#navigation.dismissTransient();
+  }
+
   refresh(layout: HTMLElement | null): void {
     const grouping = this.grouping;
     if (
