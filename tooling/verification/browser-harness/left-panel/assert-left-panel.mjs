@@ -1205,6 +1205,53 @@ export async function assertLeftPanelContextMenu(page) {
 }
 
 // ---- 源模块：assert-panel-layout.mjs ----
+// 引擎夹紧规则在各桌面视口下的确定结果，直接写成字面值：
+// 容器宽 = 视口宽 - 2px 边框；预算 = 容器宽 - 左右手柄 10 - 画布下限 360；
+// 左栏范围 200–480，检查器范围 276–480。窄档（容器 <= 1043）CSS 默认 248/276，
+// 其余档默认 336/336。这里不复用引擎公式，避免公式漂移时断言跟着一起漂。
+const WIDE_PANEL_WIDTH_EXPECTATIONS = {
+  defaultLeft: 336,
+  defaultRight: 336,
+  draggedLeft: 380,
+  draggedRight: 360,
+  inspectorMinimum: 288,
+  inspectorMaximum: 480,
+  restoredLeft: 336,
+  restoredRight: 336,
+  leftMaximum: 480,
+  leftStep: 344,
+  leftLargeStep: 376,
+  leftEnd: 480,
+  rightMaximum: 480,
+  rightStep: 328,
+  rightLargeStep: 360,
+  rightEnd: 480,
+};
+const PANEL_WIDTH_EXPECTATIONS = {
+  // 窄档：左栏拖 380 只能落到 376，检查器在该预算下只能停在 276。
+  1024: {
+    defaultLeft: 248,
+    defaultRight: 276,
+    draggedLeft: 376,
+    draggedRight: 276,
+    inspectorMinimum: 276,
+    inspectorMaximum: 276,
+    restoredLeft: 248,
+    restoredRight: 276,
+    leftMaximum: 376,
+    leftStep: 256,
+    leftLargeStep: 288,
+    leftEnd: 376,
+    rightMaximum: 404,
+    rightStep: 276,
+    rightLargeStep: 308,
+    rightEnd: 404,
+  },
+  1366: WIDE_PANEL_WIDTH_EXPECTATIONS,
+  1440: WIDE_PANEL_WIDTH_EXPECTATIONS,
+  1920: WIDE_PANEL_WIDTH_EXPECTATIONS,
+};
+
 export async function assertPanelLayout(designer, page) {
   // ADR-0037：真实鼠标拖宽后折叠必须收敛到 48px 图标轨，展开恢复拖拽宽度；折叠态箭头 180°
   // 旋转、折叠按钮不被压扁（此前按钮被压缩到约 2px）；折叠态拖拽有展开阈值（48+24，参考
@@ -1225,7 +1272,12 @@ export async function assertPanelLayout(designer, page) {
     await page.mouse.up();
   };
   // 宽度 = clientX - bounds.left - 边框1px - 列中线(2.5px)；右面板为 bounds.right 反向。
-  // 读取面板 CSS 默认宽度（不硬编码具体默认值），供最后拖回默认宽度恢复现场。
+  const viewportWidth = page.viewportSize()?.width ?? 0;
+  const expected = PANEL_WIDTH_EXPECTATIONS[viewportWidth];
+  if (expected === undefined) {
+    throw new Error(`BROWSER_HARNESS_PANEL_LAYOUT_VIEWPORT_UNSUPPORTED:${viewportWidth}`);
+  }
+  // 分档 CSS 默认值本身就是契约：先按视口校验，再用它拖回默认宽度恢复现场。
   const defaultWidths = await page.evaluate(() => {
     const style = getComputedStyle(
       window.baseScreenHarness.designer.shadowRoot.querySelector('.designer'),
@@ -1235,6 +1287,14 @@ export async function assertPanelLayout(designer, page) {
       right: parseFloat(style.getPropertyValue('--right-panel-width')),
     };
   });
+  if (
+    defaultWidths.left !== expected.defaultLeft ||
+    defaultWidths.right !== expected.defaultRight
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_PANEL_CSS_DEFAULT_FAILED:${JSON.stringify({ viewportWidth, defaultWidths, expected })}`,
+    );
+  }
   await dragTo('left', layoutBox.x + 1 + 380 + 2.5);
   await dragTo('right', layoutBox.x + layoutBox.width - 1 - 360 - 2.5);
   const readPanel = () =>
@@ -1267,20 +1327,11 @@ export async function assertPanelLayout(designer, page) {
 
   const dragged = await readPanel();
   // 面板宽度按容器预算夹紧：两侧手柄 10px + 画布下限 360px。窄栏档下左侧拖到 380
-  // 只能落在预算上限，右侧受剩余预算挤压只能停在检查器下限，期望值必须按同一账推导，
-  // 不能写死完整档的 380 / 360。
-  const contentWidth = Math.round(layoutBox.width) - 2;
-  const maxLeftFor = (rightWidth) =>
-    Math.max(200, Math.min(480, contentWidth - rightWidth - 10 - 360));
-  const maxInspectorFor = (leftWidth) =>
-    Math.max(276, Math.min(480, contentWidth - leftWidth - 10 - 360));
-  const initial = await readPanel();
-  const expectedDraggedLeft = Math.min(380, maxLeftFor(initial.right));
-  const expectedDraggedRight = Math.min(360, maxInspectorFor(expectedDraggedLeft));
+  // 只能落在预算上限，右侧受剩余预算挤压只能停在检查器下限；期望值按视口写死。
   const collapsedLeft = { ...(await collapseEvaluate('left')), ...(await readPanel()) };
   if (
-    dragged.left !== expectedDraggedLeft ||
-    dragged.right !== expectedDraggedRight ||
+    dragged.left !== expected.draggedLeft ||
+    dragged.right !== expected.draggedRight ||
     collapsedLeft.leftState !== 'true' ||
     collapsedLeft.left !== 48 ||
     collapsedLeft.arrow !== 'matrix(-1, 0, 0, -1, 0, 0)' ||
@@ -1318,11 +1369,11 @@ export async function assertPanelLayout(designer, page) {
     underThreshold.leftState !== 'true' ||
     underThreshold.left !== 48 ||
     expandedLeft.leftState !== 'false' ||
-    expandedLeft.left !== expectedDraggedLeft ||
+    expandedLeft.left !== expected.draggedLeft ||
     underThresholdRight.rightState !== 'true' ||
     underThresholdRight.right !== 48 ||
     expandedRight.rightState !== 'false' ||
-    expandedRight.right !== expectedDraggedRight
+    expandedRight.right !== expected.draggedRight
   ) {
     throw new Error(
       `BROWSER_HARNESS_PANEL_COLLAPSE_THRESHOLD_FAILED:${JSON.stringify({
@@ -1338,19 +1389,17 @@ export async function assertPanelLayout(designer, page) {
   await dragTo('right', layoutBox.x + layoutBox.width - 1 - 480 - 2.5);
   const inspectorMaximum = await readPanel();
   // 检查器下限是 276（窄栏档默认值），不是旧的 288；上限再受左栏与画布预算挤压。
-  const inspectorCeiling = maxInspectorFor(expectedDraggedLeft);
-  const expectedInspectorMinimum = Math.max(276, Math.min(288, inspectorCeiling));
   if (
-    inspectorMinimum.right !== expectedInspectorMinimum ||
-    inspectorMaximum.right !== inspectorCeiling
+    inspectorMinimum.right !== expected.inspectorMinimum ||
+    inspectorMaximum.right !== expected.inspectorMaximum
   ) {
     throw new Error(
-      `BROWSER_HARNESS_INSPECTOR_WIDTH_RANGE_FAILED:${JSON.stringify({ inspectorMinimum, inspectorMaximum, expectedInspectorMinimum, inspectorCeiling })}`,
+      `BROWSER_HARNESS_INSPECTOR_WIDTH_RANGE_FAILED:${JSON.stringify({ inspectorMinimum, inspectorMaximum, expected })}`,
     );
   }
   // 拖回默认宽度，恢复后续断言的现场。
-  await dragTo('left', layoutBox.x + 1 + defaultWidths.left + 2.5);
-  await dragTo('right', layoutBox.x + layoutBox.width - 1 - defaultWidths.right - 2.5);
+  await dragTo('left', layoutBox.x + 1 + expected.restoredLeft + 2.5);
+  await dragTo('right', layoutBox.x + layoutBox.width - 1 - expected.restoredRight - 2.5);
   const restored = await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     return {
@@ -1358,14 +1407,9 @@ export async function assertPanelLayout(designer, page) {
       right: Math.round(root.querySelector('.properties').getBoundingClientRect().width),
     };
   });
-  const expectedRestoredLeft = Math.min(defaultWidths.left, maxLeftFor(inspectorCeiling));
-  const expectedRestoredRight = Math.max(
-    276,
-    Math.min(defaultWidths.right, contentWidth - expectedRestoredLeft - 10 - 360),
-  );
-  if (restored.left !== expectedRestoredLeft || restored.right !== expectedRestoredRight) {
+  if (restored.left !== expected.restoredLeft || restored.right !== expected.restoredRight) {
     throw new Error(
-      `BROWSER_HARNESS_PANEL_WIDTH_RESTORE_FAILED:${JSON.stringify({ restored, defaultWidths, expectedRestoredLeft, expectedRestoredRight })}`,
+      `BROWSER_HARNESS_PANEL_WIDTH_RESTORE_FAILED:${JSON.stringify({ restored, expected })}`,
     );
   }
 
@@ -1411,18 +1455,21 @@ export async function assertPanelLayout(designer, page) {
     leftInitial.controls !== 'designer-left-panel' ||
     !leftInitial.label ||
     !leftInitial.focused ||
-    leftStep.value !== Math.min(leftInitial.maximum, leftInitial.value + 8) ||
-    leftLargeStep.value !== Math.min(leftInitial.maximum, leftStep.value + 32) ||
-    leftEnd.value !== leftEnd.maximum ||
+    leftInitial.value !== expected.restoredLeft ||
+    leftInitial.maximum !== expected.leftMaximum ||
+    leftStep.value !== expected.leftStep ||
+    leftLargeStep.value !== expected.leftLargeStep ||
+    leftEnd.value !== expected.leftEnd ||
+    leftEnd.width !== expected.leftEnd ||
     leftExpandedByKeyboard.state !== 'false' ||
     leftExpandedByKeyboard.value !== 200 ||
     leftExpandedByKeyboard.width !== 200
   ) {
     throw new Error(
-      `BROWSER_HARNESS_PANEL_KEYBOARD_LEFT_FAILED:${JSON.stringify({ leftInitial, leftStep, leftLargeStep, leftEnd, leftExpandedByKeyboard })}`,
+      `BROWSER_HARNESS_PANEL_KEYBOARD_LEFT_FAILED:${JSON.stringify({ leftInitial, leftStep, leftLargeStep, leftEnd, leftExpandedByKeyboard, expected })}`,
     );
   }
-  await dragTo('left', layoutBox.x + 1 + defaultWidths.left + 2.5);
+  await dragTo('left', layoutBox.x + 1 + expected.restoredLeft + 2.5);
 
   const rightHandle = designer.locator('[data-panel-handle="right"]');
   await rightHandle.focus();
@@ -1439,17 +1486,20 @@ export async function assertPanelLayout(designer, page) {
     rightInitial.role !== 'separator' ||
     rightInitial.controls !== 'designer-right-panel' ||
     !rightInitial.focused ||
-    rightStep.value !== Math.max(rightInitial.minimum, rightInitial.value - 8) ||
-    rightLargeStep.value !== Math.min(rightInitial.maximum, rightStep.value + 32) ||
-    rightHome.value !== rightInitial.minimum ||
-    rightEnd.value !== rightEnd.maximum ||
-    rightEnd.width !== rightEnd.value
+    rightInitial.value !== expected.restoredRight ||
+    rightInitial.minimum !== 276 ||
+    rightInitial.maximum !== expected.rightMaximum ||
+    rightStep.value !== expected.rightStep ||
+    rightLargeStep.value !== expected.rightLargeStep ||
+    rightHome.value !== 276 ||
+    rightEnd.value !== expected.rightEnd ||
+    rightEnd.width !== expected.rightEnd
   ) {
     throw new Error(
-      `BROWSER_HARNESS_PANEL_KEYBOARD_RIGHT_FAILED:${JSON.stringify({ rightInitial, rightStep, rightLargeStep, rightHome, rightEnd })}`,
+      `BROWSER_HARNESS_PANEL_KEYBOARD_RIGHT_FAILED:${JSON.stringify({ rightInitial, rightStep, rightLargeStep, rightHome, rightEnd, expected })}`,
     );
   }
-  await dragTo('right', layoutBox.x + layoutBox.width - 1 - defaultWidths.right - 2.5);
+  await dragTo('right', layoutBox.x + layoutBox.width - 1 - expected.restoredRight - 2.5);
 
   // XJ Data Hub 的路由加载态通过 v-show 先以 display:none 挂载设计器。验证右侧宽度在
   // 0px 宿主中初始化后仍保持持久化值，并在宿主显示时直接生效。
