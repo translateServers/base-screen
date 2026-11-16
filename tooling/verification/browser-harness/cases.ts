@@ -26,6 +26,11 @@ const BASELINES: readonly BaselineEntry[] = [
     summary: '令牌、状态矩阵与组件原语铺在一页；浅深主题可切换。样式评审从这里开始。',
     href: './system.html',
   },
+  {
+    title: '加载态观察',
+    summary: '设计器骨架、Viewer 骨架、物料 spinner 与「文档加载中」现状；延迟可调，动画肉眼可见。',
+    href: './loading-states.html',
+  },
 ];
 
 const ALL_PACKAGES = '全部';
