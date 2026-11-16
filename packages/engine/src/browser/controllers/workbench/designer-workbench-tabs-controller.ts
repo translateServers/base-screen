@@ -22,6 +22,7 @@ interface DesignerWorkbenchTabsCallbacks {
   readonly getInteraction: () => ScreenInteractionState;
   readonly getRoot: () => ShadowRoot | null;
   readonly onLeftPanelGroupChange?: (groupId: string | undefined) => void;
+  readonly onInspectorTabChange?: (tab: DesignerInspectorTab) => void;
 }
 
 export class DesignerWorkbenchTabsController {
@@ -46,6 +47,7 @@ export class DesignerWorkbenchTabsController {
       if (!this.rightTabAvailable(rightTab)) return true;
       this.#rightTab = rightTab;
       this.render();
+      this.callbacks.onInspectorTabChange?.(rightTab);
       return true;
     }
     return false;
@@ -83,6 +85,7 @@ export class DesignerWorkbenchTabsController {
     this.#rightTab = tab;
     this.callbacks.expandPanel('right');
     this.render();
+    this.callbacks.onInspectorTabChange?.(tab);
   }
 
   get selectedLeftPanelGroupId(): string | undefined {

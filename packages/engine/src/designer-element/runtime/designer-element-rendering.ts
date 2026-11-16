@@ -330,6 +330,10 @@ export function renderDocument(
   }
   elementState.deferredCanvasHydration = false;
   element.setAttribute('data-designer-canvas-state', 'ready');
+  // 宿主声明了数据集通道：首帧落定后的下一帧再预热数据面板，别让它挤进首屏关键路径。
+  if (elementState.datasetPort !== undefined) {
+    elementState.datasetController.warmUpAfterFirstFrame();
+  }
   return rendered.ok
     ? { ok: true, value: undefined, diagnostics: rendered.diagnostics }
     : { ok: false, diagnostics: rendered.diagnostics };

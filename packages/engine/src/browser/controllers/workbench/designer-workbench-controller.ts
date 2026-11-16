@@ -28,6 +28,8 @@ interface DesignerWorkbenchCallbacks {
   readonly onNativeEventsChange?: (enabled: boolean) => void;
   /** 宿主左侧分组切换；切回内建分组时传 undefined。 */
   readonly onLeftPanelGroupChange?: (groupId: string | undefined) => void;
+  /** 右栏页签切换完成；数据面板据此按需加载。 */
+  readonly onInspectorTabChange?: (tab: DesignerInspectorTab) => void;
 }
 
 export class DesignerWorkbenchController {
@@ -73,6 +75,9 @@ export class DesignerWorkbenchController {
       ...(callbacks.onLeftPanelGroupChange === undefined
         ? {}
         : { onLeftPanelGroupChange: callbacks.onLeftPanelGroupChange }),
+      ...(callbacks.onInspectorTabChange === undefined
+        ? {}
+        : { onInspectorTabChange: callbacks.onInspectorTabChange }),
     });
   }
 

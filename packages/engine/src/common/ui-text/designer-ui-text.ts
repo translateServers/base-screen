@@ -595,6 +595,7 @@ export const DESIGNER_UI_TEXT = {
   defaultExportFileName: 'screen-document.json',
   cancel: '取消',
   dataPanelEmpty: '未选择数据源。',
+  dataPanelLoadFailed: '数据面板加载失败，请刷新页面后重试。',
   dataSource: {
     title: '数据源',
     type: '数据源类型',
