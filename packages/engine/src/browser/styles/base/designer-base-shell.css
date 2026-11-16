@@ -232,6 +232,19 @@
   }
 }
 
+/* 超时失败态：停止脉冲，中央舞台换成一句可读说明；几何与骨架一致，替换时不跳位。 */
+.designer[data-designer-skeleton][data-designer-skeleton-state="error"] .designer-skeleton-block {
+  animation: none;
+  opacity: 0.6;
+}
+
+.designer-skeleton-error {
+  max-width: 32ch;
+  margin: 0;
+  color: var(--designer-text-muted);
+  text-align: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .designer-skeleton-block {
     animation: none;

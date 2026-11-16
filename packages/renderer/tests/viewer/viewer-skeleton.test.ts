@@ -112,4 +112,46 @@ describe('viewer skeleton', () => {
     expect(skeleton.parent).toBe(shadow);
     expect(viewer.getAttribute('data-viewer-state')).toBe('loading');
   });
+
+  it('removes the skeleton and reports ready once the first render settles', async () => {
+    const ownerDocument = new FakeDocument();
+    class FakeHTMLElement extends FakeNode {
+      isConnected = true;
+      ownerDocument = ownerDocument as unknown as Document;
+      shadowRoot: FakeShadowRoot | null = null;
+
+      attachShadow(): FakeShadowRoot {
+        this.shadowRoot = new FakeShadowRoot();
+        return this.shadowRoot;
+      }
+
+      dispatchEvent(): boolean {
+        return true;
+      }
+    }
+    class FakeCustomEvent {
+      constructor(
+        readonly type: string,
+        readonly init?: unknown,
+      ) {}
+    }
+    vi.stubGlobal('HTMLElement', FakeHTMLElement);
+    vi.stubGlobal('CustomEvent', FakeCustomEvent);
+    const { BaseScreenViewerElement } = await import('../../src/viewer/viewer.js');
+    const viewer = new BaseScreenViewerElement();
+
+    viewer.connectedCallback();
+    const shadow = viewer.shadowRoot as unknown as FakeShadowRoot;
+    const skeleton = shadow.children[1] as FakeNode;
+    expect(skeleton.attributes.get('data-viewer-skeleton')).toBe('true');
+
+    // `markRendered` 是渲染落定（成功或失败）的唯一出口，onRenderSettled 也走它。
+    (viewer as unknown as { markRendered(): void }).markRendered();
+
+    expect(skeleton.removed).toBe(true);
+    expect(skeleton.parent).toBeUndefined();
+    expect(shadow.children.some((child) => child === skeleton)).toBe(false);
+    expect(viewer.getAttribute('data-viewer-state')).toBe('ready');
+    expect(viewer.getAttribute('aria-busy')).toBeNull();
+  });
 });

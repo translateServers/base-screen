@@ -20,6 +20,7 @@ import {
 } from '../../common/operations/material-library/material-library-state.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { getDesignerGeometryDocument } from './designer-element-geometry.js';
+import { cancelDesignerSkeletonTimeout } from './designer-element-skeleton.js';
 import {
   type DesignerElementHost,
   type DesignerElementState,
@@ -37,6 +38,8 @@ export function initialize(element: DesignerElementHost): void {
     return;
   }
   const shadow = element.shadowRoot ?? element.attachShadow({ mode: 'open' });
+  // 运行时已就绪：骨架的兜底计时到此为止，迟到的超时不得覆盖真实界面。
+  cancelDesignerSkeletonTimeout(element);
   // 若骨架已经先画过，完整初始化只同步搭壳与控制台，物料库与画布渲染拆到后续帧。
   const deferHydration = elementState.skeletonShown;
   elementState.skeletonShown = false;
@@ -281,6 +284,8 @@ function hydrateDeferredCanvas(element: DesignerElementHost): void {
   }
   elementState.runtime.renderDocument(element, document);
   elementState.runtime.renderInteraction(element);
+  // 首个文档已落定：标记清除，重连时不再重复渲染同一帧。
+  elementState.deferredCanvasHydration = false;
 }
 
 function requestHydrationFrame(callback: () => void): number {

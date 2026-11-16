@@ -8,6 +8,7 @@ export const DESIGNER_UI_TEXT = {
   layers: '图层',
   appearance: '样式',
   loading: '正在加载设计器',
+  loadingTimedOut: '设计器加载超时，请检查网络后重试。',
   data: {
     // `data: '数据'` 只服务检查器搜索面包屑的路径段（designer-inspector-search-dom.ts:311）；
     // 页签按钮的文案来自 inspectorUi.dataSource，与本键无关。

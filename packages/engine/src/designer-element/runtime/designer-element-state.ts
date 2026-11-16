@@ -117,6 +117,8 @@ export interface DesignerElementState {
   renderer: BaseScreenRenderer | undefined;
   /** 曾以骨架形态先挂载：完整初始化时把面板内容与画布渲染拆到后续帧。 */
   skeletonShown: boolean;
+  /** 骨架超时计时器：catalog 迟迟不到时把脉冲骨架切换为可识别的错误态。 */
+  skeletonTimeout: ReturnType<typeof setTimeout> | undefined;
   /** 首帧后仍需补齐的面板内容与画布渲染；断连时保留标记，重连后继续。 */
   deferredPanelHydration: boolean;
   deferredCanvasHydration: boolean;
@@ -207,6 +209,7 @@ export function createDesignerElementState(
   state.backButton = false;
   state.hostResourceSelectionButton = false;
   state.skeletonShown = false;
+  state.skeletonTimeout = undefined;
   state.deferredPanelHydration = false;
   state.deferredCanvasHydration = false;
   state.deferredHydrationFrame = undefined;

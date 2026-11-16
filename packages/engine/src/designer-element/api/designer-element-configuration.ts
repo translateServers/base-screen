@@ -312,6 +312,9 @@ export function writeCatalog(
   }
   elementState.catalog = value;
   elementState.resolvedMaterialLibraryItems = resolved.value;
+  // catalog 是骨架闭合的唯一条件：只经 `catalog` setter 注入的宿主也必须换掉骨架
+  // 并进入 ready，不能要求宿主额外调用 configure。initialize 自带守卫，重复调用幂等。
+  elementState.runtime.initialize(element);
 }
 
 export function readLeftPanelGroups(

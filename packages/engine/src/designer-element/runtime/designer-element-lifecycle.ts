@@ -1,6 +1,9 @@
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { cancelDeferredHydration, resumeDeferredHydration } from './designer-element-rendering.js';
-import { initializeDesignerSkeleton } from './designer-element-skeleton.js';
+import {
+  cancelDesignerSkeletonTimeout,
+  initializeDesignerSkeleton,
+} from './designer-element-skeleton.js';
 import { type DesignerElementHost, getDesignerElementState } from './designer-element-state.js';
 
 export function connectedCallback(element: DesignerElementHost): void {
@@ -27,6 +30,7 @@ export function disconnectedCallback(element: DesignerElementHost): void {
   const elementState = getDesignerElementState(element);
 
   cancelDeferredHydration(element);
+  cancelDesignerSkeletonTimeout(element);
   elementState.eventSystem.disconnectWindowGuards();
   elementState.blueprintWorkbenchController.disconnect();
   elementState.runtime.cancelGesture(element);
