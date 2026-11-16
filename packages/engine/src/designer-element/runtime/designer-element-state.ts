@@ -38,6 +38,7 @@ import { DesignerPresentationLockController } from '../../browser/controllers/de
 import { DesignerPreviewController } from '../../browser/controllers/designer-preview-controller.js';
 import { DesignerSceneController } from '../../browser/controllers/designer-scene-controller.js';
 import { DesignerScrollContinuityController } from '../../browser/controllers/designer-scroll-continuity-controller.js';
+import { DesignerSizeTierController } from '../../browser/controllers/designer-size-tier-controller.js';
 import { DesignerTargetDisplayController } from '../../browser/controllers/designer-target-display-controller.js';
 import { DesignerTextEditController } from '../../browser/controllers/designer-text-edit-controller.js';
 import { DesignerTooltipController } from '../../browser/controllers/designer-tooltip-controller.js';
@@ -114,6 +115,14 @@ export interface DesignerElementState {
   backButton: boolean;
   hostResourceSelectionButton: boolean;
   renderer: BaseScreenRenderer | undefined;
+  /** 曾以骨架形态先挂载：完整初始化时把面板内容与画布渲染拆到后续帧。 */
+  skeletonShown: boolean;
+  /** 骨架超时计时器：catalog 迟迟不到时把脉冲骨架切换为可识别的错误态。 */
+  skeletonTimeout: ReturnType<typeof setTimeout> | undefined;
+  /** 首帧后仍需补齐的面板内容与画布渲染；断连时保留标记，重连后继续。 */
+  deferredPanelHydration: boolean;
+  deferredCanvasHydration: boolean;
+  deferredHydrationFrame: number | undefined;
   /** 幽灵草案渲染器：同一物料目录、只读挂载到叠加层，与主画布互不影响。 */
   ghostRenderer: BaseScreenRenderer | undefined;
   canvas: HTMLDivElement | undefined;
@@ -175,6 +184,7 @@ export interface DesignerElementState {
   panelController: DesignerPanelController;
   viewportController: DesignerViewportController;
   workbenchController: DesignerWorkbenchController;
+  sizeTierController: DesignerSizeTierController;
   commandPaletteController: DesignerCommandPaletteController;
   coordinateEntryController: DesignerCoordinateEntryController;
   sizeEntryController: DesignerSizeEntryController;
@@ -198,6 +208,11 @@ export function createDesignerElementState(
   state.resolvedMaterialLibraryItems = [];
   state.backButton = false;
   state.hostResourceSelectionButton = false;
+  state.skeletonShown = false;
+  state.skeletonTimeout = undefined;
+  state.deferredPanelHydration = false;
+  state.deferredCanvasHydration = false;
+  state.deferredHydrationFrame = undefined;
   state.instanceId = createScreenAuthoringInstanceId();
   state.pendingAuthoringRequests = new Map<
     string,
@@ -224,6 +239,7 @@ export function createDesignerElementState(
   state.targetDisplayController = new DesignerTargetDisplayController();
   state.presentationLockController = new DesignerPresentationLockController();
   state.scrollContinuityController = new DesignerScrollContinuityController();
+  state.sizeTierController = new DesignerSizeTierController();
   state.autoWidthController = createDesignerAutoWidthController(element, state);
   initializeDesignerElementControllers(element, state);
   initializeDesignerElementOperations(element, state);

@@ -496,6 +496,10 @@ export class DesignerIntentController {
       input.style.height = '';
       return;
     }
+    // 输入区不在当前页签时它没有盒子，量高度只会白花钱：先写 `height: auto` 再读
+    // `scrollHeight`，浏览器必须把整棵 dirty 树一次 flush 掉（首屏实测单次约 90ms，
+    // 200 个组件与画布都算在内），而量出来的值还会被页签切换清掉。
+    if (!hasLayoutBox(input)) return;
     input.style.height = 'auto';
     input.style.height = `${input.scrollHeight}px`;
   }
@@ -784,4 +788,23 @@ export class DesignerIntentController {
       this.#scopeClear.hidden = this.#scopeValue.kind === 'screen';
     }
   }
+}
+
+/** `checkVisibility` 只需要 style，不要求布局；用结构类型声明，避免绑定某个 TS DOM 版本。 */
+type LayoutBoxProbe = { checkVisibility?: () => boolean };
+
+/**
+ * 元素当前是否参与布局（有盒子）。
+ *
+ * 选 `checkVisibility()` 而不是 `offsetParent` / `getClientRects()`：后两者属于几何读取，
+ * 会先补齐布局再回答，这正是我们要省掉的那次 flush；`checkVisibility()` 只做 style 更新，
+ * 并且原生逐级覆盖祖先 `display: none` 与 `content-visibility: hidden`，不需要我们把
+ * CSS 的可见性条件抄一份到 JS 里（抄一份就会随样式改动而失效）。
+ *
+ * 不传 `checkVisibilityCSS` 是有意的：`visibility: hidden` 的元素仍然占位、仍然需要量高度，
+ * 只有「没有盒子」才该跳过。环境不支持该 API 时保守返回 true，维持原有行为。
+ */
+function hasLayoutBox(element: Element): boolean {
+  const probe = (element as Element & LayoutBoxProbe).checkVisibility;
+  return typeof probe === 'function' ? probe.call(element) : true;
 }

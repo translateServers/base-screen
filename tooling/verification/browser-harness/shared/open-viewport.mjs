@@ -119,7 +119,7 @@ export async function openViewport({ baseUrl, browser, viewport }) {
     });
     if (
       compact.text !==
-        '\u7f16\u8f91\u5927\u5c4f\u9700\u8981\u81f3\u5c11 1024 \u00d7 640 \u7684\u53ef\u7528\u7a7a\u95f4\u3002' ||
+        '\u7f16\u8f91\u5927\u5c4f\u9700\u8981\u81f3\u5c11 896 \u00d7 640 \u7684\u53ef\u7528\u7a7a\u95f4\u3002' ||
       !compact.visible ||
       compact.overflows
     ) {

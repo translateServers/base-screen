@@ -2323,6 +2323,9 @@ type IntentSuccess = Extract<ScreenParseResult<null>, {
     ok: true;
 }>;
 
+// @public
+export function mountBaseScreenDesignerSkeleton(container: Element): ScreenParseResult<BaseScreenDesignerElement>;
+
 // @public (undocumented)
 export function parseBaseScreenBlueprintCanvasCommand(input: unknown): ScreenParseResult<BaseScreenBlueprintCanvasCommand>;
 

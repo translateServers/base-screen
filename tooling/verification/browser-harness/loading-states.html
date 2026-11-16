@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>加载态观察 · Base Screen Harness</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --page-bg: #0b0f14;
+        --page-panel: #121820;
+        --page-border: #263140;
+        --page-fg: #e6edf6;
+        --page-muted: #94a3b8;
+        --page-accent: #5297fc;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--page-bg);
+        color: var(--page-fg);
+        font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      }
+
+      .page-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+
+      .page-header h1 {
+        margin: 0 0 4px;
+        font-size: 20px;
+      }
+
+      .page-header p {
+        margin: 0;
+        max-width: 88ch;
+        color: var(--page-muted);
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        padding: 12px 14px;
+        border: 1px solid var(--page-border);
+        border-radius: 10px;
+        background: var(--page-panel);
+      }
+
+      .controls label {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        color: var(--page-muted);
+      }
+
+      .controls input[type="number"] {
+        width: 96px;
+        padding: 4px 8px;
+        border: 1px solid var(--page-border);
+        border-radius: 6px;
+        background: #0b0f14;
+        color: var(--page-fg);
+        font: inherit;
+      }
+
+      .controls button {
+        padding: 6px 14px;
+        border: 1px solid var(--page-accent);
+        border-radius: 6px;
+        background: var(--page-accent);
+        color: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .demo {
+        padding: 16px;
+        border: 1px solid var(--page-border);
+        border-radius: 12px;
+        background: var(--page-panel);
+      }
+
+      .demo h2 {
+        margin: 0 0 4px;
+        font-size: 15px;
+      }
+
+      .meta {
+        margin: 0 0 4px;
+        color: var(--page-muted);
+        font-size: 12px;
+      }
+
+      .status {
+        display: inline-block;
+        margin: 0 0 12px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgb(82 151 252 / 14%);
+        color: #a9c8ff;
+        font-size: 12px;
+      }
+
+      code {
+        padding: 1px 4px;
+        border-radius: 4px;
+        background: rgb(255 255 255 / 8%);
+        font: 12px/1.4 ui-monospace, Consolas, monospace;
+      }
+
+      [data-stage] {
+        overflow: hidden;
+        border: 1px solid var(--page-border);
+        border-radius: 8px;
+        background: #05080c;
+      }
+
+      [data-stage] > base-screen-designer,
+      [data-stage] > base-screen-viewer {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      [data-stage="designer-skeleton"],
+      [data-stage="document-loading"] {
+        height: 720px;
+      }
+
+      [data-stage="viewer-skeleton"] {
+        width: 720px;
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+      }
+
+      [data-stage="material-spinner"] {
+        width: 480px;
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+      }
+
+      .viewer-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .viewer-row > .demo { flex: 1 1 520px; }
+    </style>
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <h1>加载态观察</h1>
+        <p>
+          四块画面全部由引擎 / 渲染器 / 物料自己渲染，harness 只在三处注入延迟：
+          designer 的 <code>catalog</code> 赋值、<code>projectAdapter.load</code>、<code>datasetPort.query</code>。
+        </p>
+      </div>
+      <div class="controls">
+        <label>延迟（毫秒）<input type="number" min="200" max="15000" step="100" value="3000" data-delay-input /></label>
+        <label><input type="checkbox" data-hold-skeleton /> 骨架保持（不注入 catalog）</label>
+        <button type="button" data-replay>重新播放</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="demo">
+        <h2>① 设计器首帧骨架</h2>
+        <p class="meta">
+          引擎在 <code>connectedCallback</code> 且 catalog 未注入时绘制；catalog 一到即被工作区替换。
+          源码：<code>designer-element-skeleton.ts</code> · <code>designer-workspace-skeleton.ts</code> · <code>designer-base-shell.css</code>
+        </p>
+        <p class="status" data-status="designer-skeleton">等待开始</p>
+        <div data-stage="designer-skeleton"></div>
+      </section>
+
+      <section class="demo">
+        <h2>② 项目文档加载期间（现状）</h2>
+        <p class="meta">
+          catalog 已注入、<code>projectAdapter.load</code> 挂起：工作区已就位，但画布为空、状态栏显示「未关联项目」，没有任何加载动画。
+          源码：<code>designer-element-status.ts</code> · <code>project-controller-load.ts</code>
+        </p>
+        <p class="status" data-status="document-loading">等待开始</p>
+        <div data-stage="document-loading"></div>
+      </section>
+
+      <div class="viewer-row">
+        <section class="demo">
+          <h2>③ Viewer 首帧骨架</h2>
+          <p class="meta">
+            元素上屏即铺满骨架，首帧渲染落定后移除。源码：<code>viewer.ts</code> 的 <code>ensureSkeleton</code> / <code>markRendered</code> · <code>viewer-skeleton.ts</code>
+          </p>
+          <p class="status" data-status="viewer-skeleton">等待开始</p>
+          <div data-stage="viewer-skeleton"></div>
+        </section>
+
+        <section class="demo">
+          <h2>④ 物料加载 spinner</h2>
+          <p class="meta">
+            水位图物料首次取数时由 <code>createBaseScreenMaterialStateView</code> 渲染 spinner。源码：<code>material-loading.ts</code> · <code>material-state-view.ts</code> · <code>board-element.ts</code>
+          </p>
+          <p class="status" data-status="material-spinner">等待开始</p>
+          <div data-stage="material-spinner"></div>
+        </section>
+      </div>
+    </main>
+
+    <script type="module" src="./loading-states.ts"></script>
+  </body>
+</html>

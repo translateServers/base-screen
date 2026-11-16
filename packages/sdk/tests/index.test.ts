@@ -16,6 +16,7 @@ import {
   defineBaseScreenDesigner,
   defineBaseScreenElements,
   defineBaseScreenViewer,
+  mountBaseScreenDesignerSkeleton,
   parseBaseScreenBlueprintCanvasCommand,
   parseBaseScreenDesignerLeftPanelGroups,
   parseBaseScreenHostResourceAuthoringIntent,
@@ -132,6 +133,45 @@ describe('SDK product element registration', () => {
       expect(defineBaseScreenElements().ok).toBe(true);
       expect(registrations.has(BASE_SCREEN_VIEWER_TAG_NAME)).toBe(true);
       expect(registrations.has(BASE_SCREEN_DESIGNER_TAG_NAME)).toBe(true);
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(globalThis, 'customElements');
+      } else {
+        Object.defineProperty(globalThis, 'customElements', previous);
+      }
+    }
+  });
+
+  it('mounts the designer skeleton before a runtime exists', () => {
+    const registrations = new Map<string, CustomElementConstructor>();
+    const previous = Object.getOwnPropertyDescriptor(globalThis, 'customElements');
+    Object.defineProperty(globalThis, 'customElements', {
+      configurable: true,
+      value: {
+        get: (tagName: string) => registrations.get(tagName),
+        define: (tagName: string, constructor: CustomElementConstructor) => {
+          registrations.set(tagName, constructor);
+        },
+      },
+    });
+    const appended: unknown[] = [];
+    const element = { tagName: '' };
+    const container = {
+      ownerDocument: {
+        createElement: (tagName: string) => {
+          element.tagName = tagName;
+          return element;
+        },
+      },
+      append: (child: unknown) => {
+        appended.push(child);
+      },
+    } as unknown as Element;
+    try {
+      const mounted = mountBaseScreenDesignerSkeleton(container);
+      expect(mounted.ok).toBe(true);
+      expect(element.tagName).toBe(BASE_SCREEN_DESIGNER_TAG_NAME);
+      expect(appended).toEqual([element]);
     } finally {
       if (previous === undefined) {
         Reflect.deleteProperty(globalThis, 'customElements');

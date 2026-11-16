@@ -35,8 +35,12 @@ import { vi } from 'vitest';
 
 export class FakeMount {
   readonly style = {} as CSSStyleDeclaration;
+  readonly attributes = new Map<string, string>();
   readonly children: FakeMaterialElement[] = [];
+  textContent = '';
   removed = false;
+
+  constructor(readonly tagName = 'div') {}
 
   appendChild(child: FakeMaterialElement): FakeMaterialElement {
     child.parent = this;
@@ -47,20 +51,38 @@ export class FakeMount {
   remove(): void {
     this.removed = true;
   }
+
+  setAttribute(name: string, value: string): void {
+    this.attributes.set(name, value);
+  }
+
+  removeAttribute(name: string): void {
+    this.attributes.delete(name);
+  }
 }
 
 export class FakeShadowDom {
-  children: FakeMount | undefined;
+  readonly appended: FakeMount[] = [];
 
   appendChild(child: FakeMount): FakeMount {
-    this.children = child;
+    this.appended.push(child);
     return child;
+  }
+
+  /**
+   * 真实 Shadow Root 同时容纳样式、首帧骨架与渲染器挂载根，测试只关心舞台节点：
+   * 取最后一个尚未移除的非样式子节点（骨架移除后自然回落到挂载根）。
+   */
+  get children(): FakeMount | undefined {
+    return [...this.appended]
+      .reverse()
+      .find((child) => !child.removed && child.tagName !== 'style');
   }
 }
 
 class FakeViewerDocument {
-  createElement(): FakeMount {
-    return new FakeMount();
+  createElement(tagName = 'div'): FakeMount {
+    return new FakeMount(tagName);
   }
 }
 
@@ -68,6 +90,7 @@ export class FakeViewerHost {
   isConnected = true;
   ownerDocument = new FakeViewerDocument();
   shadowRoot: FakeShadowDom | null = null;
+  readonly attributes = new Map<string, string>();
   readonly dispatched: unknown[] = [];
 
   attachShadow(): FakeShadowDom {
@@ -78,6 +101,14 @@ export class FakeViewerHost {
   dispatchEvent(event: unknown): boolean {
     this.dispatched.push(event);
     return true;
+  }
+
+  setAttribute(name: string, value: string): void {
+    this.attributes.set(name, value);
+  }
+
+  removeAttribute(name: string): void {
+    this.attributes.delete(name);
   }
 }
 

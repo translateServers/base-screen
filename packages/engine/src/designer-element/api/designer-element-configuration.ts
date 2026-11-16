@@ -312,6 +312,13 @@ export function writeCatalog(
   }
   elementState.catalog = value;
   elementState.resolvedMaterialLibraryItems = resolved.value;
+  // catalog 是骨架闭合的唯一条件：只经 `catalog` setter 注入的宿主也必须换掉骨架并进入
+  // ready。初始化推迟到微任务，让宿主在同一同步片里继续注入插件目录、端口等配置——
+  // 立即初始化会把它们判定为「初始化后不可变更」而丢弃。initialize 自带守卫且幂等。
+  queueMicrotask(() => {
+    if (elementState.catalog !== value) return;
+    elementState.runtime.initialize(element);
+  });
 }
 
 export function readLeftPanelGroups(

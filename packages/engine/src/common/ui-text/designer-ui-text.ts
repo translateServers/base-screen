@@ -7,6 +7,8 @@ export const DESIGNER_UI_TEXT = {
   materials: '素材',
   layers: '图层',
   appearance: '样式',
+  loading: '正在加载设计器',
+  loadingTimedOut: '设计器加载超时，请检查网络后重试。',
   data: {
     // `data: '数据'` 只服务检查器搜索面包屑的路径段（designer-inspector-search-dom.ts:311）；
     // 页签按钮的文案来自 inspectorUi.dataSource，与本键无关。
@@ -166,7 +168,8 @@ export const DESIGNER_UI_TEXT = {
     unsaved: '未保存更改',
     saved: (time: string) => `已保存 ${time}`,
   },
-  smallScreenWarning: '编辑大屏需要至少 1024 × 640 的可用空间。',
+  // 896 × 640 是元素盒（含 1px 边框）：窄栏档栅格 248 + 5 + 360 + 5 + 276 = 894 内容宽。
+  smallScreenWarning: '编辑大屏需要至少 896 × 640 的可用空间。',
   // 对比度守卫：底栏常驻结果 + 详情弹层 + 修复预览。判定口径是 WCAG AA，
   // 由画布真实渲染测量得出，不经过模型——文案里要能看出这一点。
   guard: {

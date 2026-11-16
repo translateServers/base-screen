@@ -204,9 +204,9 @@ pnpm dev:vue-host           # http://127.0.0.1:5175
 | `@base-screen/plugin-materials` | 可选 | 统一物料包：看板物料 + ECharts 图表族，`echarts` 由宿主提供（外围插件仍为仓库内私有包，不随核心发布） |
 
 示例里的插件依赖是仓库内的 `workspace:^` 引用，用来演示外围插件如何合并进 catalog；外部宿主只需要
-`npm install base-screen`，再用 `import { ... } from 'base-screen/viewer'` 按需引入。框架桥接包
-（`@base-screen/react` / `@base-screen/vue`）仍可单独安装，与 `base-screen/react`、`base-screen/vue`
-等价，二选一即可，不要在同一工程里混用两种入口。
+`npm install base-screen`，再用 `import { ... } from 'base-screen/viewer'` 按需引入。框架组件由独立
+薄封装包提供，需要时与 `base-screen` 一起安装：`@base-screen/react` 或 `@base-screen/vue`，二者
+不要在同一工程里混用。
 
 ## 冒烟验证
 

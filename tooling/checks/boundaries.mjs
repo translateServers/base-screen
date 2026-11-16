@@ -14,8 +14,6 @@ const ALLOWED_WORKSPACE_DEPENDENCIES = Object.freeze({
     'plugin-manager',
     'plugin-sdk',
     'host-kit',
-    'react',
-    'vue',
     'sdk',
   ],
   contracts: [],
@@ -164,8 +162,10 @@ function collectImports(source) {
 }
 
 function runtimeDependencyEntries(manifest) {
-  // 依赖环只看运行时边：base-screen 把桥接包列为 devDependencies（构建期内联），
-  // 桥接包运行时又依赖 base-screen，这条 dev 边不构成发布拓扑上的环。
+  // 依赖环只看运行时边：devDependencies 不参与发布拓扑。
+  // 注意 turbo 与这里的口径不同——它把 dev 边也计入任务图，跨包 dev 环会让
+  // `turbo run build` 直接以循环依赖失败。不要在 devDependencies 里建立与
+  // 运行时方向相反的依赖（历史的 base-screen -> 桥接包 dev 边即因此失效）。
   return Object.entries({
     ...manifest.dependencies,
     ...manifest.peerDependencies,
@@ -208,7 +208,8 @@ function validateManifestDependencies(directory, manifest, graph, pluginPackageN
   };
 
   for (const [dependencyName] of runtimeDependencyEntries(manifest)) validate(dependencyName, true);
-  for (const dependencyName of Object.keys(manifest.devDependencies ?? {})) validate(dependencyName, false);
+  for (const dependencyName of Object.keys(manifest.devDependencies ?? {}))
+    validate(dependencyName, false);
 
   graph.set(directory, runtimeDependencies);
 }
@@ -280,8 +281,12 @@ function validateSourceImports(base, directory, manifest, requireExtension) {
 }
 
 export function validateBoundaries() {
+  // 与 pnpm workspace 的 `plugins/*` 语义对齐：只有带 package.json 的目录才是包。
+  // 插件重构后遗留的纯产物目录（只剩 dist / node_modules）不应让边界检查崩溃。
   const pluginManifests = new Map(
-    listDirectories(PLUGIN_ROOT).map((directory) => [directory, readPluginManifest(directory)]),
+    listDirectories(PLUGIN_ROOT)
+      .filter((directory) => existsSync(join(PLUGIN_ROOT, directory, 'package.json')))
+      .map((directory) => [directory, readPluginManifest(directory)]),
   );
   const pluginPackageNames = new Set(
     [...pluginManifests.values()].map((manifest) => manifest.name),

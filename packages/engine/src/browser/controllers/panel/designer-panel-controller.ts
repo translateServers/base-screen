@@ -129,6 +129,11 @@ export class DesignerPanelController {
   }
 
   onPropertyChange(event: Event): void {
+    // 检查器重渲染会移除带焦点的控件（搜索结果卡里的克隆编辑器就是这种情况），浏览器会
+    // 趁控件仍在文档中（`isConnected` 仍为 true）补发一次 change。它属于渲染副作用而不是
+    // 用户编辑：照常提交会在刷新内部重入一次事务，外层随后只能拿已脱离文档的字段收尾，
+    // 搜索结果因此被清空。渲染窗口内的 change 一律不提交。
+    if (this.#inspector.isRendering) return;
     this.#inspector.preservePropertyScroll(event.target);
     this.#properties.onPropertyChange(event);
   }

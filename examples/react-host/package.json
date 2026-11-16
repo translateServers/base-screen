@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@base-screen/plugin-materials": "workspace:^",
+    "@base-screen/react": "workspace:^",
     "base-screen": "workspace:^",
     "echarts": "^6.1.0",
     "react": "^19.1.0",

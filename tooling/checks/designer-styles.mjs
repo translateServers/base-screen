@@ -712,3 +712,130 @@ if (groupBreakpoint[1] !== groupBreakpointConstant[1]) {
     `DESIGNER_STYLE_MATERIAL_GROUP_BREAKPOINT_DRIFT:${groupBreakpoint[1]}!=${groupBreakpointConstant[1]}`,
   );
 }
+
+// 设计器尺寸档的数字有四个载体：CSS 容器查询（布局）、控制器常量（夹紧）、尺寸档控制器
+// （宿主可读档位）与用户文案。历史上它们各写过一套，漂移只会表现为「先渲染完整界面再被裁」
+// 或「文案下限与真实栅格算不出来」，不会报错。这里把推导式直接写成断言。
+const adaptivityCss = source(
+  'packages/engine/src/browser/styles/base/designer-base-adaptivity.css',
+);
+const shellCss = source('packages/engine/src/browser/styles/base/designer-base-shell.css');
+const panelLayoutSource = source(
+  'packages/engine/src/browser/controllers/workbench/designer-panel-layout-controller.ts',
+);
+const sizeTierSource = source(
+  'packages/engine/src/browser/controllers/designer-size-tier-controller.ts',
+);
+const uiTextSource = source('packages/engine/src/common/ui-text/designer-ui-text.ts');
+
+const readFirstNumber = (pattern, text, code) => {
+  const match = pattern.exec(text);
+  if (match === null) throw new Error(code);
+  return Number(match[1]);
+};
+const sizeTierDrift = (detail) => {
+  throw new Error(`DESIGNER_STYLE_SIZE_TIER_DRIFT:${detail}`);
+};
+
+const tierWidths = [...adaptivityCss.matchAll(/@container designer-shell \(max-width: (\d+)px\)/g)]
+  .map((match) => Number(match[1]))
+  .sort((left, right) => left - right);
+const tierHeight = readFirstNumber(
+  /\(max-height: (\d+)px\)/,
+  adaptivityCss,
+  'DESIGNER_STYLE_SIZE_TIER_HEIGHT_MISSING',
+);
+const compactLeft = readFirstNumber(
+  /--left-panel-width: (\d+)px/,
+  adaptivityCss,
+  'DESIGNER_STYLE_SIZE_TIER_COMPACT_LEFT_MISSING',
+);
+const compactRight = readFirstNumber(
+  /--right-panel-width: (\d+)px/,
+  adaptivityCss,
+  'DESIGNER_STYLE_SIZE_TIER_COMPACT_RIGHT_MISSING',
+);
+
+const gridRule =
+  /grid-template-columns: var\(--left-panel-width\) (\d+)px minmax\((\d+)px, 1fr\) (\d+)px var\(--right-panel-width\)/.exec(
+    shellCss,
+  );
+if (gridRule === null) throw new Error('DESIGNER_STYLE_SIZE_TIER_GRID_MISSING');
+const handleWidth = Number(gridRule[1]);
+const canvasMin = Number(gridRule[2]);
+const shellLeft = readFirstNumber(
+  /--left-panel-width: (\d+)px;/,
+  shellCss,
+  'DESIGNER_STYLE_SIZE_TIER_SHELL_LEFT_MISSING',
+);
+const shellRight = readFirstNumber(
+  /--right-panel-width: (\d+)px;/,
+  shellCss,
+  'DESIGNER_STYLE_SIZE_TIER_SHELL_RIGHT_MISSING',
+);
+
+const canvasMinConstant = readFirstNumber(
+  /CANVAS_MIN_WIDTH = (\d+)/,
+  panelLayoutSource,
+  'DESIGNER_STYLE_SIZE_TIER_CANVAS_CONSTANT_MISSING',
+);
+const inspectorMinConstant = readFirstNumber(
+  /INSPECTOR_MIN_WIDTH = (\d+)/,
+  panelLayoutSource,
+  'DESIGNER_STYLE_SIZE_TIER_INSPECTOR_CONSTANT_MISSING',
+);
+
+const compactMaxWidth = readFirstNumber(
+  /compactMaxWidth: (\d+)/,
+  sizeTierSource,
+  'DESIGNER_STYLE_SIZE_TIER_COMPACT_LIMIT_MISSING',
+);
+const degradedMaxWidth = readFirstNumber(
+  /degradedMaxWidth: (\d+)/,
+  sizeTierSource,
+  'DESIGNER_STYLE_SIZE_TIER_DEGRADED_WIDTH_LIMIT_MISSING',
+);
+const degradedMaxHeight = readFirstNumber(
+  /degradedMaxHeight: (\d+)/,
+  sizeTierSource,
+  'DESIGNER_STYLE_SIZE_TIER_DEGRADED_HEIGHT_LIMIT_MISSING',
+);
+
+const warningCopy = /smallScreenWarning: '编辑大屏需要至少 (\d+) × (\d+) 的可用空间。'/.exec(
+  uiTextSource,
+);
+if (warningCopy === null) throw new Error('DESIGNER_STYLE_SIZE_TIER_WARNING_MISSING');
+const warningWidth = Number(warningCopy[1]);
+const warningHeight = Number(warningCopy[2]);
+
+// 容器查询只能作用于容器的后代，因此声明必须落在 :host 上（.designer 是其后代）。
+const menusCss = source('packages/engine/src/browser/styles/base/designer-base-menus.css');
+if (!/:host\s*\{[^}]*container-name:\s*designer-shell/.test(menusCss)) {
+  sizeTierDrift('container-name-not-on-host');
+}
+if (!/:host\s*\{[^}]*container-type:\s*size/.test(menusCss)) {
+  sizeTierDrift('container-type-not-on-host');
+}
+if (/\.designer\s*\{[^}]*container-name:\s*designer-shell/.test(shellCss)) {
+  sizeTierDrift('container-name-on-designer');
+}
+
+const designerBorder = 2;
+const fullGridWidth = shellLeft + handleWidth * 2 + canvasMin + shellRight;
+const compactGridWidth = compactLeft + handleWidth * 2 + canvasMin + compactRight;
+const fullContainerWidth = fullGridWidth + designerBorder;
+const compactContainerWidth = compactGridWidth + designerBorder;
+if (Number(gridRule[3]) !== handleWidth) sizeTierDrift('handle-widths-differ');
+if (tierWidths.length !== 2) sizeTierDrift(`container-queries=${tierWidths.join(',')}`);
+if (tierWidths[1] !== fullContainerWidth - 1) sizeTierDrift(`compact-query=${tierWidths[1]}`);
+if (tierWidths[0] !== compactContainerWidth - 1) sizeTierDrift(`degraded-query=${tierWidths[0]}`);
+if (tierHeight !== warningHeight - 1) sizeTierDrift(`height-query=${tierHeight}`);
+if (compactMaxWidth !== tierWidths[1]) sizeTierDrift(`compact-limit=${compactMaxWidth}`);
+if (degradedMaxWidth !== tierWidths[0]) sizeTierDrift(`degraded-width=${degradedMaxWidth}`);
+if (degradedMaxHeight !== tierHeight) sizeTierDrift(`degraded-height=${degradedMaxHeight}`);
+if (canvasMinConstant !== canvasMin) sizeTierDrift(`canvas-constant=${canvasMinConstant}`);
+if (inspectorMinConstant !== compactRight) {
+  sizeTierDrift(`inspector-constant=${inspectorMinConstant}!=${compactRight}`);
+}
+if (warningWidth !== compactContainerWidth) sizeTierDrift(`warning-width=${warningWidth}`);
+if (warningHeight !== tierHeight + 1) sizeTierDrift(`warning-height=${warningHeight}`);

@@ -98,3 +98,19 @@ export {
 export function defineBaseScreenDesigner(): ScreenParseResult<CustomElementConstructor> {
   return defineBaseScreenElement(BASE_SCREEN_DESIGNER_TAG_NAME, BaseScreenDesignerElement);
 }
+
+/**
+ * 先把设计器元素挂进页面显示首帧骨架，再异步准备运行时并向 `mountDesigner`
+ * 传入同一个 `element`。catalog 到达前元素保持骨架；配置完成后原位替换为完整工作区。
+ */
+export function mountBaseScreenDesignerSkeleton(
+  container: Element,
+): ScreenParseResult<BaseScreenDesignerElement> {
+  const defined = defineBaseScreenDesigner();
+  if (!defined.ok) return defined;
+  const element = container.ownerDocument.createElement(
+    BASE_SCREEN_DESIGNER_TAG_NAME,
+  ) as BaseScreenDesignerElement;
+  container.append(element);
+  return { ok: true, value: element, diagnostics: [] };
+}

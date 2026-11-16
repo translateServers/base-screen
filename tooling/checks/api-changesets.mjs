@@ -37,9 +37,11 @@ export function parseChangesetPackages(source) {
   if (match === null) return new Set();
   const packages = new Set();
   for (const line of match[1].split(/\r?\n/)) {
-    const entry = /^['"]?(@base-screen\/[^'":]+)['"]?\s*:\s*(?:major|minor|patch)\s*$/.exec(
-      line.trim(),
-    );
+    // 产品包 `base-screen` 不带作用域，另有一批私有 `@base-screen/*` 包，两种写法都要认。
+    const entry =
+      /^['"]?(@base-screen\/[^'":]+|base-screen)['"]?\s*:\s*(?:major|minor|patch)\s*$/.exec(
+        line.trim(),
+      );
     if (entry !== null) packages.add(entry[1]);
   }
   return packages;

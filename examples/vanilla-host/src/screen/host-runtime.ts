@@ -27,6 +27,16 @@ import { registerHostMaterials } from './register';
 
 const INSTANCE_ID = 'vanilla-host';
 
+/**
+ * 贡献身份跨插件唯一（manager preflight 强制），因此同一个蓝图能力不能被两个插件同时声明。
+ * `request-component-data` 已由统一物料插件声明，必须从宿主提交的能力列表里让出来——否则引擎
+ * 为其余能力合成的蓝图插件会与它撞身份，整次装配被判 `PLUGIN_CORE_CONTRIBUTION_CONFLICT`。
+ * union 仍覆盖全部能力 id，授权面不变。
+ */
+const HOST_BLUEPRINT_CAPABILITIES = SCREEN_BLUEPRINT_CAPABILITY_IDS.filter(
+  (id) => id !== PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
+);
+
 export interface HostRuntime extends BaseScreenRuntime, OnlineMaterialRuntime {}
 
 let runtimePromise: Promise<HostRuntime> | undefined;
@@ -56,7 +66,7 @@ async function createHostRuntime(): Promise<HostRuntime> {
         PLUGIN_PIPELINE_ACTION_CAPABILITY,
       ],
     },
-    blueprintCapabilities: SCREEN_BLUEPRINT_CAPABILITY_IDS,
+    blueprintCapabilities: HOST_BLUEPRINT_CAPABILITIES,
   });
   if (!created.ok) {
     throw new Error(`HOST_RUNTIME_ACTIVATION_FAILED:${created.diagnostics[0]?.code}`);

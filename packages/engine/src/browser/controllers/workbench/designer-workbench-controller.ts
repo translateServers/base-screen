@@ -98,6 +98,15 @@ export class DesignerWorkbenchController {
     this.#guides.disconnect();
   }
 
+  /** 元素重新连回文档后恢复面板布局对容器尺寸的观察。 */
+  reconnectLayout(): void {
+    this.#panelLayout.reconnect();
+  }
+
+  disposeLayout(): void {
+    this.#panelLayout.dispose();
+  }
+
   // 手势首帧建立吸附/测量共享的几何快照，结束或取消后释放；每轴独立记录吸附状态。
   setSnapSessionActive(active: boolean): void {
     this.#snap.setSessionActive(active);

@@ -11,6 +11,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 class FakeNode {
   readonly style = {} as CSSStyleDeclaration;
+  readonly attributes = new Map<string, string>();
+  textContent = '';
   removed = false;
 
   appendChild<T>(child: T): T {
@@ -19,6 +21,14 @@ class FakeNode {
 
   remove(): void {
     this.removed = true;
+  }
+
+  setAttribute(name: string, value: string): void {
+    this.attributes.set(name, value);
+  }
+
+  removeAttribute(name: string): void {
+    this.attributes.delete(name);
   }
 }
 

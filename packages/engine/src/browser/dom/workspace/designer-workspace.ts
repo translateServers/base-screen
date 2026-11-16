@@ -30,6 +30,7 @@ export function createDesignerWorkspace(
   materialLibraryState?: BaseScreenMaterialLibraryState,
   materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping,
   leftPanelGroups?: readonly BaseScreenDesignerLeftPanelGroup[],
+  deferMaterialLibrary = false,
 ): HTMLElement {
   const visibleMaterials = visibleLibraryMaterials(materials);
   const layout = ownerDocument.createElement('section');
@@ -112,7 +113,9 @@ export function createDesignerWorkspace(
   layout.appendChild(helpDialog);
 
   renderDesignerLeftPanelGroups(layout, leftPanelGroups);
-  populateMaterialLibrary(layout, materials, materialLibraryState, materialLibraryGrouping);
+  if (!deferMaterialLibrary) {
+    populateMaterialLibrary(layout, materials, materialLibraryState, materialLibraryGrouping);
+  }
   for (const tool of DESIGNER_TOOLS) {
     const control = layout.querySelector<HTMLButtonElement>(`[data-tool="${tool.id}"]`)!;
     control.disabled = tool.materialKey !== undefined && toolMaterialTypes?.[tool.id] === undefined;

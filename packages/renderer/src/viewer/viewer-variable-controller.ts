@@ -19,6 +19,8 @@ export interface ViewerVariableControllerHost {
   readonly readBlueprintVariables: () => ScreenJsonObject | undefined;
   readonly writeBlueprintVariables: (variables: ScreenJsonObject) => void;
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
+  /** 一次渲染尝试落定（成功或失败）后回调；Viewer 用它撤掉首帧骨架。 */
+  readonly onRenderSettled?: () => void;
 }
 
 /**
@@ -262,6 +264,7 @@ export class ViewerVariableController {
       }
     } finally {
       this.#rendering = false;
+      this.#host.onRenderSettled?.();
     }
     if (this.#pendingRecompute) {
       this.#pendingRecompute = false;

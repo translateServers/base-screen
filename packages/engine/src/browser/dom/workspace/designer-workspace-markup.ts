@@ -13,6 +13,21 @@ import {
   sizeEntryField,
 } from './designer-workspace-template.js';
 
+const MATERIAL_LIBRARY_SKELETON_LIMIT = 6;
+
+/** 物料卡片的同尺寸占位；同步填充会立即替换，延迟水合时保持左栏稳定。 */
+export function materialLibrarySkeletonMarkup(visibleMaterialCount: number): string {
+  const count = Math.min(Math.max(visibleMaterialCount, 0), MATERIAL_LIBRARY_SKELETON_LIMIT);
+  return Array.from(
+    { length: count },
+    () => `
+              <div class="material-card material-card-skeleton" aria-hidden="true">
+                <span class="material-thumb material-card-skeleton-thumb"></span>
+                <span class="material-card-skeleton-meta"></span>
+              </div>`,
+  ).join('');
+}
+
 export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
   return `
     <div class="small-screen-warning" role="alert">
@@ -87,7 +102,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             <nav class="material-group-navigation" data-material-groups aria-label="${DESIGNER_UI_TEXT.materialGroups}" hidden></nav>
           </div>
           <div class="material-library-results">
-            <div class="material-grid" data-material-grid></div>
+            <div class="material-grid" data-material-grid>${materialLibrarySkeletonMarkup(visibleMaterialCount)}</div>
             <div class="designer-empty material-search-empty" data-material-search-empty hidden>
               <span class="designer-empty-icon" aria-hidden="true">${designerIcon('search')}</span>
               <p class="designer-empty-title" role="status">${DESIGNER_UI_TEXT.materialSearchEmpty}</p>

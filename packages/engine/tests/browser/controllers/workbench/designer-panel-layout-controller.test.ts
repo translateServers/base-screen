@@ -13,9 +13,12 @@ class PanelElement {
     removeProperty: (property: string) => {
       delete (this.style as unknown as Record<string, string>)[property];
     },
+    getPropertyValue: (property: string) =>
+      (this.style as unknown as Record<string, string>)[property] ?? '',
   };
   title = '';
   clientLeft = 1;
+  clientWidth: number | undefined;
   ownerDocument!: Document;
   getBoundingClientRect = () => ({
     bottom: 600,
@@ -138,9 +141,26 @@ describe('DesignerPanelLayoutController', () => {
     expect(panel.rightHandle.attributes).toMatchObject({
       'aria-label': rightLabel,
       'aria-valuemax': '480',
-      'aria-valuemin': '288',
+      'aria-valuemin': '276',
       'aria-valuenow': '336',
     });
+  });
+
+  it('clamps rendered panel widths into the container budget', () => {
+    const panel = createPanelLayout();
+    panel.controller.initialize();
+
+    // 内容盒 894 是窄栏档下限：336 + 5 + 360 + 5 + 336 放不下，须先缩右再缩左。
+    panel.layout.clientWidth = 894;
+    panel.controller.reconnect();
+
+    const style = panel.layout.style as unknown as Record<string, string>;
+    expect(style['--left-panel-width']).toBe('248px');
+    expect(style['--right-panel-width']).toBe('276px');
+    expect(panel.leftHandle.attributes['aria-valuenow']).toBe('248');
+    expect(panel.rightHandle.attributes['aria-valuenow']).toBe('276');
+    expect(panel.leftHandle.attributes['aria-valuemax']).toBe('248');
+    expect(panel.rightHandle.attributes['aria-valuemax']).toBe('276');
   });
 
   it('resizes both separators with directional, accelerated and boundary keys', () => {

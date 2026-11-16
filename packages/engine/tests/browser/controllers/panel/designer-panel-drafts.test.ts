@@ -59,6 +59,56 @@ describe('DesignerPanelController property drafts', () => {
     ]);
   });
 
+  it('ignores the change the browser replays when a re-render removes the focused control', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeInput);
+    vi.stubGlobal('HTMLTextAreaElement', FakeInput);
+    const transactions: unknown[] = [];
+    const controller = new DesignerPanelController({
+      emitDiagnostics: () => undefined,
+      executeCommand: () => ({ ok: true, value: document(), diagnostics: [] }),
+      executeTransaction: (transaction) => {
+        transactions.push(transaction);
+        return { ok: true, value: document(), diagnostics: [] };
+      },
+      getCatalog: catalog,
+      getDocument: document,
+      getGroupMaterialType: () => undefined,
+      getInteraction: () => ({ selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' }),
+      getResourcePort: () => undefined,
+      getRuntimeContributions: () => undefined,
+      getZoom: () => 1,
+      redo: () => ({ ok: true, value: document(), diagnostics: [] }),
+      reduceSelection: () => undefined,
+      setZoom: () => undefined,
+      undo: () => ({ ok: true, value: document(), diagnostics: [] }),
+    });
+    const ownerDocument = new FakeDocument();
+    const root = ownerDocument.createElement('div');
+    const results = ownerDocument.createElement('div');
+    results.dataset.inspectorSearchResults = '';
+    root.appendChild(results);
+    // 浏览器会在移除带焦点的控件时（此时 isConnected 仍为 true）补发 change：把它挂在
+    // 清空搜索结果的那一刻，复现「刷新内部同步到达一次 property change」。
+    results.replaceChildren = () => {
+      controller.onPropertyChange({
+        target: new FakeInput('width', '120'),
+      } as unknown as Event);
+    };
+
+    controller.refreshInspectorUi(root as unknown as ShadowRoot);
+
+    expect(transactions).toEqual([]);
+
+    // 渲染之外的同一控件仍然正常提交，证明丢弃的只是渲染窗口内的重放事件。
+    controller.onPropertyChange({
+      target: new FakeInput('width', '120'),
+    } as unknown as Event);
+    expect(transactions).toHaveLength(1);
+  });
+
   it('routes flip button clicks through the canonical property transaction', () => {
     vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);

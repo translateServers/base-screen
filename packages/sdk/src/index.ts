@@ -92,6 +92,7 @@ export {
   type DesignerScenePreview,
   type DesignerSceneRequest,
   defineBaseScreenDesigner,
+  mountBaseScreenDesignerSkeleton,
   parseBaseScreenBlueprintCanvasCommand,
   parseBaseScreenDesignerLeftPanelGroups,
   parseBaseScreenHostResourceAuthoringIntent,

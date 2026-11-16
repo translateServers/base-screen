@@ -64,6 +64,7 @@ import {
   PLUGIN_BOARD_BORDER_BOX_TYPE,
   PLUGIN_BOARD_CYCLE_BORDER_COMMAND_ID,
   PLUGIN_BOARD_WATER_LEVEL_TYPE,
+  PLUGIN_ECHARTS_MATERIAL_MANIFESTS,
   PLUGIN_MATERIALS_ID,
   PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
   PLUGIN_METRICS_RESOURCE_TYPE_ID,
@@ -525,6 +526,11 @@ const bridgeCatalog = createBaseScreenMaterialCatalog([
   reactBridge.value,
   vueBridge.value,
 ]);
+// 分组必须覆盖目录中每个可见物料，且同一类型只能出现在一个分组里；
+// `PLUGIN_ECHARTS_MATERIAL_MANIFESTS` 已包含 `plugin.echarts`，不能再单独列出。
+const PLUGIN_CHART_MATERIAL_TYPES = PLUGIN_ECHARTS_MATERIAL_MANIFESTS.map(
+  (manifest) => manifest.type,
+);
 const materialLibraryGrouping = {
   groups: [
     {
@@ -541,7 +547,7 @@ const materialLibraryGrouping = {
           label: '图表',
           // 插件贡献的物料与外移的图表能力同列：分组必须覆盖目录中每个可见物料，
           // 否则 grouping 会因"缺少可见物料类型"被整体拒绝。
-          materialTypes: ['base.chart', 'harness.semantic-chart', 'plugin.echarts'],
+          materialTypes: ['base.chart', 'harness.semantic-chart', ...PLUGIN_CHART_MATERIAL_TYPES],
         },
         { id: 'tables', label: '表格', materialTypes: ['base.table'] },
       ],
@@ -589,7 +595,11 @@ const materialLibraryStressGrouping = {
       id: 'data',
       label: '数据可视化图表组件超长名称',
       children: [
-        { id: 'charts', label: '图表', materialTypes: ['base.chart', 'plugin.echarts'] },
+        {
+          id: 'charts',
+          label: '图表',
+          materialTypes: ['base.chart', ...PLUGIN_CHART_MATERIAL_TYPES],
+        },
         {
           id: 'advanced',
           label: '高级图表',
@@ -1878,6 +1888,10 @@ Object.assign(window, {
         variables: [],
         blueprint: { relations: [] },
       };
+      // 探针必须落在受支持档位：降级档（<896 宽或 <640 高）会把整个工作台换成提示，
+      // 卡片永远不可见。固定 1200×720 让封面缩略图断言与宿主视口无关。
+      probe.style.width = '1200px';
+      probe.style.height = '720px';
       document.body.appendChild(probe);
       return probe;
     },

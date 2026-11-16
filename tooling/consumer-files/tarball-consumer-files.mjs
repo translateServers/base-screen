@@ -23,6 +23,9 @@ export function writeTarballConsumerFiles(consumer, framework, packageSpec) {
   const productTag = `base-screen-${framework}-product`;
   const workspaceDependencies = ['contracts', 'material', 'plugin-core', 'sdk', framework];
   const dependencies = {
+    // 单包分发的主入口必须显式声明：桥接包的声明文件引用 `base-screen`，
+    // 只靠传递依赖在 isolated linker（Linux CI）下解析不到。
+    'base-screen': packageSpec('base-screen'),
     ...Object.fromEntries(
       workspaceDependencies.map((directory) => [
         `@base-screen/${directory}`,
@@ -322,7 +325,7 @@ function writeReactConsumerFiles(consumer, productTag) {
   writeFileSync(
     join(consumer, 'src', 'base-screen-elements.d.ts'),
     `import type { ClassAttributes, HTMLAttributes } from 'react';
-import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialModel } from 'base-screen/plugin-core';
 
 declare module 'react' {
   namespace JSX {
@@ -337,7 +340,7 @@ declare module 'react' {
     join(consumer, 'src', 'bridge.ts'),
     `import { createElement, useEffect } from 'react';
 import { createReactMaterialDefinition } from '@base-screen/react';
-import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialManifest } from 'base-screen/plugin-core';
 
 declare global {
   interface Window {
@@ -402,14 +405,14 @@ const productEntry = definition.value;
   );
   writeFileSync(
     join(consumer, 'src', 'main.tsx'),
-    `import '@base-screen/sdk/auto-register';
-import '@base-screen/material/auto-register';
+    `import 'base-screen/auto-register';
+import 'base-screen/material/auto-register';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBaseScreenRuntime } from '@base-screen/sdk';
+import { createBaseScreenRuntime } from 'base-screen';
 import { BaseScreenDesigner, BaseScreenViewer } from '@base-screen/react';
-import type { ScreenDiagnostic } from '@base-screen/contracts';
-import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type { ScreenDiagnostic } from 'base-screen/contracts';
+import type { BaseScreenMaterialModel } from 'base-screen/plugin-core';
 import { registerProduct } from './bridge';
 
 declare global {
@@ -545,7 +548,7 @@ export default defineConfig({});
 function writeVueConsumerFiles(consumer, productTag) {
   writeFileSync(
     join(consumer, 'src', 'base-screen-elements.d.ts'),
-    `import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+    `import type { BaseScreenMaterialModel } from 'base-screen/plugin-core';
 
 declare module 'vue' {
   export interface GlobalComponents {
@@ -562,7 +565,7 @@ export {};
     join(consumer, 'src', 'bridge.ts'),
     `import { defineComponent, h, onMounted, onUnmounted } from 'vue';
 import { createVueMaterialDefinition } from '@base-screen/vue';
-import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialManifest } from 'base-screen/plugin-core';
 
 declare global {
   interface Window {
@@ -641,7 +644,7 @@ const productEntry = definition.value;
     join(consumer, 'src', 'App.vue'),
     `<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialModel } from 'base-screen/plugin-core';
 
 const label = ref('Initial');
 const product = ref<HTMLElement | null>(null);
@@ -695,13 +698,13 @@ onUnmounted(() => {
   );
   writeFileSync(
     join(consumer, 'src', 'main.ts'),
-    `import '@base-screen/sdk/viewer/auto-register';
-import '@base-screen/sdk/designer/auto-register';
-import '@base-screen/material/auto-register';
+    `import 'base-screen/viewer/auto-register';
+import 'base-screen/designer/auto-register';
+import 'base-screen/material/auto-register';
 import { createApp, h } from 'vue';
-import { createBaseScreenRuntime } from '@base-screen/sdk';
+import { createBaseScreenRuntime } from 'base-screen';
 import { BaseScreenDesigner, BaseScreenViewer } from '@base-screen/vue';
-import type { ScreenDiagnostic } from '@base-screen/contracts';
+import type { ScreenDiagnostic } from 'base-screen/contracts';
 import App from './App.vue';
 import { registerProduct } from './bridge';
 
@@ -792,8 +795,8 @@ try {
   writeFileSync(
     join(consumer, 'src', 'global-components.typecheck.ts'),
     `import type { GlobalComponents } from 'vue';
-import type { ScreenDiagnostic } from '@base-screen/contracts';
-import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type { ScreenDiagnostic } from 'base-screen/contracts';
+import type { BaseScreenMaterialModel } from 'base-screen/plugin-core';
 import type {
   BaseScreenDesignerElement,
   BaseScreenDesignerMountOptions,
@@ -803,7 +806,7 @@ import type {
   BaseScreenViewerElement,
   BaseScreenViewerMountOptions,
   ScreenProjectState,
-} from '@base-screen/sdk';
+} from 'base-screen';
 import { BaseScreenDesigner, BaseScreenViewer } from '@base-screen/vue';
 
 type Equal<Left, Right> =
@@ -1016,8 +1019,8 @@ export function writeViewerOnlyTarballConsumerFiles(consumer, framework, tarball
     join(consumer, 'src', 'main.ts'),
     `import { createApp, h } from 'vue';
 import { BaseScreenViewer } from '@base-screen/vue';
-import { createBaseScreenViewerRuntime } from '@base-screen/sdk/viewer';
-import '@base-screen/sdk/host-tokens.css';
+import { createBaseScreenViewerRuntime } from 'base-screen/viewer';
+import 'base-screen/host-tokens.css';
 
 const result = await createBaseScreenViewerRuntime({ instanceId: 'vue-viewer-only' });
 if (!result.ok) throw new Error('VIEWER_ONLY_RUNTIME_FAILED');

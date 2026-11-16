@@ -28,6 +28,7 @@ export class DesignerPanelInspectorController {
   #search = '';
   #searchOpen = false;
   #searchClipboard: DesignerInspectorSearchClipboard | undefined;
+  #renderDepth = 0;
   #densityPreferenceRestored = false;
   #groupPreferenceRestored = false;
   readonly #groupPreferences = new Map<string, boolean>();
@@ -85,8 +86,26 @@ export class DesignerPanelInspectorController {
     if (persistenceTarget !== undefined) this.persistGroupPreferences(persistenceTarget);
   }
 
+  /**
+   * 重渲染期间为真。搜索结果的清空会移除带焦点的克隆编辑器，浏览器会趁控件仍在文档中
+   * （`isConnected` 仍为 true）补发一次 change——那是本次渲染的副作用而不是用户编辑，
+   * 事件路由必须据此丢弃，否则会在刷新内部重入一次提交。
+   */
+  get isRendering(): boolean {
+    return this.#renderDepth > 0;
+  }
+
   refresh(root: ShadowRoot | HTMLElement | null): void {
     if (root === null) return;
+    this.#renderDepth += 1;
+    try {
+      this.#renderChrome(root);
+    } finally {
+      this.#renderDepth -= 1;
+    }
+  }
+
+  #renderChrome(root: ShadowRoot | HTMLElement): void {
     this.restoreDensityPreference(root);
     renderDesignerInspectorContext(
       root.querySelector<HTMLElement>('[data-inspector-context]'),

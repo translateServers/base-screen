@@ -5,8 +5,9 @@ describe('designer workbench structure and layout', () => {
   it('R8 reserves stable tracks for workbench geometry and dynamic status content', () => {
     expect(baseCss).toContain('--left-panel-width: 336px;');
     expect(baseCss).toContain('--right-panel-width: 336px;');
+    // 窄栏档按容器（:host 内容盒）判定：宽 <= 1043 时左右栏收敛到 248/276。
     expect(baseCss).toMatch(
-      /@media \(min-width: 1024px\) and \(max-width: 1279px\)\s*\{[^}]*--left-panel-width: 248px;[^}]*--right-panel-width: 276px;/s,
+      /@container designer-shell \(max-width: 1043px\)\s*\{[^}]*--left-panel-width: 248px;[^}]*--right-panel-width: 276px;/s,
     );
     expect(baseCss).toContain('grid-template-rows: 48px minmax(0, 1fr) 30px;');
     expect(baseCss).toContain('grid-column: 1 / -1;');

@@ -252,23 +252,22 @@ Designer 的 `onProjectState(state)` 在成功挂载后立即投影权威快照�
 
 直接文档模式与项目模式应分别使用；绑定项目适配器后，通过项目 API 加载，不再直接赋值 `document`。
 
-**获取包**：核心能力走单包分发，宿主只安装一个 `base-screen`，内部实现按子路径引入；外围插件暂保持私有，不在本轮发布范围。**首次发布尚未执行**，以下命令需等对应版本发布后使用：
-
+**获取包**：核心能力走单包分发，宿主只安装一个 `base-screen`，内部实现按子路径引入；外围插件暂保持私有，不在本轮发布范围。**已发布 0.1.x**，以下命令可直接使用：
 ```bash
 # 核心：一个包，按子路径引入（/viewer、/designer、/contracts、/engine、/host-kit…）
 npm install base-screen
 
-# 以框架组件方式使用时，带上框架本身即可（对应子路径是 base-screen/react、base-screen/vue）
-npm install base-screen react@^19.1.0 react-dom@^19.1.0
-npm install base-screen vue@^3.5.0
+# 以框架组件方式使用时，另装对应桥接包与框架本身
+npm install base-screen @base-screen/react react@^19.1.0 react-dom@^19.1.0
+npm install base-screen @base-screen/vue vue@^3.5.0
 ```
 
-宿主不再需要逐个安装 `@base-screen/*`：contracts、core、engine、renderer、material、plugin-* 与 host-kit 都已内联进 `base-screen` 的产物，`zod` 作为唯一运行时依赖随包解析。框架桥接包 `@base-screen/react` / `@base-screen/vue` 仍可单独安装，功能与 `base-screen/react`、`base-screen/vue` 等价，二选一即可、不要混用。
+宿主不再需要逐个安装 `@base-screen/*`：contracts、core、engine、renderer、material、plugin-* 与 host-kit 都已内联进 `base-screen` 的产物，`zod` 作为唯一运行时依赖随包解析。框架组件由 `@base-screen/react` / `@base-screen/vue` 提供，需与 `base-screen` 一起安装；`base-screen` 本身不含框架绑定，也不提供 `base-screen/react` 这类入口。
 
 ```ts
 import { createBaseScreenViewerRuntime } from 'base-screen/viewer';
 import { createHttpProjectAdapter } from 'base-screen/host-kit';
-import { BaseScreenDesigner } from 'base-screen/react';
+import { BaseScreenDesigner } from '@base-screen/react';
 ```
 
 可直接运行的宿主工程见[示例总览](./examples/README.md)，三个前端已经全部按这种方式引入。接入真实业务时替换示例中的宿主适配器和端口实现，并只使用包的公开导出。

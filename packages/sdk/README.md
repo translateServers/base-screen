@@ -52,6 +52,20 @@ React/Vue 的 `BaseScreenViewer` 可消费该只读接口，也兼容完整 runt
 
 `materials` 可直接接收 React/Vue 桥产出的 catalog 条目，表格数据适配器随同注册，无需手动补构造器静态属性；物料包与定义仍可使用。插件授权仍显式声明。
 
+## Designer 首帧骨架与分帧水合
+
+`mountBaseScreenDesignerSkeleton(container)` 只负责定义并插入 `<base-screen-designer>`：元素连接后立即绘制与最终布局同尺寸的首帧骨架，不等运行时、在线物料或项目数据就绪。骨架出现后，物料库内容与画布渲染分两帧补齐（catalog 到达时单帧直出；骨架先出现的场景下先补面板、下一帧再渲染画布），避免同一帧内搭壳 + 渲染长任务。
+
+宿主可以用三个只读状态属性驱动自己的加载 UI：
+
+| 属性 | 取值 | 语义 |
+| --- | --- | --- |
+| `data-designer-state` | `loading` / `ready` / `error` | 元素整体状态；`ready` 表示工作区已搭壳（不等于项目已加载）。 |
+| `data-designer-canvas-state` | `pending` / `ready` | 分帧水合的画布进度；`ready` 表示首个文档已渲染、可交互。 |
+| `data-designer-skeleton-state` | （缺失）/ `error` | 仅失败时出现：catalog 在 15s 内未到达，脉冲骨架停止并把中央舞台替换为可读提示。 |
+
+骨架闭合只依赖 catalog：宿主通过 `element.catalog = catalog` 注入即会替换骨架并进入 `ready`，不需要额外调用 `configure()`；catalog 之后到达也可从 `error` 恢复。断连会撤销待执行水合帧与超时计时，重连后继续。
+
 Designer 挂载控制器的 `onProjectState(state)` 在挂载成功后立即提供一次权威项目快照，再订阅后续变化；状态只有 `phase`、`dirty` 和 `project: { projectId, name, revision } | null`，不复制文档或另建状态机。命令式宿主也可通过 `handle.element.getProjectState()` 与 `BASE_SCREEN_PROJECT_STATE_CHANGE_EVENT` 读取和订阅。
 
 `onDiagnostics(diagnostics, context)` 的第二参提供失败 `phase`、`instanceAvailable` 和 `recovery`。目录热刷新失败保留实例并允许 `retry-catalog`；配置/加载失败需要 `remount`；释放失败不再声明可用实例。旧的单参数回调继续有效。官方挂载失败结果带 `mountPhase`，无需解析诊断文案。

@@ -1,7 +1,14 @@
+/* 不声明 min-width/min-height：尺寸分档由容器查询决定，这里硬撑会让宿主永远看不到
+   降级提示，也会掩盖被裁切的真实原因。
+
+   容器声明必须落在 :host 上：容器查询只能作用于容器的后代，而 .designer 自身就是
+   栅格容器，写在它身上会变成永远匹配不到自己的死规则。:host 作为容器后，.designer
+   是它的后代，分档变量与 display 切换才真正生效。查询口径是 :host 的内容盒
+   （宿主不额外加 padding 时等于宿主元素盒）。 */
 :host {
   display: block;
-  min-width: 1024px;
-  min-height: 640px;
+  container-name: designer-shell;
+  container-type: size;
   color: var(--designer-text-primary);
   font: var(--designer-font);
   -webkit-font-smoothing: antialiased;

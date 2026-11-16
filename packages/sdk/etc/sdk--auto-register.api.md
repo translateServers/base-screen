@@ -529,6 +529,9 @@ export { DesignerScenePreview }
 
 export { DesignerSceneRequest }
 
+// @public
+export function mountBaseScreenDesignerSkeleton(container: Element): ScreenParseResult<BaseScreenDesignerElement>;
+
 export { parseBaseScreenBlueprintCanvasCommand }
 
 export { parseBaseScreenDesignerLeftPanelGroups }
