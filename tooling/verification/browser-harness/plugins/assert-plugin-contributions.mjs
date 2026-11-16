@@ -83,7 +83,9 @@ export async function assertPluginMaterialRenders(designer, page) {
       const node = root.querySelector(`[data-base-screen-component-id=${id}]`);
       const host =
         node !== null && node.matches(tag) ? node.querySelector('[_echarts_instance_]') : null;
-      return host?.querySelector('canvas') !== null;
+      // 必须写成 `host !== null &&`：可选链在 host 为 null 时返回 undefined，
+      // `undefined !== null` 为真，等待会在图表实例出现之前提前通过。
+      return host !== null && host.querySelector('canvas') !== null;
     },
     [ECHARTS_COMPONENT_ID, ECHARTS_TAG],
     { timeout: 5000 },
