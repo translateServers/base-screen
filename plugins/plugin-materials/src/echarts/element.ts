@@ -14,6 +14,7 @@ import {
   buildPluginEchartsOption,
   type ChartFamilyKind,
 } from './chart-option.js';
+import { cancelChartRender, scheduleChartRender } from './chart-render-scheduler.js';
 import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from './manifest.js';
 
 export class PluginEchartsElement extends HTMLElement {
@@ -23,6 +24,13 @@ export class PluginEchartsElement extends HTMLElement {
   #model: BaseScreenMaterialModel | undefined;
   #handle: EchartsChartHandle | undefined;
   #resizeObserver: ResizeObserver | undefined;
+  #renderQueued = false;
+  readonly #deferredRender = (): void => {
+    this.#renderQueued = false;
+    if (this.isConnected) {
+      this.#paint();
+    }
+  };
 
   get model(): BaseScreenMaterialModel {
     if (this.#model === undefined) {
@@ -41,6 +49,8 @@ export class PluginEchartsElement extends HTMLElement {
   }
 
   disconnectedCallback(): void {
+    cancelChartRender(this.#deferredRender);
+    this.#renderQueued = false;
     this.#resizeObserver?.disconnect();
     this.#resizeObserver = undefined;
     this.#handle?.dispose();
@@ -56,6 +66,24 @@ export class PluginEchartsElement extends HTMLElement {
     // 这里再写 `100%` 会把组件撑满画布（曾被 E2E 的几何门禁捕获）。
     this.style.display = 'block';
     this.style.backgroundColor = readString(model.style.backgroundColor, 'transparent');
+    // 实例化（echarts.init + 首次 setOption）按帧预算排队：多图表同屏时首帧只出
+    // 轻量内容，图表随后逐帧补齐；已实例化的图表仍走同步更新。
+    if (this.#handle === undefined) {
+      if (this.#renderQueued) {
+        return;
+      }
+      this.#renderQueued = true;
+      scheduleChartRender(this.#deferredRender);
+      return;
+    }
+    this.#paint();
+  }
+
+  #paint(): void {
+    const model = this.#model;
+    if (model === undefined || !this.isConnected) {
+      return;
+    }
     const handle = this.#ensureHandle();
     if (model.dataState.status !== 'ready') {
       handle.render({});
