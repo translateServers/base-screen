@@ -1,162 +1,157 @@
 import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
 import {
-  buildDesignerBlueprintComponentLibrary,
-  buildDesignerBlueprintGraph,
-} from '../../../common/operations/blueprint/designer-blueprint-model.js';
-import {
-  BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT,
-  type BaseScreenBlueprintCanvasGraph,
-  type BaseScreenBlueprintCanvasSelection,
-  type BaseScreenBlueprintCanvasState,
+  BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
   type BaseScreenDesignerSetWorkbenchModeOptions,
-  type BaseScreenDesignerWorkbenchFocus,
   type BaseScreenDesignerWorkbenchMode,
-  type BaseScreenDesignerWorkbenchModeChangeEventDetail,
   type BaseScreenDesignerWorkbenchModeChangeReason,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { parseDesignerWorkbenchModeRequest } from '../../../common/operations/workbench/designer-workbench-mode.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import {
-  createDesignerBlueprintDefaultCanvas,
-  type DesignerBlueprintDefaultCanvasHandle,
-} from '../../dom/blueprint/designer-blueprint-default-canvas.js';
-import { renderDesignerBlueprintWorkbenchChrome } from '../../dom/blueprint/designer-blueprint-workbench-dom.js';
-import { DesignerBlueprintCanvasBridge } from './designer-blueprint-canvas-bridge.js';
-import { DesignerBlueprintPanelsController } from './designer-blueprint-panels-controller.js';
 import type { DesignerBlueprintWorkbenchCallbacks } from './designer-blueprint-workbench-callbacks.js';
 
+/**
+ * Blueprint 工作台的按需加载门面。
+ *
+ * 工作台的 DOM 生成、图投影、面板与画布桥接只在编辑态使用，且默认停留在 canvas 模式。
+ * 这一整块从 designer 首屏闭包里切出去，通过动态 import 在真正需要时加载：
+ * - 宿主提供了中央画布、或声明 `initialWorkbenchMode: 'blueprint'` 时，首帧后预热；
+ * - 否则等用户点击蓝图页签、调用 `setWorkbenchMode('blueprint')` 或从变量面板加入节点。
+ *
+ * 加载完成前所有入口都给出确定结果：模式切到蓝图会排队（重复调用只保留最后一次），
+ * 画布命令按到达顺序缓存并在桥接连接后重放，其它交互返回 false。模式切换在加载完成后
+ * 一次性应用，因此不会出现空白蓝图面板或中间态布局位移。
+ */
+export interface DesignerBlueprintWorkbenchPanelDelegate {
+  readonly mode: BaseScreenDesignerWorkbenchMode;
+  readonly selectedLeftPanelGroupId: string | undefined;
+  connect(root: ShadowRoot): void;
+  disconnect(): void;
+  resetSession(): void;
+  setInitialMode(mode: BaseScreenDesignerWorkbenchMode): void;
+  selectLeftPanelGroup(groupId: string): boolean;
+  refreshLeftPanelGroups(): void;
+  setMode(
+    mode: BaseScreenDesignerWorkbenchMode,
+    options: BaseScreenDesignerSetWorkbenchModeOptions,
+    reason: BaseScreenDesignerWorkbenchModeChangeReason,
+  ): ScreenParseResult<null>;
+  addVariableNode(variableId: string): void;
+  render(): void;
+  dispatchState(): void;
+  onClick(target: Element): boolean;
+  onInput(target: Element): boolean;
+  onChange(target: Element): boolean;
+  onDragStart(event: DragEvent): boolean;
+  onKeyDown(event: KeyboardEvent): boolean;
+}
+
+interface DesignerBlueprintWorkbenchPanelModule {
+  readonly DesignerBlueprintWorkbenchPanel: new (
+    callbacks: DesignerBlueprintWorkbenchCallbacks,
+  ) => DesignerBlueprintWorkbenchPanelDelegate;
+}
+
+export interface DesignerBlueprintWorkbenchControllerOptions {
+  /** 加载器接缝：默认动态 import 工作台实现；测试可注入同步或失败实现。 */
+  readonly load?: () => Promise<DesignerBlueprintWorkbenchPanelModule>;
+}
+
+interface PendingModeRequest {
+  readonly mode: BaseScreenDesignerWorkbenchMode;
+  readonly options: BaseScreenDesignerSetWorkbenchModeOptions;
+  readonly reason: BaseScreenDesignerWorkbenchModeChangeReason;
+}
+
+interface BufferedCanvasCommand {
+  readonly canvas: Element;
+  readonly detail: unknown;
+}
+
+const MAX_BUFFERED_CANVAS_COMMANDS = 16;
+const BLUEPRINT_CANVAS_SLOT_SELECTOR = '[data-blueprint-canvas-slot]';
+
 export class DesignerBlueprintWorkbenchController {
+  readonly #callbacks: DesignerBlueprintWorkbenchCallbacks;
+  readonly #load: () => Promise<DesignerBlueprintWorkbenchPanelModule>;
+  #delegate: DesignerBlueprintWorkbenchPanelDelegate | undefined;
+  #loading: Promise<void> | undefined;
+  #failed = false;
   #root: ShadowRoot | undefined;
   #slot: HTMLSlotElement | undefined;
-  #defaultCanvasHost: HTMLElement | undefined;
-  #defaultCanvas: DesignerBlueprintDefaultCanvasHandle | undefined;
-  #mode: BaseScreenDesignerWorkbenchMode = 'canvas';
-  #selection: BaseScreenBlueprintCanvasSelection = null;
-  #viewRequest: BaseScreenBlueprintCanvasState['viewRequest'];
-  #viewRequestId = 0;
-  readonly #bridge: DesignerBlueprintCanvasBridge;
-  readonly #panels: DesignerBlueprintPanelsController;
-  readonly #onSlotChange = (): void => this.resolveCanvas();
+  #host: HTMLElement | undefined;
+  #initialMode: BaseScreenDesignerWorkbenchMode = 'canvas';
+  #pendingMode: PendingModeRequest | undefined;
+  #pendingVariableNodes: string[] = [];
+  #bufferedCommands: BufferedCanvasCommand[] = [];
+  #warmupFrame: number | undefined;
+  readonly #onSlotChange = (): void => this.handleSlotChange();
+  readonly #onCanvasCommand = (event: Event): void => this.bufferCanvasCommand(event);
 
-  constructor(private readonly callbacks: DesignerBlueprintWorkbenchCallbacks) {
-    this.#bridge = new DesignerBlueprintCanvasBridge({
-      getDocument: callbacks.getDocument,
-      getGraph: () => this.graph,
-      getMode: () => this.#mode,
-      getSelection: () => this.#selection,
-      getViewRequest: () => this.#viewRequest,
-      getCatalog: callbacks.getCatalog,
-      getRuntimeContributions: callbacks.getRuntimeContributions,
-      getDocumentRevision: callbacks.getDocumentRevision,
-      getProjectRevision: callbacks.getProjectRevision,
-      canUndo: callbacks.canUndo,
-      canRedo: callbacks.canRedo,
-      select: (selection, requestView) => this.select(selection, requestView),
-      executeCommand: callbacks.executeCommand,
-      undo: callbacks.undo,
-      redo: callbacks.redo,
-      render: () => this.render(),
-      emitDiagnostics: callbacks.emitDiagnostics,
-    });
-    this.#panels = new DesignerBlueprintPanelsController({
-      getDocument: callbacks.getDocument,
-      getGraph: () => this.graph,
-      getCatalog: callbacks.getCatalog,
-      getComponentLibrary: () => this.componentLibrary,
-      getSelection: () => this.#selection,
-      getDiagnostics: () => this.#bridge.stateDiagnostics(),
-      getTrace: () => this.#bridge.trace,
-      getLeftPanelGroups: callbacks.getLeftPanelGroups,
-      getMode: () => this.#mode,
-      select: (selection, requestView) => {
-        const result = this.select(selection, requestView);
-        if (!result.ok) callbacks.emitDiagnostics(result.diagnostics);
-      },
-      commitBlueprint: (blueprint) => this.#bridge.commitBlueprint(blueprint),
-      expandLeftPanel: callbacks.expandLeftPanel,
-      onActiveLeftPanelGroupChange: callbacks.onActiveLeftPanelGroupChange,
-      emitDiagnostics: callbacks.emitDiagnostics,
-    });
+  constructor(
+    callbacks: DesignerBlueprintWorkbenchCallbacks,
+    options: DesignerBlueprintWorkbenchControllerOptions = {},
+  ) {
+    this.#callbacks = callbacks;
+    this.#load = options.load ?? (() => import('./designer-blueprint-workbench-panel.js'));
   }
 
   get mode(): BaseScreenDesignerWorkbenchMode {
-    return this.#mode;
-  }
-
-  get available(): boolean {
-    return this.#bridge.canvas !== undefined;
+    return this.#delegate?.mode ?? 'canvas';
   }
 
   get selectedLeftPanelGroupId(): string | undefined {
-    return this.#panels.selectedLeftPanelGroupId;
+    return this.#delegate?.selectedLeftPanelGroupId;
   }
 
   setInitialMode(mode: BaseScreenDesignerWorkbenchMode): void {
-    this.#mode = mode;
+    this.#initialMode = mode;
+    if (this.#delegate !== undefined) {
+      this.#delegate.setInitialMode(mode);
+      return;
+    }
+    if (mode === 'blueprint') this.warmUpAfterFirstFrame();
   }
 
   connect(root: ShadowRoot): void {
-    if (this.#root === root) {
-      // 同一个 ShadowRoot 可能先承载首帧骨架、随后才换成完整工作台：
-      // 只比较 root 身份会漏掉新挂上的槽位与默认画布宿主，蓝图能力就永久不可用。
-      this.bindSlot(
-        root.querySelector<HTMLSlotElement>('[data-blueprint-canvas-slot]') ?? undefined,
-      );
-      this.#defaultCanvasHost =
-        root.querySelector<HTMLElement>('[data-blueprint-default-canvas]') ?? undefined;
-      this.mountDefaultCanvas();
-      this.#panels.connect(root);
-      this.resolveCanvas();
-      this.render();
-      return;
-    }
-    this.disconnect();
+    const sameRoot = this.#root === root;
+    if (!sameRoot) this.disconnect();
     this.#root = root;
-    this.bindSlot(root.querySelector<HTMLSlotElement>('[data-blueprint-canvas-slot]') ?? undefined);
-    this.#defaultCanvasHost =
-      root.querySelector<HTMLElement>('[data-blueprint-default-canvas]') ?? undefined;
-    this.mountDefaultCanvas();
-    this.#panels.connect(root);
-    this.#bridge.connect(this.callbacks.getHost());
-    this.resolveCanvas();
-    this.render();
-  }
-
-  /** 槽位会随骨架→工作台的替换而更换，监听必须跟着换到新槽位，否则画布增删无人响应。 */
-  private bindSlot(slot: HTMLSlotElement | undefined): void {
-    if (this.#slot === slot) return;
-    this.#slot?.removeEventListener('slotchange', this.#onSlotChange);
-    this.#slot = slot;
-    this.#slot?.addEventListener('slotchange', this.#onSlotChange);
+    this.bindSlot(root.querySelector<HTMLSlotElement>(BLUEPRINT_CANVAS_SLOT_SELECTOR) ?? undefined);
+    this.bindHost(this.#callbacks.getHost());
+    this.#delegate?.connect(root);
+    if (this.#delegate === undefined) {
+      this.renderModeTabs();
+      this.warmUpAfterFirstFrame();
+    } else if (this.#pendingMode !== undefined) {
+      this.applyPendingMode();
+    }
   }
 
   disconnect(): void {
-    this.#slot?.removeEventListener('slotchange', this.#onSlotChange);
-    this.#bridge.disconnect();
-    this.#panels.release();
-    this.#defaultCanvas?.destroy();
-    this.#defaultCanvas?.element.remove();
-    this.#defaultCanvas = undefined;
-    this.#defaultCanvasHost = undefined;
+    this.#delegate?.disconnect();
+    this.removeSlotListener();
+    this.removeHostListener();
+    this.#bufferedCommands = [];
     this.#root = undefined;
     this.#slot = undefined;
+    if (this.#warmupFrame !== undefined) {
+      cancelFrame(this.#warmupFrame);
+      this.#warmupFrame = undefined;
+    }
   }
 
   resetSession(): void {
-    this.#selection = null;
-    this.#viewRequest = undefined;
-    this.#panels.reset();
-    this.#bridge.reset();
-    this.render();
+    this.#pendingMode = undefined;
+    this.#pendingVariableNodes = [];
+    this.#delegate?.resetSession();
   }
 
   selectLeftPanelGroup(groupId: string): boolean {
-    return this.#mode === 'blueprint' && this.#panels.selectLeftPanelGroup(groupId);
+    return this.#delegate?.selectLeftPanelGroup(groupId) ?? false;
   }
 
   refreshLeftPanelGroups(): void {
-    this.#panels.refreshLeftPanelGroups();
-    this.render();
+    this.#delegate?.refreshLeftPanelGroups();
   }
 
   setMode(
@@ -164,79 +159,73 @@ export class DesignerBlueprintWorkbenchController {
     options: BaseScreenDesignerSetWorkbenchModeOptions = {},
     reason: BaseScreenDesignerWorkbenchModeChangeReason = 'api',
   ): ScreenParseResult<null> {
+    if (this.#delegate !== undefined) return this.#delegate.setMode(mode, options, reason);
     const validated = parseDesignerWorkbenchModeRequest(mode, options);
     if (!validated.ok) return validated;
-    if (mode === 'blueprint' && !this.available) {
-      return failure('BLUEPRINT_CAPABILITY_UNAVAILABLE', DESIGNER_UI_TEXT.blueprint.noHostCanvas);
+    if (mode === 'canvas') {
+      this.#pendingMode = undefined;
+      this.renderModeTabs();
+      return success(null);
     }
-    if (options.focus !== undefined) {
-      const targetId = this.resolveFocus(options.focus);
-      if (targetId === undefined) {
-        return failure('AUTHORING_REQUEST_INVALID', DESIGNER_UI_TEXT.blueprint.invalidSelection);
-      }
-      this.#selection = { kind: this.graphHasEdge(targetId) ? 'edge' : 'node', id: targetId };
-      this.#viewRequest = { id: ++this.#viewRequestId, type: 'focus', targetId };
+    if (this.#failed) {
+      return failure(
+        'BLUEPRINT_CAPABILITY_UNAVAILABLE',
+        DESIGNER_UI_TEXT.blueprint.workbenchLoadFailed,
+      );
     }
-    const previousMode = this.#mode;
-    this.#mode = mode;
-    this.render();
-    if (previousMode !== mode) this.emitModeChange(previousMode, mode, reason);
+    if (this.#pendingMode === undefined) this.#callbacks.dismissTransientSurfaces?.();
+    this.#pendingMode = { mode, options: validated.value, reason };
+    this.ensureLoaded();
+    this.renderModeTabs();
     return success(null);
   }
 
+  /** 变量面板「加入事件图」：加载后交给实现完成“插入节点 + 切到蓝图 + 聚焦”。 */
+  addVariableNode(variableId: string): void {
+    if (this.#delegate !== undefined) {
+      this.#delegate.addVariableNode(variableId);
+      return;
+    }
+    this.#pendingVariableNodes.push(variableId);
+    this.ensureLoaded();
+  }
+
   render(): void {
-    const graph = this.graph;
-    this.reconcileSelection(graph);
-    this.renderChrome();
-    this.callbacks.setWorkbenchAuthoringMode(this.#mode);
-    this.#panels.render();
-    this.#bridge.dispatchState(graph);
-    this.callbacks.onActiveLeftPanelGroupChange();
+    if (this.#delegate !== undefined) {
+      this.#delegate.render();
+      return;
+    }
+    this.renderModeTabs();
   }
 
   dispatchState(): void {
-    this.#bridge.dispatchState();
+    this.#delegate?.dispatchState();
   }
 
   onClick(target: Element): boolean {
-    const modeControl = target.closest<HTMLButtonElement>('[data-workbench-mode-tab]');
-    if (modeControl !== null) {
-      const mode = modeControl.dataset.workbenchModeTab;
-      if (mode === 'canvas' || mode === 'blueprint') {
-        const result = this.setMode(mode, {}, 'user');
-        if (!result.ok) this.callbacks.emitDiagnostics(result.diagnostics);
-      }
-      return true;
-    }
-    const paletteTarget = target.closest<HTMLElement>('[data-blueprint-search-id]')?.dataset
-      .blueprintSearchId;
-    if (paletteTarget !== undefined) {
-      const selected = this.select(
-        { kind: this.graphHasEdge(paletteTarget) ? 'edge' : 'node', id: paletteTarget },
-        true,
-      );
-      if (!selected.ok) this.callbacks.emitDiagnostics(selected.diagnostics);
-      const switched = this.setMode('blueprint', {}, 'user');
-      if (!switched.ok) this.callbacks.emitDiagnostics(switched.diagnostics);
-      return true;
-    }
-    return this.#panels.onClick(target);
+    if (this.#delegate !== undefined) return this.#delegate.onClick(target);
+    const control = target.closest<HTMLButtonElement>('[data-workbench-mode-tab]');
+    const mode = control?.dataset.workbenchModeTab;
+    if (mode !== 'canvas' && mode !== 'blueprint') return false;
+    const result = this.setMode(mode, {}, 'user');
+    if (!result.ok) this.#callbacks.emitDiagnostics(result.diagnostics);
+    return true;
   }
 
-  onInput(target: Element): boolean {
-    return this.#panels.onInput(target);
+  onInput(_target: Element): boolean {
+    return this.#delegate?.onInput(_target) ?? false;
   }
 
-  onChange(target: Element): boolean {
-    return this.#panels.onChange(target);
+  onChange(_target: Element): boolean {
+    return this.#delegate?.onChange(_target) ?? false;
   }
 
   onDragStart(event: DragEvent): boolean {
-    return this.#panels.onDragStart(event);
+    return this.#delegate?.onDragStart(event) ?? false;
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
-    if (this.#panels.onKeyDown(event)) return true;
+    if (this.#delegate !== undefined) return this.#delegate.onKeyDown(event);
     const control = (event.target as Element | null)?.closest<HTMLButtonElement>(
       '[data-workbench-mode-tab]',
     );
@@ -249,182 +238,233 @@ export class DesignerBlueprintWorkbenchController {
       ) ?? []),
     ];
     if (controls.length === 0) return true;
-    const current = controls.indexOf(control);
+    const index = controls.indexOf(control);
     const next =
       event.key === 'Home'
         ? controls[0]
         : event.key === 'End'
           ? controls.at(-1)
           : controls[
-              (current + (event.key === 'ArrowRight' ? 1 : -1) + controls.length) % controls.length
+              (index + (event.key === 'ArrowRight' ? 1 : -1) + controls.length) % controls.length
             ];
     next?.focus();
     next?.click();
     return true;
   }
 
-  private get graph(): BaseScreenBlueprintCanvasGraph {
-    const document = this.callbacks.getDocument();
-    return document === undefined
-      ? { nodes: [], edges: [] }
-      : buildDesignerBlueprintGraph(
-          document,
-          this.callbacks.getCatalog(),
-          this.callbacks.getRuntimeContributions(),
-        );
+  private ensureLoaded(): void {
+    if (this.#delegate !== undefined || this.#loading !== undefined || this.#failed) return;
+    this.#loading = this.load().finally(() => {
+      this.#loading = undefined;
+      this.renderModeTabs();
+    });
+    this.renderModeTabs();
   }
 
-  private get componentLibrary(): BaseScreenBlueprintCanvasGraph['nodes'] {
-    const document = this.callbacks.getDocument();
-    return document === undefined
-      ? []
-      : buildDesignerBlueprintComponentLibrary(
-          document,
-          this.callbacks.getCatalog(),
-          this.callbacks.getRuntimeContributions(),
-        );
-  }
-
-  private mountDefaultCanvas(): void {
-    if (this.#defaultCanvas !== undefined || this.#defaultCanvasHost === undefined) return;
-    const handle = createDesignerBlueprintDefaultCanvas(this.#defaultCanvasHost.ownerDocument);
-    this.#defaultCanvasHost.append(handle.element);
-    this.#defaultCanvas = handle;
-  }
-
-  private resolveCanvas(): void {
-    const assigned = this.#slot?.assignedElements({ flatten: true })[0];
-    const fallback = this.#defaultCanvas?.element;
-    if (fallback !== undefined) fallback.hidden = assigned !== undefined;
-    // 容器本身绝对定位铺满槽位：只在没有宿主画布时参与命中，否则会盖住宿主画布的手势区域。
-    if (this.#defaultCanvasHost !== undefined) {
-      this.#defaultCanvasHost.hidden = assigned !== undefined;
-    }
-    const next = assigned ?? fallback;
-    const previous = this.#bridge.canvas;
-    const changed = this.#bridge.setCanvas(next);
-    if (!changed) {
-      if (next === undefined && this.#mode === 'blueprint') this.fallbackToCanvas(false);
-      else {
-        this.renderChrome();
-        this.#bridge.dispatchState();
-      }
-      return;
-    }
-    if (next === undefined && this.#mode === 'blueprint') {
-      this.fallbackToCanvas(previous !== undefined);
-      return;
-    }
-    this.render();
-  }
-
-  private fallbackToCanvas(reportRemoval: boolean): void {
-    const previousMode = this.#mode;
-    this.#mode = 'canvas';
-    this.render();
-    this.emitModeChange(previousMode, 'canvas', 'fallback');
-    if (reportRemoval) {
-      this.callbacks.emitDiagnostics([
-        diagnostic('BLUEPRINT_CAPABILITY_UNAVAILABLE', DESIGNER_UI_TEXT.blueprint.noHostCanvas),
-      ]);
-    }
-  }
-
-  private select(
-    selection: BaseScreenBlueprintCanvasSelection,
-    requestView: boolean,
-  ): ScreenParseResult<null> {
-    if (selection !== null) {
-      const exists =
-        selection.kind === 'node'
-          ? this.graph.nodes.some((node) => node.id === selection.id)
-          : this.graph.edges.some((edge) => edge.id === selection.id);
-      if (!exists) {
-        return failure('AUTHORING_REQUEST_INVALID', DESIGNER_UI_TEXT.blueprint.invalidSelection);
-      }
-    }
-    this.#selection = selection;
-    if (requestView && selection !== null) {
-      this.#viewRequest = { id: ++this.#viewRequestId, type: 'focus', targetId: selection.id };
-    }
-    this.render();
-    return success(null);
-  }
-
-  private reconcileSelection(graph: BaseScreenBlueprintCanvasGraph): void {
-    if (this.#selection === null) return;
-    const exists =
-      this.#selection.kind === 'node'
-        ? graph.nodes.some((node) => node.id === this.#selection?.id)
-        : graph.edges.some((edge) => edge.id === this.#selection?.id);
-    if (!exists) this.#selection = null;
-  }
-
-  private resolveFocus(focus: BaseScreenDesignerWorkbenchFocus): string | undefined {
-    const graph = this.graph;
-    if (focus.kind === 'component') {
-      const id = `component:${focus.id}`;
-      return graph.nodes.some((node) => node.id === id) ? id : undefined;
-    }
-    if (focus.kind === 'variable') {
-      const id = `variable:${focus.id}`;
-      return graph.nodes.some((node) => node.id === id) ? id : undefined;
-    }
-    if (focus.kind === 'relation') {
-      return (
-        graph.edges.find((edge) => edge.relationId === focus.id)?.id ??
-        (this.graphHasEdge(focus.id) ? focus.id : undefined)
-      );
-    }
-    if (focus.kind === 'rule') {
-      return graph.edges.find((edge) => edge.relationId === focus.id)?.id;
-    }
-    if (graph.nodes.some((node) => node.id === focus.id) || this.graphHasEdge(focus.id)) {
-      return focus.id;
-    }
-    return undefined;
-  }
-
-  private graphHasEdge(id: string): boolean {
-    return this.graph.edges.some((edge) => edge.id === id);
-  }
-
-  private renderChrome(): void {
-    const root = this.#root;
-    if (root === undefined) return;
-    const document = this.callbacks.getDocument();
-    const problems = this.#bridge
-      .stateDiagnostics()
-      .filter((item) => item.severity === 'error').length;
-    const relations = document?.blueprint.relations ?? [];
-    renderDesignerBlueprintWorkbenchChrome(root, this.#mode, this.available, {
-      nodes: this.componentLibrary.length,
-      relations: relations.length,
-      semantic: relations.filter((relation) => relation.type === 'semantic').length,
-      structural:
-        document?.components.filter((component) => component.parentId !== null).length ?? 0,
-      problems,
+  /**
+   * 首帧后再预热，避免工作台的解析与首次渲染挤进首屏关键路径。
+   * 重复调用安全；断连时由 `disconnect()` 取消尚未执行的帧。
+   */
+  private warmUpAfterFirstFrame(): void {
+    if (this.#delegate !== undefined || this.#loading !== undefined || this.#failed) return;
+    if (this.#warmupFrame !== undefined) return;
+    if (!this.hasWarmUpSignal()) return;
+    this.#warmupFrame = requestFrame(() => {
+      this.#warmupFrame = undefined;
+      this.ensureLoaded();
     });
   }
 
-  private emitModeChange(
-    previousMode: BaseScreenDesignerWorkbenchMode,
-    mode: BaseScreenDesignerWorkbenchMode,
-    reason: BaseScreenDesignerWorkbenchModeChangeReason,
-  ): void {
-    this.callbacks
-      .getHost()
-      .dispatchEvent(
-        new CustomEvent<BaseScreenDesignerWorkbenchModeChangeEventDetail>(
-          BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT,
-          { bubbles: true, composed: true, detail: { previousMode, mode, reason } },
-        ),
+  private hasWarmUpSignal(): boolean {
+    return this.#initialMode === 'blueprint' || this.assignedCanvas() !== undefined;
+  }
+
+  private async load(): Promise<void> {
+    let module: DesignerBlueprintWorkbenchPanelModule;
+    try {
+      module = await this.#load();
+    } catch {
+      this.markFailed();
+      return;
+    }
+    let panel: DesignerBlueprintWorkbenchPanelDelegate;
+    try {
+      panel = new module.DesignerBlueprintWorkbenchPanel(this.#callbacks);
+    } catch {
+      this.markFailed();
+      return;
+    }
+    this.#delegate = panel;
+    this.clearBusyState();
+    panel.setInitialMode(this.#initialMode);
+    const root = this.#root;
+    if (root !== undefined) panel.connect(root);
+    this.removeHostListener();
+    this.replayBufferedCommands();
+    if (this.#pendingMode !== undefined) this.applyPendingMode();
+    for (const variableId of this.#pendingVariableNodes.splice(0))
+      panel.addVariableNode(variableId);
+    this.renderModeTabs();
+  }
+
+  private applyPendingMode(): void {
+    const pending = this.#pendingMode;
+    if (pending === undefined || this.#delegate === undefined) return;
+    this.#pendingMode = undefined;
+    const result = this.#delegate.setMode(pending.mode, pending.options, pending.reason);
+    if (!result.ok) this.#callbacks.emitDiagnostics(result.diagnostics);
+  }
+
+  private markFailed(): void {
+    this.#failed = true;
+    this.#pendingMode = undefined;
+    this.#pendingVariableNodes = [];
+    this.#bufferedCommands = [];
+    this.removeHostListener();
+    this.renderModeTabs();
+    this.#callbacks.emitDiagnostics([
+      {
+        severity: 'error',
+        code: 'BLUEPRINT_CAPABILITY_UNAVAILABLE',
+        path: [],
+        message: DESIGNER_UI_TEXT.blueprint.workbenchLoadFailed,
+      },
+    ]);
+  }
+
+  /**
+   * 未加载时页签仍由门面维护：蓝图页签可用性只取决于槽位/默认画布宿主是否存在，
+   * 不触发工作台加载。只改属性，不改几何，避免加载态引入位移。
+   */
+  private renderModeTabs(): void {
+    const root = this.#root;
+    if (root === undefined || this.#delegate !== undefined) return;
+    const available = this.isCanvasAvailable(root);
+    const busy = this.#loading !== undefined;
+    for (const control of root.querySelectorAll<HTMLButtonElement>('[data-workbench-mode-tab]')) {
+      const controlMode = control.dataset.workbenchModeTab;
+      const active = controlMode === 'canvas';
+      const unavailable = controlMode === 'blueprint' && (!available || this.#failed);
+      control.disabled = unavailable;
+      control.dataset.active = String(active);
+      control.setAttribute('aria-selected', String(active));
+      control.tabIndex = active ? 0 : -1;
+      if (controlMode === 'blueprint') {
+        control.setAttribute('aria-busy', String(busy && !this.#failed));
+      }
+      const tip =
+        controlMode === 'blueprint' && this.#failed
+          ? DESIGNER_UI_TEXT.blueprint.workbenchLoadFailed
+          : unavailable
+            ? DESIGNER_UI_TEXT.interactionWorkspaceUnavailable
+            : controlMode === 'blueprint'
+              ? DESIGNER_UI_TEXT.interactionWorkspaceHint
+              : DESIGNER_UI_TEXT.canvasWorkspace;
+      if (control.dataset.tip !== tip) {
+        control.setAttribute('data-tip', tip);
+        control.ariaLabel = tip;
+      }
+    }
+  }
+
+  private clearBusyState(): void {
+    const root = this.#root;
+    if (root === undefined) return;
+    for (const control of root.querySelectorAll<HTMLButtonElement>('[data-workbench-mode-tab]')) {
+      control.setAttribute('aria-busy', 'false');
+    }
+  }
+
+  private isCanvasAvailable(root: ShadowRoot): boolean {
+    return (
+      this.assignedCanvas(root) !== undefined ||
+      root.querySelector('[data-blueprint-default-canvas]') !== null
+    );
+  }
+
+  private assignedCanvas(root: ShadowRoot | undefined = this.#root): Element | undefined {
+    const slot =
+      this.#slot ??
+      root?.querySelector<HTMLSlotElement>(BLUEPRINT_CANVAS_SLOT_SELECTOR) ??
+      undefined;
+    return slot?.assignedElements({ flatten: true })[0];
+  }
+
+  private bindSlot(slot: HTMLSlotElement | undefined): void {
+    if (this.#slot === slot) return;
+    this.removeSlotListener();
+    this.#slot = slot;
+    this.#slot?.addEventListener('slotchange', this.#onSlotChange);
+  }
+
+  private removeSlotListener(): void {
+    this.#slot?.removeEventListener('slotchange', this.#onSlotChange);
+    this.#slot = undefined;
+  }
+
+  private bindHost(host: HTMLElement): void {
+    if (this.#host === host) return;
+    this.removeHostListener();
+    this.#host = host;
+    host.addEventListener(BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT, this.#onCanvasCommand);
+  }
+
+  private removeHostListener(): void {
+    this.#host?.removeEventListener(
+      BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
+      this.#onCanvasCommand,
+    );
+    this.#host = undefined;
+  }
+
+  private handleSlotChange(): void {
+    this.renderModeTabs();
+    if (this.#delegate !== undefined) return;
+    this.warmUpAfterFirstFrame();
+  }
+
+  /**
+   * 工作台未就绪时，宿主画布可能已经发出 `ready` 等命令。按到达顺序缓存（有界），
+   * 在画布桥接连接后重放，保证宿主画布不会因为异步加载漏掉首批命令。
+   */
+  private bufferCanvasCommand(event: Event): void {
+    if (this.#delegate !== undefined) return;
+    const canvas = this.assignedCanvas();
+    if (canvas === undefined || !event.composedPath().includes(canvas)) return;
+    if (this.#bufferedCommands.length >= MAX_BUFFERED_CANVAS_COMMANDS) {
+      this.#bufferedCommands.shift();
+    }
+    this.#bufferedCommands.push({ canvas, detail: (event as CustomEvent<unknown>).detail });
+  }
+
+  private replayBufferedCommands(): void {
+    const buffered = this.#bufferedCommands;
+    this.#bufferedCommands = [];
+    for (const { canvas, detail } of buffered) {
+      canvas.dispatchEvent(
+        new CustomEvent(BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT, {
+          bubbles: true,
+          composed: true,
+          detail,
+        }),
       );
+    }
   }
 }
 
-function diagnostic(code: ScreenDiagnostic['code'], message: string): ScreenDiagnostic {
-  return { severity: 'error', code, path: [], message };
+function requestFrame(callback: () => void): number {
+  if (typeof globalThis.requestAnimationFrame === 'function') {
+    return globalThis.requestAnimationFrame(callback);
+  }
+  return globalThis.setTimeout(callback, 0) as unknown as number;
+}
+
+function cancelFrame(frame: number): void {
+  if (typeof globalThis.cancelAnimationFrame === 'function') {
+    globalThis.cancelAnimationFrame(frame);
+    return;
+  }
+  globalThis.clearTimeout(frame);
 }
 
 function success<T>(value: T): ScreenParseResult<T> {
@@ -432,5 +472,5 @@ function success<T>(value: T): ScreenParseResult<T> {
 }
 
 function failure<T>(code: ScreenDiagnostic['code'], message: string): ScreenParseResult<T> {
-  return { ok: false, diagnostics: [diagnostic(code, message)] };
+  return { ok: false, diagnostics: [{ severity: 'error', code, path: [], message }] };
 }

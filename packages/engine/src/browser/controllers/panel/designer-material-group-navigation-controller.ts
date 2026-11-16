@@ -46,6 +46,11 @@ export class DesignerMaterialGroupNavigationController {
     this.#view = undefined;
   }
 
+  /** 切换工作台模式前立即收起分组弹层，不依赖后续面板重渲染。 */
+  dismissTransient(): void {
+    this.#popover.close(false);
+  }
+
   onClick(target: Element): boolean {
     if (this.#view === undefined || this.#layout === undefined) return false;
     const control = target.closest<HTMLElement>('[data-material-group-action]');

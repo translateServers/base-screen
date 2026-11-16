@@ -119,6 +119,7 @@ export const DESIGNER_BLUEPRINT_UI_TEXT = {
   noSourceVariables: '当前没有其他可用变量。',
   conditionOperatorLabel: '条件操作符',
   noHostCanvas: '蓝图画布暂不可用。',
+  workbenchLoadFailed: '事件工作台加载失败，请刷新页面后重试。',
   canvasSurface: {
     toolbar: '蓝图画布工具栏',
     addNode: '新增节点',
