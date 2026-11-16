@@ -34,6 +34,9 @@ describe('API report checks', () => {
         "---\n'@base-screen/engine': minor\n@base-screen/sdk: patch\n---\n",
       ),
     ]).toEqual(['@base-screen/engine', '@base-screen/sdk']);
+    expect([
+      ...parseChangesetPackages("---\nbase-screen: patch\n'@base-screen/sdk': patch\n---\n"),
+    ]).toEqual(['base-screen', '@base-screen/sdk']);
     expect(parseChangesetPackages('No frontmatter')).toEqual(new Set());
   });
 
