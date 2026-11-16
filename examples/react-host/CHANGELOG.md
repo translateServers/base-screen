@@ -1,5 +1,15 @@
 # @base-screen-example/react-host
 
+## 0.0.2
+
+### Patch Changes
+
+- Updated dependencies [525acda]
+- Updated dependencies [3647b6c]
+- Updated dependencies
+  - base-screen@0.2.0
+  - @base-screen/react@0.2.0
+
 ## 0.0.1
 
 ### Patch Changes

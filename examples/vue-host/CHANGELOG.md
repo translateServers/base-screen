@@ -1,5 +1,15 @@
 # @base-screen-example/vue-host
 
+## 0.0.2
+
+### Patch Changes
+
+- Updated dependencies [525acda]
+- Updated dependencies [3647b6c]
+- Updated dependencies
+  - base-screen@0.2.0
+  - @base-screen/vue@0.2.0
+
 ## 0.0.1
 
 ### Patch Changes
