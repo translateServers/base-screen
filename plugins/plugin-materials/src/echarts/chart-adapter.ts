@@ -1,47 +1,14 @@
-import {
-  BarChart,
-  GaugeChart,
-  HeatmapChart,
-  LineChart,
-  PieChart,
-  RadarChart,
-  ScatterChart,
-} from 'echarts/charts';
-import {
-  GridComponent,
-  LegendComponent,
-  RadarComponent,
-  TitleComponent,
-  TooltipComponent,
-  VisualMapComponent,
-} from 'echarts/components';
-import * as echarts from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
-
 /**
- * 按需注册而不是 `import * from 'echarts'`：示例只需要四种图型与基础交互，
- * 整包会把地图、关系图、3D 等全部打进宿主产物。tree-shaken 后只保留
- * line/bar/pie + grid/legend/title/tooltip + canvas 渲染器。
+ * 图表渲染 adapter 的惰性入口。
+ *
+ * ECharts 的体积远大于本插件的其它物料，静态 import 会让任何引入本插件的宿主在首屏
+ * 就下载并解析整包——哪怕文档里一个图表都没有。因此这里只保留 JSON-safe 的 handle
+ * 接口，真正的 `echarts/*` 依赖放在 `echarts-runtime.ts`，等首个图表实例化时才动态
+ * import 拉取。
+ *
+ * 单飞（single-flight）：模块级缓存同一个 Promise，同屏多个图表并发插入只触发一次
+ * 加载；运行期模块本身只求值一次，`echarts.use()` 的按需注册也只执行一次。
  */
-echarts.use([
-  LineChart,
-  BarChart,
-  PieChart,
-  GaugeChart,
-  RadarChart,
-  ScatterChart,
-  HeatmapChart,
-  RadarComponent,
-  VisualMapComponent,
-  GridComponent,
-  LegendComponent,
-  TitleComponent,
-  TooltipComponent,
-  CanvasRenderer,
-]);
-
-// 第三方类型只出现在本文件内部：对外只暴露 handle 接口与 JSON-safe 载荷。
-type ChartOption = Parameters<ReturnType<typeof echarts.init>['setOption']>[0];
 
 export interface EchartsSeriesClickPayload {
   readonly seriesIndex: number;
@@ -58,42 +25,19 @@ export interface EchartsChartHandle {
   onSeriesClick(listener: (payload: EchartsSeriesClickPayload) => void): void;
 }
 
-export function createEchartsChartHandle(host: HTMLElement): EchartsChartHandle {
-  const chart = echarts.init(host);
-  const listeners = new Set<(payload: EchartsSeriesClickPayload) => void>();
+export interface EchartsChartAdapter {
+  createChartHandle(host: HTMLElement): EchartsChartHandle;
+}
 
-  chart.on('click', (params: unknown) => {
-    const detail = params as Partial<{
-      seriesIndex: number;
-      seriesName: string;
-      dataIndex: number;
-      name: string;
-      value: number;
-    }>;
-    for (const listener of listeners) {
-      listener({
-        seriesIndex: typeof detail.seriesIndex === 'number' ? detail.seriesIndex : 0,
-        seriesName: typeof detail.seriesName === 'string' ? detail.seriesName : '',
-        pointIndex: typeof detail.dataIndex === 'number' ? detail.dataIndex : 0,
-        x: typeof detail.name === 'string' ? detail.name : '',
-        y: typeof detail.value === 'number' ? detail.value : 0,
-      });
-    }
-  });
+let adapterPromise: Promise<EchartsChartAdapter> | undefined;
 
-  return {
-    render(option: unknown): void {
-      chart.setOption(option as ChartOption, true);
-    },
-    resize(): void {
-      chart.resize();
-    },
-    dispose(): void {
-      listeners.clear();
-      chart.dispose();
-    },
-    onSeriesClick(listener: (payload: EchartsSeriesClickPayload) => void): void {
-      listeners.add(listener);
-    },
-  };
+/**
+ * 加载 ECharts 运行期。并发调用共享同一次动态 import；失败结果同样被缓存，
+ * 由调用方按物料降级路径呈现，不做隐式重试（避免每帧重复请求失败的分包）。
+ */
+export function loadEchartsChartAdapter(): Promise<EchartsChartAdapter> {
+  adapterPromise ??= import('./echarts-runtime.js').then((module) => ({
+    createChartHandle: module.createEchartsChartHandle,
+  }));
+  return adapterPromise;
 }
