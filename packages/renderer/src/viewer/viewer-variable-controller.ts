@@ -21,6 +21,8 @@ export interface ViewerVariableControllerHost {
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
   /** 一次渲染尝试落定（成功或失败）后回调；Viewer 用它撤掉首帧骨架。 */
   readonly onRenderSettled?: () => void;
+  /** 文档装载/替换后的成功渲染回调；Viewer 用它发射 `lifecycle:ready`（每文档至多一次）。 */
+  readonly onDocumentRendered?: () => void;
 }
 
 /**
@@ -261,6 +263,9 @@ export class ViewerVariableController {
       if (!forceRefresh) this.#hasRenderedDocument = true;
       if (forceRefresh) {
         renderer.refreshData(componentId, trigger === 'polling' ? 'polling' : 'manual', traceId);
+      } else {
+        // 文档装载/替换后的首个成功渲染：是否发射 ready 由 Viewer 按文档去重决定。
+        this.#host.onDocumentRendered?.();
       }
     } finally {
       this.#rendering = false;

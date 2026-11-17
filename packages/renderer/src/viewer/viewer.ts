@@ -28,6 +28,7 @@ import type {
 } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer, createBaseScreenRenderer } from '../renderer/renderer.js';
 import { applyBlueprintDispatchToRenderer } from './viewer-blueprint-runtime.js';
+import { ViewerBlueprintTimerScheduler } from './viewer-blueprint-timer-scheduler.js';
 import {
   type BaseScreenViewerConfiguration,
   type BaseScreenViewerRefreshOptions,
@@ -75,6 +76,8 @@ export class BaseScreenViewerElement extends ElementBase {
   #skeleton: HTMLDivElement | undefined;
   #skeletonStyle: HTMLStyleElement | undefined;
   #rendered = false;
+  /** 当前文档是否已发射过 `lifecycle:ready`；装载/替换时重新武装，变量刷新不重复。 */
+  #lifecycleReadyFired = false;
   #projectId: string | undefined;
   #documentRevision: string | undefined;
   readonly #variableHandles = new ViewerVariableHandles({
@@ -93,10 +96,15 @@ export class BaseScreenViewerElement extends ElementBase {
     },
     emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
     onRenderSettled: () => this.markRendered(),
+    onDocumentRendered: () => this.fireLifecycleReady(),
   });
   readonly #scheduler = new ViewerDataSourceScheduler({
     readRenderer: () => this.#renderer,
     readDocument: () => this.#document,
+  });
+  readonly #blueprintTimers = new ViewerBlueprintTimerScheduler({
+    dispatch: (intervalSeconds) =>
+      this.handleBlueprintEvent({ type: 'timer', name: 'tick', intervalSeconds, payload: null }),
   });
 
   /**
@@ -309,6 +317,8 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#scheduler.suspend();
     this.#renderer?.resetBlueprintVisibility();
     this.#document = value;
+    // 装载/替换重新武装 ready：新文档首个成功渲染再发一次；同一文档的变量刷新不重置。
+    this.#lifecycleReadyFired = false;
     this.compileBlueprint();
     if (value !== undefined) this.ensureSkeleton();
     this.initialize();
@@ -328,12 +338,15 @@ export class BaseScreenViewerElement extends ElementBase {
     this.initialize();
     this.#variableRuntime.start(undefined, false, true);
     this.#scheduler.resume();
+    // 断开期间定时器全部停止，重连按当前计划重新挂载（相位从头开始，不补跑）。
+    this.syncBlueprintTimers();
   }
 
   disconnectedCallback(): void {
     this.#scheduler.suspend();
     this.#variableRuntime.cancel();
     this.#renderer?.clear();
+    this.#blueprintTimers.stop();
   }
 
   unload(): void {
@@ -342,6 +355,7 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#variableHandles.clear();
     this.disposeRenderer();
     this.#document = undefined;
+    this.#lifecycleReadyFired = false;
     this.compileBlueprint();
     this.#rendered = false;
   }
@@ -458,6 +472,7 @@ export class BaseScreenViewerElement extends ElementBase {
     if (this.#document === undefined) {
       this.#blueprintPlan = undefined;
       this.#blueprintVariables = undefined;
+      this.#blueprintTimers.stop();
       return;
     }
     const compiled = compileScreenBlueprint(
@@ -467,6 +482,7 @@ export class BaseScreenViewerElement extends ElementBase {
     if (!compiled.ok) {
       this.#blueprintPlan = undefined;
       this.#blueprintVariables = undefined;
+      this.#blueprintTimers.stop();
       this.dispatchEvent(
         new CustomEvent('base-screen-diagnostic', {
           detail: { diagnostics: compiled.diagnostics },
@@ -476,6 +492,32 @@ export class BaseScreenViewerElement extends ElementBase {
     }
     this.#blueprintPlan = compiled.value;
     this.#blueprintVariables = compiled.value.initialVariables;
+    this.syncBlueprintTimers();
+  }
+
+  /** 按当前计划的 timer 触发间隔增删间隔计时器；无 timer 规则时不创建任何计时器。 */
+  private syncBlueprintTimers(): void {
+    const plan = this.#blueprintPlan;
+    if (plan === undefined) {
+      this.#blueprintTimers.stop();
+      return;
+    }
+    this.#blueprintTimers.sync(
+      plan.rules.flatMap((rule) =>
+        rule.trigger.type === 'timer' ? [rule.trigger.intervalSeconds] : [],
+      ),
+    );
+  }
+
+  /**
+   * 文档就绪：每个文档装载/替换后的首个成功渲染发射一次 `lifecycle:ready`。
+   * 与 Designer 的口径一致——编辑/变量导致的重渲染不重复发射，装载/替换在
+   * document setter 里重新武装；蓝图编译失败（无计划）时不发射。
+   */
+  private fireLifecycleReady(): void {
+    if (this.#blueprintPlan === undefined || this.#lifecycleReadyFired) return;
+    this.#lifecycleReadyFired = true;
+    this.handleBlueprintEvent({ type: 'lifecycle', name: 'ready', payload: null });
   }
 
   private handleMaterialEvent(event: {
