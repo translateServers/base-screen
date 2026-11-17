@@ -20,4 +20,12 @@
 - [宿主素材库与图片选择器 · OpenDesign Brief](./design/host-asset-library-opendesign-brief.md)
 - [蓝图关系视图 · 设计说明](./design/blueprint-relations.md)
 
+## 竞品调研
+
+- [大屏设计器竞品调研总览 · 2026-11-16](./research/competitor-survey-2026-11-16/README.md)
+  （LIGHT CHASER 与 GoViewPro，含 8 条可落地建议与证据等级标记）
+
+调研文档是外部产品的观察记录与推演，不是本仓库的规范；其中「如何实现」的结论一律标 `[推测]`，
+与 ADR 的决策地位不同，引用时以对应包的公共导出和 AGENTS.md 为准。
+
 ADR-0089、ADR-0090 与 ADR-0091 的引擎公共 API、示例后端与三端宿主实现均已落地；后续批次按各 ADR 的“实施切片”继续补充。
