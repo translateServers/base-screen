@@ -297,7 +297,12 @@ function parseControlValue(
     const value = Number(target.value);
     return Number.isFinite(value) ? value : undefined;
   }
-  if (control.control === 'select' && resolved?.kind === 'enum') {
+  if (
+    (control.control === 'select' || control.control === 'segmented') &&
+    resolved?.kind === 'enum'
+  ) {
+    // segmented 与 select 共用原生 select 作为值载体（值一律字符串化），
+    // 因此还原原始枚举值必须走同一条映射，否则数字/布尔枚举会写回字符串。
     return resolved.values.find((candidate) => String(candidate) === target.value);
   }
   if (control.control === 'json') {

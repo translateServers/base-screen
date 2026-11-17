@@ -158,6 +158,60 @@ describe('AE-ED-C03 descriptor transactions write canonical paths', () => {
     }
   });
 
+  it('restores original enum scalar types for segmented controls', () => {
+    // segmented 与 select 共用原生 select 作值载体（值恒为字符串），提交时必须走
+    // 同一条 schema 枚举反序列化，否则数字/布尔枚举会以字符串写回而被事务拒绝。
+    const segmentedSchema = {
+      kind: 'object' as const,
+      properties: {
+        mode: { kind: 'enum' as const, values: ['compact', 'full'] },
+        tier: { kind: 'enum' as const, values: [1, 2] },
+        enabled: { kind: 'enum' as const, values: [true, false] },
+      },
+      required: [],
+    };
+    const segmentedDocument: ScreenDocument = {
+      ...document,
+      components: [
+        {
+          ...document.components[0]!,
+          props: { mode: 'compact', tier: 1, enabled: true },
+        },
+      ],
+    };
+    const cases = [
+      { id: 'mode', raw: 'full', expected: 'full', kind: 'string' },
+      { id: 'tier', raw: '2', expected: 2, kind: 'number' },
+      { id: 'enabled', raw: 'false', expected: false, kind: 'boolean' },
+    ] as const;
+
+    for (const item of cases) {
+      const control = new FakeControl(
+        {
+          descriptorFieldId: item.id,
+          descriptorTarget: 'props',
+          descriptorPath: JSON.stringify([item.id]),
+          descriptorControl: 'segmented',
+        },
+        item.raw,
+      );
+      const result = createDescriptorFieldTransaction(
+        control as unknown as EventTarget,
+        segmentedDocument,
+        interaction,
+        catalog(segmentedSchema),
+      );
+      expect(result?.ok, `segmented ${item.id} transaction`).toBe(true);
+      if (!result?.ok) continue;
+      const command = result.value.commands[0];
+      expect(command?.type, `segmented ${item.id} command`).toBe('update-components');
+      if (command?.type !== 'update-components') continue;
+      const written = (command.patch.props as Record<string, unknown>)[item.id];
+      expect(written, `segmented ${item.id} value`).toBe(item.expected);
+      expect(typeof written, `segmented ${item.id} type`).toBe(item.kind);
+    }
+  });
+
   it('writes style and boolean fields with schema validation', () => {
     const booleanControl = new FakeControl(
       {
