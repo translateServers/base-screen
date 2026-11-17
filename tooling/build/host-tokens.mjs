@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-// 宿主公共令牌层生成器（方案 B，见 docs/design/host-public-tokens.md）。
+// 宿主公共令牌层生成器（方案 B）。
 //
 // 唯一真源是 packages/engine/src/browser/styles/designer-tokens.css：这里只声明「公共名 → 源令牌」
 // 的映射与固定输出顺序，值全部从源文件读取，绝不手写字面量。生成物提交仓库，由
@@ -279,7 +279,7 @@ export function renderHostTokens() {
   return [
     '/* 宿主公共令牌层（--bs-host-*），由 tooling/build/host-tokens.mjs 从',
     '   packages/engine/src/browser/styles/designer-tokens.css 生成，勿手改。',
-    '   契约：名字是公共 API，值随视觉调优演进而变；说明见 docs/design/host-public-tokens.md。 */',
+    '   契约：名字是公共 API，值随视觉调优演进而变。 */',
     '',
     '/* 深色（默认）：与设计器裸 :host 主题一致。这里只声明自定义属性 + color-scheme，',
     '   不写任何组件样式，也不改宿主元素的既有表现。 */',

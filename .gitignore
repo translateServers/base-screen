@@ -27,6 +27,7 @@ packages/*/LICENSE
 .schema-build/
 .trae
 .zcode
-.base-screen/local/
+# 本地研发工作区（日志、能力清单、草稿）：不进版本库
+.base-screen/
 .local/
 .qoder/

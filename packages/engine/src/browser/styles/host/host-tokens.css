@@ -1,6 +1,6 @@
 /* 宿主公共令牌层（--bs-host-*），由 tooling/build/host-tokens.mjs 从
    packages/engine/src/browser/styles/designer-tokens.css 生成，勿手改。
-   契约：名字是公共 API，值随视觉调优演进而变；说明见 docs/design/host-public-tokens.md。 */
+   契约：名字是公共 API，值随视觉调优演进而变。 */
 
 /* 深色（默认）：与设计器裸 :host 主题一致。这里只声明自定义属性 + color-scheme，
    不写任何组件样式，也不改宿主元素的既有表现。 */

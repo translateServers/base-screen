@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HostTokenError, hostThemeTokenNames, renderHostTokens } from '../build/host-tokens.mjs';
 
-// 宿主公共令牌层的门禁（方案 B，见 docs/design/host-public-tokens.md）。
+// 宿主公共令牌层的门禁（方案 B）。
 //
 // 与 designer-styles.mjs 的 publicTokens 是两套契约，不要合并：
 // - publicTokens 守「宿主能否改引擎颜色」（--base-screen-designer-* 覆盖位的完整性）；
