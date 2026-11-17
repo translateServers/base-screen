@@ -55,6 +55,19 @@ export function applyMaterialFrame(
       ? String(Math.min(1, Math.max(0, model.style.opacity)))
       : '';
   if (style.opacity !== opacity) style.opacity = opacity;
+  applyMaterialHostStyle(element, model);
+}
+
+/**
+ * 宿主级保留样式：`passThrough` / `hoverPointer` / `clip` / `blend` 与滤镜系列由引擎
+ * 写到物料宿主元素上，物料本身不消费它们。样式-only 刷新（条件样式重算）只需重跑
+ * 这一段——不重写几何、display、zIndex，因此不会打断画布手势或造成布局抖动。
+ */
+export function applyMaterialHostStyle(
+  element: BaseScreenMaterialElement,
+  model: BaseScreenMaterialModel,
+): void {
+  const style = element.style;
   // 行为 / 滤镜是引擎级保留键：物料不接管这些宿主级 CSS，渲染器统一写、同值守卫。
   const pointerEvents = model.style.passThrough === true ? 'none' : '';
   if (style.pointerEvents !== pointerEvents) style.pointerEvents = pointerEvents;

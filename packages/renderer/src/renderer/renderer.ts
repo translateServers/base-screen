@@ -227,7 +227,13 @@ class Renderer implements BaseScreenRenderer {
       const existing = this.#state.mounted.get(candidate.component.id);
       if (existing !== undefined && existing.type === candidate.component.type) {
         try {
-          reconcileMountedMaterial(this.#state, candidate, existing, stackOrder);
+          reconcileMountedMaterial(
+            this.#state,
+            candidate,
+            existing,
+            stackOrder,
+            parsedDocument.value,
+          );
         } catch {
           runtimeDiagnostics.push(
             renderFailure(candidate, 'Material model update raised an exception.'),
@@ -278,7 +284,7 @@ class Renderer implements BaseScreenRenderer {
         onEvent,
         projection: createMountedProjectionState(),
         stackOrder,
-        applied: appliedModelKeyOf(this.#state, candidate, stackOrder),
+        applied: appliedModelKeyOf(this.#state, candidate, stackOrder, parsedDocument.value),
         appliedModel: mountedModel,
       };
       mounted.projection.dataState = candidate.model.dataState;
@@ -462,6 +468,8 @@ class Renderer implements BaseScreenRenderer {
 
   refreshConditionalStyles(componentIds?: readonly string[]): void {
     if (this.#state.disposed || this.#state.options.conditionalStylePort === undefined) return;
+    const document = this.#state.document;
+    if (document === undefined) return;
     const ids =
       componentIds === undefined ? [...this.#state.mounted.keys()] : [...new Set(componentIds)];
     for (const componentId of ids) {
@@ -469,7 +477,7 @@ class Renderer implements BaseScreenRenderer {
       const mounted = this.#state.mounted.get(componentId);
       if (candidate === undefined || mounted === undefined) continue;
       try {
-        applyMountedConditionalStyle(this.#state, candidate, mounted);
+        applyMountedConditionalStyle(this.#state, candidate, mounted, document);
       } catch {
         this.#state.options.onDiagnostic?.(
           diagnostic(
@@ -601,7 +609,7 @@ class Renderer implements BaseScreenRenderer {
       }
       mounted.projection.dataState = resolved.dataState;
       mounted.projection.projectionKey = resolved.dataSource?.projectionKey;
-      applyMountedModel(this.#state, nextCandidate, mounted, mounted.stackOrder);
+      applyMountedModel(this.#state, nextCandidate, mounted, mounted.stackOrder, document);
     }
   }
 }

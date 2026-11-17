@@ -86,9 +86,10 @@ export function prepareCandidates(
     const cached = validationCache.entries.get(component);
     let props: ScreenJsonObject;
     let style: ScreenJsonObject;
-    if (cached !== undefined && cached.entry === entry) {
-      // 同一组件引用 + 同一 catalog entry：props/style/styleRules 已在先前
-      // 渲染完整通过 schema 校验（缓存只写入全量成功项），直接复用结果。
+    if (cached !== undefined && cached.entry === entry && cached.theme === document.theme) {
+      // 同一组件引用 + 同一 catalog entry + 同一主题：props/style/styleRules 已在
+      // 先前渲染完整通过 schema 校验（缓存只写入全量成功项），直接复用结果。
+      // 主题必须参与命中判定——缓存里的 style 已是 theme:<slot> 的解析结果。
       props = cached.props;
       style = cached.style;
       nextEntries.set(component, cached);
@@ -169,7 +170,7 @@ export function prepareCandidates(
       }
       props = validatedProps.value;
       style = themed.style;
-      nextEntries.set(component, { entry, props, style });
+      nextEntries.set(component, { entry, theme: document.theme, props, style });
     }
     const resolved = readComponentData(dataSources, component, entry, contributionIndex, [
       'components',

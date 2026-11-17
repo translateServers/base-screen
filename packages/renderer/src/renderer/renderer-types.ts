@@ -1,4 +1,4 @@
-import type { ScreenComponentNode, ScreenJsonObject } from '@base-screen/contracts';
+import type { ScreenComponentNode, ScreenDocument, ScreenJsonObject } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialElement,
@@ -52,6 +52,11 @@ export type AppliedModelKey = {
   readonly stackOrder: number;
   readonly hidden: boolean;
   readonly dataEpoch: unknown;
+  /**
+   * 主题参与守卫：`theme:<slot>` 的解析结果随文档 palette 变化，而组件与 catalog
+   * entry 可以保持同一引用，因此主题不进签名会让 `update-theme` 后沿用旧色。
+   */
+  readonly theme: ScreenDocument['theme'];
 };
 
 // 组件级校验缓存：同一组件引用 + 同一 catalog entry 表示 props/style/styleRules
@@ -59,6 +64,8 @@ export type AppliedModelKey = {
 // 每次渲染按当前文档重建缓存表，条目数以当前组件数为上界。
 export type CachedComponentValidation = {
   readonly entry: BaseScreenMaterialCatalogEntry;
+  /** 缓存里的 style 已是 `theme:<slot>` 解析后的颜色，主题变化必须视为未命中。 */
+  readonly theme: ScreenDocument['theme'];
   readonly props: ScreenJsonObject;
   readonly style: ScreenJsonObject;
 };

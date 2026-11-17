@@ -1,9 +1,11 @@
+import type { ScreenDocument } from '@base-screen/contracts';
 import { parseBaseScreenMaterialEventDetail } from '@base-screen/plugin-core';
 import { resolveEffectiveModel } from './renderer-effective-style.js';
 import {
   applyMaterial,
   applyMaterialDisplay,
   applyMaterialFrame,
+  applyMaterialHostStyle,
 } from './renderer-material-dom.js';
 import type { RendererState } from './renderer-state.js';
 import type { AppliedModelKey, MountedMaterial, RenderCandidate } from './renderer-types.js';
@@ -20,11 +22,12 @@ export function reconcileMountedMaterial(
   candidate: RenderCandidate,
   mounted: MountedMaterial,
   stackOrder: number,
+  document: ScreenDocument,
 ): void {
   mounted.stackOrder = stackOrder;
   mounted.projection.projectionKey = candidate.dataSource?.projectionKey;
   mounted.projection.dataState = candidate.model.dataState;
-  const applied = appliedModelKeyOf(state, candidate, stackOrder);
+  const applied = appliedModelKeyOf(state, candidate, stackOrder, document);
   if (
     mounted.applied !== undefined &&
     mounted.appliedModel !== undefined &&
@@ -34,16 +37,21 @@ export function reconcileMountedMaterial(
     applyMaterialDisplay(mounted.element, state.visibility.isHidden(candidate.component.id));
     return;
   }
-  applyMountedModel(state, candidate, mounted, stackOrder);
+  applyMountedModel(state, candidate, mounted, stackOrder, document);
 }
 
+/**
+ * 复用路径必须显式接收本次渲染的文档：`state.document` 要到本次 render 末尾才更新，
+ * 从这里读主题会按上一份文档的 palette 解析条件样式与 `theme:<slot>`。
+ */
 export function applyMountedModel(
   state: RendererState,
   candidate: RenderCandidate,
   mounted: MountedMaterial,
   stackOrder: number,
+  document: ScreenDocument,
 ): void {
-  const model = resolveEffectiveModel(state, candidate, candidate.model.dataState, state.document);
+  const model = resolveEffectiveModel(state, candidate, candidate.model.dataState, document);
   applyMaterial(
     mounted.element,
     candidate.component,
@@ -51,7 +59,7 @@ export function applyMountedModel(
     state.visibility.isHidden(candidate.component.id),
     stackOrder,
   );
-  mounted.applied = appliedModelKeyOf(state, candidate, stackOrder);
+  mounted.applied = appliedModelKeyOf(state, candidate, stackOrder, document);
   mounted.appliedModel = model;
 }
 
@@ -59,6 +67,7 @@ export function appliedModelKeyOf(
   state: RendererState,
   candidate: RenderCandidate,
   stackOrder: number,
+  document: ScreenDocument,
 ): AppliedModelKey {
   return {
     component: candidate.component,
@@ -67,6 +76,7 @@ export function appliedModelKeyOf(
     stackOrder,
     hidden: state.visibility.isHidden(candidate.component.id),
     dataEpoch: candidate.dataEpoch,
+    theme: document.theme,
   };
 }
 
@@ -77,13 +87,17 @@ function sameAppliedModelKey(left: AppliedModelKey, right: AppliedModelKey): boo
     left.interactive === right.interactive &&
     left.stackOrder === right.stackOrder &&
     left.hidden === right.hidden &&
-    left.dataEpoch === right.dataEpoch
+    left.dataEpoch === right.dataEpoch &&
+    left.theme === right.theme
   );
 }
 
 /**
- * 宿主告警状态变化后的样式-only 重算：只重写 effective model，不碰几何、transform、
- * display 与 zIndex，因此不会打断画布手势或造成布局抖动。
+ * 宿主告警状态变化后的样式-only 重算：只重写 effective model 与宿主级保留样式，
+ * 不碰几何、transform、display 与 zIndex，因此不会打断画布手势或造成布局抖动。
+ *
+ * `passThrough`、`filter` 等保留键由引擎写到宿主元素 CSS，物料自身不消费；只写 model
+ * 会让 `element.model` 与真实 `pointerEvents` / `filter` 脱节，直到下一次完整渲染才追平。
  *
  * 刻意不更新 `mounted.applied`：本次重写不改任何守卫输入，下一次渲染守卫命中时
  * 保留（而不是覆盖回）这次端口刷新的结果；但会同步 `appliedModel`，守卫命中时的
@@ -93,10 +107,12 @@ export function applyMountedConditionalStyle(
   state: RendererState,
   candidate: RenderCandidate,
   mounted: MountedMaterial,
+  document: ScreenDocument,
 ): void {
-  const model = resolveEffectiveModel(state, candidate, candidate.model.dataState, state.document);
+  const model = resolveEffectiveModel(state, candidate, candidate.model.dataState, document);
   mounted.element.model = model;
   mounted.appliedModel = model;
+  applyMaterialHostStyle(mounted.element, model);
 }
 
 export function handleMaterialEvent(
