@@ -18,6 +18,8 @@ const BEHAVIOR_RELATION_FIELDS = new Set([
 const SEMANTIC_RELATION_FIELDS = new Set(['type', 'id', 'source', 'target', 'role']);
 const RELATION_SOURCE_COMPONENT_FIELDS = new Set(['kind', 'componentId', 'event']);
 const RELATION_SOURCE_VARIABLE_FIELDS = new Set(['kind', 'variableId', 'event']);
+const RELATION_SOURCE_LIFECYCLE_FIELDS = new Set(['kind', 'event']);
+const RELATION_SOURCE_TIMER_FIELDS = new Set(['kind', 'intervalSeconds', 'event']);
 const RELATION_SOURCE_EVENT_FIELDS = new Set(['type', 'eventName']);
 const RELATION_TARGET_COMPONENT_FIELDS = new Set(['kind', 'componentId']);
 const RELATION_TARGET_VARIABLE_FIELDS = new Set(['kind', 'variableId']);
@@ -151,13 +153,15 @@ function validateSourceStrictKeys(
   phase: DiagnosticPhase,
 ): void {
   if (!isJsonObject(source)) return;
-  checkStrictObjectKeys(
-    source,
-    source.kind === 'variable' ? RELATION_SOURCE_VARIABLE_FIELDS : RELATION_SOURCE_COMPONENT_FIELDS,
-    at(base),
-    collector,
-    phase,
-  );
+  const sourceFields =
+    source.kind === 'variable'
+      ? RELATION_SOURCE_VARIABLE_FIELDS
+      : source.kind === 'lifecycle'
+        ? RELATION_SOURCE_LIFECYCLE_FIELDS
+        : source.kind === 'timer'
+          ? RELATION_SOURCE_TIMER_FIELDS
+          : RELATION_SOURCE_COMPONENT_FIELDS;
+  checkStrictObjectKeys(source, sourceFields, at(base), collector, phase);
   if (isJsonObject(source.event)) {
     checkStrictObjectKeys(
       source.event,

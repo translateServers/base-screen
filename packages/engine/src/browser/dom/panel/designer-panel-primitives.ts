@@ -375,11 +375,17 @@ function appendStyleSegmentedControl(
   appendDesignerFieldMessage(row.field, select, `style-${style}`);
 }
 
-export function appendSection(parent: HTMLElement, title: string, advanced = false): HTMLElement {
+export function appendSection(
+  parent: HTMLElement,
+  title: string,
+  advanced = false,
+  open?: boolean,
+): HTMLElement {
   // Sections render as native disclosures so every region can be collapsed with
   // pointer or keyboard; open state is persisted by the inspector group
   // preferences machinery in DesignerPanelController.
-  return createDesignerSection(parent, { advanced, title }).element;
+  return createDesignerSection(parent, { advanced, title, ...(open === undefined ? {} : { open }) })
+    .element;
 }
 
 export function appendFieldGrid(parent: HTMLElement): HTMLElement {

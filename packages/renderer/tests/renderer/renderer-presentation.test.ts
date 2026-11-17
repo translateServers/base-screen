@@ -46,6 +46,44 @@ describe('BaseScreenRenderer material presentation styles', () => {
     expect(root.children[0]?.style.transform).toBe('rotate(12deg) scale(-1, 1)');
     expect(root.children[0]?.style.opacity).toBe('1');
   });
+
+  it('applies reserved behavior and filter keys without material declarations', () => {
+    const { root, renderer } = rendererWithRoot();
+    const result = renderer.render(
+      document([
+        {
+          ...component('behavior', 0),
+          style: {
+            passThrough: true,
+            hoverPointer: true,
+            clip: true,
+            blend: 'screen',
+            filterBlur: 2,
+            filterHueRotate: 90,
+          },
+        },
+      ]),
+    );
+
+    expect(result.ok).toBe(true);
+    const style = root.children[0]!.style;
+    expect(style.pointerEvents).toBe('none');
+    expect(style.cursor).toBe('pointer');
+    expect(style.clipPath).toBe('inset(0)');
+    expect(style.mixBlendMode).toBe('screen');
+    expect(style.filter).toBe('blur(2px) hue-rotate(90deg)');
+  });
+
+  it('leaves behavior and filter CSS untouched when the keys are absent', () => {
+    const { root, renderer } = rendererWithRoot();
+    expect(renderer.render(document([component('plain', 0)])).ok).toBe(true);
+    const style = root.children[0]!.style;
+    expect(style.pointerEvents).toBe('');
+    expect(style.cursor).toBe('');
+    expect(style.clipPath).toBe('');
+    expect(style.mixBlendMode).toBe('');
+    expect(style.filter).toBe('');
+  });
 });
 
 describe('BaseScreenRenderer canvas background image', () => {

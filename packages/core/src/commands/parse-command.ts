@@ -13,6 +13,7 @@ const COMMAND_TYPES = new Set([
   'replace-data-sources',
   'replace-variables',
   'rename-variable',
+  'update-theme',
 ]);
 
 const COMMAND_FIELDS: Readonly<Record<string, ReadonlySet<string>>> = {
@@ -25,6 +26,7 @@ const COMMAND_FIELDS: Readonly<Record<string, ReadonlySet<string>>> = {
   'replace-data-sources': new Set(['type', 'dataSources']),
   'replace-variables': new Set(['type', 'variables']),
   'rename-variable': new Set(['type', 'variableId', 'nextName']),
+  'update-theme': new Set(['type', 'patch']),
 };
 
 const MAX_COMMAND_BYTES = 256 * 1024;

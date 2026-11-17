@@ -168,6 +168,21 @@ export function relationReferencesHost(relation: ScreenBlueprintRelation): boole
   return relation.type === 'behavior' && relation.target.kind === 'host';
 }
 
+export function relationReferencesLifecycle(relation: ScreenBlueprintRelation): boolean {
+  return relation.type === 'behavior' && relation.source.kind === 'lifecycle';
+}
+
+export function relationReferencesTimer(
+  relation: ScreenBlueprintRelation,
+  intervalSeconds: number,
+): boolean {
+  return (
+    relation.type === 'behavior' &&
+    relation.source.kind === 'timer' &&
+    relation.source.intervalSeconds === intervalSeconds
+  );
+}
+
 export function insertLayoutNode(
   blueprint: ScreenBlueprint,
   id: string,

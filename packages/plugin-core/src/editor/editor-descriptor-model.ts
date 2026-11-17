@@ -21,6 +21,7 @@ export type BaseScreenMaterialEditorControl =
   | 'number'
   | 'boolean'
   | 'select'
+  | 'segmented'
   | 'color'
   | 'json'
   | 'group'
@@ -113,6 +114,7 @@ export const EDITOR_CONTROLS: ReadonlySet<string> = new Set([
   'number',
   'boolean',
   'select',
+  'segmented',
   'color',
   'json',
   'group',
@@ -131,6 +133,7 @@ export const SCALAR_CONTROLS: ReadonlySet<string> = new Set([
   'number',
   'boolean',
   'select',
+  'segmented',
   'color',
   'unit-number',
   'stepper',

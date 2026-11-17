@@ -13,6 +13,9 @@ export const BASE_SCREEN_PLUGIN_COMMAND_MENUS: readonly ['commandPalette', 'menu
 // @public (undocumented)
 export const BASE_SCREEN_PLUGIN_PANEL_ACTION_EVENT: 'base-screen-plugin-panel-action';
 
+// @public
+export const BASE_SCREEN_RESERVED_STYLE_SCHEMAS: Readonly<Record<string, BaseScreenMaterialPropSchema>>;
+
 // @public (undocumented)
 export interface BaseScreenChartData {
     // (undocumented)
@@ -214,7 +217,7 @@ export interface BaseScreenMaterialEditorCondition {
 export type BaseScreenMaterialEditorConditionOperator = 'eq' | 'neq' | 'exists' | 'not-exists' | 'in' | 'not-in';
 
 // @public (undocumented)
-export type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'stepper' | 'custom';
+export type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'segmented' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'stepper' | 'custom';
 
 // @public (undocumented)
 export interface BaseScreenMaterialEditorDescriptor {
@@ -813,6 +816,9 @@ export function createBaseScreenPluginPanelCatalog(entries: readonly BaseScreenP
 export function declaredContributionIds(kind: BaseScreenPluginContributionKind, contributions: readonly BaseScreenPluginContribution[]): readonly string[];
 
 // @public (undocumented)
+export function describeBaseScreenMaterialStyleForAi(manifest: BaseScreenMaterialManifest): string;
+
+// @public (undocumented)
 export function diffBaseScreenMaterialCatalogs(before: BaseScreenMaterialCatalog, after: BaseScreenMaterialCatalog): BaseScreenMaterialCatalogDiff;
 
 // @public
@@ -1029,6 +1035,19 @@ type ScreenBlueprintRelationSource = {
     readonly event: {
         readonly type: 'variable-event';
         readonly eventName: 'data-updated' | 'request-state';
+    };
+} | {
+    readonly kind: 'lifecycle';
+    readonly event: {
+        readonly type: 'lifecycle';
+        readonly eventName: 'ready';
+    };
+} | {
+    readonly kind: 'timer';
+    readonly intervalSeconds: number;
+    readonly event: {
+        readonly type: 'timer';
+        readonly eventName: 'tick';
     };
 };
 
@@ -1326,6 +1345,7 @@ interface ScreenDocument {
     // (undocumented)
     readonly components: readonly ScreenComponentNode[];
     readonly dataSources?: readonly ScreenDataSource[];
+    readonly theme?: ScreenTheme;
     // (undocumented)
     readonly variables: readonly ScreenVariableEntry[];
 }
@@ -1418,6 +1438,15 @@ interface ScreenTabularDataset {
     // (undocumented)
     readonly totalRowCount?: number;
 }
+
+// @public (undocumented)
+interface ScreenTheme {
+    // (undocumented)
+    readonly palette: Readonly<Record<ScreenThemeSlot, string>>;
+}
+
+// @public
+type ScreenThemeSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
 
 // @public
 interface ScreenUpdatePolicy {

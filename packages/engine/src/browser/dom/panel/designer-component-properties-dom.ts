@@ -10,6 +10,7 @@ import type {
   BaseScreenMaterialManifest,
   BaseScreenPluginInspectorControlCatalog,
 } from '@base-screen/plugin-core';
+import { BASE_SCREEN_RESERVED_STYLE_SCHEMAS } from '@base-screen/plugin-core';
 import {
   designerHostStyleFields,
   withHostConditionalStyleBinding,
@@ -213,6 +214,7 @@ function appendComponentControls(
   }
   if (manifest === undefined) return;
   appendCommonOpacityControl(properties, component, manifest);
+  appendUniversalStyleSections(properties, component);
   appendDesignerQuickStyle(properties, manifest, { components: [component] });
 
   const descriptorAppearance = manifest.editorDescriptor?.appearance;
@@ -775,6 +777,64 @@ function appendImageDensityActions(parent: HTMLElement, componentId: string): vo
   }
   field.appendChild(actions);
   parent.appendChild(field);
+}
+
+/**
+ * 行为 / 滤镜是引擎级保留键：不依赖物料申报，任何物料都有这两组作者面。
+ * 滤镜默认折叠（高级分区），行为只有三个开关，保持检查器默认克制。
+ */
+function appendUniversalStyleSections(
+  properties: HTMLElement,
+  component: ScreenComponentNode,
+): void {
+  const text = DESIGNER_UI_TEXT.propertiesPanel;
+  const schemas = BASE_SCREEN_RESERVED_STYLE_SCHEMAS;
+  const behavior = appendSection(properties, text.behavior);
+  for (const [key, label] of [
+    ['passThrough', text.passThrough],
+    ['hoverPointer', text.hoverPointer],
+    ['clip', text.clip],
+  ] as const) {
+    appendStyleControl(
+      behavior,
+      label,
+      key,
+      component.style[key],
+      schemas[key]!,
+      'boolean',
+      `${component.id}:style:${key}`,
+      false,
+    );
+  }
+  const filter = appendSection(properties, text.filter, true, false);
+  appendStyleControl(
+    filter,
+    text.blend,
+    'blend',
+    component.style.blend,
+    schemas.blend!,
+    'select',
+    `${component.id}:style:blend`,
+    false,
+  );
+  for (const [key, label] of [
+    ['filterBlur', text.filterBlur],
+    ['filterBrightness', text.filterBrightness],
+    ['filterContrast', text.filterContrast],
+    ['filterSaturate', text.filterSaturate],
+    ['filterHueRotate', text.filterHueRotate],
+  ] as const) {
+    appendStyleControl(
+      filter,
+      label,
+      key,
+      component.style[key],
+      schemas[key]!,
+      'number',
+      `${component.id}:style:${key}`,
+      false,
+    );
+  }
 }
 
 function appendCommonOpacityControl(

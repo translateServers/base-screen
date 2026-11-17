@@ -218,6 +218,13 @@ export type BaseScreenBlueprintCanvasInsertNode = {
 } | {
     readonly kind: 'host';
     readonly position?: BaseScreenBlueprintCanvasNodePosition;
+} | {
+    readonly kind: 'lifecycle';
+    readonly position?: BaseScreenBlueprintCanvasNodePosition;
+} | {
+    readonly kind: 'timer';
+    readonly intervalSeconds: number;
+    readonly position?: BaseScreenBlueprintCanvasNodePosition;
 };
 
 // @public (undocumented)
@@ -240,6 +247,7 @@ export interface BaseScreenBlueprintCanvasNode {
     readonly id: string;
     // (undocumented)
     readonly inboundCount?: number;
+    readonly intervalSeconds?: number;
     // (undocumented)
     readonly isContainer?: boolean;
     // (undocumented)
@@ -273,7 +281,7 @@ export interface BaseScreenBlueprintCanvasNode {
 }
 
 // @public (undocumented)
-type BaseScreenBlueprintCanvasNodeKind = 'component' | 'variable' | 'host';
+type BaseScreenBlueprintCanvasNodeKind = 'component' | 'variable' | 'host' | 'lifecycle' | 'timer';
 
 // @public (undocumented)
 export interface BaseScreenBlueprintCanvasNodePosition {
@@ -1054,7 +1062,7 @@ interface BaseScreenMaterialEditorCondition {
 type BaseScreenMaterialEditorConditionOperator = 'eq' | 'neq' | 'exists' | 'not-exists' | 'in' | 'not-in';
 
 // @public (undocumented)
-type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'stepper' | 'custom';
+type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'segmented' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'stepper' | 'custom';
 
 // @public (undocumented)
 interface BaseScreenMaterialEditorDescriptor {
@@ -2392,7 +2400,7 @@ type RuntimeMaterial = NonNullable<CreatePluginRegistrationOptions['materials']>
 export const SCREEN_AUTHORING_REQUEST_EVENT: 'base-screen-authoring-request';
 
 // @public
-const SCREEN_BLUEPRINT_CAPABILITY_IDS: readonly ['blueprint.trigger.material-event', 'blueprint.trigger.variable-event', 'blueprint.value.event-payload', 'blueprint.value.variable', 'blueprint.condition.compare', 'blueprint.action.set-variable', 'blueprint.action.emit-host-event', 'blueprint.action.component-visibility', 'blueprint.action.request-variable', 'blueprint.action.request-component-data'];
+const SCREEN_BLUEPRINT_CAPABILITY_IDS: readonly ['blueprint.trigger.material-event', 'blueprint.trigger.variable-event', 'blueprint.trigger.lifecycle', 'blueprint.trigger.timer', 'blueprint.value.event-payload', 'blueprint.value.variable', 'blueprint.condition.compare', 'blueprint.action.set-variable', 'blueprint.action.emit-host-event', 'blueprint.action.component-visibility', 'blueprint.action.request-variable', 'blueprint.action.request-component-data'];
 
 // @public
 const SCREEN_MATERIAL_ERROR_CODES: readonly ['HOST_RESOURCE_ACCESS_DENIED', 'HOST_RESOURCE_UNAVAILABLE', 'HOST_RESOURCE_TIMEOUT', 'HOST_RESOURCE_FAILED', 'HOST_RESOURCE_INVALID', 'HOST_DATASET_INVALID', 'HOST_DATASET_BINDING_INVALID', 'HOST_DATASET_ADAPTER_FAILED'];
@@ -2585,6 +2593,19 @@ type ScreenBlueprintRelationSource = {
     readonly event: {
         readonly type: 'variable-event';
         readonly eventName: 'data-updated' | 'request-state';
+    };
+} | {
+    readonly kind: 'lifecycle';
+    readonly event: {
+        readonly type: 'lifecycle';
+        readonly eventName: 'ready';
+    };
+} | {
+    readonly kind: 'timer';
+    readonly intervalSeconds: number;
+    readonly event: {
+        readonly type: 'timer';
+        readonly eventName: 'tick';
     };
 };
 
@@ -3091,6 +3112,7 @@ interface ScreenDocument {
     // (undocumented)
     readonly components: readonly ScreenComponentNode[];
     readonly dataSources?: readonly ScreenDataSource[];
+    readonly theme?: ScreenTheme;
     // (undocumented)
     readonly variables: readonly ScreenVariableEntry[];
 }
@@ -3126,6 +3148,9 @@ type ScreenDocumentCommand = {
     readonly type: 'rename-variable';
     readonly variableId: string;
     readonly nextName: string;
+} | {
+    readonly type: 'update-theme';
+    readonly patch: ScreenThemePatch;
 };
 
 // @public (undocumented)
@@ -3718,6 +3743,18 @@ interface ScreenTargetDisplayProfile {
     readonly seamPx?: number;
     readonly viewingDistanceM?: number;
 }
+
+// @public (undocumented)
+interface ScreenTheme {
+    // (undocumented)
+    readonly palette: Readonly<Record<ScreenThemeSlot, string>>;
+}
+
+// @public
+type ScreenThemePatch = Readonly<Partial<Record<ScreenThemeSlot, string>>>;
+
+// @public
+type ScreenThemeSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
 
 // @public (undocumented)
 interface ScreenTransactionProvenance {

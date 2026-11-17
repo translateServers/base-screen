@@ -303,7 +303,11 @@ export class DesignerCommandPaletteController {
             ? relation.source.componentId
             : relation.source.kind === 'component'
               ? relation.source.componentId
-              : relation.source.variableId;
+              : relation.source.kind === 'variable'
+                ? relation.source.variableId
+                : relation.source.kind === 'lifecycle'
+                  ? 'lifecycle'
+                  : 'timer';
         const target =
           relation.type === 'semantic'
             ? relation.target.componentId

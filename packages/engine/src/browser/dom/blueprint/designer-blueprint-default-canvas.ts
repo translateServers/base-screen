@@ -569,6 +569,27 @@ export function createDesignerBlueprintDefaultCanvas(
         dependency: node.kind === 'variable',
       };
     }
+    if (node.kind === 'lifecycle' || node.kind === 'timer') {
+      const portStart = NODE_HEADER + SUBTITLE_HEIGHT;
+      return {
+        width: NODE_WIDTH,
+        height: HOST_NODE_HEIGHT,
+        portStart,
+        inputY: HOST_NODE_HEIGHT / 2,
+        outputs: [
+          {
+            handle: node.kind === 'lifecycle' ? 'event:ready' : 'event:tick',
+            label:
+              node.kind === 'lifecycle'
+                ? blueprintText.lifecycleReadyEvent
+                : blueprintText.timerTickEvent,
+            y: portStart + PORT_ROW / 2,
+            available: true,
+          },
+        ],
+        dependency: false,
+      };
+    }
     const height = HOST_NODE_HEIGHT;
     return {
       width: NODE_WIDTH,
@@ -1169,7 +1190,12 @@ export function createDesignerBlueprintDefaultCanvas(
       const ports = ownerDocument.createElement('div');
       ports.className = 'designer-blueprint-canvas-ports';
       ports.style.top = `${geometry.portStart}px`;
-      if (node.kind === 'component' || node.kind === 'variable') {
+      if (
+        node.kind === 'component' ||
+        node.kind === 'variable' ||
+        node.kind === 'lifecycle' ||
+        node.kind === 'timer'
+      ) {
         const eventPorts = geometry.outputs.filter(
           (port) => port.semantic !== true && port.containment !== true,
         );
@@ -1314,6 +1340,10 @@ export function createDesignerBlueprintDefaultCanvas(
     if (node.kind === 'component') return node.componentName ?? node.componentId ?? node.id;
     if (node.kind === 'variable') return node.variableName ?? node.variableId ?? node.id;
     if (node.kind === 'host') return blueprintText.hostNode;
+    if (node.kind === 'lifecycle') return blueprintText.lifecycleNode;
+    if (node.kind === 'timer') {
+      return blueprintText.timerNode(node.intervalSeconds ?? 0);
+    }
     return node.id;
   }
 
@@ -1323,12 +1353,18 @@ export function createDesignerBlueprintDefaultCanvas(
     }
     if (node.kind === 'variable') return text.nodeKindLine.variable;
     if (node.kind === 'host') return text.nodeKindLine.host;
+    if (node.kind === 'lifecycle') return text.nodeKindLine.lifecycle;
+    if (node.kind === 'timer') {
+      return text.nodeKindLine.timer(node.intervalSeconds ?? 0);
+    }
     return text.nodeKind[node.kind];
   }
 
   function nodeIconName(node: BaseScreenBlueprintCanvasNode): DesignerIconName {
     if (node.kind === 'variable') return 'variable';
     if (node.kind === 'host') return 'terminal';
+    if (node.kind === 'lifecycle') return 'activity';
+    if (node.kind === 'timer') return 'play';
     if (node.isContainer === true) return 'group';
     const material = node.materialType ?? '';
     if (material.includes('chart')) return 'chart-line';
@@ -1353,6 +1389,12 @@ export function createDesignerBlueprintDefaultCanvas(
     }
     if (node.kind === 'host') {
       return text.nodeSubtitle.host(node.exitCount ?? 0);
+    }
+    if (node.kind === 'lifecycle') {
+      return text.nodeSubtitle.lifecycle(node.outboundCount ?? 0);
+    }
+    if (node.kind === 'timer') {
+      return text.nodeSubtitle.timer(node.intervalSeconds ?? 0, node.outboundCount ?? 0);
     }
     return node.id;
   }

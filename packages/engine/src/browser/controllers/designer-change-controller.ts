@@ -26,6 +26,8 @@ export interface DesignerChangeGhostHandlers {
 
 export interface DesignerChangeAdoptResult {
   readonly ok: boolean;
+  /** 失败原因：用户可读摘要，不是诊断码；成功时不带。 */
+  readonly reason?: string;
 }
 
 type RightPaneMode = 'inspector' | 'intent';
@@ -202,8 +204,13 @@ export class DesignerChangeController {
     const unit = proposal.units.find((item) => item.id === unitId);
     if (unit === undefined) return false;
     const commands = proposal.commands.filter((_, index) => unit.commandIndexes.includes(index));
-    if (!handler(commands, proposal.provenance).ok) {
-      this.#feedback = { kind: 'adopt-failed', unitId };
+    const result = handler(commands, proposal.provenance);
+    if (!result.ok) {
+      this.#feedback = {
+        kind: 'adopt-failed',
+        unitId,
+        ...(result.reason === undefined ? {} : { reason: result.reason }),
+      };
       this.#paneMode = 'intent';
       this.render();
       return false;
@@ -253,8 +260,12 @@ export class DesignerChangeController {
     const proposal = this.#proposal;
     const handler = this.#adoptHandler;
     if (proposal === undefined || handler === undefined) return false;
-    if (!handler(proposal.commands, proposal.provenance).ok) {
-      this.#feedback = { kind: 'adopt-failed' };
+    const result = handler(proposal.commands, proposal.provenance);
+    if (!result.ok) {
+      this.#feedback = {
+        kind: 'adopt-failed',
+        ...(result.reason === undefined ? {} : { reason: result.reason }),
+      };
       this.#paneMode = 'intent';
       this.render();
       return false;

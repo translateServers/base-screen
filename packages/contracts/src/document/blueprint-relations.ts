@@ -114,7 +114,11 @@ export function relationCapabilities(relation: ScreenBlueprintBehaviorRelation):
   const capabilities = new Set<string>([
     relation.source.kind === 'component'
       ? SCREEN_BLUEPRINT_CAPABILITIES.materialEvent
-      : SCREEN_BLUEPRINT_CAPABILITIES.variableEvent,
+      : relation.source.kind === 'variable'
+        ? SCREEN_BLUEPRINT_CAPABILITIES.variableEvent
+        : relation.source.kind === 'lifecycle'
+          ? SCREEN_BLUEPRINT_CAPABILITIES.lifecycle
+          : SCREEN_BLUEPRINT_CAPABILITIES.timer,
   ]);
   if (relation.condition !== undefined) {
     capabilities.add(SCREEN_BLUEPRINT_CAPABILITIES.condition);
@@ -147,7 +151,11 @@ function behaviorRelationGroupKey(relation: ScreenBlueprintBehaviorRelation): st
   const source =
     relation.source.kind === 'component'
       ? `component:${relation.source.componentId}`
-      : `variable:${relation.source.variableId}`;
+      : relation.source.kind === 'variable'
+        ? `variable:${relation.source.variableId}`
+        : relation.source.kind === 'lifecycle'
+          ? 'lifecycle'
+          : `timer:${relation.source.intervalSeconds}`;
   const condition =
     relation.condition === undefined
       ? 'null'
@@ -162,6 +170,12 @@ function triggerOf(relation: ScreenBlueprintBehaviorRelation): ScreenBlueprintTr
       componentId: relation.source.componentId,
       eventName: relation.source.event.eventName,
     };
+  }
+  if (relation.source.kind === 'lifecycle') {
+    return { type: 'lifecycle', eventName: 'ready' };
+  }
+  if (relation.source.kind === 'timer') {
+    return { type: 'timer', eventName: 'tick', intervalSeconds: relation.source.intervalSeconds };
   }
   return {
     type: 'variable-event',

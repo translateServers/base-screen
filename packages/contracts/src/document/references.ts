@@ -210,7 +210,10 @@ export function validateReferences(
         );
         clean = false;
       }
-    } else if (!variableIds.has(relation.source.variableId)) {
+    } else if (
+      relation.source.kind === 'variable' &&
+      !variableIds.has(relation.source.variableId)
+    ) {
       collector.add(
         'VARIABLE_NAME_INVALID',
         at([...base, 'source', 'variableId']),

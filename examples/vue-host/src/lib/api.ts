@@ -90,6 +90,7 @@ export interface AgentCatalogMaterialShape {
     readonly props: Readonly<Record<string, string | number | boolean | null>>;
     readonly style: Readonly<Record<string, string | number | boolean | null>>;
   };
+  readonly stylePrompt: string;
 }
 
 export interface AgentCatalogShape {

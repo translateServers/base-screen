@@ -47,6 +47,12 @@ export function isScreenMaterialErrorCode(value: unknown): value is ScreenMateri
 export function isScreenMaterialType(value: unknown): value is string;
 
 // @public
+export function isScreenThemeRefSyntax(value: string): boolean;
+
+// @public (undocumented)
+export function isScreenThemeSlot(value: string): value is ScreenThemeSlot;
+
+// @public
 export function isScreenVariableName(value: unknown): value is string;
 
 // @public (undocumented)
@@ -193,10 +199,16 @@ export function readScreenComponentValueRef(component: ScreenComponentNode): Scr
 export function readScreenDocumentDataSources(document: ScreenDocument): readonly ScreenDataSource[];
 
 // @public
+export function readScreenThemeRef(value: string): ScreenThemeSlot | undefined;
+
+// @public
 export function readScreenVariableRecord(entry: ScreenVariableEntry): ScreenVariableRecord;
 
 // @public
 export function relationCapabilities(relation: ScreenBlueprintBehaviorRelation): readonly string[];
+
+// @public (undocumented)
+export function resolveScreenThemeRef(value: string, theme: ScreenTheme | undefined): string | undefined;
 
 // @public (undocumented)
 export const SCREEN_AUTHORING_REQUEST_EVENT: 'base-screen-authoring-request';
@@ -205,6 +217,8 @@ export const SCREEN_AUTHORING_REQUEST_EVENT: 'base-screen-authoring-request';
 export const SCREEN_BLUEPRINT_CAPABILITIES: {
     readonly materialEvent: 'blueprint.trigger.material-event';
     readonly variableEvent: 'blueprint.trigger.variable-event';
+    readonly lifecycle: 'blueprint.trigger.lifecycle';
+    readonly timer: 'blueprint.trigger.timer';
     readonly eventPayload: 'blueprint.value.event-payload';
     readonly variable: 'blueprint.value.variable';
     readonly condition: 'blueprint.condition.compare';
@@ -216,7 +230,7 @@ export const SCREEN_BLUEPRINT_CAPABILITIES: {
 };
 
 // @public
-export const SCREEN_BLUEPRINT_CAPABILITY_IDS: readonly ['blueprint.trigger.material-event', 'blueprint.trigger.variable-event', 'blueprint.value.event-payload', 'blueprint.value.variable', 'blueprint.condition.compare', 'blueprint.action.set-variable', 'blueprint.action.emit-host-event', 'blueprint.action.component-visibility', 'blueprint.action.request-variable', 'blueprint.action.request-component-data'];
+export const SCREEN_BLUEPRINT_CAPABILITY_IDS: readonly ['blueprint.trigger.material-event', 'blueprint.trigger.variable-event', 'blueprint.trigger.lifecycle', 'blueprint.trigger.timer', 'blueprint.value.event-payload', 'blueprint.value.variable', 'blueprint.condition.compare', 'blueprint.action.set-variable', 'blueprint.action.emit-host-event', 'blueprint.action.component-visibility', 'blueprint.action.request-variable', 'blueprint.action.request-component-data'];
 
 // @public (undocumented)
 export const SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY = "blueprint.action.component-visibility";
@@ -235,6 +249,9 @@ export const SCREEN_DOCUMENT_JSON_SCHEMA: ScreenJsonObject;
 
 // @public
 export const SCREEN_MATERIAL_ERROR_CODES: readonly ['HOST_RESOURCE_ACCESS_DENIED', 'HOST_RESOURCE_UNAVAILABLE', 'HOST_RESOURCE_TIMEOUT', 'HOST_RESOURCE_FAILED', 'HOST_RESOURCE_INVALID', 'HOST_DATASET_INVALID', 'HOST_DATASET_BINDING_INVALID', 'HOST_DATASET_ADAPTER_FAILED'];
+
+// @public
+export const SCREEN_THEME_SLOTS: readonly ScreenThemeSlot[];
 
 // @public (undocumented)
 export interface ScreenAbortSignal {
@@ -423,6 +440,14 @@ export interface ScreenBlueprintLayoutViewport {
     readonly zoom: number;
 }
 
+// @public
+interface ScreenBlueprintLifecycleTrigger {
+    // (undocumented)
+    readonly eventName: 'ready';
+    // (undocumented)
+    readonly type: 'lifecycle';
+}
+
 // @public (undocumented)
 export interface ScreenBlueprintMaterialEventTrigger {
     // (undocumented)
@@ -475,6 +500,19 @@ export type ScreenBlueprintRelationSource = {
     readonly event: {
         readonly type: 'variable-event';
         readonly eventName: 'data-updated' | 'request-state';
+    };
+} | {
+    readonly kind: 'lifecycle';
+    readonly event: {
+        readonly type: 'lifecycle';
+        readonly eventName: 'ready';
+    };
+} | {
+    readonly kind: 'timer';
+    readonly intervalSeconds: number;
+    readonly event: {
+        readonly type: 'timer';
+        readonly eventName: 'tick';
     };
 };
 
@@ -560,8 +598,18 @@ export interface ScreenBlueprintSetVariableAction {
     readonly variableId: string;
 }
 
+// @public
+interface ScreenBlueprintTimerTrigger {
+    // (undocumented)
+    readonly eventName: 'tick';
+    // (undocumented)
+    readonly intervalSeconds: number;
+    // (undocumented)
+    readonly type: 'timer';
+}
+
 // @public (undocumented)
-export type ScreenBlueprintTrigger = ScreenBlueprintMaterialEventTrigger | ScreenBlueprintVariableEventTrigger;
+export type ScreenBlueprintTrigger = ScreenBlueprintMaterialEventTrigger | ScreenBlueprintVariableEventTrigger | ScreenBlueprintLifecycleTrigger | ScreenBlueprintTimerTrigger;
 
 // @public (undocumented)
 export type ScreenBlueprintValueExpression = {
@@ -993,6 +1041,7 @@ export interface ScreenDocument {
     // (undocumented)
     readonly components: readonly ScreenComponentNode[];
     readonly dataSources?: readonly ScreenDataSource[];
+    readonly theme?: ScreenTheme;
     // (undocumented)
     readonly variables: readonly ScreenVariableEntry[];
 }
@@ -1599,6 +1648,18 @@ export interface ScreenTargetDisplayProfile {
     readonly seamPx?: number;
     readonly viewingDistanceM?: number;
 }
+
+// @public (undocumented)
+export interface ScreenTheme {
+    // (undocumented)
+    readonly palette: Readonly<Record<ScreenThemeSlot, string>>;
+}
+
+// @public (undocumented)
+export function screenThemeRef(slot: ScreenThemeSlot): string;
+
+// @public
+export type ScreenThemeSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
 
 // @public
 export interface ScreenUpdatePolicy {

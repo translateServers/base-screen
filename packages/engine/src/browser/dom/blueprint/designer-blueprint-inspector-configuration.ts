@@ -39,6 +39,8 @@ export function renderDesignerBlueprintConfiguration(
     if (node.kind === 'component') return componentConfiguration(document, graph, node);
     if (node.kind === 'variable') return variableConfiguration(document, graph, node);
     if (node.kind === 'host') return hostConfiguration(document, graph, node);
+    if (node.kind === 'lifecycle') return lifecycleConfiguration(document, graph, node);
+    if (node.kind === 'timer') return timerConfiguration(document, graph, node);
     return emptyInspector();
   }
   const edge = graph.edges.find((item) => item.id === selection.id);
@@ -169,6 +171,51 @@ function hostConfiguration(
       `<p>${DESIGNER_UI_TEXT.blueprint.hostNodeHint}</p>`,
     )}
     ${configurationSection(DESIGNER_UI_TEXT.blueprint.exitRelations, relationRows(document, exits))}
+    ${deleteButton()}`;
+}
+
+function lifecycleConfiguration(
+  document: ScreenDocument,
+  graph: BaseScreenBlueprintCanvasGraph,
+  node: BaseScreenBlueprintCanvasNode,
+): string {
+  const outbound = graph.edges.filter(
+    (edge) => edge.source === node.id && edge.kind === 'relation',
+  );
+  return `${nodeInformation(node.id, DESIGNER_UI_TEXT.blueprint.lifecycleNode)}
+    ${configurationSection(
+      DESIGNER_UI_TEXT.blueprint.lifecycleNode,
+      `<p>${DESIGNER_UI_TEXT.blueprint.lifecycleNodeHint}</p>`,
+    )}
+    ${configurationSection(
+      DESIGNER_UI_TEXT.blueprint.lifecycleRelations,
+      relationRows(document, outbound),
+    )}
+    ${deleteButton()}`;
+}
+
+function timerConfiguration(
+  document: ScreenDocument,
+  graph: BaseScreenBlueprintCanvasGraph,
+  node: BaseScreenBlueprintCanvasNode,
+): string {
+  const outbound = graph.edges.filter(
+    (edge) => edge.source === node.id && edge.kind === 'relation',
+  );
+  const seconds = node.intervalSeconds ?? 0;
+  return `${nodeInformation(node.id, DESIGNER_UI_TEXT.blueprint.canvasSurface.nodeKind.timer)}
+    ${configurationSection(
+      DESIGNER_UI_TEXT.blueprint.canvasSurface.nodeKind.timer,
+      `<label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.timerInterval}</span>
+        <input class="designer-control designer-input designer-number" type="number" min="1" max="86400" step="1" value="${seconds}" data-blueprint-timer-interval-node="${escapeAttribute(node.id)}" aria-label="${DESIGNER_UI_TEXT.blueprint.timerInterval}" />
+      </label>
+      <p>${DESIGNER_UI_TEXT.blueprint.timerIntervalHint}</p>
+      <p>${DESIGNER_UI_TEXT.blueprint.timerNodeHint}</p>`,
+    )}
+    ${configurationSection(
+      DESIGNER_UI_TEXT.blueprint.timerRelations,
+      relationRows(document, outbound),
+    )}
     ${deleteButton()}`;
 }
 

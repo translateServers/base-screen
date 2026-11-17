@@ -20,7 +20,26 @@ export interface ScreenBlueprintVariableEvent {
   readonly payload: ScreenJsonValue;
 }
 
-export type ScreenBlueprintEvent = ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent;
+/** 实例就绪事件：文档装载/替换后发射一次，payload 恒为 null。 */
+export interface ScreenBlueprintLifecycleEvent {
+  readonly type: 'lifecycle';
+  readonly name: 'ready';
+  readonly payload: ScreenJsonValue;
+}
+
+/** 定时器事件：intervalSeconds 标识是哪一个间隔的 tick，不同间隔互不串扰。 */
+export interface ScreenBlueprintTimerEvent {
+  readonly type: 'timer';
+  readonly name: 'tick';
+  readonly intervalSeconds: number;
+  readonly payload: ScreenJsonValue;
+}
+
+export type ScreenBlueprintEvent =
+  | ScreenBlueprintMaterialEvent
+  | ScreenBlueprintVariableEvent
+  | ScreenBlueprintLifecycleEvent
+  | ScreenBlueprintTimerEvent;
 
 export interface ScreenBlueprintCapabilityIndex {
   readonly hasBlueprintCapability: (id: string) => boolean;

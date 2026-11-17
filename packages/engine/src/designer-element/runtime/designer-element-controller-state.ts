@@ -49,6 +49,7 @@ import {
   type BaseScreenProjectStateChangeEventDetail,
 } from '../../common/project/project-controller.js';
 import { DesignerSession } from '../../common/session/designer-session.js';
+import { designerDiagnosticSummary } from '../../common/ui-text/designer-ui-text.js';
 import { BASE_SCREEN_GUARD_CHANGE_EVENT } from '../../common/validation/designer-guard.js';
 import { getDesignerGeometryDocument } from './designer-element-geometry.js';
 import type { DesignerElementHost, DesignerElementState } from './designer-element-state.js';
@@ -567,7 +568,13 @@ export function initializeDesignerElementControllers(
   state.changeController.setAdoptHandler((commands, provenance) => {
     const result = state.runtime.executeDesignerTransaction(element, { commands, provenance });
     state.runtime.report(element, result);
-    return { ok: result.ok };
+    if (result.ok) return { ok: true };
+    // 与状态栏/通知取同一条诊断摘要，单元卡里不再只说「采纳未成功」。
+    const diagnostic = result.diagnostics[0];
+    return {
+      ok: false,
+      ...(diagnostic === undefined ? {} : { reason: designerDiagnosticSummary(diagnostic.code) }),
+    };
   });
   // 场景切换 = 宿主提供命令 + 引擎预览，应用时仍走一次普通事务（可撤销、可回退）。
   state.sceneController.setContext({

@@ -92,6 +92,14 @@ export {
   ScreenSerializationError,
   serializeScreenDocument,
 } from './document/serialize.js';
+export {
+  isScreenThemeRefSyntax,
+  isScreenThemeSlot,
+  readScreenThemeRef,
+  resolveScreenThemeRef,
+  SCREEN_THEME_SLOTS,
+  screenThemeRef,
+} from './document/theme.js';
 export { screenJsonEquals } from './json/equality.js';
 export { parseScreenJsonValue, type ScreenJsonParseOptions } from './json/parse.js';
 export {
@@ -199,6 +207,8 @@ export type {
   ScreenSize,
   ScreenStaticDataSource,
   ScreenStaticVariable,
+  ScreenTheme,
+  ScreenThemeSlot,
   ScreenUpdatePolicy,
   ScreenUpdatePolicyMode,
   ScreenUrlQueryVariable,

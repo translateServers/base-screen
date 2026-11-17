@@ -151,6 +151,25 @@ export function validateControlForSchema(
     }
     return;
   }
+  // 分段是「一眼看全的小选项集」：选项过多就失去相对下拉的意义，fail-closed 拒收。
+  if (control === 'segmented') {
+    if (resolved.kind !== 'enum') {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        diagnosticPath,
+        'Segmented control requires an enum field.',
+      );
+      return;
+    }
+    if (resolved.values.length < 2 || resolved.values.length > 4) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        diagnosticPath,
+        'Segmented control requires 2 to 4 options.',
+      );
+    }
+    return;
+  }
   // 显式分支：不能让它落到下面 expected === undefined 的静默放行路径。
   // 自定义控件可绑任意已解析形状，值语义由控件自身负责，这里只确认 path 命中 schema。
   if (control === 'custom') {

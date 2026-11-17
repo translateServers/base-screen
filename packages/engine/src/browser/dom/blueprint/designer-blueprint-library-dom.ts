@@ -1,5 +1,10 @@
 import type { ScreenBlueprintRelation, ScreenDocument } from '@base-screen/contracts';
 import { readScreenBlueprintRelationCategory } from '@base-screen/contracts';
+import {
+  LIFECYCLE_BLUEPRINT_NODE_ID,
+  timerBlueprintNodeId,
+  timerIntervalFromBlueprintNodeId,
+} from '../../../common/operations/blueprint/designer-blueprint-node-ids.js';
 import type {
   BaseScreenBlueprintCanvasEdge,
   BaseScreenBlueprintCanvasGraph,
@@ -225,8 +230,56 @@ function relationsPane(
     })
     .join('');
   const hostSection = `<section class="blueprint-palette-group" aria-label="${DESIGNER_UI_TEXT.blueprint.hostNode}"><header><strong>${DESIGNER_UI_TEXT.blueprint.hostNode}</strong><span>${host === undefined ? 0 : 1}</span></header><div class="blueprint-palette-list">${hostRow}</div></section>`;
-  const content = `${sections}${hostSection}`;
+  const lifecycle = graph.nodes.find((node) => node.id === LIFECYCLE_BLUEPRINT_NODE_ID);
+  const timerNodes = graph.nodes
+    .filter((node) => node.kind === 'timer')
+    .sort((left, right) => (left.intervalSeconds ?? 0) - (right.intervalSeconds ?? 0));
+  const lifecycleRow = instanceNodeRow(lifecycle, selection, {
+    insertAttribute: 'data-blueprint-insert-lifecycle',
+    label: DESIGNER_UI_TEXT.blueprint.lifecycleNode,
+    hint: DESIGNER_UI_TEXT.blueprint.lifecycleNodeHint,
+    icon: 'activity',
+  });
+  const timerRows = timerNodes.map((node) =>
+    instanceNodeRow(node, selection, {
+      insertAttribute: 'data-blueprint-insert-timer',
+      label: DESIGNER_UI_TEXT.blueprint.timerNode(node.intervalSeconds ?? 0),
+      hint: DESIGNER_UI_TEXT.blueprint.timerNodeHint,
+      icon: 'play',
+    }),
+  );
+  if (!timerNodes.some((node) => node.intervalSeconds === 5)) {
+    timerRows.unshift(
+      instanceNodeRow(undefined, selection, {
+        insertAttribute: 'data-blueprint-insert-timer',
+        label: DESIGNER_UI_TEXT.blueprint.relationList.addTimer,
+        hint: DESIGNER_UI_TEXT.blueprint.timerNodeHint,
+        icon: 'play',
+      }),
+    );
+  }
+  const lifecycleSection = `<section class="blueprint-palette-group" aria-label="${DESIGNER_UI_TEXT.blueprint.lifecycleNode}"><header><strong>${DESIGNER_UI_TEXT.blueprint.lifecycleNode}</strong><span>${lifecycle === undefined ? 0 : 1}</span></header><div class="blueprint-palette-list">${lifecycleRow}</div></section>`;
+  const timerSection = `<section class="blueprint-palette-group" aria-label="${DESIGNER_UI_TEXT.blueprint.canvasSurface.nodeKind.timer}"><header><strong>${DESIGNER_UI_TEXT.blueprint.canvasSurface.nodeKind.timer}</strong><span>${timerNodes.length}</span></header><div class="blueprint-palette-list">${timerRows.join('')}</div></section>`;
+  const content = `${sections}${hostSection}${lifecycleSection}${timerSection}`;
   return content === '' ? emptyState(DESIGNER_UI_TEXT.blueprint.relationList.noRelations) : content;
+}
+
+function instanceNodeRow(
+  node: BaseScreenBlueprintCanvasNode | undefined,
+  selection: BaseScreenBlueprintCanvasSelection,
+  options: {
+    readonly insertAttribute: string;
+    readonly label: string;
+    readonly hint: string;
+    readonly icon: DesignerIconName;
+  },
+): string {
+  const glyph = `<span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon(options.icon)}</span>`;
+  const body = `<span><strong>${options.label}</strong><small>${options.hint}</small></span>`;
+  if (node === undefined) {
+    return `<div class="designer-list-row blueprint-palette-item" data-density="default"><button type="button" class="blueprint-palette-primary" ${options.insertAttribute} aria-label="${options.label}">${glyph}${body}<span class="blueprint-palette-inline-add" aria-hidden="true">${designerIcon('plus')}</span></button></div>`;
+  }
+  return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-placed="true" data-selected="${String(selection?.kind === 'node' && selection.id === node.id)}"><button type="button" class="blueprint-palette-primary" data-blueprint-select-node="${node.id}" aria-label="${options.label}">${glyph}${body}<em>${DESIGNER_UI_TEXT.blueprint.placed}</em></button></div>`;
 }
 
 function relationRow(
@@ -361,6 +414,10 @@ export function isDesignerBlueprintLibraryBuiltinTab(
 
 function sourceNodeId(relation: ScreenBlueprintRelation): string {
   if (relation.type === 'semantic') return `component:${relation.source.componentId}`;
+  if (relation.source.kind === 'lifecycle') return LIFECYCLE_BLUEPRINT_NODE_ID;
+  if (relation.source.kind === 'timer') {
+    return timerBlueprintNodeId(relation.source.intervalSeconds);
+  }
   return relation.source.kind === 'component'
     ? `component:${relation.source.componentId}`
     : `variable:${relation.source.variableId}`;
@@ -375,6 +432,11 @@ function targetNodeId(relation: ScreenBlueprintRelation): string {
 
 function nodeLabel(document: ScreenDocument, nodeId: string): string {
   if (nodeId === 'host') return DESIGNER_UI_TEXT.blueprint.hostNode;
+  if (nodeId === LIFECYCLE_BLUEPRINT_NODE_ID) return DESIGNER_UI_TEXT.blueprint.lifecycleNode;
+  const timerInterval = timerIntervalFromBlueprintNodeId(nodeId);
+  if (timerInterval !== undefined) {
+    return DESIGNER_UI_TEXT.blueprint.timerNode(timerInterval);
+  }
   if (nodeId.startsWith('component:')) {
     const id = nodeId.slice('component:'.length);
     return document.components.find((component) => component.id === id)?.name ?? id;

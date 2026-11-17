@@ -18,7 +18,12 @@ export const BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT =
 
 export type BaseScreenDesignerWorkbenchMode = 'canvas' | 'blueprint';
 export type BaseScreenDesignerWorkbenchModeChangeReason = 'user' | 'api' | 'fallback';
-export type BaseScreenBlueprintCanvasNodeKind = 'component' | 'variable' | 'host';
+export type BaseScreenBlueprintCanvasNodeKind =
+  | 'component'
+  | 'variable'
+  | 'host'
+  | 'lifecycle'
+  | 'timer';
 export type BaseScreenBlueprintCanvasEdgeKind =
   | 'relation'
   | 'semantic'
@@ -72,6 +77,8 @@ export interface BaseScreenBlueprintCanvasNode {
   readonly readCount?: number;
   readonly writeCount?: number;
   readonly exitCount?: number;
+  /** timer 节点：触发间隔（秒）；lifecycle 节点没有该字段。 */
+  readonly intervalSeconds?: number;
 }
 
 export interface BaseScreenBlueprintCanvasEdge {
@@ -123,6 +130,15 @@ export type BaseScreenBlueprintCanvasInsertNode =
     }
   | {
       readonly kind: 'host';
+      readonly position?: BaseScreenBlueprintCanvasNodePosition;
+    }
+  | {
+      readonly kind: 'lifecycle';
+      readonly position?: BaseScreenBlueprintCanvasNodePosition;
+    }
+  | {
+      readonly kind: 'timer';
+      readonly intervalSeconds: number;
       readonly position?: BaseScreenBlueprintCanvasNodePosition;
     };
 

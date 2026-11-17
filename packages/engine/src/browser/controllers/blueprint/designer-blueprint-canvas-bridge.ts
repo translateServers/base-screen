@@ -26,7 +26,11 @@ import {
   HOST_BLUEPRINT_NODE_ID,
   insertDesignerBlueprintComponentNode,
   insertDesignerBlueprintHostNode,
+  insertDesignerBlueprintLifecycleNode,
+  insertDesignerBlueprintTimerNode,
   insertDesignerBlueprintVariableNode,
+  LIFECYCLE_BLUEPRINT_NODE_ID,
+  timerBlueprintNodeId,
   variableBlueprintNodeId,
 } from '../../../common/operations/blueprint/designer-blueprint-model.js';
 import {
@@ -257,18 +261,36 @@ export class DesignerBlueprintCanvasBridge {
         if (result.ok) this.callbacks.select(null, false);
         break;
       case 'insert-node': {
-        const nodeId =
-          command.kind === 'component'
-            ? componentBlueprintNodeId(command.componentId)
-            : command.kind === 'variable'
-              ? variableBlueprintNodeId(command.variableId)
-              : HOST_BLUEPRINT_NODE_ID;
-        const blueprint =
-          command.kind === 'component'
-            ? insertDesignerBlueprintComponentNode(document, command.componentId, command.position)
-            : command.kind === 'variable'
-              ? insertDesignerBlueprintVariableNode(document, command.variableId, command.position)
-              : insertDesignerBlueprintHostNode(document.blueprint, command.position);
+        let nodeId: string;
+        let blueprint: ScreenBlueprint | null;
+        if (command.kind === 'component') {
+          nodeId = componentBlueprintNodeId(command.componentId);
+          blueprint = insertDesignerBlueprintComponentNode(
+            document,
+            command.componentId,
+            command.position,
+          );
+        } else if (command.kind === 'variable') {
+          nodeId = variableBlueprintNodeId(command.variableId);
+          blueprint = insertDesignerBlueprintVariableNode(
+            document,
+            command.variableId,
+            command.position,
+          );
+        } else if (command.kind === 'host') {
+          nodeId = HOST_BLUEPRINT_NODE_ID;
+          blueprint = insertDesignerBlueprintHostNode(document.blueprint, command.position);
+        } else if (command.kind === 'lifecycle') {
+          nodeId = LIFECYCLE_BLUEPRINT_NODE_ID;
+          blueprint = insertDesignerBlueprintLifecycleNode(document.blueprint, command.position);
+        } else {
+          nodeId = timerBlueprintNodeId(command.intervalSeconds);
+          blueprint = insertDesignerBlueprintTimerNode(
+            document.blueprint,
+            command.intervalSeconds,
+            command.position,
+          );
+        }
         result = this.commitBlueprint(blueprint);
         if (result.ok) {
           result = this.callbacks.select({ kind: 'node', id: nodeId }, false);

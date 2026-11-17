@@ -9,6 +9,7 @@ import {
   type BaseScreenResolvedMaterialLibraryItem,
   createInitialDataSourceForMaterialLibraryItem,
 } from '../../../common/operations/material-library/material-library-items.js';
+import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { DesignerMaterialGroupNavigationController } from './designer-material-group-navigation-controller.js';
 import type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
 
@@ -323,16 +324,22 @@ export class DesignerPanelMaterialController {
     }
     const empty = layout.querySelector<HTMLElement>('[data-material-search-empty]');
     const reset = layout.querySelector<HTMLElement>('[data-material-library-reset]');
-    if (reset !== null)
-      reset.hidden =
-        this.#search === '' &&
-        this.#filter === 'all' &&
-        this.#groupId === undefined &&
-        (grouping !== undefined || this.#category === undefined);
+    const unfiltered =
+      this.#search === '' &&
+      this.#filter === 'all' &&
+      this.#groupId === undefined &&
+      (grouping !== undefined || this.#category === undefined);
+    if (reset !== null) reset.hidden = unfiltered;
     if (empty !== null) {
       empty.hidden = [...layout.querySelectorAll<HTMLElement>('[data-material-card]')].some(
         (card) => !card.hidden,
       );
+      const title = empty.querySelector<HTMLElement>('.designer-empty-title');
+      // 目录本身为空不是「筛选无结果」，文案不能暗示换个条件再搜。
+      if (title !== null)
+        title.textContent = unfiltered
+          ? DESIGNER_UI_TEXT.materialCatalogEmpty
+          : DESIGNER_UI_TEXT.materialSearchEmpty;
     }
   }
 

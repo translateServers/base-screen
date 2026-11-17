@@ -15,6 +15,7 @@ import { validateCanvas } from './validate-canvas.js';
 import { validateComponent } from './validate-component.js';
 import { validateDataSource } from './validate-data-source.js';
 import type { DocumentDiagnosticPath } from './validate-support.js';
+import { validateTheme } from './validate-theme.js';
 import { validateVariable } from './validate-variable.js';
 
 const DOCUMENT_ROOT_FIELDS = new Set([
@@ -23,6 +24,7 @@ const DOCUMENT_ROOT_FIELDS = new Set([
   'dataSources',
   'variables',
   'blueprint',
+  'theme',
 ]);
 
 export function validateDocument(
@@ -75,6 +77,9 @@ export function validateDocument(
   validateVariables(candidate.variables, sharedVariables, at, collector, phase);
   if (candidate.blueprint !== base?.blueprint) {
     validateBlueprint(candidate.blueprint, at, collector, phase);
+  }
+  if (candidate.theme !== undefined && candidate.theme !== base?.theme) {
+    validateTheme(candidate.theme, at, collector, phase);
   }
 
   if (collector.count > diagnosticsBefore) return undefined;

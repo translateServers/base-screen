@@ -10,6 +10,8 @@ import { nextRelationId } from './designer-blueprint-mutation-helpers.js';
 import {
   componentIdFromBlueprintNodeId,
   HOST_BLUEPRINT_NODE_ID,
+  LIFECYCLE_BLUEPRINT_NODE_ID,
+  timerIntervalFromBlueprintNodeId,
   variableIdFromBlueprintNodeId,
 } from './designer-blueprint-node-ids.js';
 import type { BaseScreenBlueprintCanvasSelection } from './designer-blueprint-protocol.js';
@@ -41,7 +43,14 @@ export function connectDesignerBlueprintNodes(
   const targetComponentId = componentIdFromBlueprintNodeId(document, targetNodeId);
   const targetVariableId = variableIdFromBlueprintNodeId(document, targetNodeId);
   const targetHost = targetNodeId === HOST_BLUEPRINT_NODE_ID;
-  if (sourceComponentId === undefined && sourceVariableId === undefined) {
+  const sourceLifecycle = sourceNodeId === LIFECYCLE_BLUEPRINT_NODE_ID;
+  const sourceTimerInterval = timerIntervalFromBlueprintNodeId(sourceNodeId);
+  if (
+    sourceComponentId === undefined &&
+    sourceVariableId === undefined &&
+    !sourceLifecycle &&
+    sourceTimerInterval === undefined
+  ) {
     return { ok: false, reason: 'invalid' };
   }
   if (targetComponentId === undefined && targetVariableId === undefined && !targetHost) {
@@ -87,7 +96,15 @@ export function connectDesignerBlueprintNodes(
   }
   const eventName = handleValue(sourceHandle, 'event:');
   let source: ScreenBlueprintRelationSource;
-  if (sourceComponentId !== undefined && eventName !== undefined) {
+  if (sourceLifecycle && eventName === 'ready') {
+    source = { kind: 'lifecycle', event: { type: 'lifecycle', eventName: 'ready' } };
+  } else if (sourceTimerInterval !== undefined && eventName === 'tick') {
+    source = {
+      kind: 'timer',
+      intervalSeconds: sourceTimerInterval,
+      event: { type: 'timer', eventName: 'tick' },
+    };
+  } else if (sourceComponentId !== undefined && eventName !== undefined) {
     const available = events.some(
       (event) =>
         event.componentId === sourceComponentId && event.name === eventName && event.available,
@@ -186,6 +203,8 @@ function handleValue(handle: string, prefix: string): string | undefined {
 }
 
 function nodeSlug(source: ScreenBlueprintRelationSource): string {
+  if (source.kind === 'lifecycle') return 'lifecycle';
+  if (source.kind === 'timer') return `timer-${source.intervalSeconds}`;
   return source.kind === 'component' ? source.componentId : source.variableId;
 }
 
@@ -207,6 +226,10 @@ function sameSource(
       left.event.type === right.event.type &&
       left.event.eventName === right.event.eventName
     );
+  }
+  if (left.kind === 'lifecycle' && right.kind === 'lifecycle') return true;
+  if (left.kind === 'timer' && right.kind === 'timer') {
+    return left.intervalSeconds === right.intervalSeconds;
   }
   return false;
 }

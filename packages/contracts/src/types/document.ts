@@ -31,6 +31,19 @@ export interface ScreenCanvas {
   readonly backgroundImageFit?: ScreenCanvasBackgroundImageFit;
 }
 
+/** 文档级主题色位（ADR-0098）：固定语义槽，色板具体颜色由文档携带。 */
+export type ScreenThemeSlot =
+  | 'primary'
+  | 'text'
+  | 'textSecondary'
+  | 'background'
+  | 'accent'
+  | 'accentSecondary';
+
+export interface ScreenTheme {
+  readonly palette: Readonly<Record<ScreenThemeSlot, string>>;
+}
+
 export interface ScreenPosition {
   readonly x: number;
   readonly y: number;
@@ -251,9 +264,24 @@ export interface ScreenBlueprintVariableEventTrigger {
   readonly eventName: 'data-updated' | 'request-state';
 }
 
+/** 实例级触发器：文档装载/替换后就绪一次，不绑定任何组件或变量。 */
+export interface ScreenBlueprintLifecycleTrigger {
+  readonly type: 'lifecycle';
+  readonly eventName: 'ready';
+}
+
+/** 实例内定时器触发器：按间隔重复发射 tick，间隔单位为秒。 */
+export interface ScreenBlueprintTimerTrigger {
+  readonly type: 'timer';
+  readonly eventName: 'tick';
+  readonly intervalSeconds: number;
+}
+
 export type ScreenBlueprintTrigger =
   | ScreenBlueprintMaterialEventTrigger
-  | ScreenBlueprintVariableEventTrigger;
+  | ScreenBlueprintVariableEventTrigger
+  | ScreenBlueprintLifecycleTrigger
+  | ScreenBlueprintTimerTrigger;
 
 export type ScreenBlueprintValueExpression =
   | { readonly kind: 'literal'; readonly value: ScreenJsonValue }
@@ -349,6 +377,15 @@ export type ScreenBlueprintRelationSource =
         readonly type: 'variable-event';
         readonly eventName: 'data-updated' | 'request-state';
       };
+    }
+  | {
+      readonly kind: 'lifecycle';
+      readonly event: { readonly type: 'lifecycle'; readonly eventName: 'ready' };
+    }
+  | {
+      readonly kind: 'timer';
+      readonly intervalSeconds: number;
+      readonly event: { readonly type: 'timer'; readonly eventName: 'tick' };
     };
 
 export type ScreenBlueprintRelationEffect =
@@ -438,4 +475,6 @@ export interface ScreenDocument {
   readonly dataSources?: readonly ScreenDataSource[];
   readonly variables: readonly ScreenVariableEntry[];
   readonly blueprint: ScreenBlueprint;
+  /** 文档级主题色板；缺省表示没有色板，`theme:` 引用此时失败关闭。 */
+  readonly theme?: ScreenTheme;
 }

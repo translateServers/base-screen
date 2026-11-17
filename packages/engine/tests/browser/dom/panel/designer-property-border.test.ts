@@ -82,3 +82,46 @@ describe('designer border property editing', () => {
     });
   });
 });
+
+describe('engine-reserved style key authoring', () => {
+  const interaction = {
+    focusedComponentId: 'rectangle-1',
+    selectedComponentIds: ['rectangle-1'],
+  };
+  const commit = (dataset: Record<string, string>, extra: Record<string, unknown> = {}) =>
+    createPropertyTransaction(
+      { dataset, ...extra } as unknown as HTMLInputElement,
+      document,
+      interaction,
+      catalog,
+    );
+
+  it('commits a behavior switch the material never declared', () => {
+    const result = commit(
+      { style: 'passThrough' },
+      { type: 'checkbox', checked: true, value: 'on' },
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        commands: [
+          { patch: { style: { borderColor: '#111111', borderWidth: 0, passThrough: true } } },
+        ],
+      },
+    });
+  });
+
+  it('commits a reserved filter number and fails closed out of range', () => {
+    expect(commit({ style: 'filterBlur' }, { value: '4' })).toMatchObject({ ok: true });
+    expect(commit({ style: 'filterBlur' }, { value: '90' })?.ok).toBe(false);
+  });
+
+  it('clearing an optional reserved number removes the key', () => {
+    const result = commit({ style: 'filterBlur' }, { value: '' });
+    expect(result).toMatchObject({ ok: true });
+    if (result?.ok !== true) return;
+    const command = result.value.commands[0]!;
+    if (command.type !== 'update-components') throw new Error('unexpected command kind');
+    expect('filterBlur' in (command.patch.style ?? {})).toBe(false);
+  });
+});

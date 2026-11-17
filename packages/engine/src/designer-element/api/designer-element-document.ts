@@ -37,7 +37,10 @@ export function replaceDocument(
   elementState.runtime.cancelGesture(element);
   elementState.runtime.invalidateAuthoringRequests(element);
   const result = elementState.session.replaceDocument(document);
-  if (result.ok) elementState.runtime.resetSessionSurfaces(element);
+  if (result.ok) {
+    elementState.runtime.resetSessionSurfaces(element);
+    elementState.canvasRuntimeController.resetLifecycleReady();
+  }
   return result;
 }
 

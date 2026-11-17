@@ -105,6 +105,7 @@ export {
   parseBaseScreenChartData,
   parseBaseScreenTableData,
 } from './data-contracts.js';
+export { describeBaseScreenMaterialStyleForAi } from './editor/editor-ai-description.js';
 export type {
   BaseScreenMaterialEditorCondition,
   BaseScreenMaterialEditorConditionOperator,
@@ -130,6 +131,7 @@ export {
   resolveSchema,
 } from './editor/editor-descriptor.js';
 export {
+  BASE_SCREEN_RESERVED_STYLE_SCHEMAS,
   parseBaseScreenMaterialEventDetail,
   parseBaseScreenMaterialManifest,
   validateBaseScreenMaterialIdentity,

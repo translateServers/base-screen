@@ -123,6 +123,24 @@ describe('designer change controller', () => {
     expect(h.clear).not.toHaveBeenCalled();
   });
 
+  it('renders the failure reason inside the failed unit row', () => {
+    const h = harness();
+    h.submit();
+    h.controller.setAdoptHandler(() => ({ ok: false, reason: '选中组件已锁定。' }));
+    expect(h.controller.adoptUnit('a')).toBe(false);
+    expect(h.pane.innerHTML).toMatch(
+      /data-change-unit-row="a"[\s\S]*采纳未成功：选中组件已锁定。草案仍保留，可修改后重试。[\s\S]*data-change-unit-row="b"/,
+    );
+  });
+
+  it('renders the failure reason for a failed bulk adoption', () => {
+    const h = harness();
+    h.submit();
+    h.controller.setAdoptHandler(() => ({ ok: false, reason: '选中组件已锁定。' }));
+    expect(h.controller.adoptAllDirect()).toBe(false);
+    expect(h.pane.innerHTML).toContain('采纳未成功：选中组件已锁定。草案仍保留，可修改后重试。');
+  });
+
   it('reports successful adoption even when remaining commands become invalid', () => {
     const h = harness();
     h.submit();

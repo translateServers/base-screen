@@ -262,6 +262,37 @@ describe('parseBaseScreenMaterialEditorDescriptor', () => {
     ).toMatchObject({ ok: false });
   });
 
+  it('accepts a segmented only on a small enum field', () => {
+    const parse = (input: Record<string, unknown>, schema = propsSchema) =>
+      parseBaseScreenMaterialEditorDescriptor(input, schema, styleSchema, ['valueClick'], roles);
+
+    const valid = descriptor();
+    firstField(valid, 0).control = 'segmented';
+    firstField(valid, 0).path = ['align'];
+    expect(parse(valid)).toMatchObject({ ok: true });
+
+    const twoOptions = descriptor();
+    firstField(twoOptions, 0).control = 'segmented';
+    firstField(twoOptions, 0).path = ['legend', 'position'];
+    expect(parse(twoOptions)).toMatchObject({ ok: true });
+
+    const wideSchema = {
+      ...propsSchema,
+      properties: {
+        ...propsSchema.properties,
+        mode: { kind: 'enum' as const, values: ['a', 'b', 'c', 'd', 'e'] },
+      },
+    };
+    const tooMany = descriptor();
+    firstField(tooMany, 0).control = 'segmented';
+    firstField(tooMany, 0).path = ['mode'];
+    expect(parse(tooMany, wideSchema)).toMatchObject({ ok: false });
+
+    const wrongKind = descriptor();
+    firstField(wrongKind, 0).control = 'segmented';
+    expect(parse(wrongKind)).toMatchObject({ ok: false });
+  });
+
   it('accepts item fields relative to a style array item schema', () => {
     const input = descriptor({
       appearance: [

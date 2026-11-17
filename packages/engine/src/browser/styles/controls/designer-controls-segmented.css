@@ -36,6 +36,13 @@
   pointer-events: none;
 }
 
+/* descriptor 分段：外壳只承担布局占位，形态与状态全在共享分段件上。 */
+.designer-descriptor-segmented {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
 .designer-segmented .designer-segmented-option svg {
   width: 14px;
   height: 14px;

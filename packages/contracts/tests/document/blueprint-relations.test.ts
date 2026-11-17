@@ -331,3 +331,90 @@ describe('legacy blueprint migration', () => {
     }
   });
 });
+
+describe('lifecycle relation source', () => {
+  const lifecycleRelation: ScreenBlueprintBehaviorRelation = {
+    type: 'behavior',
+    id: 'ready-show',
+    source: { kind: 'lifecycle', event: { type: 'lifecycle', eventName: 'ready' } },
+    target: { kind: 'component', componentId: 'a' },
+    effect: visibility,
+  };
+
+  it('parses and derives a lifecycle trigger with its capability', () => {
+    const parsed = parseScreenDocument(
+      document({ components, blueprint: { relations: [lifecycleRelation] } }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const rules = deriveScreenBlueprintRules(parsed.value.blueprint);
+    expect(rules).toHaveLength(1);
+    expect(rules[0]!.trigger).toEqual({ type: 'lifecycle', eventName: 'ready' });
+    expect(rules[0]!.requiredCapabilities).toContain('blueprint.trigger.lifecycle');
+  });
+
+  it('rejects unknown lifecycle event names', () => {
+    const parsed = parseScreenDocument(
+      document({
+        components,
+        blueprint: {
+          relations: [
+            {
+              ...lifecycleRelation,
+              source: { kind: 'lifecycle', event: { type: 'lifecycle', eventName: 'unload' } },
+            },
+          ],
+        },
+      }),
+    );
+    expect(parsed.ok).toBe(false);
+  });
+});
+
+describe('timer relation source', () => {
+  const timerRelation: ScreenBlueprintBehaviorRelation = {
+    type: 'behavior',
+    id: 'tick-show',
+    source: {
+      kind: 'timer',
+      intervalSeconds: 5,
+      event: { type: 'timer', eventName: 'tick' },
+    },
+    target: { kind: 'component', componentId: 'a' },
+    effect: visibility,
+  };
+
+  it('parses and derives a timer trigger with its interval and capability', () => {
+    const parsed = parseScreenDocument(
+      document({ components, blueprint: { relations: [timerRelation] } }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const rules = deriveScreenBlueprintRules(parsed.value.blueprint);
+    expect(rules[0]!.trigger).toEqual({ type: 'timer', eventName: 'tick', intervalSeconds: 5 });
+    expect(rules[0]!.requiredCapabilities).toContain('blueprint.trigger.timer');
+  });
+
+  it('rejects zero, fractional and oversized intervals', () => {
+    for (const intervalSeconds of [0, 1.5, 86_401]) {
+      const parsed = parseScreenDocument(
+        document({
+          components,
+          blueprint: {
+            relations: [
+              {
+                ...timerRelation,
+                source: {
+                  kind: 'timer',
+                  intervalSeconds,
+                  event: { type: 'timer', eventName: 'tick' },
+                },
+              },
+            ],
+          },
+        }),
+      );
+      expect(parsed.ok).toBe(false);
+    }
+  });
+});

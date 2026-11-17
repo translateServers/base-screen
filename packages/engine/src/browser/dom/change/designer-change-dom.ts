@@ -12,7 +12,7 @@ import { createDesignerIconButton } from '../designer-ui-primitives.js';
 
 export type DesignerChangeFeedback =
   | { readonly kind: 'draft-pending' }
-  | { readonly kind: 'adopt-failed'; readonly unitId?: string }
+  | { readonly kind: 'adopt-failed'; readonly unitId?: string; readonly reason?: string }
   | { readonly kind: 'remaining-invalid'; readonly remainingCount: number };
 
 /**
@@ -162,7 +162,9 @@ function feedbackMarkup(feedback: DesignerChangeFeedback | undefined): string {
       ? DESIGNER_UI_TEXT.change.feedbackDraftPending
       : feedback.kind === 'remaining-invalid'
         ? DESIGNER_UI_TEXT.change.feedbackRemainingInvalid(feedback.remainingCount)
-        : DESIGNER_UI_TEXT.change.feedbackAdoptFailed;
+        : feedback.reason === undefined
+          ? DESIGNER_UI_TEXT.change.feedbackAdoptFailed
+          : DESIGNER_UI_TEXT.change.feedbackAdoptFailedReason(feedback.reason);
   return `<p class="change-panel-hint" role="alert" data-change-feedback="${feedback.kind}">${escapeHtml(text)}</p>`;
 }
 

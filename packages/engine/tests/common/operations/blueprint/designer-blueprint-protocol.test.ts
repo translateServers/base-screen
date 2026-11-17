@@ -18,6 +18,8 @@ describe('Blueprint canvas command protocol', () => {
       },
       { ...base, type: 'delete-selection', selection: { kind: 'edge', id: 'edge:r:action:0' } },
       { ...base, type: 'insert-node', kind: 'host' },
+      { ...base, type: 'insert-node', kind: 'lifecycle' },
+      { ...base, type: 'insert-node', kind: 'timer', intervalSeconds: 30 },
       { ...base, type: 'commit-layout', nodes: [{ id: 'component:a', x: 12.345, y: -6 }] },
       { ...base, type: 'commit-viewport', viewport: { x: 0, y: 0, zoom: 1 } },
       { ...base, type: 'history-undo' },
@@ -50,6 +52,22 @@ describe('Blueprint canvas command protocol', () => {
         ...base,
         type: 'commit-layout',
         nodes: [{ id: 'a', x: Number.POSITIVE_INFINITY, y: 0 }],
+      }).ok,
+    ).toBe(false);
+    expect(
+      parseBaseScreenBlueprintCanvasCommand({
+        ...base,
+        type: 'insert-node',
+        kind: 'timer',
+        intervalSeconds: 0,
+      }).ok,
+    ).toBe(false);
+    expect(
+      parseBaseScreenBlueprintCanvasCommand({
+        ...base,
+        type: 'insert-node',
+        kind: 'lifecycle',
+        intervalSeconds: 5,
       }).ok,
     ).toBe(false);
   });

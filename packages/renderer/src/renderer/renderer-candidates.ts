@@ -24,6 +24,7 @@ import type { DataSourceRuntime } from '../resource/data-source-runtime.js';
 import { getProjectionKey } from '../resource/resource-state.js';
 import { projectDataSourceResult, projectStaticValue } from './renderer-data-source.js';
 import { diagnostic, prefixDiagnostics, sortDiagnostics } from './renderer-diagnostics.js';
+import { resolveStyleThemeRefs } from './renderer-theme.js';
 import type {
   CachedComponentValidation,
   ComponentValidationCache,
@@ -112,13 +113,41 @@ export function prepareCandidates(
         );
         continue;
       }
+      // 主题引用（ADR-0098）在投影前解析：悬空引用与非法样式同路径失败关闭。
+      const themed = resolveStyleThemeRefs(validatedStyle.value, document.theme);
+      if (themed.unresolved.length > 0) {
+        diagnostics.push(
+          ...themed.unresolved.map((key) =>
+            diagnostic(
+              'DOCUMENT_FIELD_INVALID',
+              ['components', index, 'style', key],
+              'Theme reference cannot be resolved against the document palette.',
+            ),
+          ),
+        );
+        continue;
+      }
       // 条件样式规则（ADR-0058）：每条规则的 style 与基础样式合并后必须满足该物料
       // styleSchema（静态、与数据无关），非法规则样式与非法 style 同路径失败关闭。
       const styleRules = component.styleRules ?? [];
       let styleRulesValid = true;
       for (let ruleIndex = 0; ruleIndex < styleRules.length; ruleIndex++) {
+        const ruleThemed = resolveStyleThemeRefs(styleRules[ruleIndex]!.style, document.theme);
+        if (ruleThemed.unresolved.length > 0) {
+          diagnostics.push(
+            ...ruleThemed.unresolved.map((key) =>
+              diagnostic(
+                'DOCUMENT_FIELD_INVALID',
+                ['components', index, 'styleRules', ruleIndex, 'style', key],
+                'Theme reference cannot be resolved against the document palette.',
+              ),
+            ),
+          );
+          styleRulesValid = false;
+          break;
+        }
         const ruleStyle = validateBaseScreenMaterialStyle(
-          { ...validatedStyle.value, ...styleRules[ruleIndex]!.style },
+          { ...themed.style, ...ruleThemed.style },
           entry.manifest.styleSchema,
         );
         if (!ruleStyle.ok) {
@@ -139,7 +168,7 @@ export function prepareCandidates(
         continue;
       }
       props = validatedProps.value;
-      style = validatedStyle.value;
+      style = themed.style;
       nextEntries.set(component, { entry, props, style });
     }
     const resolved = readComponentData(dataSources, component, entry, contributionIndex, [

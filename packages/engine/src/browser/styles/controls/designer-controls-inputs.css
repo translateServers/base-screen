@@ -466,6 +466,55 @@
   appearance: none;
 }
 
+/* unit-number（值 + 单位后缀）：与步进器同一套复合控件形态——外壳画描边环与底色，
+   后缀只读且不参与布局伸缩，悬停/聚焦只换环宽以外的颜色，几何零位移。 */
+.designer-unit-input {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  height: var(--designer-control-height);
+  border-radius: var(--designer-radius-3);
+  background-color: var(--designer-surface-control);
+  box-shadow: var(--designer-elev-ring);
+  transition: box-shadow var(--designer-motion);
+}
+
+.designer-unit-input:hover:not(:focus-within) {
+  box-shadow: 0 0 0 1px var(--designer-border-strong);
+}
+
+.designer-unit-input:focus-within {
+  box-shadow: 0 0 0 2px var(--designer-focus-ring);
+}
+
+.designer-unit-input > .designer-input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  padding: 0 var(--designer-space-2);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.designer-unit-input > .designer-input:hover:not(:disabled):not(:focus) {
+  box-shadow: none;
+}
+
+.designer-unit-input > .designer-input:focus {
+  outline: none;
+}
+
+.designer-unit-input-suffix {
+  display: grid;
+  flex: none;
+  place-items: center;
+  padding-right: var(--designer-space-3);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  pointer-events: none;
+}
+
 /* 自绘下拉（原型 .select）：触发器承担形态与焦点环，隐藏的原生 select 承担取值与事件。 */
 .designer-select-control {
   position: relative;

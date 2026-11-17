@@ -1,4 +1,4 @@
-import type { ScreenDocument } from '@base-screen/contracts';
+import type { ScreenBlueprint, ScreenDocument } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
@@ -10,7 +10,9 @@ import {
   buildDesignerBlueprintGraph,
   commitDesignerBlueprintLayout,
   deleteDesignerBlueprintSelection,
+  insertDesignerBlueprintTimerNode,
   updateDesignerBlueprintCondition,
+  updateDesignerBlueprintTimerInterval,
 } from '../../../../src/common/operations/blueprint/designer-blueprint-model.js';
 
 const document: ScreenDocument = {
@@ -115,5 +117,144 @@ describe('shared Blueprint model', () => {
       nodes: [{ id: 'component:source', x: 20, y: 30 }],
       viewport: { x: 4, y: 8, zoom: 1.2 },
     });
+  });
+});
+
+describe('instance source nodes (lifecycle / timer)', () => {
+  const relations: ScreenBlueprint['relations'] = [
+    {
+      type: 'behavior',
+      id: 'ready-hide',
+      source: { kind: 'lifecycle', event: { type: 'lifecycle', eventName: 'ready' } },
+      target: { kind: 'component', componentId: 'target' },
+      effect: { type: 'component-visibility', operation: 'hide' },
+    },
+    {
+      type: 'behavior',
+      id: 'tick-show',
+      source: {
+        kind: 'timer',
+        intervalSeconds: 5,
+        event: { type: 'timer', eventName: 'tick' },
+      },
+      target: { kind: 'component', componentId: 'target' },
+      effect: { type: 'component-visibility', operation: 'show' },
+    },
+  ];
+
+  it('projects lifecycle and timer nodes with their relation edges', () => {
+    const graph = buildDesignerBlueprintGraph(
+      { ...document, blueprint: { relations } },
+      catalog,
+      runtime,
+    );
+    expect(graph.nodes.find((node) => node.id === 'lifecycle')).toMatchObject({
+      kind: 'lifecycle',
+    });
+    expect(graph.nodes.find((node) => node.id === 'timer:5')).toMatchObject({
+      kind: 'timer',
+      intervalSeconds: 5,
+      outboundCount: 1,
+    });
+    expect(
+      graph.edges.some((edge) => edge.source === 'lifecycle' && edge.kind === 'relation'),
+    ).toBe(true);
+    expect(graph.edges.some((edge) => edge.source === 'timer:5' && edge.kind === 'relation')).toBe(
+      true,
+    );
+  });
+
+  it('keeps pinned instance nodes even without relations', () => {
+    const graph = buildDesignerBlueprintGraph(
+      {
+        ...document,
+        blueprint: {
+          relations: [],
+          layout: {
+            nodes: [
+              { id: 'lifecycle', x: 9, y: 9 },
+              { id: 'timer:30', x: 9, y: 99 },
+            ],
+          },
+        },
+      },
+      catalog,
+      runtime,
+    );
+    expect(graph.nodes.some((node) => node.id === 'lifecycle')).toBe(true);
+    expect(graph.nodes.find((node) => node.id === 'timer:30')).toMatchObject({
+      intervalSeconds: 30,
+    });
+  });
+
+  it('connects instance sources and rejects duplicates or wrong handles', () => {
+    const first = connectDesignerBlueprintNodes(
+      { ...document, blueprint: { relations: [] } },
+      'lifecycle',
+      'event:ready',
+      'component:target',
+      'relation:in',
+      [],
+    );
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const withLifecycle = { ...document, blueprint: first.blueprint };
+    expect(
+      connectDesignerBlueprintNodes(
+        withLifecycle,
+        'lifecycle',
+        'event:ready',
+        'component:target',
+        'relation:in',
+        [],
+      ),
+    ).toMatchObject({ ok: false, reason: 'duplicate' });
+    expect(
+      connectDesignerBlueprintNodes(
+        withLifecycle,
+        'timer:5',
+        'event:tick',
+        'component:target',
+        'relation:in',
+        [],
+      ).ok,
+    ).toBe(true);
+    expect(
+      connectDesignerBlueprintNodes(
+        withLifecycle,
+        'lifecycle',
+        'event:tick',
+        'component:target',
+        'relation:in',
+        [],
+      ),
+    ).toMatchObject({ ok: false, reason: 'invalid' });
+  });
+
+  it('inserts timer nodes, keeps interval edits in sync, and rejects collisions', () => {
+    const inserted = insertDesignerBlueprintTimerNode(document.blueprint, 5);
+    if (inserted === null) throw new Error('insert 5 failed');
+    const withBoth = insertDesignerBlueprintTimerNode(inserted, 30);
+    if (withBoth === null) throw new Error('insert 30 failed');
+    const connected = connectDesignerBlueprintNodes(
+      { ...document, blueprint: withBoth },
+      'timer:5',
+      'event:tick',
+      'component:target',
+      'relation:in',
+      [],
+    );
+    if (!connected.ok) throw new Error('connect failed');
+    const updated = updateDesignerBlueprintTimerInterval(connected.blueprint, 5, 20);
+    expect(updated).not.toBeNull();
+    if (updated === null) return;
+    expect(updated.layout?.nodes.map((node) => node.id)).toEqual(['timer:20', 'timer:30']);
+    expect(updated.relations[0]).toMatchObject({
+      source: { kind: 'timer', intervalSeconds: 20 },
+    });
+    expect(updateDesignerBlueprintTimerInterval(updated, 20, 30)).toBeNull();
+    const removed = deleteDesignerBlueprintSelection(updated, { kind: 'node', id: 'timer:20' });
+    expect(removed?.relations).toEqual([]);
+    expect(removed?.layout?.nodes.map((node) => node.id)).toEqual(['timer:30']);
   });
 });

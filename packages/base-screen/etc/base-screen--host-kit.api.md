@@ -296,6 +296,19 @@ type ScreenBlueprintRelationSource = {
         readonly type: 'variable-event';
         readonly eventName: 'data-updated' | 'request-state';
     };
+} | {
+    readonly kind: 'lifecycle';
+    readonly event: {
+        readonly type: 'lifecycle';
+        readonly eventName: 'ready';
+    };
+} | {
+    readonly kind: 'timer';
+    readonly intervalSeconds: number;
+    readonly event: {
+        readonly type: 'timer';
+        readonly eventName: 'tick';
+    };
 };
 
 // @public (undocumented)
@@ -684,6 +697,7 @@ interface ScreenDocument {
     // (undocumented)
     readonly components: readonly ScreenComponentNode[];
     readonly dataSources?: readonly ScreenDataSource[];
+    readonly theme?: ScreenTheme;
     // (undocumented)
     readonly variables: readonly ScreenVariableEntry[];
 }
@@ -904,6 +918,15 @@ interface ScreenTabularDataset {
     // (undocumented)
     readonly totalRowCount?: number;
 }
+
+// @public (undocumented)
+interface ScreenTheme {
+    // (undocumented)
+    readonly palette: Readonly<Record<ScreenThemeSlot, string>>;
+}
+
+// @public
+type ScreenThemeSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
 
 // @public
 interface ScreenUpdatePolicy {

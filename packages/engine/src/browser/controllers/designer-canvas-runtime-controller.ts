@@ -1,6 +1,7 @@
 import type {
   ScreenBlueprintHostActionPort,
   ScreenBlueprintHostEvent,
+  ScreenBlueprintRule,
   ScreenDiagnostic,
   ScreenDocument,
   ScreenHostCatalogPort,
@@ -21,6 +22,7 @@ import {
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialEvent, BaseScreenRenderer } from '@base-screen/renderer';
 import { readDesignerVariableViews } from '../../common/operations/designer-variable-view.js';
+import { DesignerBlueprintTimerScheduler } from './blueprint/designer-blueprint-timer-scheduler.js';
 import { DesignerCanvasVariableController } from './variables/designer-canvas-variable-controller.js';
 
 export interface DesignerCanvasRuntimeControllerCallbacks {
@@ -37,8 +39,13 @@ export class DesignerCanvasRuntimeController {
   #document: ScreenDocument | undefined;
   #blueprintPlan: ScreenBlueprintPlan | undefined;
   #blueprintVariables: ScreenJsonObject | undefined;
+  #lifecycleReadyFired = false;
   readonly #variableListeners = new Map<string, Set<(value: ScreenJsonValue) => void>>();
   readonly #variables: DesignerCanvasVariableController;
+  readonly #timers = new DesignerBlueprintTimerScheduler({
+    dispatch: (intervalSeconds) =>
+      this.handleBlueprintEvent({ type: 'timer', name: 'tick', intervalSeconds, payload: null }),
+  });
 
   constructor(private readonly callbacks: DesignerCanvasRuntimeControllerCallbacks) {
     this.#variables = new DesignerCanvasVariableController({
@@ -55,7 +62,17 @@ export class DesignerCanvasRuntimeController {
     this.#document = document;
     this.callbacks.getRenderer()?.resetBlueprintVisibility();
     this.compileBlueprint(document);
-    return this.#variables.render(document, this.collectRuntimeVariables(document));
+    const rendered = this.#variables.render(document, this.collectRuntimeVariables(document));
+    // 就绪一次 per 文档装载：编辑重渲染不重复发射，装载/替换经 resetLifecycleReady 重新武装。
+    if (rendered.ok && this.#blueprintPlan !== undefined && !this.#lifecycleReadyFired) {
+      this.#lifecycleReadyFired = true;
+      this.handleBlueprintEvent({ type: 'lifecycle', name: 'ready', payload: null });
+    }
+    return rendered;
+  }
+
+  resetLifecycleReady(): void {
+    this.#lifecycleReadyFired = false;
   }
 
   refreshData(componentId?: string): void {
@@ -180,6 +197,8 @@ export class DesignerCanvasRuntimeController {
     this.#document = undefined;
     this.#blueprintPlan = undefined;
     this.#blueprintVariables = undefined;
+    this.#lifecycleReadyFired = false;
+    this.#timers.stop();
     this.#variableListeners.clear();
     this.#variables.clear();
     this.callbacks.getRenderer()?.resetBlueprintVisibility();
@@ -193,11 +212,17 @@ export class DesignerCanvasRuntimeController {
     if (!compiled.ok) {
       this.#blueprintPlan = undefined;
       this.#blueprintVariables = undefined;
+      this.#timers.sync([]);
       this.callbacks.emitDiagnostics(compiled.diagnostics);
       return;
     }
     this.#blueprintPlan = compiled.value;
     this.#blueprintVariables = compiled.value.initialVariables;
+    this.#timers.sync(
+      compiled.value.rules.flatMap((rule: ScreenBlueprintRule) =>
+        rule.trigger.type === 'timer' ? [rule.trigger.intervalSeconds] : [],
+      ),
+    );
   }
 
   private collectRuntimeVariables(document: ScreenDocument): ScreenJsonObject {

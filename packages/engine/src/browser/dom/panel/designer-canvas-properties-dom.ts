@@ -1,4 +1,5 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import { SCREEN_THEME_SLOTS } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
 import {
@@ -21,6 +22,7 @@ import {
   canvasBackgroundPaletteValue,
   type DesignerCanvasPresentationSettings,
   type DesignerCanvasScaleMode,
+  SCREEN_THEME_AUTHORING_DEFAULT_PALETTE,
 } from './designer-canvas-transactions.js';
 import { appendSection } from './designer-panel-primitives.js';
 
@@ -63,6 +65,33 @@ export function appendCanvasControls(
   const imageSection = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.canvasImageSection);
   imageSection.className += ' designer-canvas-image-section';
   appendCanvasBackgroundImageControls(imageSection, document, hostResourceSelectionButtonVisible);
+
+  appendCanvasThemeSection(parent, document);
+}
+
+/**
+ * 文档级主题色板（ADR-0098）：六个语义槽各复用统一颜色控件，默认折叠。
+ * 标记挂调色板根节点（色标增删会重建控件列表），提交走 update-theme 整副色板。
+ */
+function appendCanvasThemeSection(parent: HTMLElement, document: ScreenDocument): void {
+  const section = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.theme, true, false);
+  for (const slot of SCREEN_THEME_SLOTS) {
+    const { field, control } = createDesignerFieldRow(parent.ownerDocument, {
+      label: DESIGNER_UI_TEXT.propertiesPanel.themeSlots[slot],
+      tagName: 'span',
+      stacked: true,
+    });
+    const palette = createDesignerColorPalette(
+      parent.ownerDocument,
+      document.theme?.palette[slot] ?? SCREEN_THEME_AUTHORING_DEFAULT_PALETTE[slot],
+      `canvas:theme:${slot}`,
+      { allowGradient: false },
+    );
+    palette.element.dataset.canvasProperty = `theme.${slot}`;
+    control.appendChild(palette.element);
+    appendDesignerFieldMessage(field, palette.controls[0]!, `canvas-theme-${slot}`);
+    section.appendChild(field);
+  }
 }
 
 /** 几何输入：符号内嵌在输入框右缘（与组件几何网格同形），免去 W / H 这类前置小标题。 */

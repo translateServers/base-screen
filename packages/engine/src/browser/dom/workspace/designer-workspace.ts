@@ -21,7 +21,7 @@ import {
 export { designerToolGlyph };
 
 import { designerWorkspaceMarkup } from './designer-workspace-markup.js';
-import { SHORTCUT_HELP_SECTIONS } from './designer-workspace-template.js';
+import { MARQUEE_HELP_ENTRIES, SHORTCUT_HELP_SECTIONS } from './designer-workspace-template.js';
 
 export function createDesignerWorkspace(
   ownerDocument: Document,
@@ -108,6 +108,15 @@ export function createDesignerWorkspace(
             </div>
           </section>`,
         ).join('')}
+        <section class="help-section">
+          <h3>${DESIGNER_UI_TEXT.shortcutHelpSections.marquee}</h3>
+          <div class="help-shortcuts">
+            ${MARQUEE_HELP_ENTRIES.map(
+              ({ id, label, keys }) =>
+                `<p data-help-marquee="${id}"><span>${label}</span><kbd>${keys}</kbd></p>`,
+            ).join('')}
+          </div>
+        </section>
       </div>
     </div>`;
   layout.appendChild(helpDialog);

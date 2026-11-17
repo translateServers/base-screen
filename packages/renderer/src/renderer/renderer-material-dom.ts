@@ -55,6 +55,38 @@ export function applyMaterialFrame(
       ? String(Math.min(1, Math.max(0, model.style.opacity)))
       : '';
   if (style.opacity !== opacity) style.opacity = opacity;
+  // 行为 / 滤镜是引擎级保留键：物料不接管这些宿主级 CSS，渲染器统一写、同值守卫。
+  const pointerEvents = model.style.passThrough === true ? 'none' : '';
+  if (style.pointerEvents !== pointerEvents) style.pointerEvents = pointerEvents;
+  const cursor = model.style.hoverPointer === true ? 'pointer' : '';
+  if (style.cursor !== cursor) style.cursor = cursor;
+  const clipPath = model.style.clip === true ? 'inset(0)' : '';
+  if (style.clipPath !== clipPath) style.clipPath = clipPath;
+  const blend =
+    typeof model.style.blend === 'string' && model.style.blend !== 'normal'
+      ? model.style.blend
+      : '';
+  if (style.mixBlendMode !== blend) style.mixBlendMode = blend;
+  const filter = materialFilterText(model.style);
+  if (style.filter !== filter) style.filter = filter;
+}
+
+/** 只拼声明过且有限的分量；缺省分量不写，避免把浏览器默认值固化进 CSSOM。 */
+const FILTER_FUNCTIONS = [
+  ['filterBlur', 'blur', 'px'],
+  ['filterBrightness', 'brightness', '%'],
+  ['filterContrast', 'contrast', '%'],
+  ['filterSaturate', 'saturate', '%'],
+  ['filterHueRotate', 'hue-rotate', 'deg'],
+] as const;
+
+function materialFilterText(style: Readonly<Record<string, unknown>>): string {
+  const parts: string[] = [];
+  for (const [key, fn, unit] of FILTER_FUNCTIONS) {
+    const raw = style[key];
+    if (typeof raw === 'number' && Number.isFinite(raw)) parts.push(`${fn}(${raw}${unit})`);
+  }
+  return parts.join(' ');
 }
 
 /**

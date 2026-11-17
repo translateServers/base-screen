@@ -11,12 +11,18 @@ import {
   HOST_BLUEPRINT_NODE_ID,
   insertDesignerBlueprintComponentNode,
   insertDesignerBlueprintHostNode,
+  insertDesignerBlueprintLifecycleNode,
+  insertDesignerBlueprintTimerNode,
   insertDesignerBlueprintVariableNode,
+  LIFECYCLE_BLUEPRINT_NODE_ID,
   removeDesignerBlueprintCondition,
+  timerBlueprintNodeId,
+  timerIntervalFromBlueprintNodeId,
   updateDesignerBlueprintCondition,
   updateDesignerBlueprintEffect,
   updateDesignerBlueprintSemanticRole,
   updateDesignerBlueprintSourceEvent,
+  updateDesignerBlueprintTimerInterval,
   variableBlueprintNodeId,
 } from '../../../common/operations/blueprint/designer-blueprint-model.js';
 import type {
@@ -233,6 +239,35 @@ export class DesignerBlueprintPanelsController {
       }
       return true;
     }
+    const insertLifecycle = target.closest<HTMLButtonElement>('[data-blueprint-insert-lifecycle]');
+    if (insertLifecycle !== null) {
+      const document = this.callbacks.getDocument();
+      if (document !== undefined) {
+        const result = this.callbacks.commitBlueprint(
+          insertDesignerBlueprintLifecycleNode(document.blueprint),
+        );
+        if (result.ok) {
+          this.callbacks.select({ kind: 'node', id: LIFECYCLE_BLUEPRINT_NODE_ID }, true);
+        }
+        this.report(result);
+      }
+      return true;
+    }
+    const insertTimer = target.closest<HTMLButtonElement>('[data-blueprint-insert-timer]');
+    if (insertTimer !== null) {
+      const document = this.callbacks.getDocument();
+      if (document !== undefined) {
+        const blueprint = insertDesignerBlueprintTimerNode(document.blueprint);
+        if (blueprint !== null) {
+          const result = this.callbacks.commitBlueprint(blueprint);
+          if (result.ok) {
+            this.callbacks.select({ kind: 'node', id: timerBlueprintNodeId(5) }, true);
+          }
+          this.report(result);
+        }
+      }
+      return true;
+    }
     const effectButton = target.closest<HTMLButtonElement>('[data-blueprint-effect-type]');
     if (effectButton !== null) {
       const relationId = effectButton.dataset.relationId;
@@ -391,6 +426,26 @@ export class DesignerBlueprintPanelsController {
   }
 
   onChange(target: Element): boolean {
+    const timerNodeId = (target as HTMLElement).dataset.blueprintTimerIntervalNode;
+    if (timerNodeId !== undefined) {
+      const document = this.callbacks.getDocument();
+      const fromSeconds = timerIntervalFromBlueprintNodeId(timerNodeId);
+      const next = Number((target as HTMLInputElement).value);
+      if (document === undefined || fromSeconds === undefined) return true;
+      if (!Number.isInteger(next) || next < 1 || next > 86_400) {
+        (target as HTMLInputElement).value = String(fromSeconds);
+        return true;
+      }
+      const blueprint = updateDesignerBlueprintTimerInterval(document.blueprint, fromSeconds, next);
+      if (blueprint === null) {
+        (target as HTMLInputElement).value = String(fromSeconds);
+        return true;
+      }
+      const result = this.callbacks.commitBlueprint(blueprint);
+      if (result.ok) this.callbacks.select({ kind: 'node', id: timerBlueprintNodeId(next) }, true);
+      this.report(result);
+      return true;
+    }
     const relationId = (target as HTMLElement).dataset.relationId;
     if (relationId === undefined) return false;
     const document = this.callbacks.getDocument();

@@ -30,6 +30,7 @@ import { ScreenPosition } from '@base-screen/contracts';
 import { ScreenSize } from '@base-screen/contracts';
 import { ScreenStaticDataSource } from '@base-screen/contracts';
 import { ScreenStaticVariable } from '@base-screen/contracts';
+import type { ScreenThemeSlot } from '@base-screen/contracts';
 import { ScreenValueRef } from '@base-screen/contracts';
 import { ScreenVariable } from '@base-screen/contracts';
 import type { ScreenVariableEntry } from '@base-screen/contracts';
@@ -274,7 +275,7 @@ export interface ScreenBlueprintEmitHostEventActionTrace {
 }
 
 // @public (undocumented)
-export type ScreenBlueprintEvent = ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent;
+export type ScreenBlueprintEvent = ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent | ScreenBlueprintLifecycleEvent | ScreenBlueprintTimerEvent;
 
 // @public (undocumented)
 export interface ScreenBlueprintHostActionTrace {
@@ -288,6 +289,16 @@ export interface ScreenBlueprintHostActionTrace {
     readonly output: ScreenJsonValue;
     // (undocumented)
     readonly type: 'host-action';
+}
+
+// @public
+interface ScreenBlueprintLifecycleEvent {
+    // (undocumented)
+    readonly name: 'ready';
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'lifecycle';
 }
 
 // @public (undocumented)
@@ -362,6 +373,18 @@ export interface ScreenBlueprintSetVariableActionTrace {
     readonly type: 'set-variable';
     // (undocumented)
     readonly variableId: string;
+}
+
+// @public
+interface ScreenBlueprintTimerEvent {
+    // (undocumented)
+    readonly intervalSeconds: number;
+    // (undocumented)
+    readonly name: 'tick';
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'timer';
 }
 
 // @public (undocumented)
@@ -543,6 +566,9 @@ export type ScreenDocumentCommand = {
     readonly type: 'rename-variable';
     readonly variableId: string;
     readonly nextName: string;
+} | {
+    readonly type: 'update-theme';
+    readonly patch: ScreenThemePatch;
 };
 
 // @public (undocumented)
@@ -661,6 +687,9 @@ export interface ScreenSnapCandidate {
 export { ScreenStaticDataSource }
 
 export { ScreenStaticVariable }
+
+// @public
+type ScreenThemePatch = Readonly<Partial<Record<ScreenThemeSlot, string>>>;
 
 // @public (undocumented)
 export interface ScreenTransactionFailure {

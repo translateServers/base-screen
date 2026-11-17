@@ -238,7 +238,11 @@ function triggerMatches(
     ? trigger.componentId === event.componentId
     : trigger.type === 'variable-event' && event.type === 'variable-event'
       ? trigger.variableId === event.variableId
-      : false;
+      : trigger.type === 'lifecycle' && event.type === 'lifecycle'
+        ? true
+        : trigger.type === 'timer' && event.type === 'timer'
+          ? trigger.intervalSeconds === event.intervalSeconds
+          : false;
 }
 
 interface MutableRuleTrace {

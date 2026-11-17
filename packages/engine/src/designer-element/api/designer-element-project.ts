@@ -21,6 +21,7 @@ export function load(
 ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
   const elementState = getDesignerElementState(element);
 
+  elementState.canvasRuntimeController.resetLifecycleReady();
   return elementState.session.load(projectId);
 }
 

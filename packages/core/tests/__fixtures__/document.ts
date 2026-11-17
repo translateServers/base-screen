@@ -116,6 +116,16 @@ function sourceFromTrigger(
       event: { type: 'material-event', eventName: trigger.eventName },
     };
   }
+  if (trigger.type === 'lifecycle') {
+    return { kind: 'lifecycle', event: { type: 'lifecycle', eventName: 'ready' } };
+  }
+  if (trigger.type === 'timer') {
+    return {
+      kind: 'timer',
+      intervalSeconds: trigger.intervalSeconds,
+      event: { type: 'timer', eventName: 'tick' },
+    };
+  }
   return {
     kind: 'variable',
     variableId: trigger.variableId,

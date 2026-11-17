@@ -13,6 +13,7 @@ import type {
   ScreenJsonObject,
   ScreenPosition,
   ScreenSize,
+  ScreenThemeSlot,
   ScreenValueRef,
   ScreenVariableEntry,
 } from '@base-screen/contracts';
@@ -54,7 +55,11 @@ export type ScreenDocumentCommand =
       readonly type: 'rename-variable';
       readonly variableId: string;
       readonly nextName: string;
-    };
+    }
+  | { readonly type: 'update-theme'; readonly patch: ScreenThemePatch };
+
+/** 主题色板补丁：槽位 → 具体颜色；与现有色板合并后必须凑齐全部语义槽。 */
+export type ScreenThemePatch = Readonly<Partial<Record<ScreenThemeSlot, string>>>;
 
 export interface ScreenComponentPatch {
   readonly name?: string;

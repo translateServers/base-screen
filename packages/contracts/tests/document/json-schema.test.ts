@@ -44,6 +44,7 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
       'dataSources',
       'variables',
       'blueprint',
+      'theme',
     ]);
   });
 

@@ -356,6 +356,64 @@ describe('material identity and manifests', () => {
     ).toBe(true);
   });
 
+  it('accepts engine-reserved style keys without a material declaration', () => {
+    const manifest = parseBaseScreenMaterialManifest(materialManifest());
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) return;
+    const schema = manifest.value.styleSchema;
+
+    expect(
+      validateBaseScreenMaterialStyle({ color: '#ff0000', opacity: 0.5, flipX: true }, schema).ok,
+    ).toBe(true);
+    // 保留键仍按规范 schema 校验，不是放行任意值。
+    expect(validateBaseScreenMaterialStyle({ color: '#ff0000', opacity: 1.5 }, schema).ok).toBe(
+      false,
+    );
+    expect(validateBaseScreenMaterialStyle({ color: '#ff0000', flipX: 'yes' }, schema).ok).toBe(
+      false,
+    );
+    // 非保留的未申报键依旧失败关闭。
+    expect(validateBaseScreenMaterialStyle({ color: '#ff0000', blur: 2 }, schema).ok).toBe(false);
+    // 行为 / 滤镜保留键同样通用，且各自按规范 schema 校验。
+    expect(
+      validateBaseScreenMaterialStyle(
+        { color: '#ff0000', passThrough: true, clip: true, blend: 'screen', filterBlur: 40 },
+        schema,
+      ).ok,
+    ).toBe(true);
+    expect(validateBaseScreenMaterialStyle({ color: '#ff0000', blend: 'bogus' }, schema).ok).toBe(
+      false,
+    );
+    expect(validateBaseScreenMaterialStyle({ color: '#ff0000', filterBlur: 41 }, schema).ok).toBe(
+      false,
+    );
+    // props 校验不受保留键影响。
+    expect(
+      validateBaseScreenMaterialProps({ title: 'x', opacity: 0.5 }, manifest.value.propsSchema).ok,
+    ).toBe(false);
+  });
+
+  it('lets a material declaration override the reserved style schema', () => {
+    const manifest = parseBaseScreenMaterialManifest(
+      materialManifest({
+        styleSchema: {
+          kind: 'object',
+          properties: {
+            color: { kind: 'string' },
+            opacity: { kind: 'number', minimum: 0, maximum: 100 },
+          },
+          required: ['color'],
+        },
+      }),
+    );
+    expect(manifest.ok).toBe(true);
+    if (!manifest.ok) return;
+    expect(
+      validateBaseScreenMaterialStyle({ color: '#ff0000', opacity: 80 }, manifest.value.styleSchema)
+        .ok,
+    ).toBe(true);
+  });
+
   it('rejects style panels that do not declare an editable style key', () => {
     const result = parseBaseScreenMaterialManifest(
       materialManifest({ stylePanel: [{ style: 'missing', label: 'Missing', control: 'color' }] }),

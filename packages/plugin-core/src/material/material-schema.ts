@@ -31,11 +31,44 @@ export function validateBaseScreenMaterialProps(
   return { ok: true, value: parsed.value, diagnostics: [] };
 }
 
+/**
+ * 引擎级通用样式键：渲染器几何帧统一消费（不透明度 / 双轴翻转 / 行为 / 滤镜），
+ * 因此对所有物料通用，物料无需在 styleSchema 里重复申报。物料仍可自行申报同名字段，
+ * 申报的 schema 优先——既有清单的校验口径逐字不变。
+ *
+ * 行为与滤镜只覆盖物料不会自行接管的宿主级 CSS；overflow 仍归物料（内部滚动容器
+ * 依赖它），3D 旋转 / 倾斜 / 缩放不做（会破坏旋转矩形命中与渲染盒不变式）。
+ */
+export const BASE_SCREEN_RESERVED_STYLE_SCHEMAS: Readonly<
+  Record<string, BaseScreenMaterialPropSchema>
+> = {
+  opacity: { kind: 'number', minimum: 0, maximum: 1 },
+  flipX: { kind: 'boolean' },
+  flipY: { kind: 'boolean' },
+  passThrough: { kind: 'boolean' },
+  hoverPointer: { kind: 'boolean' },
+  clip: { kind: 'boolean' },
+  blend: {
+    kind: 'enum',
+    values: ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten'],
+  },
+  // 滤镜分量扁平存放（视图层在检查器里归成「滤镜」一组）：作者面提交门禁与补丁
+  // 构造器都只走顶层键，嵌套路径会迫使两处各自演化一套路径语义。
+  filterBlur: { kind: 'number', minimum: 0, maximum: 40 },
+  filterBrightness: { kind: 'number', minimum: 0, maximum: 300 },
+  filterContrast: { kind: 'number', minimum: 0, maximum: 300 },
+  filterSaturate: { kind: 'number', minimum: 0, maximum: 300 },
+  filterHueRotate: { kind: 'number', minimum: 0, maximum: 360 },
+};
+
 export function validateBaseScreenMaterialStyle(
   input: unknown,
   schema: BaseScreenMaterialObjectSchema,
 ): ScreenParseResult<ScreenJsonObject> {
-  return validateBaseScreenMaterialProps(input, schema);
+  return validateBaseScreenMaterialProps(input, {
+    ...schema,
+    properties: { ...BASE_SCREEN_RESERVED_STYLE_SCHEMAS, ...schema.properties },
+  });
 }
 
 export function validatePropsSchema(

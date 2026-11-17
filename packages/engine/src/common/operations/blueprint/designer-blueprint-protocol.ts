@@ -130,7 +130,32 @@ export function parseBaseScreenBlueprintCanvasCommand(
           ...(position.value === undefined ? {} : { position: position.value }),
         });
       }
-      if (input.kind !== 'host') {
+      if (input.kind === 'timer') {
+        const unknown = firstUnknownField(
+          input,
+          new Set([...COMMON_FIELDS, 'kind', 'intervalSeconds', 'position']),
+        );
+        const position = parseOptionalPosition(input.position);
+        const interval = input.intervalSeconds;
+        if (
+          unknown !== undefined ||
+          !position.ok ||
+          typeof interval !== 'number' ||
+          !Number.isInteger(interval) ||
+          interval < 1 ||
+          interval > 86_400
+        ) {
+          return failure([], 'Blueprint insert command is invalid.');
+        }
+        return success({
+          ...base,
+          type: input.type,
+          kind: input.kind,
+          intervalSeconds: interval,
+          ...(position.value === undefined ? {} : { position: position.value }),
+        });
+      }
+      if (input.kind !== 'host' && input.kind !== 'lifecycle') {
         return failure([], 'Blueprint insert command is invalid.');
       }
       const unknown = firstUnknownField(input, new Set([...COMMON_FIELDS, 'kind', 'position']));

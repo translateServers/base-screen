@@ -486,7 +486,7 @@ export const HARNESS_SEMANTIC_CHART_EDITOR_DESCRIPTOR: BaseScreenMaterialEditorD
           projection: 'props',
           path: ['tooltip', 'trigger'],
           label: '提示触发',
-          control: 'select',
+          control: 'segmented',
         },
         {
           id: 'hover',

@@ -238,7 +238,7 @@ describe('change diff presentation', () => {
     );
 
     expect(html).toMatch(
-      /class="change-diff-path">横坐标<\/code>\s*<span class="change-diff-before">40<\/span>\s*<span class="change-diff-arrow"[^>]*>→<\/span>\s*<span class="change-diff-after">48<\/span>/,
+      /class="change-diff-path">X<\/code>\s*<span class="change-diff-before">40<\/span>\s*<span class="change-diff-arrow"[^>]*>→<\/span>\s*<span class="change-diff-after">48<\/span>/,
     );
     expect(html).not.toContain('position.x');
   });

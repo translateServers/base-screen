@@ -21,6 +21,9 @@ import type { DesignerBlueprintEventOption } from './designer-blueprint-model-ty
 import {
   componentBlueprintNodeId,
   HOST_BLUEPRINT_NODE_ID,
+  LIFECYCLE_BLUEPRINT_NODE_ID,
+  timerBlueprintNodeId,
+  timerIntervalFromBlueprintNodeId,
   variableBlueprintNodeId,
 } from './designer-blueprint-node-ids.js';
 import type {
@@ -36,6 +39,9 @@ export {
   componentIdFromBlueprintNodeId,
   type DesignerBlueprintNodePosition,
   HOST_BLUEPRINT_NODE_ID,
+  LIFECYCLE_BLUEPRINT_NODE_ID,
+  timerBlueprintNodeId,
+  timerIntervalFromBlueprintNodeId,
   variableBlueprintNodeId,
   variableIdFromBlueprintNodeId,
 } from './designer-blueprint-node-ids.js';
@@ -44,6 +50,7 @@ const MAX_PROJECTED_COMPONENTS = 200;
 const COMPONENT_COLUMN_GAP = 264;
 const COMPONENT_ROW_GAP = 252;
 const VARIABLE_ROW_GAP = 196;
+const INSTANCE_NODE_ROW_GAP = 160;
 
 export function buildDesignerBlueprintEventOptions(
   document: ScreenDocument,
@@ -208,23 +215,68 @@ export function buildDesignerBlueprintGraph(
     (relation) => relation.type === 'behavior' && relation.target.kind === 'host',
   );
   const hostPinned = pinnedNodeIds.has(HOST_BLUEPRINT_NODE_ID);
+  const instanceColumnX =
+    72 + (Math.max(0, ...componentDepths(document).values()) + 2) * COMPONENT_COLUMN_GAP;
   const hostNode: BaseScreenBlueprintCanvasNode | undefined =
     hasExit || hostPinned
       ? withSavedPosition(
           {
             id: HOST_BLUEPRINT_NODE_ID,
             kind: 'host',
-            x: 72 + (Math.max(0, ...componentDepths(document).values()) + 2) * COMPONENT_COLUMN_GAP,
+            x: instanceColumnX,
             y: 72,
           },
           saved,
         )
       : undefined;
   if (hostNode !== undefined) nodeIds.add(hostNode.id);
+  const lifecycleRelationCount = document.blueprint.relations.filter(
+    (relation) => relation.type === 'behavior' && relation.source.kind === 'lifecycle',
+  ).length;
+  const lifecycleNode =
+    lifecycleRelationCount > 0 || pinnedNodeIds.has(LIFECYCLE_BLUEPRINT_NODE_ID)
+      ? withSavedPosition(
+          {
+            id: LIFECYCLE_BLUEPRINT_NODE_ID,
+            kind: 'lifecycle',
+            x: instanceColumnX,
+            y: 72 + INSTANCE_NODE_ROW_GAP,
+          },
+          saved,
+        )
+      : undefined;
+  if (lifecycleNode !== undefined) nodeIds.add(lifecycleNode.id);
+  const timerIntervals = new Set<number>();
+  for (const relation of document.blueprint.relations) {
+    if (relation.type === 'behavior' && relation.source.kind === 'timer') {
+      timerIntervals.add(relation.source.intervalSeconds);
+    }
+  }
+  for (const pinnedId of pinnedNodeIds) {
+    const interval = timerIntervalFromBlueprintNodeId(pinnedId);
+    if (interval !== undefined) timerIntervals.add(interval);
+  }
+  const timerNodes = [...timerIntervals]
+    .sort((left, right) => left - right)
+    .map((intervalSeconds, index) =>
+      withSavedPosition(
+        {
+          id: timerBlueprintNodeId(intervalSeconds),
+          kind: 'timer',
+          x: instanceColumnX,
+          y: 72 + (index + 2) * INSTANCE_NODE_ROW_GAP,
+          intervalSeconds,
+        },
+        saved,
+      ),
+    );
+  for (const node of timerNodes) nodeIds.add(node.id);
   const nodes: BaseScreenBlueprintCanvasNode[] = [
     ...componentNodes,
     ...variableNodes,
     ...(hostNode === undefined ? [] : [hostNode]),
+    ...(lifecycleNode === undefined ? [] : [lifecycleNode]),
+    ...timerNodes,
   ];
   const edges: BaseScreenBlueprintCanvasEdge[] = [];
   for (const relation of document.blueprint.relations) {
@@ -352,6 +404,10 @@ function appendRelationEdge(
 
 function relationSourceNodeId(relation: ScreenBlueprintRelation): string {
   if (relation.type === 'semantic') return componentBlueprintNodeId(relation.source.componentId);
+  if (relation.source.kind === 'lifecycle') return LIFECYCLE_BLUEPRINT_NODE_ID;
+  if (relation.source.kind === 'timer') {
+    return timerBlueprintNodeId(relation.source.intervalSeconds);
+  }
   return relation.source.kind === 'component'
     ? componentBlueprintNodeId(relation.source.componentId)
     : variableBlueprintNodeId(relation.source.variableId);

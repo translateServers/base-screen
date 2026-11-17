@@ -399,6 +399,21 @@ const blueprintRelationSourceSchema = z.discriminatedUnion('kind', [
       eventName: z.enum(['data-updated', 'request-state']),
     }),
   }),
+  z.strictObject({
+    kind: z.literal('lifecycle'),
+    event: z.strictObject({
+      type: z.literal('lifecycle'),
+      eventName: z.enum(['ready']),
+    }),
+  }),
+  z.strictObject({
+    kind: z.literal('timer'),
+    intervalSeconds: z.number().int().min(1).max(86_400),
+    event: z.strictObject({
+      type: z.literal('timer'),
+      eventName: z.enum(['tick']),
+    }),
+  }),
 ]);
 
 const blueprintRelationTargetSchema = z.discriminatedUnion('kind', [
@@ -511,6 +526,19 @@ export const blueprintSchema = z.strictObject({
   layout: blueprintLayoutSchema.optional(),
 });
 
+const themeColorSchema = z.string().min(1).max(64);
+
+export const themeSchema = z.strictObject({
+  palette: z.strictObject({
+    primary: themeColorSchema,
+    text: themeColorSchema,
+    textSecondary: themeColorSchema,
+    background: themeColorSchema,
+    accent: themeColorSchema,
+    accentSecondary: themeColorSchema,
+  }),
+});
+
 export const documentSchema = z.strictObject({
   canvas: canvasSchema,
   components: z.array(componentSchema).max(MAX_COMPONENTS),
@@ -526,4 +554,5 @@ export const documentSchema = z.strictObject({
     )
     .max(MAX_VARIABLES),
   blueprint: blueprintSchema,
+  theme: themeSchema.optional(),
 });

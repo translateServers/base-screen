@@ -1657,7 +1657,7 @@ async function assertHostLeftPanelGroups(designer) {
     result.selected.title !== 'Host assets' ||
     !result.selected.countHidden ||
     !result.selected.assigned ||
-    result.selected.fallback !== '此分组暂无内容。' ||
+    result.selected.fallback !== '此分组暂无内容，内容就绪后会显示在这里。' ||
     !result.selected.icon ||
     !result.selected.controls ||
     !result.selected.labelled ||

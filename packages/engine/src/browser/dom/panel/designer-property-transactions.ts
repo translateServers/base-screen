@@ -9,6 +9,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialPropSchema,
 } from '@base-screen/plugin-core';
+import { BASE_SCREEN_RESERVED_STYLE_SCHEMAS } from '@base-screen/plugin-core';
 import {
   clampScreenCoordinate,
   roundScreenGeometry,
@@ -35,6 +36,7 @@ import { readDesignerColorPaletteValue } from '../color/designer-color-palette-d
 import {
   createCanvasBackgroundPaletteTransaction,
   createCanvasTransaction,
+  createThemePaletteTransaction,
 } from './designer-canvas-transactions.js';
 import { parseJsonDraft } from './designer-data-source-model.js';
 import { isControl, success, update } from './designer-panel-transaction-utils.js';
@@ -94,6 +96,18 @@ export function createPropertyTransaction(
       if (value === undefined) return undefined;
       return createCanvasBackgroundPaletteTransaction(document, value);
     }
+    const themePalette = canQueryAncestors(target)
+      ? target.closest<HTMLElement>('[data-canvas-property^="theme."]')
+      : null;
+    if (themePalette !== null) {
+      const value = readDesignerColorPaletteValue(target);
+      if (value === undefined || document === undefined) return undefined;
+      return createThemePaletteTransaction(
+        document,
+        themePalette.dataset.canvasProperty!.slice('theme.'.length),
+        value,
+      );
+    }
     return createCanvasTransaction(document, target);
   }
   const component = context.component;
@@ -104,13 +118,19 @@ export function createPropertyTransaction(
   const prop = target.dataset.prop;
   const style = target.dataset.style;
   const manifest = context.manifest;
+  // 引擎级保留键不需要物料申报：检查器自建的行为/滤镜分区与物料 stylePanel 走同一条提交门禁。
+  const reservedStyle = style === undefined ? undefined : BASE_SCREEN_RESERVED_STYLE_SCHEMAS[style];
+  const styleSchema =
+    (style === undefined ? undefined : manifest?.styleSchema.properties[style]) ?? reservedStyle;
   if (
     manifest !== undefined &&
     style !== undefined &&
-    manifest.styleSchema.properties[style] !== undefined &&
-    (manifest.stylePanel.some((field) => field.style === style) || style === 'opacity')
+    styleSchema !== undefined &&
+    (reservedStyle !== undefined ||
+      manifest.stylePanel.some((field) => field.style === style) ||
+      style === 'opacity')
   ) {
-    const schema = manifest.styleSchema.properties[style];
+    const schema = styleSchema;
     if (isClearedOptionalNumberControl(target, schema, manifest.styleSchema.required, style)) {
       const nextStyle = { ...component.style };
       delete nextStyle[style];
@@ -175,7 +195,8 @@ export function createMultiSelectionTransaction(
     const style = multiProperty.slice('style:'.length);
     const focused = document.components.find((item) => item.id === interaction.focusedComponentId);
     const manifest = focused === undefined ? undefined : catalog?.get(focused.type)?.manifest;
-    const schema = manifest?.styleSchema?.properties?.[style];
+    const schema =
+      manifest?.styleSchema?.properties?.[style] ?? BASE_SCREEN_RESERVED_STYLE_SCHEMAS[style];
     if (schema === undefined) return undefined;
     const value = parsePropertyControlValue(target, schema);
     if (value === undefined) return undefined;

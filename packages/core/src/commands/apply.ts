@@ -1,5 +1,7 @@
 import {
+  isScreenThemeSlot,
   SCREEN_CANVAS_FIELDS,
+  SCREEN_THEME_SLOTS,
   type ScreenDocument,
   screenJsonEquals,
 } from '@base-screen/contracts';
@@ -129,6 +131,8 @@ function applyValidatedCommand(
       return applyVariables(document, command.variables);
     case 'rename-variable':
       return applyRenameVariableCommand(document, command);
+    case 'update-theme':
+      return applyTheme(document, command.patch);
     default:
       return screenCommandFailure(
         document,
@@ -160,6 +164,42 @@ function applyCanvas(document: ScreenDocument, patch: unknown): ScreenCommandRes
     return screenCommandSuccess(document, []);
   }
   return finalizeScreenCommand(document, { ...document, canvas }, []);
+}
+
+function applyTheme(document: ScreenDocument, patch: unknown): ScreenCommandResult {
+  if (!isRecord(patch)) {
+    return screenCommandFailure(
+      document,
+      invalidScreenCommand('Theme patch must be an object of slot colors.', ['patch']),
+    );
+  }
+  for (const [key, value] of Object.entries(patch)) {
+    if (
+      !isScreenThemeSlot(key) ||
+      typeof value !== 'string' ||
+      value.trim() === '' ||
+      value.length > 64
+    ) {
+      return screenCommandFailure(
+        document,
+        invalidScreenCommand('Theme patch keys must be palette slots with color strings.', [
+          'patch',
+          key,
+        ]),
+      );
+    }
+  }
+  const palette = { ...document.theme?.palette, ...patch } as Record<string, string>;
+  // 色板要么不存在、要么六槽齐全：半套色板会让 theme: 引用解析到空洞。
+  if (SCREEN_THEME_SLOTS.some((slot) => typeof palette[slot] !== 'string')) {
+    return screenCommandFailure(
+      document,
+      invalidScreenCommand('Theme patch must complete all palette slots.', ['patch']),
+    );
+  }
+  const theme = { palette };
+  if (screenJsonEquals(document.theme, theme)) return screenCommandSuccess(document, []);
+  return finalizeScreenCommand(document, { ...document, theme }, []);
 }
 
 function applyVariables(document: ScreenDocument, variables: unknown): ScreenCommandResult {

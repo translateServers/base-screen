@@ -61,6 +61,24 @@ export const SHORTCUT_HELP_SECTIONS = [
   },
 ] as const;
 
+export const MARQUEE_HELP_ENTRIES = [
+  {
+    id: 'intersect',
+    label: DESIGNER_UI_TEXT.marqueeHelp.intersect,
+    keys: DESIGNER_UI_TEXT.marqueeHelp.intersectKeys,
+  },
+  {
+    id: 'contain',
+    label: DESIGNER_UI_TEXT.marqueeHelp.contain,
+    keys: DESIGNER_UI_TEXT.marqueeHelp.containKeys,
+  },
+  {
+    id: 'union',
+    label: DESIGNER_UI_TEXT.marqueeHelp.union,
+    keys: DESIGNER_UI_TEXT.marqueeHelp.unionKeys,
+  },
+] as const;
+
 export function coordinateEntryField(axis: 'x' | 'y'): string {
   const label = axis.toUpperCase();
   return `<label class="designer-coordinate-entry-field"><span class="designer-coordinate-entry-input"><span class="designer-coordinate-entry-axis" aria-hidden="true">${label}</span><input type="number" class="designer-control designer-input designer-number" data-coordinate-entry-${axis} data-coordinate-entry-axis="${axis}" inputmode="decimal" min="-1000000" max="1000000" step="0.01" aria-label="${label}" aria-describedby="designer-coordinate-entry-error"><span class="designer-coordinate-entry-unit" aria-hidden="true">${DESIGNER_UI_TEXT.coordinateEntry.unit}</span></span></label>`;

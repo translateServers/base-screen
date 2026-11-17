@@ -3,6 +3,7 @@ import {
   DesignerPanelMaterialController,
   MATERIAL_SEARCH_DEBOUNCE_MS,
 } from '../../../../src/browser/controllers/panel/designer-panel-material-controller.js';
+import { DESIGNER_UI_TEXT } from '../../../../src/common/ui-text/designer-ui-text.js';
 import {
   createMaterialGroupLayout,
   MaterialGroupTestElement,
@@ -120,11 +121,15 @@ describe('material library browsing recovery', () => {
 
   it('does not offer a redundant reset when the entire library is empty without constraints', () => {
     const view = setup();
+    const title = view.node('p', 'designer-empty-title', {});
+    view.empty.append(title);
     view.grid.replaceChildren();
     view.controller.refresh(view.layout);
     expect(view.empty.hidden).toBe(false);
     expect(view.reset.hidden).toBe(true);
+    expect(title.textContent).toBe(DESIGNER_UI_TEXT.materialCatalogEmpty);
     view.click('[data-material-filter="favorite"]');
     expect(view.reset.hidden).toBe(false);
+    expect(title.textContent).toBe(DESIGNER_UI_TEXT.materialSearchEmpty);
   });
 });

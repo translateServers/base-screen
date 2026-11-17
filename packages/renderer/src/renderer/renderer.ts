@@ -254,7 +254,12 @@ class Renderer implements BaseScreenRenderer {
       element.addEventListener('base-screen-material-event', onEvent);
       let mountedModel: BaseScreenMaterialModel;
       try {
-        mountedModel = resolveEffectiveModel(this.#state, candidate, candidate.model.dataState);
+        mountedModel = resolveEffectiveModel(
+          this.#state,
+          candidate,
+          candidate.model.dataState,
+          parsedDocument.value,
+        );
         applyMaterial(
           element,
           candidate.component,

@@ -127,7 +127,7 @@ interface BaseScreenMaterialEditorCondition {
 type BaseScreenMaterialEditorConditionOperator = 'eq' | 'neq' | 'exists' | 'not-exists' | 'in' | 'not-in';
 
 // @public (undocumented)
-type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'stepper' | 'custom';
+type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'segmented' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'stepper' | 'custom';
 
 // @public (undocumented)
 interface BaseScreenMaterialEditorDescriptor {
@@ -885,7 +885,7 @@ interface PluginDesignReadPort {
 }
 
 // @public
-const SCREEN_BLUEPRINT_CAPABILITY_IDS: readonly ['blueprint.trigger.material-event', 'blueprint.trigger.variable-event', 'blueprint.value.event-payload', 'blueprint.value.variable', 'blueprint.condition.compare', 'blueprint.action.set-variable', 'blueprint.action.emit-host-event', 'blueprint.action.component-visibility', 'blueprint.action.request-variable', 'blueprint.action.request-component-data'];
+const SCREEN_BLUEPRINT_CAPABILITY_IDS: readonly ['blueprint.trigger.material-event', 'blueprint.trigger.variable-event', 'blueprint.trigger.lifecycle', 'blueprint.trigger.timer', 'blueprint.value.event-payload', 'blueprint.value.variable', 'blueprint.condition.compare', 'blueprint.action.set-variable', 'blueprint.action.emit-host-event', 'blueprint.action.component-visibility', 'blueprint.action.request-variable', 'blueprint.action.request-component-data'];
 
 // @public
 const SCREEN_MATERIAL_ERROR_CODES: readonly ['HOST_RESOURCE_ACCESS_DENIED', 'HOST_RESOURCE_UNAVAILABLE', 'HOST_RESOURCE_TIMEOUT', 'HOST_RESOURCE_FAILED', 'HOST_RESOURCE_INVALID', 'HOST_DATASET_INVALID', 'HOST_DATASET_BINDING_INVALID', 'HOST_DATASET_ADAPTER_FAILED'];
@@ -998,6 +998,19 @@ type ScreenBlueprintRelationSource = {
     readonly event: {
         readonly type: 'variable-event';
         readonly eventName: 'data-updated' | 'request-state';
+    };
+} | {
+    readonly kind: 'lifecycle';
+    readonly event: {
+        readonly type: 'lifecycle';
+        readonly eventName: 'ready';
+    };
+} | {
+    readonly kind: 'timer';
+    readonly intervalSeconds: number;
+    readonly event: {
+        readonly type: 'timer';
+        readonly eventName: 'tick';
     };
 };
 
@@ -1295,6 +1308,7 @@ interface ScreenDocument {
     // (undocumented)
     readonly components: readonly ScreenComponentNode[];
     readonly dataSources?: readonly ScreenDataSource[];
+    readonly theme?: ScreenTheme;
     // (undocumented)
     readonly variables: readonly ScreenVariableEntry[];
 }
@@ -1387,6 +1401,15 @@ interface ScreenTabularDataset {
     // (undocumented)
     readonly totalRowCount?: number;
 }
+
+// @public (undocumented)
+interface ScreenTheme {
+    // (undocumented)
+    readonly palette: Readonly<Record<ScreenThemeSlot, string>>;
+}
+
+// @public
+type ScreenThemeSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
 
 // @public
 interface ScreenUpdatePolicy {

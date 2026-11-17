@@ -9,6 +9,7 @@ import { createDesignerStepper } from '../designer-field-primitives.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
   createDesignerInput,
+  createDesignerSegmented,
   createDesignerSelect,
   createDesignerSwitch,
   createDesignerTextarea,
@@ -54,6 +55,46 @@ export function createDescriptorControl(
       checked: value === true,
     });
     return { element: toggle, valueTarget: toggle };
+  }
+  if (control === 'segmented' && schema?.kind === 'enum') {
+    // 与对齐分段同款：原生 select 是唯一值载体与 change 源，可见按钮只改值。
+    const current = schema.values.some((option) => option === value)
+      ? String(value)
+      : String(schema.values[0]);
+    const select = createDesignerSelect(ownerDocument, {
+      ariaLabel: field.label,
+      className: 'designer-segmented-native',
+      options: schema.values.map((optionValue) => ({
+        label: String(optionValue),
+        selected: String(optionValue) === current,
+        value: String(optionValue),
+      })),
+      value: current,
+    });
+    const segmented = createDesignerSegmented(ownerDocument, {
+      ariaLabel: field.label,
+      selection: 'radio',
+      selected: current,
+      options: schema.values.map((optionValue) => ({
+        value: String(optionValue),
+        label: String(optionValue),
+      })),
+    });
+    for (const [optionValue, option] of segmented.buttons) {
+      option.addEventListener('click', () => {
+        if (select.value === optionValue) return;
+        select.value = optionValue;
+        for (const [key, candidate] of segmented.buttons) {
+          candidate.ariaChecked = String(key === optionValue);
+          candidate.tabIndex = key === optionValue ? 0 : -1;
+        }
+        select.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+      });
+    }
+    const shell = ownerDocument.createElement('span');
+    shell.className = 'designer-descriptor-segmented';
+    shell.append(segmented.element, select);
+    return { element: shell, valueTarget: select };
   }
   if (control === 'select' && schema?.kind === 'enum') {
     const select = createDesignerSelect(ownerDocument, {
@@ -113,6 +154,17 @@ export function createDescriptorControl(
     ...(numeric && field.step !== undefined ? { step: field.step } : {}),
     value: String(value ?? ''),
   });
+  if (control === 'unit-number' && field.unit !== undefined && field.unit !== '') {
+    // 与步进器同一套复合控件形态：外壳画描边环，单位后缀不参与取值，input 仍是唯一值载体。
+    const shell = ownerDocument.createElement('span');
+    shell.className = 'designer-unit-input';
+    const suffix = ownerDocument.createElement('span');
+    suffix.className = 'designer-unit-input-suffix';
+    suffix.setAttribute('aria-hidden', 'true');
+    suffix.textContent = field.unit;
+    shell.append(input, suffix);
+    return { element: shell, valueTarget: input };
+  }
   return { element: input, valueTarget: input };
 }
 

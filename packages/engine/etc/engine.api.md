@@ -244,6 +244,13 @@ export type BaseScreenBlueprintCanvasInsertNode = {
 } | {
     readonly kind: 'host';
     readonly position?: BaseScreenBlueprintCanvasNodePosition;
+} | {
+    readonly kind: 'lifecycle';
+    readonly position?: BaseScreenBlueprintCanvasNodePosition;
+} | {
+    readonly kind: 'timer';
+    readonly intervalSeconds: number;
+    readonly position?: BaseScreenBlueprintCanvasNodePosition;
 };
 
 // @public (undocumented)
@@ -266,6 +273,7 @@ export interface BaseScreenBlueprintCanvasNode {
     readonly id: string;
     // (undocumented)
     readonly inboundCount?: number;
+    readonly intervalSeconds?: number;
     // (undocumented)
     readonly isContainer?: boolean;
     // (undocumented)
@@ -299,7 +307,7 @@ export interface BaseScreenBlueprintCanvasNode {
 }
 
 // @public (undocumented)
-type BaseScreenBlueprintCanvasNodeKind = 'component' | 'variable' | 'host';
+type BaseScreenBlueprintCanvasNodeKind = 'component' | 'variable' | 'host' | 'lifecycle' | 'timer';
 
 // @public (undocumented)
 export interface BaseScreenBlueprintCanvasNodePosition {

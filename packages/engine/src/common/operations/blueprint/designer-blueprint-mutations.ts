@@ -12,6 +12,8 @@ import {
   parseRelationEdgeId,
   relationReferencesComponent,
   relationReferencesHost,
+  relationReferencesLifecycle,
+  relationReferencesTimer,
   relationReferencesVariable,
   removeLayoutNodes,
   removeRelation,
@@ -25,6 +27,9 @@ import {
   componentBlueprintNodeId,
   type DesignerBlueprintNodePosition,
   HOST_BLUEPRINT_NODE_ID,
+  LIFECYCLE_BLUEPRINT_NODE_ID,
+  timerBlueprintNodeId,
+  timerIntervalFromBlueprintNodeId,
   variableBlueprintNodeId,
 } from './designer-blueprint-node-ids.js';
 import type { BaseScreenBlueprintCanvasSelection } from './designer-blueprint-protocol.js';
@@ -54,6 +59,54 @@ export function insertDesignerBlueprintHostNode(
   return insertLayoutNode(blueprint, HOST_BLUEPRINT_NODE_ID, position);
 }
 
+export function insertDesignerBlueprintLifecycleNode(
+  blueprint: ScreenBlueprint,
+  position?: DesignerBlueprintNodePosition,
+): ScreenBlueprint {
+  return insertLayoutNode(blueprint, LIFECYCLE_BLUEPRINT_NODE_ID, position);
+}
+
+function isTimerInterval(value: number): boolean {
+  return Number.isInteger(value) && value >= 1 && value <= 86_400;
+}
+
+export function insertDesignerBlueprintTimerNode(
+  blueprint: ScreenBlueprint,
+  intervalSeconds = 5,
+  position?: DesignerBlueprintNodePosition,
+): ScreenBlueprint | null {
+  if (!isTimerInterval(intervalSeconds)) return null;
+  return insertLayoutNode(blueprint, timerBlueprintNodeId(intervalSeconds), position);
+}
+
+/** 调整定时器间隔：节点 id 与同间隔关系的源一起改写；目标间隔已被占用时拒绝。 */
+export function updateDesignerBlueprintTimerInterval(
+  blueprint: ScreenBlueprint,
+  fromSeconds: number,
+  toSeconds: number,
+): ScreenBlueprint | null {
+  if (!isTimerInterval(fromSeconds) || !isTimerInterval(toSeconds)) return null;
+  const fromId = timerBlueprintNodeId(fromSeconds);
+  const toId = timerBlueprintNodeId(toSeconds);
+  const nodes = blueprint.layout?.nodes ?? [];
+  if (fromId !== toId && nodes.some((node) => node.id === toId)) return null;
+  const relations = blueprint.relations.map((relation) =>
+    relationReferencesTimer(relation, fromSeconds)
+      ? relation.type === 'behavior' && relation.source.kind === 'timer'
+        ? { ...relation, source: { ...relation.source, intervalSeconds: toSeconds } }
+        : relation
+      : relation,
+  );
+  const layout =
+    blueprint.layout === undefined
+      ? undefined
+      : {
+          ...blueprint.layout,
+          nodes: nodes.map((node) => (node.id === fromId ? { ...node, id: toId } : node)),
+        };
+  return { ...blueprint, relations, ...(layout === undefined ? {} : { layout }) };
+}
+
 export function deleteDesignerBlueprintSelection(
   blueprint: ScreenBlueprint,
   selection: Exclude<BaseScreenBlueprintCanvasSelection, null>,
@@ -68,6 +121,23 @@ export function deleteDesignerBlueprintSelection(
       if (relationReferencesHost(relation)) updated = removeRelation(updated, relation.id);
     }
     return removeLayoutNodes(updated, new Set([HOST_BLUEPRINT_NODE_ID]));
+  }
+  if (selection.id === LIFECYCLE_BLUEPRINT_NODE_ID) {
+    let updated: ScreenBlueprint = blueprint;
+    for (const relation of blueprint.relations) {
+      if (relationReferencesLifecycle(relation)) updated = removeRelation(updated, relation.id);
+    }
+    return removeLayoutNodes(updated, new Set([LIFECYCLE_BLUEPRINT_NODE_ID]));
+  }
+  const timerInterval = timerIntervalFromBlueprintNodeId(selection.id);
+  if (timerInterval !== undefined) {
+    let updated: ScreenBlueprint = blueprint;
+    for (const relation of blueprint.relations) {
+      if (relationReferencesTimer(relation, timerInterval)) {
+        updated = removeRelation(updated, relation.id);
+      }
+    }
+    return removeLayoutNodes(updated, new Set([selection.id]));
   }
   if (selection.id.startsWith('component:')) {
     const componentId = selection.id.slice('component:'.length);

@@ -8,7 +8,11 @@ const datasetsStub = {
   describe: async () => ({ fields: [] }),
 } as unknown as DatasetCatalogService;
 
-import { type AgentCatalog, parseAgentCatalog } from '../src/agent/agent-catalog';
+import {
+  type AgentCatalog,
+  parseAgentCatalog,
+  renderCatalogPrompt,
+} from '../src/agent/agent-catalog';
 import { requestAgentCompletion } from '../src/agent/agent-client';
 import {
   type AgentEditableComponent,
@@ -530,6 +534,38 @@ describe('目录驱动的解析与编译', () => {
       })),
     });
     expect(parsed.ok).toBe(true);
+  });
+
+  it('accepts a host-derived style signature and puts it into the catalog prompt', () => {
+    const signature = 'interface MaterialStyle {\n  /** 颜色 */\n  color?: string;\n}';
+    const parsed = parseAgentCatalog({
+      materials: [{ ...TEST_CATALOG.materials[0], stylePrompt: signature }],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.materials[0]!.stylePrompt).toBe(signature);
+    const prompt = renderCatalogPrompt(parsed.value);
+    expect(prompt).toContain('样式签名');
+    expect(prompt).toContain(signature);
+  });
+
+  it('rejects an overlong or non-string style signature', () => {
+    expect(
+      parseAgentCatalog({
+        materials: [{ ...TEST_CATALOG.materials[0], stylePrompt: 'x'.repeat(4001) }],
+      }).ok,
+    ).toBe(false);
+    expect(
+      parseAgentCatalog({ materials: [{ ...TEST_CATALOG.materials[0], stylePrompt: 42 }] }).ok,
+    ).toBe(false);
+  });
+
+  it('keeps catalogs without a style signature parseable and prompt unchanged', () => {
+    const parsed = parseAgentCatalog({ materials: [TEST_CATALOG.materials[0]] });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.materials[0]!.stylePrompt).toBeUndefined();
+    expect(renderCatalogPrompt(parsed.value)).not.toContain('样式签名');
   });
 
   it('表格数据编成 inline 值 + 目录声明的绑定角色，且不产出 legacy dataSource', () => {

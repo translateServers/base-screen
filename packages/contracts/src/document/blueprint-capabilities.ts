@@ -9,6 +9,8 @@
 export const SCREEN_BLUEPRINT_CAPABILITY_IDS = [
   'blueprint.trigger.material-event',
   'blueprint.trigger.variable-event',
+  'blueprint.trigger.lifecycle',
+  'blueprint.trigger.timer',
   'blueprint.value.event-payload',
   'blueprint.value.variable',
   'blueprint.condition.compare',
@@ -25,6 +27,8 @@ export type ScreenBlueprintCapabilityId = (typeof SCREEN_BLUEPRINT_CAPABILITY_ID
 export const SCREEN_BLUEPRINT_CAPABILITIES = {
   materialEvent: 'blueprint.trigger.material-event',
   variableEvent: 'blueprint.trigger.variable-event',
+  lifecycle: 'blueprint.trigger.lifecycle',
+  timer: 'blueprint.trigger.timer',
   eventPayload: 'blueprint.value.event-payload',
   variable: 'blueprint.value.variable',
   condition: 'blueprint.condition.compare',

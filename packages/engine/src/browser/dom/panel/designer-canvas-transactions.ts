@@ -2,8 +2,9 @@ import type {
   ScreenCanvasBackground,
   ScreenDocument,
   ScreenParseResult,
+  ScreenThemeSlot,
 } from '@base-screen/contracts';
-import { isBoundedScreenImageUrl } from '@base-screen/contracts';
+import { isBoundedScreenImageUrl, isScreenThemeSlot } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction } from '@base-screen/core';
 import type { BaseScreenCanvasScaleMode } from '../../../common/operations/canvas/canvas-presentation.js';
 import { roundScreenGeometry } from '../../../common/operations/element/designer-geometry.js';
@@ -16,6 +17,29 @@ import {
 import { success } from './designer-panel-transaction-utils.js';
 
 export type DesignerCanvasScaleMode = BaseScreenCanvasScaleMode;
+
+/** 作者面初始化色板的中性默认值；预设库与换肤策略仍归宿主（ADR-0098）。 */
+export const SCREEN_THEME_AUTHORING_DEFAULT_PALETTE: Readonly<Record<ScreenThemeSlot, string>> = {
+  primary: '#38bdf8',
+  text: '#e5e7eb',
+  textSecondary: '#9ca3af',
+  background: '#0f172a',
+  accent: '#22d3ee',
+  accentSecondary: '#a78bfa',
+};
+
+/** 色板编辑一次提交整副色板：半套色板会让 theme: 引用解析到空洞，命令层也拒绝。 */
+export function createThemePaletteTransaction(
+  document: ScreenDocument,
+  slot: string,
+  value: string,
+): ScreenParseResult<ScreenDocumentTransaction> | undefined {
+  if (!isScreenThemeSlot(slot) || value.trim() === '') return undefined;
+  const base = document.theme?.palette ?? SCREEN_THEME_AUTHORING_DEFAULT_PALETTE;
+  return success({
+    commands: [{ type: 'update-theme', patch: { ...base, [slot]: value } }],
+  });
+}
 
 export interface DesignerCanvasPresentationSettings {
   opacity: number;

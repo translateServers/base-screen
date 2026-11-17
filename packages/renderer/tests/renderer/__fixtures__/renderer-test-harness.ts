@@ -49,6 +49,7 @@ export function createCatalog(
         flipX: { kind: 'boolean' },
         flipY: { kind: 'boolean' },
         opacity: { kind: 'number' },
+        color: { kind: 'string' },
       },
       required: [],
     },

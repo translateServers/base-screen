@@ -65,6 +65,7 @@
   gap: var(--designer-space-5);
   padding-top: var(--designer-space-5);
   overflow-y: auto;
+  scrollbar-gutter: stable;
   scrollbar-color: var(--designer-border-strong) transparent;
 }
 

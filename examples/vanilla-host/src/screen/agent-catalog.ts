@@ -3,6 +3,7 @@ import type {
   BaseScreenMaterialManifest,
   BaseScreenMaterialObjectSchema,
 } from 'base-screen/plugin-core';
+import { describeBaseScreenMaterialStyleForAi } from 'base-screen/plugin-core';
 import type {
   AgentCatalogMaterialShape,
   AgentCatalogPropShape,
@@ -16,9 +17,10 @@ import type {
  * 三端合并后的结果（在线包发布/下架后宿主会 `refreshCatalog`，这里读到的就是最新一份）。
  * 所以「刚上线的组件」不需要导出快照、也不需要重启后端，下一句话就进了提示词。
  *
- * 只搬编译需要的东西：物料 type / 名称 / 数据形态 / 参数（含枚举）/ 绑定角色 / 默认值。
- * 不搬 tagName、构造函数、属性面板、事件、完整 schema——这些对生成没有用，反而会把
- * 宿主内部结构带出边界。
+ * 只搬编译需要的东西：物料 type / 名称 / 数据形态 / 参数（含枚举）/ 绑定角色 / 默认值，
+ * 以及由 styleSchema + editorDescriptor 确定性派生的带注释样式签名（stylePrompt）。
+ * 不搬 tagName、构造函数、属性面板 DOM、事件、完整 schema 原文——这些对生成没有用，
+ * 反而会把宿主内部结构带出边界。
  *
  * 三端（vanilla / react / vue）逐字共享，与 `host-intent.ts` 同一对等约定。
  */
@@ -60,6 +62,8 @@ function readMaterial(manifest: BaseScreenMaterialManifest): AgentCatalogMateria
       props: scalarOnly(manifest.defaultProps),
       style: scalarOnly(manifest.defaultStyle),
     },
+    // 嵌套 object/array 参数不进浅层摘要，改由带注释的类型签名表达，模型无从编造字段名。
+    stylePrompt: describeBaseScreenMaterialStyleForAi(manifest),
   };
 }
 

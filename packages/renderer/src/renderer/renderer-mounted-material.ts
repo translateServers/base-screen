@@ -43,7 +43,7 @@ export function applyMountedModel(
   mounted: MountedMaterial,
   stackOrder: number,
 ): void {
-  const model = resolveEffectiveModel(state, candidate, candidate.model.dataState);
+  const model = resolveEffectiveModel(state, candidate, candidate.model.dataState, state.document);
   applyMaterial(
     mounted.element,
     candidate.component,
@@ -94,7 +94,7 @@ export function applyMountedConditionalStyle(
   candidate: RenderCandidate,
   mounted: MountedMaterial,
 ): void {
-  const model = resolveEffectiveModel(state, candidate, candidate.model.dataState);
+  const model = resolveEffectiveModel(state, candidate, candidate.model.dataState, state.document);
   mounted.element.model = model;
   mounted.appliedModel = model;
 }

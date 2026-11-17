@@ -306,7 +306,7 @@ export interface ScreenBlueprintEmitHostEventActionTrace {
 }
 
 // @public (undocumented)
-export type ScreenBlueprintEvent = ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent;
+export type ScreenBlueprintEvent = ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent | ScreenBlueprintLifecycleEvent | ScreenBlueprintTimerEvent;
 
 // @public (undocumented)
 interface ScreenBlueprintHostAction {
@@ -368,6 +368,24 @@ interface ScreenBlueprintLayoutViewport {
     readonly y: number;
     // (undocumented)
     readonly zoom: number;
+}
+
+// @public
+interface ScreenBlueprintLifecycleEvent {
+    // (undocumented)
+    readonly name: 'ready';
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'lifecycle';
+}
+
+// @public
+interface ScreenBlueprintLifecycleTrigger {
+    // (undocumented)
+    readonly eventName: 'ready';
+    // (undocumented)
+    readonly type: 'lifecycle';
 }
 
 // @public (undocumented)
@@ -439,6 +457,19 @@ type ScreenBlueprintRelationSource = {
     readonly event: {
         readonly type: 'variable-event';
         readonly eventName: 'data-updated' | 'request-state';
+    };
+} | {
+    readonly kind: 'lifecycle';
+    readonly event: {
+        readonly type: 'lifecycle';
+        readonly eventName: 'ready';
+    };
+} | {
+    readonly kind: 'timer';
+    readonly intervalSeconds: number;
+    readonly event: {
+        readonly type: 'timer';
+        readonly eventName: 'tick';
     };
 };
 
@@ -572,6 +603,28 @@ export interface ScreenBlueprintSetVariableActionTrace {
     readonly variableId: string;
 }
 
+// @public
+interface ScreenBlueprintTimerEvent {
+    // (undocumented)
+    readonly intervalSeconds: number;
+    // (undocumented)
+    readonly name: 'tick';
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'timer';
+}
+
+// @public
+interface ScreenBlueprintTimerTrigger {
+    // (undocumented)
+    readonly eventName: 'tick';
+    // (undocumented)
+    readonly intervalSeconds: number;
+    // (undocumented)
+    readonly type: 'timer';
+}
+
 // @public (undocumented)
 export interface ScreenBlueprintTraceResult extends ScreenBlueprintDispatchResult {
     // (undocumented)
@@ -579,7 +632,7 @@ export interface ScreenBlueprintTraceResult extends ScreenBlueprintDispatchResul
 }
 
 // @public (undocumented)
-type ScreenBlueprintTrigger = ScreenBlueprintMaterialEventTrigger | ScreenBlueprintVariableEventTrigger;
+type ScreenBlueprintTrigger = ScreenBlueprintMaterialEventTrigger | ScreenBlueprintVariableEventTrigger | ScreenBlueprintLifecycleTrigger | ScreenBlueprintTimerTrigger;
 
 // @public (undocumented)
 type ScreenBlueprintValueExpression = {
@@ -983,6 +1036,7 @@ export interface ScreenDocument {
     // (undocumented)
     readonly components: readonly ScreenComponentNode[];
     readonly dataSources?: readonly ScreenDataSource[];
+    readonly theme?: ScreenTheme;
     // (undocumented)
     readonly variables: readonly ScreenVariableEntry[];
 }
@@ -1018,6 +1072,9 @@ export type ScreenDocumentCommand = {
     readonly type: 'rename-variable';
     readonly variableId: string;
     readonly nextName: string;
+} | {
+    readonly type: 'update-theme';
+    readonly patch: ScreenThemePatch;
 };
 
 // @public (undocumented)
@@ -1202,6 +1259,18 @@ export interface ScreenStaticVariable extends ScreenVariableBase {
     // (undocumented)
     readonly type: 'static';
 }
+
+// @public (undocumented)
+interface ScreenTheme {
+    // (undocumented)
+    readonly palette: Readonly<Record<ScreenThemeSlot, string>>;
+}
+
+// @public
+type ScreenThemePatch = Readonly<Partial<Record<ScreenThemeSlot, string>>>;
+
+// @public
+type ScreenThemeSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
 
 // @public (undocumented)
 export interface ScreenTransactionFailure {

@@ -20,6 +20,7 @@ export const AGENT_CATALOG_LIMITS = {
   labelLength: 40,
   typeLength: 64,
   assetNameLength: 60,
+  stylePromptLength: 4000,
 } as const;
 
 export type AgentCatalogData = 'scalar' | 'tabular' | 'none';
@@ -50,6 +51,8 @@ export interface AgentCatalogMaterial {
     readonly props: Readonly<Record<string, JsonValue>>;
     readonly style: Readonly<Record<string, JsonValue>>;
   };
+  /** 宿主从 styleSchema + editorDescriptor 派生的带注释类型签名；缺省表示宿主未提供。 */
+  readonly stylePrompt?: string;
 }
 
 export interface AgentCatalogAsset {
@@ -328,7 +331,10 @@ export function renderCatalogPrompt(catalog: AgentCatalog): string {
           .join('、')}`,
       );
     }
-    return parts.join(' ｜ ');
+    const line = parts.join(' ｜ ');
+    return material.stylePrompt === undefined
+      ? line
+      : `${line}\n  样式签名（字段名、嵌套路径与取值以此为准）：\n${material.stylePrompt}`;
   });
   const assetLines =
     catalog.assets.length === 0
@@ -473,6 +479,18 @@ function readMaterial(
   );
   if (defaultProps === null || defaultStyle === null) return null;
 
+  let stylePrompt: string | undefined;
+  if (record.stylePrompt !== undefined) {
+    const text = readString(
+      record.stylePrompt,
+      `${path}.stylePrompt`,
+      AGENT_CATALOG_LIMITS.stylePromptLength,
+      diagnostics,
+    );
+    if (text === null) return null;
+    stylePrompt = text;
+  }
+
   return {
     type,
     name,
@@ -483,6 +501,7 @@ function readMaterial(
     props,
     roles,
     defaults: { props: defaultProps, style: defaultStyle },
+    ...(stylePrompt === undefined ? {} : { stylePrompt }),
   };
 }
 

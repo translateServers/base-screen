@@ -8,6 +8,22 @@ export interface DesignerBlueprintNodePosition {
 /** 业务系统是单例汇点；它不是文档组件，只出现在蓝图投影中。 */
 export const HOST_BLUEPRINT_NODE_ID = 'host';
 
+/** 实例就绪是单例源节点；存在 lifecycle 关系或布局里有钉固节点时出现。 */
+export const LIFECYCLE_BLUEPRINT_NODE_ID = 'lifecycle';
+
+const TIMER_NODE_PREFIX = 'timer:';
+
+/** 定时器按间隔各自成节点：id 携带秒数，关系与布局都以此为准。 */
+export function timerBlueprintNodeId(intervalSeconds: number): string {
+  return `${TIMER_NODE_PREFIX}${intervalSeconds}`;
+}
+
+export function timerIntervalFromBlueprintNodeId(nodeId: string): number | undefined {
+  if (!nodeId.startsWith(TIMER_NODE_PREFIX)) return undefined;
+  const raw = Number(nodeId.slice(TIMER_NODE_PREFIX.length));
+  return Number.isInteger(raw) && raw >= 1 && raw <= 86_400 ? raw : undefined;
+}
+
 export function componentBlueprintNodeId(componentId: string): string {
   return `component:${componentId}`;
 }
