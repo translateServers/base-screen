@@ -11,15 +11,7 @@
 npm install base-screen
 ```
 
-以框架组件方式使用时，带上框架本身即可：
-
-```bash
-# React
-npm install base-screen react react-dom
-
-# Vue
-npm install base-screen vue
-```
+以框架组件方式使用时，另装对应桥接包与框架本身，见[框架组件](#框架组件)。
 
 ## 子路径
 
@@ -28,8 +20,6 @@ npm install base-screen vue
 | `base-screen` | `createBaseScreenRuntime()` 组合层：同时注册 Designer、Viewer 与官方物料 |
 | `base-screen/viewer` | 只读组合层与 `<base-screen-viewer>`（不引入 Designer） |
 | `base-screen/designer` | 注册 `<base-screen-designer>` |
-| `base-screen/react` | React 组件桥接 |
-| `base-screen/vue` | Vue 组件桥接 |
 | `base-screen/contracts` | Screen Document、宿主契约、严格解析、诊断与 JSON Schema |
 | `base-screen/core` | 文档命令、事务、历史与 Blueprint 运行时 |
 | `base-screen/renderer` | 物料模型与 DOM 渲染 |
@@ -39,7 +29,8 @@ npm install base-screen vue
 | `base-screen/plugins` | 插件相关导出的合集入口 |
 | `base-screen/host-kit` | 宿主接入辅助：REST 项目适配器与数据集端口 |
 | `base-screen/host-tokens.css` | 宿主面板设计令牌（唯一公共样式面） |
-| `*/auto-register` | 副作用入口：导入即注册元素 |
+| `base-screen/screen-document.schema.json` | Screen Document 的 JSON Schema 文件 |
+| `*/auto-register` | 副作用入口：导入即注册元素（`auto-register`、`viewer/auto-register`、`designer/auto-register`、`material/auto-register`） |
 
 ## 最小示例
 
