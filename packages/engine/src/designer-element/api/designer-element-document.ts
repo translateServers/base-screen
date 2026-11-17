@@ -36,11 +36,18 @@ export function replaceDocument(
 
   elementState.runtime.cancelGesture(element);
   elementState.runtime.invalidateAuthoringRequests(element);
+  // ready 必须在新文档真正渲染之前重新武装：session.replaceDocument 内部同步
+  // 调用 render，放在其后会让新文档沿用旧文档的「已发」状态而漏发，返回后再
+  // 清零又会让普通编辑的下一次渲染重复发。替换失败时回滚原值，失败的替换
+  // 不改变当前文档的 ready 状态。
+  const readyBefore = elementState.canvasRuntimeController.isLifecycleReadyFired();
+  elementState.canvasRuntimeController.resetLifecycleReady();
   const result = elementState.session.replaceDocument(document);
-  if (result.ok) {
-    elementState.runtime.resetSessionSurfaces(element);
-    elementState.canvasRuntimeController.resetLifecycleReady();
+  if (!result.ok) {
+    elementState.canvasRuntimeController.restoreLifecycleReady(readyBefore);
+    return result;
   }
+  elementState.runtime.resetSessionSurfaces(element);
   return result;
 }
 

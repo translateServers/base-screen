@@ -75,6 +75,16 @@ export class DesignerCanvasRuntimeController {
     this.#lifecycleReadyFired = false;
   }
 
+  /** 当前文档是否已发射过 ready；替换失败时用它回滚，避免错误地重新武装。 */
+  isLifecycleReadyFired(): boolean {
+    return this.#lifecycleReadyFired;
+  }
+
+  /** 恢复 ready 标志（仅用于替换失败回滚；正常流程只经 render 与 reset）。 */
+  restoreLifecycleReady(fired: boolean): void {
+    this.#lifecycleReadyFired = fired;
+  }
+
   refreshData(componentId?: string): void {
     this.#variables.refreshData(componentId);
   }
