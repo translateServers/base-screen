@@ -118,6 +118,12 @@ export interface CreateDesignerSectionOptions {
   readonly open?: boolean;
   readonly actions?: readonly HTMLElement[];
   readonly className?: string;
+  /**
+   * 折叠偏好的稳定标识。缺省时由 `decorateDesignerInspectorSearchables` 补一个
+   * 顺序键 `section-N`——插入或删除分区会让顺序键整体平移，用户上一会话的折叠
+   * 状态就会串到别的分区。凡是会长期存在的分区都应显式给 key。
+   */
+  readonly key?: string;
 }
 
 export interface DesignerSection {
@@ -146,6 +152,7 @@ export function createDesignerSection(
     element.classList.add('designer-inspector-disclosure');
   }
   if (options.advanced === true) element.dataset.inspectorAdvanced = 'true';
+  if (options.key !== undefined) element.dataset.inspectorSearchKey = options.key;
 
   const title = ownerDocument.createElement(collapsible ? 'summary' : 'h3');
   title.className = 'designer-panel-section-title designer-inspector-section-title';

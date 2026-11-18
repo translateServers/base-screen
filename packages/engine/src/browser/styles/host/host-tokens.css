@@ -7,7 +7,7 @@
 :where(.bs-host) {
   color-scheme: dark;
 
-  --bs-host-surface-workspace: #1e1e1e;
+  --bs-host-surface-workspace: #0b0b0b;
   --bs-host-surface-panel: #0f0f0f;
   --bs-host-surface-raised: #080808;
   --bs-host-surface-control: #161616;
@@ -17,9 +17,9 @@
   --bs-host-surface-canvas: #282828;
   --bs-host-surface-scrim: rgb(0 0 0 / 70%);
   --bs-host-text-primary: #f5f5f5;
-  --bs-host-text-secondary: #b7b7b7;
-  --bs-host-text-muted: #aeaeae;
-  --bs-host-text-disabled: #7d7d7d;
+  --bs-host-text-secondary: #c6c6c6;
+  --bs-host-text-muted: #8d8d8d;
+  --bs-host-text-disabled: #6a6a6a;
   --bs-host-text-on-accent: #1c2b40;
   --bs-host-border-subtle: rgb(245 245 245 / 10%);
   --bs-host-border-default: rgb(245 245 245 / 15%);
@@ -109,9 +109,9 @@
   --bs-host-surface-canvas: #efefef;
   --bs-host-surface-scrim: rgb(23 23 23 / 45%);
   --bs-host-text-primary: #171717;
-  --bs-host-text-secondary: #4d4d4d;
-  --bs-host-text-muted: #666666;
-  --bs-host-text-disabled: #808080;
+  --bs-host-text-secondary: #3d3d3d;
+  --bs-host-text-muted: #707070;
+  --bs-host-text-disabled: #969696;
   --bs-host-text-on-accent: #ffffff;
   --bs-host-border-subtle: rgb(23 23 23 / 10%);
   --bs-host-border-default: rgb(23 23 23 / 15%);

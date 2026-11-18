@@ -95,14 +95,14 @@ export function materialCategoryIcon(category: string): DesignerIconName {
 }
 
 // 缩略图色相：FNV-1a 哈希到 0-359，短分类名（含 CJK）也能拉开色相差异；
-// 深浅主题共用同一色相（CSS hsl 消费）。
+// 量化到 30° 一档（12 档），同一图标家族的卡片不会因为多一个字符就整体偏色。
 export function materialCategoryHue(category: string): number {
   let hash = 0x811c9dc5;
   for (const char of category) {
     hash ^= char.codePointAt(0) ?? 0;
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
-  return hash % 360;
+  return (Math.round((hash % 360) / 30) * 30) % 360;
 }
 
 // 未配置宿主分组时保留 catalog 顺序；分组模式按宿主树和 materialTypes 声明顺序输出卡片。
@@ -338,6 +338,7 @@ function createMaterialCoverImage(
     }
   });
   image.addEventListener('error', () => {
+    // 封面是绝对定位的叠层（inset:0 + opacity:0 直到 load），移除它不会让卡片换形。
     image.remove();
   });
   return image;

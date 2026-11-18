@@ -123,8 +123,13 @@ export class DesignerPanelInspectorController {
     inspector?.toggleAttribute('data-inspector-search-open', this.#searchOpen);
     const searchWorkspace = root.querySelector<HTMLElement>('[data-inspector-search-workspace]');
     if (searchWorkspace !== null) searchWorkspace.hidden = !this.#searchOpen;
-    this.applyGroupPreferences(root);
+    // 折叠偏好按 data-inspector-search-key 归档，而这个键由 filters 内部的
+    // decorateDesignerInspectorSearchables 补写（designer-inspector-search-dom.ts）。
+    // 顺序反了的话内建分区始终没有键，偏好被静默跳过 —— 表现为「收起某个分区，
+    // 改一次字段值它就自己弹开」。必须等键就位后再应用。
+    // 搜索态由 filters 负责自动展开，此时不覆盖偏好（搜索前的状态已由 capture 记录）。
     applyDesignerInspectorFilters(root, { density: this.#density, query: this.#search });
+    if (this.#search === '') this.applyGroupPreferences(root);
   }
 
   onClick(target: Element): boolean {

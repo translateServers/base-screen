@@ -49,11 +49,11 @@ import { createDesignerCanvasPresentationSettings } from './designer-canvas-tran
 import { appendMultiSelectionControls } from './designer-multi-selection-dom.js';
 import {
   appendActionButton,
-  appendCheckbox,
   appendFieldGrid,
   appendInput,
   appendListItem,
   appendPropControl,
+  appendPropertySwitch,
   appendSection,
   appendStyleControl,
 } from './designer-panel-primitives.js';
@@ -107,6 +107,18 @@ export function renderDesignerProperties(
   if (locked) disableLockedComponentControls(properties);
 }
 
+/** 组件是否越出画布：粘贴、跨画布改尺寸、拖到边缘外都会留下界外内容，预览时会被裁掉。 */
+function isOutOfCanvas(
+  document: ScreenDocument | undefined,
+  component: ScreenComponentNode,
+): boolean {
+  if (document === undefined) return false;
+  const { width, height } = document.canvas;
+  const { x, y } = component.position;
+  const { width: componentWidth, height: componentHeight } = component.size;
+  return x < 0 || y < 0 || x + componentWidth > width || y + componentHeight > height;
+}
+
 function appendLockedInspectorNotice(properties: HTMLElement): void {
   const notice = properties.ownerDocument.createElement('p');
   notice.className = 'designer-inspector-lock-notice';
@@ -140,7 +152,13 @@ function appendComponentControls(
   refreshConditionalStyles?: (componentIds: readonly string[]) => void,
 ): void {
   const { component, manifest } = context;
-  const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
+  const geometry = appendSection(
+    properties,
+    DESIGNER_UI_TEXT.propertiesPanel.geometry,
+    false,
+    undefined,
+    'geometry',
+  );
   geometry.className += ' designer-inspector-geometry-section';
   const geometryGrid = appendFieldGrid(geometry);
   geometryGrid.className += ' designer-inspector-geometry-grid';
@@ -195,16 +213,32 @@ function appendComponentControls(
   if (context.kind === 'single-material' && component.type === 'base.image') {
     appendImageDensityActions(geometryGrid, component.id);
   }
-  const status = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.status, true);
-  const statusGrid = appendFieldGrid(status);
-  appendCheckbox(
-    statusGrid,
+  // 越界提示挂在几何段末尾而不是逐字段：几何是三列网格，字段内插提示会把整行挤歪。
+  if (isOutOfCanvas(document, component)) {
+    const hint = geometry.ownerDocument.createElement('p');
+    hint.className = 'designer-field-hint';
+    hint.dataset.inspectorIssue = 'out-of-canvas';
+    hint.textContent = DESIGNER_UI_TEXT.propertiesPanel.outOfCanvas;
+    geometry.appendChild(hint);
+  }
+  // 状态段曾经带 advanced 标记：基础密度下整段 hidden，锁定/隐藏开关直接消失，
+  // 用户只能切到「全部」才找得到。它是常用开关而不是高级项 —— 改为可见但默认收起。
+  const status = appendSection(
+    properties,
+    DESIGNER_UI_TEXT.propertiesPanel.status,
+    false,
+    false,
+    'status',
+  );
+  // 状态用胶囊开关，与「行为」段的 boolean 控件同一套语汇；方形 checkbox 留给真正的多选。
+  appendPropertySwitch(
+    status,
     DESIGNER_UI_TEXT.propertiesPanel.locked,
     'locked',
     component.status.locked,
   );
-  appendCheckbox(
-    statusGrid,
+  appendPropertySwitch(
+    status,
     DESIGNER_UI_TEXT.propertiesPanel.hidden,
     'hidden',
     component.status.hidden,
@@ -231,7 +265,13 @@ function appendComponentControls(
   const content =
     manifest.propertyPanel.length === 0
       ? undefined
-      : appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.content);
+      : appendSection(
+          properties,
+          DESIGNER_UI_TEXT.propertiesPanel.content,
+          false,
+          undefined,
+          'content',
+        );
   for (const field of manifest.propertyPanel) {
     const schema = manifest.propsSchema.properties[field.prop];
     if (schema !== undefined && content !== undefined) {
@@ -251,7 +291,13 @@ function appendComponentControls(
   const style =
     stylePanel.length === 0
       ? undefined
-      : appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.style);
+      : appendSection(
+          properties,
+          DESIGNER_UI_TEXT.propertiesPanel.style,
+          false,
+          undefined,
+          'style',
+        );
   for (const field of stylePanel) {
     if (field.style === 'opacity') continue;
     const schema = manifest.styleSchema.properties[field.style];
@@ -299,7 +345,13 @@ function appendConditionalStyleSection(
     .map((field) => field.style);
   if (colorKeys.length === 0) return;
   const rules = component.styleRules ?? [];
-  const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.conditionalStyle);
+  const section = appendSection(
+    properties,
+    DESIGNER_UI_TEXT.propertiesPanel.conditionalStyle,
+    false,
+    undefined,
+    'conditional-style',
+  );
   section.className += ' designer-conditional-style-section';
   section.dataset.styleRuleComponent = component.id;
   const hint = section.ownerDocument.createElement('p');
@@ -464,7 +516,13 @@ function appendHostConditionalStyleSection(
   const fields = designerHostStyleFields(manifest);
   if (fields.length === 0) return;
   const doc = properties.ownerDocument;
-  const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyle);
+  const section = appendSection(
+    properties,
+    DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyle,
+    false,
+    undefined,
+    'host-conditional-style',
+  );
   section.className += ' designer-host-conditional-style-section';
   section.dataset.hostStyleComponent = component.id;
 
@@ -781,7 +839,8 @@ function appendImageDensityActions(parent: HTMLElement, componentId: string): vo
 
 /**
  * 行为 / 滤镜是引擎级保留键：不依赖物料申报，任何物料都有这两组作者面。
- * 滤镜默认折叠（高级分区），行为只有三个开关，保持检查器默认克制。
+ * 滤镜默认折叠（高级分区）；行为只有三个开关——没有非默认值时收起，
+ * 一旦用户开过其中任何一个就保持展开，避免「我开的穿透去哪了」。
  */
 function appendUniversalStyleSections(
   properties: HTMLElement,
@@ -789,7 +848,11 @@ function appendUniversalStyleSections(
 ): void {
   const text = DESIGNER_UI_TEXT.propertiesPanel;
   const schemas = BASE_SCREEN_RESERVED_STYLE_SCHEMAS;
-  const behavior = appendSection(properties, text.behavior);
+  const behaviorActive =
+    component.style.passThrough === true ||
+    component.style.hoverPointer === true ||
+    component.style.clip === true;
+  const behavior = appendSection(properties, text.behavior, false, behaviorActive, 'behavior');
   for (const [key, label] of [
     ['passThrough', text.passThrough],
     ['hoverPointer', text.hoverPointer],
@@ -806,7 +869,7 @@ function appendUniversalStyleSections(
       false,
     );
   }
-  const filter = appendSection(properties, text.filter, true, false);
+  const filter = appendSection(properties, text.filter, true, false, 'filter');
   appendStyleControl(
     filter,
     text.blend,
@@ -844,7 +907,13 @@ function appendCommonOpacityControl(
 ): void {
   const schema = manifest.styleSchema.properties.opacity;
   if (schema?.kind !== 'number') return;
-  const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.commonStyle);
+  const section = appendSection(
+    properties,
+    DESIGNER_UI_TEXT.propertiesPanel.commonStyle,
+    false,
+    undefined,
+    'opacity',
+  );
   section.className += ' designer-inspector-common-section';
   const { field, control } = createDesignerFieldRow(properties.ownerDocument, {
     label: DESIGNER_UI_TEXT.propertiesPanel.opacity,
@@ -860,6 +929,8 @@ function appendCommonOpacityControl(
     step: 1,
     value: String(percent),
     numberClassName: 'designer-field-range-value',
+    // 与画布不透明度同一条读数语言：都读作 100%，不再一个是 100、一个是 100%。
+    numberSymbol: '%',
   });
   for (const target of [range, number]) {
     target.dataset.style = 'opacity';
@@ -930,7 +1001,13 @@ function appendGroupOverview(
   properties: HTMLElement,
   context: Extract<DesignerInspectorContext, { readonly kind: 'single-group' }>,
 ): void {
-  const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.groupSummary);
+  const section = appendSection(
+    properties,
+    DESIGNER_UI_TEXT.propertiesPanel.groupSummary,
+    false,
+    undefined,
+    'group-summary',
+  );
   const list = properties.ownerDocument.createElement('ul');
   list.className = 'designer-inspector-summary';
   appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.group);
@@ -955,7 +1032,13 @@ function appendGroupActions(
   properties: HTMLElement,
   context: Extract<DesignerInspectorContext, { readonly kind: 'single-group' }>,
 ): void {
-  const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.groupActions);
+  const section = appendSection(
+    properties,
+    DESIGNER_UI_TEXT.propertiesPanel.groupActions,
+    false,
+    undefined,
+    'group-actions',
+  );
   appendActionButton(
     section,
     DESIGNER_UI_TEXT.propertiesPanel.actionUngroup,

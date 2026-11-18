@@ -329,6 +329,22 @@ function createLayerNode(
     row.appendChild(rename);
   }
 
+  // 能力标记：数据 / 交互。挂在 select（flex 行）里而不是 grid 行，避免多占一个网格单元。
+  appendLayerBadge(
+    ownerDocument,
+    select,
+    item.hasDataBinding,
+    'data',
+    DESIGNER_UI_TEXT.layersPanel.badgeData,
+  );
+  appendLayerBadge(
+    ownerDocument,
+    select,
+    item.hasInteraction,
+    'event',
+    DESIGNER_UI_TEXT.layersPanel.badgeInteraction,
+  );
+
   // 行级状态开关：锁在常态隐藏、悬停/聚焦或已锁定时露出；可见性开关常驻。
   row.appendChild(layerButton(ownerDocument, item, 'locked'));
   row.appendChild(layerButton(ownerDocument, item, 'hidden'));
@@ -341,6 +357,23 @@ function createLayerNode(
     row.appendChild(diagnostic);
   }
   return row;
+}
+
+/** 图层行的能力标记：一个 4px 圆点，悬停出说明。 */
+function appendLayerBadge(
+  ownerDocument: Document,
+  row: HTMLElement,
+  visible: boolean,
+  kind: 'data' | 'event',
+  label: string,
+): void {
+  if (!visible) return;
+  const dot = ownerDocument.createElement('span');
+  dot.className = 'layer-badge';
+  dot.dataset.layerBadge = kind;
+  dot.setAttribute('aria-label', label);
+  dot.setAttribute('data-tip', label);
+  row.appendChild(dot);
 }
 
 function layerStateLabels(

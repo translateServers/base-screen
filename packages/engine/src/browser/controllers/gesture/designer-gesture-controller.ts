@@ -224,6 +224,18 @@ export class DesignerGestureController {
       // 锁定组件不是画布选择目标，所以点它等同点空白：取消选中。渲染层不对锁定组件做
       // pointer-events 处理，一张铺满画布的锁定背景（大屏常见做法）会命中每一个"空白"点，
       // 若保持既有选择则永远无法取消选中。拖拽仍照常从它发起框选。
+      //
+      // 例外：Alt+单击。没有这条通路，铺满画布的锁定背景永远选不中，也就无从在右栏
+      // 确认它是什么、或看到「已锁定」提示（右栏对锁定组件只读，这里只是让它可被查看）。
+      if (event.altKey && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault();
+        this.callbacks.reduceSelection({
+          type: 'replace-selection',
+          componentIds: [component.id],
+          focusedComponentId: component.id,
+        });
+        return;
+      }
       if (this.callbacks.getActiveTool() === 'select') this.#marquee.start(event, true);
       return;
     }

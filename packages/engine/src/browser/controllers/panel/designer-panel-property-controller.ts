@@ -17,6 +17,7 @@ import {
   type DesignerCanvasPresentationSettings,
   renderDesignerProperties,
 } from '../../dom/panel/designer-panel-dom.js';
+import { captureInspectorFocus, restoreInspectorFocus } from './designer-inspector-focus.js';
 import type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
 import {
   handleDesignerStyleRuleChange,
@@ -31,6 +32,8 @@ export class DesignerPanelPropertyController {
 
   render(properties: HTMLElement | undefined): void {
     if (properties === undefined) return;
+    // 整栏重建会连焦点一起换掉；先记住当前控件，重建后找回同一个。
+    const focus = captureInspectorFocus(properties);
     renderDesignerProperties(
       properties,
       this.callbacks.getGeometryDocument?.() ?? this.callbacks.getDocument(),
@@ -43,6 +46,7 @@ export class DesignerPanelPropertyController {
       this.callbacks.getHostConditionalStyleAuthoring?.(),
       this.callbacks.refreshConditionalStyles,
     );
+    restoreInspectorFocus(properties, focus);
   }
 
   onClick(target: Element): boolean {

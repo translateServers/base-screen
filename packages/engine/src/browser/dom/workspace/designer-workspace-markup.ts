@@ -337,7 +337,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <div class="inspector-context" data-inspector-context></div>
       <div class="inspector-toolbar">
         <button type="button" class="designer-control designer-button designer-icon-button inspector-search-launch" data-variant="ghost" data-inspector-search-launch data-tip="${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}" aria-label="${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}">${designerIcon('search')}</button>
-        <div class="designer-segmented inspector-density" role="group" data-size="compact" aria-label="${DESIGNER_UI_TEXT.inspector}">
+        <div class="designer-segmented inspector-density" role="group" data-size="compact" aria-label="${DESIGNER_UI_TEXT.inspector}" data-tip="${DESIGNER_UI_TEXT.inspectorUi.densityHint}" aria-description="${DESIGNER_UI_TEXT.inspectorUi.densityHint}">
           <button type="button" class="designer-segmented-option" data-inspector-density="basic" aria-pressed="true">${DESIGNER_UI_TEXT.inspectorUi.basic}</button>
           <button type="button" class="designer-segmented-option" data-inspector-density="all" aria-pressed="false">${DESIGNER_UI_TEXT.inspectorUi.all}</button>
         </div>

@@ -459,7 +459,8 @@
 
 .properties .designer-inspector-batch-field-row {
   display: grid;
-  min-height: 36px;
+  /* 与单选检查器的字段行同高：多选/单选来回切换时行盒不该跳 6px。 */
+  min-height: var(--designer-control-height);
   grid-template-columns: 76px minmax(0, 1fr);
   align-items: center;
   gap: var(--designer-space-4);

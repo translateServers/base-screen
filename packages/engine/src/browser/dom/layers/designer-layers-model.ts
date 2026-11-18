@@ -1,10 +1,11 @@
-import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
+import type { ScreenComponentNode, ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
 import {
   isScreenComponentEffectivelyHidden,
   isScreenComponentEffectivelyLocked,
   type ScreenInteractionState,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerIconName } from '../../dom/designer-icons.js';
 import { materialCategoryIcon } from '../material-library/designer-material-library-dom.js';
 import type { DesignerLayerToolbarState } from './designer-layers-toolbar-dom.js';
@@ -27,6 +28,10 @@ export interface DesignerLayerItem {
   // 行副行的尺寸读数：canonical 尺寸，不含缩放。
   readonly width: number;
   readonly height: number;
+  // 能力标记：这行组件是否已经有数据绑定 / 是否出现在蓝图关系里。
+  // 以前只能靠点开组件才知道，图层里看不出来「这个卡片是不是已经接数了」。
+  readonly hasDataBinding: boolean;
+  readonly hasInteraction: boolean;
 }
 
 export interface DesignerLayerView {
@@ -109,12 +114,39 @@ export function createDesignerLayerView(
     siblings.sort((left, right) => compareSiblings(left, right, byId, order));
   }
   const items: DesignerLayerItem[] = [];
-  visitLayer(null, 0, children, byId, document, catalog, items);
+  // 每次重建只遍历一遍文档与蓝图：逐行判断会把蓝图扫描做成 O(n×r)。
+  const dataBound = new Set(
+    document.components
+      .filter(
+        (component) =>
+          component.dataBinding != null ||
+          (component.dataSource != null && component.dataSource.type !== 'static'),
+      )
+      .map((component) => component.id),
+  );
+  const interacted = collectInteractedComponents(document);
+  visitLayer(null, 0, children, byId, document, catalog, items, dataBound, interacted);
   return {
     items,
     diagnostics: items.filter((item) => item.missingMaterial).map(missingMaterialDiagnostic),
     siblingsByParent: children,
   };
+}
+
+/** 出现在任何蓝图关系（触发器源、目标、动作目标）里的组件 id。 */
+function collectInteractedComponents(document: ScreenDocument): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const relation of document.blueprint.relations) {
+    if (relation.type === 'semantic') {
+      ids.add(relation.source.componentId);
+      ids.add(relation.target.componentId);
+      continue;
+    }
+    // effect 只描述「做什么」，作用对象由 source / target 承载，不另带组件 id。
+    if ('componentId' in relation.source) ids.add(relation.source.componentId);
+    if ('componentId' in relation.target) ids.add(relation.target.componentId);
+  }
+  return ids;
 }
 
 export function filterDesignerLayerItems(
@@ -171,18 +203,12 @@ function visitLayer(
   parentId: string | null,
   depth: number,
   children: ReadonlyMap<string | null, readonly string[]>,
-  byId: ReadonlyMap<
-    string,
-    {
-      readonly id: string;
-      readonly name: string;
-      readonly type: string;
-      readonly size: { readonly width: number; readonly height: number };
-    }
-  >,
+  byId: ReadonlyMap<string, ScreenComponentNode>,
   document: ScreenDocument,
   catalog: BaseScreenMaterialCatalog | undefined,
   items: DesignerLayerItem[],
+  dataBound: ReadonlySet<string>,
+  interacted: ReadonlySet<string>,
 ): void {
   for (const id of children.get(parentId) ?? []) {
     const component = byId.get(id)!;
@@ -203,8 +229,10 @@ function visitLayer(
       ),
       width: component.size.width,
       height: component.size.height,
+      hasDataBinding: dataBound.has(component.id),
+      hasInteraction: interacted.has(component.id),
     });
-    visitLayer(id, depth + 1, children, byId, document, catalog, items);
+    visitLayer(id, depth + 1, children, byId, document, catalog, items, dataBound, interacted);
   }
 }
 
@@ -220,7 +248,12 @@ function compareSiblings(
 }
 
 function matchesLayerQuery(item: DesignerLayerItem, query: string): boolean {
-  return `${item.name} ${item.type}`.toLowerCase().includes(query);
+  // 能力标记也可搜：搜「数据」「交互」能直接筛出对应组件（标记本身只有圆点，没有文字）。
+  const badges = [
+    item.hasDataBinding ? DESIGNER_UI_TEXT.layersPanel.badgeData : '',
+    item.hasInteraction ? DESIGNER_UI_TEXT.layersPanel.badgeInteraction : '',
+  ].join(' ');
+  return `${item.name} ${item.type} ${badges}`.toLowerCase().includes(query);
 }
 
 function missingMaterialDiagnostic(item: DesignerLayerItem): ScreenDiagnostic {

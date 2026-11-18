@@ -75,12 +75,30 @@ export function appendInput(
     appearance: type === 'number' ? 'number' : 'text',
     value: String(value),
     ...(min === undefined ? {} : { min }),
+    ...(type === 'number' ? { step: 1 } : {}),
   });
   input.dataset.property = property;
+  if (type === 'number') appendNumericKeyboardNudge(input);
   field.appendChild(input);
   appendDesignerFieldMessage(field, input, `property-${property}`);
   parent.appendChild(field);
   return field;
+}
+
+/**
+ * 数值字段的键盘微调：原生 ↑/↓ 已按 step=1 生效，这里只补 Shift 的 10 倍档。
+ * 装配阶段的三列网格放不下减/值/加三段式，所以不换控件外观，只加能力。
+ */
+function appendNumericKeyboardNudge(input: HTMLInputElement): void {
+  input.addEventListener('keydown', (event) => {
+    if (!event.shiftKey) return;
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    const current = Number(input.value);
+    if (!Number.isFinite(current)) return;
+    event.preventDefault();
+    input.value = String(current + (event.key === 'ArrowUp' ? 10 : -10));
+    input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  });
 }
 
 function geometryPropertySymbol(property: string): string | undefined {
@@ -203,6 +221,33 @@ export function appendCheckbox(
   field.appendChild(input);
   appendDesignerFieldMessage(field, input, `property-${property}`);
   parent.appendChild(field);
+}
+
+/**
+ * 状态类布尔（锁定 / 隐藏）用胶囊开关。
+ *
+ * 语义上它和「行为」段的 boolean 保留键是同一件事（开关某个能力），却一个用方形 checkbox、
+ * 一个用 switch，同一栏里紧邻两行就出现两种开关语汇。这里统一到 switch；
+ * checkbox 只留给真正的多选场景。
+ */
+export function appendPropertySwitch(
+  parent: HTMLElement,
+  labelText: string,
+  property: string,
+  value: boolean,
+): void {
+  const row = createDesignerFieldRow(parent.ownerDocument, { label: labelText });
+  const control = createDesignerSwitch(parent.ownerDocument, {
+    ariaLabel: labelText,
+    checked: value,
+  });
+  control.dataset.property = property;
+  control.addEventListener('change', () => {
+    control.value = String(control.checked);
+  });
+  row.control.appendChild(control);
+  appendDesignerFieldMessage(row.field, control, `property-${property}`);
+  parent.appendChild(row.field);
 }
 
 export function appendPropControl(
@@ -380,12 +425,18 @@ export function appendSection(
   title: string,
   advanced = false,
   open?: boolean,
+  key?: string,
 ): HTMLElement {
   // Sections render as native disclosures so every region can be collapsed with
   // pointer or keyboard; open state is persisted by the inspector group
-  // preferences machinery in DesignerPanelController.
-  return createDesignerSection(parent, { advanced, title, ...(open === undefined ? {} : { open }) })
-    .element;
+  // preferences machinery in DesignerPanelController. `key` 是折叠偏好的稳定标识，
+  // 不传就会退化成按出现顺序生成的 section-N（插分区即平移）。
+  return createDesignerSection(parent, {
+    advanced,
+    title,
+    ...(open === undefined ? {} : { open }),
+    ...(key === undefined ? {} : { key }),
+  }).element;
 }
 
 export function appendFieldGrid(parent: HTMLElement): HTMLElement {

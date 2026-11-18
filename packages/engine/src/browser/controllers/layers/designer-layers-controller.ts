@@ -615,7 +615,7 @@ function layerRenderSignature(
   ];
   const rows = view.items.map(
     (item) =>
-      `${item.id}|${item.parentId ?? ''}|${item.name}|${item.type}|${item.depth}|${item.childCount}|${item.hidden}|${item.locked}|${item.missingMaterial}|${item.typeLabel}|${item.icon ?? ''}|${item.width}|${item.height}`,
+      `${item.id}|${item.parentId ?? ''}|${item.name}|${item.type}|${item.depth}|${item.childCount}|${item.hidden}|${item.locked}|${item.missingMaterial}|${item.typeLabel}|${item.icon ?? ''}|${item.width}|${item.height}|${item.hasDataBinding}|${item.hasInteraction}`,
   );
   return `${head.join('\u0001')}\u0002${rows.join('\u0002')}`;
 }

@@ -149,7 +149,13 @@ export const DESIGNER_OPERATION_TEXT = {
   'project-cancel': { label: '取消', tooltip: '取消项目操作' },
   'toggle-grid': { label: '网格', tooltip: '切换网格' },
   'toggle-guides': { label: '参考线', tooltip: '切换参考线显示', shortcut: 'Ctrl+;' },
-  'toggle-border-guides': { label: '边框参考线', tooltip: '切换边框参考线', shortcut: 'Ctrl+K' },
+  // 命令面板在 capture 阶段就吃掉了 Ctrl+K，这里若也用 Ctrl+K 会永远不可达
+  // （帮助面板与右键菜单的 <kbd> 由本表派生，改这里即可全量同步）。
+  'toggle-border-guides': {
+    label: '边框参考线',
+    tooltip: '切换边框参考线',
+    shortcut: 'Ctrl+Shift+K',
+  },
   'toggle-workbench': { label: '切换工作台模式', tooltip: '切换工作台模式', shortcut: 'F' },
   'show-help': { label: '快捷键帮助', tooltip: '显示快捷键帮助', shortcut: 'Ctrl+/' },
   'nudge-10-left': { label: '左移 10px', tooltip: '向左微调 10px', shortcut: 'Shift+ArrowLeft' },

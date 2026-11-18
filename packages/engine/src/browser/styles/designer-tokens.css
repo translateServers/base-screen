@@ -168,9 +168,9 @@
 
   /* ── 文本四级灰阶 ── */
   --designer-text-primary: var(--base-screen-designer-text-primary, #171717);
-  --designer-text-secondary: var(--base-screen-designer-text-secondary, #4d4d4d);
-  --designer-text-muted: var(--base-screen-designer-text-muted, #666666);
-  --designer-text-disabled: var(--base-screen-designer-text-disabled, #808080);
+  --designer-text-secondary: var(--base-screen-designer-text-secondary, #3d3d3d);
+  --designer-text-muted: var(--base-screen-designer-text-muted, #707070);
+  --designer-text-disabled: var(--base-screen-designer-text-disabled, #969696);
   --designer-text-on-accent: var(--base-screen-designer-text-on-accent, #ffffff);
 
   /* ── 边框与焦点：alpha 收边，压在任何表面上都成立 ── */
@@ -241,7 +241,10 @@
    但 `:host([theme="light"])` 的特异性更高，显式浅色仍能压住这里的裸 `:host`。 */
 :host,
 :host([theme="dark"]) {
-  --designer-surface-workspace: var(--base-screen-designer-surface-workspace, #1e1e1e);
+  /* 深色层级方向：越靠前越亮（桌面 → 面板 → 控件 → 画布内容）。
+     此前 workspace(#1e1e1e) 比 panel(#0f0f0f) 更亮，面板看起来是「挖进背景的洞」，
+     五块面板因此没有前后关系。 */
+  --designer-surface-workspace: var(--base-screen-designer-surface-workspace, #0b0b0b);
   --designer-surface-panel: var(--base-screen-designer-surface-panel, #0f0f0f);
   --designer-surface-raised: var(--base-screen-designer-surface-raised, #080808);
   --designer-surface-control: var(--base-screen-designer-surface-control, #161616);
@@ -254,9 +257,9 @@
   --designer-range-track: var(--base-screen-designer-range-track, rgb(245 245 245 / 26%));
 
   --designer-text-primary: var(--base-screen-designer-text-primary, #f5f5f5);
-  --designer-text-secondary: var(--base-screen-designer-text-secondary, #b7b7b7);
-  --designer-text-muted: var(--base-screen-designer-text-muted, #aeaeae);
-  --designer-text-disabled: var(--base-screen-designer-text-disabled, #7d7d7d);
+  --designer-text-secondary: var(--base-screen-designer-text-secondary, #c6c6c6);
+  --designer-text-muted: var(--base-screen-designer-text-muted, #8d8d8d);
+  --designer-text-disabled: var(--base-screen-designer-text-disabled, #6a6a6a);
   /* 黑夜的强调底上放深字，与亮色白字/蓝底同档（4.93:1）。 */
   --designer-text-on-accent: var(--base-screen-designer-text-on-accent, #1c2b40);
 

@@ -6,11 +6,11 @@
   font: var(--designer-font-small);
 }
 
-/* 右栏检查器字段密度：行高 30px（与 --designer-control-height 对齐）、正文档读数；
-   几何网格另行收紧到 28px。行距本身已经收到 4px（见 inspector.css），再压就要靠减控件高度，
-   所以这里只把行盒从 34 收到 30——多出来的 4px 是历史遗留的安全余量，控件并不需要。 */
+/* 字段行只有一档行高：30px，与 --designer-control-height 对齐。
+   历史上这里叠过三档（骨架 34 / 检查器 30 / 几何 28），滚动时节奏肉眼可见地不齐；
+   34 那 4px 注释说是"安全余量"，其实是控件高度变化后没回收的遗留值，不是预留。
+   需要更紧凑时调 row-gap，不要再改行盒。 */
 .inspector-pane .designer-field {
-  min-height: 30px;
   color: var(--designer-text-secondary);
   font: var(--designer-font);
 }
@@ -26,9 +26,14 @@
   font: var(--designer-font-numeric);
 }
 
-.designer-inspector-geometry-grid .designer-field {
-  min-height: var(--designer-control-height-compact);
+/* 带单位符号的数字读数要给后缀让位，否则 % 会被右对齐的数字压住。
+   画布不透明度与组件不透明度是同一条读数语言，共用这一处外观。 */
+.designer-canvas-opacity-field .designer-field-range-value,
+.designer-opacity-field .designer-field-range-value {
+  padding-right: calc(var(--designer-space-6) + var(--designer-space-1));
 }
+
+/* 几何网格不再单独收紧行高：紧凑感由 grid 的 row-gap 提供，行盒与其他字段一致。 */
 
 /* 省略只属于标签文本。字段行本身若 nowrap，说明/错误等附加行会被继承成不换行。 */
 .designer-field-label-text {
@@ -47,7 +52,7 @@
 .designer-field:has(> .designer-field-control) {
   grid-template-columns: 74px minmax(0, 1fr);
   align-items: center;
-  min-height: 34px;
+  min-height: var(--designer-control-height);
   overflow: visible;
   color: var(--designer-text-secondary);
   font: var(--designer-font);

@@ -325,6 +325,13 @@ details:not([open]) .designer-panel-section-disclosure {
   letter-spacing: 0.04em;
 }
 
+/* 收起的分区标题降半档字重：行为/滤镜默认收起后不应和展开的几何段抢注意力。
+   颜色不再压暗——text-muted 已是最弱一档，再退就成了禁用态。 */
+.properties .inspector-pane details:not([open]) > .designer-inspector-section-title,
+.properties .inspector-pane details:not([open]) > .designer-descriptor-group-summary {
+  font-weight: 500;
+}
+
 /* 能力摘要（可调整大小 / 可旋转 / 可预览事件）是并列标签，不是条目清单：
    两列中性 chip，避免一列裸文本被读成未完成的表单。 */
 .properties .inspector-pane .designer-inspector-summary {
