@@ -79,6 +79,10 @@ const MATERIAL_CATEGORY_ICON_RULES: readonly {
   { test: /\u5730[\u56fe\u7406]|map/i, icon: 'map' },
   { test: /\u5a92[\u4f53\u8d44]|\u56fe[\u7247\u50cf]|image|media|audio/i, icon: 'image' },
   { test: /\u6587[\u5b57\u672c]|text/i, icon: 'type' },
+  // 桥接 / 最佳实践原先都落到兜底 'rect'，同一列里两枚图标完全一样，用户无法区分。
+  // 两者语义不同：桥接是"跨框架接入"，最佳实践是"推荐范例"，各给专属符号。
+  { test: /\u6865\u63a5|bridge/i, icon: 'link' },
+  { test: /\u6700\u4f73\u5b9e\u8df5|best[\s._-]*practice/i, icon: 'star' },
   { test: /\u5bb9\u5668|\u7ec4|contain|group/i, icon: 'rect' },
   { test: /\u88c5\u9970|decor|sparkle/i, icon: 'sparkle' },
   {

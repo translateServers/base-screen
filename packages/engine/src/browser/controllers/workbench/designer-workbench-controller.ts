@@ -108,6 +108,14 @@ export class DesignerWorkbenchController {
     this.#panelLayout.reconnect();
   }
 
+  /**
+   * 重绘标尺。标尺是 <canvas> 手绘，颜料取自 CSS 令牌——主题切换只改变量不会
+   * 重绘像素，需要显式触发一次（否则浅色主题下会留着深色墨水直到下次缩放）。
+   */
+  renderRulers(): void {
+    this.#guides.renderRulers();
+  }
+
   disposeLayout(): void {
     this.#panelLayout.dispose();
   }

@@ -295,6 +295,24 @@ function requestHydrationFrame(callback: () => void): number {
   return globalThis.setTimeout(callback, 0) as unknown as number;
 }
 
+/**
+ * 首屏缩放补做：首帧渲染时视窗可能还没有布局（宽高为 0），fitOnFirstRender 会返回
+ * false 并保留标记。这里排帧重试，最多等 10 帧——超过就认为容器确实不可见
+ * （display:none / 折叠），留待元素下次可见时不再处理，避免空转。
+ */
+const INITIAL_ZOOM_RETRY_LIMIT = 10;
+
+function scheduleInitialZoomRetry(element: DesignerElementHost, attempt = 0): void {
+  if (attempt >= INITIAL_ZOOM_RETRY_LIMIT) return;
+  requestHydrationFrame(() => {
+    if (!element.isConnected) return;
+    const elementState = getDesignerElementState(element);
+    if (elementState.initialZoomApplied) return;
+    elementState.initialZoomApplied = elementState.viewportController.fitOnFirstRender();
+    if (!elementState.initialZoomApplied) scheduleInitialZoomRetry(element, attempt + 1);
+  });
+}
+
 function cancelHydrationFrame(frame: number): void {
   if (typeof globalThis.cancelAnimationFrame === 'function') {
     globalThis.cancelAnimationFrame(frame);
@@ -327,6 +345,15 @@ export function renderDocument(
     elementState.previewController.sync(document);
     elementState.guardController.schedule(document);
     elementState.targetDisplayController.setDocument(document);
+    // 首个文档首次落定：画布尺寸此时才是准的，按它决定要不要退到「适应窗口」。
+    // 只做一次——之后的文档变更（改属性、加组件、切场景）都不许动用户当前的缩放。
+    // 首次渲染发生在 shadow DOM 刚 replaceChildren 之后，此时视窗还没布局
+    // （clientWidth 为 0），所以这里可能拿不到尺寸；拿不到就排帧重试，
+    // 而不是等下一次文档变更（可能永远不来）。
+    if (!elementState.initialZoomApplied) {
+      elementState.initialZoomApplied = elementState.viewportController.fitOnFirstRender();
+      if (!elementState.initialZoomApplied) scheduleInitialZoomRetry(element);
+    }
   }
   elementState.deferredCanvasHydration = false;
   element.setAttribute('data-designer-canvas-state', 'ready');

@@ -500,11 +500,13 @@
   transition: opacity var(--designer-motion);
 }
 
-/* 面板归属：与计数同一条列头带上的静默标签（BUILTIN / HOST / PLUGIN）。 */
+/* 面板归属：与计数同一条列头带上的静默标签（BUILTIN / HOST / PLUGIN）。
+   它不是禁用态，只是次要标签——原先借用 text-disabled 导致落在 panel 底上只有
+   3.54（深）/ 2.88（浅），读起来像"这段坏了"。改用 muted 后两档都 ≥5.7。 */
 .panel-scope {
   margin-left: auto;
   flex: none;
-  color: var(--designer-text-disabled);
+  color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
   font-size: var(--designer-font-size-xs);
   letter-spacing: normal;
@@ -751,8 +753,16 @@
 
 .scene-row-state {
   flex: 0 0 auto;
-  color: var(--designer-text-muted);
+  /* 未选中行的底色是 control-active，muted 落在上面只有 3.86。
+     这是"当前/可用"这类状态字，读不清就等于没有状态——用 secondary 一档，
+     与行名的主文字仍差 2 级。 */
+  color: var(--designer-text-secondary);
   font: var(--designer-font-numeric);
+}
+
+.scene-row[aria-pressed="true"] .scene-row-state,
+.scene-row[data-scene-state="preview"] .scene-row-state {
+  color: var(--designer-text-secondary);
 }
 
 .scene-note {

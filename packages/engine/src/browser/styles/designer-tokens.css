@@ -161,16 +161,24 @@
   --designer-surface-control-hover: var(--base-screen-designer-surface-control-hover, #ececec);
   --designer-surface-control-active: var(--base-screen-designer-surface-control-active, #e7e7e7);
   --designer-surface-overlay: var(--base-screen-designer-surface-overlay, #ffffff);
-  --designer-surface-canvas: var(--base-screen-designer-surface-canvas, #efefef);
+  /* 画布舞台（viewport 底）：必须与 workspace 拉开实质差距，否则深色画布直接浮在浅灰上，
+     没有"台面"这一层。深色档 workspace↔viewport 差 29（#0b0b0b → #282828），
+     浅色这里给到 20（#f4f4f4 → #e0e0e0），方向一致（舞台更深）而不是反过来更亮。 */
+  --designer-surface-canvas: var(--base-screen-designer-surface-canvas, #e0e0e0);
   --designer-surface-scrim: var(--base-screen-designer-surface-scrim, rgb(23 23 23 / 45%));
   --designer-canvas-grid-line: var(--base-screen-designer-canvas-grid-line, rgb(23 23 23 / 8%));
   --designer-range-track: var(--base-screen-designer-range-track, rgb(23 23 23 / 16%));
 
-  /* ── 文本四级灰阶 ── */
+  /* ── 文本四级灰阶 ──
+     浅色档的 muted / disabled 比深色档更需要压深：实测浅色有 10 处文本低于 4.5，
+     深色只有 4 处。muted 从 #707070 压到 #5c5c5c（在 control-active 底上 5.4，
+     原来是 4.0）；disabled 从 #969696 压到 #6e6e6e（在 workspace 上 4.64，
+     原来只有 2.7——那个值读起来不像"禁用"而像"渲染坏了"）。
+     disabled 与 muted 仍差一档，#6e6e6e / #5c5c5c 的亮度序没有塌。 */
   --designer-text-primary: var(--base-screen-designer-text-primary, #171717);
   --designer-text-secondary: var(--base-screen-designer-text-secondary, #3d3d3d);
-  --designer-text-muted: var(--base-screen-designer-text-muted, #707070);
-  --designer-text-disabled: var(--base-screen-designer-text-disabled, #969696);
+  --designer-text-muted: var(--base-screen-designer-text-muted, #5c5c5c);
+  --designer-text-disabled: var(--base-screen-designer-text-disabled, #6e6e6e);
   --designer-text-on-accent: var(--base-screen-designer-text-on-accent, #ffffff);
 
   /* ── 边框与焦点：alpha 收边，压在任何表面上都成立 ── */
@@ -198,11 +206,15 @@
   --designer-accent-text: var(--base-screen-designer-accent-text, #145ec2);
   --designer-success: var(--base-screen-designer-success, #1d9746);
   --designer-success-surface: var(--base-screen-designer-success-surface, #e1f0e6);
-  --designer-warning: var(--base-screen-designer-warning, #a48025);
+  /* warning / danger 直接充当徽标前景色（designer-badge[data-tone]），
+     所以必须在本档内就满足「落在自己的 surface 上 ≥4.5」：
+     #a48025 on #f1ede2 只有 3.15（"草稿"读不清），#dc2626 on #f8e2e2 只有 3.90。
+     压深到 #82631a（4.79）与 #b91c1c（5.23），同时仍在白底上 ≥5.4，两种用法都成立。 */
+  --designer-warning: var(--base-screen-designer-warning, #82631a);
   --designer-warning-surface: var(--base-screen-designer-warning-surface, #f1ede2);
-  --designer-danger: var(--base-screen-designer-danger, #dc2626);
+  --designer-danger: var(--base-screen-designer-danger, #b91c1c);
   --designer-danger-surface: var(--base-screen-designer-danger-surface, #f8e2e2);
-  --designer-danger-text: var(--base-screen-designer-danger-text, #b52a26);
+  --designer-danger-text: var(--base-screen-designer-danger-text, #a02020);
 
   /* ── 高度与描边：耳语级阴影靠距离做层级，不靠浓度 ── */
   --designer-shadow-overlay: var(
@@ -259,7 +271,11 @@
   --designer-text-primary: var(--base-screen-designer-text-primary, #f5f5f5);
   --designer-text-secondary: var(--base-screen-designer-text-secondary, #c6c6c6);
   --designer-text-muted: var(--base-screen-designer-text-muted, #8d8d8d);
-  --designer-text-disabled: var(--base-screen-designer-text-disabled, #6a6a6a);
+  /* 深色档的 disabled 从 #6a6a6a 上移到 #7a7a7a：原值落在 workspace 上 3.64、
+     落在面板上 3.54，而它被用在「BUILTIN」「铺满裁剪」这类**需要读到才知状态**的
+     位置（后者是"这个选项现在不可选"）。#7a7a7a 在 #0b0b0b 上 4.59。
+     与 muted(#8d8d8d) 仍差一档，禁用语义靠亮度序而不是靠"看不清"表达。 */
+  --designer-text-disabled: var(--base-screen-designer-text-disabled, #7a7a7a);
   /* 黑夜的强调底上放深字，与亮色白字/蓝底同档（4.93:1）。 */
   --designer-text-on-accent: var(--base-screen-designer-text-on-accent, #1c2b40);
 

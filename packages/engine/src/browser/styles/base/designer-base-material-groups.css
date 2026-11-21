@@ -1,7 +1,12 @@
 /* 物料分组导航（.material-group-navigation）及配套弹层/切换样式。
    颜色、字号、间距等一律使用 --designer-* 设计 token，便于统一维护。 */
 
-/* 内容区网格：分组内联导航 + 结果列表，默认单列，分组展开时为双列。 */
+/* 内容区网格：分组内联导航 + 结果列表。
+   内联导航是「一行横向 chip」而不是原来的「32px 图标列 + 76px 标签列」竖排双栏：
+   竖排双栏会永久占掉 108px 横向宽度，而默认 336px 面板的内容区只有 287px——
+   扣掉导航、24px 内边距与 15px 滚动条槽位后卡片区只剩 140px，只排得下 1 列，
+   30 个物料要滚 5.7 屏（与 designer-workbench-panels.css 里「默认左栏 2 列」的约定不符）。
+   横向 chip 把宽度成本换成一行高度成本，卡片区拿回完整 248px，稳定排 2 列。 */
 .material-library-content,
 .material-library-results {
   display: grid;
@@ -12,7 +17,16 @@
 }
 
 .material-library-content[data-material-grouped="true"] {
-  grid-template-columns: 108px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+/* 内联导航独占首行，结果列表在第二行；两行都占满整宽。 */
+.material-library-content[data-material-grouped="true"] > .material-group-inline {
+  grid-row: 1;
+}
+
+.material-library-content[data-material-grouped="true"] > .material-library-results {
+  grid-row: 2;
 }
 
 .material-library-results > .material-grid {
@@ -28,7 +42,16 @@
   overflow: hidden;
 }
 
-/* 导航容器（紧凑布局）：roots 列（32px）+ 子分组列（76px）；弹层内由下方覆盖为自适应宽度。 */
+/* 内联导航在面板里：横向 chip 条，纵向自然增高（不再是 100% 高）。 */
+.material-group-inline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-2) var(--designer-space-3) 0;
+}
+
+/* 导航容器：弹层内是「roots 列（32px）+ 子分组列」的双栏 Miller 布局；
+   内联时由下方覆盖为两行横向 chip。 */
 .material-group-navigation {
   display: grid;
   grid-template-columns: 32px 76px;
@@ -246,6 +269,110 @@
   text-align: left;
 }
 
+/* ── 内联横向 chip 模式 ───────────────────────────────────────────────
+   面板里的导航不是 Miller 双栏，而是可横向滚动的一行 chip：
+   roots 一行（图标 + 文字 + 计数），选中带子分组的根时 secondary 再一行。
+   文字标签在 chip 上必须可见——只留图标会让 6 个分组无从辨认（桥接与最佳实践
+   曾共用同一个矩形图标，视觉上完全等价）。 */
+.material-group-inline .material-group-navigation {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  height: auto;
+  border-right: 0;
+  background: transparent;
+  gap: var(--designer-space-1);
+}
+
+.material-group-inline .material-group-roots,
+.material-group-inline .material-group-secondary {
+  flex-direction: row;
+  align-items: center;
+  overflow: visible;
+  border-right: 0;
+  padding: 0;
+  gap: var(--designer-space-1);
+  /* 分组多了横向滚动而不是折行：折行会把 2 行 chip 变成 4 行，把卡片区挤没。 */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.material-group-inline .material-group-roots::-webkit-scrollbar,
+.material-group-inline .material-group-secondary::-webkit-scrollbar {
+  display: none;
+}
+
+/* secondary 行的结构是 back(含 heading) + children，展开成一条横排。 */
+.material-group-inline .material-group-secondary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.material-group-inline .material-group-children {
+  flex-direction: row;
+  align-items: center;
+  overflow: visible;
+  padding: 0;
+  gap: var(--designer-space-1);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.material-group-inline .material-group-children::-webkit-scrollbar {
+  display: none;
+}
+
+/* chip 自身的几何：高度矮一档、横向内距小、圆角半丸形。 */
+.material-group-inline .material-group-navigation .material-group-back,
+.material-group-inline .material-group-navigation .material-group-button {
+  width: auto;
+  flex: 0 0 auto;
+  height: var(--designer-control-height-compact);
+  min-height: var(--designer-control-height-compact);
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-pill);
+  justify-content: flex-start;
+}
+
+.material-group-inline .material-group-navigation .material-group-back {
+  width: var(--designer-control-height-compact);
+  padding: 0;
+  justify-content: center;
+  border-color: transparent;
+}
+
+/* chip 上的标签必须显示；roots 的标签原先被全局规则隐藏。 */
+.material-group-inline .material-group-roots .material-group-label,
+.material-group-inline .material-group-roots .material-group-meta {
+  display: flex;
+}
+
+.material-group-inline .material-group-roots .material-group-label {
+  display: block;
+  flex: 0 0 auto;
+  max-width: 9em;
+}
+
+/* 计数在 chip 上退回纯文本，不再用固定宽度的胶囊块（24px 定宽在 chip 里像错位）。 */
+.material-group-inline .material-group-count {
+  display: block;
+  width: auto;
+  height: auto;
+  flex: 0 0 auto;
+  background: transparent;
+  color: var(--designer-text-muted);
+}
+
+.material-group-inline .material-group-button[aria-pressed="true"] .material-group-count {
+  background: transparent;
+  color: var(--designer-text-secondary);
+}
+
 .material-group-toggle [data-material-group-toggle-label] {
   flex: 1;
 }
@@ -296,15 +423,12 @@
   grid-template-columns: 32px minmax(0, 1fr);
 }
 
-/* 窄容器降级：隐藏内联导航，改用工具栏切换按钮。
-   264px 是「内联导航 + 卡片」的最小可用组合：导航固定 108px，剩下不足 156px 时
-   内联模式已放不下两张卡片，改用弹层反而更宽裕。改动这个值必须同步
+/* 窄容器降级：隐藏内联 chip，改用工具栏切换按钮。
+   264px 是「内联 chip + 卡片」的最小可用组合。改成横向 chip 后导航不再吃横向宽度，
+   但会固定占掉约两行高（roots + secondary）——面板窄到这个程度时纵向预算同样紧张，
+   弹层比"挤掉两行卡片"更划算。改动这个值必须同步
    MATERIAL_GROUP_INLINE_MIN_WIDTH（designer-styles.mjs 会比对两处）。 */
 @container material-library (width < 264px) {
-  .material-library-content[data-material-grouped="true"] {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .material-group-inline {
     display: none;
   }
@@ -316,6 +440,7 @@
 
 /* hidden 属性统一隐藏。 */
 .material-group-inline[hidden],
+.material-group-secondary[hidden],
 .material-group-navigation[hidden],
 .material-group-overlay[hidden],
 .material-group-toggle[hidden],

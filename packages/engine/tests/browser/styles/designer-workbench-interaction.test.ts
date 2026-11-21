@@ -296,7 +296,12 @@ describe('designer workbench interaction and accessibility', () => {
 
     expect(baseCss).toContain('.material-group-navigation {');
     expect(baseCss).toContain('grid-template-columns: 32px 76px;');
-    expect(baseCss).toContain('grid-template-columns: 108px minmax(0, 1fr);');
+    // 内联导航是横向 chip（两行：roots + secondary），不再是吃掉 108px 横向宽度的
+    // Miller 双栏——那个布局让默认 336px 面板的卡片区只剩 140px、只排 1 列。
+    expect(baseCss).toContain(
+      '.material-library-content[data-material-grouped="true"] {\n  grid-template-rows: auto minmax(0, 1fr);',
+    );
+    expect(baseCss).not.toContain('grid-template-columns: 108px minmax(0, 1fr);');
     expect(baseCss).toContain('grid-template-rows: 32px minmax(0, 1fr);');
     expect(baseCss).toContain('.material-group-navigation .material-group-button {');
     expect(baseCss).toContain('flex: 0 0 var(--designer-control-height-compact);');

@@ -202,7 +202,10 @@
   border-radius: var(--designer-radius-pill);
   background: color-mix(in srgb, var(--designer-surface-overlay) 92%, transparent);
   box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
-  color: var(--designer-text-muted);
+  /* 提示条是新用户看到的第一句话，不该用最低一档的 muted：
+     原先它与悬浮面合成后只有 4.44（深）/ 4.31（浅），12px 正文差一口气。
+     升到 secondary 后两种主题都 ≥6.5，且仍明显弱于面板标题。 */
+  color: var(--designer-text-secondary);
   font: var(--designer-font-small);
   pointer-events: none;
   translate: -50% 0;

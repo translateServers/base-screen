@@ -185,6 +185,33 @@ export class DesignerViewportController {
     this.setZoom(
       getFitDesignerZoom(document, { width: viewport.clientWidth, height: viewport.clientHeight }),
     );
+    // fit 会把画布以视窗中心为锚点缩放；比 100% 小时画布本身也变小了，
+    // 若不归零偏移，缩完会贴在右下角，看起来像"缩小了但没居中"。
+    this.#state = { ...this.#state, offset: { x: 0, y: 0 } };
+    this.render();
+  }
+
+  /**
+   * 首屏缩放：只在 100% 放不下时退到「适应窗口」，放得下就保持 100%。
+   *
+   * 为什么不用 fit() 无条件适配：1920 视口下 960 画布本来就该按 100% 呈现，
+   * 无脑 fit 会把它放大到 120% 以上，反而失真。这里只解决"被裁掉"这一种情况。
+   *
+   * 返回值表示「本次是否做出了决定」：视窗尚未布局（clientWidth 为 0）时返回 false，
+   * 调用方据此保留重试机会——宿主把设计器放在 display:none 容器里再显示出来是常见用法。
+   */
+  fitOnFirstRender(): boolean {
+    const document = this.callbacks.getDocument();
+    const viewport = this.#viewport;
+    if (document === undefined || viewport === undefined) return false;
+    if (viewport.clientWidth <= 0 || viewport.clientHeight <= 0) return false;
+    if (
+      document.canvas.width <= viewport.clientWidth &&
+      document.canvas.height <= viewport.clientHeight
+    )
+      return true;
+    this.fit();
+    return true;
   }
 
   fitSelection(size: { readonly width: number; readonly height: number }): void {

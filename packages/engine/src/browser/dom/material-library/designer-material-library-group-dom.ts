@@ -132,5 +132,8 @@ export function renderMaterialLibraryGroupNavigation(
     ),
   ]);
   if (branchChanged) view.children.scrollTop = 0;
+  // 次级 chip 行只在「当前根分组确有子分组」时出现。否则它只是一行孤零零的
+  // 「全部 N」——在默认全部分类下这行没有任何可选项，白占一整行高度。
+  view.secondary.hidden = branch?.children === undefined || branch.children.length === 0;
   return view;
 }

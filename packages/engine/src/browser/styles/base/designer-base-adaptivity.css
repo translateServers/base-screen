@@ -31,13 +31,41 @@
     display: none;
   }
 
+  /* 降级档原本只留一句警告：顶栏、保存、发布随整个 .designer 一起消失，
+     用户带着未保存改动被关在门外。这里把两条仍可执行的出口留在警告里——
+     导出不依赖宿主，保存依赖宿主 project 端口（未接线时由 renderOperationControls
+     置 hidden）。两者都复用顶栏的 data-action，事件委派与可用性状态自动生效。 */
   .small-screen-warning {
     display: grid;
-    place-items: center;
+    align-content: center;
+    justify-items: center;
+    gap: var(--designer-space-5);
     height: 100%;
     padding: var(--designer-space-7);
     color: var(--designer-warning);
     text-align: center;
+  }
+
+  .small-screen-warning-copy {
+    display: grid;
+    gap: var(--designer-space-2);
+    max-width: 46ch;
+  }
+
+  .small-screen-warning-hint {
+    color: var(--designer-text-muted);
+    font-size: var(--designer-font-size-sm);
+  }
+
+  .small-screen-warning-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--designer-space-3);
+    justify-content: center;
+    /* 警告块默认继承 --designer-warning 色；按钮要回到常规前景色，
+       否则会被读成"按钮本身也是警告"。在容器上改 color 由按钮继承，
+       而不是在按钮层重写外观（控件外观归 controls/ 层）。 */
+    color: var(--designer-text-primary);
   }
 }
 

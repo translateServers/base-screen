@@ -31,3 +31,6 @@ packages/*/LICENSE
 .base-screen/
 .local/
 .qoder/
+# 工具改写受跟踪文件前的备份：`aoci init` 等会在原地留 AGENTS.md.backup.<ts>.<sha>
+*.backup.*
+# AOCI 认知资产的提交面由 .aoci/.gitignore 白名单独占管理，此处不重复声明

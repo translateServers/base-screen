@@ -31,7 +31,14 @@ export function materialLibrarySkeletonMarkup(visibleMaterialCount: number): str
 export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
   return `
     <div class="small-screen-warning" role="alert">
-      <span>${DESIGNER_UI_TEXT.smallScreenWarning}</span>
+      <div class="small-screen-warning-copy">
+        <span>${DESIGNER_UI_TEXT.smallScreenWarning}</span>
+        <span class="small-screen-warning-hint">${DESIGNER_UI_TEXT.smallScreenHint}</span>
+      </div>
+      <div class="small-screen-warning-actions">
+        ${labeledActionButton('export', designerIcon('download'))}
+        ${labeledActionButton('project-save', designerIcon('save'))}
+      </div>
     </div>
 
     <section class="designer-command-palette" data-command-palette hidden role="dialog" aria-modal="true" aria-label="${DESIGNER_UI_TEXT.commandPalette.dialog}">

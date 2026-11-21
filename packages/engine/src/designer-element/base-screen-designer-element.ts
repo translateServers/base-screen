@@ -92,6 +92,10 @@ export class BaseScreenDesignerElement extends ElementBase {
   attributeChangedCallback(name: string, previousValue: string | null, value: string | null): void {
     if (name === 'theme' && previousValue !== value) {
       this.#designerState.topbarController.render();
+      // 标尺是 <canvas> 手绘的：主题切换只改 CSS 变量不会重绘像素，
+      // 浅色主题下会一直留着深色墨水（实测 rgb(141,141,141) 停在 #fcfcfc 上，
+      // 直到下一次缩放才刷新）。这里主动重绘一次。
+      this.#designerState.workbenchController.renderRulers();
       // 主题切换只改 CSS 变量，画布颜色随之变化：重新测量守卫结果。
       const document = this.#designerState.session.document;
       if (document !== undefined) this.#designerState.guardController.schedule(document);

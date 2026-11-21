@@ -123,6 +123,15 @@ export interface DesignerElementState {
   deferredPanelHydration: boolean;
   deferredCanvasHydration: boolean;
   deferredHydrationFrame: number | undefined;
+  /**
+   * 首屏缩放是否已按「适应窗口」定过初值。
+   *
+   * 100% 在大多数笔记本视口下放不下 960×540 画布（1440 视口只有 702px 可用，
+   * 右裁 290px、可见 70%），旧行为让用户第一眼看到"大屏是断的"。
+   * 这里只在**首个文档首次落定**时算一次，之后无论文档如何变更都不再自动改缩放——
+   * 用户手动缩放过就归用户所有，否则每敲一个属性都会被拉回去。
+   */
+  initialZoomApplied: boolean;
   /** 幽灵草案渲染器：同一物料目录、只读挂载到叠加层，与主画布互不影响。 */
   ghostRenderer: BaseScreenRenderer | undefined;
   canvas: HTMLDivElement | undefined;
@@ -213,6 +222,7 @@ export function createDesignerElementState(
   state.deferredPanelHydration = false;
   state.deferredCanvasHydration = false;
   state.deferredHydrationFrame = undefined;
+  state.initialZoomApplied = false;
   state.instanceId = createScreenAuthoringInstanceId();
   state.pendingAuthoringRequests = new Map<
     string,

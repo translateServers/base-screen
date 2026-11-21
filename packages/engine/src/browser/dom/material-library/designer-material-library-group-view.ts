@@ -5,6 +5,7 @@ import { createDesignerButton, createDesignerIconButton } from '../designer-ui-p
 export interface DesignerMaterialGroupView {
   readonly navigation: HTMLElement;
   readonly roots: HTMLElement;
+  readonly secondary: HTMLElement;
   readonly children: HTMLElement;
   readonly heading: HTMLElement;
   readonly back: HTMLButtonElement;
@@ -52,7 +53,7 @@ export function getMaterialGroupView(navigation: HTMLElement): DesignerMaterialG
   back.append(heading);
   secondary.append(back, children);
   navigation.replaceChildren(roots, secondary);
-  const view = { navigation, roots, children, heading, back };
+  const view = { navigation, roots, secondary, children, heading, back };
   views.set(navigation, view);
   return view;
 }

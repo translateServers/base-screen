@@ -48,6 +48,9 @@
   height: 14px;
 }
 
+/* 分段项：按钮是原生 <button>，不显式声明字体就会回落到浏览器默认
+   （Arial 13.3333px / 400），与同栏 .designer-button（Geist 13px / 500）不一致。
+   这里显式接回设计系统的字体族与字阶，字重取 500 与按钮同档。 */
 .designer-segmented .designer-segmented-option {
   min-width: 0;
   height: var(--designer-segmented-option-height);
@@ -59,7 +62,19 @@
   background: transparent;
   box-shadow: none;
   color: var(--designer-text-muted);
+  font-family: inherit;
+  font-size: var(--designer-font-size-base);
+  font-weight: 500;
+  line-height: 1;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 选中项加重到 600：选中态在检查器里被压到中性面 + 内描边，
+   字重是最后一道「这是当前值」的提示，与 .designer-tab[aria-selected] 同档。 */
+.designer-segmented .designer-segmented-option[aria-pressed="true"],
+.designer-segmented .designer-segmented-option[aria-checked="true"] {
+  font-weight: 600;
 }
 
 .designer-segmented
