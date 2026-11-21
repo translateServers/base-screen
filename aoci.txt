@@ -1,0 +1,7 @@
+#AOCI-ROOT-MANIFEST: 1
+#Format-Version: cognition-volumes/v1
+#Locale: zh-CN
+#Project: base-screen 是大屏可视化的设计器与查看器引擎 monorepo：提供设计时编排、运行时渲染、插件与物料体系、React/Vue 框架桥接，以及校验、构建与浏览器验证工具链。
+#Global-Invariants: canonical 文档是唯一真源，运行时投影只读不可回写；几何尺寸归渲染器拥有，物料不得改写宿主元素宽高；文档变更整批试算、失败关闭、绝不写半成品；props/style/dataState 是 JSON-safe 任意值，读取一律兜底不假设字段存在；用户可见文案只出自权威目录，禁止 browser 层内联；认知资产不得被 git 忽略。
+#Volume: id=meta kind=meta path=aoci.meta.txt format=meta-v1 depends=- state=enabled
+#Volume: id=code kind=code path=aoci.code.txt format=object-fras-v2 depends=meta state=enabled
