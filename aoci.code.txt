@@ -6,7 +6,7 @@
 .gitignore[FC4T]: F:版本库忽略规则 | R:- | A:- | S:忽略 node_modules/.turbo/dist 与 .workbuddy/.qoder/.base-screen 等本地工作区；新增 *.backup.* 覆盖 aoci init 改写受跟踪文件前的备份；AOCI 认知资产的提交面由 .aoci/.gitignore 白名单独占，此处不重复声明以免两份副本漂移
 .node-version[FV2T]: F:声明项目 Node 版本 | R:- | A:- | S:版本为 22
 AGENTS.md[SG8S]: F:仓库开发指南只写 Agent 该怎么做，系统结构交给 aoci.txt 认知索引 | R:code:README.md | A:环境搭建与验证 / 包边界 / 产品定位与宿主边界 / 目录结构与命名 / 分层与边界 / 契约与产物 / 代码与测试 / AOCI 与仓库门禁的交互 | S:托管区块由 aoci init 重写，人工只维护其前散文；AOCI 与门禁交互节记录格式化管辖边界、提交面由 .aoci/.gitignore 白名单独占、MCP 注册在用户级不在仓库内、认知进版本库但无门禁守护新鲜度
-CONTEXT.md[SG6S]: F:Base Screen 领域词汇表 | R:- | A:契约与诊断 / 插件贡献词汇 / Designer 组合根 / 数据面板 / 物料 / 设计系统 | S:-
+CONTEXT.md[SG6S]: F:Base Screen 领域词汇表 | R:- | A:契约与诊断 / 插件贡献词汇 / Designer 组合根 / 数据面板 / 物料 / 设计系统 | S:面板件章节新增硬约束：换掉节点时必须同批删除它的样式，只删创建代码会把失效规则留给下一个改布局的人
 LICENSE[SZ3T]: F:MIT 开源许可证 | R:- | A:- | S:Copyright 2026 zhouan190
 README.md[SG9M]: F:Base Screen 项目总览与接入指南 | R:code:CONTEXT.md | A:适用场景 / 核心能力 / 快速体验 / 按子路径引入 / 与宿主职责划分 / 包结构 | S:以 Screen Document 为统一文档、Web Components 为浏览器集成边界；项目/数据/资产/发布由宿主负责，本库只管当前实例内的编辑渲染与有界宿主端口
 biome.json[FC5T]: F:Biome 格式化与检查配置 | R:- | A:- | S:2 空格 LF 100 列单引号始终分号；linter preset=none 仅 noDebugger=error；includes 排除 .aoci（AOCI 自写与 pnpm format 互相覆盖会让 format:check 必失败）、host-tokens.css 与 common/vendor 等生成物与第三方
@@ -739,7 +739,7 @@ designer-transform-gesture.ts[IE6S]: F:变换手势 | R:code:packages/engine/src
 ===/<repository>/packages/engine/src/browser/controllers/layers/===
 designer-layer-drag-controller.ts[IE8L]: F:图层拖拽控制器 | R:code:packages/engine/src/common/operations/hierarchy.ts | A:- | S:图层树中拖拽重排父子与顺序
 designer-layer-rename-controller.ts[IE6S]: F:图层重命名控制器 | R:code:packages/engine/src/browser/dom/layers/designer-layers-dom.ts | A:- | S:图层名称内联编辑与提交
-designer-layers-controller.ts[IE8L]: F:图层面板控制器 | R:code:packages/core/src/hierarchy/hierarchy.ts | A:- | S:图层树渲染选择与可见锁定状态管理
+designer-layers-controller.ts[IE8L]: F:图层面板控制器：渲染协调、选择与多选、折叠、搜索、拖拽重排与重命名 | R:code:packages/engine/src/browser/dom/layers/designer-layers-model.ts,code:packages/engine/src/browser/dom/layers/designer-layers-dom.ts,code:packages/core/src/hierarchy/hierarchy.ts | A:- | S:图层树渲染选择与可见锁定状态管理；左右键做层级导航（展开/折叠/进子行/回父行），搜索态只移动不折叠；折叠会重建子节点但 tree 容器复用，渲染后须按 id 找回焦点
 
 ===/<repository>/packages/engine/src/browser/controllers/panel/===
 designer-inspector-focus.ts[IG5T]: F:检查器焦点管理 | R:code:packages/engine/src/browser/dom/panel/designer-panel-dom.ts | A:- | S:检查器输入框焦点与键盘导航管理
@@ -749,7 +749,7 @@ designer-panel-controller-callbacks.ts[IG4T]: F:面板控制器回调 | R:code:p
 designer-panel-controller.ts[IE6S]: F:面板基础控制器 | R:code:packages/engine/src/browser/controllers/panel/designer-panel-controller-callbacks.ts | A:- | S:面板通用渲染与事件绑定骨架
 designer-panel-inspector-controller.ts[IE7M]: F:检查器面板控制器 | R:code:packages/engine/src/common/operations/style/designer-inspector.ts | A:- | S:属性样式绑定的检查器渲染与编辑回写文档
 designer-panel-material-controller.ts[IE7M]: F:物料面板控制器 | R:code:packages/engine/src/common/operations/material-library/material-library-items.ts | A:- | S:物料列表渲染搜索与拖拽到画布入口
-designer-panel-property-controller.ts[IE7M]: F:属性面板控制器 | R:code:packages/engine/src/common/operations/style/designer-property-transactions.ts | A:- | S:组件 props 编辑界面与属性变更事务
+designer-panel-property-controller.ts[IE7M]: F:属性面板控制器：组件属性样式与画布呈现设置的事务编排 | R:code:packages/engine/src/common/operations/style/designer-property-transactions.ts | A:- | S:组件 props 编辑界面与属性变更事务；缩放档位由 applyScaleMode 单点写入，分段按钮与下拉共用同一校验；判断下拉用 tagName 而非 instanceof，单测环境没有 HTMLSelectElement 全局
 designer-panel-selection-controller.ts[IE7M]: F:选择面板控制器 | R:code:packages/core/src/hierarchy/hierarchy.ts | A:- | S:选择状态展示与选中组件操作面板
 designer-style-rules-controller.ts[IE7M]: F:样式规则面板控制器 | R:code:packages/engine/src/common/operations/style/designer-style-rules.ts | A:- | S:条件样式规则的编辑与回写文档
 
@@ -806,14 +806,14 @@ designer-data-group-dom.ts[FG6S]: F:数据分组 DOM | R:code:packages/engine/sr
 designer-data-panel-notice.ts[FG5S]: F:数据面板提示 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据面板的提示文案与空态渲染
 designer-data-section-diff.ts[FG7M]: F:数据分区差异 DOM | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据分区渲染前后的差异比对与局部更新
 designer-data-state.ts[FG4T]: F:数据面板状态类型 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据面板 DOM 状态的数据结构
-designer-dataset-authoring-dom.ts[FG7M]: F:数据集作者化 DOM | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据集创建编辑表单的 DOM 渲染
+designer-dataset-authoring-dom.ts[FG7M]: F:数据集高级设置段：编辑方式切换、过滤器、只读实例事实与工具动作 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据集创建编辑表单的 DOM 渲染；只读事实区只报更新方式与跳转，不再重复顶部来源卡片已写的实例名；摘要在检查器里写「策略 · 在工作台修改」，组内按钮用「打开工作台」避免与摘要同句；复制/全屏工具图标排在只读卡片之后而不是夹在过滤器与卡片之间；动作名不能叫 apply，空态 apply 计数是硬判据
 designer-dataset-binding.ts[FG3T]: F:数据集绑定 DOM | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据字段到组件角色绑定的 DOM
 designer-dataset-catalog-dom.ts[FG7M]: F:数据集目录 DOM | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据集目录列表的 DOM 渲染
 designer-dataset-config-controls.ts[FG6S]: F:数据集配置控件 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-config-dom.ts | A:- | S:数据源类型选择与参数配置控件
-designer-dataset-config-dom.ts[FG8L]: F:数据集配置 DOM | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-config-controls.ts | A:- | S:各数据源类型配置表单的完整 DOM 渲染
+designer-dataset-config-dom.ts[FG8L]: F:数据集配置 DOM：来源摘要卡片、字段映射、请求参数与绑定角色 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-config-controls.ts | A:- | S:各数据源类型配置表单的完整 DOM 渲染；数据集描述只挂摘要卡片的 data-tip 与 aria-description；参数行形态只由固定值/变量分段表达，inline 模式不再渲染「固定值2」这类与输入框重复的摘要触发器，只留改绑变量图标；绑定角色一行一个角色，全选/清空只留在弹层里
 designer-dataset-dom.ts[FG7M]: F:数据集面板 DOM 汇总 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-authoring-dom.ts | A:- | S:数据面板整体 DOM 结构与子模块汇总导出
 designer-dataset-flow-dom.ts[FG8L]: F:数据流 DOM | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据源到组件绑定关系的数据流可视化 DOM
-designer-dataset-preview-dom.ts[FG7M]: F:数据预览 DOM | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:查询结果表格预览的 DOM 渲染
+designer-dataset-preview-dom.ts[FG7M]: F:数据响应预览：空态、结果表格与参数摘要 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:查询结果表格预览的 DOM 渲染；空态不重复组头已写的「尚未请求」，只留行动说明与「当前参数 · …」摘要，参数顺序跟随 descriptor
 designer-dataset-primitives.ts[FG6S]: F:数据集 DOM 原语 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据面板共用的 DOM 构建原语
 designer-dataset-sections.ts[FG5T]: F:数据集分区定义 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据面板各分区键与结构定义
 designer-dataset-types.ts[FG7M]: F:数据集 DOM 类型 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:面板模式字段校验与必填统计等类型
@@ -837,11 +837,11 @@ designer-form-controls-dom.ts[FG6S]: F:表单控件 DOM | R:code:packages/engine
 designer-html-escape.ts[FG3T]: F:HTML 转义 | R:- | A:- | S:转义文本防止注入到设计器 DOM
 designer-icons.ts[FG5S]: F:设计器图标 | R:- | A:- | S:设计器内联图标的 SVG 定义
 designer-image-metadata-dom.ts[FG3T]: F:图片元数据 DOM | R:code:packages/engine/src/browser/dom/designer-field-primitives.ts | A:- | S:图片尺寸等元数据的展示 DOM
-designer-inspector-chrome-dom.ts[FG6S]: F:检查器框架 DOM | R:code:packages/engine/src/browser/dom/designer-inspector-search-dom.ts | A:- | S:检查器面板的外壳与标题结构
+designer-inspector-chrome-dom.ts[FG6S]: F:检查器框架 DOM：身份卡与密度切换 | R:code:packages/engine/src/browser/dom/designer-inspector-search-dom.ts | A:- | S:检查器面板的外壳与标题结构；组件名与物料名相同时副标题只报类型，用户改过名才补物料名，避免同一句话说两遍
 designer-inspector-search-dom.ts[FG7M]: F:检查器搜索 DOM | R:code:packages/engine/src/browser/dom/designer-inspector-chrome-dom.ts | A:- | S:检查器属性搜索过滤的 DOM 与逻辑
-designer-interaction-dom.ts[FG6S]: F:交互 DOM 结构 | R:code:packages/engine/src/browser/dom/designer-event-system.ts | A:- | S:画布交互相关的 DOM 结构与状态
+designer-interaction-dom.ts[FG6S]: F:交互 DOM：能力摘要、交互设置与事件段 | R:code:packages/engine/src/browser/dom/designer-event-system.ts | A:- | S:画布交互相关的 DOM 结构与状态；设计与预览能力合并为一个默认收起的「组件能力」折叠段，摘要直接列出能力名；事件段仍常驻；能力列表复用两列 chip
 designer-left-panel-groups-dom.ts[FG5S]: F:渲染设计器左栏宿主分组标签与面板 | R:code:packages/engine/src/common/operations/workbench/designer-left-panel-groups.ts,code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:- | S:重渲染先移除已渲染宿主节点再恢复焦点，宿主插槽事件由表面路由隔离
-designer-quick-style-dom.ts[FG6M]: F:图表类物料的快捷样式面板含配色预设字号与信息密度 | R:code:packages/engine/src/common/operations/style/designer-quick-style.ts,code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:- | S:仅对图表或表格类物料追加，按钮可用性由 manifest 能力判定
+designer-quick-style-dom.ts[FG6M]: F:图表类物料的快捷样式面板含配色预设字号与信息密度 | R:code:packages/engine/src/common/operations/style/designer-quick-style.ts,code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:- | S:仅对图表或表格类物料追加，按钮可用性由 manifest 能力判定；九宫格预设与三行配置默认收起（常驻约占 200px，且属一次性选择）；自带 details 必须带 designer-inspector-disclosure 类，否则收起态没有 chevron，看起来像一条孤立分隔线
 designer-select-dom.ts[FG7M]: F:自绘下拉控件以触发器加浮层包装原生 select | R:code:packages/engine/src/browser/dom/designer-icons.ts | A:- | S:原生 select 保留取值与 change；弹层 fixed 视口定位逐帧跟随、翻转夹紧；键盘与滚轮止住冒泡避免被画布手势抢走
 designer-selection-dom.ts[FG5S]: F:画布选中框的名称标签拖拽层与变换手柄 | R:code:packages/engine/src/common/operations/selection/designer-selection.ts,code:packages/engine/src/common/operations/element/designer-transform.ts | A:- | S:选中框覆盖完整子树，手柄仅当全部选中项可变换且未锁定时出现，拖拽层用 evenodd 裁剪挖空组件区
 designer-surface-router.ts[FG8S]: F:设计器 shadow 表面事件集中挂载与处理器链分发 | R:code:packages/engine/src/browser/dom/designer-editable-target.ts | A:- | S:宿主插槽的 light DOM 事件被守卫跳过，不被内部 data-* 路由或快捷键误识别；capture 通道抢先认领指针会话
@@ -866,8 +866,8 @@ designer-intent-reference-picker-dom.ts[FG7M]: F:意图引用选择器浮层含�
 
 ===/<repository>/packages/engine/src/browser/dom/layers/===
 designer-layer-drag-image-dom.ts[FG4T]: F:图层拖拽幽灵为自绘的跟随光标浮起行卡片 | R:- | A:- | S:挂回同一可绘制树以获取设计令牌，多选拖拽附数量徽标
-designer-layers-dom.ts[FG8L]: F:图层面板渲染含常驻外壳图层树节点与拖拽落点指示 | R:code:packages/engine/src/browser/dom/layers/designer-layers-model.ts,code:packages/engine/src/browser/dom/layers/designer-layers-toolbar-dom.ts | A:- | S:外壳只首建复用，搜索输入不因重渲染丢焦点；相邻选中行合并圆角；超出上限显示显示更多
-designer-layers-model.ts[FG7M]: F:图层视图模型构建层级树排序兄弟过滤与选中导航 | R:code:packages/engine/src/browser/dom/material-library/designer-material-library-dom.ts | A:- | S:每次重建只扫一遍文档与蓝图避免逐行的 O(n×r)，一次性标记数据绑定与蓝图交互组件
+designer-layers-dom.ts[FG8L]: F:图层面板渲染含常驻外壳图层树节点与拖拽落点指示 | R:code:packages/engine/src/browser/dom/layers/designer-layers-model.ts,code:packages/engine/src/browser/dom/layers/designer-layers-toolbar-dom.ts | A:- | S:外壳只首建复用，搜索输入不因重渲染丢焦点；相邻选中行合并圆角；超出上限的显示更多带剩余数量；treeitem 带 aria-expanded 与按同级兄弟组计算的 aria-posinset/aria-setsize；数据与交互能力标记是 5px 圆点，必须给 role=img，否则 span 上的 aria-label 不进无障碍树
+designer-layers-model.ts[FG7M]: F:图层视图模型构建层级树排序兄弟过滤与选中导航 | R:code:packages/engine/src/browser/dom/material-library/designer-material-library-dom.ts | A:- | S:每次重建只扫一遍文档与蓝图避免逐行的 O(n×r)，一次性标记数据绑定与蓝图交互组件；左右键分支动作用 resolveDesignerLayerBranchAction 纯函数裁决，DOM 只负责取样，搜索态不产生折叠动作
 designer-layers-toolbar-dom.ts[FG5S]: F:图层工具栏的置顶上移下移置底与编组解编按钮 | R:code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:- | S:常驻外壳只同步 disabled 不重建按钮，保留点击后的焦点与悬停态
 
 ===/<repository>/packages/engine/src/browser/dom/material-library/===
@@ -883,14 +883,14 @@ designer-menu.ts[FG7L]: F:设计器菜单控制器含菜单切换子菜单与键
 designer-plugin-command-menu.ts[FG4T]: F:插件命令注入工具菜单的按钮模板与渲染 | R:code:packages/engine/src/common/operations/plugin/designer-plugin-commands.ts | A:- | S:插件命令与内建动作同网格，图标槽固定用 sparkle；无命令时不产出分隔
 
 ===/<repository>/packages/engine/src/browser/dom/panel/===
-designer-canvas-properties-dom.ts[FG6M]: F:页面配置面板的画布背景与文档主题色控件 | R:code:packages/engine/src/browser/dom/panel/designer-canvas-transactions.ts | A:- | S:六个主题槽复用统一颜色控件并默认折叠；单色背景同时写 background 与 backgroundColor
+designer-canvas-properties-dom.ts[FG6M]: F:页面配置面板的画布背景与文档主题色控件 | R:code:packages/engine/src/browser/dom/panel/designer-canvas-transactions.ts | A:- | S:六个主题槽复用统一颜色控件并默认折叠；单色背景同时写 background 与 backgroundColor；画布/渲染行为/背景填充/背景图片四段各带稳定折叠 key，画布默认展开且只留尺寸/不透明度/缩放三项；两个渲染开关收进渲染行为段并带状态摘要；缩放方式用六档下拉而非分段
 designer-canvas-transactions.ts[FG7M]: F:画布展示设置与背景主题色的事务构造 | R:code:packages/engine/src/browser/dom/color/designer-color-palette-model.ts | A:- | S:主题色板一次提交整副避免 theme 引用空洞；背景调色板状态与检查器同构共用序列化
-designer-chrome-primitives.ts[FG6S]: F:面板件原语含分区空态与徽标的唯一结构 | R:code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:- | S:长期存在的分区应显式给 key 否则顺序键随插删平移导致折叠态串位；外观只在 workbench-chrome.css 一处
+designer-chrome-primitives.ts[FG6S]: F:面板件原语含分区空态与徽标的唯一结构 | R:code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:- | S:长期存在的分区应显式给 key 否则顺序键随插删平移导致折叠态串位；外观只在 workbench-chrome.css 一处；summary 选项渲染为标题行内 .designer-inspector-section-meta，只在收起时显示
 designer-component-properties-dom.ts[FG8L]: F:检查器主渲染按单件多选与画布分派属性控件 | R:code:packages/engine/src/browser/dom/panel/designer-panel-primitives.ts,code:packages/engine/src/browser/dom/panel/designer-multi-selection-dom.ts | A:- | S:锁定组件追加提示并禁用除锁定与隐藏外控件；越界组件给出画布外提示
 designer-data-source-model.ts[FG4T]: F:检查器 JSON 草稿解析与初始数据源再导出 | R:code:packages/engine/src/common/operations/material-component/material-component.ts | A:- | S:解析失败与非法值都返回 undefined，由调用方决定提示
 designer-multi-selection-dom.ts[FG6M]: F:多选检查器汇总对齐分布与批量几何样式控件 | R:code:packages/engine/src/browser/dom/panel/designer-panel-primitives.ts | A:- | S:批量几何值取焦点组件当前值再应用到全部；全部锁定或无选中时禁用
 designer-panel-dom.ts[FG3T]: F:检查器面板公开 API 的再导出桶 | R:code:packages/engine/src/browser/dom/panel/designer-component-properties-dom.ts | A:- | S:仅重导出类型与函数不承载实现
-designer-panel-primitives.ts[FG7L]: F:检查器面板字段控件与批量输入的模板集 | R:code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:- | S:数值输入补 Shift 十倍微调；无界或跨度超千不走滑杆；自绘下拉进控件列开关直接挂字段行
+designer-panel-primitives.ts[FG7L]: F:检查器面板字段控件与批量输入的模板集 | R:code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:- | S:数值输入补 Shift 十倍微调；无界或跨度超千不走滑杆；自绘下拉进控件列开关直接挂字段行；appendSection 的 summary 追加在位置参数末尾，既有调用不需改签名
 designer-panel-transaction-utils.ts[FG4T]: F:面板事务的控件判定更新与成功包装小工具 | R:- | A:- | S:isControl 仅凭 dataset 与字符串 value 判定，兼容非 DOM 合成控件
 designer-property-transactions.ts[FG7M]: F:检查器属性编辑到文档事务的分派构造 | R:code:packages/engine/src/browser/dom/panel/designer-canvas-transactions.ts,code:packages/engine/src/browser/dom/panel/designer-panel-transaction-utils.ts | A:- | S:画布背景从调色板状态重新序列化以保留增删色标；祖先链查询兼容无 closest 的合成控件
 
@@ -932,10 +932,10 @@ designer-controls-adaptivity.css[FG4T]: F:设计器控件的容器查询响应�
 designer-controls-color-palette.css[FG6L]: F:颜色调色板控件的触发器轨道与色标外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-actions.css | A:- | S:触发器用双类复合选择器钉死字段形态，避免基座按钮样式因 import 顺序覆盖色值行
 designer-controls-date-field.css[FG5M]: F:日期字段输入框触发器与自绘日历弹层外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-inputs.css | A:- | S:输入框保留 designer-input 形态，触发器绝对定位压在右缘
 designer-controls-descriptor.css[FG4T]: F:描述符分组与摘要的外观 | R:- | A:- | S:分组用 details 语义，summary 隐藏原生 marker 自绘箭头
-designer-controls-fields.css[FG6M]: F:检查器字段行与数值读数的排版 | R:code:packages/engine/src/browser/styles/controls/designer-controls-inputs.css | A:- | S:字段行只有 30px 一档行高，需要紧凑时调 row-gap 不改行盒
+designer-controls-fields.css[FG6M]: F:检查器字段行与数值读数的排版 | R:code:packages/engine/src/browser/styles/controls/designer-controls-inputs.css | A:- | S:字段行只有 30px 一档行高，需要紧凑时调 row-gap 不改行盒；字段间距 margin-bottom 用 space-3(6px)，再收到 4px 相邻标签就粘连
 designer-controls-inputs.css[FG6L]: F:勾选开关与滑杆等基础输入控件的外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-fields.css | A:- | S:滑杆轨道与滑钮用令牌自绘不借原生 appearance，避免两套主题跟系统走
 designer-controls-quick-style.css[FG5M]: F:图表快捷样式按钮网格与配色预览的外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-actions.css | A:- | S:预设按钮禁用态与选中态共用统一 token 表达
-designer-controls-segmented.css[FG6S]: F:分段控件的轨道选中态与上下文变体外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-tabs.css | A:- | S:选中态字重最后加到 600 作当前值提示；禁用态换色不换透明度满足对比度契约；画布缩放 6 档按 3 列 2 行排且容器增高避免第二行压到下一字段标签
+designer-controls-segmented.css[FG6S]: F:分段控件的轨道选中态与上下文变体外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-tabs.css | A:- | S:选中态字重最后加到 600 作当前值提示；禁用态换色不换透明度满足对比度契约；分段默认单行等高；画布缩放 6 档的 3×2 特例已删——缩放改成下拉后不再产生 segmented 节点，留着重叠规则只会误导下一个改布局的人
 designer-controls-style.ts[FG4T]: F:控件 CSS 分片的按序拼接常量 | R:code:packages/engine/src/browser/styles/controls/designer-controls-inputs.css | A:- | S:按字段色板输入日期分段快捷动作标签顺序拼接
 designer-controls-tabs.css[FG5S]: F:面板导航 tab 的横竖排布与左栏图标轨外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-segmented.css | A:- | S:tab 容器复用 designer-tablist，按下型选项组仍走 segmented
 
@@ -959,18 +959,18 @@ designer-workbench-blueprint-surface.css[FG5S]: F:蓝图工作区表面的栅格
 designer-workbench-blueprint-toolbar.css[FG3T]: F:蓝图工具栏的外观 | R:- | A:- | S:蓝图工具栏样式，体量极小
 designer-workbench-canvas.css[FG7L]: F:画布视口坐标输入与舞台的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-selection.css | A:- | S:viewport 是键盘事件容器，鼠标聚焦不绘制默认框、键盘聚焦用 inset box-shadow 内描边避免改几何；坐标输入是画布覆盖层
 designer-workbench-change.css[FG5S]: F:变更审查面板的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector.css | A:- | S:审查面板复用右栏五行结构与统一 token
-designer-workbench-chrome.css[FG7L]: F:面板件分区空态徽标与列表行的唯一外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-selection.css | A:- | S:面板件外观唯一落点，其余文件只管布局不重设背景文字描边；行高三档控件两档
-designer-workbench-data-binding.css[FG6L]: F:数据绑定步骤面板的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector-data.css | A:- | S:绑定角色字段列表与兼容字段选项共用统一 token
-designer-workbench-data-catalog.css[FG6L]: F:数据源目录面板的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-data-editor.css | A:- | S:目录列表与搜索过滤态共用统一 token
+designer-workbench-chrome.css[FG7L]: F:面板件分区空态徽标与列表行的唯一外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-selection.css | A:- | S:面板件外观唯一落点，其余文件只管布局不重设背景文字描边；行高三档控件两档；折叠区当前值摘要仅在 details:not([open]) 时作为标题行 flex 尾项显示，单行省略 12em
+designer-workbench-data-binding.css[FG6L]: F:数据绑定步骤与数据集作者化段的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector-data.css | A:- | S:绑定角色字段列表与兼容字段选项共用统一 token；高级设置段内四块（编辑方式/过滤器/只读事实/工具）的间距由 .designer-data-group[data-details-group=refresh] 控制，容器 .designer-dataset-authoring 不承担该段布局，改它不会生效；复制/全屏图标排在只读卡片之后
+designer-workbench-data-catalog.css[FG6L]: F:数据源目录面板与只读实例事实的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-data-editor.css | A:- | S:目录列表与搜索过滤态共用统一 token；只读事实区必须 grid-column:1/-1 跨满父级两列网格，否则只占左半列；行距 space-3，跳转按钮 justify-self:end 对齐读数列；designer-dataset-description 规则已删（描述改走 data-tip，DOM 不再产生该节点）
 designer-workbench-data-editor.css[FG6L]: F:数据工作台容器与步骤布局的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector-data.css | A:- | S:数据工作台为绝对定位覆盖层并声明 data-workbench 容器名
 designer-workbench-feedback.css[FG5M]: F:帮助对话框反馈提示与遮罩的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:帮助对话框用 z-modal 层级与 scrim 底并带入场动效
-designer-workbench-inspector-data.css[FG7L]: F:数据源检查器面板与数据流的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector.css | A:- | S:数据源面板保持一步展开其余停靠；嵌套数据流自管滚动不另设 gutter
+designer-workbench-inspector-data.css[FG7L]: F:数据源检查器面板与数据流的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector.css | A:- | S:数据源面板保持一步展开其余停靠；嵌套数据流自管滚动不另设 gutter；预览空态 min-height 112px；缩放字段只剩「控件占满控件列」一条，栈式布局与 segmented 宽度随下拉改造一同删除
 designer-workbench-inspector.css[FG7L]: F:检查器右栏的五行栅格与属性区外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:五行顺序在所有状态固定；列显式声明为单列，子项漏写 grid-column 会另开列挤成竖条
-designer-workbench-layers.css[FG6M]: F:图层面板列头搜索与图层树行的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-selection.css | A:- | S:行缩进折叠箭头与引导线共用 18px 加 depth 乘 16px 基准，三处必须同步
+designer-workbench-layers.css[FG6M]: F:图层面板列头搜索与图层树行的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-selection.css | A:- | S:行缩进折叠箭头与引导线共用 18px 加 depth 乘 16px 基准，三处必须同步；能力标记 data 是实心点、event 是空心环，先靠形状区分再靠颜色，纯色差对色觉差异用户等于无区分
 designer-workbench-materials.css[FG5S]: F:物料库工具栏与检查器上下文块的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:工具栏压在 z-index 1 以免被库内容遮住搜索与过滤
 designer-workbench-panels.css[FG6M]: F:左右面板通用栏与分割的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:面板外壳只负责几何，外观归 chrome 层
 designer-workbench-selection.css[FG5T]: F:图层树与蓝图库列表选中态的共用画法 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:选中态共用一份中性绘制，强调色只留给可执行操作与画布选框
-designer-workbench-shell.css[FG7L]: F:设计器舞台与状态栏的整体布局外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:舞台是标尺列加内容列的两列栅格且强制跨第 2 行；状态栏分左中右三段，对比度守卫常驻中段，失败只改计数颜色不改几何以免状态栏跳动
+designer-workbench-shell.css[FG7L]: F:设计器舞台与状态栏的整体布局外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:舞台是标尺列加内容列的两列栅格且强制跨第 2 行；状态栏分左中右三段，对比度守卫常驻中段，失败只改计数颜色不改几何以免状态栏跳动；场景列表限高两行内部滚动，行必须 flex:0 0 auto，否则多出的行被压扁而永不出现滚动条
 designer-workbench-style.ts[FG4T]: F:工作台 CSS 分片的按序拼接常量 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:选择层排在全部面板之后赢同特异性，可访问性始终最后
 designer-workbench-topbar.css[FG6L]: F:顶栏的栅格列宽与响应式收缩外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-shell.css | A:- | S:顶栏高度含 border 与栅格行等高避免 1px 溢出；首列与左栏同宽并保底 200px
 designer-workbench-variable-editor.css[FG5L]: F:变量编辑器表单的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-variables.css | A:- | S:字段分组与错误汇总的视觉层级统一由本文件承担
@@ -1112,7 +1112,7 @@ designer-tools.ts[FC5T]: F:设计器绘制工具的登记与快捷键解析 | R:
 
 ===/<repository>/packages/engine/src/common/ui-text/===
 designer-blueprint-ui-text.ts[SL6M]: F:蓝图工作台用户可见文案目录 | R:- | A:- | S:纯数据文案目录，按蓝图域维护；节点库计数与定位等带参文案以函数形式集中于此
-designer-ui-text.ts[SL7L]: F:设计器用户可见文案的唯一权威目录 | R:code:packages/engine/src/common/ui-text/designer-blueprint-ui-text.ts | A:- | S:浏览器层内联文案由 check-designer-ui 禁止，本纯数据目录是权威来源；按文案域维护不按行数拆散，短名与无障碍名须同处定义避免 aria-label 取错；含分组导航与降级档文案
+designer-ui-text.ts[SL7L]: F:设计器用户可见文案的唯一权威目录 | R:code:packages/engine/src/common/ui-text/designer-blueprint-ui-text.ts | A:- | S:浏览器层内联文案由 check-designer-ui 禁止，本纯数据目录是权威来源；按文案域维护不按行数拆散，短名与无障碍名须同处定义避免 aria-label 取错；需要数量的文案用参数函数而非拼接；折叠摘要这类状态词也在此定义；段名与字段名不得重复；占位符不带句号；行内已有标签时值与按钮只写差异部分（过滤器行写「未配置」「配置」）
 
 ===/<repository>/packages/engine/src/common/validation/===
 designer-guard.ts[OB7T]: F:对比度守卫的判定与对外快照 | R:code:packages/engine/src/browser/dom/guard/designer-contrast-measure.ts | A:- | S:输入是真实渲染后已测量的样本而非文档字段；同一组件多段文本只留最差一段；checked 为 0 表示未测非通过
@@ -1546,7 +1546,7 @@ assert-composite-insertion.mjs[FB6S]: F:组合插入的浏览器断言 | R:code:
 assert-inspector-data-tab.mjs[FB5T]: F:检查器数据页签的浏览器断言 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:验证检查器数据页签的展示与切换行为
 assert-inspector.mjs[FB9L]: F:检查器的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖检查器属性样式数据各分区与字段编辑的大量断言
 assert-interactions.mjs[FB9L]: F:交互编排的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖蓝图交互与事件编排的大量断言验证触发条件动作的执行
-assert-workbench.mjs[FB9L]: F:工作台的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖工作台模式画布与蓝图切换及布局的大量断言
+assert-workbench.mjs[FB9L]: F:工作台的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖工作台模式画布与蓝图切换及布局的大量断言；页面配置缩放方式锁 6 个选项、当前值合法且字段高度不超过 48px，防止回退成两行分段
 
 ===/<repository>/tooling/verification/browser-harness/blueprint/===
 assert-blueprint.mjs[FB9L]: F:蓝图画布的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖蓝图节点连线编排预览的大量断言验证画布行为
