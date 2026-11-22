@@ -6,6 +6,7 @@ import {
   filterDesignerLayerItems,
   getDesignerLayerSelectionTarget,
   renderDesignerLayers,
+  resolveDesignerLayerBranchAction,
 } from '../../../../src/browser/dom/layers/designer-layers-dom.js';
 
 class FakeElement {
@@ -16,6 +17,7 @@ class FakeElement {
     setProperty?: (name: string, value: string) => void;
   } = {};
   ariaCurrent = '';
+  ariaExpanded = '';
   ariaLabel = '';
   ariaLevel = '';
   ariaPressed = '';
@@ -308,6 +310,8 @@ describe('designer layers view', () => {
     const row = tree.children[0]!;
     expect(row.ariaSelected).toBe('true');
     expect(row.ariaCurrent).toBe('true');
+    // 分组行的展开态落在 treeitem 自己身上；折叠按钮的 aria-expanded 只描述按钮。
+    expect(row.ariaExpanded).toBe('true');
     expect(row.attributes['aria-description']).toBe('已隐藏，已锁定，已选中，当前焦点，放置目标');
     expect(row.dataset.renaming).toBe('true');
     expect(row.dataset.layerSelectable).toBeUndefined();
@@ -473,6 +477,14 @@ describe('designer layers view', () => {
     const tree = layerTree(layers);
     expect(tree.children).toHaveLength(DESIGNER_LAYER_PAGE_SIZE + 1);
     expect(tree.children.at(-1)?.dataset.layerShowMore).toBe('true');
+
+    // 分页渲染只把前 N 项放进 DOM，「显示更多」意味着集合尚未完整。
+    // 因此每行都要带 aria-posinset / aria-setsize，读屏才能报出真实位置与总数。
+    const rows = tree.children.filter((child) => child.attributes.role === 'treeitem');
+    expect(rows).toHaveLength(DESIGNER_LAYER_PAGE_SIZE);
+    expect(rows[0]?.attributes['aria-posinset']).toBe('1');
+    expect(rows[0]?.attributes['aria-setsize']).toBe(String(DESIGNER_LAYER_PAGE_SIZE + 1));
+    expect(rows.at(-1)?.attributes['aria-posinset']).toBe(String(DESIGNER_LAYER_PAGE_SIZE));
   });
 
   it('keeps one resident toolbar node and only flips its availability', () => {
@@ -519,5 +531,56 @@ describe('designer layers view', () => {
     ).toBe(true);
     // 外形不随可用性变化：按钮数量恒定（4 个层级操作 + 2 个成组操作 + 1 条分隔线）。
     expect(toolbar.children).toHaveLength(7);
+  });
+
+  it('R4 resolves left/right branch navigation from hierarchy state', () => {
+    const resolve = (
+      input: Omit<Parameters<typeof resolveDesignerLayerBranchAction>[0], 'searchActive'>,
+    ) => resolveDesignerLayerBranchAction({ ...input, searchActive: false });
+    const group = { id: 'group', isGroup: true, parentId: null as string | null };
+    expect(
+      resolve({ ...group, direction: 'right', expanded: false, firstChildId: 'child' }),
+    ).toEqual({ type: 'expand', id: 'group' });
+    expect(
+      resolve({ ...group, direction: 'right', expanded: true, firstChildId: 'child' }),
+    ).toEqual({ type: 'focus', id: 'child' });
+    expect(resolve({ ...group, direction: 'left', expanded: true, firstChildId: 'child' })).toEqual(
+      {
+        type: 'collapse',
+        id: 'group',
+      },
+    );
+
+    const leaf = {
+      id: 'child',
+      isGroup: false,
+      expanded: false,
+      parentId: 'group' as string | null,
+      firstChildId: null,
+    };
+    expect(resolve({ ...leaf, direction: 'left' })).toEqual({ type: 'focus', id: 'group' });
+    // 叶子行右键没有子级可进，也不该把按键让给页面横向滚动。
+    expect(resolve({ ...leaf, direction: 'right' })).toBeUndefined();
+    expect(resolve({ ...leaf, direction: 'left', parentId: null })).toBeUndefined();
+
+    // 搜索态：可见性由查询决定，折叠集合不生效，左右键只做层级移动。
+    expect(
+      resolveDesignerLayerBranchAction({
+        ...group,
+        direction: 'left',
+        expanded: true,
+        firstChildId: 'child',
+        searchActive: true,
+      }),
+    ).toBeUndefined();
+    expect(
+      resolveDesignerLayerBranchAction({
+        ...group,
+        direction: 'right',
+        expanded: false,
+        firstChildId: 'child',
+        searchActive: true,
+      }),
+    ).toEqual({ type: 'focus', id: 'child' });
   });
 });

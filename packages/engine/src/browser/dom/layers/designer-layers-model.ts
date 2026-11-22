@@ -188,6 +188,39 @@ export function filterDesignerLayerItems(
   });
 }
 
+/**
+ * 左右键在树上的动作：展开/折叠分组，或进出父子层级。
+ *
+ * 与上下键分开是因为两者的「下一步」不同源：上下键走可见序列，左右键走层级关系。
+ * 把判定收在这里，DOM 查询只负责取样（是否分组、是否展开、父与首个子行），
+ * 叶子行右键该不该消费、折叠态的父行该不该跳这类分支才有唯一落点，也才能脱离 DOM 单测。
+ */
+export type DesignerLayerBranchAction =
+  | { readonly type: 'collapse'; readonly id: string }
+  | { readonly type: 'expand'; readonly id: string }
+  | { readonly type: 'focus'; readonly id: string };
+
+export function resolveDesignerLayerBranchAction(input: {
+  readonly direction: 'left' | 'right';
+  readonly id: string;
+  readonly isGroup: boolean;
+  readonly expanded: boolean;
+  readonly parentId: string | null;
+  readonly firstChildId: string | null;
+  readonly searchActive: boolean;
+}): DesignerLayerBranchAction | undefined {
+  const { direction, id, isGroup, expanded, parentId, firstChildId, searchActive } = input;
+  // 搜索态下可见性由查询决定，折叠集合不再生效：此时再发 expand/collapse 只会改一个
+  // 当前看不见的状态，用户按了键却没有任何画面变化。搜索时左右键只做层级移动。
+  if (direction === 'right') {
+    if (!isGroup) return undefined;
+    if (!expanded && !searchActive) return { type: 'expand', id };
+    return firstChildId === null ? undefined : { type: 'focus', id: firstChildId };
+  }
+  if (isGroup && expanded && !searchActive) return { type: 'collapse', id };
+  return parentId === null ? undefined : { type: 'focus', id: parentId };
+}
+
 function addLayerDescendants(
   componentId: string,
   children: ReadonlyMap<string, readonly string[]>,

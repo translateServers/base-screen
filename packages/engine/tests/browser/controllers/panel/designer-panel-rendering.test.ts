@@ -61,11 +61,15 @@ describe('designer panel rendering', () => {
     );
     expect(fit?.tagName).toBe('select');
     expect(fit?.disabled).toBe(true); // 无背景图时禁用
-    expect(
-      descendants(properties)
-        .filter((element) => element.tagName === 'option')
-        .map((element) => element.value),
-    ).toEqual(['cover', 'contain']);
+    // 页面配置里有两个 select：背景图适配（两档）与缩放方式（六档）。
+    // 这里只锁背景图那两档——按全表 option 断言会把缩放六档一起算进来。
+    const optionValues = descendants(properties)
+      .filter((element) => element.tagName === 'option')
+      .map((element) => element.value);
+    expect(optionValues.filter((value) => value === 'cover' || value === 'contain')).toEqual([
+      'cover',
+      'contain',
+    ]);
     // 背景填充段里是与组件检查器同源的调色板控件，页面配置不再自带取色 UI。
     const backgroundPalette = descendants(properties).filter((element) =>
       element.className.includes('designer-color-palette'),

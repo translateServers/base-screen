@@ -14,7 +14,6 @@ import {
   appendDesignerFieldMessage,
   createDesignerButton,
   createDesignerInput,
-  createDesignerSegmented,
   createDesignerSelect,
   createDesignerSwitch,
 } from '../designer-ui-primitives.js';
@@ -37,19 +36,46 @@ export function appendCanvasControls(
   hostResourceSelectionButtonVisible: boolean,
   canvasPresentation: DesignerCanvasPresentationSettings,
 ): void {
-  const canvasSection = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.canvas);
+  // 首屏只展开「画布」：尺寸、不透明度、缩放方式、两个开关是高频设置；
+  // 背景填充与背景图片属于低频配置，折叠后首屏少 4 个控件，需要时一点即开。
+  // 每段都带稳定 key，折叠偏好按段记忆，不会因为插分区而串位。
+  const canvasSection = appendSection(
+    parent,
+    DESIGNER_UI_TEXT.propertiesPanel.canvas,
+    false,
+    true,
+    'canvas',
+  );
   canvasSection.className += ' designer-canvas-section';
   appendCanvasSizeField(canvasSection, document);
   appendCanvasOpacityField(canvasSection, canvasPresentation);
   appendCanvasScaleField(canvasSection, canvasPresentation);
+
+  // 两个开关是渲染行为开关而不是画布尺寸的一部分：它们一年改不了几次，
+  // 却原来和尺寸/缩放挤在同一屏。独立成段并收起后，首屏只剩三个高频字段。
+  const behaviorSection = appendSection(
+    parent,
+    DESIGNER_UI_TEXT.propertiesPanel.canvasBehaviorSection,
+    false,
+    false,
+    'canvas-behavior',
+    DESIGNER_UI_TEXT.propertiesPanel.canvasBehaviorSummary(
+      canvasPresentation.backgroundAutoFill
+        ? DESIGNER_UI_TEXT.propertiesPanel.canvasSwitchOn
+        : DESIGNER_UI_TEXT.propertiesPanel.canvasSwitchOff,
+      canvasPresentation.disableComponentLoading
+        ? DESIGNER_UI_TEXT.propertiesPanel.canvasSwitchOff
+        : DESIGNER_UI_TEXT.propertiesPanel.canvasSwitchOn,
+    ),
+  );
   appendCanvasSwitchField(
-    canvasSection,
+    behaviorSection,
     DESIGNER_UI_TEXT.propertiesPanel.canvasBackgroundAutoFill,
     'backgroundAutoFill',
     canvasPresentation.backgroundAutoFill,
   );
   appendCanvasSwitchField(
-    canvasSection,
+    behaviorSection,
     DESIGNER_UI_TEXT.propertiesPanel.canvasDisableLoading,
     'disableComponentLoading',
     canvasPresentation.disableComponentLoading,
@@ -58,11 +84,24 @@ export function appendCanvasControls(
   const backgroundSection = appendSection(
     parent,
     DESIGNER_UI_TEXT.propertiesPanel.canvasBackgroundSection,
+    false,
+    false,
+    'canvas-background',
+    canvasBackgroundPaletteValue(document),
   );
   backgroundSection.className += ' designer-canvas-background-section';
   appendCanvasBackgroundField(backgroundSection, document);
 
-  const imageSection = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.canvasImageSection);
+  const imageSection = appendSection(
+    parent,
+    DESIGNER_UI_TEXT.propertiesPanel.canvasImageSection,
+    false,
+    false,
+    'canvas-image',
+    document.canvas.backgroundImage == null
+      ? DESIGNER_UI_TEXT.propertiesPanel.canvasSummaryUnset
+      : DESIGNER_UI_TEXT.propertiesPanel.canvasSummarySet,
+  );
   imageSection.className += ' designer-canvas-image-section';
   appendCanvasBackgroundImageControls(imageSection, document, hostResourceSelectionButtonVisible);
 
@@ -186,7 +225,10 @@ function appendCanvasOpacityField(
   parent.appendChild(field);
 }
 
-/** 六档缩放方式：分段控件顶满一行，标签在上（原型 .insp-field），避免标签列挤掉档位文案。 */
+/**
+ * 六档缩放方式：用下拉而不是 3×2 分段。它是低频设置，六个按钮常驻会占掉两行、
+ * 把下面的字段整体往下推；下拉常态只占一行，标签也回到与其他字段一致的左列。
+ */
 function appendCanvasScaleField(
   parent: HTMLElement,
   settings: DesignerCanvasPresentationSettings,
@@ -194,7 +236,6 @@ function appendCanvasScaleField(
   const ownerDocument = parent.ownerDocument;
   const { field, control } = createCanvasFieldRow(ownerDocument, {
     label: DESIGNER_UI_TEXT.propertiesPanel.canvasScaleMode,
-    stacked: true,
     className: 'designer-canvas-scale-field',
   });
   const scaleOptions: readonly [DesignerCanvasScaleMode, string][] = [
@@ -205,18 +246,15 @@ function appendCanvasScaleField(
     ['original', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleOriginal],
     ['none', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleNone],
   ];
-  const { element: options } = createDesignerSegmented(ownerDocument, {
+  const select = createDesignerSelect(ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.canvasScaleMode,
-    className: 'designer-canvas-scale-segmented',
-    selected: settings.scaleMode,
-    options: scaleOptions.map(([value, label]) => ({
-      value,
-      label,
-      tip: label,
-      dataset: { canvasSetting: 'scaleMode', canvasSettingValue: value },
-    })),
+    options: scaleOptions.map(([value, label]) => ({ value, label })),
+    value: settings.scaleMode,
   });
-  control.appendChild(options);
+  // 走 canvasSetting 通道：change 冒泡到 surface router，由属性面板控制器提交。
+  select.dataset.canvasSetting = 'scaleMode';
+  control.appendChild(enhanceDesignerSelect(select).element);
+  appendDesignerFieldMessage(field, select, 'canvas-scale-mode');
   parent.appendChild(field);
 }
 

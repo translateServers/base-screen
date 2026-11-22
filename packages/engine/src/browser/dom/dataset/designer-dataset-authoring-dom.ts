@@ -138,7 +138,9 @@ export function renderDatasetAuthoring(
           overrides: options.groupOpenOverrides ?? new Map<string, boolean>(),
           onToggle: options.onToggleGroup,
         },
-        [editor, filter, actions, settings],
+        // 工具图标放在只读事实卡之后而不是夹在过滤器与卡片之间：
+        // 夹在中间时两枚 24px 图标看起来像卡片的一部分，又和上面的过滤器行没关系。
+        [editor, filter, settings, actions],
       ),
     );
     return section;
@@ -197,12 +199,10 @@ function readonlyInstanceFacts(options: DesignerDataSourcePanelOptions): HTMLEle
   const wrap = ownerDocument.createElement('div');
   wrap.className = 'designer-dataset-instance-facts';
   wrap.dataset.instanceFacts = 'true';
+  // 只报「更新方式」：来源名与数据集 ID 在面板顶部的来源卡片里已经有一份，
+  // 在这里再报一次会让同一串 tabular-orders 在同一屏出现两次。
   const rows: readonly [string, string][] = [
     [DESIGNER_UI_TEXT.dataSource.refreshStrategyLabel, refreshPolicyText(options)],
-    [
-      DESIGNER_UI_TEXT.data.groups.source,
-      options.instance?.name ?? DESIGNER_UI_TEXT.data.groups.sourceEmpty,
-    ],
   ];
   for (const [label, value] of rows) {
     const row = ownerDocument.createElement('div');
@@ -230,7 +230,7 @@ function readonlyInstanceFacts(options: DesignerDataSourcePanelOptions): HTMLEle
     jump.disabled = true;
     jump.textContent = DESIGNER_UI_TEXT.data.groups.pendingApply;
   } else {
-    jump.textContent = DESIGNER_UI_TEXT.data.groups.editInWorkbench;
+    jump.textContent = DESIGNER_UI_TEXT.data.groups.openWorkbench;
   }
   wrap.appendChild(jump);
   return wrap;

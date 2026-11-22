@@ -185,7 +185,16 @@ export class DesignerPanelPropertyController {
   }
 
   private updateScaleMode(button: HTMLButtonElement): void {
-    const value = button.dataset.canvasSettingValue;
+    this.applyScaleMode(button.dataset.canvasSettingValue);
+    for (const control of button.parentElement?.querySelectorAll<HTMLButtonElement>(
+      '[data-canvas-setting="scaleMode"]',
+    ) ?? []) {
+      control.ariaPressed = String(control === button);
+    }
+  }
+
+  /** 缩放档位的唯一写入点：分段按钮与下拉共用，避免两套校验漂移。 */
+  private applyScaleMode(value: string | undefined): void {
     if (
       value !== 'fill' &&
       value !== 'fit' &&
@@ -198,14 +207,16 @@ export class DesignerPanelPropertyController {
     }
     this.#canvasPresentation.scaleMode = value;
     this.callbacks.onCanvasPresentationChange?.(this.#canvasPresentation);
-    for (const control of button.parentElement?.querySelectorAll<HTMLButtonElement>(
-      '[data-canvas-setting="scaleMode"]',
-    ) ?? []) {
-      control.ariaPressed = String(control === button);
-    }
   }
 
   private updateCanvasPresentationSetting(target: EventTarget | null, setting: string): void {
+    // 用 tagName 而不是 instanceof：单测环境没有注册 HTMLSelectElement 全局，
+    // instanceof 会直接抛 ReferenceError，把无关用例一起带崩。
+    const element = target as { readonly tagName?: string; readonly value?: string } | null;
+    if (element?.tagName === 'SELECT') {
+      if (setting === 'scaleMode') this.applyScaleMode(element.value);
+      return;
+    }
     if (!(target instanceof HTMLInputElement)) return;
     if (setting === 'opacity') {
       // 面板读数是 0–100 的百分比（与组件不透明度同一档），呈现层仍持有 0–1 的比值。

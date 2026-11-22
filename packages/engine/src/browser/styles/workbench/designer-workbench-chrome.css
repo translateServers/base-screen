@@ -332,6 +332,36 @@ details:not([open]) .designer-panel-section-disclosure {
   font-weight: 500;
 }
 
+/* 折叠分区的当前值摘要：只在收起时出现。展开后内容本身就是答案，
+   标题行再挂一个重复读数只会把它挤长。收起时用户仍要能判断「里面配了什么」，
+   否则折叠就变成了逐段展开的成本。 */
+.designer-inspector-section-meta {
+  display: none;
+  overflow: hidden;
+  max-width: 12em;
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.properties .inspector-pane details:not([open]) > .designer-inspector-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+}
+
+.properties
+  .inspector-pane
+  details:not([open])
+  > .designer-inspector-section-title
+  > .designer-inspector-section-meta {
+  display: inline-block;
+  margin-left: auto;
+}
+
 /* 能力摘要（可调整大小 / 可旋转 / 可预览事件）是并列标签，不是条目清单：
    两列中性 chip，避免一列裸文本被读成未完成的表单。 */
 .properties .inspector-pane .designer-inspector-summary {

@@ -426,6 +426,7 @@ export function appendSection(
   advanced = false,
   open?: boolean,
   key?: string,
+  summary?: string,
 ): HTMLElement {
   // Sections render as native disclosures so every region can be collapsed with
   // pointer or keyboard; open state is persisted by the inspector group
@@ -436,6 +437,7 @@ export function appendSection(
     title,
     ...(open === undefined ? {} : { open }),
     ...(key === undefined ? {} : { key }),
+    ...(summary === undefined ? {} : { summary }),
   }).element;
 }
 

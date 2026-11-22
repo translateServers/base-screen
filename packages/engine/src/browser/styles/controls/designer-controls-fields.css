@@ -1,7 +1,9 @@
 .designer-field {
   display: grid;
   gap: var(--designer-space-2);
-  margin-bottom: var(--designer-space-4);
+  /* 字段间距 8 → 6：30px 行盒 + 6px 呼吸仍能分出层次，但 12 个字段的段落少占 24px，
+     滚动一屏多看一行。再紧（4px）相邻标签就开始粘连了。 */
+  margin-bottom: var(--designer-space-3);
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
 }

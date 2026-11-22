@@ -89,6 +89,8 @@ export const DESIGNER_UI_TEXT = {
       refreshEvery: (seconds: number) => `每 ${seconds} 秒`,
       /** 实例级字段只读：检查器里唯一的编辑入口是工作台。 */
       editInWorkbench: '在工作台修改',
+      /** 同语义动作按钮：折叠摘要已经写了「在工作台修改」，按钮只表达动作。 */
+      openWorkbench: '打开工作台',
       /** 草稿实例还没落库：跳转不可用（不是"引用已失效"）。 */
       pendingApply: '应用后可修改',
       parametersCount: (count: number) => `${count} 个参数`,
@@ -641,8 +643,10 @@ export const DESIGNER_UI_TEXT = {
     codeEditor: '代码编辑',
     filter: '过滤器',
     filterHint: '可选的数据过滤脚本。',
-    filterConfigure: '配置过滤器',
-    filterUnset: '未配置过滤器',
+    // 行内已经有「过滤器」标签：值再写「未配置过滤器」、按钮再写「配置过滤器」，
+    // 一句话在一行里出现三次。值和按钮只保留各自差异的部分。
+    filterConfigure: '配置',
+    filterUnset: '未配置',
     copyData: '复制数据',
     copyDataHint: '请先测试数据，再复制响应结果。',
     copyDataUnavailable: '尚无可复制的数据，请先测试数据。',
@@ -671,6 +675,8 @@ export const DESIGNER_UI_TEXT = {
     previewOpen: '查看响应',
     previewClose: '收起响应',
     previewIdle: '尚未请求',
+    /** 空态里参数摘要的前缀：说明「下面这一行是本次请求会带的参数」。 */
+    previewParamLead: '当前参数',
     previewIdleHint: '发起一次请求，检查当前参数返回的结果。',
     parameterUnfilledShort: '未填',
     previewLoading: '正在请求并校验数据。',
@@ -788,6 +794,8 @@ export const DESIGNER_UI_TEXT = {
     noCapabilities: '当前组件没有公开交互能力。',
     design: '设计',
     preview: '预览',
+    /** 设计与预览能力合并为一个折叠段后的标题。 */
+    capabilityGroup: '组件能力',
     resize: '调整大小',
     rotate: '旋转',
     hasChildren: '包含子组件',
@@ -829,7 +837,7 @@ export const DESIGNER_UI_TEXT = {
     emptySearch: (query: string) => `没有匹配“${query}”的图层`,
     emptySearchHint: '换个关键词，或清除搜索查看全部图层。',
     clearSearch: '清除搜索',
-    showMore: '显示更多图层',
+    showMore: (remaining: number) => `显示更多图层（还有 ${remaining} 个）`,
     expand: '展开',
     collapse: '收起',
     expandChildren: '展开子图层',
@@ -1005,7 +1013,8 @@ export const DESIGNER_UI_TEXT = {
     canvasDimensions: '尺寸',
     canvasWidth: '画布宽度',
     canvasHeight: '画布高度',
-    canvasBackground: '背景',
+    // 段名已经叫「背景填充」，字段再写「背景」就是同一句话说两遍；这里只描述控件本身。
+    canvasBackground: '颜色',
     canvasBackgroundSection: '背景填充',
     canvasImageSection: '背景图片',
     canvasImageUrl: '图片地址',
@@ -1049,6 +1058,14 @@ export const DESIGNER_UI_TEXT = {
     backgroundImageFitContain: '等比容纳',
     canvasOpacity: '不透明度',
     canvasScaleMode: '缩放方式',
+    /** 折叠分区的标题摘要：收起后仍能看出是否已配置，不必展开确认。 */
+    canvasSummarySet: '已设置',
+    canvasSummaryUnset: '未设置',
+    /** 渲染行为段：两个低频开关收进独立折叠段，首屏只留高频的画布尺寸与缩放。 */
+    canvasBehaviorSection: '渲染行为',
+    canvasSwitchOn: '开',
+    canvasSwitchOff: '关',
+    canvasBehaviorSummary: (autoFill: string, loading: string) => `填充${autoFill}·加载${loading}`,
     canvasScaleFill: '全屏铺满',
     canvasScaleFit: '等比适配',
     canvasScaleWidth: '宽度适配',
@@ -1412,7 +1429,7 @@ export const DESIGNER_UI_TEXT = {
   },
   blueprint: DESIGNER_BLUEPRINT_UI_TEXT,
   descriptor: {
-    noField: '未选择字段。',
+    noField: '未选择',
     moveUp: '上移',
     moveDown: '下移',
     removeItem: '移除',

@@ -69,10 +69,13 @@ export function renderDesignerInspectorContext(
   }
 
   title.textContent = context.component.name;
+  // 默认组件名就是物料名，再拼一遍等于同一句话说两遍（「语义图表 / 语义图表」）；
+  // 只有用户改过名时，副标题才需要补上物料名来还原它是什么。
+  const materialName = context.manifest?.name;
   subtitle.textContent =
-    context.manifest === undefined
+    materialName === undefined || materialName === context.component.name
       ? context.component.type
-      : DESIGNER_UI_TEXT.inspectorUi.componentMeta(context.component.type, context.manifest.name);
+      : DESIGNER_UI_TEXT.inspectorUi.componentMeta(context.component.type, materialName);
   icon.innerHTML = designerIcon(materialIcon(context.component.type));
   const badge = context.component.status.locked
     ? DESIGNER_UI_TEXT.inspectorUi.locked

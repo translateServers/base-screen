@@ -10,6 +10,7 @@ import {
   type DesignerDescriptorDatasetFields,
   renderDesignerDescriptorZone,
 } from './descriptor/designer-descriptor-dom.js';
+import { createDesignerSection } from './panel/designer-chrome-primitives.js';
 
 export interface DesignerInteractionCapabilities {
   readonly design: readonly string[];
@@ -36,15 +37,8 @@ export function renderDesignerInteractionPanel(
     panel.textContent = DESIGNER_UI_TEXT.interactionPanel.noComponent;
     return false;
   }
-  if (capabilities.design.length > 0) {
-    appendCapabilitySection(panel, DESIGNER_UI_TEXT.interactionPanel.design, capabilities.design);
-  }
-  if (capabilities.previewEvents.length > 0) {
-    appendCapabilitySection(
-      panel,
-      DESIGNER_UI_TEXT.interactionPanel.preview,
-      capabilities.previewEvents,
-    );
+  if (capabilities.design.length > 0 || capabilities.previewEvents.length > 0) {
+    appendCapabilityGroup(panel, capabilities.design, capabilities.previewEvents);
   }
   const component = document?.components.find((item) => item.id === interaction.focusedComponentId);
   const manifest = component === undefined ? undefined : catalog?.get(component.type)?.manifest;
@@ -103,16 +97,24 @@ export function getDesignerInteractionCapabilities(
   return { design, previewEvents };
 }
 
-function appendCapabilitySection(
+/**
+ * 能力摘要：默认收起。它描述「这个组件能做什么」，不是每次都要看的操作项；
+ * 原来拆成「设计 / 预览」两段常驻，各占一行标题加一排 chip，把真正的交互设置推到了折线以下。
+ * 合并成一段后标题直接报出全部能力（调整大小 · 旋转 · seriesClick），展开仍是两列中性 chip。
+ */
+function appendCapabilityGroup(
   panel: HTMLElement,
-  title: string,
-  capabilities: readonly string[],
+  design: readonly string[],
+  previewEvents: readonly string[],
 ): void {
-  const section = panel.ownerDocument.createElement('section');
-  section.className = 'designer-inspector-section';
-  const heading = panel.ownerDocument.createElement('h3');
-  heading.className = 'designer-inspector-section-title';
-  heading.textContent = title;
+  const capabilities = [...design, ...previewEvents];
+  if (capabilities.length === 0) return;
+  const { element } = createDesignerSection(panel, {
+    title: DESIGNER_UI_TEXT.interactionPanel.capabilityGroup,
+    open: false,
+    key: 'interaction-capabilities',
+    summary: capabilities.join(' · '),
+  });
   const list = panel.ownerDocument.createElement('ul');
   list.className = 'designer-inspector-summary';
   for (const capability of capabilities) {
@@ -120,8 +122,7 @@ function appendCapabilitySection(
     item.textContent = capability;
     list.appendChild(item);
   }
-  section.append(heading, list);
-  panel.appendChild(section);
+  element.appendChild(list);
 }
 
 function hasMaterialEventCapability(

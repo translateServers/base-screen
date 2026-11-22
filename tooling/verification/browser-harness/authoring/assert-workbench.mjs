@@ -122,32 +122,30 @@ async function assertDesktopWorkbench(designer, viewport) {
   assertPositiveNonOverlappingRects(workbench.horizontal, 'HORIZONTAL', viewport);
   assertPositiveNonOverlappingRects(workbench.vertical, 'VERTICAL', viewport);
 
-  // 页面配置的缩放方式是 3×2 的六档分段：第二行必须留在容器内，且不能压到下一个字段。
+  // 页面配置的缩放方式是六档下拉：必须是 6 个选项、当前值合法，且整行只占一行高度
+  // （改成分段的 3×2 时会涨到两行，这里正好把「不再回退成分段」锁住）。
   const canvasScale = await designer.evaluate((element) => {
     const root = element.shadowRoot;
     const field = root?.querySelector('.designer-canvas-scale-field');
     if (field === null || field === undefined) return null;
-    const segmented = field.querySelector('.designer-canvas-scale-segmented');
-    const options = [...(segmented?.querySelectorAll('.designer-segmented-option') ?? [])];
+    const select = field.querySelector('select');
+    const fieldRect = field.getBoundingClientRect();
     return {
-      optionCount: options.length,
-      segmentedBottom: segmented?.getBoundingClientRect().bottom ?? 0,
-      lastOptionBottom: Math.max(
-        ...options.map((option) => option.getBoundingClientRect().bottom),
-        0,
-      ),
+      optionCount: select?.options.length ?? 0,
+      value: select?.value ?? '',
+      fieldHeight: fieldRect.height,
       nextTop: field.nextElementSibling?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
+      fieldBottom: fieldRect.bottom,
     };
   });
   if (
     canvasScale !== null &&
     (canvasScale.optionCount !== 6 ||
-      canvasScale.segmentedBottom < canvasScale.lastOptionBottom - 1 ||
-      canvasScale.nextTop < canvasScale.segmentedBottom - 1)
+      !['fill', 'fit', 'width', 'height', 'original', 'none'].includes(canvasScale.value) ||
+      canvasScale.fieldHeight > 48 ||
+      canvasScale.nextTop < canvasScale.fieldBottom - 1)
   ) {
-    throw new Error(
-      `BROWSER_HARNESS_CANVAS_SCALE_SEGMENTED_OVERFLOW_FAILED:${JSON.stringify(canvasScale)}`,
-    );
+    throw new Error(`BROWSER_HARNESS_CANVAS_SCALE_FIELD_FAILED:${JSON.stringify(canvasScale)}`);
   }
 }
 

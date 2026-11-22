@@ -531,15 +531,9 @@
   padding-right: calc(var(--designer-space-6) + var(--designer-space-1));
 }
 
-/* 缩放方式是六档分段控件：标签在上、整行等分（原型 .insp-field + .segmented）。 */
-.properties .designer-canvas-scale-field {
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-  gap: var(--designer-space-3);
-}
-
-.properties .designer-canvas-scale-field .designer-field-control,
-.properties .designer-canvas-scale-segmented {
+/* 缩放方式改成下拉后，原来的分段栈式布局（标签在上、整行等分）随之失效，
+   只剩「控件占满控件列」这一条仍然成立。 */
+.properties .designer-canvas-scale-field .designer-field-control {
   width: 100%;
 }
 
@@ -1352,7 +1346,9 @@
    它不再是"一个句子的占位框"——「尚未请求」本身就是一条结论，下面那行参数是它的依据。 */
 .properties .designer-data-preview-empty {
   display: grid;
-  min-height: 140px;
+  /* 空态现在是图标 + 一句行动说明 + 一行参数摘要（重复的「尚未请求」标题已去掉），
+     140px 会在两段文字上下各留出一行空白；112 仍够居中，且不再把「高级设置」推下去。 */
+  min-height: 112px;
   place-items: center;
   /* 撤掉 workbench 数据编辑器的虚线占位框（那是工作台提示块的样式）。
      面板里的空态是一块安静的内容区，不是"还没做完的占位"。 */

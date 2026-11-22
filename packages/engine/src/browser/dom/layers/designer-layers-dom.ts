@@ -33,30 +33,43 @@ export function renderDesignerLayers(
   const rendered = visible.slice(0, options.renderLimit);
   const selectedIds = new Set(options.interaction.selectedComponentIds);
   const indicator = options.dropIndicator;
+  // 分页只把前 renderLimit 项放进 DOM，读屏必须知道集合的真实规模与位置。
+  // 位置按「同级兄弟」计算而不是整棵树的扁平序号：treeitem 的 aria-posinset /
+  // aria-setsize 描述的是同一父级下的次序，跨层累加会让子行报出「第 57 项，共 101 项」
+  // 这种与层级无关的数字。分子组统计也顺带覆盖了「父级已折叠、子级不在可见序列」的情况。
+  const siblingTotals = new Map<string | null, number>();
+  for (const item of visible) {
+    siblingTotals.set(item.parentId, (siblingTotals.get(item.parentId) ?? 0) + 1);
+  }
+  const siblingSeen = new Map<string | null, number>();
   for (const [index, item] of rendered.entries()) {
+    const seen = (siblingSeen.get(item.parentId) ?? 0) + 1;
+    siblingSeen.set(item.parentId, seen);
     const selected = selectedIds.has(item.id);
-    tree.appendChild(
-      createLayerNode(layers.ownerDocument, item, {
-        selected,
-        // 相邻多选合并成一段：连续被选中的行只保留最上/最下的圆角，中间无缝相接。
-        selectedRun: selected ? selectedRunAt(rendered, index, selectedIds) : undefined,
-        focused: item.id === options.interaction.focusedComponentId,
-        collapsed: options.collapsed.has(item.id),
-        dropEdge: item.id === indicator?.rowId ? indicator.edge : undefined,
-        dragging: item.id === options.draggingId,
-        renaming: item.id === options.renamingId,
-        renameDraft: options.renameDrafts.get(item.id),
-        search: options.search,
-      }),
-    );
+    const node = createLayerNode(layers.ownerDocument, item, {
+      selected,
+      // 相邻多选合并成一段：连续被选中的行只保留最上/最下的圆角，中间无缝相接。
+      selectedRun: selected ? selectedRunAt(rendered, index, selectedIds) : undefined,
+      focused: item.id === options.interaction.focusedComponentId,
+      collapsed: options.collapsed.has(item.id),
+      dropEdge: item.id === indicator?.rowId ? indicator.edge : undefined,
+      dragging: item.id === options.draggingId,
+      renaming: item.id === options.renamingId,
+      renameDraft: options.renameDrafts.get(item.id),
+      search: options.search,
+    });
+    node.setAttribute('aria-posinset', String(seen));
+    node.setAttribute('aria-setsize', String(siblingTotals.get(item.parentId) ?? seen));
+    tree.appendChild(node);
   }
   if (visible.length === 0) {
     tree.appendChild(createLayerEmptyState(layers.ownerDocument, options.search));
   } else if (visible.length > options.renderLimit) {
+    // 文案带上剩余数量：分页树的「显示更多」如果不说还有多少，用户只能反复点击试。
     const more = button(
       layers.ownerDocument,
-      DESIGNER_UI_TEXT.layersPanel.showMore,
-      DESIGNER_UI_TEXT.layersPanel.showMore,
+      DESIGNER_UI_TEXT.layersPanel.showMore(visible.length - options.renderLimit),
+      DESIGNER_UI_TEXT.layersPanel.showMore(visible.length - options.renderLimit),
     );
     more.className += ' layer-show-more';
     more.dataset.layerShowMore = 'true';
@@ -260,6 +273,9 @@ function createLayerNode(
   // 少一个装饰位，名称也就多了 16px 的可用宽度。
   if (item.hasChildren) {
     row.dataset.layerGroup = 'true';
+    // treeitem 自己必须携带展开态：折叠按钮是行内的独立控件，读屏聚焦到 treeitem
+    // 时读的是行，不是按钮。少了这一个属性，分组行与叶子行在语音里没有区别。
+    row.ariaExpanded = String(!collapsed);
     const collapse = button(
       ownerDocument,
       '',
@@ -359,7 +375,7 @@ function createLayerNode(
   return row;
 }
 
-/** 图层行的能力标记：一个 4px 圆点，悬停出说明。 */
+/** 图层行的能力标记：一个 5px 圆点，悬停出说明。 */
 function appendLayerBadge(
   ownerDocument: Document,
   row: HTMLElement,
@@ -371,6 +387,9 @@ function appendLayerBadge(
   const dot = ownerDocument.createElement('span');
   dot.className = 'layer-badge';
   dot.dataset.layerBadge = kind;
+  // 通用 span 上的 aria-label 不参与无障碍树：补 role=img 才让这个纯装饰元素
+  // 变成有名字的图形，读屏能读到「已绑定数据 / 已配置交互」而不是一个空节点。
+  dot.setAttribute('role', 'img');
   dot.setAttribute('aria-label', label);
   dot.setAttribute('data-tip', label);
   row.appendChild(dot);

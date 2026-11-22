@@ -12,8 +12,17 @@ import {
 class FakeElement {
   readonly children: FakeElement[] = [];
   readonly dataset: Record<string, string> = {};
+  readonly attributes: Record<string, string> = {};
   className = '';
   textContent = '';
+  /** 与真实 DOM 对齐的最小 classList：分区构造会往 summary 上加类名。 */
+  readonly classList = {
+    add: (...tokens: string[]): void => {
+      const set = new Set(this.className.split(' ').filter(Boolean));
+      for (const token of tokens) set.add(token);
+      this.className = [...set].join(' ');
+    },
+  };
 
   constructor(readonly ownerDocument: FakeDocument) {}
 
@@ -24,6 +33,14 @@ class FakeElement {
   appendChild(child: FakeElement): FakeElement {
     this.children.push(child);
     return child;
+  }
+
+  setAttribute(name: string, value: string): void {
+    this.attributes[name] = value;
+  }
+
+  getAttribute(name: string): string | null {
+    return this.attributes[name] ?? null;
   }
 
   replaceChildren(...children: FakeElement[]): void {
@@ -100,7 +117,8 @@ describe('designer interaction projection', () => {
       ),
     ).toEqual({ design: ['调整大小'], previewEvents: [] });
     expect(panel.children).toHaveLength(2);
-    expect(panel.children[0]?.children[0]?.textContent).toBe('设计');
+    // 设计与预览能力合并成一段「组件能力」，摘要里带上具体能力名。
+    expect(panel.children[0]?.children[0]?.textContent).toBe('组件能力');
     expect(panel.children[1]?.children[0]?.textContent).toBe('事件');
   });
 
