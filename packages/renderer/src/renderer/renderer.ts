@@ -36,7 +36,7 @@ import {
 } from './renderer-candidates.js';
 import { diagnostic, failure, renderFailure } from './renderer-diagnostics.js';
 import { resolveEffectiveModel } from './renderer-effective-style.js';
-import { applyMaterial } from './renderer-material-dom.js';
+import { applyMaterial, applyMaterialDataMarker } from './renderer-material-dom.js';
 import {
   appliedModelKeyOf,
   applyMountedConditionalStyle,
@@ -444,6 +444,7 @@ class Renderer implements BaseScreenRenderer {
         };
         mounted.element.model = model;
         mounted.appliedModel = model;
+        applyMaterialDataMarker(mounted.element, model);
       }
     }
   }

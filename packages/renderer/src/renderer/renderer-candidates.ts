@@ -327,14 +327,19 @@ export function readComponentData(
       };
     if (evaluated.value === undefined)
       return { dataState: { status: 'idle' }, dataSource, epoch: dataSourceEntry.dataState };
+    const projected = projectDataSourceResult(
+      entry,
+      evaluated.value,
+      binding,
+      component.id,
+      onDiagnostic,
+    );
     return {
-      dataState: projectDataSourceResult(
-        entry,
-        evaluated.value,
-        binding,
-        component.id,
-        onDiagnostic,
-      ),
+      // 推送实例过期（ADR-0104 §2.6）：投影后的 ready 状态带上 `stale`，物料继续显示旧值。
+      dataState:
+        dataSourceEntry.dataState.stale === true && projected.status === 'ready'
+          ? { ...projected, stale: true }
+          : projected,
       dataSource,
       epoch: dataSourceEntry.dataState,
     };

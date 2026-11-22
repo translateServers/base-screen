@@ -3,6 +3,7 @@ import type {
   ScreenDiagnostic,
   ScreenJsonObject,
   ScreenResourceExecutionContext,
+  ScreenSourceDelivery,
 } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalog,
@@ -79,6 +80,13 @@ export function createRendererState(options: CreateBaseScreenRendererOptions): R
     emit: (event) => emitDataSourceEvent(state, event),
     onChanged: (dataSourceId) => state.onDataSourceChanged(dataSourceId),
     validateParams: (source, params) => validateHostResourceParams(state, source, params),
+    push: {
+      // 设计态不订阅：push 实例在画布上只做一次 authoring preview 拉取（ADR-0104 §2.4.10）。
+      enabled: options.mode !== 'design',
+      delivery: (source) => pushDeliveryOf(state, source),
+      snapshotTimeoutMs: options.resourceTimeoutMs ?? 15_000,
+      onWarning: (item) => options.onDiagnostic?.(item),
+    },
   });
   state = {
     options,
@@ -147,6 +155,27 @@ function validateHostResourceParams(
   };
 }
 
+/**
+ * 来源的推送能力（ADR-0104 §2.3）：
+ * - `host-resource`：以插件贡献的 `delivery.push` 为准；宿主没有提供贡献索引时不做类型门控
+ *   （与 configSchema 门控同一口径），只看端口是否实现了 `subscribe`；
+ * - `host-catalog`：渲染器拿不到目录项描述，运行时只看端口是否实现了 `subscribe`，
+ *   `ScreenHostCatalogDescriptor.delivery` 由设计器在作者面门控；
+ * - `dataset` / `url-query`：不支持。
+ */
+function pushDeliveryOf(
+  state: RendererState,
+  source: ScreenDataSourceSource,
+): ScreenSourceDelivery['push'] | undefined {
+  if (source.kind === 'host-resource') {
+    const index = state.options.contributionIndex;
+    if (index === undefined) return {};
+    return index.getResourceType(source.resourceType)?.delivery?.push;
+  }
+  if (source.kind === 'host-catalog') return {};
+  return undefined;
+}
+
 export function emitDataSourceEvent(
   state: RendererState,
   event: DataSourceRuntimeObserverEvent,
@@ -165,6 +194,8 @@ export function emitDataSourceEvent(
       ...(event.fieldCount === undefined ? {} : { fieldCount: event.fieldCount }),
       ...(event.rowCount === undefined ? {} : { rowCount: event.rowCount }),
       ...(event.code === undefined ? {} : { code: event.code }),
+      ...(event.cursor === undefined ? {} : { cursor: event.cursor }),
+      ...(event.connection === undefined ? {} : { connection: event.connection }),
     });
   } catch {
     // Observer failures are isolated from rendering.

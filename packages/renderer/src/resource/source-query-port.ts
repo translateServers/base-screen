@@ -8,9 +8,11 @@ import {
   type ScreenHostDatasetPort,
   type ScreenHostResourcePort,
   type ScreenHostResourceResolveOptions,
+  type ScreenHostSubscribeOptions,
   type ScreenJsonObject,
   type ScreenJsonValue,
   type ScreenParseResult,
+  type ScreenSourcePushSink,
 } from '@base-screen/contracts';
 import { canonicalJsonString } from '../canonical-json.js';
 
@@ -73,6 +75,58 @@ export class SourceQueryPort {
         return this.resources !== undefined;
       default:
         return this.hostCatalog !== undefined;
+    }
+  }
+
+  /**
+   * 该来源当前能否订阅推送（ADR-0104 §2.3）：端口实现了可选的 `subscribe`。
+   * 数据集端口第一阶段没有订阅；`url-query` 由契约禁止 push。
+   */
+  acceptsPush(source: ScreenDataSourceSource): boolean {
+    switch (source.kind) {
+      case 'host-resource':
+        return typeof this.resources?.subscribe === 'function';
+      case 'host-catalog':
+        return typeof this.hostCatalog?.subscribe === 'function';
+      default:
+        return false;
+    }
+  }
+
+  /** 按来源分派订阅；调用方须先用 {@link acceptsPush} 判定。 */
+  subscribe(
+    request: SourceQueryRequest,
+    sink: ScreenSourcePushSink,
+    options: ScreenHostSubscribeOptions,
+  ): ScreenParseResult<null> {
+    switch (request.source.kind) {
+      case 'host-resource': {
+        const subscribe = this.resources?.subscribe;
+        if (subscribe === undefined) return unavailable();
+        return subscribe.call(
+          this.resources,
+          {
+            dataSourceId: request.dataSourceId,
+            resourceType: request.source.resourceType,
+            resourceId: request.source.resourceId,
+            params: request.params,
+          },
+          sink,
+          options,
+        );
+      }
+      case 'host-catalog': {
+        const subscribe = this.hostCatalog?.subscribe;
+        if (subscribe === undefined) return unavailable();
+        return subscribe.call(
+          this.hostCatalog,
+          { sourceId: request.source.sourceId, params: request.params, purpose: 'runtime' },
+          sink,
+          options,
+        );
+      }
+      default:
+        return unavailable();
     }
   }
 

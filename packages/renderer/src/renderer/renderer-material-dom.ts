@@ -56,6 +56,26 @@ export function applyMaterialFrame(
       : '';
   if (style.opacity !== opacity) style.opacity = opacity;
   applyMaterialHostStyle(element, model);
+  applyMaterialDataMarker(element, model);
+}
+
+/**
+ * 推送实例过期标记（ADR-0104 §2.6）：`ready && stale` 时给物料宿主元素打
+ * `data-base-screen-data-stale="true"`，否则移除。
+ *
+ * 由渲染器统一写，而不是交给物料基类：插件物料（ECharts、翻牌器等）不继承官方基类，
+ * 放在基类里它们就永远不会被标记，查看器的默认角标也就不出现。同值守卫，不改画面。
+ */
+export function applyMaterialDataMarker(
+  element: BaseScreenMaterialElement,
+  model: BaseScreenMaterialModel,
+): void {
+  const stale = model.dataState.status === 'ready' && model.dataState.stale === true;
+  if (stale) {
+    if (element.dataset.baseScreenDataStale !== 'true') element.dataset.baseScreenDataStale = 'true';
+  } else if (element.dataset.baseScreenDataStale !== undefined) {
+    delete element.dataset.baseScreenDataStale;
+  }
 }
 
 /**

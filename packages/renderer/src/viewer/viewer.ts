@@ -38,6 +38,7 @@ import { isBaseScreenMaterialCatalog } from './viewer-configuration-guards.js';
 import { ViewerDataSourceScheduler } from './viewer-data-source-scheduler.js';
 import { lifecycleFailure } from './viewer-lifecycle.js';
 import { createViewerSkeleton, createViewerSkeletonStyle } from './viewer-skeleton.js';
+import { createViewerStaleStyle } from './viewer-stale-style.js';
 import { ViewerVariableController } from './viewer-variable-controller.js';
 import {
   applyVariableWriteGuard,
@@ -75,6 +76,8 @@ export class BaseScreenViewerElement extends ElementBase {
   #mount: HTMLDivElement | undefined;
   #skeleton: HTMLDivElement | undefined;
   #skeletonStyle: HTMLStyleElement | undefined;
+  /** 推送过期角标样式；排在挂载根之后，Shadow Root 的首个元素仍是挂载根。 */
+  #staleStyle: HTMLStyleElement | undefined;
   #rendered = false;
   /** 当前文档是否已发射过 `lifecycle:ready`；装载/替换时重新武装，变量刷新不重复。 */
   #lifecycleReadyFired = false;
@@ -386,6 +389,8 @@ export class BaseScreenViewerElement extends ElementBase {
     const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
     this.#mount = this.ownerDocument.createElement('div');
     shadow.appendChild(this.#mount);
+    this.#staleStyle = createViewerStaleStyle(this.ownerDocument);
+    shadow.appendChild(this.#staleStyle);
     this.#renderer = createBaseScreenRenderer({
       root: this.#mount,
       catalog: this.#catalog,
@@ -464,6 +469,8 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#renderer = undefined;
     this.#mount?.remove();
     this.#mount = undefined;
+    this.#staleStyle?.remove();
+    this.#staleStyle = undefined;
     // 骨架挂在 Shadow Root 上，与挂载根相互独立，重连时由 ensureSkeleton 重建。
     this.clearSkeleton();
   }

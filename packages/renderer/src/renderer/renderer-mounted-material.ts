@@ -4,6 +4,7 @@ import { resolveEffectiveModel } from './renderer-effective-style.js';
 import {
   applyMaterial,
   applyMaterialDisplay,
+  applyMaterialDataMarker,
   applyMaterialFrame,
   applyMaterialHostStyle,
 } from './renderer-material-dom.js';
@@ -113,6 +114,7 @@ export function applyMountedConditionalStyle(
   mounted.element.model = model;
   mounted.appliedModel = model;
   applyMaterialHostStyle(mounted.element, model);
+  applyMaterialDataMarker(mounted.element, model);
 }
 
 export function handleMaterialEvent(

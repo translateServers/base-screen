@@ -66,6 +66,16 @@ describe('viewer skeleton', () => {
     expect(style.textContent).toContain('prefers-reduced-motion');
   });
 
+  it('ships a stale indicator style that avoids renderer-owned inline properties (ADR-0104)', async () => {
+    const { createViewerStaleStyle } = await import('../../src/viewer/viewer-stale-style.js');
+    const style = createViewerStaleStyle(new FakeDocument() as unknown as Document);
+    expect(style.getAttribute('data-viewer-stale-style')).toBe('true');
+    expect(style.textContent).toContain('[data-base-screen-data-stale]::after');
+    expect(style.textContent).toContain('--base-screen-stale-indicator-display');
+    // opacity / filter 由渲染器内联写到物料宿主上，样式表盖不过，不能用来表达过期。
+    expect(style.textContent).not.toMatch(/(^|[\s;{])(opacity|filter)\s*:/);
+  });
+
   it('stays on the shadow root until the first render settles', async () => {
     const ownerDocument = new FakeDocument();
     class FakeHTMLElement extends FakeNode {
@@ -108,7 +118,9 @@ describe('viewer skeleton', () => {
     expect(configured.ok).toBe(true);
 
     // 文档未渲染时挂载根还没有画布尺寸，骨架仍在挂载根外层撑住查看区。
-    expect(shadow.children).toHaveLength(3);
+    // 第 4 个是推送过期角标样式（ADR-0104），排在挂载根之后。
+    expect(shadow.children).toHaveLength(4);
+    expect(shadow.children[3]?.attributes.get('data-viewer-stale-style')).toBe('true');
     expect(skeleton.parent).toBe(shadow);
     expect(viewer.getAttribute('data-viewer-state')).toBe('loading');
   });
