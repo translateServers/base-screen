@@ -7,6 +7,7 @@ import type {
   ScreenMaterialErrorCode,
   ScreenParseResult,
   ScreenSize,
+  ScreenSourceDelivery,
   ScreenThemeSlot,
 } from '@base-screen/contracts';
 import type { BaseScreenMaterialEditorDescriptor } from './editor/editor-descriptor.js';
@@ -21,7 +22,15 @@ export type BaseScreenMaterialMode = 'design' | 'preview' | 'viewer';
 export type BaseScreenMaterialDataState =
   | { readonly status: 'idle' }
   | { readonly status: 'loading' }
-  | { readonly status: 'ready'; readonly value: ScreenJsonValue }
+  | {
+      readonly status: 'ready';
+      readonly value: ScreenJsonValue;
+      /**
+       * 推送实例的值已过期（ADR-0104 §2.6）：连接 reconnecting / suspended、重同步中，或超过
+       * 静默超时。物料可据此弱化显示；不读此字段的物料行为不变。只在为 true 时出现。
+       */
+      readonly stale?: true;
+    }
   | {
       readonly status: 'error';
       readonly code: ScreenMaterialErrorCode;
@@ -290,6 +299,11 @@ export interface BaseScreenPluginDataResourceTypeContribution {
   /** 显式共享声明（Data Runtime Hardening / DRH-R2）：仅 'resource' 开启同实例
    *  in-flight 共享；缺省为组件域，不共享。仅作声明，不含其它运行时语义。 */
   readonly queryScope?: 'resource';
+  /**
+   * 推送能力声明（ADR-0104 §2.3）：缺省视为只支持拉取，设计器不提供「实时推送」。
+   * 声明即表示宿主的资源端口为该类型实现了 `subscribe`。
+   */
+  readonly delivery?: ScreenSourceDelivery;
 }
 
 /**

@@ -805,6 +805,48 @@ describe('plugin manifests and catalogs', () => {
     }
   });
 
+  it('accepts a push delivery declaration and rejects malformed ones (ADR-0104)', () => {
+    const manifestWith = (delivery: unknown) =>
+      parseBaseScreenPluginManifest(
+        pluginManifest({
+          contributions: [
+            {
+              kind: 'dataResourceType',
+              id: 'acme_series',
+              name: '时序',
+              configSchema: { kind: 'object', properties: {}, required: [] },
+              delivery,
+            },
+          ],
+        }),
+      );
+    const push = manifestWith({ push: { append: true, inactivityTimeoutSeconds: 15 } });
+    expect(push.ok).toBe(true);
+    if (push.ok) {
+      expect(push.value.contributions[0]).toMatchObject({
+        delivery: { push: { append: true, inactivityTimeoutSeconds: 15 } },
+      });
+    }
+    for (const delivery of [
+      'push',
+      { push: { append: 'yes' } },
+      { push: { inactivityTimeoutSeconds: 0 } },
+      { push: { url: 'ws://example.invalid' } },
+    ]) {
+      const invalid = manifestWith(delivery);
+      expect(invalid.ok).toBe(false);
+      if (!invalid.ok) {
+        expect(
+          invalid.diagnostics.some(
+            (item) =>
+              item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID' &&
+              item.path.includes('delivery'),
+          ),
+        ).toBe(true);
+      }
+    }
+  });
+
   it('requires dataResourceType ids to satisfy the document resourceType name pattern', () => {
     const parse = (id: string) =>
       parseBaseScreenPluginManifest(

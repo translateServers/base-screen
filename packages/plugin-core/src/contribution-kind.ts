@@ -1,6 +1,7 @@
 import {
   isScreenComponentId,
   isScreenVariableName,
+  listScreenSourceDeliveryIssues,
   type ScreenDiagnostic,
   type ScreenJsonObject,
   type ScreenJsonValue,
@@ -123,7 +124,7 @@ export const CONTRIBUTION_KIND_DESCRIPTORS: readonly ContributionKindDescriptor[
   {
     kind: 'dataResourceType',
     requiredFields: ['kind', 'id', 'name', 'configSchema'],
-    optionalFields: ['queryScope'],
+    optionalFields: ['queryScope', 'delivery'],
     identifierFields: ['id'],
     hasDisplayName: true,
     identityField: 'id',
@@ -150,6 +151,15 @@ export const CONTRIBUTION_KIND_DESCRIPTORS: readonly ContributionKindDescriptor[
           [...path, 'queryScope'],
           'Resource queryScope must be the literal "resource" when declared.',
         );
+      }
+      if (contribution.delivery !== undefined) {
+        for (const issue of listScreenSourceDeliveryIssues(contribution.delivery)) {
+          collector.add(
+            'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+            [...path, 'delivery', ...issue.path],
+            issue.message,
+          );
+        }
       }
     },
   },

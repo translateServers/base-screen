@@ -557,6 +557,38 @@ describe('parseBaseScreenMaterialEditorDescriptor', () => {
     expect(conditions.ok).toBe(false);
   });
 
+  // ADR-0105 P1：style 字段可以依赖 props 开关，条件显式写出读哪一侧。
+  it('accepts a cross-target condition and rejects an unknown target', () => {
+    const input = descriptor();
+    firstField(input, 1).when = [{ target: 'style', path: ['color'], operator: 'exists' }];
+    const accepted = parseBaseScreenMaterialEditorDescriptor(
+      input,
+      propsSchema,
+      styleSchema,
+      ['valueClick'],
+      roles,
+    );
+    expect(accepted.ok).toBe(true);
+    if (accepted.ok) {
+      expect(accepted.value.appearance?.[0]?.fields[1]?.when).toEqual([
+        { target: 'style', path: ['color'], operator: 'exists' },
+      ]);
+    }
+
+    firstField(input, 1).when = [{ target: 'data', path: ['color'], operator: 'exists' }];
+    const rejected = parseBaseScreenMaterialEditorDescriptor(
+      input,
+      propsSchema,
+      styleSchema,
+      ['valueClick'],
+      roles,
+    );
+    expect(rejected.ok).toBe(false);
+    if (!rejected.ok) {
+      expect(rejected.diagnostics.some((d) => d.path.includes('target'))).toBe(true);
+    }
+  });
+
   it('AE-DC-C03 rejects duplicate ids', () => {
     const input = descriptor();
     firstField(input, 1).id = 'title';
