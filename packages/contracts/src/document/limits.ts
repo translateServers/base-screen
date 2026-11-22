@@ -17,6 +17,17 @@ export const MAX_DATA_SOURCE_NAME_CODE_POINTS = 256;
 export const MAX_VALUE_REF_PATH_SEGMENTS = 8;
 export const MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS = 1;
 export const MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS = 86_400;
+/** `push` 实例的保留窗口（ADR-0104 §2.5）：行数上限、缺省行数与时长上限。 */
+export const MIN_PUSH_RETAIN_ROWS = 1;
+export const MAX_PUSH_RETAIN_ROWS = 10_000;
+export const DEFAULT_PUSH_RETAIN_ROWS = 1_000;
+export const MIN_PUSH_RETAIN_SECONDS = 1;
+export const MAX_PUSH_RETAIN_SECONDS = 604_800;
+/** `retain.timeField` 是数据集字段 id，长度与数据源参数名一致。 */
+export const MAX_PUSH_RETAIN_TIME_FIELD_CODE_UNITS = 128;
+/** 宿主能力声明 `delivery.push.inactivityTimeoutSeconds` 的范围。 */
+export const MIN_PUSH_INACTIVITY_TIMEOUT_SECONDS = 1;
+export const MAX_PUSH_INACTIVITY_TIMEOUT_SECONDS = 3_600;
 export const MAX_NAME_CODE_POINTS = 256;
 export const MAX_DESCRIPTION_CODE_POINTS = 4_096;
 export const MAX_BACKGROUND_COLOR_CODE_POINTS = 128;

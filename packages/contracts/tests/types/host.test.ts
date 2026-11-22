@@ -162,4 +162,40 @@ describe('project lifecycle contracts', () => {
     });
     expect(result).toMatchObject({ ok: false, diagnostics: [{ code: 'PROJECT_ADAPTER_INVALID' }] });
   });
+
+  it('accepts an optional subscribe on resource and catalog ports, rejects a non-function', () => {
+    const capabilities = {
+      projectCatalog: false,
+      projectPreview: false,
+      projectSnapshots: false,
+      resources: true,
+      datasets: false,
+      hostCatalog: true,
+      actions: false,
+    };
+    const resolve = async () => ({ ok: false as const, diagnostics: [] });
+    const hostCatalog = {
+      list: async () => ({ ok: true as const, value: { items: [] }, diagnostics: [] }),
+      describe: resolve,
+      resolve,
+    };
+    const subscribe = () => ({ ok: true as const, value: null, diagnostics: [] });
+    expect(
+      validateScreenDesignerHostAdapter({
+        capabilities,
+        resources: { resolve, subscribe },
+        hostCatalog: { ...hostCatalog, subscribe },
+      }),
+    ).toMatchObject({ ok: true });
+    expect(
+      validateScreenDesignerHostAdapter({ capabilities, resources: { resolve }, hostCatalog }),
+    ).toMatchObject({ ok: true });
+    expect(
+      validateScreenDesignerHostAdapter({
+        capabilities,
+        resources: { resolve, subscribe: true },
+        hostCatalog,
+      }),
+    ).toMatchObject({ ok: false, diagnostics: [{ code: 'PROJECT_ADAPTER_INVALID' }] });
+  });
 });

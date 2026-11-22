@@ -839,12 +839,42 @@
             "properties": {
               "mode": {
                 "type": "string",
-                "enum": ["once", "manual", "auto"]
+                "enum": ["once", "manual", "auto", "push"]
               },
               "intervalSeconds": {
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 86400
+              },
+              "fallbackIntervalSeconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 86400
+              },
+              "retain": {
+                "type": "object",
+                "properties": {
+                  "rows": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  },
+                  "seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 604800
+                  },
+                  "timeField": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "additionalProperties": false,
+                "dependentRequired": {
+                  "seconds": ["timeField"],
+                  "timeField": ["seconds"]
+                }
               }
             },
             "required": ["mode"],
@@ -867,6 +897,28 @@
                     "required": ["intervalSeconds"]
                   }
                 }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "mode": {
+                      "const": "push"
+                    }
+                  },
+                  "required": ["mode"]
+                },
+                "else": {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": ["fallbackIntervalSeconds"]
+                      },
+                      {
+                        "required": ["retain"]
+                      }
+                    ]
+                  }
+                }
               }
             ]
           },
@@ -880,7 +932,39 @@
           }
         },
         "required": ["id", "name", "source", "params"],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "source": {
+                  "properties": {
+                    "kind": {
+                      "const": "url-query"
+                    }
+                  },
+                  "required": ["kind"]
+                }
+              },
+              "required": ["source"]
+            },
+            "then": {
+              "not": {
+                "properties": {
+                  "updatePolicy": {
+                    "properties": {
+                      "mode": {
+                        "const": "push"
+                      }
+                    },
+                    "required": ["mode"]
+                  }
+                },
+                "required": ["updatePolicy"]
+              }
+            }
+          }
+        ]
       }
     },
     "variables": {

@@ -134,13 +134,34 @@ export type ScreenDataSourceSource =
 
 export type ScreenDataSourceSourceKind = ScreenDataSourceSource['kind'];
 
-export type ScreenUpdatePolicyMode = 'once' | 'manual' | 'auto';
+export type ScreenUpdatePolicyMode = 'once' | 'manual' | 'auto' | 'push';
 
-/** 刷新策略：`auto` 必须带 `intervalSeconds`，其余模式禁止带。 */
+/**
+ * `push` 实例的保留窗口（ADR-0104 §2.5）。`seconds` 与 `timeField` 必须同时出现或同时省略。
+ */
+export interface ScreenPushRetainPolicy {
+  /** 最多保留的行数，1..10000；省略时运行时取 1000。 */
+  readonly rows?: number;
+  /** 只保留 `timeField` 落在「最新一行时间 − seconds」之后的行，1..604800。 */
+  readonly seconds?: number;
+  /** 时间字段 id：取值须为 epoch 毫秒数或 ISO-8601 字符串。 */
+  readonly timeField?: string;
+}
+
+/**
+ * 刷新策略。
+ * - `auto` 必须带 `intervalSeconds`，其余模式禁止带；
+ * - `fallbackIntervalSeconds` 与 `retain` 只允许出现在 `push`；
+ * - `url-query` 来源禁止 `push`（由实例级校验保证）。
+ */
 export interface ScreenUpdatePolicy {
   readonly mode: ScreenUpdatePolicyMode;
   /** 仅 `mode: 'auto'` 允许出现；1..86400 的整数（秒）。 */
   readonly intervalSeconds?: number;
+  /** 仅 `mode: 'push'`：订阅不可用或连接 suspended 时回退轮询的间隔，1..86400 秒。 */
+  readonly fallbackIntervalSeconds?: number;
+  /** 仅 `mode: 'push'`：`append` 增量下的保留窗口。 */
+  readonly retain?: ScreenPushRetainPolicy;
 }
 
 /** 文档级命名取数管道：请求身份与刷新策略的唯一落点。JSON-safe。 */

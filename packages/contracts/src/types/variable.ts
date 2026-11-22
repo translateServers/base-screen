@@ -1,4 +1,5 @@
 import type { ScreenDatasetParameterDefinition } from './dataset-port.js';
+import type { ScreenSourceDelivery } from './push.js';
 
 /**
  * 来源目录项：宿主命名空间内的一个可取值的来源（host-catalog / url-query 共用）。
@@ -19,6 +20,8 @@ export interface ScreenHostCatalogDescriptor extends ScreenHostCatalogSummary {
   /** 宿主声明该来源只读（D5 的第二个只读来源）。 */
   readonly readOnly?: boolean;
   readonly previewable: boolean;
+  /** 宿主声明该来源支持推送（ADR-0104 §2.3）；缺省视为只支持拉取。 */
+  readonly delivery?: ScreenSourceDelivery;
 }
 
 export interface ScreenHostCatalogPage {

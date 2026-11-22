@@ -31,17 +31,45 @@ export function generateScreenDocumentJsonSchema(): ScreenJsonObject {
       else: { required: ['value'] },
     },
   ];
-  // 数据源实例的刷新策略交叉约束：auto 必须带 intervalSeconds，其余模式禁止带。
-  const updatePolicy = getObject(
-    getObject(getObject(getObject(properties.dataSources).items).properties).updatePolicy,
-  );
+  // 数据源实例的刷新策略交叉约束：auto 必须带 intervalSeconds，其余模式禁止带；
+  // fallbackIntervalSeconds 与 retain 只属于 push；url-query 来源禁止 push（ADR-0104）。
+  const dataSourceItem = getObject(getObject(properties.dataSources).items);
+  dataSourceItem.allOf = [
+    {
+      if: {
+        properties: {
+          source: { properties: { kind: { const: 'url-query' } }, required: ['kind'] },
+        },
+        required: ['source'],
+      },
+      then: {
+        not: {
+          properties: {
+            updatePolicy: { properties: { mode: { const: 'push' } }, required: ['mode'] },
+          },
+          required: ['updatePolicy'],
+        },
+      },
+    },
+  ];
+  const updatePolicy = getObject(getObject(dataSourceItem.properties).updatePolicy);
   updatePolicy.allOf = [
     {
       if: { properties: { mode: { const: 'auto' } }, required: ['mode'] },
       then: { required: ['intervalSeconds'] },
       else: { not: { required: ['intervalSeconds'] } },
     },
+    {
+      if: { properties: { mode: { const: 'push' } }, required: ['mode'] },
+      else: {
+        not: {
+          anyOf: [{ required: ['fallbackIntervalSeconds'] }, { required: ['retain'] }],
+        },
+      },
+    },
   ];
+  const retain = getObject(getObject(updatePolicy.properties).retain);
+  retain.dependentRequired = { seconds: ['timeField'], timeField: ['seconds'] };
   const behaviorRelation = findObjectWithTypeConst(generated, 'behavior');
   const condition = getObject(getObject(behaviorRelation.properties).condition);
   condition.allOf = [

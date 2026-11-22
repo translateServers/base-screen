@@ -177,3 +177,33 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
     expect(serialized).not.toContain('$type');
   });
 });
+
+describe('SCREEN_DOCUMENT_JSON_SCHEMA push update policy (ADR-0104)', () => {
+  const dataSource = (propertiesOf(schema).dataSources as { items: Record<string, unknown> }).items;
+  const updatePolicy = propertiesOf(dataSource).updatePolicy as Record<string, unknown>;
+
+  it('lists push as a mode and declares push-only fields', () => {
+    const fields = propertiesOf(updatePolicy);
+    expect((fields.mode as { enum: unknown[] }).enum).toEqual(['once', 'manual', 'auto', 'push']);
+    expect(Object.keys(fields)).toEqual([
+      'mode',
+      'intervalSeconds',
+      'fallbackIntervalSeconds',
+      'retain',
+    ]);
+    const retain = fields.retain as Record<string, unknown>;
+    expect(retain.additionalProperties).toBe(false);
+    expect(retain.dependentRequired).toEqual({ seconds: ['timeField'], timeField: ['seconds'] });
+  });
+
+  it('forbids push-only fields outside push and push on url-query sources', () => {
+    expect(updatePolicy.allOf).toHaveLength(2);
+    expect((updatePolicy.allOf as unknown[])[1]).toEqual({
+      if: { properties: { mode: { const: 'push' } }, required: ['mode'] },
+      else: {
+        not: { anyOf: [{ required: ['fallbackIntervalSeconds'] }, { required: ['retain'] }] },
+      },
+    });
+    expect(dataSource.allOf).toHaveLength(1);
+  });
+});

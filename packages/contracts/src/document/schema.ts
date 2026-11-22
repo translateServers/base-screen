@@ -14,6 +14,9 @@ import {
   MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS,
   MAX_DATA_SOURCES,
   MAX_DESCRIPTION_CODE_POINTS,
+  MAX_PUSH_RETAIN_ROWS,
+  MAX_PUSH_RETAIN_SECONDS,
+  MAX_PUSH_RETAIN_TIME_FIELD_CODE_UNITS,
   MAX_STYLE_RULE_ID_CODE_POINTS,
   MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
   MAX_STYLE_RULE_PATH_SEGMENTS,
@@ -21,6 +24,8 @@ import {
   MAX_VALUE_REF_PATH_SEGMENTS,
   MAX_VARIABLES,
   MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS,
+  MIN_PUSH_RETAIN_ROWS,
+  MIN_PUSH_RETAIN_SECONDS,
 } from './limits.js';
 
 export const COMPONENT_ID_PATTERN = '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$';
@@ -188,18 +193,51 @@ export const dataSourceSourceSchema = z.discriminatedUnion('kind', [
 ]);
 
 /**
- * 刷新策略。交叉约束（`auto` 必带 `intervalSeconds`，其余模式禁止带）由
- * `superRefine` 表达，JSON Schema 侧的等价 `allOf` 补丁见 `json-schema.ts`。
+ * `push` 实例的保留窗口。`seconds` 与 `timeField` 成对出现由 `superRefine` 表达，
+ * JSON Schema 侧的等价 `dependentRequired` 补丁见 `json-schema.ts`。
+ */
+export const pushRetainPolicySchema = z
+  .strictObject({
+    rows: z.number().int().min(MIN_PUSH_RETAIN_ROWS).max(MAX_PUSH_RETAIN_ROWS).optional(),
+    seconds: z
+      .number()
+      .int()
+      .min(MIN_PUSH_RETAIN_SECONDS)
+      .max(MAX_PUSH_RETAIN_SECONDS)
+      .optional(),
+    timeField: z.string().min(1).max(MAX_PUSH_RETAIN_TIME_FIELD_CODE_UNITS).optional(),
+  })
+  .superRefine((retain, context) => {
+    if ((retain.seconds === undefined) !== (retain.timeField === undefined)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Push retain seconds and timeField must be declared together.',
+        path: [retain.seconds === undefined ? 'seconds' : 'timeField'],
+      });
+    }
+  });
+
+/**
+ * 刷新策略。交叉约束（`auto` 必带 `intervalSeconds`，其余模式禁止带；`fallbackIntervalSeconds`
+ * 与 `retain` 只属于 `push`）由 `superRefine` 表达，JSON Schema 侧的等价 `allOf` 补丁见
+ * `json-schema.ts`。
  */
 export const updatePolicySchema = z
   .strictObject({
-    mode: z.enum(['once', 'manual', 'auto']),
+    mode: z.enum(['once', 'manual', 'auto', 'push']),
     intervalSeconds: z
       .number()
       .int()
       .min(MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS)
       .max(MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS)
       .optional(),
+    fallbackIntervalSeconds: z
+      .number()
+      .int()
+      .min(MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS)
+      .max(MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS)
+      .optional(),
+    retain: pushRetainPolicySchema.optional(),
   })
   .superRefine((policy, context) => {
     if (policy.mode === 'auto' && policy.intervalSeconds === undefined) {
@@ -216,21 +254,43 @@ export const updatePolicySchema = z
         path: ['intervalSeconds'],
       });
     }
+    if (policy.mode !== 'push') {
+      for (const field of ['fallbackIntervalSeconds', 'retain'] as const) {
+        if (policy[field] !== undefined) {
+          context.addIssue({
+            code: 'custom',
+            message: `Only push update policy may define ${field}.`,
+            path: [field],
+          });
+        }
+      }
+    }
   });
 
-export const dataSourceSchema = z.strictObject({
-  id: z.string().regex(COMPONENT_ID_REGEXP),
-  name: z.string().min(1).max(MAX_DATA_SOURCE_NAME_CODE_POINTS),
-  source: dataSourceSourceSchema,
-  params: z
-    .record(z.string().min(1).max(128), valueRefSchema)
-    .refine((params) => Object.keys(params).length <= MAX_DATA_SOURCE_PARAMS, {
-      message: `A data source may define at most ${MAX_DATA_SOURCE_PARAMS} params.`,
-    }),
-  updatePolicy: updatePolicySchema.optional(),
-  processorId: z.string().min(1).max(256).optional(),
-  readOnly: z.boolean().optional(),
-});
+export const dataSourceSchema = z
+  .strictObject({
+    id: z.string().regex(COMPONENT_ID_REGEXP),
+    name: z.string().min(1).max(MAX_DATA_SOURCE_NAME_CODE_POINTS),
+    source: dataSourceSourceSchema,
+    params: z
+      .record(z.string().min(1).max(128), valueRefSchema)
+      .refine((params) => Object.keys(params).length <= MAX_DATA_SOURCE_PARAMS, {
+        message: `A data source may define at most ${MAX_DATA_SOURCE_PARAMS} params.`,
+      }),
+    updatePolicy: updatePolicySchema.optional(),
+    processorId: z.string().min(1).max(256).optional(),
+    readOnly: z.boolean().optional(),
+  })
+  .superRefine((instance, context) => {
+    // URL 参数在页面生命周期内不变，订阅没有意义（ADR-0104 §2.1）。
+    if (instance.source.kind === 'url-query' && instance.updatePolicy?.mode === 'push') {
+      context.addIssue({
+        code: 'custom',
+        message: 'url-query data sources cannot use push update policy.',
+        path: ['updatePolicy', 'mode'],
+      });
+    }
+  });
 
 export const variableRecordSchema = z.strictObject({
   id: z.string().regex(COMPONENT_ID_REGEXP),

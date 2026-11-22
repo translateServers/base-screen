@@ -55,11 +55,16 @@ export { isScreenMaterialType } from './document/identity.js';
 export { isBoundedScreenImageUrl } from './document/image-url.js';
 export { SCREEN_DOCUMENT_JSON_SCHEMA } from './document/json-schema.js';
 export {
+  DEFAULT_PUSH_RETAIN_ROWS,
   MAX_DATA_SOURCE_NAME_CODE_POINTS,
   MAX_DATA_SOURCE_PARAMS,
   MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS,
   MAX_DATA_SOURCE_VALUE_BYTES,
   MAX_DATA_SOURCES,
+  MAX_PUSH_INACTIVITY_TIMEOUT_SECONDS,
+  MAX_PUSH_RETAIN_ROWS,
+  MAX_PUSH_RETAIN_SECONDS,
+  MAX_PUSH_RETAIN_TIME_FIELD_CODE_UNITS,
   MAX_STYLE_RULE_ID_CODE_POINTS,
   MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
   MAX_STYLE_RULE_PATH_SEGMENTS,
@@ -67,6 +72,9 @@ export {
   MAX_STYLE_RULES_PER_COMPONENT,
   MAX_VALUE_REF_PATH_SEGMENTS,
   MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS,
+  MIN_PUSH_INACTIVITY_TIMEOUT_SECONDS,
+  MIN_PUSH_RETAIN_ROWS,
+  MIN_PUSH_RETAIN_SECONDS,
 } from './document/limits.js';
 export {
   parseScreenDataSource,
@@ -113,6 +121,12 @@ export {
   type ScreenMigrationDecision,
   type ScreenMigrationResult,
 } from './migration/migrate-document.js';
+export {
+  listScreenSourceDeliveryIssues,
+  normalizeScreenSourceDelivery,
+  type ScreenSourceDeliveryIssue,
+  supportsScreenSourcePush,
+} from './push/delivery.js';
 export type {
   ScreenAuthoringEditorContext,
   ScreenAuthoringEditorLimits,
@@ -210,6 +224,7 @@ export type {
   ScreenHostResourceDataSource,
   ScreenHostResourceParameter,
   ScreenPosition,
+  ScreenPushRetainPolicy,
   ScreenSize,
   ScreenStaticDataSource,
   ScreenStaticVariable,
@@ -247,9 +262,11 @@ export type {
   ScreenHostCatalogListRequest,
   ScreenHostCatalogPort,
   ScreenHostCatalogResolveRequest,
+  ScreenHostCatalogSubscribeRequest,
   ScreenHostResourcePort,
   ScreenHostResourceRequest,
   ScreenHostResourceResolveOptions,
+  ScreenHostSubscribeOptions,
   ScreenIntentReference,
   ScreenIntentReferenceCatalogPage,
   ScreenIntentReferenceCatalogPort,
@@ -280,6 +297,14 @@ export type {
 } from './types/host.js';
 export { validateScreenDesignerHostAdapter } from './types/host.js';
 export type { ScreenJsonObject, ScreenJsonValue } from './types/json.js';
+export type {
+  ScreenPushCursor,
+  ScreenSourceConnectionStatus,
+  ScreenSourceDelivery,
+  ScreenSourcePushEvent,
+  ScreenSourcePushEventType,
+  ScreenSourcePushSink,
+} from './types/push.js';
 export type {
   ScreenHostCatalogDescriptor,
   ScreenHostCatalogPage,

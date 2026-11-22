@@ -1,11 +1,13 @@
 import { isScreenVariableName } from '../document/schema.js';
 import { parseScreenJsonValue } from '../json/parse.js';
+import { listScreenSourceDeliveryIssues, normalizeScreenSourceDelivery } from '../push/delivery.js';
 import type {
   ScreenDatasetParameterDefinition,
   ScreenDatasetParameterValue,
 } from '../types/dataset-port.js';
 import type { ScreenDiagnostic, ScreenParseResult } from '../types/diagnostics.js';
 import type { ScreenJsonObject } from '../types/json.js';
+import type { ScreenSourceDelivery } from '../types/push.js';
 import type {
   ScreenHostCatalogDescriptor,
   ScreenHostCatalogPage,
@@ -34,7 +36,15 @@ export function parseScreenHostCatalogDescriptor(
   }
   checkExact(
     parsed.value,
-    new Set(['sourceId', 'name', 'description', 'parameters', 'readOnly', 'previewable']),
+    new Set([
+      'sourceId',
+      'name',
+      'description',
+      'parameters',
+      'readOnly',
+      'previewable',
+      'delivery',
+    ]),
     [],
     diagnostics,
   );
@@ -44,6 +54,12 @@ export function parseScreenHostCatalogDescriptor(
   }
   if (parsed.value.readOnly !== undefined && typeof parsed.value.readOnly !== 'boolean') {
     diagnostics.push(diagnostic(['readOnly'], 'Host catalog readOnly flag must be boolean.'));
+  }
+  const delivery = parsed.value.delivery;
+  if (delivery !== undefined) {
+    for (const issue of listScreenSourceDeliveryIssues(delivery)) {
+      diagnostics.push(diagnostic(['delivery', ...issue.path], issue.message));
+    }
   }
   const parameters = parseParameters(parsed.value.parameters, diagnostics);
   if (diagnostics.length > 0) return invalidWith(diagnostics);
@@ -57,6 +73,9 @@ export function parseScreenHostCatalogDescriptor(
       parameters,
       ...(readOnly === true ? { readOnly: true } : {}),
       previewable: parsed.value.previewable as boolean,
+      ...(delivery !== undefined
+        ? { delivery: normalizeScreenSourceDelivery(delivery as ScreenSourceDelivery) }
+        : {}),
     },
     diagnostics: [],
   };
