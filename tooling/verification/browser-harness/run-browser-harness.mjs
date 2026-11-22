@@ -48,6 +48,7 @@ import {
 } from './canvas/assert-canvas.mjs';
 import { assertDatasetAuthoring, assertDatasetSurface } from './dataset/assert-dataset.mjs';
 import { assertDatasetPanelInteraction } from './dataset/assert-dataset-panel.mjs';
+import { assertPushDataSources } from './dataset/assert-push.mjs';
 import { assertStaticSourceSwitch } from './dataset/assert-source-switch.mjs';
 import {
   assertBlueprintHostLeftPanelGroups,
@@ -127,6 +128,8 @@ export async function runBrowserHarness(serverPort) {
       await assertInspectorFormConsistency(browser, baseUrl);
       // 固定值 / 变量配置态回到来源浮层的那一行：没有它，这两类形态再也接不上数据集。
       await assertStaticSourceSwitch(browser, baseUrl);
+      // 推送数据源（ADR-0104）：独立页 push.html，宿主端口与事件全部由断言脚本控制。
+      await assertPushDataSources(browser, baseUrl);
       await assertAgentHostResourceProposal(baseUrl, browser);
       for (const viewport of [
         { width: 1024, height: 640 },

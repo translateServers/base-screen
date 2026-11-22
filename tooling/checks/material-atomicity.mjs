@@ -22,7 +22,7 @@ const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
  */
 
 /** 只描述"这个组件是什么"的 prop 名：需要标题时由文档层另放一个 `base.text` 组合。 */
-const FORBIDDEN_TEXT_PROPS = [
+export const FORBIDDEN_TEXT_PROPS = [
   'title',
   'caption',
   'description',
@@ -69,7 +69,7 @@ const RESERVED_STYLE_SOURCE = 'packages/plugin-core/src/material/material-schema
 const RESERVED_STYLE_EXPORT = 'export const BASE_SCREEN_RESERVED_STYLE_SCHEMAS';
 
 /** ADR-0099 §2.6 样式键词典。改动须与 ADR 同步。 */
-const STYLE_KEY_DICTIONARY = new Set([
+export const STYLE_KEY_DICTIONARY = new Set([
   'fill',
   'backgroundColor',
   'color',
@@ -100,6 +100,9 @@ const STYLE_KEY_DICTIONARY = new Set([
   'faultColor',
   'offlineColor',
   'unknownColor',
+  // 趋势语义色（ADR-0105 P4）：读数朝好 / 坏方向变化，由组件的「越高越好」决定哪一侧算改善。
+  'positiveColor',
+  'negativeColor',
 ]);
 
 /**
@@ -108,7 +111,7 @@ const STYLE_KEY_DICTIONARY = new Set([
  * 新物料可以复用这里的键；要新增词典外的键，必须在评审中说明为何不能复用词典键，
  * 并把它登记到这里——登记本身就是评审留痕。键名须带物料语义前缀（如 `trackColor`）。
  */
-const REGISTERED_STYLE_KEYS = new Set([
+export const REGISTERED_STYLE_KEYS = new Set([
   'accent',
   'background',
   'connectorColor',

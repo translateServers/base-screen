@@ -1673,6 +1673,11 @@ hostShell.addEventListener('click', (event) => {
 });
 
 mountFeatureCases(designer);
+// 组件工坊（ADR-0105）：只在 `?workshop` 时挂载，避免固定定位按钮干扰其他断言的命中测试。
+if (harnessSearch.has('workshop')) {
+  const { mountHarnessComponentWorkshop } = await import('./component-workshop-host.ts');
+  await mountHarnessComponentWorkshop(designer);
+}
 
 Object.assign(window, {
   baseScreenHarness: {

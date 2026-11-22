@@ -31,6 +31,11 @@ const BASELINES: readonly BaselineEntry[] = [
     summary: '设计器骨架、Viewer 骨架、物料 spinner 与「文档加载中」现状；延迟可调，动画肉眼可见。',
     href: './loading-states.html',
   },
+  {
+    title: '推送数据源',
+    summary: 'ADR-0104：查看器订阅、按帧合并、游标重同步、过期角标、回退轮询；设计器「实时推送」门控。事件由控制台 basePushHarness.emit() 投递。',
+    href: './push.html',
+  },
 ];
 
 const ALL_PACKAGES = '全部';

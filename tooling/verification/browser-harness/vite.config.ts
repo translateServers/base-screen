@@ -38,6 +38,11 @@ export default defineConfig({
   },
   resolve: {
     alias: [
+      // 组件工坊（ADR-0105）复用三端示例的共享实现，它按产品包子路径导入插件 SDK。
+      {
+        find: /^base-screen\/plugins$/,
+        replacement: resolve(import.meta.dirname, '../../../packages/sdk/src/plugins.ts'),
+      },
       // 子路径必须先于裸包匹配；用精确正则避免 `base-screen` 吞掉子路径。
       ...PRODUCT_ALIASES.map(([specifier, packageName]) => ({
         find: new RegExp(`^${specifier}$`),
