@@ -131,11 +131,9 @@ describe('designer group operations', () => {
     );
   });
 
-  it('re-derives every group shell on any transaction, including unrelated edits', () => {
-    // 特征测试（不是期望行为）：组壳几何不接受作者意图——任何一次事务都会把它吸附到
-    // 子项并集。之所以无条件运行，是 auto-width 文本的实测宽度变化根本不产生事务，
-    // 只能靠下一次事务顺带同步（见 designer-auto-width 的同名派生用例）。
-    // 后果：带内边距的容器不能当组壳用，否则第一次无关编辑就会把留白压平。
+  // 以前的特征测试记录的是「任何事务都把组壳吸附到子项并集」，带内边距的容器因此在第一次无关编辑
+  // 后被压平（组合分片的卡片外壳、作者手搭的面板都会中招）。现在逐边判断：留有内边距的边保持。
+  it('keeps the padding of a container on an unrelated edit', () => {
     const source = document([
       component('outside', { x: 0, y: 0 }, { width: 100, height: 20 }),
       component('group', { x: 10, y: 10 }, { width: 200, height: 120 }),
@@ -155,11 +153,86 @@ describe('designer group operations', () => {
       'base.group',
     );
 
+    expect(transaction.commands).toHaveLength(1);
     const result = applyScreenDocumentTransaction(source, transaction);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.document.components.find((item) => item.id === 'group')).toEqual(
-      expect.objectContaining({ position: { x: 30, y: 30 }, size: { width: 40, height: 20 } }),
+      expect.objectContaining({ position: { x: 10, y: 10 }, size: { width: 200, height: 120 } }),
+    );
+  });
+
+  it('keeps a padded container when a child moves inside it, and grows only where it overflows', () => {
+    const source = document([
+      component('group', { x: 10, y: 10 }, { width: 200, height: 120 }),
+      component('child', { x: 30, y: 30 }, { width: 40, height: 20 }, 'group'),
+    ]);
+    const move = (position: { readonly x: number; readonly y: number }) => {
+      const result = applyScreenDocumentTransaction(
+        source,
+        withDerivedDesignerGroupBounds(
+          source,
+          {
+            commands: [{ type: 'update-components', componentIds: ['child'], patch: { position } }],
+          },
+          'base.group',
+        ),
+      );
+      if (!result.ok) throw new Error('transaction must apply');
+      return result.document.components.find((item) => item.id === 'group');
+    };
+
+    expect(move({ x: 60, y: 50 })).toEqual(
+      expect.objectContaining({ position: { x: 10, y: 10 }, size: { width: 200, height: 120 } }),
+    );
+    // 拖出右下角：右边与下边外扩到包住子项，左边与上边的内边距不动。
+    expect(move({ x: 190, y: 120 })).toEqual(
+      expect.objectContaining({ position: { x: 10, y: 10 }, size: { width: 220, height: 130 } }),
+    );
+  });
+
+  it('follows the children on the sides that touched them and keeps the padded sides', () => {
+    // 子项贴着左边与上边，右边与下边留白。
+    const source = document([
+      component('group', { x: 10, y: 10 }, { width: 200, height: 120 }),
+      component('child', { x: 10, y: 10 }, { width: 40, height: 20 }, 'group'),
+    ]);
+    const transaction = withDerivedDesignerGroupBounds(
+      source,
+      {
+        commands: [
+          {
+            type: 'update-components',
+            componentIds: ['child'],
+            patch: { position: { x: 30, y: 40 } },
+          },
+        ],
+      },
+      'base.group',
+    );
+    const result = applyScreenDocumentTransaction(source, transaction);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.document.components.find((item) => item.id === 'group')).toEqual(
+      expect.objectContaining({ position: { x: 30, y: 40 }, size: { width: 180, height: 90 } }),
+    );
+  });
+
+  it('keeps the size of a container that had no children before the edit', () => {
+    const source = document([
+      component('group', { x: 0, y: 0 }, { width: 300, height: 200 }),
+      component('child', { x: 40, y: 40 }, { width: 40, height: 20 }),
+    ]);
+    const transaction = withDerivedDesignerGroupBounds(
+      source,
+      { commands: [{ type: 'reparent-components', componentIds: ['child'], parentId: 'group' }] },
+      'base.group',
+    );
+    const result = applyScreenDocumentTransaction(source, transaction);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.document.components.find((item) => item.id === 'group')).toEqual(
+      expect.objectContaining({ position: { x: 0, y: 0 }, size: { width: 300, height: 200 } }),
     );
   });
 });

@@ -8,6 +8,7 @@ import {
   DESIGNER_OPERATION_TEXT,
   type DesignerOperationDefinition,
 } from '../designer-operation-registry.js';
+import { selectAllTargetIds } from '../selection/designer-selection.js';
 import type {
   DesignerElementOperationsHost,
   DesignerOperationContext,
@@ -49,11 +50,11 @@ export function createDesignerElementOperations(
     ),
     simpleOperation(
       'select-all',
-      () => (host.getDocument()?.components.length ?? 0) > 0,
+      () => selectAllTargets(host).length > 0,
       () => {
-        const document = host.getDocument();
-        if (document === undefined) return;
-        const componentIds = document.components.map((component) => component.id);
+        // 只选当前编辑层级的直接成员：父子混选会让删除 / 移动 / 对齐整体失效。
+        const componentIds = selectAllTargets(host);
+        if (componentIds.length === 0) return;
         host.reduceSelection({
           type: 'replace-selection',
           componentIds,
@@ -64,7 +65,7 @@ export function createDesignerElementOperations(
     ),
     simpleOperation(
       'delete',
-      () => host.canMutateSelection(),
+      () => host.canDeleteSelection?.() ?? host.canMutateSelection(),
       () => host.deleteSelection(),
       'canvas',
     ),
@@ -132,6 +133,13 @@ export function createDesignerElementOperations(
       () => host.canUngroup(),
       () => host.report(host.ungroup()),
       'canvas',
+    ),
+    simpleOperation(
+      'save-as-fragment',
+      () => host.canSaveFragment(),
+      () => host.requestFragmentSave(),
+      'canvas',
+      () => host.isFragmentSaveAvailable(),
     ),
     simpleOperation(
       'group-enter',
@@ -405,6 +413,12 @@ const REPEATABLE_OPERATION_IDS = new Set([
   'nudge-10-up',
   'nudge-10-down',
 ]);
+
+function selectAllTargets(host: DesignerElementOperationsHost): readonly string[] {
+  const document = host.getDocument();
+  if (document === undefined) return [];
+  return selectAllTargetIds(document, host.getGroupEditingParentId?.() ?? null);
+}
 
 function simpleOperation(
   id: keyof typeof DESIGNER_OPERATION_TEXT,

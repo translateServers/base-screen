@@ -7,8 +7,11 @@ import {
   type ScreenParseResult,
   type ScreenPosition,
 } from '@base-screen/contracts';
-import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
-import { isBoundedName } from '../designer-name-validation.js';
+import {
+  type BaseScreenMaterialManifest,
+  isBaseScreenBoundedName,
+  resolveBaseScreenMaterialDefaultStyle,
+} from '@base-screen/plugin-core';
 import { roundScreenGeometry } from '../element/designer-geometry.js';
 
 /**
@@ -116,7 +119,8 @@ export function createMaterialComponent(
     zIndex: placement.zIndex ?? nextMaterialComponentZIndex(document),
     status: { locked: false, hidden: false },
     props: manifest.defaultProps,
-    style: manifest.defaultStyle,
+    // 文档带主题色板时，manifest 声明的 `themeStyle` 键取当前色板（ADR-0101）。
+    style: resolveBaseScreenMaterialDefaultStyle(manifest, document.theme),
     dataSource:
       placement.dataSource === undefined
         ? createInitialMaterialDataSource(manifest)
@@ -162,7 +166,10 @@ export function parseBaseScreenComponentInsertionIntent(
       ['materialType'],
     );
   }
-  if (input.name !== undefined && !isBoundedName(input.name, MAX_INSERTION_NAME_CODE_POINTS)) {
+  if (
+    input.name !== undefined &&
+    !isBaseScreenBoundedName(input.name, MAX_INSERTION_NAME_CODE_POINTS)
+  ) {
     return failure(
       'AUTHORING_PAYLOAD_INVALID',
       `Component name must contain 1 to ${MAX_INSERTION_NAME_CODE_POINTS} code points without control characters.`,

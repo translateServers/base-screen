@@ -254,7 +254,20 @@ function projectManifest(
     defaultProps: { ...manifest.defaultProps, ...(item.defaultProps ?? {}) },
     defaultStyle: { ...manifest.defaultStyle, ...(item.defaultStyle ?? {}) },
     ...(Object.hasOwn(item, 'defaultData') ? { defaultData: item.defaultData } : {}),
+    ...themeStyleWithout(manifest.themeStyle, item.defaultStyle),
   });
+}
+
+/** 条目显式覆盖的样式键不再跟随主题：条目写的颜色是宿主的意图（ADR-0101）。 */
+function themeStyleWithout(
+  themeStyle: BaseScreenMaterialManifest['themeStyle'],
+  overrides: BaseScreenMaterialLibraryItem['defaultStyle'],
+): { readonly themeStyle?: NonNullable<BaseScreenMaterialManifest['themeStyle']> } {
+  if (themeStyle === undefined || overrides === undefined) return {};
+  const kept = Object.entries(themeStyle).filter(([key]) => !Object.hasOwn(overrides, key));
+  return kept.length === Object.keys(themeStyle).length
+    ? {}
+    : { themeStyle: Object.fromEntries(kept) };
 }
 
 function validateOptionalString(

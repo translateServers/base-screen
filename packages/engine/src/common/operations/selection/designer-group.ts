@@ -2,6 +2,7 @@ import type { ScreenComponentNode, ScreenDocument, ScreenSize } from '@base-scre
 import {
   applyScreenDocumentCommand,
   applyScreenDocumentTransaction,
+  getScreenComponentBounds,
   getScreenSelectionBounds,
   isScreenComponentEffectivelyLocked,
   type ScreenDocumentCommand,
@@ -111,10 +112,37 @@ export function createGroupRotationTransaction(
 }
 
 /**
- * Keeps configured group shells aligned with their descendants after child edits.
- * Explicit group geometry in the same transaction remains authoritative, which lets
- * resize/rotate operations express an intentional group transform without being
- * immediately overwritten by the derived-bound pass.
+ * 小于它的内边距视为「贴着子项」：几何经 `roundScreenGeometry` 取两位小数，吸附也会留零点几的误差。
+ */
+const GROUP_EDGE_TOLERANCE = 0.5;
+
+type GroupSide = 'left' | 'top' | 'right' | 'bottom';
+const GROUP_SIDES: readonly GroupSide[] = ['left', 'top', 'right', 'bottom'];
+
+interface GroupEdges {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+
+/**
+ * 让已配置的组壳（`groupMaterialType`）在子项变化后仍包住子项。
+ *
+ * 逐条边决定跟随还是保持，依据是事务**之前**这条边与子项并集的距离：
+ * - **贴着子项**（距离 ≤ 0.5 px）的边跟随子项：「成组」命令建出的组壳四边都贴着，因此仍然
+ *   精确跟随子项移动、缩放、增删——与以前一致；
+ * - **留有内边距**的边保持不动，只在子项越出时外扩：带内边距的卡片（组合分片的外壳、作者手搭的
+ *   面板）不会再在一次无关编辑后被压平；
+ * - 原本没有子项的容器四边都视为留有内边距：把组件放进一个空底座时底座保持原尺寸。
+ *
+ * 自适应宽度文本的渲染宽度变化不产生事务，组壳只能在下一次事务里顺带同步，这也是本函数对每个
+ * 事务都运行的原因。这类文本的右边界在事务前就可能已经漂移，按距离判断会把漂移误当成内边距，
+ * 所以**定义某条边的子项若在这条边上的投影位置不等于存储位置**（正在被渲染测量改写），
+ * 这条边一律跟随。
+ * 代价：一张卡片里最宽的子项若开启了自适应宽度，卡片右侧的内边距会被它吃掉。
+ *
+ * 同一事务里显式写了组壳几何的（缩放/旋转/插入组合）以该事务为准，不再派生。
  */
 export function withDerivedDesignerGroupBounds(
   document: ScreenDocument,
@@ -145,6 +173,8 @@ export function withDerivedDesignerGroupBounds(
     }
   }
 
+  const before = document;
+  const beforeGeometry = projectGeometry?.(before) ?? before;
   let current = projected.document;
   const commands: ScreenDocumentCommand[] = [];
   const groups = current.components
@@ -157,8 +187,16 @@ export function withDerivedDesignerGroupBounds(
     const descendants = getDescendants(projectGeometry?.(current) ?? current, group.id);
     const bounds = getScreenSelectionBounds(descendants);
     if (bounds === null) continue;
-    const position = { x: bounds.left, y: bounds.top };
-    const size = { width: bounds.right - bounds.left, height: bounds.bottom - bounds.top };
+    const following = followingGroupSides(before, beforeGeometry, group.id);
+    const shell = edgesOf(group);
+    const next: GroupEdges = {
+      left: following.has('left') ? bounds.left : Math.min(shell.left, bounds.left),
+      top: following.has('top') ? bounds.top : Math.min(shell.top, bounds.top),
+      right: following.has('right') ? bounds.right : Math.max(shell.right, bounds.right),
+      bottom: following.has('bottom') ? bounds.bottom : Math.max(shell.bottom, bounds.bottom),
+    };
+    const position = { x: next.left, y: next.top };
+    const size = { width: next.right - next.left, height: next.bottom - next.top };
     if (samePosition(group.position, position) && sameSize(group.size, size)) continue;
     const command: ScreenDocumentCommand = {
       type: 'update-components',
@@ -171,6 +209,58 @@ export function withDerivedDesignerGroupBounds(
     commands.push(command);
   }
   return commands.length === 0 ? transaction : { commands: [...transaction.commands, ...commands] };
+}
+
+/**
+ * 事务之前哪些边贴着子项（应当跟随）。组壳在事务前不存在时由调用方按显式几何跳过；
+ * 事务前没有子项时返回空集（四边都保持）。
+ */
+function followingGroupSides(
+  storedDocument: ScreenDocument,
+  geometryDocument: ScreenDocument,
+  groupId: string,
+): ReadonlySet<GroupSide> {
+  const following = new Set<GroupSide>();
+  const shell = storedDocument.components.find((component) => component.id === groupId);
+  if (shell === undefined) return following;
+  const descendants = getDescendants(geometryDocument, groupId);
+  const union = getScreenSelectionBounds(descendants);
+  if (union === null) return following;
+  const stored = new Map(
+    getDescendants(storedDocument, groupId).map((component) => [component.id, component]),
+  );
+  const outer = edgesOf(shell);
+  const inset: GroupEdges = {
+    left: union.left - outer.left,
+    top: union.top - outer.top,
+    right: outer.right - union.right,
+    bottom: outer.bottom - union.bottom,
+  };
+  for (const side of GROUP_SIDES) {
+    if (inset[side] <= GROUP_EDGE_TOLERANCE) {
+      following.add(side);
+      continue;
+    }
+    // 定义这条边的子项在这条边上被渲染测量改写过（自适应宽度文本的右边界）：边界本身在漂移，
+    // 不能据此判定内边距。只比较这一条边——自适应宽度不动左、上、下边，那三边照常判断。
+    const drifting = descendants.some((component) => {
+      const edge = getScreenComponentBounds(component)[side];
+      if (Math.abs(edge - union[side]) > GROUP_EDGE_TOLERANCE) return false;
+      const original = stored.get(component.id);
+      return original !== undefined && getScreenComponentBounds(original)[side] !== edge;
+    });
+    if (drifting) following.add(side);
+  }
+  return following;
+}
+
+function edgesOf(component: ScreenComponentNode): GroupEdges {
+  return {
+    left: component.position.x,
+    top: component.position.y,
+    right: component.position.x + component.size.width,
+    bottom: component.position.y + component.size.height,
+  };
 }
 
 function getDescendants(

@@ -43,6 +43,39 @@ function entry(
 }
 
 describe('material library item projection', () => {
+  it('stops a key from following the theme once the item overrides it (ADR-0101)', () => {
+    const themed = entry('base.frame');
+    const catalog = createBaseScreenMaterialCatalog([
+      {
+        ...themed,
+        manifest: {
+          ...themed.manifest,
+          defaultStyle: { opacity: 1, borderColor: '#111111', accentColor: '#222222' },
+          styleSchema: {
+            kind: 'object' as const,
+            properties: {
+              opacity: { kind: 'number' as const, minimum: 0, maximum: 1 },
+              borderColor: { kind: 'string' as const },
+              accentColor: { kind: 'string' as const },
+            },
+            required: ['opacity'],
+          },
+          themeStyle: { borderColor: 'primary', accentColor: 'accent' },
+        },
+      },
+    ]);
+    const parsed = parseBaseScreenMaterialLibraryItems([
+      { id: 'frame:red', materialType: 'base.frame', defaultStyle: { borderColor: '#ff0000' } },
+    ]);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const resolved = resolveBaseScreenMaterialLibraryItems(catalog, parsed.value);
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) return;
+    expect(resolved.value[0]?.manifest.themeStyle).toEqual({ accentColor: 'accent' });
+    expect(resolved.value[0]?.manifest.defaultStyle.borderColor).toBe('#ff0000');
+  });
+
   it('allows multiple stable items to reuse one runtime material type', () => {
     const catalog = createBaseScreenMaterialCatalog([entry('base.image')]);
     const parsed = parseBaseScreenMaterialLibraryItems([

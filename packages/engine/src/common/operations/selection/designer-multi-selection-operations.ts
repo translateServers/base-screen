@@ -3,13 +3,18 @@ import type { ScreenDocumentCommand, ScreenDocumentTransaction } from '@base-scr
 import { isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { clampScreenSize, roundScreenGeometry } from '../element/designer-geometry.js';
+import {
+  type DesignerMaterialEditorKey,
+  designerMaterialEditorKeys,
+} from '../style/designer-material-appearance.js';
 import { createDesignerStyleFieldPatch } from '../style/designer-style-field.js';
 import { selectedComponents } from './designer-selection.js';
 
 /**
- * 多选批量样式字段交集（ADR-0053 R2）：所有选中组件 manifest.stylePanel 且
- * styleSchema 声明的字段的交集。交集为空（如文本与矩形混合多选）返回空数组，
- * 调用方只显示几何区。
+ * 多选批量样式字段交集（ADR-0053 R2）：所有选中组件外观区开放的 style 键的交集
+ * （ADR-0102 D1：与单选同一份字段表）。只收批量控件能承载的字段：颜色、开关、枚举、
+ * 数字与文本；字段声明 `batchable: false` 的不收。交集为空（如文本与矩形混合多选）
+ * 返回空数组，调用方只显示几何区。
  */
 export function commonStyleFields(
   document: ScreenDocument,
@@ -23,9 +28,9 @@ export function commonStyleFields(
     const manifest = catalog.get(component.type)?.manifest;
     if (manifest === undefined) return [];
     const fields = new Set(
-      (manifest.stylePanel ?? [])
-        .filter((field) => manifest.styleSchema?.properties?.[field.style] !== undefined)
-        .map((field) => field.style),
+      designerMaterialEditorKeys(manifest, 'style')
+        .filter((entry) => isBatchableEditorKey(entry))
+        .map((entry) => entry.key),
     );
     intersection = intersection === undefined ? fields : intersectKeys(intersection, fields);
     if (intersection.size === 0) return [];
@@ -52,7 +57,9 @@ export function createMultiSelectionStyleTransaction(
     const manifest = catalog.get(component.type)?.manifest;
     if (
       manifest === undefined ||
-      !(manifest.stylePanel ?? []).some((field) => field.style === style) ||
+      !designerMaterialEditorKeys(manifest, 'style').some(
+        (entry) => entry.key === style && isBatchableEditorKey(entry),
+      ) ||
       manifest.styleSchema?.properties?.[style] === undefined
     ) {
       return undefined;
@@ -65,6 +72,21 @@ export function createMultiSelectionStyleTransaction(
   }
   if (commands.length === 0) return undefined;
   return { ok: true, value: { commands }, diagnostics: [] };
+}
+
+const BATCHABLE_CONTROLS: ReadonlySet<string> = new Set([
+  'color',
+  'boolean',
+  'select',
+  'segmented',
+  'number',
+  'unit-number',
+  'stepper',
+  'text',
+]);
+
+function isBatchableEditorKey(entry: DesignerMaterialEditorKey): boolean {
+  return entry.field.batchable !== false && BATCHABLE_CONTROLS.has(entry.field.control);
 }
 
 /** 多选批量几何字段：宽/高/旋转（ADR-0053 R1，不提供 X/Y）。 */

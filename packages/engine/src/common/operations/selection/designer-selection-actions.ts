@@ -10,7 +10,7 @@ import {
   createZOrderTransaction,
 } from '../element/designer-layout-operations.js';
 import { removeComponentCommands } from './designer-remove-operations.js';
-import { selectedComponents, selectionSubtree } from './designer-selection.js';
+import { selectedComponents, selectedRootIds, selectionSubtree } from './designer-selection.js';
 
 // 元素面向"选择动作"暴露的门面契约，本控制器只依赖此契约，不直接耦合元素或会话。
 export interface DesignerSelectionActionsHost {
@@ -45,17 +45,41 @@ export class DesignerSelectionActions {
     return document.components.length > 0;
   }
 
+  /**
+   * 删除不要求选区同属一个父级：父子混选（例如从图层面板多选）时只删最上层，子孙随父级级联删除。
+   * 选区里有锁定组件时整体不删（与移动、对齐一致），避免作者误删。
+   */
+  canDelete(): boolean {
+    return this.#deletableIds() !== undefined;
+  }
+
   delete(): void {
-    if (!this.canMutate()) return;
     const document = this.callbacks.getDocument();
-    if (document === undefined) return;
-    const commands = removeComponentCommands(document, this.callbacks.getSelectedComponentIds());
+    const componentIds = this.#deletableIds();
+    if (document === undefined || componentIds === undefined) return;
+    const commands = removeComponentCommands(document, componentIds);
     const result =
       commands.length === 1
         ? this.callbacks.executeCommand(commands[0]!)
         : this.callbacks.executeTransaction({ commands });
     if (result.ok) this.callbacks.reduceSelection({ type: 'clear-selection' });
     else this.callbacks.report(result);
+  }
+
+  #deletableIds(): readonly string[] | undefined {
+    const document = this.callbacks.getDocument();
+    if (document === undefined) return undefined;
+    const selected = selectedComponents(document, this.callbacks.getSelectedComponentIds());
+    if (
+      selected.length === 0 ||
+      selected.some((component) => isScreenComponentEffectivelyLocked(document, component.id))
+    ) {
+      return undefined;
+    }
+    return selectedRootIds(
+      document,
+      selected.map((component) => component.id),
+    );
   }
 
   nudge(x: number, y: number): void {

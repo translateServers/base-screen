@@ -477,8 +477,11 @@ export const DESIGNER_UI_TEXT = {
   materialResetFilters: '显示全部素材',
   materialDraft: '草稿',
   materialUnavailable: '不可用',
+  // 组合分片卡片角标（ADR-0100）：插入即展开为普通组件，角标只区分「这是一组」。
+  materialFragment: '组合',
   clearMaterialSearch: '清除搜索',
   addMaterial: (name: string) => `添加 ${name}`,
+  addMaterialFragment: (name: string) => `添加组合 ${name}`,
   materialLibrary: {
     label: '素材目录状态',
     statuses: {
@@ -519,6 +522,7 @@ export const DESIGNER_UI_TEXT = {
     placeholder: '输入关键词；+ 素材，/ 图层，> 命令',
     empty: '没有匹配结果。',
     hint: '输入关键词，或使用前缀缩小范围。',
+    fragmentDetail: (id: string) => `组合 · ${id}`,
     kinds: {
       material: '素材',
       layer: '图层',
@@ -910,7 +914,6 @@ export const DESIGNER_UI_TEXT = {
     batchAllLocked: '全部选中组件已锁定。',
     batchObjectPosition: '对象位置',
     batchObjectSize: '对象尺寸',
-    multipleValues: '多个值',
     unifiedStyle: '统一样式配置',
     noUnifiedStyle: '无统一样式配置',
     geometry: '几何',

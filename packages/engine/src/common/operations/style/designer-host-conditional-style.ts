@@ -3,6 +3,7 @@ import type {
   BaseScreenHostConditionalStyleBinding,
   BaseScreenMaterialManifest,
 } from '@base-screen/plugin-core';
+import { designerMaterialEditorKeys } from './designer-material-appearance.js';
 
 /**
  * 宿主条件样式作者面的纯逻辑：字段推导与绑定增删。
@@ -18,17 +19,15 @@ export interface DesignerHostStyleField {
   readonly values?: readonly string[];
 }
 
-/** 可被宿主覆盖的样式字段 = stylePanel 中 schema 为 string 或 enum（字符串值）的字段。 */
+/** 可被宿主覆盖的样式字段 = 外观区 style 字段中 schema 为 string 或 enum（字符串值）的字段。 */
 export function designerHostStyleFields(
   manifest: BaseScreenMaterialManifest,
 ): readonly DesignerHostStyleField[] {
   const fields = new Map<string, DesignerHostStyleField>();
-  for (const field of manifest.stylePanel ?? []) {
-    const schema = manifest.styleSchema.properties[field.style];
-    if (schema === undefined) continue;
+  for (const { key, field, schema } of designerMaterialEditorKeys(manifest, 'style')) {
     if (schema.kind === 'string') {
-      fields.set(field.style, {
-        key: field.style,
+      fields.set(key, {
+        key,
         label: field.label,
         control: field.control === 'color' ? 'color' : 'text',
       });
@@ -37,8 +36,8 @@ export function designerHostStyleFields(
     if (schema.kind === 'enum') {
       const values = schema.values.filter((value): value is string => typeof value === 'string');
       if (values.length === 0) continue;
-      fields.set(field.style, {
-        key: field.style,
+      fields.set(key, {
+        key,
         label: field.label,
         control: 'select',
         values,

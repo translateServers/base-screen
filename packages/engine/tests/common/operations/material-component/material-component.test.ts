@@ -41,6 +41,29 @@ function document(components: readonly Partial<ScreenDocument['components'][numb
 }
 
 describe('material component factory', () => {
+  it('fills theme-following style keys from the document palette (ADR-0101)', () => {
+    const themed = manifest({
+      defaultStyle: { color: '#fff', borderColor: '#111' },
+      themeStyle: { color: 'accent' },
+    });
+    const palette = {
+      primary: '#ff6600',
+      text: '#ffffff',
+      textSecondary: '#cccccc',
+      background: '#000000',
+      accent: '#00ccff',
+      accentSecondary: '#0066aa',
+    };
+    const withTheme = { ...document(), theme: { palette } } as ScreenDocument;
+    expect(createMaterialComponent(withTheme, themed, { position: { x: 0, y: 0 } }).style).toEqual({
+      color: '#00ccff',
+      borderColor: '#111',
+    });
+    expect(createMaterialComponent(document(), themed, { position: { x: 0, y: 0 } }).style).toEqual(
+      { color: '#fff', borderColor: '#111' },
+    );
+  });
+
   it('derives ids from the material type without colliding with existing ids', () => {
     expect(nextMaterialComponentId(document(), 'acme.card')).toBe('acme-card-1');
     expect(

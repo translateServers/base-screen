@@ -2,6 +2,7 @@ import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts
 import { describe, expect, it } from 'vitest';
 import {
   hasSelectedAncestor,
+  selectAllTargetIds,
   selectedComponents,
   selectedRootIds,
   selectionSubtree,
@@ -82,5 +83,25 @@ describe('designer selection helpers', () => {
     expect(selectedRootIds(doc, ['group', 'child', 'grandchild'])).toEqual(['group']);
     expect(selectedRootIds(doc, ['child', 'sibling'])).toEqual(['child', 'sibling']);
     expect(selectedRootIds(doc, ['group', 'sibling'])).toEqual(['group', 'sibling']);
+  });
+});
+
+describe('select all targets', () => {
+  const locked = { ...component('locked-bg'), status: { locked: true, hidden: false } };
+  const doc = document([
+    component('card'),
+    component('title', 'card'),
+    component('grid', 'card'),
+    component('note'),
+    locked,
+  ]);
+
+  // Ctrl+A 只选当前层级的直接成员：父子混选会让删除 / 移动 / 对齐整体失效。
+  it('selects the root members only, without children and locked components', () => {
+    expect(selectAllTargetIds(doc, null)).toEqual(['card', 'note']);
+  });
+
+  it('selects the members of the group being edited', () => {
+    expect(selectAllTargetIds(doc, 'card')).toEqual(['title', 'grid']);
   });
 });

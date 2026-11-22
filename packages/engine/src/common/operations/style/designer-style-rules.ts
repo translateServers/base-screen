@@ -14,6 +14,7 @@ import {
   type BaseScreenMaterialCatalog,
   validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
+import { designerMaterialEditorKeys } from './designer-material-appearance.js';
 
 export const DESIGNER_STYLE_RULE_OPERATORS = [
   'eq',
@@ -36,13 +37,10 @@ export function designerStyleRuleColorKeys(
   const manifest = catalog?.get(materialType)?.manifest;
   if (manifest === undefined) return [];
   const keys = new Set<string>();
-  for (const field of manifest.stylePanel ?? []) {
-    if (field.control !== 'color') continue;
-    if (manifest.styleSchema.properties[field.style]?.kind === 'string') {
-      keys.add(field.style);
-    }
+  for (const entry of designerMaterialEditorKeys(manifest, 'style')) {
+    if (entry.field.control === 'color' && entry.schema.kind === 'string') keys.add(entry.key);
   }
-  // 条件着色最常见的目标是文字色：默认键优先 `color`，其余按 stylePanel 声明顺序。
+  // 条件着色最常见的目标是文字色：默认键优先 `color`，其余按外观区声明顺序。
   return [...keys].sort((left, right) => (left === 'color' ? -1 : right === 'color' ? 1 : 0));
 }
 
