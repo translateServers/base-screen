@@ -6,6 +6,9 @@ import type {
 } from 'base-screen/contracts';
 import type {
   AgentGenerateShape,
+  ComponentDraftShape,
+  ComponentFragmentShape,
+  ComponentScreenReferenceShape,
   DatasetCatalog,
   DatasetDefinition,
   HostAssetShape,
@@ -480,6 +483,39 @@ export const api = {
     }),
   deleteMaterialPackage: (id: string): Promise<ApiResult<{ deleted: true; id: string }>> =>
     request(`/material-packages/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  // ---- 组件库（ADR-0106）：原子组件草稿、组合与引用 ----
+  listComponentDrafts: (signal?: AbortSignal): Promise<ApiResult<{ drafts: ComponentDraftShape[] }>> =>
+    request('/component-drafts', signal === undefined ? {} : { signal }),
+  saveComponentDraft: (
+    type: string,
+    body: { readonly name: string; readonly source: string; readonly revision: number },
+  ): Promise<ApiResult<{ draft: ComponentDraftShape }>> =>
+    request(`/component-drafts/${encodeURIComponent(type)}`, { method: 'PUT', body }),
+  deleteComponentDraft: (type: string): Promise<ApiResult<{ deleted: true; type: string }>> =>
+    request(`/component-drafts/${encodeURIComponent(type)}`, { method: 'DELETE' }),
+  listComponentFragments: (
+    signal?: AbortSignal,
+  ): Promise<ApiResult<{ fragments: ComponentFragmentShape[] }>> =>
+    request('/component-fragments', signal === undefined ? {} : { signal }),
+  createComponentFragment: (
+    definition: Record<string, unknown>,
+  ): Promise<ApiResult<{ fragment: ComponentFragmentShape }>> =>
+    request('/component-fragments', { method: 'POST', body: { definition } }),
+  updateComponentFragment: (
+    id: string,
+    definition: Record<string, unknown>,
+    revision: number,
+  ): Promise<ApiResult<{ fragment: ComponentFragmentShape }>> =>
+    request(`/component-fragments/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: { definition, revision },
+    }),
+  deleteComponentFragment: (id: string): Promise<ApiResult<{ deleted: true; id: string }>> =>
+    request(`/component-fragments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  listComponentReferences: (
+    signal?: AbortSignal,
+  ): Promise<ApiResult<{ references: Record<string, ComponentScreenReferenceShape[]> }>> =>
+    request('/component-library/references', signal === undefined ? {} : { signal }),
   /** 数据集目录：分组与条目一次返回（宿主不复用这份分组做第二次请求）。 */
   listDatasets: (
     query: DatasetListQuery,

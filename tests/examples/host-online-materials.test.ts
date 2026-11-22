@@ -88,6 +88,8 @@ const REFRESH_FAILURE = {
 
 const HOSTS = ['vanilla-host', 'react-host', 'vue-host'] as const;
 const SHARED_FILES = [
+  'src/screen/component-workshop.ts',
+  'src/screen/fragment-shelf.ts',
   'src/screen/online-materials.ts',
   'src/styles/online-materials.css',
   'src/types.ts',

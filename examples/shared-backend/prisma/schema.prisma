@@ -73,6 +73,37 @@ model MaterialPackage {
   @@index([updatedAt])
 }
 
+/// 组件库草稿（ADR-0106 D3）：原子组件的编辑中版本，与已发布的 `MaterialPackage` 分开存。
+/// `source` 是规格模块源码（`export const spec` + `export function render`），只存储、不执行；
+/// 发布成功后由前端删除草稿，因此「有草稿」即「有未发布的改动」。
+model ComponentDraft {
+  id        String   @id @default(uuid())
+  /// 稳定物料 type，与 MaterialPackage.type 对应（首次发布前也已确定）
+  type      String   @unique
+  name      String
+  source    String
+  revision  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+/// 组件库组合（ADR-0106 §2.6）：分片定义（ADR-0100）的 JSON，插入即展开，文档不记录来源。
+model ComponentFragment {
+  /// 分片 id：跨构建稳定，即物料库条目身份
+  id         String   @id
+  name       String
+  category   String
+  /// JSON：完整 BaseScreenFragmentDefinition，由前端经 plugin-core 解析器校验
+  definition String
+  revision   Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
 /// 数据源台账（PRD §8.1）。内置 4 个数据集**不入表**：它们由
 /// `src/datasets/dataset-definitions.ts` 的代码常量提供，落表会产生两份会漂移的真理。
 model DataSource {

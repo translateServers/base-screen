@@ -5,6 +5,7 @@ import './styles/components.css';
 import 'base-screen/host-tokens.css';
 import './styles/asset-library.css';
 import './styles/online-materials.css';
+import './styles/component-library.css';
 import { startRouter } from './router';
 import { registerHostMaterials } from './screen/register';
 

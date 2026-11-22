@@ -9,6 +9,7 @@ import {
 import { createMaterialDefinition } from 'base-screen/plugins';
 import { api } from '../lib/api';
 import type { OnlineMaterialPackageShape } from '../types';
+import { isSpecMaterialModule, loadSpecMaterialEntry } from './component-workshop';
 
 /**
  * 在线物料（ADR-0090）——三端逐字共享的宿主侧实现。
@@ -180,10 +181,15 @@ export async function validateOnlineMaterialDraft(
   return importOnlineMaterialModule(draft.code, manifest.value, false);
 }
 
-/** 运行时加载：导入、校验、注册 tagName，返回可直接并入 catalog 的条目。 */
+/**
+ * 运行时加载：导入、校验、注册 tagName，返回可直接并入 catalog 的条目。
+ * 组件工坊生成的规格模块（ADR-0105）走 `loadSpecMaterialEntry`；旧模板生成的包仍按
+ * 「default export 构造器」加载，两种包可以同时存在。
+ */
 export async function loadOnlineMaterialEntry(
   pkg: OnlineMaterialPackageShape,
 ): Promise<ScreenParseResult<BaseScreenMaterialCatalogEntry>> {
+  if (isSpecMaterialModule(pkg.code)) return loadSpecMaterialEntry(pkg.code, pkg.manifest);
   const manifest = parseBaseScreenMaterialManifest(pkg.manifest);
   if (!manifest.ok) return manifest;
   const cached = definedOnlineConstructors.get(manifest.value.tagName);

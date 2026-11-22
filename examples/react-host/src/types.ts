@@ -134,6 +134,33 @@ export interface OnlineMaterialPackageShape {
   readonly updatedAt: string;
 }
 
+/** 组件库（ADR-0106）：原子组件草稿。`source` 是规格模块源码，发布后草稿被删除。 */
+export interface ComponentDraftShape {
+  readonly id: string;
+  readonly type: string;
+  readonly name: string;
+  readonly source: string;
+  readonly revision: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/** 组件库（ADR-0106）：组合。`definition` 是完整分片定义（ADR-0100），前端解析后使用。 */
+export interface ComponentFragmentShape {
+  readonly id: string;
+  readonly name: string;
+  readonly category: string;
+  readonly definition: Record<string, unknown>;
+  readonly revision: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface ComponentScreenReferenceShape {
+  readonly id: string;
+  readonly name: string;
+}
+
 /** `?smoke=1` 的调试面：只暴露状态与手动刷新入口，不含端口/文档/URL。 */
 declare global {
   interface Window {

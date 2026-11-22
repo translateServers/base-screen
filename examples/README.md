@@ -126,6 +126,7 @@ styles/asset-library.css  styles/online-materials.css
 | `PATCH /api/material-packages/:id/visibility` | `{ visible }` | `{ package }`（只改 `libraryVisible`） | `404` |
 | `DELETE /api/material-packages/:id` | — | `{ deleted: true, id }` | `404` / `409 MATERIAL_IN_USE` + `refScreens` |
 | `GET /api/metrics/series?metric=&points=` | — | `{ metric, unit, points: [{ t, value }] }` | `400 UNKNOWN_METRIC` / `400 INVALID_POINTS` |
+| `GET /api/metrics/stream?metric=&points=` | — | SSE（ADR-0104 推送演示）：订阅先发 `event: snapshot`（`{ metric, unit, points }`，最近 `points` 个采样点），之后每 2 秒 `event: point`（`{ metric, point: { t, value } }`），每 15 秒 `event: heartbeat`；数据事件带 `id: <epoch>:<revision>`，序号来自服务端统一时钟、重连不回退，进程重启换 epoch；落后超过一个窗口时改发新 `snapshot` | `400 UNKNOWN_METRIC` / `400 INVALID_POINTS`（建立流之前返回） |
 | `GET /api/metrics/ranking?dimension=&limit=` | — | `{ dimension, unit, items: [{ name, value }] }` | `400 UNKNOWN_DIMENSION` / `400 INVALID_LIMIT` |
 | `GET /api/demo/alarms` | — | `{ revision, alarms: [{ id, key, level, message, raisedAt, acknowledged, suppressed }] }` | — |
 | `GET /api/demo/alarms/stream` | — | SSE：订阅先发 snapshot，随后 raise / clear / ack / suppress / heartbeat | — |
@@ -533,7 +534,22 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 经 `element.materialLibraryFragments` 注入）：容器底座 + 标题文本 + 指标读数。它在物料库「业务指标」分类里带
 「组合」角标，点击或拖入画布即展开为三个普通组件（父子成组、一次撤销），文档里不留分片引用（ADR-0100）。
 编辑页同时开启了 `fragmentSaveAction`：选中组件后右键「存为组合」，设计器派发 `base-screen-fragment-save-request`，
-`src/screen/fragment-shelf.ts` 把它补上 id / 名称 / 分类后放进物料库「我的组合」。示例只存在内存里，真实宿主应写入自己的后端。
+由组件工坊接管命名、归类、体检与保存。
+
+### 组件工坊（ADR-0105）
+
+编辑页右下角的「组件工坊」（`src/screen/component-workshop.ts`，三端逐字共享；接线在 `src/screen/fragment-shelf.ts`）
+在线制作两类组件，都先体检再发布，无需刷新页面：
+
+- **原子组件**：写规格（可调项按分区声明、数据形状选无 / 单值 / 多行）与渲染函数体，右侧实时预览四态、预览检查器表单、
+  显示体检结论（ADR-0099 原子判定与门禁、ADR-0102 表单范式、渲染代码静态检查）。发布即存为在线物料包
+  （后端 `MaterialPackage`，代码是导出 `spec` + `render` 的 ES 模块），经 `host-runtime` 热刷新进物料库；
+  可上架 / 下架、复制为新组件、删除（被大屏引用时后端拒绝）。旧模板生成的在线物料包仍按原方式加载。
+- **组合组件**：在画布上摆好（容器做外壳、标题用文本），选中后「从选区新建组合」或右键「存为组合」，
+  起名归类、看体检（ADR-0100 F 规则）后保存；可用当前选区更新、插入、删除。示例把组合存在 localStorage，
+  真实宿主应写入自己的后端。预置「指标卡」只读。
+
+工坊是宿主研发 / 管理员工具：在线代码与宿主页面同源执行（ADR-0090 §8 信任边界不变），终端租户自助仍需独立的威胁模型。
 
 三端的数据通道都支持四种宿主资源类型，投影形状与绑定角色一一对应：
 

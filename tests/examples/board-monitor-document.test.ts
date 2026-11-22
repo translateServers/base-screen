@@ -274,9 +274,17 @@ describe('production monitor document', () => {
 
   it('lets the device grid and its legend share one document-level instance (ADR-0100 F4)', () => {
     if (!parsed.ok) throw new Error('document did not parse');
-    expect(parsed.value.dataSources?.map((item) => item.id)).toEqual(['devices']);
+    expect(parsed.value.dataSources?.map((item) => item.id)).toEqual([
+      'devices',
+      'live-oee',
+      'live-output-trend',
+    ]);
     const readers = parsed.value.components
-      .filter((component) => component.dataValue?.kind === 'data-source-field')
+      .filter(
+        (component) =>
+          component.dataValue?.kind === 'data-source-field' &&
+          component.dataValue.dataSourceId === 'devices',
+      )
       .map((component) => component.id);
     expect(readers).toEqual(['grid-devices', 'grid-legend']);
     for (const id of readers) {
@@ -319,8 +327,45 @@ describe('production monitor document', () => {
         );
       }
     }
-    // 5 张 KPI + 趋势 1 + 排行 1 + 主轴负载水位 1 + 能耗胶囊 1 = 9。
-    expect(hostResourceCount).toBe(9);
+    // 4 张 KPI + 排行 1 + 主轴负载水位 1 + 能耗胶囊 1 = 7（OEE 读数与产量趋势改读推送实例）。
+    expect(hostResourceCount).toBe(7);
+  });
+
+  it('reads OEE and the output trend from push instances (ADR-0104)', () => {
+    if (!parsed.ok) throw new Error('document did not parse');
+    const instances = new Map((parsed.value.dataSources ?? []).map((item) => [item.id, item]));
+    const expectations = [
+      { componentId: 'kpi-oee-value', instanceId: 'live-oee', resourceType: 'demo_metric' },
+      {
+        componentId: 'trend-output',
+        instanceId: 'live-output-trend',
+        resourceType: 'demo_series',
+      },
+    ] as const;
+    for (const { componentId, instanceId, resourceType } of expectations) {
+      const component = parsed.value.components.find((item) => item.id === componentId);
+      expect(component?.dataSource).toBeNull();
+      expect(component?.dataValue).toMatchObject({ dataSourceId: instanceId, path: [] });
+      const instance = instances.get(instanceId);
+      expect(instance?.updatePolicy).toMatchObject({ mode: 'push', fallbackIntervalSeconds: 30 });
+      if (instance?.source.kind !== 'host-resource') {
+        throw new Error(`${instanceId} 必须是 host-resource 推送实例`);
+      }
+      expect(instance.source.resourceType).toBe(resourceType);
+      // 字段映射与旧形态同一口径：必须落在示例通道返回的字段上。
+      const fields = FIELDS[resourceType];
+      const manifest = MANIFESTS.find((item) => item.type === component?.type);
+      if (fields === undefined || manifest?.dataBinding === undefined || component === undefined) {
+        throw new Error(`${componentId} 缺少字段或物料绑定声明`);
+      }
+      const binding = validateScreenHostResourceBinding(
+        component.dataBinding ?? null,
+        fields,
+        manifest.dataBinding.roles,
+      );
+      expect(binding.ok, `${componentId} binding invalid`).toBe(true);
+    }
+    expect(instances.get('live-output-trend')?.updatePolicy?.retain).toEqual({ rows: 24 });
   });
 
   it('keeps every static table binding aligned with its own fields', () => {

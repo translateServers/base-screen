@@ -15,7 +15,7 @@ import { resolveApiBase } from '../lib/api-base';
 import { createLogger } from '../lib/logger';
 import { createHostAssetLibrary, HOST_ASSET_LIBRARY_GROUP_ID } from '../screen/asset-library';
 import { loadReactDesignerRuntime } from '../screen/composition-runtime';
-import { attachHostFragmentShelf } from '../screen/fragment-shelf';
+import { attachHostComponentWorkshop } from '../screen/fragment-shelf';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
   createHostAlarmStyleAuthoring,
@@ -192,8 +192,8 @@ export function ScreenEditorPage(): ReactElement {
     const assetLibrary = createHostAssetLibrary({ designer: element, screenId });
     handle.onDispose(() => assetLibrary.dispose());
     element.append(assetLibrary.element);
-    // 宿主分片（ADR-0100）：预置「指标卡」+ 作者经「存为组合」保存的组合。
-    attachHostFragmentShelf(element, (type, listener) => handle.on(type, listener));
+    // 组件工坊（ADR-0105）：在线制作原子组件与组合组件；预置「指标卡」，接管「存为组合」。
+    attachHostComponentWorkshop(element, (cleanup) => handle.onDispose(cleanup));
 
     return () => {
       if (designerRef.current === element) designerRef.current = null;

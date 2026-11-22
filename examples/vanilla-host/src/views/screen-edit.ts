@@ -12,7 +12,7 @@ import { createLogger } from '../lib/logger';
 import { goToList } from '../lib/navigation';
 import type { Route, ViewModule } from '../router';
 import { createHostAssetLibrary, HOST_ASSET_LIBRARY_GROUP_ID } from '../screen/asset-library';
-import { attachHostFragmentShelf } from '../screen/fragment-shelf';
+import { attachHostComponentEntry, HOST_COMPONENT_LIBRARY_GROUP_ID } from '../screen/component-entry';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
   createHostAlarmStyleAuthoring,
@@ -114,7 +114,10 @@ export const screenEditView: ViewModule = {
           backButton: true,
           hostResourceSelectionButton: true,
           fragmentSaveAction: true,
-          leftPanelGroups: [{ id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' }],
+          leftPanelGroups: [
+            { id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' },
+            { id: HOST_COMPONENT_LIBRARY_GROUP_ID, label: '组件库', icon: 'cube' },
+          ],
         },
         onProjectState: (state) => {
           if (disposed) return;
@@ -160,8 +163,10 @@ export const screenEditView: ViewModule = {
           const assetLibrary = createHostAssetLibrary({ designer: element, screenId });
           handle.onDispose(() => assetLibrary.dispose());
           element.append(assetLibrary.element);
-          // 宿主分片（ADR-0100）：预置「指标卡」+ 作者经「存为组合」保存的组合。
-          attachHostFragmentShelf(element, (type, listener) => handle.on(type, listener));
+          // 组件库入口（ADR-0106）：物料库组合来自后端；「存为组合」命名后存进组件库；左栏「管理组件」。
+          const componentEntry = attachHostComponentEntry({ designer: element, screenId });
+          handle.onDispose(() => componentEntry.dispose());
+          element.append(componentEntry.element);
         },
       });
       await controller.attach(stage);

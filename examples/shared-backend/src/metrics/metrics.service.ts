@@ -82,6 +82,12 @@ const RANKING_DATASETS: Readonly<
 /** 固定基准时间：保证同参数的序列完全确定，冒烟与前端可以对值做断言。 */
 const SERIES_BASE_EPOCH_MS = Date.UTC(2026, 0, 1, 0, 0, 0);
 
+/**
+ * 推送演示（ADR-0104）的采样节拍：服务端统一时钟每 2 秒产生一个新采样点。
+ * 采样点的 `t` 仍按「模拟分钟」递增，图表横轴的 HH:mm 标签不会挤在一起。
+ */
+export const STREAM_TICK_MS = 2_000;
+
 export interface MetricPoint {
   readonly t: string;
   readonly value: number;
@@ -104,28 +110,25 @@ export interface MetricRanking {
   readonly items: readonly RankingItem[];
 }
 
+/** 推送流的当前窗口：最近 `points` 个采样点，`revision` 是窗口最后一个点的序号。 */
+export interface MetricStreamWindow {
+  readonly series: MetricSeries;
+  readonly revision: number;
+}
+
 @Injectable()
 export class MetricsService {
+  /**
+   * 推送流的 epoch：进程级，重启即变。前端据此识别「这已经不是原来那条流」，
+   * 重启后的序号从头计也不会被当成重复数据丢弃。
+   */
+  readonly streamEpoch = `boot-${Date.now().toString(36)}`;
+  readonly #streamStartedAt = Date.now();
+
   /** 确定性 mock 数据：mulberry32 + 固定 seed（指标名哈希）+ 固定基准时间。 */
   series(metric: string, points?: number): MetricSeries {
-    const definition = METRIC_DEFINITIONS[metric as MetricId];
-    if (definition === undefined) {
-      throw new BadRequestException({
-        error: 'UNKNOWN_METRIC',
-        message: `Unknown metric: ${metric}`,
-      });
-    }
-    const resolvedPoints = points ?? DEFAULT_SERIES_POINTS;
-    if (
-      !Number.isInteger(resolvedPoints) ||
-      resolvedPoints < 1 ||
-      resolvedPoints > MAX_SERIES_POINTS
-    ) {
-      throw new BadRequestException({
-        error: 'INVALID_POINTS',
-        message: `points must be within 1..${MAX_SERIES_POINTS}`,
-      });
-    }
+    const definition = metricDefinition(metric);
+    const resolvedPoints = resolveSeriesPoints(points);
     const random = mulberry32(hashSeed(metric));
     const values: MetricPoint[] = [];
     for (let index = 0; index < resolvedPoints; index += 1) {
@@ -138,6 +141,28 @@ export class MetricsService {
       });
     }
     return { metric, unit: definition.unit, points: values };
+  }
+
+  /** 服务端统一时钟的当前序号：所有连接共享，重连后单调不回退。 */
+  streamIndex(now: number = Date.now()): number {
+    return Math.max(0, Math.floor((now - this.#streamStartedAt) / STREAM_TICK_MS));
+  }
+
+  /** 推送流的首包：以当前序号结尾的 `points` 个采样点。参数非法时与 `series` 同样失败关闭。 */
+  streamWindow(metric: string, points?: number, now: number = Date.now()): MetricStreamWindow {
+    const definition = metricDefinition(metric);
+    const resolvedPoints = resolveSeriesPoints(points);
+    const head = this.streamIndex(now) + resolvedPoints - 1;
+    const values: MetricPoint[] = [];
+    for (let index = head - resolvedPoints + 1; index <= head; index += 1) {
+      values.push(streamPointOf(metric, definition, index));
+    }
+    return { series: { metric, unit: definition.unit, points: values }, revision: head };
+  }
+
+  /** 推送流第 `index` 个采样点：只由指标与序号决定，同序号同值。 */
+  streamPoint(metric: string, index: number): MetricPoint {
+    return streamPointOf(metric, metricDefinition(metric), index);
   }
 
   /** resourcePort 使用的标量投影：text 类物料只消费最新一个点。 */
@@ -172,6 +197,43 @@ export class MetricsService {
       items: dataset.items.slice(0, resolvedLimit),
     };
   }
+}
+
+function metricDefinition(metric: string): MetricDefinition {
+  const definition = METRIC_DEFINITIONS[metric as MetricId];
+  if (definition === undefined) {
+    throw new BadRequestException({
+      error: 'UNKNOWN_METRIC',
+      message: `Unknown metric: ${metric}`,
+    });
+  }
+  return definition;
+}
+
+function resolveSeriesPoints(points: number | undefined): number {
+  const resolvedPoints = points ?? DEFAULT_SERIES_POINTS;
+  if (
+    !Number.isInteger(resolvedPoints) ||
+    resolvedPoints < 1 ||
+    resolvedPoints > MAX_SERIES_POINTS
+  ) {
+    throw new BadRequestException({
+      error: 'INVALID_POINTS',
+      message: `points must be within 1..${MAX_SERIES_POINTS}`,
+    });
+  }
+  return resolvedPoints;
+}
+
+/** 周期固定为默认点数，与窗口大小无关：同一序号在任何窗口里都是同一个值。 */
+function streamPointOf(metric: string, definition: MetricDefinition, index: number): MetricPoint {
+  const drift = Math.sin((index / DEFAULT_SERIES_POINTS) * Math.PI * 2);
+  const noise = mulberry32(hashSeed(`${metric}#${index}`))() - 0.5;
+  const raw = definition.base + definition.amplitude * (0.6 * drift + 0.4 * noise);
+  return {
+    t: new Date(SERIES_BASE_EPOCH_MS + index * 60_000).toISOString(),
+    value: Math.max(0, Math.round(raw * 100) / 100),
+  };
 }
 
 function lineRankingValue(lineId: LineId): number {

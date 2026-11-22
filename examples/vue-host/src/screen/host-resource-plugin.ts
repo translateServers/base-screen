@@ -28,6 +28,13 @@ const POINTS_CONFIG_SCHEMA: BaseScreenMaterialObjectSchema = {
   required: [],
 };
 
+/**
+ * 推送能力（ADR-0104）：两类演示指标可经 `/api/metrics/stream` 订阅。后端每 2 秒一个新点、
+ * 每 15 秒一个心跳，静默 20 秒即判定过期。时序会发 `append`，标量每个新点都是新快照。
+ */
+const METRIC_PUSH_DELIVERY = { push: { inactivityTimeoutSeconds: 20 } } as const;
+const SERIES_PUSH_DELIVERY = { push: { append: true, inactivityTimeoutSeconds: 20 } } as const;
+
 const RANKING_CONFIG_SCHEMA: BaseScreenMaterialObjectSchema = {
   kind: 'object',
   properties: {
@@ -36,7 +43,7 @@ const RANKING_CONFIG_SCHEMA: BaseScreenMaterialObjectSchema = {
   required: [],
 };
 
-/** 零 DOM、零 handler：只声明宿主愿意暴露给文档的三个资源类型。 */
+/** 零 DOM、零 handler：只声明宿主愿意暴露给文档的资源类型（含推送能力）。 */
 export function createHostResourceRuntime(): BaseScreenPluginRuntime {
   const defined = definePlugin({
     manifest: {
@@ -49,12 +56,14 @@ export function createHostResourceRuntime(): BaseScreenPluginRuntime {
           id: DEMO_METRIC_RESOURCE,
           name: '演示指标（标量）',
           configSchema: POINTS_CONFIG_SCHEMA,
+          delivery: METRIC_PUSH_DELIVERY,
         },
         {
           kind: 'dataResourceType',
           id: DEMO_SERIES_RESOURCE,
           name: '演示指标（时序）',
           configSchema: POINTS_CONFIG_SCHEMA,
+          delivery: SERIES_PUSH_DELIVERY,
         },
         {
           kind: 'dataResourceType',

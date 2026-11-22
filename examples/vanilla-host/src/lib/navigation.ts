@@ -13,6 +13,23 @@ export function goToAssets(): void {
   window.location.hash = '#/assets';
 }
 
+/** 组件库（ADR-0106）：列表与两个全页编辑器。 */
+export function goToComponents(): void {
+  window.location.hash = '#/components';
+}
+
+export function goToAtomicComponent(type: string | undefined, template?: string): void {
+  window.location.hash =
+    type === undefined
+      ? `#/components/atomic/new${template === undefined ? '' : `?template=${encodeURIComponent(template)}`}`
+      : `#/components/atomic/${encodeURIComponent(type)}`;
+}
+
+export function goToFragmentComponent(id: string | undefined): void {
+  window.location.hash =
+    id === undefined ? '#/components/fragment/new' : `#/components/fragment/${encodeURIComponent(id)}`;
+}
+
 export function goToEdit(id: string): void {
   window.location.hash = `#/screens/${encodeURIComponent(id)}/edit`;
 }

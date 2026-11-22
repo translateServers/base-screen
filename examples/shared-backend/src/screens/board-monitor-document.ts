@@ -11,6 +11,7 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  * | `dataset` | 设备灯阵 + 状态图例 ← 文档级共享实例 `devices`（`monitor.devices`）、告警流水 ← `monitor.alarms`、工序链 ← `monitor.pipeline` | 走 `describe/query`，参数由变量槽位求值 |
  * | `variable` | 产线/时间窗/状态/播报/时钟/更新时间 | 3 个 static 变量可交互，3 个 `production.*` 由宿主只读提供 |
  * | `host-resource` | 5 张 KPI + 产量趋势 + 产线负载排行 | 旧的 `demo_metric/series/ranking` 通道，用来证明新链路没有挤掉旧链路 |
+ * | `host-resource` + `push` | OEE 读数 ← 文档级实例 `live-oee`、产量趋势 ← `live-output-trend` | ADR-0104 推送：查看器订阅 `/api/metrics/stream`，宿主刷新控制器不再轮询它们 |
  *
  * 版式纪律（与 `board-demo-document.ts` 同）：所有组件都是**根节点**，整体搬动靠编辑期的成组。
  *
@@ -42,6 +43,13 @@ interface DemoComponent {
 
 /** 灯阵与图例共享的文档级实例 id（见 `BOARD_MONITOR_DOCUMENT.dataSources`）。 */
 const DEVICES_SOURCE_ID = 'devices';
+/** 推送实例（ADR-0104）：OEE 读数与产量趋势由查看器订阅更新，不进宿主轮询表。 */
+const LIVE_OEE_SOURCE_ID = 'live-oee';
+const LIVE_OUTPUT_TREND_SOURCE_ID = 'live-output-trend';
+
+function liveRef(dataSourceId: string) {
+  return { kind: 'data-source-field' as const, dataSourceId, path: [] };
+}
 const DEVICES_REF = {
   kind: 'data-source-field' as const,
   dataSourceId: DEVICES_SOURCE_ID,
@@ -169,16 +177,6 @@ function metricSource(resourceId: string, points = 24): unknown {
   };
 }
 
-function seriesSource(resourceId: string): unknown {
-  return {
-    type: 'host-resource',
-    resourceType: 'demo_series',
-    resourceId,
-    params: { points: { kind: 'literal', value: 24 } },
-    binding: { fields: { dimension: ['t'], measures: ['value'] } },
-  };
-}
-
 function rankingSource(dimension: string, limit: number): unknown {
   return {
     type: 'host-resource',
@@ -189,7 +187,15 @@ function rankingSource(dimension: string, limit: number): unknown {
   };
 }
 
-function flop(id: string, name: string, box: Box, resourceId: string, decimals: number): void {
+/** `liveSourceId` 给出时读文档级推送实例，否则沿用组件自带的 `host-resource` 旧形态。 */
+function flop(
+  id: string,
+  name: string,
+  box: Box,
+  resourceId: string,
+  decimals: number,
+  liveSourceId?: string,
+): void {
   const [x, y, width, height] = box;
   push({
     id,
@@ -213,7 +219,13 @@ function flop(id: string, name: string, box: Box, resourceId: string, decimals: 
       accentColor: '#0e3b5c',
       fontSize: 40,
     },
-    dataSource: metricSource(resourceId),
+    ...(liveSourceId === undefined
+      ? { dataSource: metricSource(resourceId) }
+      : {
+          dataSource: null,
+          dataValue: liveRef(liveSourceId),
+          dataBinding: { fields: { value: ['value'] } },
+        }),
   });
 }
 
@@ -222,6 +234,7 @@ function chart(
   name: string,
   box: Box,
   seriesType: 'line' | 'bar' | 'area',
+  /** 旧形态 `host-resource` 数据源，或 `{ live: 实例 id }` 读文档级推送实例。 */
   source: unknown,
   seriesColor = '#38bdf8',
 ): void {
@@ -243,8 +256,22 @@ function chart(
       seriesColor,
       opacity: 1,
     },
-    dataSource: source,
+    ...(isLiveSource(source)
+      ? {
+          dataSource: null,
+          dataValue: liveRef(source.live),
+          dataBinding: { fields: { dimension: ['t'], measures: ['value'] } },
+        }
+      : { dataSource: source }),
   });
+}
+
+function isLiveSource(source: unknown): source is { readonly live: string } {
+  return (
+    source !== null &&
+    typeof source === 'object' &&
+    typeof (source as { readonly live?: unknown }).live === 'string'
+  );
 }
 
 /** 静态表格：`base.table` 的 `staticData.kind='tabular'` 要求同时给 binding。 */
@@ -393,7 +420,14 @@ variableText('top-clock', '当前时间', [1600, 20, 296, 18], 'clock', {
 
 // ── KPI 五卡 ──────────────────────────────────────────────────────────────
 const KPI_CARDS = [
-  { id: 'kpi-oee', label: 'OEE（%）', metric: 'oee', kind: 'flop', decimals: 1 },
+  {
+    id: 'kpi-oee',
+    label: 'OEE（%）',
+    metric: 'oee',
+    kind: 'flop',
+    decimals: 1,
+    liveSourceId: LIVE_OEE_SOURCE_ID,
+  },
   {
     id: 'kpi-online',
     label: '设备在线率（%）',
@@ -450,6 +484,7 @@ KPI_CARDS.forEach((card, index) => {
       [x + 16, 140, 328, 78],
       card.metric,
       card.decimals,
+      'liveSourceId' in card ? card.liveSourceId : undefined,
     );
   }
 });
@@ -524,12 +559,14 @@ push({
   dataBinding: { fields: { status: ['status'] } },
 });
 
-text('trend-title', '趋势标题', [652, 262, 320, 20], '产量趋势（最近 24 个采样点）', {
+text('trend-title', '趋势标题', [652, 262, 320, 20], '产量趋势（实时推送，最近 24 个采样点）', {
   color: '#a8d4ea',
   fontSize: 14,
   fontWeight: '700',
 });
-chart('trend-output', '产量趋势', [644, 288, 644, 412], 'area', seriesSource('output_count'));
+chart('trend-output', '产量趋势', [644, 288, 644, 412], 'area', {
+  live: LIVE_OUTPUT_TREND_SOURCE_ID,
+});
 
 text('rank-title', '排行标题', [1312, 262, 320, 18], '产线负载排行', {
   color: '#a8d4ea',
@@ -824,6 +861,26 @@ export const BOARD_MONITOR_DOCUMENT = {
         line: { kind: 'variable' as const, variableId: 'line' },
         limit: { kind: 'inline' as const, value: 48 },
       },
+    },
+    // 推送实例（ADR-0104）：断线超过 suspended 阈值时按 30 秒回退轮询。
+    {
+      id: LIVE_OEE_SOURCE_ID,
+      name: 'live-oee',
+      source: { kind: 'host-resource' as const, resourceType: 'demo_metric', resourceId: 'oee' },
+      params: { points: { kind: 'inline' as const, value: 24 } },
+      updatePolicy: { mode: 'push' as const, fallbackIntervalSeconds: 30 },
+    },
+    {
+      id: LIVE_OUTPUT_TREND_SOURCE_ID,
+      name: 'live-output-trend',
+      source: {
+        kind: 'host-resource' as const,
+        resourceType: 'demo_series',
+        resourceId: 'output_count',
+      },
+      params: { points: { kind: 'inline' as const, value: 24 } },
+      // 横轴只显示 HH:mm，窗口按行数保留，与「最近 24 个采样点」的标题一致。
+      updatePolicy: { mode: 'push' as const, fallbackIntervalSeconds: 30, retain: { rows: 24 } },
     },
   ],
   variables: [

@@ -94,7 +94,12 @@ describe('host refresh controller · 节拍表真的驱动种子组件', () => {
     // 只由代表组件（文档顺序第一个读者 = 灯阵）刷新一次，图例不单独排期。
     expect(firstAt('grid-devices')).toBe(DEFAULT_REFRESH_INTERVALS['dataset.monitor.devices']);
     expect(firstAt('grid-legend')).toBeUndefined();
-    expect(firstAt('kpi-oee-value')).toBe(DEFAULT_REFRESH_INTERVALS['metric.oee']);
+    expect(firstAt('kpi-online-value')).toBe(
+      DEFAULT_REFRESH_INTERVALS['metric.device_online_rate'],
+    );
+    // 推送实例（ADR-0104）：OEE 读数与产量趋势由渲染器订阅更新，轮询控制器永不排期。
+    expect(firstAt('kpi-oee-value')).toBeUndefined();
+    expect(firstAt('trend-output')).toBeUndefined();
     // 15s：工序链 + 主轴负载水位（B2 补的 C16）
     expect(firstAt('stage-pipeline')).toBe(DEFAULT_REFRESH_INTERVALS['dataset.monitor.pipeline']);
     expect(firstAt('load-water')).toBe(DEFAULT_REFRESH_INTERVALS['metric.line_load']);

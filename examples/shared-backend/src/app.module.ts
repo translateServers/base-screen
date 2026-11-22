@@ -6,6 +6,7 @@ import { AlarmsModule } from './alarms/alarms.module';
 import { AssetsModule } from './assets/assets.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { ComponentsModule } from './components/components.module';
 import { DatasetsModule } from './datasets/datasets.module';
 import { DatasourcesModule } from './datasources/datasources.module';
 import { DemoModule } from './demo/demo.module';
@@ -27,6 +28,8 @@ import { SqliteModule } from './sqlite/sqlite.module';
     AssetsModule,
     // 在线物料包（ADR-0090）：宿主只存储代码与 Manifest，不执行；前端 import 后热刷新 catalog。
     MaterialPackagesModule,
+    // 组件库（ADR-0106）：原子组件草稿与组合；已发布的原子组件仍在 MaterialPackage。
+    ComponentsModule,
     // 数据源管理（台账 / 测试 / 预览 / 受管目录）。必须排在 DatasetsModule 之前：
     // 后者依赖它导出的 DatasourceRuntime（test/preview 与设计器查询共用同一份取数实现）。
     DatasourcesModule,

@@ -335,6 +335,7 @@ interface RefreshGroup {
 
 /**
  * 按数据源实例分组：14 个组件共享 live 实例时只排一次期、只调一次 refreshData。
+ * `updatePolicy.mode: 'push'` 的实例不进入到期表。
  * 代表组件与运行时 `DataSourceRuntime.#consumerOf` 一致（文档顺序第一个读者）。
  */
 function collectRefreshGroups(
@@ -359,6 +360,8 @@ function collectRefreshGroups(
     if (ref?.kind !== 'data-source-field') continue;
     const instance = dataSources.find((candidate) => candidate.id === ref.dataSourceId);
     if (instance === undefined) continue;
+    // 推送实例由渲染器订阅更新（ADR-0104），轮询会与推送叠加，这里一律跳过。
+    if (instance.updatePolicy?.mode === 'push') continue;
     const intervalKey = intervalKeyOfSource(instance.source);
     if (intervalKey === undefined) continue;
     if (!groups.has(instance.id)) {
