@@ -6,36 +6,49 @@ import type {
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { BaseScreenOfficialMaterialElement } from './base-material.js';
+import { styleField, withOfficialEditorDescriptor } from './editor-descriptor.js';
 
-export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
-  type: 'base.image',
-  tagName: 'base-screen-image',
-  name: '图片',
-  category: '基础',
-  keywords: ['图片', '图像'],
-  defaultSize: { width: 240, height: 160 },
-  defaultProps: {},
-  defaultData: '',
-  staticData: { kind: 'scalar', valueType: 'string' },
-  defaultStyle: { objectFit: 'contain', opacity: 1, flipX: false, flipY: false },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      objectFit: { kind: 'enum', values: ['contain', 'cover', 'fill'] },
-      opacity: { kind: 'number', minimum: 0, maximum: 1 },
-      flipX: { kind: 'boolean' },
-      flipY: { kind: 'boolean' },
+export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
+  withOfficialEditorDescriptor(
+    {
+      type: 'base.image',
+      tagName: 'base-screen-image',
+      name: '图片',
+      category: '基础',
+      keywords: ['图片', '图像'],
+      defaultSize: { width: 240, height: 160 },
+      defaultProps: {},
+      defaultData: '',
+      staticData: { kind: 'scalar', valueType: 'string' },
+      defaultStyle: { objectFit: 'contain', opacity: 1, flipX: false, flipY: false },
+      styleSchema: {
+        kind: 'object',
+        properties: {
+          objectFit: { kind: 'enum', values: ['contain', 'cover', 'fill'] },
+          opacity: { kind: 'number', minimum: 0, maximum: 1 },
+          flipX: { kind: 'boolean' },
+          flipY: { kind: 'boolean' },
+        },
+        required: ['objectFit', 'opacity'],
+      },
+      stylePanel: [],
+      propsSchema: { kind: 'object', properties: {}, required: [] },
+      propertyPanel: [],
+      events: [],
+      dataCapabilities: ['static', 'host-resource', 'variable'],
+      hostResourceSelection: true,
+      designCapabilities: { resize: true, rotate: true, children: false },
     },
-    required: ['objectFit', 'opacity'],
-  },
-  stylePanel: [{ style: 'objectFit', label: '适应方式', control: 'select' }],
-  propsSchema: { kind: 'object', properties: {}, required: [] },
-  propertyPanel: [],
-  events: [],
-  dataCapabilities: ['static', 'host-resource', 'variable'],
-  hostResourceSelection: true,
-  designCapabilities: { resize: true, rotate: true, children: false },
-};
+    {
+      appearance: [
+        {
+          id: 'structure',
+          label: '结构',
+          fields: [styleField('objectFit', '适应方式', 'select')],
+        },
+      ],
+    },
+  );
 
 export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialElement {
   static readonly manifest = BASE_SCREEN_IMAGE_MATERIAL_MANIFEST;

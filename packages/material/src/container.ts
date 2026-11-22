@@ -6,47 +6,60 @@ import type {
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { BaseScreenOfficialMaterialElement } from './base-material.js';
+import { styleField, withOfficialEditorDescriptor } from './editor-descriptor.js';
 
-export const BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
-  type: 'base.container',
-  tagName: 'base-screen-container',
-  name: '容器',
-  category: '基础',
-  keywords: ['容器', '分组'],
-  defaultSize: { width: 320, height: 180 },
-  defaultProps: {},
-  defaultStyle: {
-    fill: 'transparent',
-    borderColor: 'transparent',
-    borderWidth: 1,
-    opacity: 1,
-    flipX: false,
-    flipY: false,
-  },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      fill: { kind: 'string' },
-      borderColor: { kind: 'string' },
-      borderWidth: { kind: 'number', minimum: 0, maximum: 100 },
-      opacity: { kind: 'number', minimum: 0, maximum: 1 },
-      flipX: { kind: 'boolean' },
-      flipY: { kind: 'boolean' },
+export const BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
+  withOfficialEditorDescriptor(
+    {
+      type: 'base.container',
+      tagName: 'base-screen-container',
+      name: '容器',
+      category: '基础',
+      keywords: ['容器', '分组'],
+      defaultSize: { width: 320, height: 180 },
+      defaultProps: {},
+      defaultStyle: {
+        fill: 'transparent',
+        borderColor: 'transparent',
+        borderWidth: 1,
+        opacity: 1,
+        flipX: false,
+        flipY: false,
+      },
+      styleSchema: {
+        kind: 'object',
+        properties: {
+          fill: { kind: 'string' },
+          borderColor: { kind: 'string' },
+          borderWidth: { kind: 'number', minimum: 0, maximum: 100 },
+          opacity: { kind: 'number', minimum: 0, maximum: 1 },
+          flipX: { kind: 'boolean' },
+          flipY: { kind: 'boolean' },
+        },
+        required: ['fill', 'borderColor', 'borderWidth', 'opacity'],
+      },
+      stylePanel: [],
+      propsSchema: { kind: 'object', properties: {}, required: [] },
+      propertyPanel: [],
+      events: [],
+      dataCapabilities: [],
+      designCapabilities: { resize: true, rotate: true, children: true },
+      libraryVisible: false,
     },
-    required: ['fill', 'borderColor', 'borderWidth', 'opacity'],
-  },
-  stylePanel: [
-    { style: 'fill', label: '填充', control: 'color', allowGradient: true },
-    { style: 'borderColor', label: '边框颜色', control: 'color' },
-    { style: 'borderWidth', label: '边框宽度', control: 'number' },
-  ],
-  propsSchema: { kind: 'object', properties: {}, required: [] },
-  propertyPanel: [],
-  events: [],
-  dataCapabilities: [],
-  designCapabilities: { resize: true, rotate: true, children: true },
-  libraryVisible: false,
-};
+    {
+      appearance: [
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            styleField('fill', '填充色', 'color', { allowGradient: true }),
+            styleField('borderColor', '边框颜色', 'color'),
+            styleField('borderWidth', '边框宽度', 'number'),
+          ],
+        },
+      ],
+    },
+  );
 
 export class BaseScreenContainerMaterialElement extends BaseScreenOfficialMaterialElement {
   static readonly manifest = BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST;

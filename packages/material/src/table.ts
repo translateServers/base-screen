@@ -19,95 +19,113 @@ import {
   applyBackgroundColorOrGradient,
   BaseScreenOfficialMaterialElement,
 } from './base-material.js';
+import { styleField, withOfficialEditorDescriptor } from './editor-descriptor.js';
 
-export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
-  type: 'base.table',
-  tagName: 'base-screen-table',
-  name: '表格',
-  category: '数据',
-  keywords: ['表格', '数据', '明细'],
-  defaultSize: { width: 560, height: 320 },
-  defaultProps: {},
-  defaultData: {
-    fields: [
-      { id: 'category', label: '区域', valueType: 'string', nullable: false },
-      { id: 'amount', label: '金额', valueType: 'number', nullable: false },
-      { id: 'orders', label: '订单数', valueType: 'number', nullable: false },
-    ],
-    rows: [
-      { category: 'north', amount: 42, orders: 18 },
-      { category: 'south', amount: 36, orders: 15 },
-      { category: 'east', amount: 28, orders: 11 },
-      { category: 'west', amount: 24, orders: 9 },
-      { category: 'central', amount: 19, orders: 7 },
-    ],
-  },
-  staticData: {
-    kind: 'tabular',
-    defaultBinding: { fields: { columns: ['category', 'amount', 'orders'] } },
-  },
-  defaultStyle: {
-    backgroundColor: '#111827',
-    color: '#f9fafb',
-    headerBackgroundColor: '#1f2937',
-    borderColor: '#374151',
-    fontSize: 13,
-    rowHeight: 32,
-    opacity: 1,
-    flipX: false,
-    flipY: false,
-  },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      headerBackgroundColor: { kind: 'string' },
-      borderColor: { kind: 'string' },
-      fontSize: { kind: 'number', minimum: 10, maximum: 32 },
-      rowHeight: { kind: 'number', minimum: 20, maximum: 96 },
-      opacity: { kind: 'number', minimum: 0, maximum: 1 },
-      flipX: { kind: 'boolean' },
-      flipY: { kind: 'boolean' },
-    },
-    required: [
-      'backgroundColor',
-      'color',
-      'headerBackgroundColor',
-      'borderColor',
-      'fontSize',
-      'rowHeight',
-    ],
-  },
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
-    { style: 'color', label: '文字色', control: 'color' },
+export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
+  withOfficialEditorDescriptor(
     {
-      style: 'headerBackgroundColor',
-      label: '表头色',
-      control: 'color',
-      allowGradient: true,
-    },
-    { style: 'borderColor', label: '边框色', control: 'color' },
-    { style: 'fontSize', label: '字号', control: 'number' },
-    { style: 'rowHeight', label: '行高', control: 'number' },
-  ],
-  propsSchema: { kind: 'object', properties: {}, required: [] },
-  propertyPanel: [],
-  events: ['rowClick', 'cellClick'],
-  dataCapabilities: ['static', 'dataset', 'variable'],
-  dataBinding: {
-    roles: [
-      {
-        id: 'columns',
-        minFields: 1,
-        maxFields: 256,
-        valueTypes: ['string', 'number', 'boolean', 'date'],
+      type: 'base.table',
+      tagName: 'base-screen-table',
+      name: '表格',
+      category: '数据',
+      keywords: ['表格', '数据', '明细'],
+      defaultSize: { width: 560, height: 320 },
+      defaultProps: {},
+      defaultData: {
+        fields: [
+          { id: 'category', label: '区域', valueType: 'string', nullable: false },
+          { id: 'amount', label: '金额', valueType: 'number', nullable: false },
+          { id: 'orders', label: '订单数', valueType: 'number', nullable: false },
+        ],
+        rows: [
+          { category: 'north', amount: 42, orders: 18 },
+          { category: 'south', amount: 36, orders: 15 },
+          { category: 'east', amount: 28, orders: 11 },
+          { category: 'west', amount: 24, orders: 9 },
+          { category: 'central', amount: 19, orders: 7 },
+        ],
       },
-    ],
-  },
-  designCapabilities: { resize: true, rotate: true, children: false },
-};
+      staticData: {
+        kind: 'tabular',
+        defaultBinding: { fields: { columns: ['category', 'amount', 'orders'] } },
+      },
+      defaultStyle: {
+        backgroundColor: '#111827',
+        color: '#f9fafb',
+        headerBackgroundColor: '#1f2937',
+        borderColor: '#374151',
+        fontSize: 13,
+        rowHeight: 32,
+        opacity: 1,
+        flipX: false,
+        flipY: false,
+      },
+      styleSchema: {
+        kind: 'object',
+        properties: {
+          backgroundColor: { kind: 'string' },
+          color: { kind: 'string' },
+          headerBackgroundColor: { kind: 'string' },
+          borderColor: { kind: 'string' },
+          fontSize: { kind: 'number', minimum: 10, maximum: 32 },
+          rowHeight: { kind: 'number', minimum: 20, maximum: 96 },
+          opacity: { kind: 'number', minimum: 0, maximum: 1 },
+          flipX: { kind: 'boolean' },
+          flipY: { kind: 'boolean' },
+        },
+        required: [
+          'backgroundColor',
+          'color',
+          'headerBackgroundColor',
+          'borderColor',
+          'fontSize',
+          'rowHeight',
+        ],
+      },
+      stylePanel: [],
+      propsSchema: { kind: 'object', properties: {}, required: [] },
+      propertyPanel: [],
+      events: ['rowClick', 'cellClick'],
+      dataCapabilities: ['static', 'dataset', 'variable'],
+      dataBinding: {
+        roles: [
+          {
+            id: 'columns',
+            minFields: 1,
+            maxFields: 256,
+            valueTypes: ['string', 'number', 'boolean', 'date'],
+          },
+        ],
+      },
+      designCapabilities: { resize: true, rotate: true, children: false },
+    },
+    {
+      appearance: [
+        {
+          id: 'structure',
+          label: '结构',
+          fields: [styleField('rowHeight', '行高', 'number')],
+        },
+        {
+          id: 'text',
+          label: '文字',
+          fields: [
+            styleField('color', '文字色', 'color'),
+            styleField('fontSize', '字号', 'number'),
+          ],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            styleField('backgroundColor', '背景色', 'color', { allowGradient: true }),
+            styleField('headerBackgroundColor', '表头色', 'color', { allowGradient: true }),
+            styleField('borderColor', '边框色', 'color'),
+          ],
+        },
+      ],
+    },
+  );
 
 export class BaseScreenTableMaterialElement extends BaseScreenOfficialMaterialElement {
   static readonly manifest = BASE_SCREEN_TABLE_MATERIAL_MANIFEST;

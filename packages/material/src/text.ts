@@ -7,72 +7,90 @@ import type {
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { BaseScreenOfficialMaterialElement, isGradientColorValue } from './base-material.js';
+import { propField, styleField, withOfficialEditorDescriptor } from './editor-descriptor.js';
 
-export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
-  type: 'base.text',
-  tagName: 'base-screen-text',
-  name: '文本',
-  category: '基础',
-  keywords: ['文本', '标签'],
-  defaultSize: { width: 320, height: 72 },
-  defaultProps: { autoWidth: false },
-  defaultData: '文本',
-  staticData: { kind: 'scalar', valueType: 'string', multiline: true },
-  defaultStyle: {
-    color: '#ffffff',
-    fontSize: 32,
-    fontWeight: '400',
-    textAlign: 'left',
-    verticalAlign: 'top',
-    letterSpacing: 0,
-    lineSpacing: 0,
-    opacity: 1,
-    flipX: false,
-    flipY: false,
-  },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      color: { kind: 'string' },
-      fontSize: { kind: 'number', minimum: 1, maximum: 512 },
-      fontWeight: { kind: 'enum', values: ['400', '700'] },
-      textAlign: { kind: 'enum', values: ['left', 'center', 'right'] },
-      verticalAlign: { kind: 'enum', values: ['top', 'middle', 'bottom'] },
-      letterSpacing: { kind: 'number', minimum: 0, maximum: 100 },
-      lineHeight: { kind: 'number', minimum: 1, maximum: 512 },
-      lineSpacing: { kind: 'number', minimum: 0, maximum: 512 },
-      opacity: { kind: 'number', minimum: 0, maximum: 1 },
-      flipX: { kind: 'boolean' },
-      flipY: { kind: 'boolean' },
-    },
-    required: ['color', 'fontSize', 'fontWeight', 'textAlign'],
-  },
-  stylePanel: [
-    { style: 'color', label: '颜色', control: 'color', allowGradient: true },
-    { style: 'fontSize', label: '字号', control: 'number' },
-    { style: 'fontWeight', label: '字重', control: 'select' },
-    { style: 'textAlign', label: '水平对齐', control: 'select' },
-    { style: 'verticalAlign', label: '垂直对齐', control: 'select' },
-    { style: 'letterSpacing', label: '字间距', control: 'number' },
-    { style: 'lineHeight', label: '行高', control: 'number' },
-    { style: 'lineSpacing', label: '行间距', control: 'number' },
-  ],
-  propsSchema: { kind: 'object', properties: { autoWidth: { kind: 'boolean' } }, required: [] },
-  propertyPanel: [{ prop: 'autoWidth', label: '自适应宽度', control: 'boolean' }],
-  events: ['valueClick'],
-  dataCapabilities: ['static', 'dataset', 'variable'],
-  dataBinding: {
-    roles: [
-      {
-        id: 'value',
-        minFields: 1,
-        maxFields: 1,
-        valueTypes: ['string', 'number', 'boolean', 'date'],
+export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
+  withOfficialEditorDescriptor(
+    {
+      type: 'base.text',
+      tagName: 'base-screen-text',
+      name: '文本',
+      category: '基础',
+      keywords: ['文本', '标签'],
+      defaultSize: { width: 320, height: 72 },
+      defaultProps: { autoWidth: false },
+      defaultData: '文本',
+      staticData: { kind: 'scalar', valueType: 'string', multiline: true },
+      defaultStyle: {
+        color: '#ffffff',
+        fontSize: 32,
+        fontWeight: '400',
+        textAlign: 'left',
+        verticalAlign: 'top',
+        letterSpacing: 0,
+        lineSpacing: 0,
+        opacity: 1,
+        flipX: false,
+        flipY: false,
       },
-    ],
-  },
-  designCapabilities: { resize: true, rotate: true, children: false },
-};
+      styleSchema: {
+        kind: 'object',
+        properties: {
+          color: { kind: 'string' },
+          fontSize: { kind: 'number', minimum: 1, maximum: 512 },
+          fontWeight: { kind: 'enum', values: ['400', '700'] },
+          textAlign: { kind: 'enum', values: ['left', 'center', 'right'] },
+          verticalAlign: { kind: 'enum', values: ['top', 'middle', 'bottom'] },
+          letterSpacing: { kind: 'number', minimum: 0, maximum: 100 },
+          lineHeight: { kind: 'number', minimum: 1, maximum: 512 },
+          lineSpacing: { kind: 'number', minimum: 0, maximum: 512 },
+          opacity: { kind: 'number', minimum: 0, maximum: 1 },
+          flipX: { kind: 'boolean' },
+          flipY: { kind: 'boolean' },
+        },
+        required: ['color', 'fontSize', 'fontWeight', 'textAlign'],
+      },
+      stylePanel: [],
+      propsSchema: { kind: 'object', properties: { autoWidth: { kind: 'boolean' } }, required: [] },
+      propertyPanel: [],
+      events: ['valueClick'],
+      dataCapabilities: ['static', 'dataset', 'variable'],
+      dataBinding: {
+        roles: [
+          {
+            id: 'value',
+            minFields: 1,
+            maxFields: 1,
+            valueTypes: ['string', 'number', 'boolean', 'date'],
+          },
+        ],
+      },
+      designCapabilities: { resize: true, rotate: true, children: false },
+    },
+    {
+      appearance: [
+        {
+          id: 'structure',
+          label: '结构',
+          fields: [propField('autoWidth', '自适应宽度', 'boolean')],
+        },
+        {
+          id: 'text',
+          label: '文字',
+          fields: [
+            styleField('color', '颜色', 'color', { allowGradient: true }),
+            styleField('fontSize', '字号', 'number'),
+            styleField('fontWeight', '字重', 'select'),
+            styleField('textAlign', '水平对齐', 'segmented'),
+            styleField('verticalAlign', '垂直对齐', 'select'),
+            styleField('letterSpacing', '字间距', 'number'),
+            styleField('lineHeight', '行高', 'number'),
+            styleField('lineSpacing', '行间距', 'number'),
+          ],
+        },
+      ],
+    },
+  );
 
 export class BaseScreenTextMaterialElement extends BaseScreenOfficialMaterialElement {
   static readonly manifest = BASE_SCREEN_TEXT_MATERIAL_MANIFEST;

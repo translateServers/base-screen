@@ -89,6 +89,13 @@ function model(
   };
 }
 
+
+function chartAppearanceField(key: string) {
+  return (BASE_SCREEN_CHART_MATERIAL_MANIFEST.editorDescriptor?.appearance ?? [])
+    .flatMap((section) => section.fields)
+    .find((field) => field.path[0] === key);
+}
+
 describe('official material conformance (DRH-R7)', () => {
   it('table material safely handles idle, loading, empty, ready, and error states', () => {
     for (const status of ['idle', 'loading', 'ready', 'error'] as const) {
@@ -151,13 +158,10 @@ describe('official material conformance (DRH-R7)', () => {
     }
 
     expect(
-      BASE_SCREEN_CHART_MATERIAL_MANIFEST.stylePanel.find(
-        (field) => field.style === 'backgroundColor',
-      )?.allowGradient,
+      chartAppearanceField('backgroundColor')?.allowGradient,
     ).toBe(true);
     expect(
-      BASE_SCREEN_CHART_MATERIAL_MANIFEST.stylePanel.find((field) => field.style === 'gridColor')
-        ?.allowGradient,
+      chartAppearanceField('gridColor')?.allowGradient,
     ).toBeUndefined();
   });
 });

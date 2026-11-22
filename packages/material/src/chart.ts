@@ -15,77 +15,94 @@ import {
   applyBackgroundColorOrGradient,
   BaseScreenOfficialMaterialElement,
 } from './base-material.js';
+import { styleField, withOfficialEditorDescriptor } from './editor-descriptor.js';
 
-export const BASE_SCREEN_CHART_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
-  type: 'base.chart',
-  tagName: 'base-screen-chart',
-  name: '图表',
-  category: '数据',
-  keywords: ['图表', '趋势', '数据'],
-  defaultSize: { width: 480, height: 280 },
-  defaultProps: {},
-  defaultData: {
-    fields: [
-      { id: 'region', label: '区域', valueType: 'string', nullable: false },
-      { id: 'amount', label: '订单金额', valueType: 'number', nullable: false },
-    ],
-    rows: [
-      { region: 'north', amount: 42 },
-      { region: 'south', amount: 36 },
-      { region: 'east', amount: 28 },
-      { region: 'west', amount: 24 },
-      { region: 'central', amount: 19 },
-    ],
-  },
-  staticData: {
-    kind: 'tabular',
-    defaultBinding: { fields: { dimension: ['region'], measures: ['amount'] } },
-  },
-  defaultStyle: {
-    backgroundColor: '#111827',
-    color: '#f9fafb',
-    gridColor: '#374151',
-    lineWidth: 2,
-    opacity: 1,
-    flipX: false,
-    flipY: false,
-  },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      gridColor: { kind: 'string' },
-      lineWidth: { kind: 'number', minimum: 1, maximum: 8 },
-      opacity: { kind: 'number', minimum: 0, maximum: 1 },
-      flipX: { kind: 'boolean' },
-      flipY: { kind: 'boolean' },
-    },
-    required: ['backgroundColor', 'color', 'gridColor', 'lineWidth'],
-  },
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
-    { style: 'color', label: '文字色', control: 'color' },
-    { style: 'gridColor', label: '网格色', control: 'color' },
-    { style: 'lineWidth', label: '线宽', control: 'number' },
-  ],
-  propsSchema: { kind: 'object', properties: {}, required: [] },
-  propertyPanel: [],
-  events: ['pointClick'],
-  dataCapabilities: ['static', 'dataset', 'variable'],
-  dataBinding: {
-    roles: [
-      {
-        id: 'dimension',
-        minFields: 1,
-        maxFields: 1,
-        valueTypes: ['string', 'number', 'boolean', 'date'],
+export const BASE_SCREEN_CHART_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
+  withOfficialEditorDescriptor(
+    {
+      type: 'base.chart',
+      tagName: 'base-screen-chart',
+      name: '图表',
+      category: '数据',
+      keywords: ['图表', '趋势', '数据'],
+      defaultSize: { width: 480, height: 280 },
+      defaultProps: {},
+      defaultData: {
+        fields: [
+          { id: 'region', label: '区域', valueType: 'string', nullable: false },
+          { id: 'amount', label: '订单金额', valueType: 'number', nullable: false },
+        ],
+        rows: [
+          { region: 'north', amount: 42 },
+          { region: 'south', amount: 36 },
+          { region: 'east', amount: 28 },
+          { region: 'west', amount: 24 },
+          { region: 'central', amount: 19 },
+        ],
       },
-      { id: 'measures', minFields: 1, maxFields: 8, valueTypes: ['number'] },
-    ],
-  },
-  designCapabilities: { resize: true, rotate: true, children: false },
-};
+      staticData: {
+        kind: 'tabular',
+        defaultBinding: { fields: { dimension: ['region'], measures: ['amount'] } },
+      },
+      defaultStyle: {
+        backgroundColor: '#111827',
+        color: '#f9fafb',
+        gridColor: '#374151',
+        lineWidth: 2,
+        opacity: 1,
+        flipX: false,
+        flipY: false,
+      },
+      styleSchema: {
+        kind: 'object',
+        properties: {
+          backgroundColor: { kind: 'string' },
+          color: { kind: 'string' },
+          gridColor: { kind: 'string' },
+          lineWidth: { kind: 'number', minimum: 1, maximum: 8 },
+          opacity: { kind: 'number', minimum: 0, maximum: 1 },
+          flipX: { kind: 'boolean' },
+          flipY: { kind: 'boolean' },
+        },
+        required: ['backgroundColor', 'color', 'gridColor', 'lineWidth'],
+      },
+      stylePanel: [],
+      propsSchema: { kind: 'object', properties: {}, required: [] },
+      propertyPanel: [],
+      events: ['pointClick'],
+      dataCapabilities: ['static', 'dataset', 'variable'],
+      dataBinding: {
+        roles: [
+          {
+            id: 'dimension',
+            minFields: 1,
+            maxFields: 1,
+            valueTypes: ['string', 'number', 'boolean', 'date'],
+          },
+          { id: 'measures', minFields: 1, maxFields: 8, valueTypes: ['number'] },
+        ],
+      },
+      designCapabilities: { resize: true, rotate: true, children: false },
+    },
+    {
+      appearance: [
+        {
+          id: 'text',
+          label: '文字',
+          fields: [styleField('color', '文字色', 'color')],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            styleField('backgroundColor', '背景色', 'color', { allowGradient: true }),
+            styleField('gridColor', '网格色', 'color'),
+            styleField('lineWidth', '线宽', 'number'),
+          ],
+        },
+      ],
+    },
+  );
 
 const CHART_COLORS = ['#38bdf8', '#f97316', '#a78bfa', '#4ade80', '#facc15', '#fb7185'];
 

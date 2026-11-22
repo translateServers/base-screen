@@ -1,5 +1,9 @@
 import type { ScreenJsonValue } from '@base-screen/contracts';
-import type { BaseScreenMaterialElement, BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type {
+  BaseScreenMaterialElement,
+  BaseScreenMaterialManifest,
+  BaseScreenMaterialModel,
+} from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
@@ -126,6 +130,19 @@ function dataModel(value: ScreenJsonValue): BaseScreenMaterialModel {
   };
 }
 
+
+function appearanceField(manifest: BaseScreenMaterialManifest, key: string) {
+  return (manifest.editorDescriptor?.appearance ?? [])
+    .flatMap((section) => section.fields)
+    .find((field) => field.path[0] === key);
+}
+
+function appearanceKeys(manifest: BaseScreenMaterialManifest): readonly unknown[] {
+  return (manifest.editorDescriptor?.appearance ?? []).flatMap((section) =>
+    section.fields.map((field) => field.path[0]),
+  );
+}
+
 describe('shape material visual capabilities', () => {
   it('keeps visible borders within the canonical component bounds', () => {
     const { style } = mount(
@@ -150,26 +167,18 @@ describe('shape material visual capabilities', () => {
     expect(schema.properties.shadowColor).toEqual({ kind: 'string' });
     expect(schema.properties.shadowBlur).toEqual({ kind: 'number', minimum: 0, maximum: 100 });
     expect(
-      BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.stylePanel.some(
-        (field) => field.style === 'borderRadius',
-      ),
+      appearanceKeys(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST).includes('borderRadius'),
     ).toBe(true);
     expect(
-      BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.stylePanel.some(
-        (field) => field.style === 'shadowBlur',
-      ),
+      appearanceKeys(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST).includes('shadowBlur'),
     ).toBe(true);
     expect(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.defaultStyle.borderRadius).toBe(0);
     expect(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.defaultStyle.shadowColor).toBe('');
     expect(
-      BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.stylePanel.find(
-        (field) => field.style === 'borderColor',
-      )?.allowGradient,
+      appearanceField(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST, 'borderColor')?.allowGradient,
     ).toBe(true);
     expect(
-      BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST.stylePanel.find(
-        (field) => field.style === 'borderColor',
-      )?.allowGradient,
+      appearanceField(BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST, 'borderColor')?.allowGradient,
     ).toBeUndefined();
   });
 
@@ -289,9 +298,7 @@ describe('shape material visual capabilities', () => {
     );
     expect(style.borderRadius).toBe('50%');
     expect(
-      BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST.stylePanel.some(
-        (field) => field.style === 'borderRadius',
-      ),
+      appearanceKeys(BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST).includes('borderRadius'),
     ).toBe(false);
   });
 
