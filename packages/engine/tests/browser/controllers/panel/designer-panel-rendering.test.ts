@@ -289,6 +289,55 @@ describe('designer panel rendering', () => {
     );
   });
 
+  it('keeps both conditional style sections for a material whose appearance uses a descriptor', () => {
+    const ownerDocument = new FakeDocument();
+    const properties = ownerDocument.createElement('div');
+    const flat = catalog();
+    const descriptorCatalog = {
+      ...flat,
+      get: (type: string) => {
+        const entry = flat.get(type);
+        if (entry === undefined) return undefined;
+        return {
+          ...entry,
+          manifest: {
+            ...entry.manifest,
+            editorDescriptor: { appearance: [{ id: 'text', label: 'Text', fields: [] }] },
+          },
+        };
+      },
+    } as unknown as ReturnType<typeof catalog>;
+
+    renderDesignerProperties(
+      properties as unknown as HTMLElement,
+      document(),
+      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
+      descriptorCatalog,
+      undefined,
+      false,
+      createDesignerCanvasPresentationSettings(),
+      undefined,
+      {
+        sources: [
+          { id: 'alarm.open', label: '未处理告警', conditions: [{ id: 'warning', label: '警告' }] },
+        ],
+        bindings: () => [],
+        save: async () => ({ ok: true as const, value: undefined, diagnostics: [] }),
+      },
+    );
+
+    const all = descendants(properties);
+    // 描述符取代扁平外观区：扁平 prop 控件不再出现……
+    expect(all.some((element) => element.dataset.prop === 'title')).toBe(false);
+    // ……但条件样式与宿主条件样式按 stylePanel 颜色键照常出现。
+    expect(
+      all.some((element) => element.className.includes('designer-conditional-style-section')),
+    ).toBe(true);
+    expect(
+      all.some((element) => element.className.includes('designer-host-conditional-style-section')),
+    ).toBe(true);
+  });
+
   it('renders the host conditional style section from the host authoring port', () => {
     const ownerDocument = new FakeDocument();
     const properties = ownerDocument.createElement('div');

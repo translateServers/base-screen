@@ -1,5 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../dom/designer-icons.js';
+import { type DesignerIconName, designerIcon } from '../dom/designer-icons.js';
 import {
   createDesignerCheckbox,
   createDesignerInput,
@@ -13,13 +13,36 @@ import {
  * 分层：`designer-ui-primitives` 产出单个控件（input / select / switch…），本模块把它们组合成
  * 检查器认可的一行字段。`.designer-field` 是「标签列 74px + 控件列 1fr」的两列网格，标签文案必须
  * 是 `.designer-field-label-text` 的 span（纯文本节点无法参与网格），控件必须落在 `.designer-field-control`
- * 里；开关 / 勾选框是例外，它们直接挂在 `.designer-field` 上以命中 `:has(> .designer-switch)` 的行式布局。
+ * 里。开关是例外：直接挂在 `.designer-field` 上，命中 `:has(> .designer-switch)` 的行式布局
+ * （`createDesignerSwitchField`，带说明文字的设置项用 `createDesignerToggleField`）。
  *
  * 这些结构约束此前在检查器、页面配置、描述符三处各写一遍，类名与层级靠人工对齐；集中到本模块后，
  * 新增字段只声明「标签 + 控件」，不再复制行结构。
  */
 
 export type DesignerFieldTagName = 'label' | 'span' | 'div';
+
+/**
+ * 有界数值是否用「滑杆 + 数字」双控件；无界或跨度超过 1000 保持单个数字输入。
+ * 扁平面板与描述符共用这一条判定，同一个字段换编排方式不会换控件形态。
+ */
+export function isDesignerRangeEligible(
+  minimum: number | undefined,
+  maximum: number | undefined,
+): boolean {
+  return minimum !== undefined && maximum !== undefined && maximum - minimum <= 1000;
+}
+
+/** 三档水平对齐（left / center / right）用图标分段：扁平面板与描述符共用同一组图标。 */
+export const DESIGNER_ALIGNMENT_ICONS: Readonly<Record<string, DesignerIconName>> = {
+  left: 'align-left',
+  center: 'align-center',
+  right: 'align-right',
+};
+
+export function isDesignerAlignmentEnum(values: readonly unknown[]): boolean {
+  return values.length === 3 && values.join('|') === 'left|center|right';
+}
 
 export interface DesignerFieldElementOptions {
   readonly label: string;
@@ -84,6 +107,42 @@ export function createDesignerFieldRow(
   control.className = designerClassNames('designer-field-control', options.controlClassName);
   field.appendChild(control);
   return { field, control, labelText };
+}
+
+export interface DesignerSwitchFieldOptions {
+  readonly label: string;
+  readonly checked: boolean;
+  readonly disabled?: boolean;
+  readonly className?: string;
+}
+
+export interface DesignerSwitchField {
+  readonly field: HTMLElement;
+  readonly input: HTMLInputElement;
+}
+
+/**
+ * 开关字段行：右栏里所有布尔字段的唯一写法（页面配置、组件检查器、描述符、多选批量）。
+ *
+ * 开关直接挂在 `<label class="designer-field">` 上，命中 `:has(> .designer-switch)` 的行式布局：
+ * 标签在左、开关贴右，整行都是点击区与指针手型。不放进控件列——放进去就落进
+ * 「标签列 74px + 控件列」网格，手型只剩开关本身，长标签也被 74px 截断。
+ */
+export function createDesignerSwitchField(
+  ownerDocument: Document,
+  options: DesignerSwitchFieldOptions,
+): DesignerSwitchField {
+  const field = createDesignerFieldElement(ownerDocument, {
+    label: options.label,
+    ...(options.className === undefined ? {} : { className: options.className }),
+  });
+  const input = createDesignerSwitch(ownerDocument, {
+    ariaLabel: options.label,
+    checked: options.checked,
+    ...(options.disabled === undefined ? {} : { disabled: options.disabled }),
+  });
+  field.appendChild(input);
+  return { field, input };
 }
 
 export interface DesignerToggleFieldOptions {
@@ -204,6 +263,28 @@ export function appendDesignerRangeField(
   options: DesignerRangeFieldOptions,
 ): DesignerRangeField {
   const ownerDocument = control.ownerDocument;
+  const field = createDesignerRangeField(ownerDocument, options);
+  control.appendChild(field.range);
+  if (options.numberSymbol === undefined) {
+    control.appendChild(field.number);
+  } else {
+    const symbolField = ownerDocument.createElement('label');
+    symbolField.className = 'designer-geo-field';
+    symbolField.dataset.symbol = options.numberSymbol;
+    symbolField.appendChild(field.number);
+    control.appendChild(symbolField);
+  }
+  return field;
+}
+
+/**
+ * 只造滑杆与数字读数并接好联动，不挂进 DOM：由调用方决定落位（描述符字段把两者作为控件列的
+ * 直接子元素挂入）。`numberSymbol` 只在 `appendDesignerRangeField` 里生效。
+ */
+export function createDesignerRangeField(
+  ownerDocument: Document,
+  options: DesignerRangeFieldOptions,
+): DesignerRangeField {
   const rangeValue =
     options.rangeValue ?? (options.value === '' ? String(options.min) : options.value);
   const range = createDesignerInput(ownerDocument, {
@@ -239,16 +320,6 @@ export function appendDesignerRangeField(
   number.addEventListener('input', () => {
     range.value = number.value;
   });
-  control.appendChild(range);
-  if (options.numberSymbol === undefined) {
-    control.appendChild(number);
-  } else {
-    const symbolField = ownerDocument.createElement('label');
-    symbolField.className = 'designer-geo-field';
-    symbolField.dataset.symbol = options.numberSymbol;
-    symbolField.appendChild(number);
-    control.appendChild(symbolField);
-  }
   return { range, number };
 }
 

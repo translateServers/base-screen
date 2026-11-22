@@ -17,6 +17,7 @@ import type {
   BaseScreenPluginInspectorControlCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
+import type { BaseScreenResolvedFragmentLibraryItem } from '../../../common/operations/material-library/material-library-fragments.js';
 import type { BaseScreenMaterialLibraryGrouping } from '../../../common/operations/material-library/material-library-grouping.js';
 import type { BaseScreenResolvedMaterialLibraryItem } from '../../../common/operations/material-library/material-library-items.js';
 import type { DesignerDescriptorDatasetFields } from '../../dom/descriptor/designer-descriptor-dom.js';
@@ -26,6 +27,10 @@ export interface DesignerPanelControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
   readonly getMaterialLibraryItems?: () => readonly BaseScreenResolvedMaterialLibraryItem[];
   readonly getMaterialLibraryGrouping?: () => BaseScreenMaterialLibraryGrouping | undefined;
+  /** 物料库中通过 catalog 试运行的组合分片（ADR-0100）。缺省即物料库没有分片卡片。 */
+  readonly getMaterialLibraryFragments?: () => readonly BaseScreenResolvedFragmentLibraryItem[];
+  /** 把一份分片插到可见画布中心；失败诊断由实现方上报，成功后整片成为选中项。 */
+  readonly insertMaterialLibraryFragment?: (fragmentId: string) => void;
   readonly getDocument: () => ScreenDocument | undefined;
   /**
    * 设计器表面是否存在非折叠文本选区：有选区时复制快捷键必须让位给浏览器原生复制，

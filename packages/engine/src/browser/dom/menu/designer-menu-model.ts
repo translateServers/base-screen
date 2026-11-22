@@ -54,6 +54,7 @@ export const DESIGNER_CONTEXT_MENU = {
     'separator',
     'group',
     'ungroup',
+    'save-as-fragment',
     {
       label: DESIGNER_UI_TEXT.layer,
       entries: [
@@ -74,6 +75,7 @@ export const DESIGNER_CONTEXT_MENU = {
     'separator',
     'group',
     'ungroup',
+    'save-as-fragment',
     {
       label: DESIGNER_UI_TEXT.arrange,
       entries: [

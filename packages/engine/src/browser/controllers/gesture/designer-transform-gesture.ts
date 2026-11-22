@@ -10,10 +10,12 @@ import {
   selectedComponents,
   selectionSubtree,
 } from '../../../common/operations/selection/designer-selection.js';
+import type { DesignerSnapPoint } from '../../viewport/designer-canvas-aids.js';
 import type { DesignerGestureCallbacks } from './designer-gesture-callbacks.js';
 import {
   DesignerGestureEnvironment,
   type DesignerGesturePoint,
+  isDesignerSnapBypassed,
 } from './designer-gesture-environment.js';
 
 interface TransformPreviewStyle {
@@ -30,6 +32,7 @@ interface TransformState {
   readonly handle: BaseScreenTransformHandle | undefined;
   readonly start: DesignerGesturePoint;
   readonly components: readonly ScreenComponentNode[];
+  readonly componentIds: readonly string[];
   readonly previewStyles: ReadonlyMap<string, TransformPreviewStyle>;
   readonly elements: ReadonlyMap<string, HTMLElement>;
   readonly selection: HTMLElement | undefined;
@@ -90,6 +93,7 @@ export class DesignerTransformGesture {
       handle,
       start: this.environment.canvasPoint(event),
       components,
+      componentIds: components.map((component) => component.id),
       previewStyles: capturePreviewStyles(elements),
       elements,
       selection: canvas.querySelector<HTMLElement>('[data-selection]') ?? undefined,
@@ -100,8 +104,17 @@ export class DesignerTransformGesture {
   move(event: PointerEvent): boolean {
     const state = this.#state;
     if (state === undefined || event.pointerId !== state.pointerId) return false;
-    const after = this.transformComponents(state, event);
+    const { after, pointer } = this.transformComponents(state, event);
     const bounds = getScreenSelectionBounds(after);
+    // Resize previews the guides of the resized box (tldraw recomputes with every edge after
+    // the moving edge snapped); rotation aligns no edge, and Ctrl / Cmd bypasses snapping.
+    this.environment.previewGeometry(
+      state.kind === 'resize' && !isDesignerSnapBypassed(event) && bounds !== null
+        ? bounds
+        : undefined,
+      state.componentIds,
+      pointer,
+    );
     if (bounds === null || state.selection === undefined) return true;
     state.selection.style.left = `${bounds.left}px`;
     state.selection.style.top = `${bounds.top}px`;
@@ -122,7 +135,7 @@ export class DesignerTransformGesture {
   finish(event: PointerEvent): boolean {
     const state = this.#state;
     if (state === undefined || event.pointerId !== state.pointerId) return false;
-    const after = this.transformComponents(state, event);
+    const { after } = this.transformComponents(state, event);
     this.cancel();
     this.callbacks.reportTransaction(createTransformTransaction(state.components, after));
     return true;
@@ -150,17 +163,18 @@ export class DesignerTransformGesture {
   private transformComponents(
     state: TransformState,
     event: PointerEvent,
-  ): readonly ScreenComponentNode[] {
-    const pointer = this.environment.snapCanvasPoint(
-      event,
-      state.components.map((component) => component.id),
-    );
-    return state.kind === 'resize'
-      ? resizeScreenComponents(state.components, state.handle!, pointer, {
-          shift: event.shiftKey,
-          alt: event.altKey,
-        })
-      : rotateScreenComponents(state.components, state.start, pointer, event.shiftKey);
+  ): { readonly after: readonly ScreenComponentNode[]; readonly pointer: DesignerSnapPoint } {
+    const pointer = this.environment.resolveCanvasPoint(event, state.componentIds);
+    return {
+      pointer,
+      after:
+        state.kind === 'resize'
+          ? resizeScreenComponents(state.components, state.handle!, pointer, {
+              shift: event.shiftKey,
+              alt: event.altKey,
+            })
+          : rotateScreenComponents(state.components, state.start, pointer, event.shiftKey),
+    };
   }
 }
 

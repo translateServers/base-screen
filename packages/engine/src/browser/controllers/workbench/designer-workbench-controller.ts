@@ -3,10 +3,13 @@ import type { ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenDesignerWorkbenchMode } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import {
+  type DesignerSelectionSnapBounds,
+  type DesignerSnapGuides,
   type DesignerSnapPoint,
   type DesignerSnapPreview,
   type DesignerSnapTranslation,
 } from '../../viewport/designer-canvas-aids.js';
+import { getDesignerVisibleCanvasRegion } from '../../viewport/designer-canvas-coordinates.js';
 import { DesignerGuideController } from './designer-guide-controller.js';
 import { DesignerPanelLayoutController } from './designer-panel-layout-controller.js';
 import { DesignerSnapController } from './designer-snap-controller.js';
@@ -59,6 +62,13 @@ export class DesignerWorkbenchController {
       getDocument: callbacks.getDocument,
       getGuides: () => this.#guides.guides,
       getRoot: callbacks.getRoot,
+      getVisibleRegion: () => {
+        const viewport = callbacks.getRoot()?.querySelector<HTMLElement>('[data-viewport]');
+        const canvas = callbacks.getCanvas();
+        return viewport === null || viewport === undefined || canvas === undefined
+          ? undefined
+          : getDesignerVisibleCanvasRegion(viewport, canvas, callbacks.getZoom());
+      },
       getZoom: callbacks.getZoom,
       renderGuides: () => this.#guides.render(),
       renderRulers: () => this.#guides.renderRulers(),
@@ -149,7 +159,15 @@ export class DesignerWorkbenchController {
     return this.#snap.snapSelectionOffset(bounds, offset, excludedComponentIds);
   }
 
-  // 预览只绘制求解器显式给出的 guides，吸附结果本身不代表已经进入显示阈值。
+  // 由已吸附指针推导出的几何（拉伸、绘制新组件）按最终边框重新收集参考线。
+  snapAlignmentGuides(
+    bounds: DesignerSelectionSnapBounds,
+    excludedComponentIds: readonly string[] = [],
+  ): DesignerSnapGuides | undefined {
+    return this.#snap.alignmentGuides(bounds, excludedComponentIds);
+  }
+
+  // 预览只绘制求解器按最终几何重新收集的 guides，吸附坐标本身不隐含任何参考线。
   renderSnapPreview(point: DesignerSnapPreview | undefined): void {
     this.#snap.renderPreview(point);
   }

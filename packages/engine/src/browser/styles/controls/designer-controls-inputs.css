@@ -84,10 +84,11 @@
   font-size: var(--designer-font-size-sm);
 }
 
-/* 右栏检查器：批次几何输入为紧凑档，几何网格输入给符号留出内距。 */
+/* 右栏检查器：批量几何与几何网格与其他数字框同高（ADR-0102 §3.2：检查器只有一档控件高度）；
+   几何网格输入给内嵌符号留出右内距。 */
 .designer-inspector-batch-field-row-controls .designer-input {
-  height: var(--designer-control-height-compact);
-  padding: 0 calc(var(--designer-space-3) + 1px);
+  height: var(--designer-control-height);
+  padding: 0 var(--designer-control-padding-inline);
 }
 
 .designer-inspector-batch-readonly .designer-input:disabled {
@@ -96,7 +97,7 @@
 }
 
 .designer-inspector-geometry-grid [data-property-symbol] .designer-input {
-  height: var(--designer-control-height-compact);
+  height: var(--designer-control-height);
   padding-right: calc(var(--designer-space-7) + 1px);
   color: var(--designer-text-primary);
   font-size: var(--designer-font-size-base);
@@ -447,7 +448,8 @@
   background: transparent;
   box-shadow: none;
   color: var(--designer-text-primary);
-  font: 500 var(--designer-font-size-base) / 1 var(--designer-font-family-mono);
+  /* 数字字体与其他数字框一致（ADR-0102 §3.4）；居中是步进器唯一的例外：值夹在 − / + 之间。 */
+  font: inherit;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -491,7 +493,8 @@
   min-width: 0;
   flex: 1;
   height: 100%;
-  padding: 0 var(--designer-space-2);
+  /* 文字起点与普通输入框同一条竖线（9px），后缀一侧留 4px。 */
+  padding: 0 var(--designer-space-2) 0 var(--designer-control-padding-inline);
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -505,13 +508,14 @@
   outline: none;
 }
 
+/* 后缀与几何符号、四边距单位同一档：11px 等宽、弱文字色（ADR-0102 §3.4）。 */
 .designer-unit-input-suffix {
   display: grid;
   flex: none;
   place-items: center;
-  padding-right: var(--designer-space-3);
+  padding-right: var(--designer-space-4);
   color: var(--designer-text-muted);
-  font: var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-family-mono);
   pointer-events: none;
 }
 

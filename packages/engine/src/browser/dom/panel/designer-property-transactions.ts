@@ -31,6 +31,7 @@ import {
   type DesignerInspectorContext,
   getDesignerInspectorContext,
 } from '../../../common/operations/style/designer-inspector.js';
+import { isDesignerMaterialEditorKey } from '../../../common/operations/style/designer-material-appearance.js';
 import { createDesignerStyleFieldPatch } from '../../../common/operations/style/designer-style-field.js';
 import { readDesignerColorPaletteValue } from '../color/designer-color-palette-dom.js';
 import {
@@ -75,7 +76,10 @@ export function createPropertyTransaction(
   if (geometryAction === 'flipX' || geometryAction === 'flipY') {
     const context = getDesignerInspectorContext(document, interaction, catalog);
     if (context.kind !== 'single-material' || context.manifest === undefined) return undefined;
-    const schema = context.manifest.styleSchema.properties[geometryAction];
+    // 与公共区同一口径：物料申报优先，否则回落到引擎级保留 schema（ADR-0099 §2.3）。
+    const schema =
+      context.manifest.styleSchema.properties[geometryAction] ??
+      BASE_SCREEN_RESERVED_STYLE_SCHEMAS[geometryAction];
     if (schema?.kind !== 'boolean') return undefined;
     return success(
       update(context.component.id, {
@@ -118,7 +122,8 @@ export function createPropertyTransaction(
   const prop = target.dataset.prop;
   const style = target.dataset.style;
   const manifest = context.manifest;
-  // 引擎级保留键不需要物料申报：检查器自建的行为/滤镜分区与物料 stylePanel 走同一条提交门禁。
+  // 引擎级保留键不需要物料申报：检查器自建的行为/滤镜分区与物料外观区走同一条提交门禁。
+  // 物料键是否开放编辑只看外观字段表（ADR-0102 D1），与它来自描述符还是扁平面板无关。
   const reservedStyle = style === undefined ? undefined : BASE_SCREEN_RESERVED_STYLE_SCHEMAS[style];
   const styleSchema =
     (style === undefined ? undefined : manifest?.styleSchema.properties[style]) ?? reservedStyle;
@@ -127,7 +132,7 @@ export function createPropertyTransaction(
     style !== undefined &&
     styleSchema !== undefined &&
     (reservedStyle !== undefined ||
-      manifest.stylePanel.some((field) => field.style === style) ||
+      isDesignerMaterialEditorKey(manifest, 'style', style) ||
       style === 'opacity')
   ) {
     const schema = styleSchema;
@@ -150,7 +155,7 @@ export function createPropertyTransaction(
     manifest === undefined ||
     prop === undefined ||
     schema === undefined ||
-    !manifest.propertyPanel.some((field) => field.prop === prop)
+    !isDesignerMaterialEditorKey(manifest, 'props', prop)
   ) {
     return undefined;
   }

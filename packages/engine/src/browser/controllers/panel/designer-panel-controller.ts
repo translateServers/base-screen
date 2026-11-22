@@ -8,6 +8,7 @@ import { DesignerPanelInspectorController } from './designer-panel-inspector-con
 import {
   DesignerPanelMaterialController,
   MATERIAL_DRAG_TYPE,
+  MATERIAL_LIBRARY_FRAGMENT_DRAG_TYPE,
   MATERIAL_LIBRARY_ITEM_DRAG_TYPE,
   MATERIAL_SEARCH_DEBOUNCE_MS,
 } from './designer-panel-material-controller.js';
@@ -15,7 +16,12 @@ import { DesignerPanelPropertyController } from './designer-panel-property-contr
 import { DesignerPanelSelectionController } from './designer-panel-selection-controller.js';
 
 export type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
-export { MATERIAL_DRAG_TYPE, MATERIAL_LIBRARY_ITEM_DRAG_TYPE, MATERIAL_SEARCH_DEBOUNCE_MS };
+export {
+  MATERIAL_DRAG_TYPE,
+  MATERIAL_LIBRARY_FRAGMENT_DRAG_TYPE,
+  MATERIAL_LIBRARY_ITEM_DRAG_TYPE,
+  MATERIAL_SEARCH_DEBOUNCE_MS,
+};
 
 /**
  * Stable facade for Designer panel interactions.

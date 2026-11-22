@@ -78,6 +78,67 @@ describe('DesignerGuideOverlay incremental rendering', () => {
     expect(y.className).toBe('canvas-guide canvas-guide-snap');
   });
 
+  it('places × markers on snap points and reuses them across frames', () => {
+    const { overlay, container, options } = fixture();
+    const withPoints = (points: readonly number[]) => ({
+      ...options,
+      snapPreview: preview({
+        x: [{ value: 100, start: 20, size: 100, points }],
+        y: undefined,
+        measurements: undefined,
+      }),
+    });
+    overlay.render(withPoints([20, 60, 120]));
+    const guide = container.children.find((node) => node.className.includes('guide-snap'))!;
+    expect(guide.children.map((marker) => marker.className)).toEqual([
+      'canvas-guide-marker',
+      'canvas-guide-marker',
+      'canvas-guide-marker',
+    ]);
+    expect(guide.children.map((marker) => marker.style.top)).toEqual(['0px', '40px', '100px']);
+    const markers = [...guide.children];
+    const writes = markers.map((marker) => marker.writes);
+    overlay.render(withPoints([20, 60, 120]));
+    guide.children.forEach((marker, index) => expect(marker).toBe(markers[index]));
+    expect(markers.map((marker) => marker.writes)).toEqual(writes);
+    overlay.render(withPoints([20, 120]));
+    expect(guide.children).toHaveLength(2);
+    guide.children.forEach((marker, index) => expect(marker).toBe(markers[index]));
+    expect(guide.children[1]?.style.top).toBe('100px');
+  });
+
+  it('styles equal-spacing marks apart from rail gaps and switches in place', () => {
+    const { overlay, container, options } = fixture();
+    overlay.render(options);
+    const marker = container.children.find((node) => node.className === 'canvas-measurement')!;
+    overlay.render({
+      ...options,
+      snapPreview: preview({
+        measurements: [
+          { axis: 'x', from: 150, to: 200, position: 80, distance: 50, kind: 'equal' },
+        ],
+      }),
+    });
+    expect(marker.className).toBe('canvas-measurement canvas-measurement-equal');
+    expect(container.children).toContain(marker);
+    overlay.render(options);
+    expect(marker.className).toBe('canvas-measurement');
+  });
+
+  it('keeps a zero-length guide local instead of spanning the canvas', () => {
+    const { overlay, container, options } = fixture();
+    overlay.render({
+      ...options,
+      snapPreview: preview({
+        x: [{ value: 120, start: 120, size: 0, points: [120] }],
+        y: undefined,
+      }),
+    });
+    const guide = container.children.find((node) => node.className.includes('guide-snap'))!;
+    expect(guide.style.top).toBe('120px');
+    expect(guide.style.height).toBe('0px');
+  });
+
   it('changes only the owned scale declarations when zoom changes', () => {
     const { overlay, container, options } = fixture();
     overlay.render(options);

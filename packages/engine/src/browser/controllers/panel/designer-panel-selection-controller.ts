@@ -4,6 +4,7 @@ import type {
   ScreenParseResult,
 } from '@base-screen/contracts';
 import { getScreenSelectionBounds, isScreenComponentEffectivelyLocked } from '@base-screen/core';
+import { resolveBaseScreenMaterialDefaultStyle } from '@base-screen/plugin-core';
 import {
   type BaseScreenClipboard,
   createClipboard,
@@ -156,7 +157,7 @@ export class DesignerPanelSelectionController {
       zIndex: Math.max(...selected.map((component) => component.zIndex)) + 1,
       status: { locked: false, hidden: false },
       props: entry.manifest.defaultProps,
-      style: entry.manifest.defaultStyle,
+      style: resolveBaseScreenMaterialDefaultStyle(entry.manifest, document.theme),
       dataSource: createInitialDataSource(entry.manifest),
     };
     const result = this.callbacks.executeTransaction(

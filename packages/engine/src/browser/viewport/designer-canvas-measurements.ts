@@ -14,6 +14,11 @@ interface Interval {
   readonly start: number;
 }
 
+interface AnchorEntry {
+  readonly value: number;
+  readonly index: number;
+}
+
 /**
  * 生成与当前拖动选区 anchor 对齐的布局间距标注。
  *
@@ -35,66 +40,135 @@ export function collectDesignerCanvasMeasurements(
   );
 }
 
-/** Gesture path: reuse the same static component geometry as the snap index. */
+/** One-off path: indexes the given geometry for a single measurement. */
 export function measureDesignerCanvasBounds(
   components: readonly DesignerSelectionSnapBounds[],
   selection: DesignerSelectionSnapBounds,
   zoom = 1,
 ): readonly DesignerCanvasMeasurement[] {
-  const tolerance = DESIGNER_SNAP_RENDER_THRESHOLD / Math.max(zoom, Number.EPSILON);
-  const measurements: DesignerCanvasMeasurement[] = [];
+  return new DesignerCanvasMeasurementIndex(components).measure(selection, zoom);
+}
 
-  for (const position of uniqueAnchors(selection.left, selection.right)) {
-    const intervals: Interval[] = [
-      { start: selection.top, end: selection.bottom },
-      ...components
-        .filter(
-          (bounds) =>
-            matchesAnchor(position, bounds.left, bounds.right, tolerance) &&
-            hasEffectiveOverlap(
-              selection.left,
-              selection.right,
-              bounds.left,
-              bounds.right,
-              tolerance,
-            ),
-        )
-        .map((bounds) => ({ start: bounds.top, end: bounds.bottom })),
-    ];
-    measurements.push(...collectGapMeasurements('y', position, intervals, tolerance));
+/**
+ * Gesture path: built once per geometry snapshot. Each rail only visits components whose
+ * start / center / end lies inside the tolerance window (binary search over sorted anchors),
+ * so a frame costs O(log N + matches) instead of scanning every component per rail.
+ */
+export class DesignerCanvasMeasurementIndex {
+  readonly #components: readonly DesignerSelectionSnapBounds[];
+  readonly #x: readonly AnchorEntry[];
+  readonly #y: readonly AnchorEntry[];
+  readonly #visited: Uint32Array;
+  #visit = 0;
+
+  constructor(components: readonly DesignerSelectionSnapBounds[]) {
+    this.#components = components;
+    this.#x = sortedAnchors(components, (bounds) => [bounds.left, bounds.right]);
+    this.#y = sortedAnchors(components, (bounds) => [bounds.top, bounds.bottom]);
+    this.#visited = new Uint32Array(components.length);
   }
-  for (const position of uniqueAnchors(selection.top, selection.bottom)) {
-    const intervals: Interval[] = [
-      { start: selection.left, end: selection.right },
-      ...components
-        .filter(
-          (bounds) =>
-            matchesAnchor(position, bounds.top, bounds.bottom, tolerance) &&
-            hasEffectiveOverlap(
-              selection.top,
-              selection.bottom,
-              bounds.top,
-              bounds.bottom,
-              tolerance,
-            ),
-        )
-        .map((bounds) => ({ start: bounds.left, end: bounds.right })),
-    ];
-    measurements.push(...collectGapMeasurements('x', position, intervals, tolerance));
+
+  /** `reach` (document units) drops rail components farther than it from the selection. */
+  measure(
+    selection: DesignerSelectionSnapBounds,
+    zoom = 1,
+    reach = Number.POSITIVE_INFINITY,
+  ): readonly DesignerCanvasMeasurement[] {
+    const tolerance = DESIGNER_SNAP_RENDER_THRESHOLD / Math.max(zoom, Number.EPSILON);
+    const measurements: DesignerCanvasMeasurement[] = [];
+
+    for (const position of uniqueAnchors(selection.left, selection.right)) {
+      const intervals: Interval[] = [{ start: selection.top, end: selection.bottom }];
+      for (const index of this.#matches(this.#x, position, tolerance)) {
+        const bounds = this.#components[index]!;
+        const overlaps = hasEffectiveOverlap(
+          selection.left,
+          selection.right,
+          bounds.left,
+          bounds.right,
+          tolerance,
+        );
+        const gap = gapBetween(selection.top, selection.bottom, bounds.top, bounds.bottom);
+        if (overlaps && gap <= reach) {
+          intervals.push({ start: bounds.top, end: bounds.bottom });
+        }
+      }
+      measurements.push(...collectGapMeasurements('y', position, intervals, tolerance));
+    }
+    for (const position of uniqueAnchors(selection.top, selection.bottom)) {
+      const intervals: Interval[] = [{ start: selection.left, end: selection.right }];
+      for (const index of this.#matches(this.#y, position, tolerance)) {
+        const bounds = this.#components[index]!;
+        const overlaps = hasEffectiveOverlap(
+          selection.top,
+          selection.bottom,
+          bounds.top,
+          bounds.bottom,
+          tolerance,
+        );
+        const gap = gapBetween(selection.left, selection.right, bounds.left, bounds.right);
+        if (overlaps && gap <= reach) {
+          intervals.push({ start: bounds.left, end: bounds.right });
+        }
+      }
+      measurements.push(...collectGapMeasurements('x', position, intervals, tolerance));
+    }
+    return measurements;
   }
-  return measurements;
+
+  // Components with any anchor in [position - tolerance, position + tolerance], once each,
+  // in document order (the same membership as `Math.abs(anchor - position) <= tolerance`).
+  #matches(entries: readonly AnchorEntry[], position: number, tolerance: number): number[] {
+    let low = 0;
+    let high = entries.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (entries[middle]!.value - position < -tolerance) low = middle + 1;
+      else high = middle;
+    }
+    const visit = this.#nextVisit();
+    const matches: number[] = [];
+    for (let cursor = low; cursor < entries.length; cursor++) {
+      const entry = entries[cursor]!;
+      if (entry.value - position > tolerance) break;
+      if (this.#visited[entry.index] === visit) continue;
+      this.#visited[entry.index] = visit;
+      matches.push(entry.index);
+    }
+    return matches.length > 1 ? matches.sort((left, right) => left - right) : matches;
+  }
+
+  #nextVisit(): number {
+    this.#visit = (this.#visit + 1) >>> 0;
+    if (this.#visit === 0) {
+      this.#visited.fill(0);
+      this.#visit = 1;
+    }
+    return this.#visit;
+  }
+}
+
+function sortedAnchors(
+  components: readonly DesignerSelectionSnapBounds[],
+  span: (bounds: DesignerSelectionSnapBounds) => readonly [number, number],
+): readonly AnchorEntry[] {
+  const entries: AnchorEntry[] = [];
+  for (const [index, bounds] of components.entries()) {
+    const [start, end] = span(bounds);
+    // Same center expression as the original per-rail scan, so floating-point membership matches.
+    for (const value of [start, (start + end) / 2, end]) {
+      if (Number.isFinite(value)) entries.push({ value, index });
+    }
+  }
+  return entries.sort((left, right) => left.value - right.value);
 }
 
 function uniqueAnchors(start: number, end: number): readonly number[] {
   return [...new Set([start, (start + end) / 2, end])];
 }
 
-function matchesAnchor(position: number, start: number, end: number, tolerance: number): boolean {
-  return (
-    Math.abs(start - position) <= tolerance ||
-    Math.abs((start + end) / 2 - position) <= tolerance ||
-    Math.abs(end - position) <= tolerance
-  );
+function gapBetween(firstStart: number, firstEnd: number, secondStart: number, secondEnd: number) {
+  return Math.max(0, secondStart - firstEnd, firstStart - secondEnd);
 }
 
 function hasEffectiveOverlap(

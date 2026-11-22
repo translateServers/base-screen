@@ -97,12 +97,21 @@ export class DesignerGroupEditingController {
     return this.#parentId;
   }
 
-  onDoubleClick(event: MouseEvent): void {
+  /**
+   * 双击进入组内编辑，或进入文本编辑。
+   *
+   * 第一击选中组件后，选框上的拖动层（`[data-selection-grab]`）盖在组件上面，第二击的 DOM 目标
+   * 因此是拖动层而不是组件，按 DOM 找不到组件。这时用 `geometryHitId`（按指针位置做几何命中，
+   * 取最上层组件）兜底——与单击拖动层时的命中口径一致。
+   */
+  onDoubleClick(event: MouseEvent, geometryHitId?: () => string | undefined): void {
     const target = event.target;
     const document = this.callbacks.getDocument();
     if (!(target instanceof Element) || document === undefined) return;
     const material = target.closest<HTMLElement>('[data-base-screen-component-id]');
-    const hitId = material?.dataset.baseScreenComponentId;
+    const hitId =
+      material?.dataset.baseScreenComponentId ??
+      (target.closest('[data-selection-grab]') === null ? undefined : geometryHitId?.());
     if (hitId === undefined) return;
     const groupId = this.selectableComponentId(document, hitId);
     if (groupId !== null && this.canEditChildren(document, groupId)) {

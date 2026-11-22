@@ -228,6 +228,12 @@
   left: auto;
 }
 
+/* 「组合」角标占左上角，与左下的草稿、右下的不可用徽章互不遮挡。 */
+.material-badge[data-material-badge="fragment"] {
+  top: var(--designer-space-2);
+  bottom: auto;
+}
+
 .material-card-wrap[data-material-draft][data-material-unavailable] .material-badge {
   max-width: calc(50% - var(--designer-space-4));
 }

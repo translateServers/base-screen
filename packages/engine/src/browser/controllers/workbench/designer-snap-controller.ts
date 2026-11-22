@@ -1,22 +1,26 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import {
+  collectDesignerAlignmentGuides,
   DEFAULT_DESIGNER_CANVAS_AIDS,
+  DesignerAlignmentIndex,
   type DesignerCanvasAidsState,
   type DesignerSelectionSnapBounds,
+  type DesignerSnapGuides,
   type DesignerSnapPoint,
   type DesignerSnapPreview,
   type DesignerSnapSession,
   type DesignerSnapTranslation,
+  DesignerSpacingIndex,
+  designerSnapGuideReach,
   snapDesignerCanvasPoint,
   snapDesignerSelectionTranslation,
 } from '../../viewport/designer-canvas-aids.js';
-import { measureDesignerCanvasBounds } from '../../viewport/designer-canvas-measurements.js';
-import { createDesignerSnapCandidates } from '../../viewport/designer-canvas-snap-candidates.js';
+import { DesignerCanvasMeasurementIndex } from '../../viewport/designer-canvas-measurements.js';
 import {
   collectDesignerSnapComponentBounds,
   type DesignerSnapComponentBounds,
+  resolveDesignerSnapScope,
 } from '../../viewport/designer-canvas-snap-geometry.js';
-import { DesignerSnapIndex } from '../../viewport/designer-canvas-snap-index.js';
 import {
   type DesignerGuideSnapPreview,
   equalDesignerSnapPreviews,
@@ -27,16 +31,24 @@ interface DesignerSnapCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getGuides: () => { readonly x: readonly number[]; readonly y: readonly number[] };
   readonly getRoot: () => ShadowRoot | null;
+  /** Visible canvas region in document coordinates; undefined when it cannot be measured. */
+  readonly getVisibleRegion?: () => DesignerSelectionSnapBounds | undefined;
   readonly getZoom: () => number;
   readonly renderGuides: () => void;
   readonly renderRulers: () => void;
   readonly renderStatus: () => void;
 }
 
+// One snapshot per gesture: static component geometry feeds the alignment index and, built
+// lazily on the first selection drag frame, the equal-spacing and measurement indexes.
 interface DesignerSnapGeometry {
   readonly components: readonly DesignerSnapComponentBounds[] | undefined;
   readonly excluded: ReadonlySet<string>;
-  readonly index: DesignerSnapIndex;
+  /** Last exclusion list seen, so per-frame calls with the same array skip the set comparison. */
+  excludedIds: readonly string[];
+  readonly index: DesignerAlignmentIndex;
+  spacing?: DesignerSpacingIndex;
+  measurements?: DesignerCanvasMeasurementIndex;
 }
 
 export class DesignerSnapController {
@@ -109,6 +121,8 @@ export class DesignerSnapController {
     if (!this.#enabled || !this.#canvasAids.smartGuidesEnabled) return { x: offset.x, y: offset.y };
     const geometry = this.resolveGeometry(excludedComponentIds);
     const zoom = this.callbacks.getZoom();
+    const components = geometry.components;
+    if (components !== undefined) geometry.spacing ??= new DesignerSpacingIndex(components);
     const snapped = snapDesignerSelectionTranslation(
       bounds,
       offset,
@@ -116,19 +130,34 @@ export class DesignerSnapController {
       geometry.index,
       zoom,
       this.#sessionActive ? this.#session : undefined,
+      geometry.spacing,
     );
+    // Equal spacing, when the final position has it, is the only spacing worth showing;
+    // otherwise fall back to the gaps along the selection's alignment rails.
+    if (components === undefined || snapped.measurements !== undefined) return snapped;
+    geometry.measurements ??= new DesignerCanvasMeasurementIndex(components);
     return {
       ...snapped,
-      ...(geometry.components === undefined
-        ? {}
-        : {
-            measurements: measureDesignerCanvasBounds(
-              geometry.components,
-              translateSelectionBounds(bounds, snapped),
-              zoom,
-            ),
-          }),
+      measurements: geometry.measurements.measure(
+        translateSelectionBounds(bounds, snapped),
+        zoom,
+        designerSnapGuideReach(zoom),
+      ),
     };
+  }
+
+  /** Guides for geometry the gesture derived from a snapped pointer (resize, drawing). */
+  alignmentGuides(
+    bounds: DesignerSelectionSnapBounds,
+    excludedComponentIds: readonly string[] = [],
+  ): DesignerSnapGuides | undefined {
+    if (!this.#enabled || !this.#canvasAids.smartGuidesEnabled) return undefined;
+    return collectDesignerAlignmentGuides(
+      bounds,
+      this.#canvasAids,
+      this.resolveGeometry(excludedComponentIds).index,
+      this.callbacks.getZoom(),
+    );
   }
 
   renderPreview(point: DesignerSnapPreview | undefined): void {
@@ -177,27 +206,43 @@ export class DesignerSnapController {
   }
 
   private resolveGeometry(excludedComponentIds: readonly string[]): DesignerSnapGeometry {
+    const cache = this.#cache;
+    if (this.#sessionActive && cache !== undefined && cache.excludedIds === excludedComponentIds) {
+      return cache;
+    }
     const excluded = new Set(excludedComponentIds);
     if (
       this.#sessionActive &&
-      this.#cache !== undefined &&
-      this.#cache.excluded.size === excluded.size &&
-      excludedComponentIds.every((id) => this.#cache!.excluded.has(id))
+      cache !== undefined &&
+      cache.excluded.size === excluded.size &&
+      excludedComponentIds.every((id) => cache.excluded.has(id))
     ) {
-      return this.#cache;
+      cache.excludedIds = excludedComponentIds;
+      return cache;
     }
     const document = this.callbacks.getDocument();
+    const region = this.callbacks.getVisibleRegion?.();
+    // Targets: the selection's siblings under their common parent, plus that parent (tldraw /
+    // Penpot), limited to what is visible; the reach is applied per frame by the solver.
     const components =
-      document === undefined ? undefined : collectDesignerSnapComponentBounds(document, excluded);
+      document === undefined
+        ? undefined
+        : visibleComponents(
+            collectDesignerSnapComponentBounds(
+              document,
+              excluded,
+              resolveDesignerSnapScope(document, excluded),
+            ),
+            region,
+          );
     const geometry: DesignerSnapGeometry = {
       components,
       excluded,
-      index: new DesignerSnapIndex(
-        createDesignerSnapCandidates(
-          document?.canvas,
-          this.callbacks.getGuides(),
-          components ?? [],
-        ),
+      excludedIds: excludedComponentIds,
+      index: DesignerAlignmentIndex.fromScene(
+        document?.canvas,
+        this.callbacks.getGuides(),
+        components ?? [],
       ),
     };
     if (this.#sessionActive) {
@@ -218,6 +263,21 @@ export class DesignerSnapController {
       .querySelector<HTMLButtonElement>('[data-action="toggle-grid"]')
       ?.setAttribute('aria-pressed', String(this.#canvasAids.gridEnabled));
   }
+}
+
+// Like tldraw / Penpot / Excalidraw, only components the user can see are snap targets.
+function visibleComponents(
+  components: readonly DesignerSnapComponentBounds[],
+  region: DesignerSelectionSnapBounds | undefined,
+): readonly DesignerSnapComponentBounds[] {
+  if (region === undefined) return components;
+  return components.filter(
+    (bounds) =>
+      bounds.right >= region.left &&
+      bounds.left <= region.right &&
+      bounds.bottom >= region.top &&
+      bounds.top <= region.bottom,
+  );
 }
 
 function translateSelectionBounds(

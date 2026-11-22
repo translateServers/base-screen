@@ -321,7 +321,7 @@
 
 /* 智能对齐线（参考 Moveable/Nebula）：走强调色族（编辑 affordance），参考线 1px，
    吸附目标线（active）2px 更醒目 + 柔和发光，距离标签显示间距；
-   仅渲染阈值（1px）内的命中才显示，吸附与渲染分离。 */
+   吸上即显示（每个吸附轴一条，贴角时两条）；拖动中未移动的轴、拉伸手柄不作用的轴不标线。 */
 .canvas-guide-snap {
   background: var(--designer-snap-guide);
 }
@@ -427,6 +427,24 @@
   translate: 0 -50%;
 }
 
+/* 等间距标注（tldraw / Penpot）：与同排其它间距精确相等时，实线 + 强调色读数胶囊，
+   和对齐轨道上的普通虚线间距区分。 */
+.canvas-measurement-equal[data-axis="x"] {
+  border-top-style: solid;
+}
+
+.canvas-measurement-equal[data-axis="y"] {
+  border-left-style: solid;
+}
+
+.canvas-measurement-equal .canvas-measurement-label {
+  padding: 0 calc(var(--designer-overlay-pixel, 1px) * 4);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-snap-guide);
+  color: var(--designer-text-on-accent);
+  text-shadow: none;
+}
+
 .canvas-guide[data-axis="x"] {
   top: 0;
   bottom: 0;
@@ -438,6 +456,40 @@
   left: 0;
   height: var(--designer-overlay-pixel, 1px);
   transform: translateY(-50%);
+}
+
+/* 吸附点 × 标记（Penpot / Grida / tldraw）：标出这条线因哪些点重合而出现，屏幕尺寸固定。 */
+.canvas-guide-marker {
+  position: absolute;
+  width: var(--designer-overlay-marker-size, 6px);
+  height: var(--designer-overlay-marker-size, 6px);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.canvas-guide[data-axis="x"] > .canvas-guide-marker {
+  left: 50%;
+}
+
+.canvas-guide[data-axis="y"] > .canvas-guide-marker {
+  top: 50%;
+}
+
+.canvas-guide-marker::before,
+.canvas-guide-marker::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 141%;
+  height: var(--designer-overlay-pixel, 1px);
+  background: var(--designer-snap-guide);
+  content: "";
+  translate: -50% -50%;
+  rotate: 45deg;
+}
+
+.canvas-guide-marker::after {
+  rotate: -45deg;
 }
 /* 选中框视觉轮廓与吸附锚点使用同一选区几何（组件包围盒）：
    outline-offset 取 -1px 使 2px 轮廓以边缘为中线，与 1px 吸附预览线重合。 */

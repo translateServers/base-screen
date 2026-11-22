@@ -41,6 +41,8 @@ describe('DesignerWorkbenchController instance state', () => {
       x: 50,
       y: 47,
       snappedX: 50,
+      // The user guide spans the canvas; the only snap point on it is the pointer.
+      guides: { x: [{ value: 50, start: 0, size: 540, points: [47] }] },
     });
     expect(second.controller.snapPoint({ x: 47, y: 47 })).toEqual({ x: 47, y: 47 });
   });

@@ -12,7 +12,7 @@ export interface DesignerGuideSnapPreview {
   readonly measurements: readonly DesignerCanvasMeasurement[] | undefined;
 }
 
-/** Coordinates alone never imply a visible guide: the solver owns the render threshold. */
+/** Coordinates alone never imply a visible guide: the solver decides which axes are marked. */
 export function projectDesignerSnapPreview(
   point: DesignerSnapPreview | undefined,
 ): DesignerGuideSnapPreview | undefined {
@@ -59,7 +59,12 @@ function equalItems<T>(
 }
 
 function equalGuide(left: DesignerSnapGuideLine, right: DesignerSnapGuideLine): boolean {
-  return left.value === right.value && left.start === right.start && left.size === right.size;
+  return (
+    left.value === right.value &&
+    left.start === right.start &&
+    left.size === right.size &&
+    equalItems(left.points, right.points, Object.is)
+  );
 }
 
 function equalMeasurement(
@@ -71,6 +76,7 @@ function equalMeasurement(
     left.from === right.from &&
     left.to === right.to &&
     left.position === right.position &&
+    left.kind === right.kind &&
     Math.round(left.distance) === Math.round(right.distance)
   );
 }

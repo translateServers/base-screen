@@ -24,6 +24,8 @@ export type DesignerGuideOverlayItem =
 export interface DesignerGuideOverlayNode {
   readonly element: HTMLElement;
   readonly label: HTMLElement | undefined;
+  /** × markers on the snap points of a smart guide, reused across frames. */
+  readonly markers: HTMLElement[];
 }
 
 export function createDesignerGuideOverlayNode(
@@ -36,7 +38,7 @@ export function createDesignerGuideOverlayNode(
     label.className = 'canvas-measurement-label';
     element.appendChild(label);
   }
-  return { element, label };
+  return { element, label, markers: [] };
 }
 
 /** Read inline state only; unchanged geometry, classes and labels perform no DOM writes. */
@@ -47,7 +49,12 @@ export function updateDesignerGuideOverlayNode(
   const { element, label } = node;
   if (item.kind === 'measurement') {
     const { axis, from, to, position, distance } = item.measurement;
-    setClassName(element, 'canvas-measurement');
+    setClassName(
+      element,
+      item.measurement.kind === 'equal'
+        ? 'canvas-measurement canvas-measurement-equal'
+        : 'canvas-measurement',
+    );
     setData(element, 'axis', axis);
     setGeometry(
       element,
@@ -69,7 +76,8 @@ export function updateDesignerGuideOverlayNode(
   setData(element, 'axis', axis);
   setData(element, 'canvasGuide', variant === 'persistent' ? 'true' : undefined);
   setData(element, 'guideIndex', item.index === undefined ? undefined : String(item.index));
-  const local = line.start !== undefined && line.size !== undefined && line.size > 0;
+  // A zero-length segment is still local (a single snap point), never a canvas-spanning line.
+  const local = line.start !== undefined && line.size !== undefined;
   const start = local ? `${line.start}px` : '';
   const size = local ? `${line.size}px` : '';
   // Empty strings restore CSS defaults when a reused local guide becomes canvas-spanning.
@@ -80,6 +88,30 @@ export function updateDesignerGuideOverlayNode(
     axis === 'y' ? size : '',
     axis === 'x' ? size : '',
   );
+  syncMarkers(node, axis, variant === 'snap' ? line : undefined);
+}
+
+function syncMarkers(
+  node: DesignerGuideOverlayNode,
+  axis: DesignerGuideAxis,
+  line: DesignerSnapGuideLine | undefined,
+): void {
+  const points = line?.points ?? [];
+  const origin = line?.start ?? 0;
+  const { element, markers } = node;
+  while (markers.length > points.length) markers.pop()!.remove();
+  while (markers.length < points.length) {
+    const marker = element.ownerDocument.createElement('span');
+    marker.className = 'canvas-guide-marker';
+    element.appendChild(marker);
+    markers.push(marker);
+  }
+  points.forEach((point, index) => {
+    const marker = markers[index]!;
+    const offset = `${point - origin}px`;
+    const property = axis === 'x' ? 'top' : 'left';
+    if (marker.style[property] !== offset) marker.style[property] = offset;
+  });
 }
 
 function setClassName(element: HTMLElement, value: string): void {

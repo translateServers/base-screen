@@ -3,7 +3,11 @@ import type {
   BaseScreenMaterialPropSchema,
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
-import { createDescriptorControl } from '../../../../src/browser/dom/descriptor/designer-descriptor-control-dom.js';
+import {
+  applyFieldDataset,
+  createDescriptorControl,
+  createDescriptorRangeControl,
+} from '../../../../src/browser/dom/descriptor/designer-descriptor-control-dom.js';
 
 // 假 DOM：只覆盖数值/分段控件用到的节点 API，不引入 jsdom（与同仓其他 DOM 测试同款）。
 class FakeElement {
@@ -327,5 +331,99 @@ describe('createDescriptorControl 分段控件', () => {
       [],
     );
     expect((handle.valueTarget as unknown as FakeElement).value).toBe('left');
+  });
+});
+
+describe('createDescriptorControl 与扁平面板同形的控件', () => {
+  const boundedSchema = {
+    kind: 'number',
+    minimum: 1,
+    maximum: 512,
+  } as unknown as BaseScreenMaterialPropSchema;
+
+  it('有界 number 渲染成滑杆 + 数字读数，读数是唯一值载体', () => {
+    const handle = createDescriptorRangeControl(
+      ownerDocument,
+      numericField('number'),
+      boundedSchema,
+      24,
+    );
+    expect(handle).toBeDefined();
+    const slider = handle!.element as unknown as FakeElement;
+    const reading = handle!.trailing as unknown as FakeElement;
+    expect(slider.type).toBe('range');
+    expect(reading).toBe(handle!.valueTarget);
+    expect(reading.className).toContain('designer-field-range-value');
+    expect(reading.value).toBe('24');
+  });
+
+  it('可选数值未设置时读数留空，滑杆停在下限', () => {
+    const handle = createDescriptorRangeControl(
+      ownerDocument,
+      numericField('number'),
+      boundedSchema,
+      undefined,
+    );
+    expect((handle!.valueTarget as unknown as FakeElement).value).toBe('');
+    expect((handle!.element as unknown as FakeElement).value).toBe('1');
+  });
+
+  it('无界、超大跨度、带单位或非 number 控件都不改成滑杆', () => {
+    const wide = { kind: 'number', minimum: 0, maximum: 120000 } as BaseScreenMaterialPropSchema;
+    expect(
+      createDescriptorRangeControl(ownerDocument, numericField('number'), wide, 1),
+    ).toBeUndefined();
+    expect(
+      createDescriptorRangeControl(ownerDocument, numericField('number'), undefined, 1),
+    ).toBeUndefined();
+    expect(
+      createDescriptorRangeControl(
+        ownerDocument,
+        numericField('unit-number', 'px'),
+        boundedSchema,
+        1,
+      ),
+    ).toBeUndefined();
+  });
+
+  it('声明为 select 的三档水平对齐也画成分段，选项带对齐图标', () => {
+    const field: BaseScreenMaterialEditorField = {
+      id: 'textAlign',
+      target: 'style',
+      path: ['textAlign'],
+      label: '水平对齐',
+      control: 'select',
+    };
+    const handle = createDescriptorControl(ownerDocument, field, alignSchema, 'center', []);
+    const shell = handle.element as unknown as FakeElement;
+    expect(shell.className).toBe('designer-descriptor-segmented');
+    const track = shell.children[0]!;
+    expect(track.children.map((button) => button.attributes['aria-label'])).toEqual([
+      'left',
+      'center',
+      'right',
+    ]);
+  });
+
+  it('顶层 props/style 字段同时挂 data-prop / data-style 钩子，嵌套路径不挂', () => {
+    const top = new FakeElement();
+    applyFieldDataset(top as unknown as HTMLElement, {
+      id: 'fill',
+      target: 'style',
+      path: ['fill'],
+      label: '填充',
+      control: 'color',
+    });
+    expect(top.dataset.style).toBe('fill');
+    expect(top.dataset.descriptorFieldId).toBe('fill');
+    const nested = new FakeElement();
+    applyFieldDataset(nested as unknown as HTMLElement, {
+      id: 'titleText',
+      target: 'props',
+      path: ['title', 'text'],
+      label: '标题',
+      control: 'text',
+    });
+    expect(nested.dataset.prop).toBeUndefined();
   });
 });

@@ -109,7 +109,12 @@ describe('DesignerPanelController property drafts', () => {
     expect(transactions).toHaveLength(1);
   });
 
-  it('routes flip button clicks through the canonical property transaction', () => {
+  // 翻转是引擎级保留键（ADR-0099 §2.3）：物料未申报 flipX/flipY 时同样可用。
+  const declaredFlip = { flipX: { kind: 'boolean' }, flipY: { kind: 'boolean' } };
+  it.each([
+    ['declared', declaredFlip],
+    ['undeclared', {}],
+  ])('routes %s flip clicks through the canonical property transaction', (_, styleProperties) => {
     vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     vi.stubGlobal('HTMLInputElement', FakeInput);
@@ -125,7 +130,7 @@ describe('DesignerPanelController property drafts', () => {
           stylePanel: [],
           styleSchema: {
             kind: 'object',
-            properties: { flipX: { kind: 'boolean' }, flipY: { kind: 'boolean' } },
+            properties: styleProperties,
             required: [],
           },
         },

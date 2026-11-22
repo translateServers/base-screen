@@ -4,12 +4,13 @@ import type {
 } from '@base-screen/plugin-core';
 import { designerIcon } from '../../dom/designer-icons.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
-import { createDesignerFieldRow } from '../designer-field-primitives.js';
+import { createDesignerFieldRow, createDesignerSwitchField } from '../designer-field-primitives.js';
 import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';
 import { appendDescriptorArrayControls } from './designer-descriptor-array-fields-dom.js';
 import {
   applyFieldDataset,
   createDescriptorControl,
+  createDescriptorRangeControl,
   descriptorFieldSchema,
 } from './designer-descriptor-control-dom.js';
 import { appendDescriptorCustomControl } from './designer-descriptor-custom-control-dom.js';
@@ -90,6 +91,10 @@ function appendDescriptorField(
   const schema = descriptorFieldSchema(field, context);
   const value = readFieldTargetValue(field, field.path, context);
   const ownerDocument = parent.ownerDocument;
+  if (field.control === 'boolean') {
+    appendDescriptorSwitchField(parent, field, value === true);
+    return;
+  }
   const palette =
     field.control === 'color'
       ? createDesignerColorPalette(
@@ -111,20 +116,18 @@ function appendDescriptorField(
     tagName: palette === undefined && field.control !== 'spacing' ? 'label' : 'span',
     stacked,
   });
-  row.dataset.inspectorSearchKind = 'field';
-  row.dataset.inspectorSearchKey = `descriptor-field-${field.id}`;
-  row.dataset.inspectorSearchText = `${field.label} ${field.help ?? ''} ${field.keywords?.join(' ') ?? ''}`;
-  if (field.advanced === true) row.dataset.inspectorAdvanced = 'true';
+  applyFieldSearch(row, field);
   const handle =
     palette === undefined
-      ? createDescriptorControl(
+      ? (createDescriptorRangeControl(ownerDocument, field, schema, value) ??
+        createDescriptorControl(
           ownerDocument,
           field,
           schema,
           value,
           context.datasetFields,
           `${context.component.id}:descriptor:${field.id}`,
-        )
+        ))
       : undefined;
   if (handle?.labelAction !== undefined) {
     // 标签文字让位给字段级动作：文字先省略，按钮固定在列尾。
@@ -143,15 +146,44 @@ function appendDescriptorField(
     // 字段标识只挂在值载体上：步进器的外壳不重复携带，避免选择器命中两个元素。
     applyFieldDataset(handle.valueTarget, field);
     fieldControl.appendChild(handle.element);
+    if (handle.trailing !== undefined) fieldControl.appendChild(handle.trailing);
   }
-  if (field.help !== undefined) {
-    const help = ownerDocument.createElement('span');
-    help.className = 'designer-descriptor-help';
-    help.textContent = field.help;
-    row.appendChild(help);
-  }
+  appendFieldHelp(row, field);
   appendDesignerFieldMessage(row, control, `descriptor-${field.id}`);
   parent.appendChild(row);
+}
+
+/** 布尔字段：与页面配置同一个开关字段行（ADR-0102 §5），整行可点、开关贴右。 */
+function appendDescriptorSwitchField(
+  parent: HTMLElement,
+  field: BaseScreenMaterialEditorField,
+  checked: boolean,
+): void {
+  const { field: row, input } = createDesignerSwitchField(parent.ownerDocument, {
+    label: field.label,
+    checked,
+  });
+  applyFieldSearch(row, field);
+  applyFieldDataset(input, field);
+  appendFieldHelp(row, field);
+  appendDesignerFieldMessage(row, input, `descriptor-${field.id}`);
+  parent.appendChild(row);
+}
+
+function applyFieldSearch(row: HTMLElement, field: BaseScreenMaterialEditorField): void {
+  row.dataset.inspectorSearchKind = 'field';
+  row.dataset.inspectorSearchKey = `descriptor-field-${field.id}`;
+  const keywords = field.keywords?.join(' ') ?? '';
+  row.dataset.inspectorSearchText = `${field.label} ${field.help ?? ''} ${keywords}`;
+  if (field.advanced === true) row.dataset.inspectorAdvanced = 'true';
+}
+
+function appendFieldHelp(row: HTMLElement, field: BaseScreenMaterialEditorField): void {
+  if (field.help === undefined) return;
+  const help = row.ownerDocument.createElement('span');
+  help.className = 'designer-descriptor-help';
+  help.textContent = field.help;
+  row.appendChild(help);
 }
 
 function appendDescriptorGroup(

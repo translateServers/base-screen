@@ -15,6 +15,8 @@ export interface DesignerCommandPaletteEntry {
   readonly disabled?: boolean;
   readonly materialType?: string;
   readonly materialItemId?: string;
+  /** 组合分片（ADR-0100）：点击后由物料库面板按分片 id 整片插入。 */
+  readonly materialFragmentId?: string;
   readonly componentId?: string;
   readonly operationId?: keyof typeof DESIGNER_OPERATION_TEXT;
   readonly pluginCommandId?: string;
@@ -219,6 +221,24 @@ export class DesignerCommandPaletteController {
     if (root === null) return [];
     const materials = [...root.querySelectorAll<HTMLElement>('[data-material-card]')].flatMap(
       (card): DesignerCommandPaletteEntry[] => {
+        const fragmentId = card.dataset.materialFragmentCard;
+        if (fragmentId !== undefined) {
+          const fragmentControl = card.querySelector<HTMLButtonElement>('[data-material-fragment]');
+          if (fragmentControl === null) return [];
+          const label =
+            card.querySelector<HTMLElement>('.material-name')?.textContent?.trim() || fragmentId;
+          return [
+            {
+              kind: 'material',
+              label,
+              detail: DESIGNER_UI_TEXT.commandPalette.fragmentDetail(fragmentId),
+              searchText:
+                `${label} ${fragmentId} ${DESIGNER_UI_TEXT.materialFragment}`.toLocaleLowerCase(),
+              disabled: fragmentControl.disabled,
+              materialFragmentId: fragmentId,
+            },
+          ];
+        }
         const control = card.querySelector<HTMLButtonElement>('[data-material-type]');
         const materialType = card.dataset.materialType ?? control?.dataset.materialType;
         if (control === null || materialType === undefined) return [];
@@ -356,6 +376,9 @@ export class DesignerCommandPaletteController {
     button.append(glyph, text, kind);
     if (entry.materialType !== undefined) button.dataset.materialType = entry.materialType;
     if (entry.materialItemId !== undefined) button.dataset.materialItemId = entry.materialItemId;
+    if (entry.materialFragmentId !== undefined) {
+      button.dataset.materialFragment = entry.materialFragmentId;
+    }
     if (entry.componentId !== undefined) button.dataset.layerSelect = entry.componentId;
     if (entry.operationId !== undefined) button.dataset.action = entry.operationId;
     if (entry.pluginCommandId !== undefined) button.dataset.pluginCommand = entry.pluginCommandId;

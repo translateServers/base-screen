@@ -1,8 +1,11 @@
 import type { ScreenComponentNode } from '@base-screen/contracts';
+import { resolveBaseScreenMaterialDefaultStyle } from '@base-screen/plugin-core';
 import { nextMaterialComponentId } from '../../../common/operations/material-component/material-component.js';
+import type { BaseScreenResolvedFragmentLibraryItem } from '../../../common/operations/material-library/material-library-fragments.js';
 import {
   type BaseScreenMaterialLibraryGrouping,
   hasMaterialLibraryGroup,
+  materialLibraryGroupFragmentIds,
   materialLibraryGroupMaterialTypes,
 } from '../../../common/operations/material-library/material-library-grouping.js';
 import {
@@ -15,6 +18,8 @@ import type { DesignerPanelControllerCallbacks } from './designer-panel-controll
 
 export const MATERIAL_DRAG_TYPE = 'application/x-base-screen-material';
 export const MATERIAL_LIBRARY_ITEM_DRAG_TYPE = 'application/x-base-screen-material-library-item';
+// 组合分片拖放（ADR-0100）：只携带分片 id，落点时由 Engine 重新查已解析的分片并整片插入。
+export const MATERIAL_LIBRARY_FRAGMENT_DRAG_TYPE = 'application/x-base-screen-material-fragment';
 // 搜索输入渲染防抖窗口（ADR-0042）：快速连续输入合并为一次渲染，避免每键一次布局失效。
 export const MATERIAL_SEARCH_DEBOUNCE_MS = 120;
 
@@ -106,6 +111,13 @@ export class DesignerPanelMaterialController {
       this.callbacks.requestMaterialLibraryAction?.(libraryAction);
       return true;
     }
+    const fragmentCard = target.closest<HTMLElement>('[data-material-fragment]');
+    const fragmentId = fragmentCard?.dataset.materialFragment;
+    if (fragmentCard != null && fragmentId !== undefined) {
+      this.addFragment(fragmentId);
+      this.render(fragmentCard.closest<HTMLElement>('.designer'));
+      return true;
+    }
     const materialCard = target.closest<HTMLElement>('[data-material-type]');
     if (materialCard?.dataset.materialType === undefined) return false;
     const itemId = materialCard.dataset.materialItemId ?? materialCard.dataset.materialType;
@@ -118,6 +130,17 @@ export class DesignerPanelMaterialController {
   onDragStart(event: DragEvent): boolean {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return false;
+    const fragmentId = target.closest<HTMLElement>('[data-material-fragment]')?.dataset
+      .materialFragment;
+    if (fragmentId !== undefined) {
+      const fragment = this.libraryFragment(fragmentId);
+      if (fragment === undefined || !this.isFragmentAvailable(fragment)) return false;
+      if (event.dataTransfer !== null && event.dataTransfer !== undefined) {
+        event.dataTransfer.setData(MATERIAL_LIBRARY_FRAGMENT_DRAG_TYPE, fragmentId);
+        event.dataTransfer.effectAllowed = 'copy';
+      }
+      return true;
+    }
     const material = target.closest<HTMLElement>('[data-material-type]');
     const materialType = material?.dataset.materialType;
     const itemId = material?.dataset.materialItemId;
@@ -163,15 +186,21 @@ export class DesignerPanelMaterialController {
       this.clearSearch(search.closest<HTMLElement>('.designer'));
       return true;
     }
+    // 物料卡与分片卡分开查找（不依赖逗号选择器列表）；分片卡及其祖先都不带 data-material-type。
     const materialCard =
       event.target instanceof HTMLElement
-        ? event.target.closest<HTMLButtonElement>('[data-material-type]')
+        ? (event.target.closest<HTMLButtonElement>('[data-material-type]') ??
+          event.target.closest<HTMLButtonElement>('[data-material-fragment]'))
         : undefined;
     if (materialCard === null || materialCard === undefined) return false;
     if (event.key === 'Enter' && !event.isComposing) {
       event.preventDefault();
+      const fragmentId = materialCard.dataset.materialFragment;
       const type = materialCard.dataset.materialType;
-      if (type !== undefined) {
+      if (fragmentId !== undefined) {
+        this.addFragment(fragmentId);
+        this.render(materialCard.closest<HTMLElement>('.designer'));
+      } else if (type !== undefined) {
         const itemId = materialCard.dataset.materialItemId ?? type;
         this.add(itemId);
         this.recordRecent(itemId);
@@ -208,11 +237,30 @@ export class DesignerPanelMaterialController {
       zIndex: index,
       status: { locked: false, hidden: false },
       props: manifest.defaultProps,
-      style: manifest.defaultStyle,
+      style: resolveBaseScreenMaterialDefaultStyle(manifest, document.theme),
       dataSource: createInitialDataSourceForMaterialLibraryItem(item),
     };
     const result = this.callbacks.executeCommand({ type: 'add-component', component });
     result.ok ? this.select([component.id]) : this.callbacks.emitDiagnostics(result.diagnostics);
+  }
+
+  private addFragment(fragmentId: string): void {
+    const fragment = this.libraryFragment(fragmentId);
+    if (
+      fragment === undefined ||
+      this.callbacks.getDocument() === undefined ||
+      !this.isFragmentAvailable(fragment)
+    ) {
+      return;
+    }
+    this.callbacks.insertMaterialLibraryFragment?.(fragmentId);
+    this.recordRecent(fragment.key);
+  }
+
+  private isFragmentAvailable(fragment: BaseScreenResolvedFragmentLibraryItem): boolean {
+    return fragment.materialTypes.every(
+      (type) => this.callbacks.isMaterialAvailable?.(type) !== false,
+    );
   }
 
   private selectGroup(groupId: string | undefined, layout: HTMLElement | null): void {
@@ -248,9 +296,7 @@ export class DesignerPanelMaterialController {
   private navigateGrid(current: HTMLButtonElement, event: KeyboardEvent): boolean {
     const layout = current.closest<HTMLElement>('.designer');
     if (layout === null) return false;
-    const cards = [
-      ...layout.querySelectorAll<HTMLButtonElement>('button[data-material-type]'),
-    ].filter(
+    const cards = materialCardControls(layout).filter(
       (card) =>
         !card.disabled && card.closest<HTMLElement>('[data-material-card]')?.hidden !== true,
     );
@@ -290,21 +336,39 @@ export class DesignerPanelMaterialController {
       grouping === undefined || this.#groupId === undefined
         ? undefined
         : new Set(materialLibraryGroupMaterialTypes(grouping, this.#groupId));
+    const groupedFragmentIds =
+      grouping === undefined || this.#groupId === undefined
+        ? undefined
+        : new Set(materialLibraryGroupFragmentIds(grouping, this.#groupId));
     for (const card of layout.querySelectorAll<HTMLElement>('[data-material-card]')) {
       const itemId = card.dataset.materialCard;
-      const item = itemId === undefined ? undefined : this.libraryItem(itemId);
-      const materialType = item?.materialType ?? card.dataset.materialType;
-      const category = item?.manifest.category ?? card.dataset.materialCategory ?? '';
-      const searchable =
-        `${item?.manifest.name ?? ''} ${materialType ?? ''} ${category} ${item?.manifest.keywords.join(' ') ?? ''}`.toLocaleLowerCase();
+      const fragmentId = card.dataset.materialFragmentCard;
+      let category: string;
+      let searchable: string;
+      let inGroup: boolean;
+      if (fragmentId !== undefined) {
+        const fragment = this.libraryFragment(fragmentId)?.fragment;
+        category = fragment?.category ?? card.dataset.materialCategory ?? '';
+        searchable =
+          `${fragment?.name ?? ''} ${fragmentId} ${category} ${fragment?.keywords.join(' ') ?? ''}`.toLocaleLowerCase();
+        inGroup = groupedFragmentIds === undefined || groupedFragmentIds.has(fragmentId);
+      } else {
+        const item = itemId === undefined ? undefined : this.libraryItem(itemId);
+        const materialType = item?.materialType ?? card.dataset.materialType;
+        category = item?.manifest.category ?? card.dataset.materialCategory ?? '';
+        searchable =
+          `${item?.manifest.name ?? ''} ${materialType ?? ''} ${category} ${item?.manifest.keywords.join(' ') ?? ''}`.toLocaleLowerCase();
+        inGroup =
+          groupedTypes === undefined ||
+          (materialType !== undefined && groupedTypes.has(materialType));
+      }
       const included =
         itemId !== undefined &&
         (this.#filter === 'all' ||
           (this.#filter === 'favorite' && this.#favorites.has(itemId)) ||
           (this.#filter === 'recent' && this.#recents.includes(itemId))) &&
         searchable.includes(this.#search) &&
-        (groupedTypes === undefined ||
-          (materialType !== undefined && groupedTypes.has(materialType))) &&
+        inGroup &&
         (grouping !== undefined || this.#category === undefined || category === this.#category);
       card.hidden = !included;
       const favorite = card.querySelector<HTMLButtonElement>('[data-material-favorite]');
@@ -355,6 +419,10 @@ export class DesignerPanelMaterialController {
     return this.callbacks.getMaterialLibraryGrouping?.();
   }
 
+  private libraryFragment(id: string): BaseScreenResolvedFragmentLibraryItem | undefined {
+    return this.callbacks.getMaterialLibraryFragments?.().find((fragment) => fragment.id === id);
+  }
+
   private libraryItem(id: string): BaseScreenResolvedMaterialLibraryItem | undefined {
     const projected = this.callbacks.getMaterialLibraryItems?.().find((item) => item.id === id);
     if (projected !== undefined) return projected;
@@ -363,4 +431,20 @@ export class DesignerPanelMaterialController {
       ? undefined
       : { id, materialType: entry.manifest.type, manifest: entry.manifest };
   }
+}
+
+/**
+ * 物料卡与分片卡的主按钮，按文档顺序。两类分开查询再按 DOM 位置归并，
+ * 只有两类同时存在时才需要排序。
+ */
+function materialCardControls(layout: HTMLElement): HTMLButtonElement[] {
+  const materials = [...layout.querySelectorAll<HTMLButtonElement>('button[data-material-type]')];
+  const fragments = [
+    ...layout.querySelectorAll<HTMLButtonElement>('button[data-material-fragment]'),
+  ];
+  if (fragments.length === 0) return materials;
+  if (materials.length === 0) return fragments;
+  return [...materials, ...fragments].sort((left, right) =>
+    left.compareDocumentPosition(right) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+  );
 }

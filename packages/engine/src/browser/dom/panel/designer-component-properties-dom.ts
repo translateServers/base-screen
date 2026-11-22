@@ -8,7 +8,6 @@ import type {
   BaseScreenHostConditionalStyleSource,
   BaseScreenMaterialCatalog,
   BaseScreenMaterialManifest,
-  BaseScreenMaterialPropSchema,
   BaseScreenPluginInspectorControlCatalog,
 } from '@base-screen/plugin-core';
 import { BASE_SCREEN_RESERVED_STYLE_SCHEMAS } from '@base-screen/plugin-core';
@@ -21,6 +20,10 @@ import {
   type DesignerInspectorContext,
   getDesignerInspectorContext,
 } from '../../../common/operations/style/designer-inspector.js';
+import {
+  designerMaterialAppearance,
+  designerMaterialEditorKeys,
+} from '../../../common/operations/style/designer-material-appearance.js';
 import {
   DESIGNER_STYLE_RULE_OPERATORS,
   formatDesignerStyleRuleValue,
@@ -47,18 +50,12 @@ import {
 } from '../designer-ui-primitives.js';
 import { appendCanvasControls } from './designer-canvas-properties-dom.js';
 import { createDesignerCanvasPresentationSettings } from './designer-canvas-transactions.js';
-import {
-  appendDesignerColorGroup,
-  segmentDesignerColorFields,
-  shouldGroupColorFields,
-} from './designer-color-group-dom.js';
 import { appendMultiSelectionControls } from './designer-multi-selection-dom.js';
 import {
   appendActionButton,
   appendFieldGrid,
   appendInput,
   appendListItem,
-  appendPropControl,
   appendPropertySwitch,
   appendSection,
   appendStyleControl,
@@ -143,49 +140,6 @@ function disableLockedComponentControls(properties: HTMLElement): void {
     if (!control.hasAttribute('data-tip')) {
       control.setAttribute('data-tip', DESIGNER_UI_TEXT.propertiesPanel.lockedEditingHint);
     }
-  }
-}
-
-interface RenderableInspectorField<T> {
-  readonly control: string;
-  readonly field: T;
-  readonly schema: BaseScreenMaterialPropSchema;
-}
-
-/**
- * 分区内按「连续色值」分段：一段 ≥ 3 个色值时合成色板组，其余字段原样落行。
- * 只认相邻关系——被字号、开关这类字段打断就不跨段拼板，避免把不相关的颜色凑成一套配色。
- */
-function appendInspectorFields<T>(
-  parent: HTMLElement,
-  fields: readonly RenderableInspectorField<T>[],
-  options: {
-    readonly groupKey: string;
-    readonly keyOf: (field: T) => string;
-    readonly labelOf: (field: T) => string;
-    readonly valueOf: (field: T) => ScreenJsonValue | undefined;
-    readonly renderField: (parent: HTMLElement, field: RenderableInspectorField<T>) => void;
-  },
-): void {
-  for (const segment of segmentDesignerColorFields(fields)) {
-    if (segment.color && shouldGroupColorFields(segment.fields.length)) {
-      appendDesignerColorGroup(parent, {
-        groupKey: options.groupKey,
-        entries: segment.fields.map((item) => ({
-          key: options.keyOf(item.field),
-          label: options.labelOf(item.field),
-          value: options.valueOf(item.field),
-        })),
-        renderField: (container, entry) => {
-          const item = segment.fields.find(
-            (candidate) => options.keyOf(candidate.field) === entry.key,
-          );
-          if (item !== undefined) options.renderField(container, item);
-        },
-      });
-      continue;
-    }
-    for (const item of segment.fields) options.renderField(parent, item);
   }
 }
 
@@ -300,91 +254,15 @@ function appendComponentControls(
   appendUniversalStyleSections(properties, component);
   appendDesignerQuickStyle(properties, manifest, { components: [component] });
 
-  const descriptorAppearance = manifest.editorDescriptor?.appearance;
-  if (descriptorAppearance !== undefined && descriptorAppearance.length > 0) {
-    renderDesignerDescriptorZone(properties, descriptorAppearance, {
-      document,
-      interaction,
-      catalog,
-      getDatasetFields,
-      inspectorControls,
-    });
-    return;
-  }
-  const content =
-    manifest.propertyPanel.length === 0
-      ? undefined
-      : appendSection(
-          properties,
-          DESIGNER_UI_TEXT.propertiesPanel.content,
-          false,
-          undefined,
-          'content',
-        );
-  const propFields: RenderableInspectorField<
-    BaseScreenMaterialManifest['propertyPanel'][number]
-  >[] = [];
-  for (const field of manifest.propertyPanel) {
-    const schema = manifest.propsSchema.properties[field.prop];
-    if (schema !== undefined) propFields.push({ control: field.control, field, schema });
-  }
-  if (content !== undefined) {
-    appendInspectorFields(content, propFields, {
-      groupKey: `${component.id}:prop`,
-      keyOf: (field) => field.prop,
-      labelOf: (field) => field.label,
-      valueOf: (field) => component.props[field.prop],
-      renderField: (host, item) =>
-        appendPropControl(
-          host,
-          item.field.label,
-          item.field.prop,
-          component.props[item.field.prop],
-          item.schema,
-          item.field.control,
-          `${component.id}:prop:${item.field.prop}`,
-          item.field.allowGradient === true,
-        ),
-    });
-  }
-  const stylePanel = manifest.stylePanel ?? [];
-  const style =
-    stylePanel.length === 0
-      ? undefined
-      : appendSection(
-          properties,
-          DESIGNER_UI_TEXT.propertiesPanel.style,
-          false,
-          undefined,
-          'style',
-        );
-  const styleFields: RenderableInspectorField<
-    NonNullable<BaseScreenMaterialManifest['stylePanel']>[number]
-  >[] = [];
-  for (const field of stylePanel) {
-    if (field.style === 'opacity') continue;
-    const schema = manifest.styleSchema.properties[field.style];
-    if (schema !== undefined) styleFields.push({ control: field.control, field, schema });
-  }
-  if (style !== undefined) {
-    appendInspectorFields(style, styleFields, {
-      groupKey: `${component.id}:style`,
-      keyOf: (field) => field.style,
-      labelOf: (field) => field.label,
-      valueOf: (field) => component.style[field.style],
-      renderField: (host, item) =>
-        appendStyleControl(
-          host,
-          item.field.label,
-          item.field.style,
-          component.style[item.field.style],
-          item.schema,
-          item.field.control,
-          `${component.id}:style:${item.field.style}`,
-          item.field.allowGradient === true,
-        ),
-    });
-  }
+  // 外观区只有一条渲染路径（ADR-0102 D1）：扁平面板先转换成描述符分区再渲染。
+  renderDesignerDescriptorZone(properties, designerMaterialAppearance(manifest), {
+    document,
+    interaction,
+    catalog,
+    getDatasetFields,
+    inspectorControls,
+  });
+  // 条件样式与宿主条件样式从同一份外观字段表识别可绑字段。
   appendConditionalStyleSection(properties, component, manifest);
   if (
     context.kind === 'single-material' &&
@@ -407,13 +285,9 @@ function appendConditionalStyleSection(
   component: ScreenComponentNode,
   manifest: BaseScreenMaterialManifest,
 ): void {
-  const colorKeys = (manifest.stylePanel ?? [])
-    .filter(
-      (field) =>
-        field.control === 'color' &&
-        manifest.styleSchema.properties[field.style]?.kind === 'string',
-    )
-    .map((field) => field.style);
+  const colorKeys = designerMaterialEditorKeys(manifest, 'style')
+    .filter((entry) => entry.field.control === 'color' && entry.schema.kind === 'string')
+    .map((entry) => entry.key);
   if (colorKeys.length === 0) return;
   const rules = component.styleRules ?? [];
   const section = appendSection(
@@ -1020,8 +894,12 @@ function appendFlipActions(
   component: ScreenComponentNode,
   manifest: BaseScreenMaterialManifest,
 ): void {
-  const supportsHorizontal = manifest.styleSchema.properties.flipX?.kind === 'boolean';
-  const supportsVertical = manifest.styleSchema.properties.flipY?.kind === 'boolean';
+  // 翻转是引擎级保留键（ADR-0099 §2.3）：Renderer 几何帧对所有物料统一写入 transform，
+  // 因此公共区无条件提供入口；物料申报的 schema 只用于收窄取值，不决定是否显示。
+  const schemaOf = (key: 'flipX' | 'flipY') =>
+    manifest.styleSchema.properties[key] ?? BASE_SCREEN_RESERVED_STYLE_SCHEMAS[key];
+  const supportsHorizontal = schemaOf('flipX')?.kind === 'boolean';
+  const supportsVertical = schemaOf('flipY')?.kind === 'boolean';
   if (!supportsHorizontal && !supportsVertical) return;
   const field = createDesignerFieldElement(parent.ownerDocument, {
     label: DESIGNER_UI_TEXT.propertiesPanel.flipHorizontal,

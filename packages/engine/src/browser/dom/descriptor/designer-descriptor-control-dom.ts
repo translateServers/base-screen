@@ -5,7 +5,13 @@ import {
   resolveSchema,
 } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { createDesignerStepper } from '../designer-field-primitives.js';
+import {
+  createDesignerRangeField,
+  createDesignerStepper,
+  DESIGNER_ALIGNMENT_ICONS,
+  isDesignerAlignmentEnum,
+  isDesignerRangeEligible,
+} from '../designer-field-primitives.js';
 import { designerIcon } from '../designer-icons.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
@@ -23,6 +29,11 @@ import type {
 export interface DescriptorControlHandle {
   /** 挂到字段行里的元素（复合控件时是外壳）。 */
   readonly element: HTMLElement;
+  /**
+   * 紧跟 `element` 挂进同一控件列的兄弟元素。滑杆 + 数字双控件靠它保持两者都是控件列的直接子元素
+   * （检查器布局按 `.designer-field-control:has(> .designer-range)` 识别），与扁平面板同一结构。
+   */
+  readonly trailing?: HTMLElement;
   /** 承载值、派发 change、被设计器路由识别的元素。 */
   readonly valueTarget: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
   /** 可选：挂到标签旁的字段级动作（四边距的统一/分开）。 */
@@ -60,8 +71,10 @@ export function createDescriptorControl(
     });
     return { element: toggle, valueTarget: toggle };
   }
-  if (control === 'segmented' && schema?.kind === 'enum') {
+  const alignment = schema?.kind === 'enum' && isDesignerAlignmentEnum(schema.values);
+  if ((control === 'segmented' || (control === 'select' && alignment)) && schema?.kind === 'enum') {
     // 与对齐分段同款：原生 select 是唯一值载体与 change 源，可见按钮只改值。
+    // 三档水平对齐与扁平面板一样画成图标（声明为 select 也是），其余枚举显示取值文本。
     const current = schema.values.some((option) => option === value)
       ? String(value)
       : String(schema.values[0]);
@@ -79,10 +92,14 @@ export function createDescriptorControl(
       ariaLabel: field.label,
       selection: 'radio',
       selected: current,
-      options: schema.values.map((optionValue) => ({
-        value: String(optionValue),
-        label: String(optionValue),
-      })),
+      options: schema.values.map((optionValue) => {
+        const icon = alignment ? DESIGNER_ALIGNMENT_ICONS[String(optionValue)] : undefined;
+        return {
+          value: String(optionValue),
+          label: String(optionValue),
+          ...(icon === undefined ? {} : { icon, ariaLabel: String(optionValue) }),
+        };
+      }),
     });
     for (const [optionValue, option] of segmented.buttons) {
       option.addEventListener('click', () => {
@@ -161,7 +178,7 @@ export function createDescriptorControl(
     ...(numeric && field.step !== undefined ? { step: field.step } : {}),
     value: String(value ?? ''),
   });
-  if (control === 'unit-number' && field.unit !== undefined && field.unit !== '') {
+  if (numeric && field.unit !== undefined && field.unit !== '') {
     // 与步进器同一套复合控件形态：外壳画描边环，单位后缀不参与取值，input 仍是唯一值载体。
     const shell = ownerDocument.createElement('span');
     shell.className = 'designer-unit-input';
@@ -173,6 +190,54 @@ export function createDescriptorControl(
     return { element: shell, valueTarget: input };
   }
   return { element: input, valueTarget: input };
+}
+
+/**
+ * 有界数值：滑杆 + 数字读数（判定见 `isDesignerRangeEligible`）。
+ * 数字读数是唯一值载体；滑杆松手时把值转发给它再派发 change。可选字段未设置时读数留空并显示「自动」，
+ * 清空读数即删除该键（提交侧见描述符事务）。声明了 `unit` 时单位内嵌在读数右缘（ADR-0102 §5），
+ * 与几何符号同一形态——有界长度与无单位的有界数值是同一种控件，不再因为写了单位就换成数字框。
+ *
+ * 只用于字段行（`number` 控件）；数组项内的数值仍是单个输入——项行是紧凑的标签内联布局，放不下滑杆。
+ */
+export function createDescriptorRangeControl(
+  ownerDocument: Document,
+  field: BaseScreenMaterialEditorField,
+  schema: BaseScreenMaterialPropSchema | undefined,
+  value: ScreenJsonValue | undefined,
+): DescriptorControlHandle | undefined {
+  if (field.control !== 'number') return undefined;
+  const minimum = field.min ?? (schema?.kind === 'number' ? schema.minimum : undefined);
+  const maximum = field.max ?? (schema?.kind === 'number' ? schema.maximum : undefined);
+  if (
+    minimum === undefined ||
+    maximum === undefined ||
+    !isDesignerRangeEligible(minimum, maximum)
+  ) {
+    return undefined;
+  }
+  const empty = typeof value !== 'number' || !Number.isFinite(value);
+  const current = empty ? minimum : (value as number);
+  const step = field.step ?? (Number.isInteger(minimum) && Number.isInteger(maximum) ? 1 : 0.01);
+  const range = createDesignerRangeField(ownerDocument, {
+    ariaLabel: field.label,
+    min: minimum,
+    max: maximum,
+    step,
+    value: empty ? '' : String(current),
+    rangeValue: String(current),
+    numberClassName: 'designer-field-range-value',
+    ...(empty ? { placeholder: DESIGNER_UI_TEXT.inspectorUi.autoValue, empty: true } : {}),
+    forwardRangeChange: true,
+  });
+  if (field.unit === undefined || field.unit === '') {
+    return { element: range.range, trailing: range.number, valueTarget: range.number };
+  }
+  const reading = ownerDocument.createElement('label');
+  reading.className = 'designer-geo-field designer-field-range-reading';
+  reading.dataset.symbol = field.unit;
+  reading.appendChild(range.number);
+  return { element: range.range, trailing: reading, valueTarget: range.number };
 }
 
 const SPACING_SIDES = ['top', 'right', 'bottom', 'left'] as const;
@@ -414,4 +479,21 @@ export function applyFieldDataset(
   control.dataset.descriptorPath = JSON.stringify(field.path);
   control.dataset.descriptorControl = field.control;
   if (field.projection !== undefined) control.dataset.descriptorProjection = field.projection;
+  // 顶层 props/style 键再挂一份与扁平面板相同的 `data-prop` / `data-style`：检查器搜索、回车提交、
+  // 自动化与宿主脚本按同一个钩子定位字段，不必关心外观区用的是描述符还是扁平面板。
+  // 提交仍由描述符事务先行处理（见 designer-descriptor-operations），不会走两遍。
+  const key = topLevelKey(field);
+  if (key !== undefined) {
+    if (key.target === 'props') control.dataset.prop = key.name;
+    else control.dataset.style = key.name;
+  }
+}
+
+function topLevelKey(
+  field: BaseScreenMaterialEditorField,
+): { readonly target: 'props' | 'style'; readonly name: string } | undefined {
+  const target = field.target === 'interaction' ? field.projection : field.target;
+  if (target !== 'props' && target !== 'style') return undefined;
+  if (field.path.length !== 1 || typeof field.path[0] !== 'string') return undefined;
+  return { target, name: field.path[0] };
 }

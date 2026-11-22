@@ -101,3 +101,40 @@ describe('designer command palette shortcut', () => {
     expect(controller.onKeyDown(key({ key: 'k', metaKey: true }))).toBe(true);
   });
 });
+
+describe('designer command palette material fragments (ADR-0100)', () => {
+  it('lists a fragment card as a material entry that carries the fragment id', () => {
+    const control = { disabled: false, dataset: { materialFragment: 'acme.kpi' } };
+    const name = { textContent: ' 指标卡 ' };
+    const card = {
+      dataset: { materialCard: 'fragment:acme.kpi', materialFragmentCard: 'acme.kpi' },
+      querySelector: (selector: string) =>
+        selector === '[data-material-fragment]'
+          ? control
+          : selector === '.material-name'
+            ? name
+            : null,
+    };
+    const root = {
+      querySelectorAll: (selector: string) => (selector === '[data-material-card]' ? [card] : []),
+    } as unknown as ShadowRoot;
+    const controller = new DesignerCommandPaletteController({
+      getRoot: () => root,
+      getDocument: () => undefined,
+      getWorkbenchMode: () => 'canvas',
+      renderKindIcon: () => '',
+    });
+    const list = (
+      controller as unknown as { entries(): readonly DesignerCommandPaletteEntry[] }
+    ).entries();
+    const fragment = list.find((entry) => entry.materialFragmentId !== undefined);
+    expect(fragment).toMatchObject({
+      kind: 'material',
+      label: '指标卡',
+      materialFragmentId: 'acme.kpi',
+      disabled: false,
+    });
+    expect(fragment?.materialType).toBeUndefined();
+    expect(filterDesignerCommandPaletteEntries(list, '+ 指标')).toEqual([fragment]);
+  });
+});

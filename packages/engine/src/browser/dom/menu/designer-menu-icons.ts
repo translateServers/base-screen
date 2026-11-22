@@ -14,6 +14,7 @@ const MENU_ACTION_ICONS: Readonly<Record<string, DesignerIconName>> = {
   delete: 'trash',
   group: 'group',
   ungroup: 'ungroup',
+  'save-as-fragment': 'star',
   'bring-to-front': 'bring-to-front',
   'bring-forward': 'arrow-up',
   'send-backward': 'arrow-down',

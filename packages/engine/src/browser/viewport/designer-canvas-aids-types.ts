@@ -1,11 +1,22 @@
-export const DESIGNER_SMART_GUIDE_THRESHOLD = 5;
+// 吸附捕获阈值（屏幕 px，按 zoom 换算成文档坐标），对齐吸附与等间距吸附共用。参考值：
+// Moveable 5、Grida 5–6、tldraw / Excalidraw 8、Penpot 10（research/canvas-snap-guides-2026-11-22.md）。
+// 8 在加入等间距候选后手感偏“黏”，取 6。
+export const DESIGNER_SMART_GUIDE_THRESHOLD = 6;
 // 吸附保持范围倍率：1.0 = 捕获阈值本身（超出阈值立即释放），
-// 对齐 Nebula/Moveable 的每帧重新判定语义（Moveable snapThreshold=5，无额外滞后带）。
+// 对齐 Moveable / Penpot 的每帧重新判定语义（无额外滞后带）。
 export const DESIGNER_SNAP_RELEASE_MULTIPLIER = 1;
-// 对齐线渲染阈值（屏幕 px，按 zoom 换算成文档坐标）：仅距离 ≤ 该值的命中才绘制参考线，
-// 对应 Moveable 的 snapRenderThreshold（默认 1）——吸附（5px）与渲染（1px）分离，
-// 接近阶段无线，几乎贴合时才出现线。
+// 吸附邻近范围（屏幕 px，按 zoom 换算成文档坐标）：组件只有在其与拖动几何在正交方向的
+// 间距 ≤ 该值时才参与吸附、参考线、等间距与间距标注；等间距本身也不超过该值。对应 Moveable
+// maxSnapElementGuidelineDistance / maxSnapElementGapDistance（默认不限）。大屏设计器通常
+// 整张画布都在视口内，只靠视口过滤（tldraw / Penpot）不能约束范围，因此另设此上限。
+// 画布边与用户 guide 不受此限。
+export const DESIGNER_SNAP_REACH = 180;
+// 间距标注判定“同轨道 / 已重合”的容差（屏幕 px，按 zoom 换算成文档坐标）。
 export const DESIGNER_SNAP_RENDER_THRESHOLD = 1;
+// 参考线重合容差（屏幕 px，按 zoom 换算成文档坐标）：吸附完成后，按最终几何重新收集
+// 与之精确重合的对齐（Penpot ±0.5px；tldraw / Excalidraw 为零偏移），每个坐标画一条线，
+// 覆盖该坐标上全部吸附点。贴角时两轴各一条，已对齐但这次未修正的边同样显示。
+export const DESIGNER_SNAP_ALIGNMENT_TOLERANCE = 0.5;
 
 export interface DesignerCanvasAidsState {
   readonly gridEnabled: boolean;
@@ -35,6 +46,8 @@ export interface DesignerCanvasMeasurement {
   readonly from: number;
   readonly position: number;
   readonly to: number;
+  /** `equal`：与同排其它间距精确相等的等间距标注；缺省为对齐轨道上的普通间距。 */
+  readonly kind?: 'equal' | undefined;
 }
 
 export type DesignerSnapPreview = DesignerSnapPoint &
@@ -48,6 +61,8 @@ export interface DesignerSnapGuideLine {
   readonly start?: number | undefined;
   /** 参考线长度（可选）：undefined 表示全画布线。 */
   readonly size?: number | undefined;
+  /** 线上各吸附点的正交坐标（目标与被拖几何），供绘制 × 标记。 */
+  readonly points?: readonly number[] | undefined;
 }
 
 export interface DesignerSnapGuides {
@@ -60,7 +75,7 @@ export interface DesignerSnapTranslation {
   readonly y: number;
   readonly snappedX?: number | undefined;
   readonly snappedY?: number | undefined;
-  /** 显示阈值内的最近一条智能对齐线。 */
+  /** 吸附后与最终几何精确重合的对齐线（每个坐标一条）。 */
   readonly guides?: DesignerSnapGuides | undefined;
   /** 选区对齐轨道上的相邻组件间距，仅作为覆盖层视觉反馈。 */
   readonly measurements?: readonly DesignerCanvasMeasurement[] | undefined;

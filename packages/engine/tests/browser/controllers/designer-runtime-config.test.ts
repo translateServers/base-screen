@@ -256,6 +256,56 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     expect(designer.materialLibraryItems).toBe(configured);
   });
 
+  it('accepts host material library fragments and hides those the catalog cannot expand', () => {
+    const designer = new BaseScreenDesignerElement();
+    const dispatched: CustomEvent[] = [];
+    Object.assign(designer, {
+      dispatchEvent: (event: CustomEvent) => {
+        dispatched.push(event);
+        return true;
+      },
+    });
+    const fragments = [
+      {
+        id: 'acme.card',
+        name: 'Card',
+        category: 'Base',
+        keywords: [],
+        nodes: [{ key: 'image', materialType: 'base.image' }],
+      },
+    ];
+    expect(
+      designer.configure({ catalog: projectableCatalog(), materialLibraryFragments: fragments }).ok,
+    ).toBe(true);
+    expect(designer.materialLibraryFragments).toEqual(fragments);
+    const configured = designer.materialLibraryFragments;
+
+    designer.materialLibraryFragments = [{ ...fragments[0]!, extra: true }] as never;
+    expect(designer.materialLibraryFragments).toBe(configured);
+    expect(dispatched.at(-1)?.detail.diagnostics[0]?.severity).toBe('error');
+
+    const state = getDesignerElementState(designer);
+    expect(state.runtime.listMaterialLibraryFragmentItems(designer).map((item) => item.id)).toEqual(
+      ['acme.card'],
+    );
+    designer.materialLibraryFragments = [
+      { ...fragments[0]!, id: 'acme.missing', nodes: [{ key: 'x', materialType: 'acme.missing' }] },
+    ];
+    expect(designer.materialLibraryFragments?.map((fragment) => fragment.id)).toEqual([
+      'acme.missing',
+    ]);
+    expect(state.runtime.listMaterialLibraryFragmentItems(designer)).toEqual([]);
+    const warning = dispatched.at(-1)?.detail.diagnostics[0];
+    expect(warning).toMatchObject({
+      severity: 'warning',
+      path: ['fragments', 'acme.missing', 'nodes', 0, 'materialType'],
+    });
+    // 同一组输入只试运行一次：再次读取不重复上报。
+    const count = dispatched.length;
+    state.runtime.listMaterialLibraryFragmentItems(designer);
+    expect(dispatched).toHaveLength(count);
+  });
+
   it('rejects a designer host adapter whose capabilities disagree with its ports', () => {
     const designer = new BaseScreenDesignerElement();
     const result = designer.configure({

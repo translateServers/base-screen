@@ -4,8 +4,8 @@ import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
 import {
   appendDesignerRangeField,
-  createDesignerFieldElement,
   createDesignerFieldRow,
+  createDesignerSwitchField,
   type DesignerFieldRow,
   type DesignerFieldRowOptions,
 } from '../designer-field-primitives.js';
@@ -15,7 +15,6 @@ import {
   createDesignerButton,
   createDesignerInput,
   createDesignerSelect,
-  createDesignerSwitch,
 } from '../designer-ui-primitives.js';
 import {
   canvasBackgroundPaletteValue,
@@ -265,18 +264,14 @@ function appendCanvasSwitchField(
   checked: boolean,
 ): void {
   const ownerDocument = parent.ownerDocument;
-  // 开关行：标签左、开关右（原型 .toggle-row），长标签换行时开关仍贴右缘。
-  const field = createDesignerFieldElement(ownerDocument, {
+  // 开关行：与组件检查器的布尔字段同一个原语（ADR-0102 §5）。
+  const { field, input } = createDesignerSwitchField(ownerDocument, {
     label: labelText,
+    checked,
     className: 'designer-canvas-setting-checkbox',
   });
-  const input = createDesignerSwitch(ownerDocument, {
-    ariaLabel: labelText,
-    checked,
-    value: String(checked),
-  });
+  input.value = String(checked);
   input.dataset.canvasSetting = setting;
-  field.appendChild(input);
   appendDesignerFieldMessage(field, input, `canvas-${setting}`);
   parent.appendChild(field);
 }

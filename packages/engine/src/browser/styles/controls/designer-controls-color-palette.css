@@ -81,7 +81,6 @@
    暗夜面板上的白块）本来就靠面板对比就够，不需要第二条线。
    也不能用 border + 内层伪元素各画一条 —— 两层圆角在 1px 缝里各抗一次锯齿，放大就是台阶毛边。 */
 .designer-color-palette,
-.designer-color-group,
 .designer-fill-color-picker {
   /* 勾边走 0.5px hairline：1px 的环在 6px 圆角弧线上是分段采样，会断成一串亮点（放大看就是毛刺）；
      半像素线在 1x 下抗锯齿成半透明、2x 下正好落在一个物理像素上，弧线才连续。 */
@@ -833,87 +832,4 @@
   box-shadow:
     inset 0 0 0 2px var(--designer-accent),
     0 0 0 2px var(--designer-accent-surface);
-}
-
-/* ── 色板组：分区内连续 ≥3 个色值 ──
-   色卡列数由宽度算，不按个数写阈值：每格最小 46px（三个汉字 33px + 两侧内距），
-   放得下几格排几格，放不下换行。名字放在色块下方——压在色块上就得按底色算字色，
-   渐变与半透明色没有可靠的墨色，而色块本身才是要判断的东西。 */
-.designer-color-group {
-  display: grid;
-  gap: var(--designer-space-4);
-  /* 分区标题只有 6px 下距，色卡又是一整块实色：再补 6px 内距（padding 不与标题外边距
-     折叠）让标题与色块之间留出 12px，选中环外扩后也不至于贴住标题。 */
-  padding-top: var(--designer-space-3);
-  margin-bottom: var(--designer-space-3);
-}
-
-.designer-color-group-band {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
-  /* 列距给选中环留位置（环外扩 3.5px），行距让名字与上一行色块分开。 */
-  gap: var(--designer-space-4);
-}
-
-.designer-color-group-card {
-  display: grid;
-  gap: var(--designer-space-4);
-  appearance: none;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  text-align: left;
-  cursor: pointer;
-}
-
-/* 选中只圈色块，不圈名字：连名字一起圈会把一行标签包成一颗竖胶囊，比色块本身还抢眼。
-   环画在色块外，名字同时提亮到 primary，靠亮度差而不是靠描边读选中。 */
-.designer-color-group-card[aria-pressed="true"] .designer-color-group-swatch {
-  outline: 1.5px solid var(--designer-text-primary);
-  outline-offset: 2px;
-}
-
-.designer-color-group-card[aria-pressed="true"] .designer-color-group-name {
-  color: var(--designer-text-primary);
-}
-
-/* 键盘焦点压过选中环：焦点才是「当前定位」，与列表选中同一套语义。 */
-.designer-color-group-card:focus-visible .designer-color-group-swatch {
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: 2px;
-}
-
-.designer-color-group-swatch {
-  position: relative;
-  box-sizing: border-box;
-  height: 58px;
-  border-radius: var(--designer-radius-3);
-}
-
-/* 填充层压在棋盘之上：与调色板触发器的 `::after` 同一做法。色值带 alpha 时透出棋盘，
-   纯色时整块盖住；勾边也只画一层，方向随主题反转。 */
-.designer-color-group-fill {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 0 0 0.5px var(--designer-swatch-edge);
-}
-
-/* 透明色的棋盘细一档：10px 方格落进 58px 色块会像马赛克，读不出「透出底纹」。 */
-.designer-fill-color-checkerboard.designer-color-group-swatch {
-  background-size: 8px 8px;
-  background-position:
-    0 0,
-    0 4px,
-    4px -4px,
-    -4px 0;
-}
-
-.designer-color-group-name {
-  overflow: hidden;
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-size-xs) / 1.2 var(--designer-font-family);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
