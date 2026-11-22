@@ -122,27 +122,9 @@ export const PLUGIN_BOARD_SCROLL_BOARD_MANIFEST: BaseScreenMaterialManifest = {
     unknownColor: BOARD_ALARM_LEVEL_COLORS.unknown,
   },
   styleSchema: SCROLL_BOARD_STYLE_SCHEMA,
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
-    { style: 'color', label: '文字色', control: 'color' },
-    { style: 'headerColor', label: '表头色', control: 'color' },
-    { style: 'accentColor', label: '强调色', control: 'color' },
-    { style: 'borderColor', label: '分隔线色', control: 'color' },
-    { style: 'fontSize', label: '字号', control: 'number' },
-    { style: 'rowHeight', label: '行高', control: 'number' },
-    { style: 'criticalColor', label: '严重色', control: 'color' },
-    { style: 'warningColor', label: '警告色', control: 'color' },
-    { style: 'infoColor', label: '提示色', control: 'color' },
-    { style: 'unknownColor', label: '未知等级色', control: 'color' },
-  ],
+  stylePanel: [],
   propsSchema: SCROLL_BOARD_PROPS_SCHEMA,
-  propertyPanel: [
-    { prop: 'headerVisible', label: '显示表头', control: 'boolean' },
-    { prop: 'rowCount', label: '可见行数', control: 'number' },
-    { prop: 'intervalMs', label: '轮播间隔', control: 'number' },
-    { prop: 'autoScroll', label: '自动轮播', control: 'boolean' },
-    { prop: 'statusColumn', label: '等级列', control: 'text' },
-  ],
+  propertyPanel: [],
   editorDescriptor: parseScrollBoardEditorDescriptor(),
   events: [...PLUGIN_BOARD_SCROLL_BOARD_EVENTS],
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
@@ -161,8 +143,8 @@ export const PLUGIN_BOARD_SCROLL_BOARD_MANIFEST: BaseScreenMaterialManifest = {
 
 /**
  * 检查器编排（ADR-0099 §2.3/§2.4）：外观区按「结构 → 文字 → 填充与描边 → 语义色 → 动效」排列，
- * 等级列是字段映射，放数据区用 `field-selector`。扁平 `propertyPanel`/`stylePanel` 仍保留：
- * 多选批量与条件样式按它们识别可编辑字段。
+ * 等级列是字段映射，放数据区用 `field-selector`。描述符是唯一的表单来源（ADR-0102 D1）：
+ * 多选批量与条件样式同样从它识别可编辑字段。
  */
 function parseScrollBoardEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
   const parsed = parseBaseScreenMaterialEditorDescriptor(
@@ -193,7 +175,6 @@ function parseScrollBoardEditorDescriptor(): BaseScreenMaterialEditorDescriptor 
               target: 'style',
               path: ['rowHeight'],
               label: '行高',
-              control: 'unit-number',
               unit: 'px',
               min: 20,
               max: 96,

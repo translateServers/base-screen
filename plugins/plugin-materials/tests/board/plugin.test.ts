@@ -1,11 +1,27 @@
 import {
+  type BaseScreenMaterialManifest,
+  parseBaseScreenFragmentDefinition,
   parseBaseScreenMaterialManifest,
   parseBaseScreenPluginManifest,
 } from '@base-screen/plugin-core';
+import { auditBaseScreenMaterialEditorForm } from '@base-screen/plugin-sdk';
 import { describe, expect, it } from 'vitest';
 import { PLUGIN_BOARD_BORDER_BOX_MANIFEST } from '../../src/board/border-box.js';
 import { PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST } from '../../src/board/capsule-progress.js';
+import { BOARD_DEVICE_SAMPLE_DATA } from '../../src/board/device-sample.js';
 import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../src/board/digital-flop.js';
+import {
+  PLUGIN_BOARD_DEVICE_FRAGMENTS,
+  PLUGIN_BOARD_DEVICE_OVERVIEW_FRAGMENT,
+  PLUGIN_BOARD_DEVICE_OVERVIEW_FRAGMENT_ID,
+  PLUGIN_BOARD_DEVICE_PANEL_FRAGMENT,
+  PLUGIN_BOARD_DEVICE_PANEL_FRAGMENT_ID,
+  PLUGIN_BOARD_DEVICE_STATUS_FRAGMENT,
+  PLUGIN_BOARD_DEVICE_STATUS_FRAGMENT_ID,
+  PLUGIN_BOARD_FRAGMENTS,
+  PLUGIN_BOARD_TITLE_BAR_FRAGMENT,
+  PLUGIN_BOARD_TITLE_BAR_FRAGMENT_ID,
+} from '../../src/board/fragments.js';
 import {
   BOARD_ALARM_LEVEL_COLORS,
   BOARD_BORDER_STYLES,
@@ -29,6 +45,10 @@ import {
   PLUGIN_BOARD_STATUS_GRID_TYPE,
   PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME,
   PLUGIN_BOARD_STATUS_LEGEND_TYPE,
+  PLUGIN_BOARD_TITLE_DECOR_PICKER_ID,
+  PLUGIN_BOARD_TITLE_DECOR_PICKER_TAG_NAME,
+  PLUGIN_BOARD_TITLE_DECOR_TAG_NAME,
+  PLUGIN_BOARD_TITLE_DECOR_TYPE,
   PLUGIN_BOARD_WATER_LEVEL_TAG_NAME,
   PLUGIN_BOARD_WATER_LEVEL_TYPE,
 } from '../../src/board/identity.js';
@@ -42,6 +62,7 @@ import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../src/board/scroll-board
 import { PLUGIN_BOARD_STATUS_GRID_MANIFEST } from '../../src/board/status-grid.js';
 import { PLUGIN_BOARD_STATUS_LEGEND_MANIFEST } from '../../src/board/status-legend.js';
 import { createBoardColumnsAdapter } from '../../src/board/tabular-columns-adapter.js';
+import { PLUGIN_BOARD_TITLE_DECOR_MANIFEST } from '../../src/board/title-decor.js';
 import { PLUGIN_BOARD_WATER_LEVEL_MANIFEST } from '../../src/board/water-level.js';
 import { createPluginMaterialsRuntime, PLUGIN_MATERIALS_ID } from '../../src/plugin.js';
 
@@ -55,9 +76,18 @@ const MANIFESTS = [
   PLUGIN_BOARD_STATUS_GRID_MANIFEST,
   PLUGIN_BOARD_STATUS_LEGEND_MANIFEST,
   PLUGIN_BOARD_PIPELINE_MANIFEST,
+  PLUGIN_BOARD_TITLE_DECOR_MANIFEST,
 ];
 
+function appearanceFields(manifest: BaseScreenMaterialManifest) {
+  return (manifest.editorDescriptor?.appearance ?? []).flatMap((section) => section.fields);
+}
+
 describe('plugin-board-materials manifests', () => {
+  it('conforms to the inspector form paradigm (ADR-0102 R9/R11–R14)', () => {
+    expect(MANIFESTS.flatMap((manifest) => auditBaseScreenMaterialEditorForm(manifest))).toEqual([]);
+  });
+
   it('every material manifest parses as canonical', () => {
     for (const manifest of MANIFESTS) {
       const parsed = parseBaseScreenMaterialManifest(manifest);
@@ -81,6 +111,7 @@ describe('plugin-board-materials manifests', () => {
       [PLUGIN_BOARD_STATUS_GRID_TYPE, PLUGIN_BOARD_STATUS_GRID_TAG_NAME],
       [PLUGIN_BOARD_STATUS_LEGEND_TYPE, PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME],
       [PLUGIN_BOARD_PIPELINE_TYPE, PLUGIN_BOARD_PIPELINE_TAG_NAME],
+      [PLUGIN_BOARD_TITLE_DECOR_TYPE, PLUGIN_BOARD_TITLE_DECOR_TAG_NAME],
     ];
     expect(MANIFESTS.map((manifest) => [manifest.type, manifest.tagName])).toEqual(expected);
   });
@@ -111,6 +142,38 @@ describe('plugin-board-materials manifests', () => {
     ).toBe(true);
   });
 
+  // ADR-0101：装饰边框可以当卡片外壳，双色（角标强调色 + 边线色），角标色新插入时跟随主题。
+  it('lets the border box hold children and keeps the accent colour optional', () => {
+    const manifest = PLUGIN_BOARD_BORDER_BOX_MANIFEST;
+    expect(manifest.designCapabilities.children).toBe(true);
+    expect(manifest.styleSchema.properties.accentColor?.kind).toBe('string');
+    // 存量文档没有 accentColor：不进 required，渲染退回单色。
+    expect(manifest.styleSchema.required).not.toContain('accentColor');
+    expect(manifest.themeStyle).toEqual({ accentColor: 'primary' });
+    expect(parseBaseScreenMaterialManifest(manifest).ok).toBe(true);
+  });
+
+  // 标题装饰只画图元：文字由放在里面的 base.text 承担（物料原子化、门禁 R2）。
+  it('keeps the title decor free of text and lets the title text sit inside it', () => {
+    const manifest = PLUGIN_BOARD_TITLE_DECOR_MANIFEST;
+    expect(Object.keys(manifest.propsSchema.properties)).toEqual(['decorStyle']);
+    expect(manifest.dataCapabilities).toEqual([]);
+    expect(manifest.designCapabilities.children).toBe(true);
+    expect(manifest.themeStyle).toEqual({ accentColor: 'primary' });
+    const custom = manifest.editorDescriptor?.appearance
+      ?.flatMap((section) => section.fields)
+      .find((field) => field.control === 'custom');
+    expect(custom?.tagName).toBe(PLUGIN_BOARD_TITLE_DECOR_PICKER_TAG_NAME);
+    expect(
+      createPluginMaterialsRuntime().manifest.contributions.some(
+        (item) =>
+          item.kind === 'inspectorControl' &&
+          item.id === PLUGIN_BOARD_TITLE_DECOR_PICKER_ID &&
+          item.tagName === PLUGIN_BOARD_TITLE_DECOR_PICKER_TAG_NAME,
+      ),
+    ).toBe(true);
+  });
+
   it('the border style enum only lists styles the renderer actually implements', () => {
     const schema = PLUGIN_BOARD_BORDER_BOX_MANIFEST.propsSchema.properties.borderStyle;
     expect(schema?.kind).toBe('enum');
@@ -128,10 +191,16 @@ describe('plugin-board-materials manifests', () => {
       expect(Object.keys(manifest.defaultProps).filter((key) => forbidden.includes(key))).toEqual(
         [],
       );
-      // 面板字段同样不得出现标题类字段（否则会重新引入被移除的能力）。
+      // 检查器字段同样不得出现标题类字段（否则会重新引入被移除的能力）。
       expect(
-        manifest.propertyPanel.map((field) => field.prop).filter((key) => forbidden.includes(key)),
+        appearanceFields(manifest)
+          .filter((field) => field.target === 'props')
+          .map((field) => String(field.path[0]))
+          .filter((key) => forbidden.includes(key)),
       ).toEqual([]);
+      // 描述符是唯一的表单来源（ADR-0102 D1）。
+      expect(manifest.propertyPanel, manifest.type).toEqual([]);
+      expect(manifest.stylePanel, manifest.type).toEqual([]);
     }
   });
 
@@ -156,7 +225,7 @@ describe('plugin-board-materials manifests', () => {
     for (const key of levelKeys) {
       expect(manifest.styleSchema.properties[key]?.kind).toBe('string');
       expect(manifest.styleSchema.required).not.toContain(key);
-      expect(manifest.stylePanel.some((field) => field.style === key)).toBe(true);
+      expect(appearanceFields(manifest).some((field) => field.path[0] === key)).toBe(true);
     }
     expect(manifest.defaultStyle).toMatchObject({
       criticalColor: BOARD_ALARM_LEVEL_COLORS.critical,
@@ -171,9 +240,7 @@ describe('plugin-board-materials manifests', () => {
       control: 'unit-number',
       unit: 'ms',
     });
-    expect(manifest.propertyPanel.find((field) => field.prop === 'intervalMs')?.label).toBe(
-      '轮播间隔',
-    );
+    expect(appearance?.find((field) => field.id === 'intervalMs')?.label).toBe('轮播间隔');
   });
 });
 
@@ -184,14 +251,15 @@ describe('plugin-materials runtime', () => {
     expect(runtime.manifest.id).toBe(PLUGIN_MATERIALS_ID);
   });
 
-  it('declares twenty materials, two inspector controls and two palette-only commands', () => {
+  it('declares 21 materials, 3 inspector controls and 2 palette-only commands', () => {
     const runtime = createPluginMaterialsRuntime();
     const counts = new Map<string, number>();
     for (const contribution of runtime.manifest.contributions) {
       counts.set(contribution.kind, (counts.get(contribution.kind) ?? 0) + 1);
     }
-    expect(counts.get('material')).toBe(20);
-    expect(counts.get('inspectorControl')).toBe(2);
+    expect(counts.get('material')).toBe(21);
+    expect(counts.get('inspectorControl')).toBe(3);
+    expect(counts.get('fragment')).toBe(4);
     expect(counts.get('command')).toBe(2);
     // 原 metrics / pipeline 的能力面仍各有一条贡献。
     expect(counts.get('dataResourceType')).toBe(1);
@@ -262,7 +330,7 @@ describe('plugin-materials runtime', () => {
         expect(manifest.defaultStyle[styleKey]).toBe(BOARD_STATUS_COLORS[statusKey]);
         expect(manifest.styleSchema.properties[styleKey]?.kind).toBe('string');
         expect(manifest.styleSchema.required).toContain(styleKey);
-        expect(manifest.stylePanel.map((field) => field.style)).toContain(styleKey);
+        expect(appearanceFields(manifest).map((field) => field.path[0])).toContain(styleKey);
       }
     }
     // 状态图例同源但非必填：未写五态色的图例回落到同一份默认值。
@@ -272,6 +340,33 @@ describe('plugin-materials runtime', () => {
       );
       expect(PLUGIN_BOARD_STATUS_LEGEND_MANIFEST.styleSchema.required).not.toContain(styleKey);
     }
+  });
+
+  // ISA-101：正常态低饱和、只有故障是高饱和色——否则一屏绿格会淹没一个红格。
+  it('keeps the normal states muted and only the fault state saturated', () => {
+    const saturation = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
+      const max = Math.max(r!, g!, b!);
+      const min = Math.min(r!, g!, b!);
+      return max === 0 ? 0 : (max - min) / max;
+    };
+    const fault = saturation(BOARD_STATUS_COLORS.fault);
+    for (const state of ['running', 'standby', 'offline', 'unknown'] as const) {
+      expect(saturation(BOARD_STATUS_COLORS[state]), state).toBeLessThan(fault / 1.5);
+    }
+  });
+
+  // 新开关不进 required：存量文档（没有这些键）仍能通过 schema，渲染退回旧行为。
+  it('adds the new layout switches as optional props', () => {
+    expect(PLUGIN_BOARD_STATUS_LEGEND_MANIFEST.propsSchema.required).toEqual(['showCount']);
+    expect(PLUGIN_BOARD_STATUS_LEGEND_MANIFEST.defaultProps).toMatchObject({
+      showTotal: true,
+      showBar: true,
+    });
+    expect(PLUGIN_BOARD_STATUS_GRID_MANIFEST.propsSchema.required).not.toContain(
+      'sortAbnormalFirst',
+    );
+    expect(PLUGIN_BOARD_STATUS_GRID_MANIFEST.defaultProps.sortAbnormalFirst).toBe(true);
   });
 
   // ADR-0099：五态分布图例是独立原子，灯阵不再内建图例。
@@ -486,5 +581,102 @@ describe('board tabular adapters', () => {
     expect(result.ok === false ? result.diagnostics[0]?.code : undefined).toBe(
       'HOST_DATASET_BINDING_INVALID',
     );
+  });
+});
+
+describe('plugin-materials component fragments (ADR-0100)', () => {
+  it('declares the fragments in library order', () => {
+    const runtime = createPluginMaterialsRuntime();
+    const fragments = runtime.manifest.contributions.filter((item) => item.kind === 'fragment');
+    expect(fragments.map((item) => ('id' in item ? item.id : undefined))).toEqual([
+      PLUGIN_BOARD_DEVICE_OVERVIEW_FRAGMENT_ID,
+      PLUGIN_BOARD_DEVICE_STATUS_FRAGMENT_ID,
+      PLUGIN_BOARD_DEVICE_PANEL_FRAGMENT_ID,
+      PLUGIN_BOARD_TITLE_BAR_FRAGMENT_ID,
+    ]);
+  });
+
+  // ADR-0101：标题文字放在标题装饰里面（父子），装饰边框做外壳；外观色不写死，跟随主题。
+  it('nests the title text inside the title decor and leaves the accent to the theme', () => {
+    expect(PLUGIN_BOARD_TITLE_BAR_FRAGMENT.shell?.materialType).toBe(PLUGIN_BOARD_TITLE_DECOR_TYPE);
+    expect(PLUGIN_BOARD_TITLE_BAR_FRAGMENT.nodes.map((node) => node.materialType)).toEqual([
+      'base.text',
+    ]);
+    const panel = PLUGIN_BOARD_DEVICE_PANEL_FRAGMENT;
+    expect(panel.shell?.materialType).toBe(PLUGIN_BOARD_BORDER_BOX_TYPE);
+    expect(panel.nodes.find((node) => node.key === 'title')?.parent).toBe('decor');
+    for (const entry of [PLUGIN_BOARD_TITLE_BAR_FRAGMENT.shell!, panel.shell!, ...panel.nodes]) {
+      if (entry.materialType === 'base.text') continue;
+      expect(entry.style?.accentColor, entry.key).toBeUndefined();
+    }
+  });
+
+  it('parses through the single fragment definition parser', () => {
+    const keys: Record<string, readonly string[]> = {
+      [PLUGIN_BOARD_DEVICE_OVERVIEW_FRAGMENT_ID]: ['title', 'summary'],
+      [PLUGIN_BOARD_DEVICE_STATUS_FRAGMENT_ID]: ['title', 'summary', 'grid'],
+    };
+    for (const fragment of PLUGIN_BOARD_DEVICE_FRAGMENTS) {
+      const { id, name, category, keywords, shell, nodes } = fragment;
+      const parsed = parseBaseScreenFragmentDefinition({
+        id,
+        name,
+        category,
+        keywords,
+        shell,
+        nodes,
+      });
+      if (!parsed.ok) throw new Error(JSON.stringify(parsed.diagnostics));
+      expect(parsed.value.nodes.map((node) => node.key)).toEqual(keys[id]);
+    }
+  });
+
+  it('only composes its own materials and official ones, with the title as base.text (F3/F8)', () => {
+    const own = new Set(MANIFESTS.map((manifest) => manifest.type));
+    for (const fragment of PLUGIN_BOARD_FRAGMENTS) {
+      for (const entry of [fragment.shell!, ...fragment.nodes]) {
+        expect(entry.materialType.startsWith('base.') || own.has(entry.materialType)).toBe(true);
+      }
+      expect(fragment.nodes.find((node) => node.key === 'title')?.materialType).toBe('base.text');
+    }
+    expect(PLUGIN_BOARD_DEVICE_OVERVIEW_FRAGMENT.nodes.map((node) => node.materialType)).toEqual([
+      'base.text',
+      PLUGIN_BOARD_STATUS_LEGEND_TYPE,
+    ]);
+    expect(PLUGIN_BOARD_DEVICE_STATUS_FRAGMENT.nodes.map((node) => node.materialType)).toEqual([
+      'base.text',
+      PLUGIN_BOARD_STATUS_LEGEND_TYPE,
+      PLUGIN_BOARD_STATUS_GRID_TYPE,
+    ]);
+  });
+
+  it('keeps every node inside the shell', () => {
+    for (const { shell, nodes } of PLUGIN_BOARD_FRAGMENTS) {
+      for (const node of nodes) {
+        const offset = node.offset ?? { x: 0, y: 0 };
+        expect(offset.x + node.size!.width).toBeLessThanOrEqual(shell!.size!.width);
+        expect(offset.y + node.size!.height).toBeLessThanOrEqual(shell!.size!.height);
+      }
+    }
+  });
+
+  // 调研结论：卡片是 1920×1080 设计稿上的一块（DataEase 600×300、GoView 500×300），不是半屏。
+  it('sizes the cards as a card, not as half of the canvas', () => {
+    for (const { shell } of PLUGIN_BOARD_DEVICE_FRAGMENTS) {
+      expect(shell!.size!.width).toBeLessThanOrEqual(480);
+      expect(shell!.size!.height).toBeLessThanOrEqual(270);
+    }
+  });
+
+  // 分布与灯阵读同一份示例：插入后计数与格数必须对得上，不能一张卡自相矛盾。
+  it('gives the summary and the grid the same sample data', () => {
+    expect(PLUGIN_BOARD_STATUS_LEGEND_MANIFEST.defaultData).toBe(BOARD_DEVICE_SAMPLE_DATA);
+    expect(PLUGIN_BOARD_STATUS_GRID_MANIFEST.defaultData).toBe(BOARD_DEVICE_SAMPLE_DATA);
+    for (const { nodes } of PLUGIN_BOARD_DEVICE_FRAGMENTS) {
+      for (const node of nodes.filter((item) => item.materialType !== 'base.text')) {
+        // 不覆盖数据源：两者都回落到 manifest 的同一份示例。
+        expect(node.dataSource).toBeUndefined();
+      }
+    }
   });
 });

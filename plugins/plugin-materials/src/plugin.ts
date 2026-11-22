@@ -5,6 +5,7 @@ import type {
   PluginDesignReadPort,
 } from '@base-screen/plugin-core';
 import { definePlugin } from '@base-screen/plugin-sdk';
+import { PLUGIN_BOARD_FRAGMENTS } from './board/fragments.js';
 import {
   BOARD_BORDER_STYLES,
   type BoardBorderStyle,
@@ -28,6 +29,10 @@ import {
   PLUGIN_BOARD_STATUS_GRID_TYPE,
   PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME,
   PLUGIN_BOARD_STATUS_LEGEND_TYPE,
+  PLUGIN_BOARD_TITLE_DECOR_PICKER_ID,
+  PLUGIN_BOARD_TITLE_DECOR_PICKER_TAG_NAME,
+  PLUGIN_BOARD_TITLE_DECOR_TAG_NAME,
+  PLUGIN_BOARD_TITLE_DECOR_TYPE,
   PLUGIN_BOARD_WATER_LEVEL_TAG_NAME,
   PLUGIN_BOARD_WATER_LEVEL_TYPE,
 } from './board/identity.js';
@@ -60,7 +65,7 @@ export const PLUGIN_ECHARTS_TOGGLE_COMMAND_ID = 'base-screen.echarts.toggle-seri
 export const PLUGIN_ECHARTS_SERIES_PICKER_ID = 'base-screen.echarts.series-picker';
 
 /**
- * 统一物料插件的 runtime：20 个物料、2 个检查器控件、2 条命令，外加原 metrics /
+ * 统一物料插件的 runtime：21 个物料、4 个组合分片、3 个检查器控件、2 条命令，外加原 metrics /
  * pipeline 两个插件的能力面（1 个数据资源类型、1 个蓝图能力、1 个数据处理器、
  * 1 个蓝图动作）。
  *
@@ -87,6 +92,7 @@ export function createPluginMaterialsRuntime(): BaseScreenPluginRuntime {
       ],
       contributions: [
         ...materialContributions(),
+        ...fragmentContributions(),
         ...authoringContributions(),
         ...runtimeContributions(),
       ],
@@ -126,7 +132,7 @@ export function createPluginMaterialsRuntime(): BaseScreenPluginRuntime {
   return defined.value;
 }
 
-/** 20 个物料：9 个大屏组件 + 1 个通用图表 + 10 个图表家族。 */
+/** 21 个物料：10 个大屏组件 + 1 个通用图表 + 10 个图表家族。 */
 function materialContributions(): BaseScreenPluginContribution[] {
   const boardMaterials = [
     [PLUGIN_BOARD_DIGITAL_FLOP_TYPE, PLUGIN_BOARD_DIGITAL_FLOP_TAG_NAME],
@@ -138,6 +144,7 @@ function materialContributions(): BaseScreenPluginContribution[] {
     [PLUGIN_BOARD_STATUS_GRID_TYPE, PLUGIN_BOARD_STATUS_GRID_TAG_NAME],
     [PLUGIN_BOARD_STATUS_LEGEND_TYPE, PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME],
     [PLUGIN_BOARD_PIPELINE_TYPE, PLUGIN_BOARD_PIPELINE_TAG_NAME],
+    [PLUGIN_BOARD_TITLE_DECOR_TYPE, PLUGIN_BOARD_TITLE_DECOR_TAG_NAME],
   ] as const;
   return [
     ...boardMaterials.map(([type, tagName]) => ({ kind: 'material' as const, type, tagName })),
@@ -147,6 +154,14 @@ function materialContributions(): BaseScreenPluginContribution[] {
       tagName: manifest.tagName,
     })),
   ];
+}
+
+/**
+ * 组合分片（ADR-0100）：只组合本插件与官方物料的纯数据贡献，不需要能力授权；
+ * Engine 在物料库里按 catalog 试运行后展示，插入即展开为普通组件。
+ */
+function fragmentContributions(): BaseScreenPluginContribution[] {
+  return [...PLUGIN_BOARD_FRAGMENTS];
 }
 
 /**
@@ -160,6 +175,12 @@ function authoringContributions(): BaseScreenPluginContribution[] {
       id: PLUGIN_BOARD_BORDER_PICKER_ID,
       name: '边框样式选择器',
       tagName: PLUGIN_BOARD_BORDER_PICKER_TAG_NAME,
+    },
+    {
+      kind: 'inspectorControl',
+      id: PLUGIN_BOARD_TITLE_DECOR_PICKER_ID,
+      name: '标题装饰形态选择器',
+      tagName: PLUGIN_BOARD_TITLE_DECOR_PICKER_TAG_NAME,
     },
     {
       kind: 'inspectorControl',

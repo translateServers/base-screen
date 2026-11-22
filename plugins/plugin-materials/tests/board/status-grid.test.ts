@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeStatusGridLayout,
+  computeStatusGridTileSize,
   STATUS_GRID_MAX_COLUMNS,
   STATUS_GRID_MIN_TILE_SIZE,
+  sortStatusGridItems,
+  statusGridTileTextLines,
+  summarizeStatusGridOverflow,
 } from '../../src/board/status-grid.js';
 import {
   buildStatusLegend,
   readStatusLegendCounts,
   STATUS_LEGEND_ORDER,
   STATUS_LEGEND_TABULAR_DATA_ADAPTER,
+  statusLegendBarSegments,
 } from '../../src/board/status-legend.js';
 import {
   createBoardStateAdapter,
@@ -113,6 +118,135 @@ describe('computeStatusGridLayout', () => {
         expect(layout.capacity).toBeGreaterThanOrEqual(1);
       }
     }
+  });
+});
+
+describe('computeStatusGridTileSize', () => {
+  it('keeps tiles square when there are few rows (no more tall colour bars)', () => {
+    // 旧版：3 台设备一行 8 列，格子被拉到满高（~380 px 高的细长条）。
+    const size = computeStatusGridTileSize({
+      width: 588,
+      height: 376,
+      columns: 8,
+      rows: 1,
+      tileGap: 6,
+    });
+    expect(size).toBe(Math.floor((588 - 7 * 6) / 8));
+  });
+
+  it('is capped by the height when the rows are what does not fit', () => {
+    // 48 台、8 列 6 行、容器 588×368：宽给得起 68 px，高只给得起 56 px。
+    const size = computeStatusGridTileSize({
+      width: 588,
+      height: 368,
+      columns: 8,
+      rows: 6,
+      tileGap: 6,
+    });
+    expect(size).toBe(56);
+  });
+
+  it('never returns less than one pixel', () => {
+    const size = computeStatusGridTileSize({
+      width: 0,
+      height: 0,
+      columns: 8,
+      rows: 6,
+      tileGap: 6,
+    });
+    expect(size).toBe(1);
+  });
+});
+
+describe('statusGridTileTextLines', () => {
+  it('degrades from two lines to one line to colour only as the tile shrinks', () => {
+    expect(statusGridTileTextLines(56, 11)).toBe(2);
+    expect(statusGridTileTextLines(32, 11)).toBe(1);
+    expect(statusGridTileTextLines(24, 11)).toBe(0);
+  });
+
+  it('scales the thresholds with the font size', () => {
+    expect(statusGridTileTextLines(56, 16)).toBe(1);
+  });
+});
+
+describe('sortStatusGridItems', () => {
+  it('puts abnormal states first and keeps row order within a state', () => {
+    const rows = [
+      { name: 'a', status: 'running' },
+      { name: 'b', status: 'fault' },
+      { name: 'c', status: 'standby' },
+      { name: 'd', status: 'MELTING' },
+      { name: 'e', status: 'offline' },
+      { name: 'f', status: 'fault' },
+      { name: 'g', status: 'running' },
+    ];
+    expect(sortStatusGridItems(rows).map((row) => row.name)).toEqual([
+      'b',
+      'f',
+      'e',
+      'd',
+      'c',
+      'a',
+      'g',
+    ]);
+    // 不改原数组：行序仍是数据的事实。
+    expect(rows[0]?.name).toBe('a');
+  });
+});
+
+describe('summarizeStatusGridOverflow', () => {
+  it('names the state when everything hidden shares it', () => {
+    const hidden = Array.from({ length: 12 }, () => ({ status: 'running' }));
+    expect(summarizeStatusGridOverflow(hidden)).toEqual({
+      text: '+12 运行',
+      detail: '另有 12 项未显示：运行 12',
+    });
+  });
+
+  it('falls back to a bare count and lists the breakdown abnormal-first', () => {
+    const hidden = [{ status: 'running' }, { status: 'standby' }, { status: 'running' }];
+    expect(summarizeStatusGridOverflow(hidden)).toEqual({
+      text: '+3',
+      detail: '另有 3 项未显示：待机 1、运行 2',
+    });
+  });
+});
+
+describe('statusLegendBarSegments', () => {
+  it('splits 100 % across the non-zero states in legend order', () => {
+    const segments = statusLegendBarSegments({
+      running: 7,
+      standby: 2,
+      fault: 1,
+      offline: 1,
+      unknown: 1,
+    });
+    expect(segments.map((segment) => segment.state)).toEqual([
+      'running',
+      'standby',
+      'fault',
+      'offline',
+      'unknown',
+    ]);
+    expect(segments.reduce((sum, segment) => sum + segment.percent, 0)).toBeCloseTo(100, 6);
+  });
+
+  it('closes the bar exactly when the shares do not divide evenly', () => {
+    const segments = statusLegendBarSegments({
+      running: 1,
+      standby: 1,
+      fault: 1,
+      offline: 0,
+      unknown: 0,
+    });
+    expect(segments.map((segment) => segment.percent)).toEqual([33.33, 33.33, 33.34]);
+  });
+
+  it('returns no segments for an empty table so the caller draws an empty track', () => {
+    expect(
+      statusLegendBarSegments({ running: 0, standby: 0, fault: 0, offline: 0, unknown: 0 }),
+    ).toEqual([]);
   });
 });
 

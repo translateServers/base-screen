@@ -4,8 +4,13 @@ import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialConstructor,
   type BaseScreenMaterialManifest,
+  type BaseScreenMaterialObjectSchema,
 } from '@base-screen/plugin-core';
-import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+import {
+  createBaseScreenNumberFormatConfig,
+  createMaterialDefinition,
+} from '@base-screen/plugin-sdk';
+import { parseBoardEditorDescriptor } from './board-editor.js';
 import { BoardMaterialElement, type BoardMaterialModel } from './board-element.js';
 import { PLUGIN_BOARD_DIGITAL_FLOP_TAG_NAME, PLUGIN_BOARD_DIGITAL_FLOP_TYPE } from './identity.js';
 import { readBoolean, readNumber, readString, styleColor } from './json-values.js';
@@ -18,6 +23,38 @@ import { BOARD_SCALAR_VALUE_ADAPTER } from './scalar-adapter.js';
  * 翻动。这里刻意只依赖原生 DOM 与 Web Animations，不打包任何动画库：这类组件的
  * 视觉差异来自排版与动效细节，不需要第三方运行时。
  */
+/**
+ * 读数格式走通用配置组（ADR-0102 §11）：前缀、单位、小数位、千分位与其他数字类物料同键、同控件。
+ * `prefix` / `unit` 是读数本身的构成（货币符号、单位），不是说明文字，故留在物料里。
+ */
+const DIGITAL_FLOP_NUMBER_FORMAT = createBaseScreenNumberFormatConfig({
+  prefix: true,
+  unit: true,
+  decimals: 0,
+  maxDecimals: 6,
+  thousandsSeparator: true,
+});
+
+const DIGITAL_FLOP_PROPS_SCHEMA = {
+  kind: 'object',
+  properties: {
+    ...DIGITAL_FLOP_NUMBER_FORMAT.properties,
+    flipAnimation: { kind: 'boolean' },
+  },
+  required: [...DIGITAL_FLOP_NUMBER_FORMAT.required],
+} satisfies BaseScreenMaterialObjectSchema;
+
+const DIGITAL_FLOP_STYLE_SCHEMA = {
+  kind: 'object',
+  properties: {
+    backgroundColor: { kind: 'string' },
+    color: { kind: 'string' },
+    accentColor: { kind: 'string' },
+    fontSize: { kind: 'number', minimum: 12, maximum: 200 },
+  },
+  required: ['backgroundColor', 'color', 'accentColor', 'fontSize'],
+} satisfies BaseScreenMaterialObjectSchema;
+
 export const PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
   type: PLUGIN_BOARD_DIGITAL_FLOP_TYPE,
   tagName: PLUGIN_BOARD_DIGITAL_FLOP_TAG_NAME,
@@ -27,12 +64,8 @@ export const PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
   defaultSize: { width: 320, height: 120 },
   // 原子化：这个物料只负责「把一个数按位翻牌显示」。标题属于说明文字，应由文档层
   // 另放 `base.text` 组合，组件内建会让它无法独立排版、也无法在无标题场景复用。
-  // `prefix`/`suffix` 不是说明文字而是读数本身的构成（货币符号、单位），故保留。
   defaultProps: {
-    prefix: '',
-    suffix: '',
-    decimals: 0,
-    thousandsSeparator: true,
+    ...DIGITAL_FLOP_NUMBER_FORMAT.defaults,
     flipAnimation: true,
   },
   defaultData: 128_430,
@@ -43,40 +76,50 @@ export const PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
     accentColor: '#38bdf8',
     fontSize: 48,
   },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      accentColor: { kind: 'string' },
-      fontSize: { kind: 'number', minimum: 12, maximum: 200 },
+  styleSchema: DIGITAL_FLOP_STYLE_SCHEMA,
+  stylePanel: [],
+  propsSchema: DIGITAL_FLOP_PROPS_SCHEMA,
+  propertyPanel: [],
+  editorDescriptor: parseBoardEditorDescriptor(
+    'board.digital-flop',
+    {
+      appearance: [
+        { id: 'format', label: '读数格式', fields: DIGITAL_FLOP_NUMBER_FORMAT.fields },
+        {
+          id: 'text',
+          label: '文字',
+          fields: [
+            { id: 'color', target: 'style', path: ['color'], label: '数字色' },
+            { id: 'fontSize', target: 'style', path: ['fontSize'], label: '数字字号', unit: 'px' },
+          ],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            {
+              id: 'backgroundColor',
+              target: 'style',
+              path: ['backgroundColor'],
+              label: '背景色',
+              allowGradient: true,
+            },
+            { id: 'accentColor', target: 'style', path: ['accentColor'], label: '格底色' },
+          ],
+        },
+        {
+          id: 'motion',
+          label: '动效',
+          advanced: true,
+          fields: [
+            { id: 'flipAnimation', target: 'props', path: ['flipAnimation'], label: '启用翻牌动画' },
+          ],
+        },
+      ],
     },
-    required: ['backgroundColor', 'color', 'accentColor', 'fontSize'],
-  },
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
-    { style: 'color', label: '数字色', control: 'color' },
-    { style: 'accentColor', label: '格底色', control: 'color' },
-    { style: 'fontSize', label: '数字字号', control: 'number' },
-  ],
-  propsSchema: {
-    kind: 'object',
-    properties: {
-      prefix: { kind: 'string', maxLength: 16 },
-      suffix: { kind: 'string', maxLength: 16 },
-      decimals: { kind: 'number', minimum: 0, maximum: 6 },
-      thousandsSeparator: { kind: 'boolean' },
-      flipAnimation: { kind: 'boolean' },
-    },
-    required: ['decimals', 'thousandsSeparator'],
-  },
-  propertyPanel: [
-    { prop: 'prefix', label: '前缀', control: 'text' },
-    { prop: 'suffix', label: '后缀', control: 'text' },
-    { prop: 'decimals', label: '小数位', control: 'number' },
-    { prop: 'thousandsSeparator', label: '千分位', control: 'boolean' },
-    { prop: 'flipAnimation', label: '翻牌动画', control: 'boolean' },
-  ],
+    DIGITAL_FLOP_PROPS_SCHEMA,
+    DIGITAL_FLOP_STYLE_SCHEMA,
+  ),
   events: ['valueClick'],
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
   dataBinding: {
@@ -143,8 +186,8 @@ export class PluginBoardDigitalFlopElement extends BoardMaterialElement {
     for (const [index, character] of [...text].entries()) {
       row.appendChild(this.#cell(character, index, model, animated));
     }
-    const suffix = readString(model.props.suffix);
-    if (suffix !== '') row.appendChild(this.#affix(suffix, model));
+    const unit = readString(model.props.unit);
+    if (unit !== '') row.appendChild(this.#affix(unit, model));
 
     container.appendChild(row);
     // 收尾统一走 `commit()`：它就位画面、标记「已成功渲染过」，并清掉降级角标。

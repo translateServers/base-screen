@@ -4,8 +4,13 @@ import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialConstructor,
   type BaseScreenMaterialManifest,
+  type BaseScreenMaterialObjectSchema,
 } from '@base-screen/plugin-core';
-import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+import {
+  createBaseScreenNumberFormatConfig,
+  createMaterialDefinition,
+} from '@base-screen/plugin-sdk';
+import { parseBoardEditorDescriptor } from './board-editor.js';
 import { BoardMaterialElement, type BoardMaterialModel } from './board-element.js';
 import { PLUGIN_BOARD_WATER_LEVEL_TAG_NAME, PLUGIN_BOARD_WATER_LEVEL_TYPE } from './identity.js';
 import { readBoolean, readNumber, styleColor } from './json-values.js';
@@ -20,6 +25,36 @@ type WaterLevelShape = 'circle' | 'rect';
  * 液面高度由数据决定、用百分比布局表达——两者都不参与彼此的几何计算，因此数值
  * 变化不会连带波纹重排。设计态保持静止（`interactive` 门控），预览与 Viewer 才播放。
  */
+/** 读数格式走通用配置组（ADR-0102 §11）。 */
+const WATER_LEVEL_NUMBER_FORMAT = createBaseScreenNumberFormatConfig({
+  decimals: 1,
+  maxDecimals: 3,
+});
+
+const WATER_LEVEL_PROPS_SCHEMA = {
+  kind: 'object',
+  properties: {
+    shape: { kind: 'enum', values: ['circle', 'rect'] },
+    ...WATER_LEVEL_NUMBER_FORMAT.properties,
+    showLabel: { kind: 'boolean' },
+    waveAnimation: { kind: 'boolean' },
+  },
+  required: ['shape', ...WATER_LEVEL_NUMBER_FORMAT.required, 'showLabel', 'waveAnimation'],
+} satisfies BaseScreenMaterialObjectSchema;
+
+const WATER_LEVEL_STYLE_SCHEMA = {
+  kind: 'object',
+  properties: {
+    backgroundColor: { kind: 'string' },
+    color: { kind: 'string' },
+    waterColor: { kind: 'string' },
+    waveColor: { kind: 'string' },
+    borderColor: { kind: 'string' },
+    fontSize: { kind: 'number', minimum: 10, maximum: 96 },
+  },
+  required: ['backgroundColor', 'color', 'waterColor', 'waveColor', 'borderColor', 'fontSize'],
+} satisfies BaseScreenMaterialObjectSchema;
+
 export const PLUGIN_BOARD_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
   type: PLUGIN_BOARD_WATER_LEVEL_TYPE,
   tagName: PLUGIN_BOARD_WATER_LEVEL_TAG_NAME,
@@ -32,7 +67,7 @@ export const PLUGIN_BOARD_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
   // 在「只要水位」的场景里被复用。
   defaultProps: {
     shape: 'circle',
-    decimals: 1,
+    ...WATER_LEVEL_NUMBER_FORMAT.defaults,
     showLabel: true,
     waveAnimation: true,
   },
@@ -46,42 +81,64 @@ export const PLUGIN_BOARD_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
     borderColor: '#1e3a5f',
     fontSize: 22,
   },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      waterColor: { kind: 'string' },
-      waveColor: { kind: 'string' },
-      borderColor: { kind: 'string' },
-      fontSize: { kind: 'number', minimum: 10, maximum: 96 },
+  styleSchema: WATER_LEVEL_STYLE_SCHEMA,
+  stylePanel: [],
+  propsSchema: WATER_LEVEL_PROPS_SCHEMA,
+  propertyPanel: [],
+  editorDescriptor: parseBoardEditorDescriptor(
+    'board.water-level',
+    {
+      appearance: [
+        {
+          id: 'format',
+          label: '读数格式',
+          fields: [
+            { id: 'showLabel', target: 'props', path: ['showLabel'], label: '显示读数' },
+            ...WATER_LEVEL_NUMBER_FORMAT.fields,
+          ],
+        },
+        {
+          id: 'structure',
+          label: '结构',
+          fields: [{ id: 'shape', target: 'props', path: ['shape'], label: '形状' }],
+        },
+        {
+          id: 'text',
+          label: '文字',
+          fields: [
+            { id: 'color', target: 'style', path: ['color'], label: '读数色' },
+            { id: 'fontSize', target: 'style', path: ['fontSize'], label: '读数字号', unit: 'px' },
+          ],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            {
+              id: 'backgroundColor',
+              target: 'style',
+              path: ['backgroundColor'],
+              label: '背景色',
+              allowGradient: true,
+            },
+            { id: 'waterColor', target: 'style', path: ['waterColor'], label: '水体色' },
+            { id: 'waveColor', target: 'style', path: ['waveColor'], label: '波纹色' },
+            { id: 'borderColor', target: 'style', path: ['borderColor'], label: '边框色' },
+          ],
+        },
+        {
+          id: 'motion',
+          label: '动效',
+          advanced: true,
+          fields: [
+            { id: 'waveAnimation', target: 'props', path: ['waveAnimation'], label: '启用波纹动画' },
+          ],
+        },
+      ],
     },
-    required: ['backgroundColor', 'color', 'waterColor', 'waveColor', 'borderColor', 'fontSize'],
-  },
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
-    { style: 'waterColor', label: '水体色', control: 'color' },
-    { style: 'waveColor', label: '波纹色', control: 'color' },
-    { style: 'borderColor', label: '边框色', control: 'color' },
-    { style: 'color', label: '读数色', control: 'color' },
-    { style: 'fontSize', label: '读数字号', control: 'number' },
-  ],
-  propsSchema: {
-    kind: 'object',
-    properties: {
-      shape: { kind: 'enum', values: ['circle', 'rect'] },
-      decimals: { kind: 'number', minimum: 0, maximum: 3 },
-      showLabel: { kind: 'boolean' },
-      waveAnimation: { kind: 'boolean' },
-    },
-    required: ['shape', 'decimals', 'showLabel', 'waveAnimation'],
-  },
-  propertyPanel: [
-    { prop: 'shape', label: '形状', control: 'select' },
-    { prop: 'decimals', label: '小数位', control: 'number' },
-    { prop: 'showLabel', label: '显示读数', control: 'boolean' },
-    { prop: 'waveAnimation', label: '波纹动画', control: 'boolean' },
-  ],
+    WATER_LEVEL_PROPS_SCHEMA,
+    WATER_LEVEL_STYLE_SCHEMA,
+  ),
   events: ['valueClick'],
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
   dataBinding: {

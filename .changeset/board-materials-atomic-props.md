@@ -14,6 +14,7 @@
   检查器整体迁移至 `editorDescriptor`，`intervalMs` 的单位经 `unit` 声明。
 - 装饰边框的线宽从 props 移到 style：`lineWidth` 更名为 `strokeWidth`（style，非必填，缺省 2px），可被条件样式覆盖；
   检查器补齐线宽、边框色与背景色入口（此前描述符只含 props 字段，单选检查器里没有颜色入口）。
+- 装饰边框移除无效的 `color`（「文字色」）样式：本物料不渲染文字，边框与角标均用 `borderColor` 着色。
 - 胶囊进度的发光从 props 移到 style：`glow` 更名为 `fillGlow`（style，非必填，缺省发光）。
 - 新增物料 `board.status-legend`（状态图例）：读一列状态值，按设备五态计数（运行 / 待机 / 故障 / 离线 / 未知），
   可绑定与状态灯阵相同的数据放在其下方，也可单独使用。状态灯阵移除内建图例（`showLegend` prop 与 `legendColor` 样式）；
@@ -23,4 +24,4 @@
   `color` 的 label 统一为「文字色」。
 
 旧文档中残留的 `speedSeconds`、`emptyText`、`statusPalette`、装饰边框的 `lineWidth`、胶囊进度的 `glow`，
-状态灯阵的 `showLegend` / `legendColor`，或工序链的 `legendColor` 键会被校验失败关闭，需要改写为新形态。
+状态灯阵的 `showLegend` / `legendColor`，工序链的 `legendColor`，或装饰边框的 `color` 键会被校验失败关闭，需要改写为新形态。

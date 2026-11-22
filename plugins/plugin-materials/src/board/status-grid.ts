@@ -12,11 +12,13 @@ import {
   createMaterialDefinition,
 } from '@base-screen/plugin-sdk';
 import { BoardMaterialElement, type BoardMaterialModel } from './board-element.js';
+import { BOARD_DEVICE_SAMPLE_DATA } from './device-sample.js';
 import {
   BOARD_DEFAULT_SURFACE,
   BOARD_SECONDARY_COLOR,
   BOARD_STATUS_COLORS,
   BOARD_STATUS_LABELS,
+  BOARD_STATUS_PRIORITY,
   type BoardStatusKey,
   normalizeBoardStatus,
   PLUGIN_BOARD_STATUS_GRID_TAG_NAME,
@@ -34,7 +36,7 @@ import {
 const STATUS_GRID_EMPTY_LABEL = '无设备数据';
 
 /**
- * 状态灯阵：把"多实体 × 值→色"画成等宽格阵。
+ * 状态灯阵：把"多实体 × 值→色"画成正方形格阵。
  *
  * 为什么它是独立物料而不是 `scroll-board` 的一个模式：灯阵的信息形态是**全量可见**
  * （48 台设备一眼扫完，故障红点靠密度对比跳出来），而列表是**逐条滚动**。同一个数据集
@@ -46,6 +48,17 @@ const STATUS_GRID_EMPTY_LABEL = '无设备数据';
  *
  * 五态分布图例不在本物料里（ADR-0099 T1/T4）：它是另一个读数，由 `board.status-legend`
  * 承担，可绑定同一份数据放在灯阵下方。灯阵底栏只保留属于自身读数的 `+N`（容量溢出）。
+ *
+ * 2026-11-22 按调研结论（Grafana 状态历史 / Polystat、ISA-101、ThingsBoard 高性能模式）重做：
+ * - 格子恒为正方形：边长取「按列平分的宽」与「按行平分的高」的较小者，格阵靠左上排布，
+ *   数据少时不再被拉成细长色柱；
+ * - 格内文字按边长自动降级（两行 → 一行 → 只有色块，悬停看名称），开关只是上限；
+ * - 默认异常优先排序（`sortAbnormalFirst`），容量不够时被 `+N` 收起的是正常设备，
+ *   底栏说明收起的是什么状态；
+ * - 未知格画成虚线框而不是实心色块，故障格加一道内描边：颜色之外再给一层形状编码。
+ *
+ * `sortAbnormalFirst` 不进 required：存量文档缺省为不排序（保持行序），新插入由
+ * `defaultProps` 打开。
  */
 const STATUS_GRID_PROPS_SCHEMA = {
   kind: 'object',
@@ -53,6 +66,7 @@ const STATUS_GRID_PROPS_SCHEMA = {
     columns: { kind: 'number', minimum: 1, maximum: 24 },
     showValue: { kind: 'boolean' },
     labelVisible: { kind: 'boolean' },
+    sortAbnormalFirst: { kind: 'boolean' },
   },
   required: ['columns', 'showValue', 'labelVisible'],
 } satisfies BaseScreenMaterialObjectSchema;
@@ -90,25 +104,18 @@ export const PLUGIN_BOARD_STATUS_GRID_MANIFEST: BaseScreenMaterialManifest = {
   name: '状态灯阵',
   category: '指标',
   keywords: ['状态', '灯阵', '设备', '大屏'],
-  defaultSize: { width: 604, height: 420 },
+  // 约为 1920×1080 设计稿上一张卡片的宽度（DataEase 600×300、GoView 500×300 的一半量级），
+  // 而不是半屏：12 台示例设备排两行 8 列，留出给汇总与标题的位置。
+  defaultSize: { width: 304, height: 84 },
   // 原子化：只画"多实体的状态格"。标题/说明由文档层的 base.text 组合。
   defaultProps: {
     columns: 8,
     showValue: false,
     labelVisible: false,
+    sortAbnormalFirst: true,
   },
-  defaultData: {
-    fields: [
-      { id: 'name', label: '设备', valueType: 'string', nullable: false },
-      { id: 'status', label: '状态', valueType: 'string', nullable: false },
-      { id: 'load', label: '负载', valueType: 'number', unit: '%', nullable: false },
-    ],
-    rows: [
-      { name: '1#冲压机', status: 'fault', load: 86 },
-      { name: '2#冲床', status: 'running', load: 64 },
-      { name: '3#焊机', status: 'standby', load: 12 },
-    ],
-  },
+  // 与状态分布同一份示例：放进「设备状态卡」时两者一一对得上。
+  defaultData: BOARD_DEVICE_SAMPLE_DATA,
   staticData: {
     kind: 'tabular',
     // 位置语义：第 1 列 = 标签、第 2 列 = 状态、第 3 列（可选）= 数值。
@@ -129,25 +136,9 @@ export const PLUGIN_BOARD_STATUS_GRID_MANIFEST: BaseScreenMaterialManifest = {
     fontSize: 11,
   },
   styleSchema: STATUS_GRID_STYLE_SCHEMA,
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color' },
-    { style: 'color', label: '文字色', control: 'color' },
-    { style: 'labelColor', label: '次级文字色', control: 'color' },
-    { style: 'runningColor', label: '运行色', control: 'color' },
-    { style: 'standbyColor', label: '待机色', control: 'color' },
-    { style: 'faultColor', label: '故障色', control: 'color' },
-    { style: 'offlineColor', label: '离线色', control: 'color' },
-    { style: 'unknownColor', label: '未知状态色', control: 'color' },
-    { style: 'tileGap', label: '格间距', control: 'number' },
-    { style: 'tileRadius', label: '圆角', control: 'number' },
-    { style: 'fontSize', label: '字号', control: 'number' },
-  ],
+  stylePanel: [],
   propsSchema: STATUS_GRID_PROPS_SCHEMA,
-  propertyPanel: [
-    { prop: 'columns', label: '每行列数', control: 'number' },
-    { prop: 'showValue', label: '格内显示数值', control: 'boolean' },
-    { prop: 'labelVisible', label: '显示设备名', control: 'boolean' },
-  ],
+  propertyPanel: [],
   editorDescriptor: parseStatusGridEditorDescriptor(),
   // tileClick 是 P1：本轮不给事件，避免"声明了但宿主没有通道"的空承诺。
   events: [],
@@ -202,16 +193,21 @@ function parseStatusGridEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
               target: 'props',
               path: ['columns'],
               label: '每行列数',
-              control: 'number',
               min: 1,
               max: 24,
+            },
+            {
+              id: 'sortAbnormalFirst',
+              target: 'props',
+              path: ['sortAbnormalFirst'],
+              label: '异常优先排列',
+              control: 'boolean',
             },
             {
               id: 'tileGap',
               target: 'style',
               path: ['tileGap'],
               label: '格间距',
-              control: 'unit-number',
               unit: 'px',
               min: 0,
               max: 24,
@@ -221,7 +217,6 @@ function parseStatusGridEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
               target: 'style',
               path: ['tileRadius'],
               label: '圆角',
-              control: 'unit-number',
               unit: 'px',
               min: 0,
               max: 16,
@@ -370,6 +365,81 @@ export function computeStatusGridLayout(input: StatusGridLayoutInput): StatusGri
   return { columns, rows, capacity, visible, hidden: Math.max(0, total - capacity) };
 }
 
+/**
+ * 正方形格边长（px，向下取整）：按列平分的宽与按行平分的高取较小者。
+ *
+ * 纯函数、不测 DOM。`computeStatusGridLayout` 已保证 rows×columns 在最小格尺寸下放得下，
+ * 这里只决定「放得下的前提下画多大」；结果至少为 1。
+ */
+export function computeStatusGridTileSize(input: {
+  readonly width: number;
+  readonly height: number;
+  readonly columns: number;
+  readonly rows: number;
+  readonly tileGap: number;
+}): number {
+  const gap = Math.max(0, Math.round(input.tileGap));
+  const columns = Math.max(1, Math.round(input.columns));
+  const rows = Math.max(1, Math.round(input.rows));
+  const byWidth = (Math.max(0, input.width) - (columns - 1) * gap) / columns;
+  const byHeight = (Math.max(0, input.height) - (rows - 1) * gap) / rows;
+  return Math.max(1, Math.floor(Math.min(byWidth, byHeight)));
+}
+
+/**
+ * 格内能放几行文字：边长 ≥ 4 倍字号放两行（名称 + 数值），≥ 2.6 倍放一行，否则只有色块。
+ *
+ * `labelVisible` / `showValue` 是上限而不是承诺：格子太小时自动降级（Grafana Polystat、
+ * Stat 的 Text mode 都是这个做法），被降级掉的信息仍在格子的悬停提示与无障碍名称里。
+ */
+export function statusGridTileTextLines(tileSize: number, fontSize: number): 0 | 1 | 2 {
+  const font = Math.max(1, fontSize);
+  if (tileSize >= font * 4) return 2;
+  if (tileSize >= font * 2.6) return 1;
+  return 0;
+}
+
+/** 异常优先的稳定排序：故障 → 离线 → 未知 → 待机 → 运行，同状态保持行序。 */
+export function sortStatusGridItems<T extends { readonly status: string }>(
+  items: readonly T[],
+): readonly T[] {
+  return items
+    .map((item, index) => ({
+      item,
+      index,
+      rank: BOARD_STATUS_PRIORITY[normalizeBoardStatus(item.status)],
+    }))
+    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .map((entry) => entry.item);
+}
+
+/**
+ * `+N` 底栏的读数：被收起的条目全是同一状态时写出状态（`+12 运行`），否则只写条数；
+ * 悬停与无障碍名称给出完整分布。
+ */
+export function summarizeStatusGridOverflow(hidden: readonly { readonly status: string }[]): {
+  readonly text: string;
+  readonly detail: string;
+} {
+  const counts = new Map<BoardStatusKey, number>();
+  for (const item of hidden) {
+    const status = normalizeBoardStatus(item.status);
+    counts.set(status, (counts.get(status) ?? 0) + 1);
+  }
+  const ordered = [...counts].sort(
+    ([left], [right]) => BOARD_STATUS_PRIORITY[left] - BOARD_STATUS_PRIORITY[right],
+  );
+  const [only] = ordered;
+  const text =
+    ordered.length === 1 && only !== undefined
+      ? `+${hidden.length} ${BOARD_STATUS_LABELS[only[0]]}`
+      : `+${hidden.length}`;
+  const detail = `另有 ${hidden.length} 项未显示：${ordered
+    .map(([status, count]) => `${BOARD_STATUS_LABELS[status]} ${count}`)
+    .join('、')}`;
+  return { text, detail };
+}
+
 export class PluginBoardStatusGridElement extends BoardMaterialElement {
   static readonly manifest = PLUGIN_BOARD_STATUS_GRID_MANIFEST;
 
@@ -403,8 +473,12 @@ export class PluginBoardStatusGridElement extends BoardMaterialElement {
     this.#paint(items, model);
   }
 
-  #paint(items: readonly BoardStateRow[], model: BoardMaterialModel): void {
+  #paint(rows: readonly BoardStateRow[], model: BoardMaterialModel): void {
     const doc = this.ownerDocument;
+    // 存量文档没有这个键：缺省保持行序，新插入的组件由 defaultProps 打开。
+    const items = readBoolean(model.props.sortAbnormalFirst, false)
+      ? sortStatusGridItems(rows)
+      : rows;
     const colors = statusColorMap(model.style);
     const gap = Math.max(0, Math.round(readNumber(model.style.tileGap, 6)));
     const radius = Math.max(0, Math.round(readNumber(model.style.tileRadius, 4)));
@@ -425,6 +499,14 @@ export class PluginBoardStatusGridElement extends BoardMaterialElement {
     const footerHeight =
       unconstrained.hidden > 0 ? STATUS_GRID_FOOTER_HEIGHT + STATUS_GRID_FOOTER_GAP : 0;
     const layout = footerHeight === 0 ? unconstrained : layoutFor(footerHeight);
+    const tileSize = computeStatusGridTileSize({
+      width: model.size.width - STATUS_GRID_PADDING * 2,
+      height: model.size.height - STATUS_GRID_PADDING * 2 - footerHeight,
+      columns: layout.columns,
+      rows: layout.rows,
+      tileGap: gap,
+    });
+    const textLines = statusGridTileTextLines(tileSize, fontSize);
 
     this.style.backgroundColor = styleColor(model.style.backgroundColor, 'transparent');
     this.style.color = styleColor(model.style.color, BOARD_DEFAULT_SURFACE.color);
@@ -436,7 +518,8 @@ export class PluginBoardStatusGridElement extends BoardMaterialElement {
     const grid = doc.createElement('div');
     grid.dataset.boardStatusTiles = '';
     grid.setAttribute('role', 'list');
-    grid.style.cssText = `flex:1 1 auto;min-height:0;display:grid;grid-template-columns:repeat(${layout.columns},minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:${gap}px;`;
+    // 固定格边长 + 左上排布：数据少时格子不随剩余高度拉伸（拉伸正是旧版"细长色柱"的来源）。
+    grid.style.cssText = `flex:1 1 auto;min-height:0;display:grid;grid-template-columns:repeat(${layout.columns},${tileSize}px);grid-auto-rows:${tileSize}px;align-content:start;justify-content:start;gap:${gap}px;`;
 
     if (items.length === 0) {
       // 空表：只画骨架，不产生 tile（A14 断言"0 个 tile"）。尺寸与有数据时一致。
@@ -455,6 +538,7 @@ export class PluginBoardStatusGridElement extends BoardMaterialElement {
             fontSize,
             showValue,
             labelVisible,
+            textLines,
             labelColor: styleColor(model.style.labelColor, BOARD_SECONDARY_COLOR),
             valueColor: styleColor(model.style.color, BOARD_DEFAULT_SURFACE.color),
           }),
@@ -477,7 +561,7 @@ export class PluginBoardStatusGridElement extends BoardMaterialElement {
 
     if (layout.hidden > 0) {
       root.appendChild(
-        this.#footer(layout.hidden, {
+        this.#footer(items.slice(layout.visible), {
           fontSize,
           color: styleColor(model.style.labelColor, BOARD_SECONDARY_COLOR),
         }),
@@ -495,6 +579,7 @@ export class PluginBoardStatusGridElement extends BoardMaterialElement {
       readonly fontSize: number;
       readonly showValue: boolean;
       readonly labelVisible: boolean;
+      readonly textLines: 0 | 1 | 2;
       readonly labelColor: string;
       readonly valueColor: string;
     },
@@ -509,17 +594,29 @@ export class PluginBoardStatusGridElement extends BoardMaterialElement {
     // 颜色不是唯一编码：无障碍名称始终带状态中文，视觉上再由 label/value 双编码。
     const label = `${item.name === '' ? '未命名设备' : item.name} ${BOARD_STATUS_LABELS[status]}`;
     const outOfRange = item.value !== undefined && (item.value < 0 || item.value > 100);
-    tile.setAttribute('aria-label', outOfRange ? `${label}，读数超出范围` : label);
-    tile.style.cssText = `position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-width:0;min-height:0;overflow:hidden;border-radius:${options.radius}px;background:${color};font:${options.fontSize}px/1.1 sans-serif;`;
+    const reading = item.value === undefined ? label : `${label} ${item.value}`;
+    tile.setAttribute('aria-label', outOfRange ? `${reading}，读数超出范围` : reading);
+    // 文字被降级掉时，悬停仍能看到这台设备是谁、什么状态。
+    tile.title = reading;
+    // 形状冗余编码：未知画虚线框（读不出 ≠ 一种颜色），故障加内描边（颜色之外再多一层）。
+    const ring = status === 'fault' ? 'box-shadow:inset 0 0 0 1px rgba(255,255,255,.6);' : '';
+    const fill =
+      status === 'unknown'
+        ? `background:transparent;border:1px dashed ${color};`
+        : `background:${color};${ring}`;
+    tile.style.cssText = `position:relative;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-width:0;min-height:0;overflow:hidden;border-radius:${options.radius}px;${fill}font:${options.fontSize}px/1.1 sans-serif;`;
 
-    if (options.labelVisible && item.name !== '') {
+    // 开关是上限，边长决定实际行数；名称优先于数值。
+    let lines: number = options.textLines;
+    if (options.labelVisible && item.name !== '' && lines > 0) {
+      lines -= 1;
       const name = doc.createElement('span');
       name.dataset.boardStatusName = '';
       name.textContent = item.name;
       name.style.cssText = `max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${options.labelColor};`;
       tile.appendChild(name);
     }
-    if (options.showValue && item.value !== undefined) {
+    if (options.showValue && item.value !== undefined && lines > 0) {
       const value = doc.createElement('span');
       value.dataset.boardStatusValue = '';
       // 读数保留原值（128% 就显示 128%），不因为越界而改成 100——那是着色的事，不是读数的事。
@@ -530,18 +627,21 @@ export class PluginBoardStatusGridElement extends BoardMaterialElement {
     return tile;
   }
 
-  /** 容量溢出的 `+N`：属于灯阵自身读数（还有几台没画出来），不是图例。 */
+  /** 容量溢出的 `+N`：属于灯阵自身读数（还有几台、什么状态没画出来），不是图例。 */
   #footer(
-    hidden: number,
+    hidden: readonly BoardStateRow[],
     options: { readonly fontSize: number; readonly color: string },
   ): HTMLElement {
     const doc = this.ownerDocument;
+    const summary = summarizeStatusGridOverflow(hidden);
     const footer = doc.createElement('div');
     footer.dataset.boardStatusFooter = '';
+    footer.title = summary.detail;
+    footer.setAttribute('aria-label', summary.detail);
     footer.style.cssText = `flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;height:${STATUS_GRID_FOOTER_HEIGHT}px;font:${options.fontSize}px/1 sans-serif;color:${options.color};`;
     const count = doc.createElement('span');
-    count.dataset.boardStatusHidden = '';
-    count.textContent = `+${hidden}`;
+    count.dataset.boardStatusHidden = String(hidden.length);
+    count.textContent = summary.text;
     count.style.cssText = 'flex:0 0 auto;font-variant-numeric:tabular-nums;white-space:nowrap;';
     footer.appendChild(count);
     return footer;

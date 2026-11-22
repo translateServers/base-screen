@@ -10,11 +10,14 @@ import {
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { BoardMaterialElement, type BoardMaterialModel } from './board-element.js';
+import { BOARD_DEVICE_SAMPLE_DATA } from './device-sample.js';
 import {
+  BOARD_DEFAULT_SURFACE,
   BOARD_SECONDARY_COLOR,
   BOARD_STATUS_COLORS,
   BOARD_STATUS_LABELS,
   type BoardStatusKey,
+  isBoardAbnormalStatus,
   isBoardStatusKey,
   normalizeBoardStatus,
   PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME,
@@ -24,20 +27,29 @@ import {
 import { readBoolean, readNumber, styleColor } from './json-values.js';
 
 /**
- * 状态图例：设备五态的分布读数（运行 n / 待机 n / 故障 n / 离线 n / 未知 n）。
+ * 状态分布：设备五态的汇总读数——总数、占比条、各状态计数（运行 n / 待机 n / 故障 n …）。
  *
  * 它原本内建在状态灯阵的底栏里（`showLegend`）。按 ADR-0099 的原子判定拆出来：
- * - T1 单一读数：图例读的是「各状态各有几台」，灯阵读的是「每台是什么状态」；
- * - T3 拆开不失效：图例单独放上画布仍然有意义（一排汇总读数），不像图表的坐标轴；
- * - T4 可组合：多个灯阵、或灯阵 + 工序链可以共用一条图例，放在哪、多宽由文档层决定。
+ * - T1 单一读数：它读的是「各状态各有几台」，灯阵读的是「每台是什么状态」；
+ * - T3 拆开不失效：单独放上画布仍然有意义（一张汇总卡），不像图表的坐标轴；
+ * - T4 可组合：多个灯阵、或灯阵 + 工序链可以共用一份分布，放在哪、多宽由文档层决定。
+ *
+ * 总数、占比条、计数是同一个读数（一列状态的分布）的三种写法，而不是三个读数，所以是本物料
+ * 的开关而不是三个物料。调研结论（Grafana 电梯状态看板、DataEase 智慧工厂模板、ThingsBoard）：
+ * 设备规模一大，监控屏表达设备状态靠的是这张汇总，而不是逐台格子。
  *
  * 只消费一列（状态列），因此可以绑定与灯阵相同的数据，也可以单独绑定任何带状态列的表。
  * 计数按五态归一（未知值归 `unknown`），合计恒等于行数。
+ *
+ * `showTotal` / `showBar` 不进 required：存量文档没有这两个键，缺省即关闭，渲染与拆分时的
+ * 单行图例逐像素一致；新插入的组件由 `defaultProps` 打开。
  */
 const STATUS_LEGEND_PROPS_SCHEMA = {
   kind: 'object',
   properties: {
     showCount: { kind: 'boolean' },
+    showTotal: { kind: 'boolean' },
+    showBar: { kind: 'boolean' },
   },
   required: ['showCount'],
 } satisfies BaseScreenMaterialObjectSchema;
@@ -47,6 +59,7 @@ const STATUS_LEGEND_STYLE_SCHEMA = {
   properties: {
     backgroundColor: { kind: 'string' },
     color: { kind: 'string' },
+    valueColor: { kind: 'string' },
     fontSize: { kind: 'number', minimum: 10, maximum: 32 },
     runningColor: { kind: 'string' },
     standbyColor: { kind: 'string' },
@@ -58,7 +71,7 @@ const STATUS_LEGEND_STYLE_SCHEMA = {
   required: ['backgroundColor', 'color', 'fontSize'],
 } satisfies BaseScreenMaterialObjectSchema;
 
-/** 图例顺序的唯一来源：DOM 顺序与断言顺序都按它。 */
+/** 图例与占比条的顺序（从正常到异常的阅读顺序）：DOM 顺序与断言顺序都按它。 */
 export const STATUS_LEGEND_ORDER: readonly BoardStatusKey[] = [
   'running',
   'standby',
@@ -69,27 +82,23 @@ export const STATUS_LEGEND_ORDER: readonly BoardStatusKey[] = [
 
 export type StatusLegendCounts = Readonly<Record<BoardStatusKey, number>>;
 
+/** 总数下方的说明：属于读数本身，由物料固定给出，不开放成 prop（ADR-0099 §2.5）。 */
+const STATUS_LEGEND_TOTAL_LABEL = '总数';
+
 export const PLUGIN_BOARD_STATUS_LEGEND_MANIFEST: BaseScreenMaterialManifest = {
   type: PLUGIN_BOARD_STATUS_LEGEND_TYPE,
   tagName: PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME,
-  name: '状态图例',
+  name: '状态分布',
   category: '指标',
-  keywords: ['图例', '状态', '设备', '分布', '大屏'],
-  defaultSize: { width: 420, height: 24 },
+  keywords: ['图例', '状态', '设备', '分布', '汇总', '占比', '大屏'],
+  defaultSize: { width: 288, height: 48 },
   defaultProps: {
     showCount: true,
+    showTotal: true,
+    showBar: true,
   },
-  defaultData: {
-    fields: [
-      { id: 'name', label: '设备', valueType: 'string', nullable: false },
-      { id: 'status', label: '状态', valueType: 'string', nullable: false },
-    ],
-    rows: [
-      { name: '1#冲压机', status: 'fault' },
-      { name: '2#冲床', status: 'running' },
-      { name: '3#焊机', status: 'standby' },
-    ],
-  },
+  // 与状态灯阵同一份示例：放进「设备状态卡」时两者的计数与格数一一对得上。
+  defaultData: BOARD_DEVICE_SAMPLE_DATA,
   staticData: {
     kind: 'tabular',
     defaultBinding: { fields: { status: ['status'] } },
@@ -97,6 +106,7 @@ export const PLUGIN_BOARD_STATUS_LEGEND_MANIFEST: BaseScreenMaterialManifest = {
   defaultStyle: {
     backgroundColor: 'transparent',
     color: BOARD_SECONDARY_COLOR,
+    valueColor: BOARD_DEFAULT_SURFACE.color,
     fontSize: 11,
     runningColor: BOARD_STATUS_COLORS.running,
     standbyColor: BOARD_STATUS_COLORS.standby,
@@ -105,18 +115,9 @@ export const PLUGIN_BOARD_STATUS_LEGEND_MANIFEST: BaseScreenMaterialManifest = {
     unknownColor: BOARD_STATUS_COLORS.unknown,
   },
   styleSchema: STATUS_LEGEND_STYLE_SCHEMA,
-  stylePanel: [
-    { style: 'color', label: '文字色', control: 'color' },
-    { style: 'fontSize', label: '字号', control: 'number' },
-    { style: 'backgroundColor', label: '背景色', control: 'color' },
-    { style: 'runningColor', label: '运行色', control: 'color' },
-    { style: 'standbyColor', label: '待机色', control: 'color' },
-    { style: 'faultColor', label: '故障色', control: 'color' },
-    { style: 'offlineColor', label: '离线色', control: 'color' },
-    { style: 'unknownColor', label: '未知状态色', control: 'color' },
-  ],
+  stylePanel: [],
   propsSchema: STATUS_LEGEND_PROPS_SCHEMA,
-  propertyPanel: [{ prop: 'showCount', label: '显示计数', control: 'boolean' }],
+  propertyPanel: [],
   editorDescriptor: parseStatusLegendEditorDescriptor(),
   events: [],
   dataCapabilities: ['static', 'dataset', 'host-resource'],
@@ -136,6 +137,20 @@ function parseStatusLegendEditorDescriptor(): BaseScreenMaterialEditorDescriptor
           label: '读数格式',
           fields: [
             {
+              id: 'showTotal',
+              target: 'props',
+              path: ['showTotal'],
+              label: '显示总数',
+              control: 'boolean',
+            },
+            {
+              id: 'showBar',
+              target: 'props',
+              path: ['showBar'],
+              label: '显示占比条',
+              control: 'boolean',
+            },
+            {
               id: 'showCount',
               target: 'props',
               path: ['showCount'],
@@ -149,6 +164,13 @@ function parseStatusLegendEditorDescriptor(): BaseScreenMaterialEditorDescriptor
           label: '文字',
           fields: [
             { id: 'color', target: 'style', path: ['color'], label: '文字色', control: 'color' },
+            {
+              id: 'valueColor',
+              target: 'style',
+              path: ['valueColor'],
+              label: '数值色',
+              control: 'color',
+            },
             {
               id: 'fontSize',
               target: 'style',
@@ -268,6 +290,29 @@ export const STATUS_LEGEND_TABULAR_DATA_ADAPTER: BaseScreenMaterialTabularDataAd
   },
 };
 
+/**
+ * 占比条各段的宽度（百分比，按 `STATUS_LEGEND_ORDER`，计数为 0 的状态不出段）。
+ *
+ * 纯函数、不测 DOM：各段之和恒为 100（合计为 0 时返回空数组，由调用方画空轨）。末段吃掉
+ * 舍入误差，避免 33.3 × 3 = 99.9 在条尾留一道缝。
+ */
+export function statusLegendBarSegments(
+  counts: StatusLegendCounts,
+): readonly { readonly state: BoardStatusKey; readonly percent: number }[] {
+  const total = STATUS_LEGEND_ORDER.reduce((sum, state) => sum + counts[state], 0);
+  if (total === 0) return [];
+  const present = STATUS_LEGEND_ORDER.filter((state) => counts[state] > 0);
+  let used = 0;
+  return present.map((state, index) => {
+    const percent =
+      index === present.length - 1
+        ? Math.round((100 - used) * 100) / 100
+        : Math.round((counts[state] / total) * 10_000) / 100;
+    used += percent;
+    return { state, percent };
+  });
+}
+
 /** 从 `dataState.value` 读回计数；形状不符时返回 `undefined`，由物料走「数据无效」降级。 */
 export function readStatusLegendCounts(value: unknown): StatusLegendCounts | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
@@ -323,13 +368,82 @@ export class PluginBoardStatusLegendElement extends BoardMaterialElement {
     const doc = this.ownerDocument;
     const colors = statusColorMap(model.style);
     const showCount = readBoolean(model.props.showCount, true);
+    // 存量文档没有这两个键：缺省关闭，渲染退回拆分时的单行图例。
+    const showTotal = readBoolean(model.props.showTotal, false);
+    const showBar = readBoolean(model.props.showBar, false);
     const fontSize = readNumber(model.style.fontSize, 11);
     const color = styleColor(model.style.color, BOARD_SECONDARY_COLOR);
+    const valueColor = styleColor(model.style.valueColor, BOARD_DEFAULT_SURFACE.color);
+    const legend = this.#legend(counts, {
+      colors,
+      showCount,
+      fontSize,
+      color,
+      alertColor: valueColor,
+    });
 
+    if (!showTotal && !showBar) {
+      legend.style.height = '100%';
+      this.commit(legend);
+      return;
+    }
+
+    // 汇总模式里计数行与总数并排，宽度不够时折到第二行，而不是把最后一项截掉。
+    legend.style.flexWrap = 'wrap';
+    legend.style.rowGap = '4px';
+    legend.style.columnGap = '8px';
+
+    const total = STATUS_LEGEND_ORDER.reduce((sum, state) => sum + counts[state], 0);
+    const root = doc.createElement('div');
+    root.dataset.boardStatusSummary = '';
+    root.style.cssText = `display:flex;align-items:center;gap:12px;width:100%;height:100%;min-width:0;overflow:hidden;font:${fontSize}px/1 sans-serif;color:${color};`;
+
+    if (showTotal) {
+      const block = doc.createElement('div');
+      block.style.cssText = 'flex:0 0 auto;display:flex;flex-direction:column;gap:4px;';
+      const value = doc.createElement('span');
+      value.dataset.boardStatusTotal = String(total);
+      value.textContent = String(total);
+      value.style.cssText = `font-size:${Math.round(fontSize * 2.2)}px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;color:${valueColor};`;
+      const caption = doc.createElement('span');
+      caption.textContent = STATUS_LEGEND_TOTAL_LABEL;
+      block.append(value, caption);
+      root.appendChild(block);
+    }
+
+    const side = doc.createElement('div');
+    side.style.cssText = [
+      'flex:1 1 auto;min-width:0;display:flex;flex-direction:column;',
+      'justify-content:center;gap:6px;',
+    ].join('');
+    if (showBar) side.appendChild(this.#bar(counts, colors, fontSize));
+    side.appendChild(legend);
+    root.appendChild(side);
+    this.commit(root);
+  }
+
+  /**
+   * 各状态计数：每一项都带状态中文（颜色不是唯一编码），异常且非零的计数提亮加粗。
+   *
+   * 提亮用的是「数值色」而不是状态色：状态色是填充色，压暗的未知色、离线色当文字用
+   * 达不到 4.5:1（对比度守卫实测未知色 2.4:1）。ISA-101 要求填充与文字各一套色，
+   * 色相交给前面的色点，计数只负责「醒目」。
+   */
+  #legend(
+    counts: StatusLegendCounts,
+    options: {
+      readonly colors: Readonly<Record<BoardStatusKey, string>>;
+      readonly showCount: boolean;
+      readonly fontSize: number;
+      readonly color: string;
+      readonly alertColor: string;
+    },
+  ): HTMLElement {
+    const doc = this.ownerDocument;
     const legend = doc.createElement('div');
     legend.dataset.boardStatusLegend = '';
     legend.setAttribute('role', 'list');
-    legend.style.cssText = `display:flex;align-items:center;gap:10px;width:100%;height:100%;min-width:0;overflow:hidden;font:${fontSize}px/1 sans-serif;color:${color};`;
+    legend.style.cssText = `display:flex;align-items:center;gap:10px;width:100%;min-width:0;overflow:hidden;font:${options.fontSize}px/1 sans-serif;color:${options.color};`;
     for (const state of STATUS_LEGEND_ORDER) {
       const item = doc.createElement('span');
       item.dataset.state = state;
@@ -338,16 +452,49 @@ export class PluginBoardStatusLegendElement extends BoardMaterialElement {
       item.style.cssText = 'display:inline-flex;align-items:center;gap:4px;white-space:nowrap;';
       const dot = doc.createElement('span');
       dot.setAttribute('aria-hidden', 'true');
-      dot.style.cssText = `width:8px;height:8px;border-radius:2px;background:${colors[state]};`;
-      item.appendChild(dot);
-      // 颜色不是唯一编码：每一项都带状态中文。
-      const text = showCount
-        ? `${BOARD_STATUS_LABELS[state]} ${counts[state]}`
-        : BOARD_STATUS_LABELS[state];
-      item.appendChild(doc.createTextNode(text));
+      dot.style.cssText = `width:8px;height:8px;border-radius:2px;background:${options.colors[state]};`;
+      item.append(dot, doc.createTextNode(BOARD_STATUS_LABELS[state]));
+      if (options.showCount) {
+        const count = doc.createElement('span');
+        count.textContent = String(counts[state]);
+        count.style.cssText = 'font-variant-numeric:tabular-nums;';
+        // ISA-101：正常态不抢眼，只有「需要处理」的状态在有数时高亮。
+        if (isBoardAbnormalStatus(state) && counts[state] > 0) {
+          item.dataset.alert = '';
+          count.style.color = options.alertColor;
+          count.style.fontWeight = '700';
+        }
+        item.append(doc.createTextNode(' '), count);
+      }
       legend.appendChild(item);
     }
-    this.commit(legend);
+    return legend;
+  }
+
+  /** 占比条：段宽来自 `statusLegendBarSegments`；合计为 0 时只画空轨。 */
+  #bar(
+    counts: StatusLegendCounts,
+    colors: Readonly<Record<BoardStatusKey, string>>,
+    fontSize: number,
+  ): HTMLElement {
+    const doc = this.ownerDocument;
+    const bar = doc.createElement('div');
+    bar.dataset.boardStatusBar = '';
+    bar.setAttribute('role', 'img');
+    const description = STATUS_LEGEND_ORDER.map(
+      (state) => `${BOARD_STATUS_LABELS[state]} ${counts[state]}`,
+    ).join('，');
+    bar.setAttribute('aria-label', description);
+    const height = Math.max(4, Math.round(fontSize * 0.6));
+    bar.style.cssText = `display:flex;width:100%;height:${height}px;border-radius:${height}px;overflow:hidden;background:rgba(255,255,255,.08);`;
+    for (const segment of statusLegendBarSegments(counts)) {
+      const part = doc.createElement('span');
+      // 不用 `data-state`：smoke 与宿主按 `[data-board-status-legend] [data-state]` 读计数。
+      part.dataset.segment = segment.state;
+      part.style.cssText = `flex:0 0 ${segment.percent}%;background:${colors[segment.state]};`;
+      bar.appendChild(part);
+    }
+    return bar;
   }
 }
 

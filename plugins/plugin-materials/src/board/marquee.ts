@@ -60,16 +60,9 @@ export const PLUGIN_BOARD_MARQUEE_MANIFEST: BaseScreenMaterialManifest = {
     fontSize: 14,
   },
   styleSchema: MARQUEE_STYLE_SCHEMA,
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
-    { style: 'color', label: '文字色', control: 'color' },
-    { style: 'fontSize', label: '字号', control: 'number' },
-  ],
+  stylePanel: [],
   propsSchema: MARQUEE_PROPS_SCHEMA,
-  propertyPanel: [
-    { prop: 'periodMs', label: '滚动周期', control: 'number' },
-    { prop: 'gap', label: '接缝间距', control: 'number' },
-  ],
+  propertyPanel: [],
   editorDescriptor: parseMarqueeEditorDescriptor(),
   events: [],
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
@@ -88,7 +81,7 @@ export const PLUGIN_BOARD_MARQUEE_MANIFEST: BaseScreenMaterialManifest = {
 
 /**
  * 检查器编排（ADR-0099 §2.4）：结构 → 文字 → 填充 → 动效。单位经 `unit` 声明，不写进 label。
- * 扁平 `propertyPanel`/`stylePanel` 仍保留：多选批量、条件样式等通道按它们识别可编辑字段。
+ * 描述符是唯一的表单来源（ADR-0102 D1）；未写 control 的字段按语义推导。
  */
 function parseMarqueeEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
   const parsed = parseBaseScreenMaterialEditorDescriptor(
@@ -103,7 +96,6 @@ function parseMarqueeEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
               target: 'props',
               path: ['gap'],
               label: '接缝间距',
-              control: 'unit-number',
               unit: 'px',
               min: 0,
               max: 240,
