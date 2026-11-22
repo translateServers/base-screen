@@ -20,8 +20,13 @@ import { BOARD_MONITOR_DOCUMENT } from '../../examples/shared-backend/src/screen
  * 2. README 声明 `variable` 组件参与 30s 节拍；这条断言把它固定下来。
  */
 
-const components = (BOARD_MONITOR_DOCUMENT as unknown as { components: readonly never[] })
-  .components;
+const monitor = BOARD_MONITOR_DOCUMENT as unknown as {
+  readonly components: readonly never[];
+  readonly dataSources: readonly never[];
+};
+const components = monitor.components;
+/** 灯阵与图例共享文档级实例 `devices`（ADR-0100 F4）：控制器按实例分组，代表组件是灯阵。 */
+const dataSources = monitor.dataSources;
 
 interface RefreshRecord {
   readonly at: number;
@@ -43,7 +48,7 @@ function createHarness() {
   };
 
   const element: RefreshableElement = {
-    document: { components } as RefreshableElement['document'],
+    document: { components, dataSources } as RefreshableElement['document'],
     // 无参调用是「全量刷新」（hidden → visible 的补一次），用 `*` 标记以便区分。
     refreshData: (options?: { readonly componentId: string }) => {
       records.push({ at: clock, componentId: options?.componentId ?? '*' });
@@ -85,8 +90,10 @@ describe('host refresh controller · 节拍表真的驱动种子组件', () => {
 
     // 3s：告警流水
     expect(firstAt('alarm-stream')).toBe(DEFAULT_REFRESH_INTERVALS['dataset.monitor.alarms']);
-    // 5s：设备灯阵 + 5s 档的 KPI（翻牌卡组件 id 是 `<card>-value`）
+    // 5s：设备灯阵 + 5s 档的 KPI（翻牌卡组件 id 是 `<card>-value`）。灯阵与图例共享实例，
+    // 只由代表组件（文档顺序第一个读者 = 灯阵）刷新一次，图例不单独排期。
     expect(firstAt('grid-devices')).toBe(DEFAULT_REFRESH_INTERVALS['dataset.monitor.devices']);
+    expect(firstAt('grid-legend')).toBeUndefined();
     expect(firstAt('kpi-oee-value')).toBe(DEFAULT_REFRESH_INTERVALS['metric.oee']);
     // 15s：工序链 + 主轴负载水位（B2 补的 C16）
     expect(firstAt('stage-pipeline')).toBe(DEFAULT_REFRESH_INTERVALS['dataset.monitor.pipeline']);
@@ -101,6 +108,12 @@ describe('host refresh controller · 节拍表真的驱动种子组件', () => {
     const keys = new Set(
       components.map((component) => intervalKeyOf(component)).filter((key) => key !== undefined),
     );
+    // 文档级实例的节拍键（共享读者的组件自身 dataSource 为 null，intervalKeyOf 看不到它们）。
+    for (const instance of dataSources as readonly {
+      readonly source: { readonly kind: string; readonly datasetId?: string };
+    }[]) {
+      if (instance.source.kind === 'dataset') keys.add(`dataset.${instance.source.datasetId}`);
+    }
 
     for (const key of [
       'dataset.monitor.devices',

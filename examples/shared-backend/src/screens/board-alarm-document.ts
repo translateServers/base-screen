@@ -23,8 +23,7 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  * 不 import 插件包（CJS 宿主不依赖 ESM 插件），所以这里写同值字面量，由根测试
  * `tests/examples/board-alarm-document.test.ts` 逐色比对，避免两处各改一半。
  *
- * 版式纪律（与其余种子同）：所有组件都是**根节点**，组壳几何由引擎持有；把色块当
- * 父节点会在第一次无关编辑时被压平。
+ * 版式纪律（与其余种子同）：所有组件都是**根节点**，整体搬动靠编辑期的成组。
  *
  * 数据纪律：文档里只写"形状"，不写时间戳与随机值；读数全部来自演示指标接口与宿主
  * 变量，因此整份种子是确定性的，可被根级文档测试逐字段断言。
@@ -167,7 +166,6 @@ function frame(id: string, name: string, box: Box): void {
     style: {
       backgroundColor: 'rgba(10, 16, 26, .55)',
       borderColor: '#7a2a33',
-      color: '#c98b93',
     },
     dataSource: null,
   });
@@ -196,7 +194,7 @@ function flop(
     status: { locked: false, hidden: false },
     props: {
       prefix: '',
-      suffix: '',
+      unit: '',
       decimals: 0,
       thousandsSeparator: true,
       flipAnimation: true,

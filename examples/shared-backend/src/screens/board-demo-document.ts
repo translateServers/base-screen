@@ -8,9 +8,7 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  * 真正的合法性仍由 contracts 的 canonical 解析器和各 manifest 的 schema 把关
  * （见 tests/examples/board-demo-document.test.ts）。
  *
- * 版式约定：所有组件都是根节点。组壳几何由引擎持有，配置 groupMaterialType 后
- * 任何一次事务都会把 base.container 吸附到子孙包围盒——把面板当父节点会在第一次
- * 无关编辑时压平内缩留白。
+ * 版式约定：所有组件都是根节点，整体搬动靠编辑期的成组。
  */
 
 interface DemoComponent {
@@ -181,7 +179,6 @@ function frame(
     style: {
       backgroundColor: 'rgba(8, 26, 46, .72)',
       borderColor: '#1d5b8f',
-      color: '#7fb0cf',
       ...style,
     },
     dataSource: null,
@@ -208,7 +205,7 @@ function flop(
     status: { locked: false, hidden: false },
     props: {
       prefix: '',
-      suffix: '',
+      unit: '',
       decimals,
       thousandsSeparator: true,
       flipAnimation: true,

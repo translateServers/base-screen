@@ -259,7 +259,7 @@ function flop(
     readonly fontSize?: number;
     readonly color?: string;
     readonly decimals?: number;
-    readonly suffix?: string;
+    readonly unit?: string;
     readonly flipAnimation?: boolean;
   } = {},
 ): void {
@@ -275,7 +275,7 @@ function flop(
     status: { locked: false, hidden: false },
     props: {
       prefix: '',
-      suffix: options.suffix ?? '',
+      unit: options.unit ?? '',
       decimals: options.decimals ?? 0,
       thousandsSeparator: true,
       flipAnimation: options.flipAnimation ?? true,
@@ -484,7 +484,7 @@ flop('hero-ratio', 'PM2.5标准比读数', [982, 164, 280, 48], liveWiring('PM2.
   fontSize: 40,
   color: '#E8F3F5',
   decimals: 1,
-  suffix: '%',
+  unit: '%',
   flipAnimation: false,
 });
 liveText('hero-ratio-status', 'PM2.5达标状态', [982, 214, 280, 18], 'PM2.5状态', {
@@ -504,7 +504,7 @@ flop('hero-good', '24h优良率读数', [982, 286, 280, 48], liveWiring('优良�
   fontSize: 40,
   color: '#E8F3F5',
   decimals: 1,
-  suffix: '%',
+  unit: '%',
   flipAnimation: false,
 });
 push({

@@ -8,15 +8,19 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  * | 通道 | 组件 | 说明 |
  * | --- | --- | --- |
  * | `static` | 标题/标签/选择器表格/班组表 | 不依赖接口的文字与示例表 |
- * | `dataset` | 设备灯阵 ← `monitor.devices`、告警流水 ← `monitor.alarms`、工序链 ← `monitor.pipeline` | 走 `describe/query`，参数由变量槽位求值 |
+ * | `dataset` | 设备灯阵 + 状态图例 ← 文档级共享实例 `devices`（`monitor.devices`）、告警流水 ← `monitor.alarms`、工序链 ← `monitor.pipeline` | 走 `describe/query`，参数由变量槽位求值 |
  * | `variable` | 产线/时间窗/状态/播报/时钟/更新时间 | 3 个 static 变量可交互，3 个 `production.*` 由宿主只读提供 |
  * | `host-resource` | 5 张 KPI + 产量趋势 + 产线负载排行 | 旧的 `demo_metric/series/ranking` 通道，用来证明新链路没有挤掉旧链路 |
  *
- * 版式纪律（与 `board-demo-document.ts` 同）：所有组件都是**根节点**。宿主配置
- * `groupMaterialType` 后组壳几何由引擎持有，把面板当父节点会在第一次无关编辑时被压平。
+ * 版式纪律（与 `board-demo-document.ts` 同）：所有组件都是**根节点**，整体搬动靠编辑期的成组。
  *
  * 数据纪律：这里只写"形状"，不写任何时间戳或随机值——数值全部来自后端与宿主变量，
  * 因此种子本身是确定性的，可被根级文档测试逐字段断言。
+ *
+ * 共享纪律（ADR-0100 F4）：灯阵与图例读的是同一份设备数据，因此引用同一个文档级实例
+ * `dataSources.devices`，切产线只发一次 query；两者经各自的 `dataBinding` 取不同的列。
+ * 告警流水与工序链各读各的数据集，保留组件自带 `dataSource` 的旧形态——这张屏同时
+ * 证明两种写法可以并存。
  */
 
 interface DemoComponent {
@@ -32,7 +36,17 @@ interface DemoComponent {
   readonly props: Readonly<Record<string, unknown>>;
   readonly style: Readonly<Record<string, unknown>>;
   readonly dataSource: unknown;
+  readonly dataValue?: unknown;
+  readonly dataBinding?: unknown;
 }
+
+/** 灯阵与图例共享的文档级实例 id（见 `BOARD_MONITOR_DOCUMENT.dataSources`）。 */
+const DEVICES_SOURCE_ID = 'devices';
+const DEVICES_REF = {
+  kind: 'data-source-field' as const,
+  dataSourceId: DEVICES_SOURCE_ID,
+  path: [],
+};
 
 const components: DemoComponent[] = [];
 let zIndex = 0;
@@ -140,7 +154,6 @@ function frame(id: string, name: string, box: Box): void {
     style: {
       backgroundColor: 'rgba(8, 26, 46, .55)',
       borderColor: '#1d5b8f',
-      color: '#7fb0cf',
     },
     dataSource: null,
   });
@@ -189,7 +202,7 @@ function flop(id: string, name: string, box: Box, resourceId: string, decimals: 
     status: { locked: false, hidden: false },
     props: {
       prefix: '',
-      suffix: '',
+      unit: '',
       decimals,
       thousandsSeparator: true,
       flipAnimation: true,
@@ -356,7 +369,7 @@ push({
   rotation: 0,
   status: { locked: false, hidden: false },
   // 绑定变量而不是数据集：`window` 是 static 变量，用户切选择器时它整屏联动。
-  props: { prefix: '', suffix: '', decimals: 0, thousandsSeparator: false, flipAnimation: true },
+  props: { prefix: '', unit: '', decimals: 0, thousandsSeparator: false, flipAnimation: true },
   style: { backgroundColor: 'transparent', color: '#7ff0ff', accentColor: '#0e3b5c', fontSize: 22 },
   dataSource: { type: 'variable', variableId: 'window' },
 });
@@ -464,33 +477,28 @@ push({
     // 面板标题里的「设备状态」+ 下方图例已足够表达"这是什么"。
     showValue: false,
     labelVisible: false,
+    // 异常优先：故障、离线排在最前，一眼可见（与 plugin-materials 新插入组件的默认一致）。
+    sortAbnormalFirst: true,
   },
   style: {
     backgroundColor: 'transparent',
     color: '#e6f1ff',
     labelColor: '#8aa4c0',
-    runningColor: '#52c41a',
-    standbyColor: '#fa8c16',
+    runningColor: '#3e7b5e',
+    standbyColor: '#8c7a46',
     faultColor: '#f5222d',
-    offlineColor: '#6b7d8f',
-    unknownColor: '#6b7d8f',
+    offlineColor: '#8796a5',
+    unknownColor: '#4f5d6b',
     tileGap: 6,
     tileRadius: 4,
     fontSize: 11,
   },
-  dataSource: {
-    type: 'dataset',
-    datasetId: 'monitor.devices',
-    // 参数顺序与 `describe().parameters` 一致；`line` 走变量槽位，切产线即整屏联动。
-    params: {
-      line: { kind: 'variable', variableId: 'line' },
-      limit: { kind: 'literal', value: 48 },
-    },
-    binding: { fields: { items: ['name', 'status', 'load'] } },
-  },
+  // 读共享实例 `devices`；参数（产线变量、条数）在实例上，切产线即整屏联动。
+  dataSource: null,
+  dataValue: DEVICES_REF,
+  dataBinding: { fields: { items: ['name', 'status', 'load'] } },
 });
-// 五态分布图例：与灯阵绑定同一数据集与参数，只读状态列。
-// 两个组件各发一次 query；改为共享文档级数据源属于 ADR-0100 第二阶段。
+// 五态分布图例：与灯阵读同一个文档级实例，只取状态列——两个组件只发一次 query。
 push({
   id: 'grid-legend',
   type: 'board.status-legend',
@@ -505,21 +513,15 @@ push({
     backgroundColor: 'transparent',
     color: '#8aa4c0',
     fontSize: 11,
-    runningColor: '#52c41a',
-    standbyColor: '#fa8c16',
+    runningColor: '#3e7b5e',
+    standbyColor: '#8c7a46',
     faultColor: '#f5222d',
-    offlineColor: '#6b7d8f',
-    unknownColor: '#6b7d8f',
+    offlineColor: '#8796a5',
+    unknownColor: '#4f5d6b',
   },
-  dataSource: {
-    type: 'dataset',
-    datasetId: 'monitor.devices',
-    params: {
-      line: { kind: 'variable', variableId: 'line' },
-      limit: { kind: 'literal', value: 48 },
-    },
-    binding: { fields: { status: ['status'] } },
-  },
+  dataSource: null,
+  dataValue: DEVICES_REF,
+  dataBinding: { fields: { status: ['status'] } },
 });
 
 text('trend-title', '趋势标题', [652, 262, 320, 20], '产量趋势（最近 24 个采样点）', {
@@ -670,11 +672,11 @@ push({
     backgroundColor: 'transparent',
     color: '#e6f1ff',
     labelColor: '#8aa4c0',
-    runningColor: '#52c41a',
-    standbyColor: '#fa8c16',
+    runningColor: '#3e7b5e',
+    standbyColor: '#8c7a46',
     faultColor: '#f5222d',
-    offlineColor: '#6b7d8f',
-    unknownColor: '#6b7d8f',
+    offlineColor: '#8796a5',
+    unknownColor: '#4f5d6b',
     nodeBackground: '#0b1a2b',
     nodeBorderColor: '#1e3a5f',
     connectorColor: '#38bdf8',
@@ -812,6 +814,18 @@ export const BOARD_MONITOR_DOCUMENT = {
     },
   },
   components,
+  dataSources: [
+    {
+      id: DEVICES_SOURCE_ID,
+      name: 'monitor-devices',
+      source: { kind: 'dataset' as const, datasetId: 'monitor.devices' },
+      // 参数顺序与 `describe().parameters` 一致；`line` 走变量槽位。
+      params: {
+        line: { kind: 'variable' as const, variableId: 'line' },
+        limit: { kind: 'inline' as const, value: 48 },
+      },
+    },
+  ],
   variables: [
     // `name` 必须是 ASCII 标识符（canonical schema 的 `VARIABLE_NAME_INVALID` 会拒绝中文），
     // 中文说明放 `description`。

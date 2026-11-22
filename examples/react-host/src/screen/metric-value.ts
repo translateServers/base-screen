@@ -1,4 +1,7 @@
-import type { BaseScreenMaterialManifest } from 'base-screen/plugin-core';
+import type {
+  BaseScreenFragmentDefinition,
+  BaseScreenMaterialManifest,
+} from 'base-screen/plugin-core';
 
 /**
  * 三端共有的宿主自有物料「指标读数」manifest：React / Vue / Vanilla 三个前端
@@ -46,4 +49,46 @@ export const METRIC_VALUE_MANIFEST: BaseScreenMaterialManifest = {
     roles: [{ id: 'value', minFields: 1, maxFields: 1, valueTypes: ['number'] }],
   },
   designCapabilities: { resize: true, rotate: false, children: false },
+};
+
+/**
+ * 三端共有的宿主分片「指标卡」（ADR-0100）：容器底座 + 标题文本 + 指标读数三件套。
+ *
+ * 物料库里带「组合」角标，点击或拖入画布即展开为三个普通组件（父子成组、一次撤销）；
+ * 展开后与手工搭的组合没有任何区别，文档里不留分片引用。外观由外壳 `base.container` 承担，
+ * 标题是独立的 `base.text`——读数物料保持原子，不为「卡片」长出标题或边框属性。
+ */
+export const METRIC_CARD_FRAGMENT: BaseScreenFragmentDefinition = {
+  id: 'host-app.metric-card',
+  name: '指标卡',
+  category: '业务指标',
+  keywords: ['指标', '卡片', 'KPI'],
+  shell: {
+    key: 'card',
+    materialType: 'base.container',
+    name: '指标卡',
+    size: { width: 240, height: 128 },
+    style: {
+      fill: 'rgba(15, 23, 42, 0.72)',
+      borderColor: 'rgba(148, 163, 184, 0.35)',
+      borderWidth: 1,
+    },
+  },
+  nodes: [
+    {
+      key: 'title',
+      materialType: 'base.text',
+      name: '指标名称',
+      offset: { x: 20, y: 16 },
+      size: { width: 200, height: 28 },
+      style: { color: '#94a3b8', fontSize: 16 },
+      dataSource: { type: 'static', value: '在线率' },
+    },
+    {
+      key: 'value',
+      materialType: METRIC_VALUE_TYPE,
+      offset: { x: 20, y: 52 },
+      size: { width: 200, height: 64 },
+    },
+  ],
 };

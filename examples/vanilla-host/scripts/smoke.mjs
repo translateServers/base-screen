@@ -329,6 +329,8 @@ async function main() {
       );
 
     // A. 首屏：48 格 / 图例故障 3 / 工序 6 节点 5 连线 / 告警可见 8 行 / 在线
+    //    灯阵与图例共享一个文档级实例：poll=0 下设备数据集恰好只查一次（ADR-0100 F4）。
+    const firstFrom = datasetQueries.length;
     const first = await openMonitor('smoke=1&poll=0');
     await waitTiles(first, 48);
     await first.waitForTimeout(1200);
@@ -341,6 +343,12 @@ async function main() {
     if (firstState.boardRows < 8) fail(`告警行数应 ≥8，实际 ${firstState.boardRows}`);
     if (!firstState.chip.includes('在线')) fail(`首屏 chip 不是在线：${firstState.chip}`);
     if (firstState.badges !== 0) fail(`首屏不应出现降级角标，实际 ${firstState.badges}`);
+    const firstDeviceQueries = datasetQueries
+      .slice(firstFrom)
+      .filter((item) => item.includes('/datasets/monitor.devices/query'));
+    if (firstDeviceQueries.length !== 1) {
+      fail(`灯阵与图例共享实例，设备数据集应只查 1 次，实际 ${firstDeviceQueries.length}`);
+    }
     if (firstState.host === null || firstState.host.failures !== 0) {
       fail(`首屏 status().failures 应为 0：${JSON.stringify(firstState.host)}`);
     }
@@ -531,6 +539,7 @@ async function main() {
     if (seededState.tiles !== 36) fail(`LINE-B 灯阵应 36 格，实际 ${seededState.tiles}`);
     if (seededState.faultLegend !== '1') fail(`LINE-B 故障数应 1，实际 ${seededState.faultLegend}`);
     const seededLineQueries = seededQueries.filter((item) => item.includes('line=LINE-B'));
+    // 设备（灯阵 + 图例共享 1 次）+ 告警流水 + 工序链 = 3 条带 line 的 query。
     if (seededLineQueries.length < 3) {
       fail(
         `LINE-B 应产生 ≥3 条带 line=LINE-B 的 query，实际 ${seededLineQueries.length}/${seededQueries.length}`,
@@ -679,18 +688,24 @@ async function main() {
       return { status: response.status, body };
     };
 
-    // 以「生产监控大屏」为模板：它的文档 53 个组件全部可渲染。手工拼"最小文档"会被
+    // 以「生产监控大屏」为模板：它的文档 54 个组件全部可渲染。手工拼"最小文档"会被
     // canonical 解析器拒掉（实测 viewer 渲染 0 组件），所以克隆后只改数据源绑定。
     const dsTemplates = (await dsFetch('/screens')).body.screens;
     const dsTemplate = dsTemplates.find((item) => item.name === '生产监控大屏');
     if (dsTemplate === undefined) fail('G: 缺少「生产监控大屏」模板屏');
     const dsTemplateDocument = (await dsFetch(`/screens/${dsTemplate.id}`)).body.screen.document;
 
-    /** 把模板里的状态灯阵改绑到指定数据源（模板里恰好有 1 个）。 */
+    /**
+     * 把模板里的状态灯阵改绑到指定数据源（模板里恰好有 1 个）。灯阵在模板里读文档级共享实例
+     * `devices`（与图例共用，ADR-0100 F4）；这里改回组件自带 `dataSource`，`dataValue` /
+     * `dataBinding` 必须一并删掉（两种写法互斥）。图例仍读原实例，不影响灯阵格数断言。
+     */
     const dsPatchGrid = (document, datasetId, fields, params) => {
       let patched = 0;
       for (const component of document.components) {
-        if (component.dataSource?.datasetId !== 'monitor.devices') continue;
+        if (component.type !== 'board.status-grid') continue;
+        delete component.dataValue;
+        delete component.dataBinding;
         component.dataSource = {
           type: 'dataset',
           datasetId,

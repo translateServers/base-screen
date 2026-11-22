@@ -265,7 +265,7 @@ M 段是**宿主资源作者面**闭环：编辑页右下角打开作者面，�
 
 | dataSource | 组件 | 数据来自 |
 | --- | --- | --- |
-| `dataset` | 设备状态灯阵 / 告警流水 / 产线工序链 | `monitor.devices` / `monitor.alarms` / `monitor.pipeline`（`/api/datasets`） |
+| `dataset` | 设备状态灯阵 + 状态图例 / 告警流水 / 产线工序链 | `monitor.devices`（文档级共享实例 `devices`）/ `monitor.alarms` / `monitor.pipeline`（`/api/datasets`） |
 | `variable` | 当前产线 / 时间窗 / 数据源状态 / 告警播报 / 时钟 / 更新时间 | 3 个 `static` 变量（可交互）+ 3 个 `production.*` 宿主只读变量 |
 | `host-resource` | 5 张 KPI（OEE / 在线率 / 产量 / 目标达成 / 未处理告警）+ 产量趋势 + 产线负载排行 | `demo_metric` / `demo_series` / `demo_ranking`（`/api/metrics`） |
 | `static` | 标题、标签、班组绩效表、三个选择器 | 文档内字面量 |
@@ -273,6 +273,11 @@ M 段是**宿主资源作者面**闭环：编辑页右下角打开作者面，�
 它同时是「物料形状 × 数据形状」的对照样本：`board.status-grid` 承载多实体灯阵（48 台设备
 一眼扫完），`board.pipeline` 承载保序工序链（哪道卡住），`board.scroll-board` 承载带等级色条
 的告警流水（逐条读），三者消费的是同一个后端的三张表。
+
+灯阵与下方的状态图例读的是同一份设备数据，因此引用同一个文档级数据源实例（`dataSources.devices`，
+参数 `line` 走变量槽位）：两个组件经各自的 `dataBinding` 取不同的列，切产线只发一次设备查询
+（ADR-0100 F4；三端冒烟在首屏断言设备数据集恰好查询 1 次）。告警流水与工序链仍用组件自带的
+`dataSource`——两种写法在同一张屏上并存。
 
 **「实时告警演示大屏」**——告警链路的专用屏，三块共用同一套等级语义：
 
@@ -510,9 +515,10 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 
 起始文档里那张卡片**不是一个物料**，而是四个原子物料按 zIndex 叠出来的：`stage-card-bg`
 （`base.rectangle` 底座与边框）、`stage-card-title`（`base.text`）、`stage-card-rule`
-（`base.rule`）与 `stage-card-value`。四个节点都是根节点——组壳的几何由引擎持有，配置了
-`groupMaterialType` 之后任何一次事务都会把 `base.container` 吸附到其子孙的包围盒并集，拿它当
-父节点会在第一次无关编辑时压平卡片的内缩留白。其中 `stage-card-value` 的 `dataSource` 是 `host-resource`
+（`base.rule`）与 `stage-card-value`。四个节点都是根节点，整体搬动靠编辑期的成组。配置了
+`groupMaterialType` 之后 `base.container` 是组壳：贴着子项的边跟随子项，留有内边距的边保持不动、
+只在子项越出时外扩，因此把底座当父节点也不会再被压平（组合分片的卡片就是这么做的）。其中
+`stage-card-value` 的 `dataSource` 是 `host-resource`
 （`resourceType: 'demo_metric'`、`resourceId: 'cpu_usage'`）。三端各自的
 `src/screen/host-data-channel.ts` 把它解析成一次 `/api/metrics/series` 查询，
 经物料的 tabular 适配器投影为组件视图模型——这正是宿主接入真实数据源的形态。
@@ -522,6 +528,12 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 文档能在三端渲染**。三端的 `configure` 都带 `groupMaterialType: 'base.container'`，所以多选原子
 物料即可成组整体移动/缩放/旋转；要成套插入同一份组合，用 `insertComponentFragment`，预设 JSON
 由宿主自己存。
+
+三端编辑页还给设计器配了一份宿主分片「指标卡」（`src/screen/metric-value.ts` 的 `METRIC_CARD_FRAGMENT`，
+经 `element.materialLibraryFragments` 注入）：容器底座 + 标题文本 + 指标读数。它在物料库「业务指标」分类里带
+「组合」角标，点击或拖入画布即展开为三个普通组件（父子成组、一次撤销），文档里不留分片引用（ADR-0100）。
+编辑页同时开启了 `fragmentSaveAction`：选中组件后右键「存为组合」，设计器派发 `base-screen-fragment-save-request`，
+`src/screen/fragment-shelf.ts` 把它补上 id / 名称 / 分类后放进物料库「我的组合」。示例只存在内存里，真实宿主应写入自己的后端。
 
 三端的数据通道都支持四种宿主资源类型，投影形状与绑定角色一一对应：
 

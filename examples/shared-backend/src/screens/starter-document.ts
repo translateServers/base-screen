@@ -11,10 +11,9 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  * 边框，`base.text` 做标题，`base.rule` 做分隔线，`host-app.metric-value` 只画「数值 + 单位」。
  * 需要成套搬运这份组合时，宿主用 `insertComponentFragment` 一次插入。
  *
- * 四个节点**刻意都是根节点**，不是挂在底座下的父子结构：宿主配置 `groupMaterialType` 之后，
- * 组壳的几何由引擎持有——任何一次事务都会把 `base.container` 吸附到其子孙的包围盒并集
- * （auto-width 文本的实测宽度变化不产生事务，只能靠下一次事务顺带同步）。把底座当父节点，
- * 20px 内缩会在第一次无关编辑时被压平。"整体搬动"是编辑期的**成组**动作，不是文档层的父子关系。
+ * 四个节点**刻意都是根节点**，不是挂在底座下的父子结构："整体搬动"是编辑期的**成组**动作，
+ * 不是文档层的父子关系。（宿主配置 `groupMaterialType` 后，`base.container` 留有内边距的边
+ * 不再被吸附到子项，把底座当父节点也能保住 20px 内缩——组合分片的卡片就是这种结构。）
  *
  * - `stage-card-value` 演示 host-resource 数据绑定：`resourceType: 'demo_metric'`、
  *   `resourceId: 'cpu_usage'`，参数 `points` 为字面量。该组件使用三个前端各自实现的

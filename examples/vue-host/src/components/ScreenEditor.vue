@@ -18,6 +18,7 @@ import { createLogger } from '../lib/logger';
 import { showToast } from '../lib/toast';
 import { createHostAssetLibrary, HOST_ASSET_LIBRARY_GROUP_ID } from '../screen/asset-library';
 import { loadVueDesignerRuntime } from '../screen/composition-runtime';
+import { attachHostFragmentShelf } from '../screen/fragment-shelf';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
   createHostAlarmStyleAuthoring,
@@ -132,6 +133,7 @@ onMounted(() => {
         // 返回按钮由基座顶栏渲染，宿主只负责点击后跳回自己的路由。
         backButton: true,
         hostResourceSelectionButton: true,
+        fragmentSaveAction: true,
         leftPanelGroups: [{ id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' }],
       },
     };
@@ -181,6 +183,8 @@ function onDesignerMounted(
   const assetLibrary = createHostAssetLibrary({ designer: element, screenId });
   handle.onDispose(() => assetLibrary.dispose());
   element.append(assetLibrary.element);
+  // 宿主分片（ADR-0100）：预置「指标卡」+ 作者经「存为组合」保存的组合。
+  attachHostFragmentShelf(element, (type, listener) => handle.on(type, listener));
 
   return () => {
     if (designer.value === element) designer.value = null;

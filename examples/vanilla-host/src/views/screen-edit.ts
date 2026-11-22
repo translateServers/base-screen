@@ -12,6 +12,7 @@ import { createLogger } from '../lib/logger';
 import { goToList } from '../lib/navigation';
 import type { Route, ViewModule } from '../router';
 import { createHostAssetLibrary, HOST_ASSET_LIBRARY_GROUP_ID } from '../screen/asset-library';
+import { attachHostFragmentShelf } from '../screen/fragment-shelf';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
   createHostAlarmStyleAuthoring,
@@ -112,6 +113,7 @@ export const screenEditView: ViewModule = {
           hostConditionalStyleAuthoring: alarmStyleAuthoring,
           backButton: true,
           hostResourceSelectionButton: true,
+          fragmentSaveAction: true,
           leftPanelGroups: [{ id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' }],
         },
         onProjectState: (state) => {
@@ -158,6 +160,8 @@ export const screenEditView: ViewModule = {
           const assetLibrary = createHostAssetLibrary({ designer: element, screenId });
           handle.onDispose(() => assetLibrary.dispose());
           element.append(assetLibrary.element);
+          // 宿主分片（ADR-0100）：预置「指标卡」+ 作者经「存为组合」保存的组合。
+          attachHostFragmentShelf(element, (type, listener) => handle.on(type, listener));
         },
       });
       await controller.attach(stage);
