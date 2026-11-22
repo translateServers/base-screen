@@ -1,8 +1,11 @@
 import type { ScreenDiagnostic, ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenComponentFragmentInsertionIntent,
-  createBaseScreenComponentFragmentTransaction,
   parseBaseScreenComponentFragmentInsertionIntent,
+} from '@base-screen/plugin-core';
+import {
+  type BaseScreenComponentFragmentPlacement,
+  createBaseScreenComponentFragmentTransaction,
 } from '../../common/operations/material-component/material-component-fragment.js';
 import {
   type DesignerElementHost,
@@ -22,11 +25,24 @@ export type { BaseScreenComponentFragmentInsertionIntent };
  * - `anchor` 是组合**包围盒的左上角**，省略时与 `insertComponent` 一致取当前可见画布中心；
  * - 节点位置是相对 anchor 的偏移，整片只平移保证不变形，超出画布时贴边而不是缩放；
  * - `props`/`style` 与 manifest 默认值顶层浅合并后再过 schema，宿主无需自己补齐必填字段；
- * - 一次事务提交，因此可撤销；成功后整片成为选中项，焦点在 shell（若有）。
+ * - 一次事务提交，因此可撤销；成功后选中分片的根节点（有 shell 时只选 shell，可直接拖动整片），
+ *   焦点在 shell（若有）。
  */
 export function insertComponentFragment(
   element: DesignerElementHost,
   intent: BaseScreenComponentFragmentInsertionIntent,
+): ScreenParseResult<ScreenDocument> {
+  return insertComponentFragmentWithPlacement(element, intent, 'fit-canvas');
+}
+
+/**
+ * 内部入口：物料库拖放用 `'at-anchor'`（落点即左上角，可越出画布，与单个物料拖放一致）；
+ * 公开 API 与点击插入固定 `'fit-canvas'`。
+ */
+export function insertComponentFragmentWithPlacement(
+  element: DesignerElementHost,
+  intent: BaseScreenComponentFragmentInsertionIntent,
+  placement: BaseScreenComponentFragmentPlacement,
 ): ScreenParseResult<ScreenDocument> {
   const state = getDesignerElementState(element);
   const document = state.session.document;
@@ -50,6 +66,7 @@ export function insertComponentFragment(
     catalog,
     intent: parsed.value,
     anchor,
+    placement,
   });
   if (!built.ok) return built;
 
@@ -57,7 +74,7 @@ export function insertComponentFragment(
   if (result.ok) {
     state.session.reduceSelection({
       type: 'replace-selection',
-      componentIds: built.value.componentIds,
+      componentIds: built.value.selectionIds,
       focusedComponentId: built.value.focusedComponentId,
     });
   }

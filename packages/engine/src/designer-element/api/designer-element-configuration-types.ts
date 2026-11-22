@@ -11,6 +11,7 @@ import type {
 } from '@base-screen/contracts';
 import type {
   BaseScreenConditionalStylePort,
+  BaseScreenFragmentDefinition,
   BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
@@ -34,6 +35,11 @@ export interface BaseScreenDesignerConfiguration {
   readonly materialLibraryState?: BaseScreenMaterialLibraryState;
   readonly materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping;
   readonly materialLibraryItems?: readonly BaseScreenMaterialLibraryItem[];
+  /**
+   * 宿主组合分片（ADR-0100）：与插件 `fragment` 贡献一起出现在物料库，插入即展开为普通组件。
+   * 与 `materialLibraryItems` 相互独立——后者须覆盖全部可见物料，分片不受这条约束。
+   */
+  readonly materialLibraryFragments?: readonly BaseScreenFragmentDefinition[];
   readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
   readonly pluginCatalog?: BaseScreenPluginCatalog;
   readonly pluginPanels?: BaseScreenPluginPanelCatalog;
@@ -66,4 +72,9 @@ export interface BaseScreenDesignerConfiguration {
    * 仅声明 host-resource 表示物料能消费宿主资源（读数、图表等），不显示选择入口。
    */
   readonly hostResourceSelectionButton?: boolean;
+  /**
+   * 提供「存为组合」操作（ADR-0100）：选中组件后在右键菜单与命令面板出现，提取成功即派发
+   * `base-screen-fragment-save-request`。宿主负责命名、归类与存储；未开启时操作不出现。
+   */
+  readonly fragmentSaveAction?: boolean;
 }

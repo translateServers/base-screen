@@ -57,6 +57,12 @@ import {
   ungroup,
 } from '../api/designer-element-editing.js';
 import {
+  canRequestFragmentSave,
+  createComponentFragment,
+  readFragmentSaveAction,
+  requestFragmentSave,
+} from '../api/designer-element-fragment-save.js';
+import {
   readConditionalStylePort,
   readDatasetCatalogPort,
   readDesignerHostAdapter,
@@ -96,6 +102,12 @@ import {
   setIntentHandler,
   setIntentReferenceCatalog,
 } from '../api/designer-element-intent.js';
+import {
+  insertMaterialLibraryFragment,
+  listMaterialLibraryFragmentItems,
+  readMaterialLibraryFragments,
+  writeMaterialLibraryFragments,
+} from '../api/designer-element-material-library-fragments.js';
 import {
   readBackButton,
   readGroupMaterialType,
@@ -242,6 +254,14 @@ export const designerElementRuntime = {
   writeMaterialLibraryGrouping,
   readMaterialLibraryItems,
   writeMaterialLibraryItems,
+  readMaterialLibraryFragments,
+  writeMaterialLibraryFragments,
+  listMaterialLibraryFragmentItems,
+  insertMaterialLibraryFragment,
+  createComponentFragment,
+  readFragmentSaveAction,
+  canRequestFragmentSave,
+  requestFragmentSave,
   readRuntimeContributions,
   readPluginCatalog,
   writePluginCatalog,

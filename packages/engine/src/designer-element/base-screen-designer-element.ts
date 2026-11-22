@@ -29,7 +29,10 @@ import {
   type ScreenInteractionState,
 } from '@base-screen/core';
 import type {
+  BaseScreenComponentFragmentInsertionIntent,
   BaseScreenConditionalStylePort,
+  BaseScreenFragmentBody,
+  BaseScreenFragmentDefinition,
   BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
@@ -60,7 +63,6 @@ import type {
 } from '../common/operations/host-resource/host-resource-selection.js';
 import type { DesignerIntentHandler } from '../common/operations/intent/designer-intent.js';
 import type { BaseScreenComponentInsertionIntent } from '../common/operations/material-component/material-component.js';
-import type { BaseScreenComponentFragmentInsertionIntent } from '../common/operations/material-component/material-component-fragment.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../common/operations/material-library/material-library-grouping.js';
 import { type BaseScreenMaterialLibraryItem } from '../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../common/operations/material-library/material-library-state.js';
@@ -182,6 +184,19 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#designerState.runtime.writeMaterialLibraryItems(this, value);
   }
 
+  /**
+   * 宿主组合分片（ADR-0100）：与插件 `fragment` 贡献一起在物料库中展示，带「组合」角标；
+   * 点击或拖入画布即按 `insertComponentFragment` 的语义整片插入。引用的物料在 catalog 中
+   * 缺失或不可插入时，该分片被隐藏并上报 warning 诊断，其余物料库不受影响。
+   */
+  get materialLibraryFragments(): readonly BaseScreenFragmentDefinition[] | undefined {
+    return this.#designerState.runtime.readMaterialLibraryFragments(this);
+  }
+
+  set materialLibraryFragments(value: readonly BaseScreenFragmentDefinition[] | undefined) {
+    this.#designerState.runtime.writeMaterialLibraryFragments(this, value);
+  }
+
   get runtimeContributions(): BaseScreenRuntimeContributionIndex | undefined {
     return this.#designerState.runtime.readRuntimeContributions(this);
   }
@@ -228,6 +243,11 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   get hostResourceSelectionButton(): boolean {
     return this.#designerState.runtime.readHostResourceSelectionButton(this);
+  }
+
+  /** 是否提供「存为组合」操作；经 `configure({ fragmentSaveAction: true })` 开启。 */
+  get fragmentSaveAction(): boolean {
+    return this.#designerState.runtime.readFragmentSaveAction(this);
   }
 
   set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined) {
@@ -410,6 +430,17 @@ export class BaseScreenDesignerElement extends ElementBase {
    */
   insertComponent(intent: BaseScreenComponentInsertionIntent): ScreenParseResult<ScreenDocument> {
     return this.#designerState.runtime.insertComponent(this, intent);
+  }
+
+  /**
+   * 把组件（缺省为当前选区，连同后代）提取为分片组合（ADR-0100）：只读，不改文档。
+   * 结果可直接交给 `insertComponentFragment`，或补上 id / name / category 作为物料库分片保存。
+   * 选区引用变量时失败关闭；被舍弃的条件样式、锁定 / 隐藏状态与跨出选区的关系以 warning 诊断告知。
+   */
+  createComponentFragment(
+    componentIds?: readonly string[],
+  ): ScreenParseResult<BaseScreenFragmentBody> {
+    return this.#designerState.runtime.createComponentFragment(this, componentIds);
   }
 
   /**

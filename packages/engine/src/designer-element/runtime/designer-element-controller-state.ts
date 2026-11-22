@@ -160,6 +160,8 @@ export function initializeDesignerElementControllers(
     getCatalog: () => state.catalog,
     getMaterialLibraryItem: (id) =>
       state.resolvedMaterialLibraryItems.find((item) => item.id === id),
+    insertMaterialLibraryFragmentAt: (fragmentId, position) =>
+      state.runtime.insertMaterialLibraryFragment(element, fragmentId, position),
     getDocument: () => getDesignerGeometryDocument(state),
     getCanonicalDocument: () => state.session.document,
     getInteraction: () => state.session.interaction,
@@ -174,6 +176,8 @@ export function initializeDesignerElementControllers(
       state.workbenchController.snapPoint(point, excludedComponentIds),
     snapCanvasSelection: (bounds, offset, excludedComponentIds) =>
       state.workbenchController.snapSelectionOffset(bounds, offset, excludedComponentIds),
+    snapCanvasGuides: (bounds, excludedComponentIds) =>
+      state.workbenchController.snapAlignmentGuides(bounds, excludedComponentIds),
     renderSnapPreview: (point) => state.workbenchController.renderSnapPreview(point),
     setSnapSessionActive: (active) => {
       state.autoWidthController.setFrozen(active);
@@ -339,6 +343,13 @@ export function initializeDesignerElementControllers(
     getCatalog: () => state.catalog,
     getMaterialLibraryItems: () => state.resolvedMaterialLibraryItems,
     getMaterialLibraryGrouping: () => state.materialLibraryGrouping,
+    getMaterialLibraryFragments: () => state.runtime.listMaterialLibraryFragmentItems(element),
+    insertMaterialLibraryFragment: (fragmentId) => {
+      const result = state.runtime.insertMaterialLibraryFragment(element, fragmentId);
+      if (result !== undefined && !result.ok) {
+        state.runtime.emitDiagnostics(element, result.diagnostics);
+      }
+    },
     getDocument: () => state.session.document,
     hasTextSelection: () => hasDesignerTextSelection(element.shadowRoot),
     getGeometryDocument: () => getDesignerGeometryDocument(state),

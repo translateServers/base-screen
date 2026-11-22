@@ -1,3 +1,14 @@
+// 分片形状契约的唯一所有者是 plugin-core（ADR-0100）；engine 公共面继续转发，宿主导入路径不变。
+export {
+  type BaseScreenComponentFragmentInsertionIntent,
+  type BaseScreenFragmentBody,
+  type BaseScreenFragmentDataSource,
+  type BaseScreenFragmentDefinition,
+  type BaseScreenFragmentNode,
+  type BaseScreenFragmentRelation,
+  type BaseScreenFragmentShell,
+  parseBaseScreenComponentFragmentInsertionIntent,
+} from '@base-screen/plugin-core';
 export {
   BASE_SCREEN_METRIC_EVENT,
   type BaseScreenMetricEventDetail,
@@ -83,11 +94,10 @@ export {
   parseBaseScreenComponentInsertionIntent,
 } from '../common/operations/material-component/material-component.js';
 export {
-  type BaseScreenComponentFragmentInsertionIntent,
-  type BaseScreenFragmentNode,
-  type BaseScreenFragmentShell,
-  parseBaseScreenComponentFragmentInsertionIntent,
-} from '../common/operations/material-component/material-component-fragment.js';
+  BASE_SCREEN_FRAGMENT_SAVE_REQUEST_EVENT,
+  type BaseScreenFragmentSaveRequestEventDetail,
+} from '../common/operations/material-component/material-component-fragment-extract.js';
+export { parseBaseScreenMaterialLibraryFragments } from '../common/operations/material-library/material-library-fragments.js';
 export {
   type BaseScreenMaterialLibraryGroup,
   type BaseScreenMaterialLibraryGrouping,

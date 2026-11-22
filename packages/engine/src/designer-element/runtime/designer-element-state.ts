@@ -11,6 +11,7 @@ import type {
 } from '@base-screen/contracts';
 import type {
   BaseScreenConditionalStylePort,
+  BaseScreenFragmentDefinition,
   BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
@@ -94,6 +95,8 @@ export interface DesignerElementState {
   materialLibraryState: BaseScreenMaterialLibraryState | undefined;
   materialLibraryGrouping: BaseScreenMaterialLibraryGrouping | undefined;
   materialLibraryItems: readonly BaseScreenMaterialLibraryItem[] | undefined;
+  /** 宿主声明的组合分片（ADR-0100）；与插件 fragment 贡献一起在物料库里试运行后展示。 */
+  materialLibraryFragments: readonly BaseScreenFragmentDefinition[] | undefined;
   resolvedMaterialLibraryItems: readonly BaseScreenResolvedMaterialLibraryItem[];
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   pluginCatalog: BaseScreenPluginCatalog | undefined;
@@ -114,6 +117,8 @@ export interface DesignerElementState {
   previewHandler: ((document: ScreenDocument) => boolean) | undefined;
   backButton: boolean;
   hostResourceSelectionButton: boolean;
+  /** 是否提供「存为组合」操作（ADR-0100 第二阶段）；宿主监听保存请求事件时开启。 */
+  fragmentSaveAction: boolean;
   renderer: BaseScreenRenderer | undefined;
   /** 曾以骨架形态先挂载：完整初始化时把面板内容与画布渲染拆到后续帧。 */
   skeletonShown: boolean;
@@ -217,6 +222,7 @@ export function createDesignerElementState(
   state.resolvedMaterialLibraryItems = [];
   state.backButton = false;
   state.hostResourceSelectionButton = false;
+  state.fragmentSaveAction = false;
   state.skeletonShown = false;
   state.skeletonTimeout = undefined;
   state.deferredPanelHydration = false;

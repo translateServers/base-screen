@@ -21,7 +21,10 @@ import type {
 } from '@base-screen/contracts';
 import { type ScreenDocumentCommand, type ScreenDocumentTransaction } from '@base-screen/core';
 import type {
+  BaseScreenComponentFragmentInsertionIntent,
   BaseScreenConditionalStylePort,
+  BaseScreenFragmentBody,
+  BaseScreenFragmentDefinition,
   BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
@@ -43,7 +46,6 @@ import type {
   BaseScreenHostResourceSelectionTarget,
 } from '../../common/operations/host-resource/host-resource-selection.js';
 import type { BaseScreenComponentInsertionIntent } from '../../common/operations/material-component/material-component.js';
-import type { BaseScreenComponentFragmentInsertionIntent } from '../../common/operations/material-component/material-component-fragment.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../../common/operations/material-library/material-library-grouping.js';
 import { type BaseScreenMaterialLibraryItem } from '../../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../../common/operations/material-library/material-library-state.js';
@@ -58,12 +60,14 @@ export interface DesignerElementHost extends HTMLElement {
   materialLibraryState: BaseScreenMaterialLibraryState | undefined;
   materialLibraryGrouping: BaseScreenMaterialLibraryGrouping | undefined;
   materialLibraryItems: readonly BaseScreenMaterialLibraryItem[] | undefined;
+  materialLibraryFragments: readonly BaseScreenFragmentDefinition[] | undefined;
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   pluginCatalog: BaseScreenPluginCatalog | undefined;
   pluginCommandPort: PluginCommandPort | undefined;
   readonly previewHandler: ((document: ScreenDocument) => boolean) | undefined;
   readonly backButton: boolean;
   readonly hostResourceSelectionButton: boolean;
+  readonly fragmentSaveAction: boolean;
   projectAdapter: ScreenProjectAdapter | undefined;
   toolMaterialTypes: DesignerToolMaterialTypes | undefined;
   groupMaterialType: string | undefined;
@@ -98,6 +102,9 @@ export interface DesignerElementHost extends HTMLElement {
     intent: BaseScreenHostResourceAuthoringIntent,
   ): ScreenParseResult<ScreenDocument>;
   insertComponent(intent: BaseScreenComponentInsertionIntent): ScreenParseResult<ScreenDocument>;
+  createComponentFragment(
+    componentIds?: readonly string[],
+  ): ScreenParseResult<BaseScreenFragmentBody>;
   insertComponentFragment(
     intent: BaseScreenComponentFragmentInsertionIntent,
   ): ScreenParseResult<ScreenDocument>;

@@ -57,6 +57,7 @@ export function initialize(element: DesignerElementHost): void {
       elementState.materialLibraryGrouping,
       elementState.leftPanelGroups,
       deferHydration,
+      elementState.runtime.listMaterialLibraryFragmentItems(element),
     ),
   );
   attachDesignerCanvasHint(shadow, element.ownerDocument);
@@ -270,6 +271,7 @@ function hydrateDeferredPanels(element: DesignerElementHost): void {
     elementState.resolvedMaterialLibraryItems,
     elementState.materialLibraryState,
     elementState.materialLibraryGrouping,
+    elementState.runtime.listMaterialLibraryFragmentItems(element),
   );
   elementState.panelController.refreshMaterialLibrary(layout);
 }
@@ -433,6 +435,7 @@ export function renderMaterialLibraryGrouping(element: DesignerElementHost): voi
     elementState.resolvedMaterialLibraryItems,
     elementState.materialLibraryState,
     elementState.materialLibraryGrouping,
+    elementState.runtime.listMaterialLibraryFragmentItems(element),
   );
   elementState.panelController.refreshMaterialLibrary(layout);
 }

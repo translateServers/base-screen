@@ -16,6 +16,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
+  BASE_SCREEN_FRAGMENT_SAVE_REQUEST_EVENT,
   BASE_SCREEN_HOST_RESOURCE_DRAG_MIME,
   BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT,
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
@@ -27,7 +28,10 @@ import {
   type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
   type BaseScreenDesignerSetWorkbenchModeOptions,
   type BaseScreenDesignerWorkbenchMode,
+  type BaseScreenFragmentBody,
+  type BaseScreenFragmentDefinition,
   type BaseScreenFragmentNode,
+  type BaseScreenFragmentSaveRequestEventDetail,
   type BaseScreenHostResourceAuthoringIntent,
   type BaseScreenHostResourceSelectionCommit,
   type BaseScreenHostResourceSelectionRequest,
@@ -40,6 +44,7 @@ import {
   parseBaseScreenComponentInsertionIntent,
   parseBaseScreenDesignerLeftPanelGroups,
   parseBaseScreenHostResourceAuthoringIntent,
+  parseBaseScreenMaterialLibraryFragments,
   parseBaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryItems,
   ScreenProjectController,
@@ -84,6 +89,25 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<typeof parseBaseScreenMaterialLibraryItems>().returns.toMatchTypeOf<
       ScreenParseResult<readonly BaseScreenMaterialLibraryItem[]>
     >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['materialLibraryFragments']
+    >().toEqualTypeOf<readonly BaseScreenFragmentDefinition[] | undefined>();
+    expectTypeOf<typeof parseBaseScreenMaterialLibraryFragments>().returns.toMatchTypeOf<
+      ScreenParseResult<readonly BaseScreenFragmentDefinition[]>
+    >();
+  });
+
+  it('exports the save-selection-as-fragment contract (ADR-0100 phase 2)', () => {
+    expect(BASE_SCREEN_FRAGMENT_SAVE_REQUEST_EVENT).toBe('base-screen-fragment-save-request');
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['createComponentFragment']
+    >().returns.toEqualTypeOf<ScreenParseResult<BaseScreenFragmentBody>>();
+    expectTypeOf<
+      BaseScreenFragmentSaveRequestEventDetail['fragment']
+    >().toEqualTypeOf<BaseScreenFragmentBody>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['fragmentSaveAction']
+    >().toEqualTypeOf<boolean>();
   });
 
   it('exports the host left panel group contract', () => {
