@@ -39,7 +39,6 @@ export const BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST: BaseScreenMaterialManifest
     { style: 'fill', label: '填充', control: 'color', allowGradient: true },
     { style: 'borderColor', label: '边框颜色', control: 'color' },
     { style: 'borderWidth', label: '边框宽度', control: 'number' },
-    { style: 'opacity', label: '不透明度', control: 'number' },
   ],
   propsSchema: { kind: 'object', properties: {}, required: [] },
   propertyPanel: [],

@@ -152,7 +152,6 @@ export function createOnlineMaterialDraft(
     stylePanel: [
       { style: 'background', label: '背景色', control: 'color' },
       { style: 'accent', label: '强调色', control: 'color' },
-      { style: 'opacity', label: '不透明度', control: 'number' },
     ],
     events: [],
     dataCapabilities: ['static', 'variable'],
@@ -843,9 +842,7 @@ class OnlineMaterial extends HTMLElement {
     const value = state.status === 'ready' ? formatValue(state.value) : state.status === 'loading' ? '…' : '--';
     const background = typeof style.background === 'string' ? style.background : DEFAULT_BACKGROUND;
     const accent = typeof style.accent === 'string' ? style.accent : DEFAULT_ACCENT;
-    const opacity = typeof style.opacity === 'number' ? style.opacity : 1;
     this.style.display = 'block';
-    this.style.opacity = String(opacity);
     const root = this.#root;
     root.replaceChildren();
     const sheet = document.createElement('style');

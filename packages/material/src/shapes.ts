@@ -34,7 +34,6 @@ const shapeStylePanel = [
   { style: 'shadowBlur', label: '阴影模糊', control: 'number' as const },
   { style: 'shadowOffsetX', label: '阴影偏移 X', control: 'number' as const },
   { style: 'shadowOffsetY', label: '阴影偏移 Y', control: 'number' as const },
-  { style: 'opacity', label: '不透明度', control: 'number' as const },
 ];
 
 const rectangleStylePanel = shapeStylePanel.map((field) =>

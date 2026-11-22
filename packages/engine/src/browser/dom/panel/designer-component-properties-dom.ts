@@ -976,7 +976,11 @@ function appendCommonOpacityControl(
   component: ScreenComponentNode,
   manifest: BaseScreenMaterialManifest,
 ): void {
-  const schema = manifest.styleSchema.properties.opacity;
+  // 不透明度是引擎级保留键（ADR-0099 §2.3）：Renderer 几何帧对所有物料统一写入，
+  // 因此公共区也无条件提供入口。物料申报的 schema 只用于收窄取值，不决定是否显示；
+  // 提交侧同样回落到保留 schema（designer-property-transactions）。
+  const schema =
+    manifest.styleSchema.properties.opacity ?? BASE_SCREEN_RESERVED_STYLE_SCHEMAS.opacity;
   if (schema?.kind !== 'number') return;
   const section = appendSection(
     properties,

@@ -46,13 +46,12 @@ export abstract class BaseScreenOfficialMaterialElement extends ElementBase {
    * 按 content-box 解析的话 1px 边框会让实际盒子比声明尺寸大 2px（渲染盒不变式）。
    * 渐变边框无法与圆角用 `border-image` 共存，改用宿主自己的叠加层 + mask 挖空；
    * 叠加层只动自身 `display`，不碰宿主的 `display`（渲染器会强制它）。
+   * 不透明度是保留样式，由 Renderer 几何帧统一写到宿主元素，这里不再重复写（ADR-0099 §2.3）。
    */
   protected drawBoxSurface(style: Readonly<Record<string, unknown>>): void {
     this.style.boxSizing = 'border-box';
     applyBackgroundColorOrGradient(this, readStringStyle(style.fill));
     this.applyBoxBorder(readStringStyle(style.borderColor), readNumberStyle(style.borderWidth));
-    const opacity = readNumberStyle(style.opacity);
-    this.style.opacity = opacity === undefined ? '' : String(opacity);
     const borderRadius = readNumberStyle(style.borderRadius);
     this.style.borderRadius = borderRadius === undefined ? '0px' : `${borderRadius}px`;
     this.style.boxShadow = boxShadowStyle(style);

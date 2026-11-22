@@ -361,7 +361,8 @@ describe('rule material', () => {
       ruleModel({ axis: 'horizontal' }, defaultStyle({ dash: 'wavy', opacity: 0.5 })),
     );
     expect(style.borderTop).toBe('2px solid #1f2a44');
-    expect(style.opacity).toBe('0.5');
+    // 不透明度是保留样式：由 Renderer 几何帧写到宿主元素，物料自身不再写（ADR-0099 §2.3）。
+    expect(style.opacity).toBeUndefined();
   });
 });
 

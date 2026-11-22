@@ -33,7 +33,6 @@ export const BASE_SCREEN_RULE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     { style: 'color', label: '线条颜色', control: 'color' },
     { style: 'thickness', label: '线宽', control: 'number' },
     { style: 'dash', label: '线型', control: 'select' },
-    { style: 'opacity', label: '不透明度', control: 'number' },
   ],
   propsSchema: {
     kind: 'object',
@@ -80,7 +79,6 @@ export class BaseScreenRuleMaterialElement extends BaseScreenOfficialMaterialEle
     this.style.borderLeft = '';
     if (vertical) this.style.borderLeft = line;
     else this.style.borderTop = line;
-    this.style.opacity = typeof model.style.opacity === 'number' ? String(model.style.opacity) : '';
   }
 }
 

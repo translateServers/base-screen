@@ -284,7 +284,6 @@ describe('online material package contract (ADR-0090)', () => {
     expect(draft.manifest.stylePanel).toEqual([
       { style: 'background', label: '背景色', control: 'color' },
       { style: 'accent', label: '强调色', control: 'color' },
-      { style: 'opacity', label: '不透明度', control: 'number' },
     ]);
     const parsed = parseBaseScreenMaterialManifest(draft.manifest);
     expect(parsed.ok).toBe(true);

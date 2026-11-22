@@ -197,9 +197,10 @@ describe('designer panel rendering', () => {
       'hidden',
     ]);
     expect(propertyInputs).not.toContain('name');
-    // 原有属性/代理输入保持不变；其后是填充颜色控件的精确通道输入，以及行为/滤镜分区的
-    // 三个开关、混合模式下拉与五组滑杆+数值双控件（引擎级保留键，不依赖物料申报）。
-    expect(propertyInputs.slice(8)).toHaveLength(34);
+    // 原有属性/代理输入保持不变；其后是填充颜色控件的精确通道输入，以及公共区不透明度的
+    // 滑杆+数值双控件、行为/滤镜分区的三个开关、混合模式下拉与五组滑杆+数值双控件
+    // （引擎级保留键，不依赖物料申报，ADR-0099 §2.3）。
+    expect(propertyInputs.slice(8)).toHaveLength(36);
     expect(
       descendants(properties).find((element) => element.dataset.propertySymbol === 'Z')?.dataset
         .inspectorAdvanced,
@@ -230,7 +231,7 @@ describe('designer panel rendering', () => {
       descendants(properties)
         .filter((element) => element.tagName === 'summary')
         .map((element) => element.textContent),
-    ).toEqual(['几何', '状态', '行为', '滤镜', '内容', '样式', '条件样式']);
+    ).toEqual(['几何', '状态', '通用', '行为', '滤镜', '内容', '样式', '条件样式']);
     expect(descendants(properties).find((element) => element.dataset.prop === 'title')?.value).toBe(
       'Status',
     );

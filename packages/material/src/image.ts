@@ -28,10 +28,7 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     },
     required: ['objectFit', 'opacity'],
   },
-  stylePanel: [
-    { style: 'objectFit', label: '适应方式', control: 'select' },
-    { style: 'opacity', label: '不透明度', control: 'number' },
-  ],
+  stylePanel: [{ style: 'objectFit', label: '适应方式', control: 'select' }],
   propsSchema: { kind: 'object', properties: {}, required: [] },
   propertyPanel: [],
   events: [],
@@ -53,7 +50,6 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
     this.replaceChildren();
     this.style.display = 'block';
     this.style.overflow = 'hidden';
-    this.style.opacity = typeof model.style.opacity === 'number' ? String(model.style.opacity) : '';
     if (model.dataState.status !== 'ready') {
       this.renderDataState(model.dataState, { label: '图片加载中' });
       return;
