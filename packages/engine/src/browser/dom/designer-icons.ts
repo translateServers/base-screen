@@ -73,6 +73,8 @@ const ICONS = {
 
   'lock-open':
     '<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.9-.7"/>',
+  unlink:
+    '<path d="M10.9 14.2 8.6 16.5a4 4 0 0 1-5.7-5.7l2.3-2.3"/><path d="M13.1 9.8l2.3-2.3a4 4 0 0 1 5.7 5.7l-2.3 2.3"/>',
   calendar:
     '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
   locate:

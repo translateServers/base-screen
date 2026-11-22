@@ -305,7 +305,7 @@ function parseControlValue(
     // 因此还原原始枚举值必须走同一条映射，否则数字/布尔枚举会写回字符串。
     return resolved.values.find((candidate) => String(candidate) === target.value);
   }
-  if (control.control === 'json') {
+  if (control.control === 'json' || control.control === 'spacing') {
     try {
       const parsed = parseScreenJsonValue(JSON.parse(target.value));
       return parsed.ok ? parsed.value : undefined;

@@ -220,6 +220,59 @@ describe('parseBaseScreenMaterialEditorDescriptor', () => {
     ).toMatchObject({ ok: false });
   });
 
+  it('accepts spacing only on an object with four numeric sides', () => {
+    const parse = (input: Record<string, unknown>, schema = propsSchema) =>
+      parseBaseScreenMaterialEditorDescriptor(input, schema, styleSchema, ['valueClick'], roles);
+    const paddingSchema = {
+      ...propsSchema,
+      properties: {
+        ...propsSchema.properties,
+        padding: {
+          kind: 'object' as const,
+          properties: {
+            top: { kind: 'number' as const },
+            right: { kind: 'number' as const },
+            bottom: { kind: 'number' as const },
+            left: { kind: 'number' as const },
+          },
+          required: ['top', 'right', 'bottom', 'left'],
+        },
+      },
+    };
+
+    const valid = descriptor();
+    firstField(valid, 0).control = 'spacing';
+    firstField(valid, 0).path = ['padding'];
+    expect(parse(valid, paddingSchema)).toMatchObject({ ok: true });
+
+    // 缺一条边：渲染期无从取值，失败关闭。
+    const missingSide = descriptor();
+    firstField(missingSide, 0).control = 'spacing';
+    firstField(missingSide, 0).path = ['padding'];
+    const threeSides = {
+      ...paddingSchema,
+      properties: {
+        ...paddingSchema.properties,
+        padding: {
+          kind: 'object' as const,
+          properties: {
+            top: { kind: 'number' as const },
+            right: { kind: 'number' as const },
+            bottom: { kind: 'number' as const },
+          },
+          required: ['top', 'right', 'bottom'],
+        },
+      },
+    };
+    expect(parse(missingSide, threeSides)).toMatchObject({ ok: false });
+
+    // 标量字段不是四条边。
+    const wrongKind = descriptor();
+    firstField(wrongKind, 0).control = 'spacing';
+    firstField(wrongKind, 0).path = ['value'];
+    expect(parse(wrongKind)).toMatchObject({ ok: false });
+  });
+
   it('accepts a stepper only on a bounded number field', () => {
     const valid = descriptor();
     firstField(valid, 0).control = 'stepper';

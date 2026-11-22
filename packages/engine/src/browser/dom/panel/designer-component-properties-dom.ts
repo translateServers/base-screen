@@ -8,6 +8,7 @@ import type {
   BaseScreenHostConditionalStyleSource,
   BaseScreenMaterialCatalog,
   BaseScreenMaterialManifest,
+  BaseScreenMaterialPropSchema,
   BaseScreenPluginInspectorControlCatalog,
 } from '@base-screen/plugin-core';
 import { BASE_SCREEN_RESERVED_STYLE_SCHEMAS } from '@base-screen/plugin-core';
@@ -46,6 +47,11 @@ import {
 } from '../designer-ui-primitives.js';
 import { appendCanvasControls } from './designer-canvas-properties-dom.js';
 import { createDesignerCanvasPresentationSettings } from './designer-canvas-transactions.js';
+import {
+  appendDesignerColorGroup,
+  segmentDesignerColorFields,
+  shouldGroupColorFields,
+} from './designer-color-group-dom.js';
 import { appendMultiSelectionControls } from './designer-multi-selection-dom.js';
 import {
   appendActionButton,
@@ -137,6 +143,49 @@ function disableLockedComponentControls(properties: HTMLElement): void {
     if (!control.hasAttribute('data-tip')) {
       control.setAttribute('data-tip', DESIGNER_UI_TEXT.propertiesPanel.lockedEditingHint);
     }
+  }
+}
+
+interface RenderableInspectorField<T> {
+  readonly control: string;
+  readonly field: T;
+  readonly schema: BaseScreenMaterialPropSchema;
+}
+
+/**
+ * 分区内按「连续色值」分段：一段 ≥ 3 个色值时合成色板组，其余字段原样落行。
+ * 只认相邻关系——被字号、开关这类字段打断就不跨段拼板，避免把不相关的颜色凑成一套配色。
+ */
+function appendInspectorFields<T>(
+  parent: HTMLElement,
+  fields: readonly RenderableInspectorField<T>[],
+  options: {
+    readonly groupKey: string;
+    readonly keyOf: (field: T) => string;
+    readonly labelOf: (field: T) => string;
+    readonly valueOf: (field: T) => ScreenJsonValue | undefined;
+    readonly renderField: (parent: HTMLElement, field: RenderableInspectorField<T>) => void;
+  },
+): void {
+  for (const segment of segmentDesignerColorFields(fields)) {
+    if (segment.color && shouldGroupColorFields(segment.fields.length)) {
+      appendDesignerColorGroup(parent, {
+        groupKey: options.groupKey,
+        entries: segment.fields.map((item) => ({
+          key: options.keyOf(item.field),
+          label: options.labelOf(item.field),
+          value: options.valueOf(item.field),
+        })),
+        renderField: (container, entry) => {
+          const item = segment.fields.find(
+            (candidate) => options.keyOf(candidate.field) === entry.key,
+          );
+          if (item !== undefined) options.renderField(container, item);
+        },
+      });
+      continue;
+    }
+    for (const item of segment.fields) options.renderField(parent, item);
   }
 }
 
@@ -272,20 +321,31 @@ function appendComponentControls(
           undefined,
           'content',
         );
+  const propFields: RenderableInspectorField<
+    BaseScreenMaterialManifest['propertyPanel'][number]
+  >[] = [];
   for (const field of manifest.propertyPanel) {
     const schema = manifest.propsSchema.properties[field.prop];
-    if (schema !== undefined && content !== undefined) {
-      appendPropControl(
-        content,
-        field.label,
-        field.prop,
-        component.props[field.prop],
-        schema,
-        field.control,
-        `${component.id}:prop:${field.prop}`,
-        field.allowGradient === true,
-      );
-    }
+    if (schema !== undefined) propFields.push({ control: field.control, field, schema });
+  }
+  if (content !== undefined) {
+    appendInspectorFields(content, propFields, {
+      groupKey: `${component.id}:prop`,
+      keyOf: (field) => field.prop,
+      labelOf: (field) => field.label,
+      valueOf: (field) => component.props[field.prop],
+      renderField: (host, item) =>
+        appendPropControl(
+          host,
+          item.field.label,
+          item.field.prop,
+          component.props[item.field.prop],
+          item.schema,
+          item.field.control,
+          `${component.id}:prop:${item.field.prop}`,
+          item.field.allowGradient === true,
+        ),
+    });
   }
   const stylePanel = manifest.stylePanel ?? [];
   const style =
@@ -298,21 +358,32 @@ function appendComponentControls(
           undefined,
           'style',
         );
+  const styleFields: RenderableInspectorField<
+    NonNullable<BaseScreenMaterialManifest['stylePanel']>[number]
+  >[] = [];
   for (const field of stylePanel) {
     if (field.style === 'opacity') continue;
     const schema = manifest.styleSchema.properties[field.style];
-    if (schema !== undefined && style !== undefined) {
-      appendStyleControl(
-        style,
-        field.label,
-        field.style,
-        component.style[field.style],
-        schema,
-        field.control,
-        `${component.id}:style:${field.style}`,
-        field.allowGradient === true,
-      );
-    }
+    if (schema !== undefined) styleFields.push({ control: field.control, field, schema });
+  }
+  if (style !== undefined) {
+    appendInspectorFields(style, styleFields, {
+      groupKey: `${component.id}:style`,
+      keyOf: (field) => field.style,
+      labelOf: (field) => field.label,
+      valueOf: (field) => component.style[field.style],
+      renderField: (host, item) =>
+        appendStyleControl(
+          host,
+          item.field.label,
+          item.field.style,
+          component.style[item.field.style],
+          item.schema,
+          item.field.control,
+          `${component.id}:style:${item.field.style}`,
+          item.field.allowGradient === true,
+        ),
+    });
   }
   appendConditionalStyleSection(properties, component, manifest);
   if (

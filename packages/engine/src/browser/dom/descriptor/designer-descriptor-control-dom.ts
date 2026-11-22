@@ -6,6 +6,7 @@ import {
 } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerStepper } from '../designer-field-primitives.js';
+import { designerIcon } from '../designer-icons.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
   createDesignerInput,
@@ -24,6 +25,8 @@ export interface DescriptorControlHandle {
   readonly element: HTMLElement;
   /** 承载值、派发 change、被设计器路由识别的元素。 */
   readonly valueTarget: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+  /** 可选：挂到标签旁的字段级动作（四边距的统一/分开）。 */
+  readonly labelAction?: HTMLButtonElement;
 }
 
 export function createDescriptorControl(
@@ -32,6 +35,7 @@ export function createDescriptorControl(
   schema: BaseScreenMaterialPropSchema | undefined,
   value: ScreenJsonValue | undefined,
   datasetFields: readonly DesignerDescriptorDatasetFields[],
+  fieldKey?: string,
 ): DescriptorControlHandle {
   const control = field.control;
   if (control === 'stepper') {
@@ -146,6 +150,9 @@ export function createDescriptorControl(
     });
     return { element: input, valueTarget: input };
   }
+  if (control === 'spacing') {
+    return createSpacingControl(ownerDocument, field, schema, value, fieldKey);
+  }
   const numeric = control === 'number' || control === 'unit-number';
   const input = createDesignerInput(ownerDocument, {
     appearance: numeric ? 'number' : 'text',
@@ -166,6 +173,222 @@ export function createDescriptorControl(
     return { element: shell, valueTarget: input };
   }
   return { element: input, valueTarget: input };
+}
+
+const SPACING_SIDES = ['top', 'right', 'bottom', 'left'] as const;
+type SpacingSide = (typeof SPACING_SIDES)[number];
+
+const MAX_SPACING_LINK_FIELDS = 64;
+/** 每个字段的联动状态：面板每次提交都会整栏重建，状态必须活在 DOM 之外。 */
+const spacingLinkState = new Map<string, boolean>();
+
+function readSpacingValue(value: ScreenJsonValue | undefined): Record<SpacingSide, number> {
+  const source =
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  const read = (side: SpacingSide): number => {
+    const candidate = source[side];
+    return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : 0;
+  };
+  return { top: read('top'), right: read('right'), bottom: read('bottom'), left: read('left') };
+}
+
+function allSidesEqual(sides: Record<SpacingSide, number>): boolean {
+  return sides.top === sides.right && sides.right === sides.bottom && sides.bottom === sides.left;
+}
+
+function readSpacingLinkState(
+  fieldKey: string | undefined,
+  sides: Record<SpacingSide, number>,
+): boolean {
+  if (fieldKey !== undefined) {
+    const remembered = spacingLinkState.get(fieldKey);
+    if (remembered !== undefined) return remembered;
+  }
+  return allSidesEqual(sides);
+}
+
+function rememberSpacingLinkState(fieldKey: string | undefined, linked: boolean): void {
+  if (fieldKey === undefined) return;
+  spacingLinkState.delete(fieldKey);
+  spacingLinkState.set(fieldKey, linked);
+  while (spacingLinkState.size > MAX_SPACING_LINK_FIELDS) {
+    const oldest = spacingLinkState.keys().next();
+    if (oldest.done === true) break;
+    spacingLinkState.delete(oldest.value);
+  }
+}
+
+/**
+ * 四边距：一个对象值（top/right/bottom/left）只占一格。
+ *
+ * 布局按控件实际宽度自适应：够宽时一行四格（30px），窄于 190px 时换成两行两列（60px）。
+ * 面板可拖到 276–480px，宽度判断交给 CSS 容器查询，不读面板像素。
+ *
+ * 四边相等时收成一个输入（联动），标签旁的链图标负责统一/分开：统一把四边写成上边距的值，
+ * 走一次事务；分开只改形态、不写文档。联动状态按字段记忆，改写值不会把它重置。
+ *
+ * 值载体始终是一个隐藏 input（JSON），可见输入只负责改它的值再派发 change：
+ * 事务层读 `data-descriptor-*` 与 `target.value`，不需要认识复合控件。
+ */
+function createSpacingControl(
+  ownerDocument: Document,
+  field: BaseScreenMaterialEditorField,
+  schema: BaseScreenMaterialPropSchema | undefined,
+  value: ScreenJsonValue | undefined,
+  fieldKey: string | undefined,
+): DescriptorControlHandle {
+  let values = readSpacingValue(value);
+  let linked = readSpacingLinkState(fieldKey, values);
+
+  const scope = ownerDocument.createElement('div');
+  scope.className = 'designer-spacing-scope';
+  scope.setAttribute('role', 'group');
+  scope.setAttribute('aria-label', field.label);
+  const frame = ownerDocument.createElement('div');
+  frame.className = 'designer-spacing-frame';
+  const shell = ownerDocument.createElement('div');
+  shell.className = 'designer-spacing';
+  frame.appendChild(shell);
+
+  const carrier = createDesignerInput(ownerDocument, { type: 'hidden' });
+  const toggle = ownerDocument.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'designer-spacing-toggle';
+
+  const unit =
+    field.unit === undefined || field.unit === '' ? undefined : ownerDocument.createElement('span');
+  if (unit !== undefined) {
+    unit.className = 'designer-spacing-unit';
+    unit.setAttribute('aria-hidden', 'true');
+    unit.textContent = field.unit ?? '';
+  }
+
+  const boundsFor = (side: SpacingSide): { minimum: number; maximum: number | undefined } => {
+    const sideSchema = schema?.kind === 'object' ? schema.properties[side] : undefined;
+    return {
+      minimum: field.min ?? (sideSchema?.kind === 'number' ? sideSchema.minimum : undefined) ?? 0,
+      maximum: field.max ?? (sideSchema?.kind === 'number' ? sideSchema.maximum : undefined),
+    };
+  };
+
+  const writeCarrier = (): void => {
+    carrier.value = JSON.stringify(values);
+  };
+  const commit = (): void => {
+    writeCarrier();
+    carrier.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  };
+
+  const createSideInput = (
+    side: SpacingSide,
+    options: { readonly key: string; readonly ariaLabel: string; readonly linked: boolean },
+  ): HTMLInputElement => {
+    const bounds = boundsFor(side);
+    const input = createDesignerInput(ownerDocument, {
+      appearance: 'number',
+      ariaLabel: options.ariaLabel,
+      value: String(values[side]),
+      min: bounds.minimum,
+      ...(bounds.maximum === undefined ? {} : { max: bounds.maximum }),
+      ...(field.step === undefined ? {} : { step: field.step }),
+    });
+    input.className += ' designer-spacing-input';
+    // 面板提交后整栏重建；唯一稳定键让焦点回到刚编辑的那条边，而不是第一条。
+    input.dataset.inspectorSearchKey = `descriptor-field-${field.id}-${options.key}`;
+    input.addEventListener('input', () => {
+      const parsed = Number(input.value);
+      if (!Number.isFinite(parsed)) return;
+      if (options.linked) values = { top: parsed, right: parsed, bottom: parsed, left: parsed };
+      else values[side] = parsed;
+      writeCarrier();
+    });
+    input.addEventListener('change', () => {
+      const parsed = Number(input.value);
+      const next = Math.min(
+        Math.max(Number.isFinite(parsed) ? parsed : 0, bounds.minimum),
+        bounds.maximum ?? Infinity,
+      );
+      if (options.linked) values = { top: next, right: next, bottom: next, left: next };
+      else values[side] = next;
+      input.value = String(next);
+      commit();
+    });
+    return input;
+  };
+
+  const renderSplit = (): void => {
+    for (const side of SPACING_SIDES) {
+      const copy = DESIGNER_UI_TEXT.descriptor.spacingSides[side];
+      const cell = ownerDocument.createElement('label');
+      cell.className = `designer-spacing-cell designer-spacing-cell-${side}`;
+      const direction = ownerDocument.createElement('span');
+      direction.className = 'designer-spacing-dir';
+      direction.setAttribute('aria-hidden', 'true');
+      direction.textContent = copy.short;
+      cell.append(
+        direction,
+        createSideInput(side, { key: side, ariaLabel: copy.label, linked: false }),
+      );
+      shell.appendChild(cell);
+    }
+  };
+
+  const renderLinked = (): void => {
+    const copy = DESIGNER_UI_TEXT.descriptor;
+    const cell = ownerDocument.createElement('label');
+    cell.className = 'designer-spacing-cell designer-spacing-cell-all';
+    const direction = ownerDocument.createElement('span');
+    direction.className = 'designer-spacing-dir';
+    direction.setAttribute('aria-hidden', 'true');
+    direction.textContent = copy.spacingAllSides;
+    cell.append(
+      direction,
+      createSideInput('top', {
+        key: 'all',
+        ariaLabel: `${field.label} ${copy.spacingAllSides}`,
+        linked: true,
+      }),
+    );
+    shell.appendChild(cell);
+  };
+
+  const render = (): void => {
+    shell.dataset.spacingMode = linked ? 'linked' : 'split';
+    toggle.setAttribute('aria-pressed', String(linked));
+    toggle.setAttribute(
+      'aria-label',
+      linked ? DESIGNER_UI_TEXT.descriptor.spacingUnlink : DESIGNER_UI_TEXT.descriptor.spacingLink,
+    );
+    toggle.dataset.tip = linked
+      ? DESIGNER_UI_TEXT.descriptor.spacingUnlink
+      : DESIGNER_UI_TEXT.descriptor.spacingLinkHint;
+    toggle.innerHTML = designerIcon(linked ? 'link' : 'unlink');
+    shell.replaceChildren();
+    if (linked) renderLinked();
+    else renderSplit();
+    writeCarrier();
+  };
+
+  toggle.addEventListener('click', () => {
+    if (linked) {
+      linked = false;
+      rememberSpacingLinkState(fieldKey, false);
+      render();
+      return;
+    }
+    const top = values.top;
+    values = { top, right: top, bottom: top, left: top };
+    linked = true;
+    rememberSpacingLinkState(fieldKey, true);
+    render();
+    commit();
+  });
+
+  scope.append(frame, ...(unit === undefined ? [] : [unit]), carrier);
+  render();
+  return { element: scope, valueTarget: carrier, labelAction: toggle };
 }
 
 export function descriptorFieldSchema(

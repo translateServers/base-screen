@@ -100,10 +100,15 @@ function appendDescriptorField(
         )
       : undefined;
   // color 控件用 span 容器：label 点击会激活 color input 弹出原生取色器。
+  // 四边距的标签里带联动按钮，同样不能落在 label 里（按钮会被标签的默认激活吞掉）。
   const stacked = palette !== undefined || field.control === 'json';
-  const { field: row, control: fieldControl } = createDesignerFieldRow(ownerDocument, {
+  const {
+    field: row,
+    control: fieldControl,
+    labelText,
+  } = createDesignerFieldRow(ownerDocument, {
     label: field.label,
-    tagName: palette === undefined ? 'label' : 'span',
+    tagName: palette === undefined && field.control !== 'spacing' ? 'label' : 'span',
     stacked,
   });
   row.dataset.inspectorSearchKind = 'field';
@@ -112,8 +117,24 @@ function appendDescriptorField(
   if (field.advanced === true) row.dataset.inspectorAdvanced = 'true';
   const handle =
     palette === undefined
-      ? createDescriptorControl(ownerDocument, field, schema, value, context.datasetFields)
+      ? createDescriptorControl(
+          ownerDocument,
+          field,
+          schema,
+          value,
+          context.datasetFields,
+          `${context.component.id}:descriptor:${field.id}`,
+        )
       : undefined;
+  if (handle?.labelAction !== undefined) {
+    // 标签文字让位给字段级动作：文字先省略，按钮固定在列尾。
+    const label = ownerDocument.createElement('span');
+    label.className = 'designer-spacing-label-text';
+    label.textContent = field.label;
+    labelText.className += ' designer-spacing-label';
+    labelText.textContent = '';
+    labelText.append(label, handle.labelAction);
+  }
   const control = handle === undefined ? palette!.controls[0]! : handle.valueTarget;
   if (handle === undefined) {
     for (const paletteControl of palette!.controls) applyFieldDataset(paletteControl, field);

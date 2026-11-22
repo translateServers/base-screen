@@ -1419,6 +1419,18 @@ export const DESIGNER_UI_TEXT = {
     addItem: '添加',
     item: (index: number) => `第 ${index} 项`,
     unsupportedControl: '该字段的编辑控件不可用。',
+    /** 四边距控件的四条边：短名进色块前缀，全名做无障碍名称。 */
+    spacingSides: {
+      top: { short: '上', label: '上边距' },
+      right: { short: '右', label: '右边距' },
+      bottom: { short: '下', label: '下边距' },
+      left: { short: '左', label: '左边距' },
+    },
+    /** 四边联动：相等时收成一个输入，链图标切换统一/分开。 */
+    spacingAllSides: '四边',
+    spacingLink: '统一四边',
+    spacingLinkHint: '统一四边（以上边距为准）',
+    spacingUnlink: '分开设置四边',
   },
   stepper: {
     decrement: (label: string) => `减小${label}`,

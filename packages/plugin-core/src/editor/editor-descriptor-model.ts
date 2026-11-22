@@ -31,6 +31,7 @@ export type BaseScreenMaterialEditorControl =
   | 'field-selector'
   | 'unit-number'
   | 'stepper'
+  | 'spacing'
   | 'custom';
 
 export type BaseScreenMaterialEditorConditionOperator =
@@ -124,6 +125,9 @@ export const EDITOR_CONTROLS: ReadonlySet<string> = new Set([
   'field-selector',
   'unit-number',
   'stepper',
+  // 四边距是对象值（top/right/bottom/left 四个数字），因此也不进 SCALAR_CONTROLS：
+  // 它不能绑 data，也不冒充数组容器，只用于 props/style 上的一个复合字段。
+  'spacing',
   // 不进 SCALAR_CONTROLS / ARRAY_CONTROLS：因此不能绑 data，也不能冒充数组容器。
   'custom',
 ]);

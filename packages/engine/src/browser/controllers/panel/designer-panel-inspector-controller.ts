@@ -203,7 +203,14 @@ export class DesignerPanelInspectorController {
     this.#searchOpen = false;
     this.refresh(root);
     field?.scrollIntoView({ block: 'center' });
-    field?.querySelector<HTMLElement>('input, select, textarea, button')?.focus();
+    // 色板组的色卡本身就是按钮：搜索命中它时先切到这一格，编辑器才会跟着换过去；
+    // 其余可搜索字段仍是「聚焦其内部控件」。
+    if (field !== undefined && field.tagName === 'BUTTON') {
+      field.click();
+      field.focus({ preventScroll: true });
+    } else {
+      field?.querySelector<HTMLElement>('input, select, textarea, button')?.focus();
+    }
     field?.classList.add('inspector-search-highlight');
     setTimeout(() => field?.classList.remove('inspector-search-highlight'), 900);
     return true;

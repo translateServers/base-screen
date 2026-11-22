@@ -36,6 +36,10 @@ class FakeElement {
     this.attributes[name] = value;
   }
 
+  getAttribute(name: string): string | null {
+    return this.attributes[name] ?? null;
+  }
+
   appendChild(node: FakeElement): FakeElement {
     node.parent = this;
     this.children.push(node);
@@ -118,6 +122,147 @@ describe('createDescriptorControl 数值控件', () => {
   it('unit-number 未声明单位时退化为普通数值输入', () => {
     const { handle, element } = render(numericField('unit-number'));
     expect(element).toBe(handle.valueTarget);
+  });
+});
+
+describe('createDescriptorControl 四边距控件', () => {
+  const spacingSchema = {
+    kind: 'object',
+    properties: {
+      top: { kind: 'number', minimum: 0, maximum: 200 },
+      right: { kind: 'number', minimum: 0, maximum: 200 },
+      bottom: { kind: 'number', minimum: 0, maximum: 200 },
+      left: { kind: 'number', minimum: 0, maximum: 200 },
+    },
+    required: ['top', 'right', 'bottom', 'left'],
+  } as unknown as BaseScreenMaterialPropSchema;
+
+  it('四个边共用一个对象值，隐藏 input 是唯一值载体', () => {
+    const field: BaseScreenMaterialEditorField = {
+      id: 'padding',
+      target: 'props',
+      path: ['padding'],
+      label: '内边距',
+      control: 'spacing',
+      unit: 'px',
+    };
+    const handle = createDescriptorControl(
+      ownerDocument,
+      field,
+      spacingSchema,
+      { top: 32, right: 24, bottom: 24, left: 48 },
+      [],
+    );
+    const scope = handle.element as unknown as FakeElement;
+    expect(scope.className).toBe('designer-spacing-scope');
+    const frame = scope.children[0]!;
+    const shell = frame.children[0]!;
+    const unit = scope.children[1]!;
+    const carrier = scope.children[2]!;
+    expect(frame.className).toBe('designer-spacing-frame');
+    expect(shell.className).toBe('designer-spacing');
+    expect(shell.dataset.spacingMode).toBe('split');
+    expect(shell.children).toHaveLength(4);
+    expect(shell.children.map((cell) => cell.children[1]!.value)).toEqual(['32', '24', '24', '48']);
+    expect(unit.className).toBe('designer-spacing-unit');
+    expect(unit.textContent).toBe('px');
+    expect(carrier.type).toBe('hidden');
+    expect(handle.valueTarget).toBe(carrier);
+    expect(JSON.parse(carrier.value)).toEqual({ top: 32, right: 24, bottom: 24, left: 48 });
+  });
+
+  it('改一条边时夹到 schema 边界，并同步载体后派发 change', () => {
+    const field: BaseScreenMaterialEditorField = {
+      id: 'padding',
+      target: 'props',
+      path: ['padding'],
+      label: '内边距',
+      control: 'spacing',
+    };
+    const handle = createDescriptorControl(
+      ownerDocument,
+      field,
+      spacingSchema,
+      { top: 10, right: 11, bottom: 11, left: 12 },
+      [],
+    );
+    const scope = handle.element as unknown as FakeElement;
+    const top = scope.children[0]!.children[0]!.children[0]!.children[1]!;
+    const carrier = handle.valueTarget as unknown as FakeElement;
+    let changes = 0;
+    carrier.addEventListener('change', () => {
+      changes += 1;
+    });
+
+    top.value = '260';
+    top.dispatchEvent({ type: 'change' } as Event);
+
+    expect(top.value).toBe('200');
+    expect(JSON.parse(carrier.value)).toEqual({ top: 200, right: 11, bottom: 11, left: 12 });
+    expect(changes).toBe(1);
+  });
+
+  it('四边相等时收成一个输入，链图标处于联动态', () => {
+    const field: BaseScreenMaterialEditorField = {
+      id: 'padding',
+      target: 'props',
+      path: ['padding'],
+      label: '内边距',
+      control: 'spacing',
+    };
+    const handle = createDescriptorControl(
+      ownerDocument,
+      field,
+      spacingSchema,
+      { top: 32, right: 32, bottom: 32, left: 32 },
+      [],
+    );
+    const scope = handle.element as unknown as FakeElement;
+    const shell = scope.children[0]!.children[0]!;
+    expect(shell.dataset.spacingMode).toBe('linked');
+    expect(shell.children).toHaveLength(1);
+    expect(shell.children[0]!.children[1]!.value).toBe('32');
+    expect(handle.labelAction?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('链图标统一四边只写一次值，再点分开不写文档', () => {
+    const field: BaseScreenMaterialEditorField = {
+      id: 'padding',
+      target: 'props',
+      path: ['padding'],
+      label: '内边距',
+      control: 'spacing',
+    };
+    const handle = createDescriptorControl(
+      ownerDocument,
+      field,
+      spacingSchema,
+      { top: 32, right: 24, bottom: 24, left: 48 },
+      [],
+      'test:descriptor:padding-link',
+    );
+    const toggle = handle.labelAction as unknown as FakeElement;
+    const carrier = handle.valueTarget as unknown as FakeElement;
+    let changes = 0;
+    carrier.addEventListener('change', () => {
+      changes += 1;
+    });
+
+    toggle.dispatchEvent({ type: 'click' } as Event);
+
+    const scope = handle.element as unknown as FakeElement;
+    const shell = scope.children[0]!.children[0]!;
+    expect(shell.dataset.spacingMode).toBe('linked');
+    expect(JSON.parse(carrier.value)).toEqual({ top: 32, right: 32, bottom: 32, left: 32 });
+    expect(changes).toBe(1);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+
+    toggle.dispatchEvent({ type: 'click' } as Event);
+
+    expect(shell.dataset.spacingMode).toBe('split');
+    expect(shell.children).toHaveLength(4);
+    expect(changes).toBe(1);
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
   });
 });
 
