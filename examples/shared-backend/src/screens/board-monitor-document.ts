@@ -136,7 +136,7 @@ function frame(id: string, name: string, box: Box): void {
     size: { width, height },
     rotation: 0,
     status: { locked: false, hidden: false },
-    props: { borderStyle: 'corner-brackets', bracketSize: 16, lineWidth: 2 },
+    props: { borderStyle: 'corner-brackets', bracketSize: 16 },
     style: {
       backgroundColor: 'rgba(8, 26, 46, .55)',
       borderColor: '#1d5b8f',
@@ -304,7 +304,6 @@ function selectorBoard(
       // 选择器必须静止：轮播会让「点第二行」变成点到一个不断移动的目标。
       autoScroll: false,
       statusColumn: '',
-      statusPalette: {},
     },
     style: {
       backgroundColor: 'rgba(9, 26, 44, .7)',
@@ -421,7 +420,7 @@ KPI_CARDS.forEach((card, index) => {
       size: { width: 328, height: 30 },
       rotation: 0,
       status: { locked: false, hidden: false },
-      props: { segments: 20, showValue: true, decimals: card.decimals, glow: true },
+      props: { segments: 20, showValue: true, decimals: card.decimals },
       style: {
         backgroundColor: 'transparent',
         color: '#cfe9ff',
@@ -455,23 +454,21 @@ push({
   name: '设备状态灯阵',
   parentId: null,
   position: { x: 24, y: 288 },
-  size: { width: 604, height: 412 },
+  // 底部 28 px 让给独立的状态图例（ADR-0099：图例是另一个原子），格子尺寸与拆分前一致。
+  size: { width: 604, height: 384 },
   rotation: 0,
   status: { locked: false, hidden: false },
   props: {
     columns: 8,
-    showLegend: true,
     // 灯阵不带单位（adapter 只投影值），负载的具体数值由用户按需打开；
-    // 面板标题里的「设备状态」+ 图例已足够表达"这是什么"。
+    // 面板标题里的「设备状态」+ 下方图例已足够表达"这是什么"。
     showValue: false,
     labelVisible: false,
-    emptyText: '无设备数据',
   },
   style: {
     backgroundColor: 'transparent',
     color: '#e6f1ff',
     labelColor: '#8aa4c0',
-    legendColor: '#8aa4c0',
     runningColor: '#52c41a',
     standbyColor: '#fa8c16',
     faultColor: '#f5222d',
@@ -490,6 +487,38 @@ push({
       limit: { kind: 'literal', value: 48 },
     },
     binding: { fields: { items: ['name', 'status', 'load'] } },
+  },
+});
+// 五态分布图例：与灯阵绑定同一数据集与参数，只读状态列。
+// 两个组件各发一次 query；改为共享文档级数据源属于 ADR-0100 第二阶段。
+push({
+  id: 'grid-legend',
+  type: 'board.status-legend',
+  name: '设备状态图例',
+  parentId: null,
+  position: { x: 32, y: 672 },
+  size: { width: 588, height: 22 },
+  rotation: 0,
+  status: { locked: false, hidden: false },
+  props: { showCount: true },
+  style: {
+    backgroundColor: 'transparent',
+    color: '#8aa4c0',
+    fontSize: 11,
+    runningColor: '#52c41a',
+    standbyColor: '#fa8c16',
+    faultColor: '#f5222d',
+    offlineColor: '#6b7d8f',
+    unknownColor: '#6b7d8f',
+  },
+  dataSource: {
+    type: 'dataset',
+    datasetId: 'monitor.devices',
+    params: {
+      line: { kind: 'variable', variableId: 'line' },
+      limit: { kind: 'literal', value: 48 },
+    },
+    binding: { fields: { status: ['status'] } },
   },
 });
 
@@ -555,7 +584,7 @@ push({
   size: { width: 288, height: 180 },
   rotation: 0,
   status: { locked: false, hidden: false },
-  props: { segments: 20, showValue: true, decimals: 1, glow: true },
+  props: { segments: 20, showValue: true, decimals: 1 },
   style: {
     backgroundColor: 'transparent',
     color: '#cfe9ff',
@@ -589,12 +618,6 @@ push({
     autoScroll: true,
     // 等级色列：`level` 是绑定里的第二列，行左侧出现状态色条 + 文本染色。
     statusColumn: 'level',
-    statusPalette: {
-      critical: '#f5222d',
-      warning: '#fa8c16',
-      info: '#1677ff',
-      default: '#6b7d8f',
-    },
   },
   style: {
     backgroundColor: 'transparent',
@@ -604,6 +627,10 @@ push({
     borderColor: '#143a5c',
     fontSize: 12,
     rowHeight: 20,
+    criticalColor: '#f5222d',
+    warningColor: '#fa8c16',
+    infoColor: '#1677ff',
+    unknownColor: '#6b7d8f',
   },
   dataSource: {
     type: 'dataset',
@@ -638,13 +665,11 @@ push({
     decimals: 0,
     nameLines: 1,
     statusVisible: true,
-    emptyText: '该产线无工序配置',
   },
   style: {
     backgroundColor: 'transparent',
     color: '#e6f1ff',
     labelColor: '#8aa4c0',
-    legendColor: '#8aa4c0',
     runningColor: '#52c41a',
     standbyColor: '#fa8c16',
     faultColor: '#f5222d',

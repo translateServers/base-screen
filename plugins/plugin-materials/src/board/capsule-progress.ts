@@ -19,6 +19,8 @@ import { BOARD_SCALAR_VALUE_ADAPTER } from './scalar-adapter.js';
  *
  * 与水位图的分工：水位图强调「液面高度」这一连续量，胶囊池强调「分段刻度」——
  * 大屏上常用于一排并列的完成率/健康度指标。两者都只画读数本身，不内建标题。
+ *
+ * 发光是纯视觉效果，属于 style 的 `fillGlow`（ADR-0099 §2.2）：告警条件样式可以点亮或关掉它。
  */
 const CAPSULE_PROGRESS_PROPS_SCHEMA = {
   kind: 'object',
@@ -26,9 +28,8 @@ const CAPSULE_PROGRESS_PROPS_SCHEMA = {
     segments: { kind: 'number', minimum: 4, maximum: 60 },
     showValue: { kind: 'boolean' },
     decimals: { kind: 'number', minimum: 0, maximum: 3 },
-    glow: { kind: 'boolean' },
   },
-  required: ['segments', 'showValue', 'decimals', 'glow'],
+  required: ['segments', 'showValue', 'decimals'],
 } satisfies BaseScreenMaterialObjectSchema;
 
 export const PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST: BaseScreenMaterialManifest = {
@@ -42,7 +43,6 @@ export const PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST: BaseScreenMaterialManifest 
     segments: 24,
     showValue: true,
     decimals: 1,
-    glow: true,
   },
   defaultData: 72.4,
   staticData: { kind: 'scalar', valueType: 'number' },
@@ -52,6 +52,7 @@ export const PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST: BaseScreenMaterialManifest 
     trackColor: '#132f4c',
     fillColor: '#38bdf8',
     fontSize: 16,
+    fillGlow: true,
   },
   styleSchema: {
     kind: 'object',
@@ -61,6 +62,8 @@ export const PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST: BaseScreenMaterialManifest 
       trackColor: { kind: 'string' },
       fillColor: { kind: 'string' },
       fontSize: { kind: 'number', minimum: 10, maximum: 72 },
+      // 不进 required：缺省为发光，未写该键的文档无需改写。
+      fillGlow: { kind: 'boolean' },
     },
     required: ['backgroundColor', 'color', 'trackColor', 'fillColor', 'fontSize'],
   },
@@ -68,6 +71,7 @@ export const PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST: BaseScreenMaterialManifest 
     { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
     { style: 'trackColor', label: '轨道色', control: 'color' },
     { style: 'fillColor', label: '填充色', control: 'color' },
+    { style: 'fillGlow', label: '发光', control: 'boolean' },
     { style: 'color', label: '读数色', control: 'color' },
     { style: 'fontSize', label: '读数字号', control: 'number' },
   ],
@@ -76,7 +80,6 @@ export const PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST: BaseScreenMaterialManifest 
     { prop: 'segments', label: '胶囊数量', control: 'number' },
     { prop: 'showValue', label: '显示读数', control: 'boolean' },
     { prop: 'decimals', label: '小数位', control: 'number' },
-    { prop: 'glow', label: '发光', control: 'boolean' },
   ],
   events: [],
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
@@ -128,7 +131,7 @@ export class PluginBoardCapsuleProgressElement extends BoardMaterialElement {
     const segments = Math.max(1, Math.min(60, Math.round(readNumber(model.props.segments, 24))));
     const activeCount = Math.min(segments, Math.round((percent / 100) * segments));
     const showValue = readBoolean(model.props.showValue, true);
-    const glow = readBoolean(model.props.glow, true);
+    const glow = readBoolean(model.style.fillGlow, true);
     const decimals = Math.max(0, Math.min(3, Math.round(readNumber(model.props.decimals, 1))));
 
     const root = doc.createElement('div');

@@ -404,8 +404,6 @@ push({
     intervalMs: 3000,
     autoScroll: false,
     statusColumn: 'level',
-    // 色板只接受四个固定键；中文等级值走 default，完整等级文字仍逐行可读。
-    statusPalette: { default: '#72D6C2' },
   },
   style: {
     backgroundColor: 'transparent',
@@ -415,6 +413,8 @@ push({
     borderColor: '#14303A',
     fontSize: 16,
     rowHeight: 80,
+    // 中文等级值都不是 critical / warning / info，统一走未知等级色；完整等级文字仍逐行可读。
+    unknownColor: '#72D6C2',
   },
   ...rankWiring(['rank', 'city', 'AQI', 'level', 'primary']),
 });
@@ -516,13 +516,14 @@ push({
   size: { width: 280, height: 10 },
   rotation: 0,
   status: { locked: false, hidden: false },
-  props: { segments: 24, showValue: false, decimals: 0, glow: false },
+  props: { segments: 24, showValue: false, decimals: 0 },
   style: {
     backgroundColor: 'transparent',
     color: MUTED,
     trackColor: '#122C35',
     fillColor: ACCENT,
     fontSize: 10,
+    fillGlow: false,
   },
   ...liveWiring('优良率'),
 });

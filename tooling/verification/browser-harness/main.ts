@@ -565,6 +565,7 @@ const materialLibraryGrouping = {
         'board.marquee',
         'board.pipeline',
         'board.status-grid',
+        'board.status-legend',
       ],
     },
     {
@@ -626,6 +627,7 @@ const materialLibraryStressGrouping = {
         'board.marquee',
         'board.pipeline',
         'board.status-grid',
+        'board.status-legend',
       ],
     },
     {

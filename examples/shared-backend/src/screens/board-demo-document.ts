@@ -177,7 +177,7 @@ function frame(
     size: { width, height },
     rotation: 0,
     status: { locked: false, hidden: false },
-    props: { borderStyle: 'corner-brackets', bracketSize: 18, lineWidth: 2 },
+    props: { borderStyle: 'corner-brackets', bracketSize: 18 },
     style: {
       backgroundColor: 'rgba(8, 26, 46, .72)',
       borderColor: '#1d5b8f',
@@ -269,7 +269,7 @@ function capsule(
     size: { width, height },
     rotation: 0,
     status: { locked: false, hidden: false },
-    props: { segments: 24, showValue: true, decimals: 1, glow: true },
+    props: { segments: 24, showValue: true, decimals: 1 },
     style: {
       backgroundColor: 'transparent',
       color: '#cfe9ff',
@@ -512,7 +512,7 @@ push({
   size: { width: 1560, height: 26 },
   rotation: 0,
   status: { locked: false, hidden: false },
-  props: { speedSeconds: 26, gap: 72 },
+  props: { periodMs: 26000, gap: 72 },
   style: { backgroundColor: 'transparent', color: '#8fd6ff', fontSize: 13 },
   dataSource: {
     type: 'static',

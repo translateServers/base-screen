@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = fileURLToPath(new URL('../../', import.meta.url));
+const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /**
  * 物料原子化的源码门禁。AGENTS.md「物料原子化」是约定，这里把它变成可执行检查。
@@ -14,6 +14,9 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
  * 本门禁的职权。因此描述性文案 prop 的禁令分三层：官方物料与插件物料由本脚本 R2 把守，
  * 宿主示例由 R3 把守（连 `label` 一起禁），大屏组件插件另有
  * `plugins/plugin-materials/tests/board/plugin.test.ts` 的清单断言。
+ *
+ * R4–R9 落实 ADR-0099（原子物料范式与属性面板编排，见 base-screen-docs 仓库
+ * `decisions/ADR-0099-material-atomicity-and-inspector-paradigm.md`）。
  */
 
 /** 只描述"这个组件是什么"的 prop 名：需要标题时由文档层另放一个 `base.text` 组合。 */
@@ -50,6 +53,107 @@ const CHART_FURNITURE_EXEMPTIONS = [
   'tooling/verification/browser-harness/hosted-material-package.ts',
   'tooling/verification/browser-harness/inspector-control-fixture.ts',
 ];
+
+/**
+ * R4–R9 的扫描范围：交付面的物料（官方、外围插件、宿主示例）。
+ *
+ * browser-harness 不在内：它的演示物料按设计展示各种作者面形态（含 `xField` 这类
+ * 手填字段），是验证夹具而不是物料范式的样板。它仍受 R1/R2 约束。
+ */
+const PARADIGM_GLOBS = ['packages/material/src', 'plugins', 'examples'];
+
+/** 保留样式键的唯一声明处；本门禁只读取，不复制清单（引用而不复制）。 */
+const RESERVED_STYLE_SOURCE = 'packages/plugin-core/src/material/material-schema.ts';
+const RESERVED_STYLE_EXPORT = 'export const BASE_SCREEN_RESERVED_STYLE_SCHEMAS';
+
+/** ADR-0099 §2.6 样式键词典。改动须与 ADR 同步。 */
+const STYLE_KEY_DICTIONARY = new Set([
+  'fill',
+  'backgroundColor',
+  'color',
+  'labelColor',
+  'accentColor',
+  'fontSize',
+  'labelFontSize',
+  'borderColor',
+  'borderWidth',
+  'borderRadius',
+  'strokeColor',
+  'strokeWidth',
+  'fontWeight',
+  'textAlign',
+  'verticalAlign',
+  'letterSpacing',
+  'lineHeight',
+  'lineSpacing',
+  'shadowColor',
+  'shadowBlur',
+  'shadowOffsetX',
+  'shadowOffsetY',
+  'criticalColor',
+  'warningColor',
+  'infoColor',
+  'runningColor',
+  'standbyColor',
+  'faultColor',
+  'offlineColor',
+  'unknownColor',
+]);
+
+/**
+ * R4 已登记的词典外 style 键（ADR-0099 §6 决议 2：R4 只约束新增键）。
+ *
+ * 新物料可以复用这里的键；要新增词典外的键，必须在评审中说明为何不能复用词典键，
+ * 并把它登记到这里——登记本身就是评审留痕。键名须带物料语义前缀（如 `trackColor`）。
+ */
+const REGISTERED_STYLE_KEYS = new Set([
+  'accent',
+  'background',
+  'connectorColor',
+  'connectorWidth',
+  'dash',
+  'fillColor',
+  'fillGlow',
+  'gridColor',
+  'headerBackgroundColor',
+  'headerColor',
+  'lineWidth',
+  'nodeBackground',
+  'nodeBorderColor',
+  'objectFit',
+  'rowHeight',
+  'seriesColor',
+  'thickness',
+  'tileGap',
+  'tileRadius',
+  'trackColor',
+  'valueColor',
+  'waterColor',
+  'waveColor',
+]);
+
+/** R5：label 里的单位记号。单位应走字段 `unit` 或 `unit-number` 控件。 */
+const UNIT_IN_LABEL = /[（(]\s*(?:px|ms|s|秒|毫秒|分钟|%|°|度)\s*[)）]/i;
+
+/**
+ * R7：字段映射类 prop 名。映射应走 `dataBinding.roles`，或在检查器里用 `field-selector`
+ * 选择（ADR-0099 §2.3）；只能经 text/json 控件手填时违规。
+ */
+const FIELD_MAPPING_PROP = /(?:Column|Field)$/;
+
+/** R8：状态文案 prop。空态 / 加载态文案由 `@base-screen/plugin-sdk` 状态视图统一提供。 */
+const STATE_TEXT_PROP = /^(?:empty|loading|error|idle)(?:Text|Label|Message)$/;
+
+/** R9：默认可见字段预算（警告级，不阻断）。 */
+const VISIBLE_FIELD_BUDGET = 12;
+
+/**
+ * ADR-0099 §3 迁移清单中尚未偿还的存量违规（2026-11-22 已全部偿还）。
+ *
+ * 只能缩短：违规修复后条目必须同批删除，否则门禁报「已偿还」失败；新违规不得加进来。
+ * `key` 为 `host:<prop>` 时表示渲染路径写宿主元素样式（R6 第二条）。
+ */
+export const PARADIGM_DEBT = [];
 
 function isChartFurnitureExempt(relativePath) {
   return CHART_FURNITURE_EXEMPTIONS.includes(relativePath);
@@ -114,6 +218,143 @@ function collectForbiddenPropKeys(source, forbidden) {
   return [...declared].filter((key) => forbidden.includes(key));
 }
 
+/**
+ * 面板条目：扁平 `propertyPanel`/`stylePanel`（`{ prop|style, label, control }`）与
+ * `editorDescriptor` 字段（`{ target, projection?, path, label, control, advanced? }`）。
+ *
+ * 只认不含嵌套大括号的对象字面量，且必须带 `control`；`itemFields` 内层条目因此按自身
+ * 被识别，外层数组容器不会被误当成字段。`interaction` 字段按 `projection` 归入 props/style，
+ * `data` 字段不计入（由 Engine 的数据区渲染）。
+ *
+ * `origin` 区分扁平面板与描述符字段；`hidden` 标记默认不可见的字段：字段自身 `advanced`，
+ * 或位于 `collapsed` / `advanced` 分区里。
+ */
+function collectPanelEntries(source) {
+  const entries = [];
+  const hiddenRanges = collectHiddenFieldRanges(source);
+  const objectLiteral = /\{([^{}]*)\}/g;
+  let match;
+  while ((match = objectLiteral.exec(source)) !== null) {
+    const body = match[1];
+    if (readLiteral(body, 'control') === undefined) continue;
+    const line = lineOf(source, match.index);
+    const label = readLiteral(body, 'label');
+    const control = readLiteral(body, 'control');
+    const hidden =
+      /(?<![\w$])advanced\s*:\s*true/.test(body) ||
+      hiddenRanges.some(([start, end]) => match.index > start && match.index < end);
+    const style = readLiteral(body, 'style');
+    const prop = readLiteral(body, 'prop');
+    if (style !== undefined) {
+      entries.push({ origin: 'flat', target: 'style', key: style, label, control, hidden, line });
+      continue;
+    }
+    if (prop !== undefined) {
+      entries.push({ origin: 'flat', target: 'props', key: prop, label, control, hidden, line });
+      continue;
+    }
+    const target = readLiteral(body, 'target');
+    const projection = readLiteral(body, 'projection');
+    const effective = target === 'interaction' ? projection : target;
+    const path = /(?<![\w$])path\s*:\s*\[\s*'([A-Za-z_$][\w$]*)'/.exec(body)?.[1];
+    if ((effective === 'props' || effective === 'style') && path !== undefined) {
+      const entry = { target: effective, key: path, label, control, hidden, line };
+      entries.push({ origin: 'descriptor', ...entry });
+    }
+  }
+  return entries;
+}
+
+/**
+ * 描述符里默认收起的分区：分区对象自身（`fields` 数组之外）声明了 `collapsed: true`
+ * 或 `advanced: true`。返回这些分区 `fields` 数组的源码区间。
+ */
+function collectHiddenFieldRanges(source) {
+  const ranges = [];
+  const marker = /(?<![\w$])fields\s*:\s*\[/g;
+  let match;
+  while ((match = marker.exec(source)) !== null) {
+    const open = enclosingBrace(source, match.index);
+    if (open === -1) continue;
+    const fieldsEnd = matchingClose(source, marker.lastIndex - 1, '[', ']');
+    const sectionEnd = matchingClose(source, open, '{', '}');
+    if (fieldsEnd === -1 || sectionEnd === -1) continue;
+    const header = source.slice(open, match.index) + source.slice(fieldsEnd + 1, sectionEnd);
+    if (/(?<![\w$])(?:collapsed|advanced)\s*:\s*true/.test(header)) {
+      ranges.push([match.index, fieldsEnd]);
+    }
+  }
+  return ranges;
+}
+
+function enclosingBrace(source, index) {
+  let depth = 0;
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const char = source[cursor];
+    if (char === '}') depth += 1;
+    else if (char === '{') {
+      if (depth === 0) return cursor;
+      depth -= 1;
+    }
+  }
+  return -1;
+}
+
+function matchingClose(source, openIndex, open, close) {
+  let depth = 0;
+  for (let cursor = openIndex; cursor < source.length; cursor += 1) {
+    if (source[cursor] === open) depth += 1;
+    else if (source[cursor] === close) {
+      depth -= 1;
+      if (depth === 0) return cursor;
+    }
+  }
+  return -1;
+}
+
+function readLiteral(body, name) {
+  return new RegExp(`(?<![\\w$])${name}\\s*:\\s*'([^']*)'`).exec(body)?.[1];
+}
+
+function lineOf(source, index) {
+  return source.slice(0, index).split('\n').length;
+}
+
+/** 读取保留样式键；读不到即失败关闭，避免 R6 静默失效。 */
+function readReservedStyleKeys(root) {
+  const source = readFileSync(resolve(root, RESERVED_STYLE_SOURCE), 'utf8');
+  const start = source.indexOf(RESERVED_STYLE_EXPORT);
+  const open = start === -1 ? -1 : source.indexOf('= {', start);
+  if (open === -1) {
+    throw new Error(`MATERIAL_ATOMICITY_RESERVED_KEYS_UNREADABLE: ${RESERVED_STYLE_SOURCE}`);
+  }
+  let depth = 0;
+  let end = open + 2;
+  for (; end < source.length; end += 1) {
+    if (source[end] === '{') depth += 1;
+    else if (source[end] === '}') {
+      depth -= 1;
+      if (depth === 0) break;
+    }
+  }
+  const block = source.slice(open + 2, end + 1).replace(/\/\/[^\n]*/g, '');
+  const keys = new Set();
+  depth = 0;
+  for (let index = 0; index < block.length; index += 1) {
+    const char = block[index];
+    if (char === '{') depth += 1;
+    else if (char === '}') depth -= 1;
+    else if (depth === 1 && !/[\w$]/.test(block[index - 1] ?? '')) {
+      const keyMatch = /^([A-Za-z_$][\w$]*)\s*:/.exec(block.slice(index));
+      if (keyMatch !== null) keys.add(keyMatch[1]);
+    }
+  }
+  if (keys.size === 0) {
+    throw new Error(`MATERIAL_ATOMICITY_RESERVED_KEYS_UNREADABLE: ${RESERVED_STYLE_SOURCE}`);
+  }
+  return keys;
+}
+
 function* walk(dir) {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
@@ -125,7 +366,7 @@ function* walk(dir) {
   }
 }
 
-function filesUnder(glob) {
+function filesUnder(root, glob) {
   const base = resolve(root, glob);
   try {
     return [...walk(base)];
@@ -134,49 +375,177 @@ function filesUnder(glob) {
   }
 }
 
-const failures = [];
-
-for (const glob of MATERIAL_GLOBS) {
-  for (const file of filesUnder(glob)) {
-    const source = readFileSync(file, 'utf8');
-    const rel = relative(root, file).replace(/\\/g, '/');
-    // 只检查声明了 manifest 的物料实现文件，工具/类型文件不参与。
-    if (!source.includes('propsSchema')) continue;
-    // "读取 model 上未声明的字段"只在物料渲染路径上成立：harness 页面里 Vue/React
-    // 组件自己的 `props.X` 不是 model 读取。
-    if (source.includes('renderMaterial')) {
-      const declared = collectDeclaredKeys(source);
-      for (const { key, index } of collectReads(source)) {
-        if (declared.size > 0 && !declared.has(key)) {
-          const line = source.slice(0, index).split('\n').length;
-          failures.push(`${rel}:${line} 读取了未在 manifest 声明的 ${key}`);
+/** R1–R3：原有的未声明读取与描述性文案 prop 禁令，语义逐字不变。 */
+function checkDeclaredContract(root, failures) {
+  for (const glob of MATERIAL_GLOBS) {
+    for (const file of filesUnder(root, glob)) {
+      const source = readFileSync(file, 'utf8');
+      const rel = relative(root, file).replace(/\\/g, '/');
+      // 只检查声明了 manifest 的物料实现文件，工具/类型文件不参与。
+      if (!source.includes('propsSchema')) continue;
+      // "读取 model 上未声明的字段"只在物料渲染路径上成立：harness 页面里 Vue/React
+      // 组件自己的 `props.X` 不是 model 读取。
+      if (source.includes('renderMaterial')) {
+        const declared = collectDeclaredKeys(source);
+        for (const { key, index } of collectReads(source)) {
+          if (declared.size > 0 && !declared.has(key)) {
+            const line = lineOf(source, index);
+            failures.push(`${rel}:${line} 读取了未在 manifest 声明的 ${key}`);
+          }
+        }
+      }
+      for (const key of collectForbiddenPropKeys(source, FORBIDDEN_TEXT_PROPS)) {
+        if (!isChartFurnitureExempt(rel)) {
+          failures.push(`${rel} 把 ${key} 声明成了 prop（描述组件自身的文案应交给 base.text）`);
         }
       }
     }
-    for (const key of collectForbiddenPropKeys(source, FORBIDDEN_TEXT_PROPS)) {
-      if (!isChartFurnitureExempt(rel)) {
-        failures.push(`${rel} 把 ${key} 声明成了 prop（描述组件自身的文案应交给 base.text）`);
+  }
+
+  for (const glob of HOST_MATERIAL_GLOBS) {
+    for (const file of filesUnder(root, glob)) {
+      const source = readFileSync(file, 'utf8');
+      if (!source.includes('propsSchema')) continue;
+      const rel = relative(root, file).replace(/\\/g, '/');
+      for (const key of collectForbiddenPropKeys(source, HOST_FORBIDDEN_TEXT_PROPS)) {
+        failures.push(`${rel} 把 ${key} 声明成了 prop（宿主物料同样要原子化）`);
       }
     }
   }
 }
 
-for (const glob of HOST_MATERIAL_GLOBS) {
-  for (const file of filesUnder(glob)) {
-    const source = readFileSync(file, 'utf8');
-    if (!source.includes('propsSchema')) continue;
-    const rel = relative(root, file).replace(/\\/g, '/');
-    for (const key of collectForbiddenPropKeys(source, HOST_FORBIDDEN_TEXT_PROPS)) {
-      failures.push(`${rel} 把 ${key} 声明成了 prop（宿主物料同样要原子化）`);
+/** R4–R9：ADR-0099 范式规则。返回可被债务清单抵消的违规与警告。 */
+function checkParadigm(root) {
+  const reserved = readReservedStyleKeys(root);
+  const violations = [];
+  const warnings = [];
+  const report = (rule, rel, line, key, message) => {
+    violations.push({ rule, file: rel, key, text: `${rel}:${line} [${rule}] ${message}` });
+  };
+  const seen = new Set();
+
+  for (const glob of PARADIGM_GLOBS) {
+    for (const file of filesUnder(root, glob)) {
+      const rel = relative(root, file).replace(/\\/g, '/');
+      if (seen.has(rel)) continue;
+      seen.add(rel);
+      const source = readFileSync(file, 'utf8');
+
+      if (source.includes('renderMaterial')) {
+        const hostWrite = /\bthis\.style\.(opacity|transform)\s*=(?!=)/g;
+        let match;
+        while ((match = hostWrite.exec(source)) !== null) {
+          const property = match[1];
+          const line = lineOf(source, match.index);
+          const message = `渲染路径写宿主元素 style.${property}；保留样式由 Renderer 统一渲染`;
+          report('R6', rel, line, `host:${property}`, message);
+        }
+      }
+
+      if (!source.includes('propsSchema')) continue;
+      const entries = collectPanelEntries(source);
+      const selectedFields = new Set(
+        entries
+          .filter((entry) => entry.target === 'props' && entry.control === 'field-selector')
+          .map((entry) => entry.key),
+      );
+      const visible = new Set();
+      for (const entry of entries) {
+        const { target, key, label, line } = entry;
+        if (target === 'style' && reserved.has(key)) {
+          const message = `面板声明了保留样式 ${key}；保留样式只在公共区出现`;
+          report('R6', rel, line, key, message);
+          continue;
+        }
+        if (
+          target === 'style' &&
+          !STYLE_KEY_DICTIONARY.has(key) &&
+          !REGISTERED_STYLE_KEYS.has(key)
+        ) {
+          const message = `style 键 ${key} 不在 §2.6 词典内也未登记；复用词典键，或评审后登记`;
+          report('R4', rel, line, key, message);
+        }
+        if (label !== undefined && UNIT_IN_LABEL.test(label)) {
+          const message = `label「${label}」含单位记号；改用字段 unit 或 unit-number 控件`;
+          report('R5', rel, line, key, message);
+        }
+        if (target === 'props' && FIELD_MAPPING_PROP.test(key) && !selectedFields.has(key)) {
+          const message = `prop ${key} 是手填字段映射；改为 dataBinding.roles 或 field-selector`;
+          report('R7', rel, line, key, message);
+        }
+      }
+      // R9 按作者实际看到的检查器计数：有描述符时只数描述符字段（单选检查器不再渲染扁平面板），
+      // 并排除默认收起的字段与分区。
+      const counted = entries.some((entry) => entry.origin === 'descriptor')
+        ? entries.filter((entry) => entry.origin === 'descriptor')
+        : entries;
+      for (const entry of counted) {
+        if (!entry.hidden) visible.add(`${entry.target}:${entry.key}`);
+      }
+
+      const stateTextKeys = new Set();
+      for (const key of collectDeclaredKeys(source)) {
+        if (STATE_TEXT_PROP.test(key)) stateTextKeys.add(key);
+      }
+      for (const entry of entries) {
+        if (entry.target === 'props' && STATE_TEXT_PROP.test(entry.key)) {
+          stateTextKeys.add(entry.key);
+        }
+      }
+      for (const key of stateTextKeys) {
+        const line = lineOf(source, source.indexOf(key));
+        const message = `声明了状态文案 ${key}；空态/加载态文案由 plugin-sdk 状态视图提供`;
+        report('R8', rel, line, key, message);
+      }
+
+      if (visible.size > VISIBLE_FIELD_BUDGET) {
+        const budget = `${visible.size} 个（> ${VISIBLE_FIELD_BUDGET}）`;
+        warnings.push(`${rel} [R9] 默认可见字段 ${budget}，是拆分信号（ADR-0099 §2.5）`);
+      }
     }
   }
+  return { violations, warnings };
 }
 
-if (failures.length > 0) {
-  throw new Error(
-    `MATERIAL_ATOMICITY_CHECK_FAILED:\n  ${[...new Set(failures)].join('\n  ')}\n` +
-      '依据：AGENTS.md「物料原子化（组件制作约定）」与 plugins/plugin-materials 的 title 断言。',
-  );
+/**
+ * 运行全部规则。`debt` 抵消 ADR-0099 §3 的存量违规；已偿还却仍在清单里的条目同样失败，
+ * 保证清单只减不增。
+ */
+export function checkMaterialAtomicity({ root = DEFAULT_ROOT, debt = PARADIGM_DEBT } = {}) {
+  const failures = [];
+  checkDeclaredContract(root, failures);
+
+  const { violations, warnings } = checkParadigm(root);
+  const identity = (item) => `${item.rule}|${item.file}|${item.key}`;
+  const owed = new Set(debt.map(identity));
+  const found = new Set();
+  for (const violation of violations) {
+    const id = identity(violation);
+    found.add(id);
+    if (!owed.has(id)) failures.push(violation.text);
+  }
+  for (const item of debt) {
+    if (!found.has(identity(item))) {
+      const message = `${item.key} 已偿还，请从 PARADIGM_DEBT 删除该条目（清单只减不增）`;
+      failures.push(`${item.file} [${item.rule}] ${message}`);
+    }
+  }
+  return { failures: [...new Set(failures)], warnings: [...new Set(warnings)] };
 }
 
-console.log('material atomicity check passed.');
+function main() {
+  const { failures, warnings } = checkMaterialAtomicity();
+  for (const warning of warnings) console.warn(`warning: ${warning}`);
+  if (failures.length > 0) {
+    throw new Error(
+      `MATERIAL_ATOMICITY_CHECK_FAILED:\n  ${failures.join('\n  ')}\n` +
+        '依据：AGENTS.md「物料原子化」、ADR-0099 与 plugins/plugin-materials 的 title 断言。',
+    );
+  }
+  console.log(`material atomicity check passed (${PARADIGM_DEBT.length} ADR-0099 debt items).`);
+}
+
+const invokedPath = process.argv[1];
+if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
+  main();
+}

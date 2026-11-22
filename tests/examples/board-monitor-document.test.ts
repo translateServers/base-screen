@@ -20,6 +20,7 @@ import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-materia
 import { PLUGIN_BOARD_PIPELINE_MANIFEST } from '../../plugins/plugin-materials/src/board/pipeline.js';
 import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-materials/src/board/scroll-board.js';
 import { PLUGIN_BOARD_STATUS_GRID_MANIFEST } from '../../plugins/plugin-materials/src/board/status-grid.js';
+import { PLUGIN_BOARD_STATUS_LEGEND_MANIFEST } from '../../plugins/plugin-materials/src/board/status-legend.js';
 import { PLUGIN_BOARD_WATER_LEVEL_MANIFEST } from '../../plugins/plugin-materials/src/board/water-level.js';
 import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from '../../plugins/plugin-materials/src/echarts/manifest.js';
 
@@ -41,6 +42,7 @@ const MANIFESTS = [
   PLUGIN_BOARD_WATER_LEVEL_MANIFEST,
   PLUGIN_BOARD_SCROLL_BOARD_MANIFEST,
   PLUGIN_BOARD_STATUS_GRID_MANIFEST,
+  PLUGIN_BOARD_STATUS_LEGEND_MANIFEST,
   PLUGIN_BOARD_PIPELINE_MANIFEST,
   PLUGIN_ECHARTS_MATERIAL_MANIFEST,
 ];
@@ -60,6 +62,7 @@ const FIELDS: Readonly<Record<string, readonly ScreenDatasetField[]>> = {
 /** 每个 dataset 组件的绑定顺序（防"绑对了列但顺序错"，顺序即位置语义）。 */
 const EXPECTED_BINDING_ORDER: Readonly<Record<string, readonly string[]>> = {
   'grid-devices': ['name', 'status', 'load'],
+  'grid-legend': ['status'],
   'alarm-stream': ['t', 'level', 'deviceName', 'message'],
   'stage-pipeline': ['name', 'status', 'throughput'],
 };
@@ -77,9 +80,9 @@ describe('production monitor document', () => {
     }
     expect(parsed.value.canvas).toMatchObject({ width: 1920, height: 1080 });
     expect(parsed.value.canvas.backgroundColor).toBe('#06101c');
-    // 53 个根节点。QA 复核时是 49，本轮补 C16/C17 新增 4 个（`rank-line` 是改尺寸不是新增）：
-    // 主轴负载标签 + 水位图 + 能耗标签 + 能耗胶囊。
-    expect(parsed.value.components.length).toBe(53);
+    // 54 个根节点。QA 复核时是 49，补 C16/C17 新增 4 个（`rank-line` 是改尺寸不是新增）：
+    // 主轴负载标签 + 水位图 + 能耗标签 + 能耗胶囊；ADR-0099 把灯阵图例拆成独立的 `grid-legend`。
+    expect(parsed.value.components.length).toBe(54);
   });
 
   it('contains the C16 / C17 blocks with their own metrics', () => {
@@ -221,8 +224,8 @@ describe('production monitor document', () => {
       expect([...positions].sort((left, right) => left - right)).toEqual(positions);
     }
 
-    // 设备灯阵 + 告警流水 + 工序链 = 3 个数据集组件。
-    expect(datasetCount).toBe(3);
+    // 设备灯阵 + 状态图例 + 告警流水 + 工序链 = 4 个数据集组件。
+    expect(datasetCount).toBe(4);
     // 参数里的变量槽位：grid 1 + alarm 3 + pipeline 1 = 5 处（≥2 即满足"参数真的靠变量驱动"）。
     expect(variableParamCount).toBeGreaterThanOrEqual(2);
   });

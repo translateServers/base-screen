@@ -58,6 +58,8 @@ export {
   PLUGIN_BOARD_SCROLL_BOARD_TYPE,
   PLUGIN_BOARD_STATUS_GRID_TAG_NAME,
   PLUGIN_BOARD_STATUS_GRID_TYPE,
+  PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME,
+  PLUGIN_BOARD_STATUS_LEGEND_TYPE,
   PLUGIN_BOARD_WATER_LEVEL_TAG_NAME,
   PLUGIN_BOARD_WATER_LEVEL_TYPE,
   statusColorMap,
@@ -87,15 +89,23 @@ export {
   PluginBoardScrollBoardElement,
 } from './scroll-board.js';
 export {
-  buildStatusLegend,
   computeStatusGridLayout,
   definePluginBoardStatusGridMaterial,
   PLUGIN_BOARD_STATUS_GRID_MANIFEST,
   PluginBoardStatusGridElement,
-  STATUS_GRID_LEGEND_ORDER,
   STATUS_GRID_MAX_COLUMNS,
   STATUS_GRID_MIN_TILE_SIZE,
 } from './status-grid.js';
+export {
+  buildStatusLegend,
+  definePluginBoardStatusLegendMaterial,
+  PLUGIN_BOARD_STATUS_LEGEND_MANIFEST,
+  PluginBoardStatusLegendElement,
+  readStatusLegendCounts,
+  STATUS_LEGEND_ORDER,
+  STATUS_LEGEND_TABULAR_DATA_ADAPTER,
+  type StatusLegendCounts,
+} from './status-legend.js';
 export {
   type BoardStateRow,
   createBoardColumnsAdapter,

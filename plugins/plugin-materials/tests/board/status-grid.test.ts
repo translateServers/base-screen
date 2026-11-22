@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildStatusLegend,
   computeStatusGridLayout,
-  STATUS_GRID_LEGEND_ORDER,
   STATUS_GRID_MAX_COLUMNS,
   STATUS_GRID_MIN_TILE_SIZE,
 } from '../../src/board/status-grid.js';
+import {
+  buildStatusLegend,
+  readStatusLegendCounts,
+  STATUS_LEGEND_ORDER,
+  STATUS_LEGEND_TABULAR_DATA_ADAPTER,
+} from '../../src/board/status-legend.js';
 import {
   createBoardStateAdapter,
   readBoardStateRows,
@@ -114,20 +118,14 @@ describe('computeStatusGridLayout', () => {
 
 describe('buildStatusLegend', () => {
   it('counts the five states in a fixed order and sums to the row count', () => {
-    const items = [
-      { name: 'a', status: 'running' },
-      { name: 'b', status: 'fault' },
-      { name: 'c', status: 'fault' },
-      // 不在五态内：归 unknown，不能被丢掉（否则图例合计对不上格数）。
-      { name: 'd', status: 'unknown-ish' },
-      { name: 'e', status: '' },
-    ];
+    // 不在五态内的值（含空串、null）归 unknown，不能被丢掉（否则图例合计对不上格数）。
+    const statuses = ['running', 'fault', 'fault', 'unknown-ish', '', null];
 
-    const counts = buildStatusLegend(items);
+    const counts = buildStatusLegend(statuses);
 
-    expect(STATUS_GRID_LEGEND_ORDER).toEqual(['running', 'standby', 'fault', 'offline', 'unknown']);
-    expect(counts).toEqual({ running: 1, standby: 0, fault: 2, offline: 0, unknown: 2 });
-    expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(items.length);
+    expect(STATUS_LEGEND_ORDER).toEqual(['running', 'standby', 'fault', 'offline', 'unknown']);
+    expect(counts).toEqual({ running: 1, standby: 0, fault: 2, offline: 0, unknown: 3 });
+    expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(statuses.length);
   });
 
   it('returns five zero counts for an empty list', () => {
@@ -138,6 +136,55 @@ describe('buildStatusLegend', () => {
       offline: 0,
       unknown: 0,
     });
+  });
+});
+
+describe('status-legend adapter', () => {
+  const nameField = { id: 'name', label: '设备', valueType: 'string' as const };
+  const statusField = { id: 'status', label: '状态', valueType: 'string' as const };
+
+  it('counts only the column bound to the status role', () => {
+    const result = STATUS_LEGEND_TABULAR_DATA_ADAPTER.adapt({
+      dataset: {
+        fields: [nameField, statusField],
+        rows: [
+          { name: '1#冲压机', status: 'fault' },
+          { name: '2#冲床', status: 'running' },
+          { name: '3#焊机', status: 'MELTING' },
+        ],
+      },
+      fields: { status: [statusField] },
+    });
+
+    if (!result.ok) throw new Error('the adapter must accept a status binding');
+    expect(result.value).toEqual({
+      counts: { running: 1, standby: 0, fault: 1, offline: 0, unknown: 1 },
+      total: 3,
+    });
+    expect(readStatusLegendCounts(result.value)).toEqual({
+      running: 1,
+      standby: 0,
+      fault: 1,
+      offline: 0,
+      unknown: 1,
+    });
+  });
+
+  it('fails closed when the status role is not bound', () => {
+    const result = STATUS_LEGEND_TABULAR_DATA_ADAPTER.adapt({
+      dataset: { fields: [nameField], rows: [{ name: 'a' }] },
+      fields: {},
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false ? result.diagnostics[0]?.code : undefined).toBe(
+      'HOST_DATASET_BINDING_INVALID',
+    );
+  });
+
+  it('rejects a payload that is not a five-state count map', () => {
+    expect(readStatusLegendCounts({ counts: { melting: 1 } })).toBeUndefined();
+    expect(readStatusLegendCounts({ counts: { fault: -1 } })).toBeUndefined();
+    expect(readStatusLegendCounts([])).toBeUndefined();
   });
 });
 

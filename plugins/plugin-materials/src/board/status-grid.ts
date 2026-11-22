@@ -2,9 +2,15 @@ import type { ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialConstructor,
+  type BaseScreenMaterialEditorDescriptor,
   type BaseScreenMaterialManifest,
+  type BaseScreenMaterialObjectSchema,
+  parseBaseScreenMaterialEditorDescriptor,
 } from '@base-screen/plugin-core';
-import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+import {
+  createBaseScreenMaterialEmptyView,
+  createMaterialDefinition,
+} from '@base-screen/plugin-sdk';
 import { BoardMaterialElement, type BoardMaterialModel } from './board-element.js';
 import {
   BOARD_DEFAULT_SURFACE,
@@ -17,12 +23,15 @@ import {
   PLUGIN_BOARD_STATUS_GRID_TYPE,
   statusColorMap,
 } from './identity.js';
-import { readBoolean, readNumber, readString, styleColor } from './json-values.js';
+import { readBoolean, readNumber, styleColor } from './json-values.js';
 import {
   type BoardStateRow,
   createBoardStateAdapter,
   readBoardStateRows,
 } from './tabular-columns-adapter.js';
+
+/** 空态领域文案：属于读数本身，由物料固定给出，不开放成 prop（ADR-0099 §2.5）。 */
+const STATUS_GRID_EMPTY_LABEL = '无设备数据';
 
 /**
  * 状态灯阵：把"多实体 × 值→色"画成等宽格阵。
@@ -34,7 +43,47 @@ import {
  * 几何不测量 DOM：容量由 `computeStatusGridLayout` 按 `model.size` 与 props 算出，
  * 设计态与预览态因此完全一致（不会因为尚未布局而少画几格）。CSS Grid 只负责把
  * 已决定的格数铺满可用区域。
+ *
+ * 五态分布图例不在本物料里（ADR-0099 T1/T4）：它是另一个读数，由 `board.status-legend`
+ * 承担，可绑定同一份数据放在灯阵下方。灯阵底栏只保留属于自身读数的 `+N`（容量溢出）。
  */
+const STATUS_GRID_PROPS_SCHEMA = {
+  kind: 'object',
+  properties: {
+    columns: { kind: 'number', minimum: 1, maximum: 24 },
+    showValue: { kind: 'boolean' },
+    labelVisible: { kind: 'boolean' },
+  },
+  required: ['columns', 'showValue', 'labelVisible'],
+} satisfies BaseScreenMaterialObjectSchema;
+
+const STATUS_GRID_STYLE_SCHEMA = {
+  kind: 'object',
+  properties: {
+    backgroundColor: { kind: 'string' },
+    color: { kind: 'string' },
+    labelColor: { kind: 'string' },
+    runningColor: { kind: 'string' },
+    standbyColor: { kind: 'string' },
+    faultColor: { kind: 'string' },
+    offlineColor: { kind: 'string' },
+    unknownColor: { kind: 'string' },
+    tileGap: { kind: 'number', minimum: 0, maximum: 24 },
+    tileRadius: { kind: 'number', minimum: 0, maximum: 16 },
+    fontSize: { kind: 'number', minimum: 10, maximum: 32 },
+  },
+  required: [
+    'backgroundColor',
+    'color',
+    'labelColor',
+    'runningColor',
+    'standbyColor',
+    'faultColor',
+    'offlineColor',
+    'unknownColor',
+  ],
+} satisfies BaseScreenMaterialObjectSchema;
+
 export const PLUGIN_BOARD_STATUS_GRID_MANIFEST: BaseScreenMaterialManifest = {
   type: PLUGIN_BOARD_STATUS_GRID_TYPE,
   tagName: PLUGIN_BOARD_STATUS_GRID_TAG_NAME,
@@ -45,10 +94,8 @@ export const PLUGIN_BOARD_STATUS_GRID_MANIFEST: BaseScreenMaterialManifest = {
   // 原子化：只画"多实体的状态格"。标题/说明由文档层的 base.text 组合。
   defaultProps: {
     columns: 8,
-    showLegend: true,
     showValue: false,
     labelVisible: false,
-    emptyText: '无设备数据',
   },
   defaultData: {
     fields: [
@@ -71,7 +118,6 @@ export const PLUGIN_BOARD_STATUS_GRID_MANIFEST: BaseScreenMaterialManifest = {
     backgroundColor: 'transparent',
     color: BOARD_DEFAULT_SURFACE.color,
     labelColor: BOARD_SECONDARY_COLOR,
-    legendColor: BOARD_SECONDARY_COLOR,
     // 五态色只从 identity.ts 取默认值，物料内不写十六进制字面量。
     runningColor: BOARD_STATUS_COLORS.running,
     standbyColor: BOARD_STATUS_COLORS.standby,
@@ -82,39 +128,11 @@ export const PLUGIN_BOARD_STATUS_GRID_MANIFEST: BaseScreenMaterialManifest = {
     tileRadius: 4,
     fontSize: 11,
   },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      labelColor: { kind: 'string' },
-      legendColor: { kind: 'string' },
-      runningColor: { kind: 'string' },
-      standbyColor: { kind: 'string' },
-      faultColor: { kind: 'string' },
-      offlineColor: { kind: 'string' },
-      unknownColor: { kind: 'string' },
-      tileGap: { kind: 'number', minimum: 0, maximum: 24 },
-      tileRadius: { kind: 'number', minimum: 0, maximum: 16 },
-      fontSize: { kind: 'number', minimum: 10, maximum: 32 },
-    },
-    required: [
-      'backgroundColor',
-      'color',
-      'labelColor',
-      'legendColor',
-      'runningColor',
-      'standbyColor',
-      'faultColor',
-      'offlineColor',
-      'unknownColor',
-    ],
-  },
+  styleSchema: STATUS_GRID_STYLE_SCHEMA,
   stylePanel: [
     { style: 'backgroundColor', label: '背景色', control: 'color' },
     { style: 'color', label: '文字色', control: 'color' },
-    { style: 'labelColor', label: '设备名色', control: 'color' },
-    { style: 'legendColor', label: '图例色', control: 'color' },
+    { style: 'labelColor', label: '次级文字色', control: 'color' },
     { style: 'runningColor', label: '运行色', control: 'color' },
     { style: 'standbyColor', label: '待机色', control: 'color' },
     { style: 'faultColor', label: '故障色', control: 'color' },
@@ -124,24 +142,13 @@ export const PLUGIN_BOARD_STATUS_GRID_MANIFEST: BaseScreenMaterialManifest = {
     { style: 'tileRadius', label: '圆角', control: 'number' },
     { style: 'fontSize', label: '字号', control: 'number' },
   ],
-  propsSchema: {
-    kind: 'object',
-    properties: {
-      columns: { kind: 'number', minimum: 1, maximum: 24 },
-      showLegend: { kind: 'boolean' },
-      showValue: { kind: 'boolean' },
-      labelVisible: { kind: 'boolean' },
-      emptyText: { kind: 'string', maxLength: 16 },
-    },
-    required: ['columns', 'showLegend', 'showValue', 'labelVisible', 'emptyText'],
-  },
+  propsSchema: STATUS_GRID_PROPS_SCHEMA,
   propertyPanel: [
     { prop: 'columns', label: '每行列数', control: 'number' },
-    { prop: 'showLegend', label: '显示图例', control: 'boolean' },
     { prop: 'showValue', label: '格内显示数值', control: 'boolean' },
     { prop: 'labelVisible', label: '显示设备名', control: 'boolean' },
-    { prop: 'emptyText', label: '空数据文案', control: 'text' },
   ],
+  editorDescriptor: parseStatusGridEditorDescriptor(),
   // tileClick 是 P1：本轮不给事件，避免"声明了但宿主没有通道"的空承诺。
   events: [],
   dataCapabilities: ['static', 'dataset', 'host-resource'],
@@ -161,12 +168,162 @@ export const PLUGIN_BOARD_STATUS_GRID_MANIFEST: BaseScreenMaterialManifest = {
   designCapabilities: { resize: true, rotate: true, children: false },
 };
 
+/** 检查器编排（ADR-0099 §2.4）：读数格式 → 结构 → 文字 → 填充 → 语义色（默认折叠）。 */
+function parseStatusGridEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
+  const parsed = parseBaseScreenMaterialEditorDescriptor(
+    {
+      appearance: [
+        {
+          id: 'format',
+          label: '读数格式',
+          fields: [
+            {
+              id: 'labelVisible',
+              target: 'props',
+              path: ['labelVisible'],
+              label: '显示设备名',
+              control: 'boolean',
+            },
+            {
+              id: 'showValue',
+              target: 'props',
+              path: ['showValue'],
+              label: '格内显示数值',
+              control: 'boolean',
+            },
+          ],
+        },
+        {
+          id: 'structure',
+          label: '结构',
+          fields: [
+            {
+              id: 'columns',
+              target: 'props',
+              path: ['columns'],
+              label: '每行列数',
+              control: 'number',
+              min: 1,
+              max: 24,
+            },
+            {
+              id: 'tileGap',
+              target: 'style',
+              path: ['tileGap'],
+              label: '格间距',
+              control: 'unit-number',
+              unit: 'px',
+              min: 0,
+              max: 24,
+            },
+            {
+              id: 'tileRadius',
+              target: 'style',
+              path: ['tileRadius'],
+              label: '圆角',
+              control: 'unit-number',
+              unit: 'px',
+              min: 0,
+              max: 16,
+            },
+          ],
+        },
+        {
+          id: 'text',
+          label: '文字',
+          fields: [
+            { id: 'color', target: 'style', path: ['color'], label: '文字色', control: 'color' },
+            {
+              id: 'labelColor',
+              target: 'style',
+              path: ['labelColor'],
+              label: '次级文字色',
+              control: 'color',
+            },
+            {
+              id: 'fontSize',
+              target: 'style',
+              path: ['fontSize'],
+              label: '字号',
+              control: 'number',
+            },
+          ],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            {
+              id: 'backgroundColor',
+              target: 'style',
+              path: ['backgroundColor'],
+              label: '背景色',
+              control: 'color',
+            },
+          ],
+        },
+        {
+          id: 'states',
+          label: '语义色',
+          collapsed: true,
+          fields: [
+            {
+              id: 'runningColor',
+              target: 'style',
+              path: ['runningColor'],
+              label: '运行色',
+              control: 'color',
+            },
+            {
+              id: 'standbyColor',
+              target: 'style',
+              path: ['standbyColor'],
+              label: '待机色',
+              control: 'color',
+            },
+            {
+              id: 'faultColor',
+              target: 'style',
+              path: ['faultColor'],
+              label: '故障色',
+              control: 'color',
+            },
+            {
+              id: 'offlineColor',
+              target: 'style',
+              path: ['offlineColor'],
+              label: '离线色',
+              control: 'color',
+            },
+            {
+              id: 'unknownColor',
+              target: 'style',
+              path: ['unknownColor'],
+              label: '未知状态色',
+              control: 'color',
+            },
+          ],
+        },
+      ],
+    },
+    STATUS_GRID_PROPS_SCHEMA,
+    STATUS_GRID_STYLE_SCHEMA,
+    undefined,
+    undefined,
+  );
+  if (!parsed.ok) {
+    throw new Error('plugin-materials status grid editor descriptor is invalid.');
+  }
+  return parsed.value;
+}
+
 /** 最小格边长（px）：小于它就少排一列/一行，而不是把格子压成 1 px 不可辨。 */
 export const STATUS_GRID_MIN_TILE_SIZE = 18;
 
-/** 根容器的内边距与图例行高（布局纯函数的输入，元素与单测共用同一常量）。 */
+/** 根容器的内边距与溢出底栏行高（布局纯函数的输入，元素与单测共用同一常量）。 */
 export const STATUS_GRID_PADDING = 8;
-export const STATUS_GRID_LEGEND_HEIGHT = 22;
+export const STATUS_GRID_FOOTER_HEIGHT = 22;
+const STATUS_GRID_FOOTER_GAP = 6;
 
 /** 灯阵列数上限（与 propsSchema 的 columns 上限一致）。 */
 export const STATUS_GRID_MAX_COLUMNS = 24;
@@ -213,33 +370,6 @@ export function computeStatusGridLayout(input: StatusGridLayoutInput): StatusGri
   return { columns, rows, capacity, visible, hidden: Math.max(0, total - capacity) };
 }
 
-export type StatusLegendCounts = Readonly<Record<BoardStatusKey, number>>;
-
-/**
- * 图例计数：五项固定顺序（running→standby→fault→offline→unknown），
- * 计数之和**恒等于** items 长度（未知状态已归 `unknown`，不会被丢掉）。
- */
-export function buildStatusLegend(items: readonly BoardStateRow[]): StatusLegendCounts {
-  const counts: Record<BoardStatusKey, number> = {
-    running: 0,
-    standby: 0,
-    fault: 0,
-    offline: 0,
-    unknown: 0,
-  };
-  for (const item of items) counts[normalizeBoardStatus(item.status)] += 1;
-  return counts;
-}
-
-/** 图例顺序的唯一来源：DOM 顺序与断言顺序都按它。 */
-export const STATUS_GRID_LEGEND_ORDER: readonly BoardStatusKey[] = [
-  'running',
-  'standby',
-  'fault',
-  'offline',
-  'unknown',
-];
-
 export class PluginBoardStatusGridElement extends BoardMaterialElement {
   static readonly manifest = PLUGIN_BOARD_STATUS_GRID_MANIFEST;
 
@@ -279,25 +409,29 @@ export class PluginBoardStatusGridElement extends BoardMaterialElement {
     const gap = Math.max(0, Math.round(readNumber(model.style.tileGap, 6)));
     const radius = Math.max(0, Math.round(readNumber(model.style.tileRadius, 4)));
     const fontSize = readNumber(model.style.fontSize, 11);
-    const showLegend = readBoolean(model.props.showLegend, true);
     const showValue = readBoolean(model.props.showValue, false);
     const labelVisible = readBoolean(model.props.labelVisible, false);
-    const legendHeight = showLegend ? STATUS_GRID_LEGEND_HEIGHT : 0;
-    const layout = computeStatusGridLayout({
-      width: model.size.width - STATUS_GRID_PADDING * 2,
-      height: model.size.height - STATUS_GRID_PADDING * 2 - legendHeight,
-      columns: Math.round(readNumber(model.props.columns, 8)),
-      total: items.length,
-      tileGap: gap,
-      minTileSize: STATUS_GRID_MIN_TILE_SIZE,
-    });
+    const layoutFor = (footerHeight: number) =>
+      computeStatusGridLayout({
+        width: model.size.width - STATUS_GRID_PADDING * 2,
+        height: model.size.height - STATUS_GRID_PADDING * 2 - footerHeight,
+        columns: Math.round(readNumber(model.props.columns, 8)),
+        total: items.length,
+        tileGap: gap,
+        minTileSize: STATUS_GRID_MIN_TILE_SIZE,
+      });
+    // 底栏只在容量溢出时出现（`+N`）：先按无底栏排，溢出了再给底栏留出高度重排一次。
+    const unconstrained = layoutFor(0);
+    const footerHeight =
+      unconstrained.hidden > 0 ? STATUS_GRID_FOOTER_HEIGHT + STATUS_GRID_FOOTER_GAP : 0;
+    const layout = footerHeight === 0 ? unconstrained : layoutFor(footerHeight);
 
     this.style.backgroundColor = styleColor(model.style.backgroundColor, 'transparent');
     this.style.color = styleColor(model.style.color, BOARD_DEFAULT_SURFACE.color);
 
     const root = doc.createElement('div');
     root.dataset.boardStatusGrid = '';
-    root.style.cssText = `display:flex;flex-direction:column;width:100%;height:100%;box-sizing:border-box;padding:${STATUS_GRID_PADDING}px;gap:${legendHeight === 0 ? 0 : 6}px;`;
+    root.style.cssText = `display:flex;flex-direction:column;width:100%;height:100%;box-sizing:border-box;padding:${STATUS_GRID_PADDING}px;gap:${footerHeight === 0 ? 0 : STATUS_GRID_FOOTER_GAP}px;`;
 
     const grid = doc.createElement('div');
     grid.dataset.boardStatusTiles = '';
@@ -330,23 +464,25 @@ export class PluginBoardStatusGridElement extends BoardMaterialElement {
     root.appendChild(grid);
 
     if (items.length === 0) {
-      const empty = doc.createElement('div');
+      // 空态 chrome 与文案统一走 SDK 状态视图（ADR-0099 §2.5）；领域文案由物料固定给出。
+      const empty = createBaseScreenMaterialEmptyView(doc, { emptyLabel: STATUS_GRID_EMPTY_LABEL });
       empty.dataset.boardStatusEmpty = '';
-      empty.textContent = readString(model.props.emptyText, '无设备数据');
       // 覆盖在骨架之上而不是挤占布局：空表与非空表的格子尺寸因此完全相同。
-      empty.style.cssText = `position:absolute;inset:0;display:grid;place-items:center;font:${fontSize}px/1.4 sans-serif;color:${styleColor(model.style.labelColor, BOARD_SECONDARY_COLOR)};pointer-events:none;`;
+      empty.style.position = 'absolute';
+      empty.style.inset = '0';
+      empty.style.pointerEvents = 'none';
       root.style.position = 'relative';
       root.appendChild(empty);
     }
 
-    const footer = this.#footer(items, {
-      showLegend,
-      hidden: layout.hidden,
-      fontSize,
-      legendColor: styleColor(model.style.legendColor, BOARD_SECONDARY_COLOR),
-      colors,
-    });
-    if (footer !== undefined) root.appendChild(footer);
+    if (layout.hidden > 0) {
+      root.appendChild(
+        this.#footer(layout.hidden, {
+          fontSize,
+          color: styleColor(model.style.labelColor, BOARD_SECONDARY_COLOR),
+        }),
+      );
+    }
 
     this.commit(root);
   }
@@ -394,49 +530,20 @@ export class PluginBoardStatusGridElement extends BoardMaterialElement {
     return tile;
   }
 
+  /** 容量溢出的 `+N`：属于灯阵自身读数（还有几台没画出来），不是图例。 */
   #footer(
-    items: readonly BoardStateRow[],
-    options: {
-      readonly showLegend: boolean;
-      readonly hidden: number;
-      readonly fontSize: number;
-      readonly legendColor: string;
-      readonly colors: Readonly<Record<BoardStatusKey, string>>;
-    },
-  ): HTMLElement | undefined {
-    if (!options.showLegend && options.hidden === 0) return undefined;
+    hidden: number,
+    options: { readonly fontSize: number; readonly color: string },
+  ): HTMLElement {
     const doc = this.ownerDocument;
     const footer = doc.createElement('div');
     footer.dataset.boardStatusFooter = '';
-    footer.style.cssText = `flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;height:${STATUS_GRID_LEGEND_HEIGHT}px;font:${options.fontSize}px/1 sans-serif;color:${options.legendColor};`;
-
-    if (options.showLegend) {
-      const counts = buildStatusLegend(items);
-      const legend = doc.createElement('div');
-      legend.dataset.boardStatusLegend = '';
-      legend.style.cssText =
-        'display:flex;align-items:center;gap:10px;min-width:0;overflow:hidden;pointer-events:none;';
-      for (const state of STATUS_GRID_LEGEND_ORDER) {
-        const item = doc.createElement('span');
-        item.dataset.state = state;
-        item.dataset.count = String(counts[state]);
-        item.style.cssText = 'display:inline-flex;align-items:center;gap:4px;white-space:nowrap;';
-        const dot = doc.createElement('span');
-        dot.style.cssText = `width:8px;height:8px;border-radius:2px;background:${options.colors[state]};`;
-        item.appendChild(dot);
-        item.appendChild(doc.createTextNode(`${BOARD_STATUS_LABELS[state]} ${counts[state]}`));
-        legend.appendChild(item);
-      }
-      footer.appendChild(legend);
-    }
-
-    if (options.hidden > 0) {
-      const hidden = doc.createElement('span');
-      hidden.dataset.boardStatusHidden = '';
-      hidden.textContent = `+${options.hidden}`;
-      hidden.style.cssText = 'flex:0 0 auto;font-variant-numeric:tabular-nums;white-space:nowrap;';
-      footer.appendChild(hidden);
-    }
+    footer.style.cssText = `flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;height:${STATUS_GRID_FOOTER_HEIGHT}px;font:${options.fontSize}px/1 sans-serif;color:${options.color};`;
+    const count = doc.createElement('span');
+    count.dataset.boardStatusHidden = '';
+    count.textContent = `+${hidden}`;
+    count.style.cssText = 'flex:0 0 auto;font-variant-numeric:tabular-nums;white-space:nowrap;';
+    footer.appendChild(count);
     return footer;
   }
 }

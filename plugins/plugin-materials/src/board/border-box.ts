@@ -25,16 +25,32 @@ import { readNumber, styleColor } from './json-values.js';
  * 它同时是本插件的检查器控件宿主：`borderStyle` 字段用 `control: 'custom'` 指向
  * 插件自己贡献的 `base-screen-board-border-picker`，用来验证"插件既能贡献物料、
  * 也能为物料贡献已授权的属性面板控件"这条组合路径。
+ *
+ * props / style 分界（ADR-0099 §2.2）：边框形态与角标尺寸是结构（props）；线宽、颜色是纯视觉量，
+ * 应能被告警条件样式改写（style）。线宽因此是 style 的 `strokeWidth`。
  */
 const BORDER_BOX_PROPS_SCHEMA = {
   kind: 'object',
   properties: {
     borderStyle: { kind: 'enum', values: [...BOARD_BORDER_STYLES] },
     bracketSize: { kind: 'number', minimum: 4, maximum: 72 },
-    lineWidth: { kind: 'number', minimum: 1, maximum: 8 },
   },
-  required: ['borderStyle', 'bracketSize', 'lineWidth'],
+  required: ['borderStyle', 'bracketSize'],
 } satisfies BaseScreenMaterialObjectSchema;
+
+const BORDER_BOX_STYLE_SCHEMA = {
+  kind: 'object',
+  properties: {
+    backgroundColor: { kind: 'string' },
+    color: { kind: 'string' },
+    borderColor: { kind: 'string' },
+    // 不进 required：缺省按 2px 绘制，未写线宽的文档无需改写。
+    strokeWidth: { kind: 'number', minimum: 1, maximum: 8 },
+  },
+  required: ['backgroundColor', 'borderColor'],
+} satisfies BaseScreenMaterialObjectSchema;
+
+const DEFAULT_STROKE_WIDTH = 2;
 
 export const PLUGIN_BOARD_BORDER_BOX_MANIFEST: BaseScreenMaterialManifest = {
   type: PLUGIN_BOARD_BORDER_BOX_TYPE,
@@ -49,32 +65,22 @@ export const PLUGIN_BOARD_BORDER_BOX_MANIFEST: BaseScreenMaterialManifest = {
   defaultProps: {
     borderStyle: 'corner-brackets',
     bracketSize: 22,
-    lineWidth: 2,
   },
   defaultStyle: {
     backgroundColor: 'rgba(11,26,43,.55)',
     color: BOARD_DEFAULT_SURFACE.color,
     borderColor: BOARD_DEFAULT_SURFACE.accentColor,
+    strokeWidth: DEFAULT_STROKE_WIDTH,
   },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      borderColor: { kind: 'string' },
-    },
-    required: ['backgroundColor', 'borderColor'],
-  },
+  styleSchema: BORDER_BOX_STYLE_SCHEMA,
   stylePanel: [
     { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
     { style: 'borderColor', label: '边框色', control: 'color' },
+    { style: 'strokeWidth', label: '线宽', control: 'number' },
     { style: 'color', label: '文字色', control: 'color' },
   ],
   propsSchema: BORDER_BOX_PROPS_SCHEMA,
-  propertyPanel: [
-    { prop: 'bracketSize', label: '角标大小', control: 'number' },
-    { prop: 'lineWidth', label: '线宽', control: 'number' },
-  ],
+  propertyPanel: [{ prop: 'bracketSize', label: '角标大小', control: 'number' }],
   events: [],
   // 装饰边框只是容器外观，不接数据：声明 static 会诱导用户在边框上挂数据集。
   dataCapabilities: [],
@@ -107,19 +113,42 @@ function parseBorderBoxEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
               unit: 'px',
             },
             {
-              id: 'lineWidth',
-              target: 'props',
-              path: ['lineWidth'],
+              id: 'strokeWidth',
+              target: 'style',
+              path: ['strokeWidth'],
               label: '线宽',
               control: 'unit-number',
               unit: 'px',
+              min: 1,
+              max: 8,
+            },
+            {
+              id: 'borderColor',
+              target: 'style',
+              path: ['borderColor'],
+              label: '边框色',
+              control: 'color',
+            },
+          ],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            {
+              id: 'backgroundColor',
+              target: 'style',
+              path: ['backgroundColor'],
+              label: '背景色',
+              control: 'color',
+              allowGradient: true,
             },
           ],
         },
       ],
     },
     BORDER_BOX_PROPS_SCHEMA,
-    undefined,
+    BORDER_BOX_STYLE_SCHEMA,
     undefined,
     undefined,
   );
@@ -150,7 +179,8 @@ export class PluginBoardBorderBoxElement extends BoardMaterialElement {
     const style = isBoardBorderStyle(model.props.borderStyle) ? model.props.borderStyle : 'plain';
     this.dataset.boardBorderStyle = style;
     const borderColor = styleColor(model.style.borderColor, BOARD_DEFAULT_SURFACE.accentColor);
-    const lineWidth = Math.max(1, Math.round(readNumber(model.props.lineWidth, 2)));
+    const strokeWidth = readNumber(model.style.strokeWidth, DEFAULT_STROKE_WIDTH);
+    const lineWidth = Math.max(1, Math.round(strokeWidth));
     const bracketSize = Math.max(4, Math.round(readNumber(model.props.bracketSize, 22)));
 
     const doc = this.ownerDocument;

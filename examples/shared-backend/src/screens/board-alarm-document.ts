@@ -163,7 +163,7 @@ function frame(id: string, name: string, box: Box): void {
     size: { width, height },
     rotation: 0,
     status: { locked: false, hidden: false },
-    props: { borderStyle: 'corner-brackets', bracketSize: 16, lineWidth: 2 },
+    props: { borderStyle: 'corner-brackets', bracketSize: 16 },
     style: {
       backgroundColor: 'rgba(10, 16, 26, .55)',
       borderColor: '#7a2a33',
@@ -245,7 +245,6 @@ function selectorBoard(
       // 选择器必须静止：轮播会让「点第三行」变成点一个不断移动的目标。
       autoScroll: false,
       statusColumn: '',
-      statusPalette: {},
     },
     style: {
       backgroundColor: 'rgba(9, 18, 30, .7)',
@@ -387,7 +386,6 @@ push({
     autoScroll: true,
     // 等级色列：`level` 是绑定的第二列，行左侧出现 4px 色条 + 等级文字染色。
     statusColumn: 'level',
-    statusPalette: { ...LEVEL_COLORS, default: '#6b7d8f' },
   },
   style: {
     backgroundColor: 'transparent',
@@ -397,6 +395,11 @@ push({
     borderColor: '#22364d',
     fontSize: 13,
     rowHeight: 40,
+    // 等级语义色与色块同源（ADR-0099：等级色是 style，可被宿主条件样式覆盖）。
+    criticalColor: LEVEL_COLORS.critical,
+    warningColor: LEVEL_COLORS.warning,
+    infoColor: LEVEL_COLORS.info,
+    unknownColor: '#6b7d8f',
   },
   dataSource: {
     type: 'dataset',
@@ -459,7 +462,7 @@ const CALIBER_LINES: readonly string[] = [
   '未处理告警：当前未确认快照，不按产线拆分',
   '等级计数：近 1 小时新增（critical / warning / info）',
   '告警流水：所选产线、近 60 分钟、最多 20 条',
-  '等级色板与流水的 statusPalette 同源：#f5222d / #fa8c16 / #1677ff',
+  '等级色板与流水的等级语义色同源：#f5222d / #fa8c16 / #1677ff',
   '读数来自演示指标接口，只保证确定性，不对应真实告警台账',
 ];
 CALIBER_LINES.forEach((line, index) => {

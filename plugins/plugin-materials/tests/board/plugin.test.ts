@@ -7,6 +7,7 @@ import { PLUGIN_BOARD_BORDER_BOX_MANIFEST } from '../../src/board/border-box.js'
 import { PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST } from '../../src/board/capsule-progress.js';
 import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../src/board/digital-flop.js';
 import {
+  BOARD_ALARM_LEVEL_COLORS,
   BOARD_BORDER_STYLES,
   BOARD_STATUS_COLORS,
   PLUGIN_BOARD_BORDER_BOX_TAG_NAME,
@@ -26,6 +27,8 @@ import {
   PLUGIN_BOARD_SCROLL_BOARD_TYPE,
   PLUGIN_BOARD_STATUS_GRID_TAG_NAME,
   PLUGIN_BOARD_STATUS_GRID_TYPE,
+  PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME,
+  PLUGIN_BOARD_STATUS_LEGEND_TYPE,
   PLUGIN_BOARD_WATER_LEVEL_TAG_NAME,
   PLUGIN_BOARD_WATER_LEVEL_TYPE,
 } from '../../src/board/identity.js';
@@ -37,6 +40,7 @@ import {
 } from '../../src/board/scalar-adapter.js';
 import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../src/board/scroll-board.js';
 import { PLUGIN_BOARD_STATUS_GRID_MANIFEST } from '../../src/board/status-grid.js';
+import { PLUGIN_BOARD_STATUS_LEGEND_MANIFEST } from '../../src/board/status-legend.js';
 import { createBoardColumnsAdapter } from '../../src/board/tabular-columns-adapter.js';
 import { PLUGIN_BOARD_WATER_LEVEL_MANIFEST } from '../../src/board/water-level.js';
 import { createPluginMaterialsRuntime, PLUGIN_MATERIALS_ID } from '../../src/plugin.js';
@@ -49,6 +53,7 @@ const MANIFESTS = [
   PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST,
   PLUGIN_BOARD_MARQUEE_MANIFEST,
   PLUGIN_BOARD_STATUS_GRID_MANIFEST,
+  PLUGIN_BOARD_STATUS_LEGEND_MANIFEST,
   PLUGIN_BOARD_PIPELINE_MANIFEST,
 ];
 
@@ -74,6 +79,7 @@ describe('plugin-board-materials manifests', () => {
       [PLUGIN_BOARD_CAPSULE_PROGRESS_TYPE, PLUGIN_BOARD_CAPSULE_PROGRESS_TAG_NAME],
       [PLUGIN_BOARD_MARQUEE_TYPE, PLUGIN_BOARD_MARQUEE_TAG_NAME],
       [PLUGIN_BOARD_STATUS_GRID_TYPE, PLUGIN_BOARD_STATUS_GRID_TAG_NAME],
+      [PLUGIN_BOARD_STATUS_LEGEND_TYPE, PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME],
       [PLUGIN_BOARD_PIPELINE_TYPE, PLUGIN_BOARD_PIPELINE_TAG_NAME],
     ];
     expect(MANIFESTS.map((manifest) => [manifest.type, manifest.tagName])).toEqual(expected);
@@ -129,40 +135,45 @@ describe('plugin-board-materials manifests', () => {
     }
   });
 
-  // scroll-board 的等级色列：两个新 prop 必须**非必填**——一旦进 required，现有销售
-  // 大屏种子与三端冒烟的 props 校验会立刻失败（旧文档里没有这两个键）。
-  it('keeps the scroll board status props optional, declared and panel-editable', () => {
+  // scroll-board 的等级色列（ADR-0099）：「哪一列」是字段映射，经数据区 field-selector 选择；
+  // 「等级 → 颜色」是语义色，属于 style，缺省回落到共用等级色板。
+  it('picks the scroll level column with a field selector and keeps level colors in style', () => {
     const manifest = PLUGIN_BOARD_SCROLL_BOARD_MANIFEST;
     const required = manifest.propsSchema.required;
-    expect(required).not.toContain('statusColumn');
-    expect(required).not.toContain('statusPalette');
-
-    const properties = manifest.propsSchema.properties;
-    expect(properties.statusColumn?.kind).toBe('string');
-    const palette = properties.statusPalette;
-    expect(palette?.kind).toBe('object');
-    if (palette?.kind !== 'object') throw new Error('statusPalette must be an object schema');
-    // 只允许 4 个固定键：等级色板是枚举语义，不是自由字典（schema 不支持子字段控件）。
-    expect(Object.keys(palette.properties)).toEqual(['critical', 'warning', 'info', 'default']);
-    expect(palette.required).toEqual([]);
-
-    // 原子化门禁的另一半：渲染路径读取的键必须同时出现在 propsSchema 与面板里。
-    const panelProps = manifest.propertyPanel.map((field) => field.prop);
-    expect(panelProps).toContain('statusColumn');
-    expect(panelProps).toContain('statusPalette');
-    expect(panelProps.filter((prop) => prop === 'statusPalette')).toHaveLength(1);
-    expect(manifest.propertyPanel.find((field) => field.prop === 'statusPalette')?.control).toBe(
-      'json',
-    );
-
-    // 旧文档的 props（只有原来 4 个键）依然覆盖 schema 的全部必填项 ⇒ manifest 校验通过。
-    const legacyProps = { headerVisible: true, rowCount: 5, intervalMs: 3000, autoScroll: true };
-    expect(required).toHaveLength(4);
-    expect(required.every((key) => Object.hasOwn(legacyProps, key))).toBe(true);
-
-    // 默认值必须是「不启用」：这是「不传两个 prop 时 DOM 与扩展前逐字一致」的前提。
+    expect(required).toEqual(['headerVisible', 'rowCount', 'intervalMs', 'autoScroll']);
+    expect(manifest.propsSchema.properties.statusColumn?.kind).toBe('string');
+    expect(manifest.propsSchema.properties).not.toHaveProperty('statusPalette');
     expect(manifest.defaultProps.statusColumn).toBe('');
-    expect(manifest.defaultProps.statusPalette).toEqual({});
+
+    const dataFields = manifest.editorDescriptor?.data?.flatMap((section) => section.fields) ?? [];
+    expect(dataFields.find((field) => field.id === 'statusColumn')).toMatchObject({
+      target: 'props',
+      path: ['statusColumn'],
+      control: 'field-selector',
+    });
+
+    const levelKeys = ['criticalColor', 'warningColor', 'infoColor', 'unknownColor'];
+    for (const key of levelKeys) {
+      expect(manifest.styleSchema.properties[key]?.kind).toBe('string');
+      expect(manifest.styleSchema.required).not.toContain(key);
+      expect(manifest.stylePanel.some((field) => field.style === key)).toBe(true);
+    }
+    expect(manifest.defaultStyle).toMatchObject({
+      criticalColor: BOARD_ALARM_LEVEL_COLORS.critical,
+      warningColor: BOARD_ALARM_LEVEL_COLORS.warning,
+      infoColor: BOARD_ALARM_LEVEL_COLORS.info,
+      unknownColor: BOARD_ALARM_LEVEL_COLORS.unknown,
+    });
+
+    // 单位经 unit 声明而不写进 label（ADR-0099 §2.5）。
+    const appearance = manifest.editorDescriptor?.appearance?.flatMap((section) => section.fields);
+    expect(appearance?.find((field) => field.id === 'intervalMs')).toMatchObject({
+      control: 'unit-number',
+      unit: 'ms',
+    });
+    expect(manifest.propertyPanel.find((field) => field.prop === 'intervalMs')?.label).toBe(
+      '轮播间隔',
+    );
   });
 });
 
@@ -173,13 +184,13 @@ describe('plugin-materials runtime', () => {
     expect(runtime.manifest.id).toBe(PLUGIN_MATERIALS_ID);
   });
 
-  it('declares nineteen materials, two inspector controls and two palette-only commands', () => {
+  it('declares twenty materials, two inspector controls and two palette-only commands', () => {
     const runtime = createPluginMaterialsRuntime();
     const counts = new Map<string, number>();
     for (const contribution of runtime.manifest.contributions) {
       counts.set(contribution.kind, (counts.get(contribution.kind) ?? 0) + 1);
     }
-    expect(counts.get('material')).toBe(19);
+    expect(counts.get('material')).toBe(20);
     expect(counts.get('inspectorControl')).toBe(2);
     expect(counts.get('command')).toBe(2);
     // 原 metrics / pipeline 的能力面仍各有一条贡献。
@@ -254,6 +265,32 @@ describe('plugin-materials runtime', () => {
         expect(manifest.stylePanel.map((field) => field.style)).toContain(styleKey);
       }
     }
+    // 状态图例同源但非必填：未写五态色的图例回落到同一份默认值。
+    for (const [styleKey, statusKey] of paletteKeys) {
+      expect(PLUGIN_BOARD_STATUS_LEGEND_MANIFEST.defaultStyle[styleKey]).toBe(
+        BOARD_STATUS_COLORS[statusKey],
+      );
+      expect(PLUGIN_BOARD_STATUS_LEGEND_MANIFEST.styleSchema.required).not.toContain(styleKey);
+    }
+  });
+
+  // ADR-0099：五态分布图例是独立原子，灯阵不再内建图例。
+  it('splits the status legend out of the status grid', () => {
+    const grid = PLUGIN_BOARD_STATUS_GRID_MANIFEST;
+    expect(grid.propsSchema.properties).not.toHaveProperty('showLegend');
+    expect(grid.styleSchema.properties).not.toHaveProperty('legendColor');
+    // 工序链从不渲染图例：同名无效键一并移除。
+    expect(PLUGIN_BOARD_PIPELINE_MANIFEST.styleSchema.properties).not.toHaveProperty('legendColor');
+
+    const legend = PLUGIN_BOARD_STATUS_LEGEND_MANIFEST;
+    expect(legend.dataBinding?.roles).toEqual([
+      { id: 'status', minFields: 1, maxFields: 1, valueTypes: ['string'] },
+    ]);
+    expect(legend.staticData).toEqual({
+      kind: 'tabular',
+      defaultBinding: { fields: { status: ['status'] } },
+    });
+    expect(legend.dataCapabilities).toEqual(grid.dataCapabilities);
   });
 
   it('cycles the focused border box through every declared style and stays undoable', async () => {
@@ -273,7 +310,7 @@ describe('plugin-materials runtime', () => {
           rotation: 0,
           zIndex: 1,
           status: { locked: false, hidden: false },
-          props: { borderStyle: 'plain', bracketSize: 22, lineWidth: 2 },
+          props: { borderStyle: 'plain', bracketSize: 22 },
           style: {},
           dataSource: null,
         },
@@ -309,7 +346,7 @@ describe('plugin-materials runtime', () => {
       commandId: 'update-components',
       args: {
         componentIds: ['frame-1'],
-        patch: { props: { borderStyle, bracketSize: 22, lineWidth: 2 } },
+        patch: { props: { borderStyle, bracketSize: 22 } },
       },
     });
     expect(executed).toEqual([expected('corner-brackets'), expected('notch')]);

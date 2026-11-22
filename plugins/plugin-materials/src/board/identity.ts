@@ -31,6 +31,9 @@ export const PLUGIN_BOARD_MARQUEE_TAG_NAME = 'base-screen-board-marquee';
 export const PLUGIN_BOARD_STATUS_GRID_TYPE = 'board.status-grid';
 export const PLUGIN_BOARD_STATUS_GRID_TAG_NAME = 'base-screen-board-status-grid';
 
+export const PLUGIN_BOARD_STATUS_LEGEND_TYPE = 'board.status-legend';
+export const PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME = 'base-screen-board-status-legend';
+
 export const PLUGIN_BOARD_PIPELINE_TYPE = 'board.pipeline';
 export const PLUGIN_BOARD_PIPELINE_TAG_NAME = 'base-screen-board-pipeline';
 

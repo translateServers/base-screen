@@ -350,7 +350,7 @@ async function main() {
     // A2. 实时告警演示大屏：告警流水 + KPI 读数 + 等级色块，以及 SSE 推送 → 条件样式。
     //     这张屏是告警专用种子（组件 id 对齐宿主 `alarm.open` 绑定）：
     //     流水 14 行（LINE-A 近 60 分钟定值，critical 2 条）、4 个读数走 demo_metric
-    //     （alarm_open + 三个等级）、三块等级色块与流水的 statusPalette 同源。
+    //     （alarm_open + 三个等级）、三块等级色块与流水的等级语义色同源。
     //     poll=0 关闭数据轮询，确保样式变化期间 datasetQueries 不增长。
     const readingIds = [
       'kpi-alarm-value',
@@ -402,7 +402,7 @@ async function main() {
         bars: ['critical', 'warning', 'info'].map(
           (level) => modelOf(`level-${level}-bar`)?.style?.fill ?? null,
         ),
-        palette: stream?.props?.statusPalette ?? null,
+        palette: stream?.style ?? null,
         readings: ids.map((id) => textOf(id)),
         chip: document.querySelector('[data-viewer-status]')?.textContent ?? '',
       };
@@ -429,12 +429,12 @@ async function main() {
     }
     const palette = alarmDemoState.palette ?? {};
     if (
-      palette.critical !== '#f5222d' ||
-      palette.warning !== '#fa8c16' ||
-      palette.info !== '#1677ff' ||
-      palette.default !== '#6b7d8f'
+      palette.criticalColor !== '#f5222d' ||
+      palette.warningColor !== '#fa8c16' ||
+      palette.infoColor !== '#1677ff' ||
+      palette.unknownColor !== '#6b7d8f'
     ) {
-      fail(`流水 statusPalette 应与色块同源：${JSON.stringify(palette)}`);
+      fail(`流水等级语义色应与色块同源：${JSON.stringify(palette)}`);
     }
     if (alarmDemoState.readings.some((text) => !/\d/.test(text))) {
       fail(`4 个 KPI 读数都应出数：${JSON.stringify(alarmDemoState.readings)}`);

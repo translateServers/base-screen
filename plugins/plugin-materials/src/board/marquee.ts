@@ -2,8 +2,10 @@ import type { ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialConstructor,
+  type BaseScreenMaterialEditorDescriptor,
   type BaseScreenMaterialManifest,
   type BaseScreenMaterialObjectSchema,
+  parseBaseScreenMaterialEditorDescriptor,
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { BoardMaterialElement, type BoardMaterialModel } from './board-element.js';
@@ -17,14 +19,26 @@ import { BOARD_TEXT_VALUE_ADAPTER } from './scalar-adapter.js';
  * 无缝循环靠「同一段文本复制两份 + 轨道位移 -50%」实现，因此轨道宽度必须恰好是
  * 一份文本宽度的两倍：两份 copy 的 padding-right 必须一致。设计态不播放动画，
  * 只显示第一份文本，避免画布上出现半截字。
+ *
+ * 时间统一用毫秒（ADR-0099 §2.5）：滚动周期是 `periodMs`，与轮播列表的 `intervalMs` 同单位。
  */
 const MARQUEE_PROPS_SCHEMA = {
   kind: 'object',
   properties: {
-    speedSeconds: { kind: 'number', minimum: 3, maximum: 120 },
+    periodMs: { kind: 'number', minimum: 3000, maximum: 120000 },
     gap: { kind: 'number', minimum: 0, maximum: 240 },
   },
-  required: ['speedSeconds', 'gap'],
+  required: ['periodMs', 'gap'],
+} satisfies BaseScreenMaterialObjectSchema;
+
+const MARQUEE_STYLE_SCHEMA = {
+  kind: 'object',
+  properties: {
+    backgroundColor: { kind: 'string' },
+    color: { kind: 'string' },
+    fontSize: { kind: 'number', minimum: 10, maximum: 48 },
+  },
+  required: ['backgroundColor', 'color', 'fontSize'],
 } satisfies BaseScreenMaterialObjectSchema;
 
 export const PLUGIN_BOARD_MARQUEE_MANIFEST: BaseScreenMaterialManifest = {
@@ -35,7 +49,7 @@ export const PLUGIN_BOARD_MARQUEE_MANIFEST: BaseScreenMaterialManifest = {
   keywords: ['字幕', '跑马灯', '播报', '大屏'],
   defaultSize: { width: 900, height: 40 },
   defaultProps: {
-    speedSeconds: 20,
+    periodMs: 20000,
     gap: 64,
   },
   defaultData: '华东区域领跑 · 今日销售额突破 386.4 万元 · 订单量同比增长 12.4%',
@@ -45,15 +59,7 @@ export const PLUGIN_BOARD_MARQUEE_MANIFEST: BaseScreenMaterialManifest = {
     color: '#8fd6ff',
     fontSize: 14,
   },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      fontSize: { kind: 'number', minimum: 10, maximum: 48 },
-    },
-    required: ['backgroundColor', 'color', 'fontSize'],
-  },
+  styleSchema: MARQUEE_STYLE_SCHEMA,
   stylePanel: [
     { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
     { style: 'color', label: '文字色', control: 'color' },
@@ -61,9 +67,10 @@ export const PLUGIN_BOARD_MARQUEE_MANIFEST: BaseScreenMaterialManifest = {
   ],
   propsSchema: MARQUEE_PROPS_SCHEMA,
   propertyPanel: [
-    { prop: 'speedSeconds', label: '滚动周期(秒)', control: 'number' },
-    { prop: 'gap', label: '接缝间距(px)', control: 'number' },
+    { prop: 'periodMs', label: '滚动周期', control: 'number' },
+    { prop: 'gap', label: '接缝间距', control: 'number' },
   ],
+  editorDescriptor: parseMarqueeEditorDescriptor(),
   events: [],
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
   dataBinding: {
@@ -78,6 +85,89 @@ export const PLUGIN_BOARD_MARQUEE_MANIFEST: BaseScreenMaterialManifest = {
   },
   designCapabilities: { resize: true, rotate: false, children: false },
 };
+
+/**
+ * 检查器编排（ADR-0099 §2.4）：结构 → 文字 → 填充 → 动效。单位经 `unit` 声明，不写进 label。
+ * 扁平 `propertyPanel`/`stylePanel` 仍保留：多选批量、条件样式等通道按它们识别可编辑字段。
+ */
+function parseMarqueeEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
+  const parsed = parseBaseScreenMaterialEditorDescriptor(
+    {
+      appearance: [
+        {
+          id: 'structure',
+          label: '结构',
+          fields: [
+            {
+              id: 'gap',
+              target: 'props',
+              path: ['gap'],
+              label: '接缝间距',
+              control: 'unit-number',
+              unit: 'px',
+              min: 0,
+              max: 240,
+            },
+          ],
+        },
+        {
+          id: 'text',
+          label: '文字',
+          fields: [
+            { id: 'color', target: 'style', path: ['color'], label: '文字色', control: 'color' },
+            {
+              id: 'fontSize',
+              target: 'style',
+              path: ['fontSize'],
+              label: '字号',
+              control: 'number',
+            },
+          ],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            {
+              id: 'backgroundColor',
+              target: 'style',
+              path: ['backgroundColor'],
+              label: '背景色',
+              control: 'color',
+              allowGradient: true,
+            },
+          ],
+        },
+        {
+          id: 'motion',
+          label: '动效',
+          advanced: true,
+          fields: [
+            {
+              id: 'periodMs',
+              target: 'props',
+              path: ['periodMs'],
+              label: '滚动周期',
+              control: 'unit-number',
+              unit: 'ms',
+              min: 3000,
+              max: 120000,
+              step: 500,
+            },
+          ],
+        },
+      ],
+    },
+    MARQUEE_PROPS_SCHEMA,
+    MARQUEE_STYLE_SCHEMA,
+    undefined,
+    undefined,
+  );
+  if (!parsed.ok) {
+    throw new Error('plugin-materials marquee editor descriptor is invalid.');
+  }
+  return parsed.value;
+}
 
 export class PluginBoardMarqueeElement extends BoardMaterialElement {
   static readonly manifest = PLUGIN_BOARD_MARQUEE_MANIFEST;
@@ -112,7 +202,7 @@ export class PluginBoardMarqueeElement extends BoardMaterialElement {
   #paint(text: string, model: BoardMaterialModel): void {
     const doc = this.ownerDocument;
     const gap = Math.max(0, Math.round(readNumber(model.props.gap, 64)));
-    const duration = Math.max(3, readNumber(model.props.speedSeconds, 20)) * 1000;
+    const duration = Math.max(3000, readNumber(model.props.periodMs, 20000));
     const reduceMotion =
       doc.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches ?? false;
 

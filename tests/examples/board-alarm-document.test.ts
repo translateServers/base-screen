@@ -24,7 +24,7 @@ import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-materia
  * 3) 数据集/宿主资源绑定必须回到后端定义与演示通道的字段上核对。
  *
  * 额外一层是这张屏的存在理由：组件 id 必须与宿主 `alarm.open` 演示绑定的两个 id 对齐，
- * 且等级色块与流水的 statusPalette 必须同源——两处任一漂移，屏幕就不再是"告警演示屏"。
+ * 且等级色块与流水的等级语义色必须同源——两处任一漂移，屏幕就不再是"告警演示屏"。
  */
 const MANIFESTS = [
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
@@ -205,16 +205,12 @@ describe('alarm demo document', () => {
 
     // 告警流水的行级色条必须与色块同源，否则"同一等级两种红"。
     const stream = byId.get('alarm-stream');
-    const props = stream?.props as {
-      statusColumn?: string;
-      statusPalette?: Record<string, string>;
-    };
-    expect(props.statusColumn).toBe('level');
-    expect(props.statusPalette).toEqual({
-      critical: BOARD_ALARM_LEVEL_COLORS.critical,
-      warning: BOARD_ALARM_LEVEL_COLORS.warning,
-      info: BOARD_ALARM_LEVEL_COLORS.info,
-      default: BOARD_ALARM_LEVEL_COLORS.unknown,
+    expect(stream?.props.statusColumn).toBe('level');
+    expect(stream?.style).toMatchObject({
+      criticalColor: BOARD_ALARM_LEVEL_COLORS.critical,
+      warningColor: BOARD_ALARM_LEVEL_COLORS.warning,
+      infoColor: BOARD_ALARM_LEVEL_COLORS.info,
+      unknownColor: BOARD_ALARM_LEVEL_COLORS.unknown,
     });
   });
 

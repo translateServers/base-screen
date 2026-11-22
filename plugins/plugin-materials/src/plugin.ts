@@ -26,6 +26,8 @@ import {
   PLUGIN_BOARD_SCROLL_BOARD_TYPE,
   PLUGIN_BOARD_STATUS_GRID_TAG_NAME,
   PLUGIN_BOARD_STATUS_GRID_TYPE,
+  PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME,
+  PLUGIN_BOARD_STATUS_LEGEND_TYPE,
   PLUGIN_BOARD_WATER_LEVEL_TAG_NAME,
   PLUGIN_BOARD_WATER_LEVEL_TYPE,
 } from './board/identity.js';
@@ -58,7 +60,7 @@ export const PLUGIN_ECHARTS_TOGGLE_COMMAND_ID = 'base-screen.echarts.toggle-seri
 export const PLUGIN_ECHARTS_SERIES_PICKER_ID = 'base-screen.echarts.series-picker';
 
 /**
- * 统一物料插件的 runtime：19 个物料、2 个检查器控件、2 条命令，外加原 metrics /
+ * 统一物料插件的 runtime：20 个物料、2 个检查器控件、2 条命令，外加原 metrics /
  * pipeline 两个插件的能力面（1 个数据资源类型、1 个蓝图能力、1 个数据处理器、
  * 1 个蓝图动作）。
  *
@@ -124,7 +126,7 @@ export function createPluginMaterialsRuntime(): BaseScreenPluginRuntime {
   return defined.value;
 }
 
-/** 19 个物料：8 个大屏组件 + 1 个通用图表 + 10 个图表家族。 */
+/** 20 个物料：9 个大屏组件 + 1 个通用图表 + 10 个图表家族。 */
 function materialContributions(): BaseScreenPluginContribution[] {
   const boardMaterials = [
     [PLUGIN_BOARD_DIGITAL_FLOP_TYPE, PLUGIN_BOARD_DIGITAL_FLOP_TAG_NAME],
@@ -134,6 +136,7 @@ function materialContributions(): BaseScreenPluginContribution[] {
     [PLUGIN_BOARD_CAPSULE_PROGRESS_TYPE, PLUGIN_BOARD_CAPSULE_PROGRESS_TAG_NAME],
     [PLUGIN_BOARD_MARQUEE_TYPE, PLUGIN_BOARD_MARQUEE_TAG_NAME],
     [PLUGIN_BOARD_STATUS_GRID_TYPE, PLUGIN_BOARD_STATUS_GRID_TAG_NAME],
+    [PLUGIN_BOARD_STATUS_LEGEND_TYPE, PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME],
     [PLUGIN_BOARD_PIPELINE_TYPE, PLUGIN_BOARD_PIPELINE_TAG_NAME],
   ] as const;
   return [
@@ -225,7 +228,7 @@ async function cycleBorderStyle(
     args: {
       componentIds: [focused.id],
       // `props` 是整体替换：必须带上当前其余字段，否则 schema 必填的
-      // borderStyle/bracketSize/lineWidth 会被抹掉，事务被拒。
+      // borderStyle/bracketSize 会被抹掉，事务被拒。
       patch: { props: { ...focused.props, borderStyle: next } },
     },
   });

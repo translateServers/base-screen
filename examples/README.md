@@ -222,7 +222,7 @@ pnpm verify:examples        # 依次跑三端冒烟
 三端断言集合一致：种子列表渲染、设计器注册并挂载、指标读数经 host-resource
 数据通道渲染出后端数值、查看器播放种子文档、指标接口确定性、**生产监控大屏的数据层六条**
 （首屏灯阵/工序链/告警流水、URL 播种、变量联动、空结果、失败保留上一帧、后台暂停）、
-**实时告警演示大屏**（流水 14 行 / critical 2 条 / 等级色块与 statusPalette 同色 / 4 个 KPI
+**实时告警演示大屏**（流水 14 行 / critical 2 条 / 等级色块与流水等级语义色同色 / 4 个 KPI
 出数），以及**实时告警样式**（在该屏上 `poll=0` 打开：SSE snapshot → warning；raise critical →
 变色；clear → 恢复；期间 dataset query 数与 canonical 文档不变），最后是无未捕获页面错误。
 数据层断言的详细口径见下文「数据层接入」。
@@ -286,7 +286,8 @@ M 段是**宿主资源作者面**闭环：编辑页右下角打开作者面，�
 （`ScreenAlarmBinding`），种子把 `alarm.open` 映射到组件 id（`kpi-alarm-value`、`top-notice`），
 作为开箱模板；组件检查器的「业务条件样式」段可以改条件源、等级与样式并保存。
 组件沿用与生产监控屏相同的两个 id 与基础色，文档本身仍然没有告警 key、阈值或样式规则。
-等级色块的三条实色条与流水的 `statusPalette` 同源（`#f5222d` / `#fa8c16` / `#1677ff`），
+等级色块的三条实色条与流水的等级语义色（`criticalColor` / `warningColor` / `infoColor`）同源
+（`#f5222d` / `#fa8c16` / `#1677ff`），
 根测试按 `BOARD_ALARM_LEVEL_COLORS` 逐色比对，避免"同一等级两种红"。
 
 页面内配置路径（不依赖 JSON 导入或改代码）：
@@ -332,8 +333,8 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 - **表格类物料的列 id 必须是 ASCII**：`scroll-board`/`base.table` 的列 id 走
   `PLUGIN_CORE_DATA_CONTRACT_INVALID` 的标识符校验；中文列别名能用于标量与图表，
   但不能直接做表格列。本案例用 ASCII 排名列 + 文档层表头解释列义。
-- **scroll-board 不能逐行着色，也没有选中行样式**：`statusPalette` 只有四个固定键，
-  中文等级值只能落到 default 色；榜单的行内等级色因此是统一的青色。当前城市由主视觉
+- **scroll-board 不能逐行着色，也没有选中行样式**：等级语义色只认 critical / warning / info，
+  中文等级值只能落到未知等级色（`unknownColor`）；榜单的行内等级色因此是统一的青色。当前城市由主视觉
   与榜单标题表达；主视觉的等级/标准比/达标状态/优良率用 `styleRules` 条件着色。
 - **ECharts 物料不暴露轴范围**：评审稿的固定量程（AQI 0–160 / 颗粒物 0–120）无法在
   文档层设置，双趋势图使用自适应量程；固定刻度需要给图表物料增加轴 props。
