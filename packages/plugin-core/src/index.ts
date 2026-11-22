@@ -53,6 +53,7 @@ export type {
   BaseScreenPluginDataResourceTypeContribution,
   BaseScreenPluginDependency,
   BaseScreenPluginDesignSnapshot,
+  BaseScreenPluginFragmentContribution,
   BaseScreenPluginInspectorControlCatalog,
   BaseScreenPluginInspectorControlCatalogEntry,
   BaseScreenPluginInspectorControlConstructor,
@@ -110,10 +111,14 @@ export type {
   BaseScreenMaterialEditorCondition,
   BaseScreenMaterialEditorConditionOperator,
   BaseScreenMaterialEditorControl,
+  BaseScreenMaterialEditorControlInferenceInput,
   BaseScreenMaterialEditorDescriptor,
+  BaseScreenMaterialEditorDescriptorInput,
   BaseScreenMaterialEditorField,
+  BaseScreenMaterialEditorFieldInput,
   BaseScreenMaterialEditorProjection,
   BaseScreenMaterialEditorSection,
+  BaseScreenMaterialEditorSectionInput,
   BaseScreenMaterialEditorTarget,
   BaseScreenMaterialEventDescriptor,
 } from './editor/editor-descriptor.js';
@@ -127,9 +132,23 @@ export {
   MAX_EDITOR_ITEM_PATH_DEPTH,
   MAX_EDITOR_PATH_DEPTH,
   MAX_EDITOR_SECTIONS_PER_ZONE,
+  inferBaseScreenMaterialEditorControl,
   parseBaseScreenMaterialEditorDescriptor,
   resolveSchema,
 } from './editor/editor-descriptor.js';
+export {
+  type BaseScreenComponentFragmentInsertionIntent,
+  type BaseScreenFragmentBody,
+  type BaseScreenFragmentDataSource,
+  type BaseScreenFragmentDefinition,
+  type BaseScreenFragmentEntry,
+  type BaseScreenFragmentNode,
+  type BaseScreenFragmentRelation,
+  type BaseScreenFragmentShell,
+  isBaseScreenBoundedName,
+  parseBaseScreenComponentFragmentInsertionIntent,
+  parseBaseScreenFragmentDefinition,
+} from './fragment/fragment.js';
 export {
   BASE_SCREEN_RESERVED_STYLE_SCHEMAS,
   parseBaseScreenMaterialEventDetail,
@@ -138,6 +157,7 @@ export {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from './material/material.js';
+export { resolveBaseScreenMaterialDefaultStyle } from './material/material-theme.js';
 export { isValidCustomElementName } from './material/material-validation-utils.js';
 export {
   parseBaseScreenPluginManifest,

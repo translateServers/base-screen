@@ -7,8 +7,10 @@ import type {
   ScreenMaterialErrorCode,
   ScreenParseResult,
   ScreenSize,
+  ScreenThemeSlot,
 } from '@base-screen/contracts';
 import type { BaseScreenMaterialEditorDescriptor } from './editor/editor-descriptor.js';
+import type { BaseScreenFragmentDefinition } from './fragment/fragment.js';
 
 export const BASE_SCREEN_MATERIAL_EVENT = 'base-screen-material-event' as const;
 
@@ -222,6 +224,13 @@ export interface BaseScreenMaterialManifest {
   readonly cover?: string;
   /** 可选：JSON-safe 声明式作者描述（appearance/data/interaction/events）。 */
   readonly editorDescriptor?: BaseScreenMaterialEditorDescriptor;
+  /**
+   * 可选：新建组件时跟随文档主题色板的样式键（样式键 → 主题色位，ADR-0101）。
+   *
+   * 文档带色板时，这些键取当前色板的颜色写入新组件；没有色板时仍用 `defaultStyle`。
+   * 只影响插入那一刻（见 `resolveBaseScreenMaterialDefaultStyle`），不改变已有组件。
+   */
+  readonly themeStyle?: Readonly<Record<string, ScreenThemeSlot>>;
 }
 
 export interface BaseScreenMaterialElement extends HTMLElement {
@@ -342,7 +351,16 @@ export type BaseScreenPluginContribution =
       readonly name: string;
       /** 由宿主 registry 解析的 custom element 标签；editorDescriptor 字段用 tagName 引用它。 */
       readonly tagName: string;
-    };
+    }
+  | BaseScreenPluginFragmentContribution;
+
+/**
+ * 插件随物料一起交付的组合分片（ADR-0100）：分片定义本身就是 JSON-safe 数据，直接写进清单。
+ * 不需要能力授权——它只在作者期被展开成普通组件，不在运行期执行任何代码。
+ */
+export interface BaseScreenPluginFragmentContribution extends BaseScreenFragmentDefinition {
+  readonly kind: 'fragment';
+}
 
 export interface BaseScreenRuntimeContributionIndex {
   getResourceType(resourceType: string): BaseScreenPluginDataResourceTypeContribution | undefined;
@@ -358,6 +376,10 @@ export interface BaseScreenRuntimeContributionIndex {
   getDataProcessor?(processorId: string): BaseScreenPluginDataProcessorContribution | undefined;
   /** 枚举生效的数据处理器，供作者面生成处理器选择器。 */
   listDataProcessors?(): readonly BaseScreenPluginDataProcessorContribution[];
+  /** 按 id 查插件贡献的组合分片（ADR-0100）；未声明即 undefined。 */
+  getFragment?(fragmentId: string): BaseScreenPluginFragmentContribution | undefined;
+  /** 枚举插件贡献的组合分片，供物料库展示。可选，同 listResourceTypes 的兼容约定。 */
+  listFragments?(): readonly BaseScreenPluginFragmentContribution[];
 }
 
 export interface BaseScreenPluginManifest {

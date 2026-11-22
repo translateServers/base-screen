@@ -24,6 +24,7 @@ const EXPECTED_KINDS = [
   'blueprintCapability',
   'panel',
   'inspectorControl',
+  'fragment',
 ] as const;
 
 function contribution(value: Record<string, unknown>): BaseScreenPluginContribution {

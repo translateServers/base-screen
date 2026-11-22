@@ -1,11 +1,15 @@
 import type { ScreenJsonValue, ScreenParseResult } from '@base-screen/contracts';
 import type { BaseScreenMaterialManifest } from '../contracts.js';
 import { PluginDiagnosticCollector } from '../diagnostics.js';
-import { parseBaseScreenMaterialEditorDescriptor } from '../editor/editor-descriptor.js';
+import {
+  type BaseScreenMaterialEditorDescriptor,
+  parseBaseScreenMaterialEditorDescriptor,
+} from '../editor/editor-descriptor.js';
 import { validateDefaultValues, validateMaterialFields } from './material-manifest-fields.js';
 import { validatePropertyPanel, validateStylePanel } from './material-panel.js';
 import { validatePropsSchema } from './material-schema.js';
 import { validateStaticData } from './material-static-data.js';
+import { validateMaterialThemeStyle } from './material-theme.js';
 import { MANIFEST_FIELDS, MAX_MATERIAL_MANIFEST_BYTES } from './material-validation-constants.js';
 import {
   failure,
@@ -37,6 +41,7 @@ export function parseBaseScreenMaterialManifest(
       field !== 'staticData' &&
       field !== 'editorDescriptor' &&
       field !== 'cover' &&
+      field !== 'themeStyle' &&
       !Object.hasOwn(manifest, field)
     ) {
       collector.add('PLUGIN_CORE_MANIFEST_FIELD_INVALID', [field], 'Manifest field is required.');
@@ -74,8 +79,11 @@ export function parseBaseScreenMaterialManifest(
   validateDefaultValues(manifest.defaultProps, propsSchema, ['defaultProps'], collector);
   validateDefaultValues(manifest.defaultStyle, styleSchema, ['defaultStyle'], collector);
   validateStaticData(manifest, collector);
+  validateMaterialThemeStyle(manifest.themeStyle, styleSchema, collector);
   validatePropertyPanel(manifest.propertyPanel, propsSchema, collector);
   validateStylePanel(manifest.stylePanel, styleSchema, collector);
+  // 解析结果用规范化后的描述符（字段都带 control，ADR-0102 D2）：作者可以省略 control。
+  let editorDescriptor: BaseScreenMaterialEditorDescriptor | undefined;
   if (manifest.editorDescriptor !== undefined) {
     const descriptor = parseBaseScreenMaterialEditorDescriptor(
       manifest.editorDescriptor,
@@ -89,10 +97,16 @@ export function parseBaseScreenMaterialManifest(
       for (const diagnostic of descriptor.diagnostics) {
         collector.add(diagnostic.code, diagnostic.path, diagnostic.message);
       }
+    } else {
+      editorDescriptor = descriptor.value;
     }
   }
   if (collector.hasErrors) {
     return collector.failure();
   }
-  return collector.result(manifest as unknown as BaseScreenMaterialManifest);
+  return collector.result(
+    (editorDescriptor === undefined
+      ? manifest
+      : { ...manifest, editorDescriptor }) as unknown as BaseScreenMaterialManifest,
+  );
 }

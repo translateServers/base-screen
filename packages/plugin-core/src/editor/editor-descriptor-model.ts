@@ -108,6 +108,32 @@ export interface BaseScreenMaterialEditorDescriptor {
   readonly events?: readonly BaseScreenMaterialEventDescriptor[];
 }
 
+/**
+ * 作者写的描述符字段（base-screen-docs ADR-0102 D2）：`control` 可省略，解析时按字段语义推导补齐
+ * （`inferBaseScreenMaterialEditorControl`）。解析结果是 `BaseScreenMaterialEditorField`，`control` 必有。
+ */
+export type BaseScreenMaterialEditorFieldInput = Omit<
+  BaseScreenMaterialEditorField,
+  'control' | 'itemFields'
+> & {
+  readonly control?: BaseScreenMaterialEditorControl;
+  readonly itemFields?: readonly BaseScreenMaterialEditorFieldInput[];
+};
+
+export type BaseScreenMaterialEditorSectionInput = Omit<
+  BaseScreenMaterialEditorSection,
+  'fields'
+> & {
+  readonly fields: readonly BaseScreenMaterialEditorFieldInput[];
+};
+
+export interface BaseScreenMaterialEditorDescriptorInput {
+  readonly appearance?: readonly BaseScreenMaterialEditorSectionInput[];
+  readonly data?: readonly BaseScreenMaterialEditorSectionInput[];
+  readonly interaction?: readonly BaseScreenMaterialEditorSectionInput[];
+  readonly events?: readonly BaseScreenMaterialEventDescriptor[];
+}
+
 export const EDITOR_ZONES = ['appearance', 'data', 'interaction', 'events'] as const;
 
 export const EDITOR_CONTROLS: ReadonlySet<string> = new Set([

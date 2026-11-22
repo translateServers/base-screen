@@ -284,7 +284,7 @@ function validateDataSourceStrictKeys(
   return true;
 }
 
-function validateComponentDataValue(
+export function validateComponentDataValue(
   dataValue: unknown,
   base: DiagnosticSegment[],
   at: DocumentDiagnosticPath,
@@ -312,7 +312,7 @@ function validateComponentDataValue(
   return true;
 }
 
-function validateComponentDataBinding(
+export function validateComponentDataBinding(
   dataBinding: unknown,
   base: DiagnosticSegment[],
   at: DocumentDiagnosticPath,

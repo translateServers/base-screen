@@ -4,6 +4,7 @@ import type {
   BaseScreenPluginContributionKind,
   BaseScreenPluginDataProcessorContribution,
   BaseScreenPluginDataResourceTypeContribution,
+  BaseScreenPluginFragmentContribution,
 } from '@base-screen/plugin-core';
 
 /**
@@ -25,6 +26,7 @@ export interface ContributionIndexBuckets {
   readonly blueprintActions: Map<string, BaseScreenPluginBlueprintActionContribution>;
   readonly dataProcessors: Map<string, BaseScreenPluginDataProcessorContribution>;
   readonly blueprintCapabilities: Set<string>;
+  readonly fragments: Map<string, BaseScreenPluginFragmentContribution>;
 }
 
 export interface ContributionKindPlanEntry<K extends BaseScreenPluginContributionKind> {
@@ -68,6 +70,12 @@ export const CONTRIBUTION_KIND_PLAN: ContributionKindPlan = {
   },
   panel: {},
   inspectorControl: {},
+  // ADR-0100：分片是纯数据、只在作者期展开，不需要能力授权；跨插件同 id 由清单身份冲突拦截。
+  fragment: {
+    index(contribution, buckets) {
+      buckets.fragments.set(contribution.id, contribution);
+    },
+  },
 };
 
 /**

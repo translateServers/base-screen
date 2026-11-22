@@ -75,6 +75,12 @@ export {
   type ScreenDataSourceParseOptions,
 } from './document/parse.js';
 export {
+  parseScreenBlueprintRelation,
+  parseScreenDataBinding,
+  parseScreenDataSourceInstance,
+  parseScreenValueRef,
+} from './document/parse-parts.js';
+export {
   derivedDataSourceId,
   readScreenComponentDataBinding,
   readScreenComponentValueRef,
