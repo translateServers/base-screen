@@ -63,6 +63,10 @@ import {
   createPluginMaterialsRuntime,
   PLUGIN_BOARD_BORDER_BOX_TYPE,
   PLUGIN_BOARD_CYCLE_BORDER_COMMAND_ID,
+  PLUGIN_BOARD_DEVICE_OVERVIEW_FRAGMENT_ID,
+  PLUGIN_BOARD_DEVICE_PANEL_FRAGMENT_ID,
+  PLUGIN_BOARD_DEVICE_STATUS_FRAGMENT_ID,
+  PLUGIN_BOARD_TITLE_BAR_FRAGMENT_ID,
   PLUGIN_BOARD_WATER_LEVEL_TYPE,
   PLUGIN_ECHARTS_MATERIAL_MANIFESTS,
   PLUGIN_MATERIALS_ID,
@@ -376,7 +380,7 @@ const pluginChecks: ReadonlyArray<readonly [string, boolean]> = [
   ],
   [
     'board-inspector-control-authorized',
-    ['base-screen-board-border-picker'].every(
+    ['base-screen-board-border-picker', 'base-screen-board-title-decor-picker'].every(
       (tagName) => pluginManager.snapshot?.inspectorControls.getByTagName(tagName) !== undefined,
     ),
   ],
@@ -566,6 +570,14 @@ const materialLibraryGrouping = {
         'board.pipeline',
         'board.status-grid',
         'board.status-legend',
+        'board.title-decor',
+      ],
+      // plugin-materials 贡献的组合分片（ADR-0100）：排在本组物料之后。
+      fragmentIds: [
+        PLUGIN_BOARD_DEVICE_OVERVIEW_FRAGMENT_ID,
+        PLUGIN_BOARD_DEVICE_STATUS_FRAGMENT_ID,
+        PLUGIN_BOARD_DEVICE_PANEL_FRAGMENT_ID,
+        PLUGIN_BOARD_TITLE_BAR_FRAGMENT_ID,
       ],
     },
     {
@@ -628,6 +640,14 @@ const materialLibraryStressGrouping = {
         'board.pipeline',
         'board.status-grid',
         'board.status-legend',
+        'board.title-decor',
+      ],
+      // plugin-materials 贡献的组合分片（ADR-0100）：排在本组物料之后。
+      fragmentIds: [
+        PLUGIN_BOARD_DEVICE_OVERVIEW_FRAGMENT_ID,
+        PLUGIN_BOARD_DEVICE_STATUS_FRAGMENT_ID,
+        PLUGIN_BOARD_DEVICE_PANEL_FRAGMENT_ID,
+        PLUGIN_BOARD_TITLE_BAR_FRAGMENT_ID,
       ],
     },
     {

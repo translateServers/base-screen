@@ -6,6 +6,14 @@ import { screenshotDirectory } from '../shared/constants.mjs';
 import { rectWithin } from '../shared/layout-assertions.mjs';
 
 // 与通用图表共享渲染器的图表家族；目录顺序与插件注册顺序一致。
+// plugin-materials 贡献的组合分片卡（ADR-0100），宿主分组把它放在「大屏」组的物料之后。
+const PLUGIN_FRAGMENT_CARDS = [
+  'fragment:base-screen.board.device-status-overview',
+  'fragment:base-screen.board.device-status-card',
+  'fragment:base-screen.board.device-status-panel',
+  'fragment:base-screen.board.title-bar',
+];
+
 const PLUGIN_CHART_FAMILY = [
   'plugin.chart.line',
   'plugin.chart.area',
@@ -440,10 +448,12 @@ export async function assertMaterialGroupUpdates(page, designer) {
   const count = () =>
     designer.locator('[data-material-group-current="library"] .material-group-count').textContent();
   // 分组计数按 canonical 物料类型算，卡片按条目算：两条 base.text 条目只贡献一个类型，
-  // 所以卡片数 = 类型数 + 1。目录新增物料时两处一起加一。
+  // 所以卡片数 = 类型数 + 1。目录新增物料时两处一起加一。这里的分组由类型生成、没有
+  // fragmentIds，所以分片卡不进分组计数，但仍出现在「全部」末尾（ADR-0100）。
   if (
     (await count()) !== String(expectedTypeCount) ||
-    (await designer.locator('[data-material-card]').count()) !== expectedTypeCount + 1
+    (await designer.locator('[data-material-card]').count()) !==
+      expectedTypeCount + 1 + PLUGIN_FRAGMENT_CARDS.length
   )
     throw new Error('MATERIAL_GROUP_TYPE_VS_ITEM_COUNT_FAILED');
   await designer.locator('[data-material-search]').fill('Alpha');
@@ -577,18 +587,20 @@ export async function assertMaterialGroupUsability(page, designer) {
   await designer.locator('[data-material-search-clear]').waitFor({ state: 'visible' });
   await designer.locator('[data-material-library-reset]').click();
   await expectFocus(designer, '[data-material-search]');
-  const reset = await designer.evaluate((element) => {
+  const reset = await designer.evaluate((element, fragmentCards) => {
     const root = element.shadowRoot;
     return {
       query: root.querySelector('[data-material-search]').value,
       allGroups: root.querySelector('[data-material-group-all]').ariaPressed,
       allItems: root.querySelector('[data-material-filter="all"]').ariaPressed,
       visible: root.querySelectorAll('[data-material-card]:not([hidden])').length,
-      expected: element.catalog.list().filter((entry) => entry.manifest.libraryVisible !== false)
-        .length,
+      // 「全部」= 每个可见物料类型一张卡 + 插件分片卡（ADR-0100）。
+      expected:
+        element.catalog.list().filter((entry) => entry.manifest.libraryVisible !== false).length +
+        fragmentCards,
       emptyHidden: root.querySelector('[data-material-search-empty]').hidden,
     };
-  });
+  }, PLUGIN_FRAGMENT_CARDS.length);
   if (
     reset.query !== '' ||
     reset.allGroups !== 'true' ||
@@ -760,6 +772,8 @@ async function assertMaterialLibraryGrouping(page, designer) {
     'board.pipeline',
     'board.status-grid',
     'board.status-legend',
+    'board.title-decor',
+    ...PLUGIN_FRAGMENT_CARDS,
     'harness.react-button',
     'harness.vue-button',
     'harness.dataset-ranking',
@@ -961,6 +975,8 @@ async function assertMaterialLibraryGrouping(page, designer) {
         'board.pipeline',
         'board.status-grid',
         'board.status-legend',
+        'board.title-decor',
+        ...PLUGIN_FRAGMENT_CARDS,
         'base.text',
         'base.rectangle',
         'base.ellipse',
@@ -1575,9 +1591,10 @@ export async function assertAuthoringMaterialVisuals(page, designer) {
   await page.waitForFunction(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const panel = root.querySelector('[data-inspector-pane="appearance"]');
+    // 阴影分区默认收起（ADR-0099 §2.4）：收起的 <details> 内容不进 innerText，按 textContent 判断字段已声明。
     return (
-      panel?.innerText.includes('圆角') &&
-      panel.innerText.includes('阴影模糊') &&
+      panel?.textContent.includes('圆角') &&
+      panel.textContent.includes('阴影模糊') &&
       panel.querySelector(
         '[data-style="borderColor"][data-color-palette-field="mode"][value="linear-gradient"]',
       ) !== null

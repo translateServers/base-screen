@@ -17,6 +17,8 @@ const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
  *
  * R4–R9 落实 ADR-0099（原子物料范式与属性面板编排，见 base-screen-docs 仓库
  * `decisions/ADR-0099-material-atomicity-and-inspector-paradigm.md`）。
+ * R10 落实 ADR-0100（组合分片正式化）的 F2/F3/F8：分片引用的物料必须在交付面有声明，
+ * 插件分片只能引用本插件或官方（`base.*`）物料，文案节点必须是 `base.text`。
  */
 
 /** 只描述"这个组件是什么"的 prop 名：需要标题时由文档层另放一个 `base.text` 组合。 */
@@ -155,6 +157,14 @@ const VISIBLE_FIELD_BUDGET = 12;
  */
 export const PARADIGM_DEBT = [];
 
+/** R10：识别分片定义所在文件（类型标注、SDK 定义函数或插件贡献 kind）。 */
+const FRAGMENT_SOURCE_MARKER =
+  /\bBaseScreenFragmentDefinition\b|\bdefineBaseScreenFragment\s*\(|kind\s*:\s*'fragment'/;
+/** R10（F3）：承载文案的节点键。标题、说明一律由 `base.text` 承担，不让别的物料长出文案。 */
+const FRAGMENT_TEXT_NODE_KEY = /^(?:title|subtitle|caption|label|heading|description|desc)$/i;
+const OFFICIAL_TEXT_TYPE = 'base.text';
+const OFFICIAL_TYPE_PREFIX = 'base.';
+
 function isChartFurnitureExempt(relativePath) {
   return CHART_FURNITURE_EXEMPTIONS.includes(relativePath);
 }
@@ -222,7 +232,8 @@ function collectForbiddenPropKeys(source, forbidden) {
  * 面板条目：扁平 `propertyPanel`/`stylePanel`（`{ prop|style, label, control }`）与
  * `editorDescriptor` 字段（`{ target, projection?, path, label, control, advanced? }`）。
  *
- * 只认不含嵌套大括号的对象字面量，且必须带 `control`；`itemFields` 内层条目因此按自身
+ * 只认不含嵌套大括号的对象字面量。扁平条目必须带 `control`；描述符字段的 `control` 可省略
+ * （ADR-0102 D2，按语义推导），以 `target` + `path` 识别。`itemFields` 内层条目因此按自身
  * 被识别，外层数组容器不会被误当成字段。`interaction` 字段按 `projection` 归入 props/style，
  * `data` 字段不计入（由 Engine 的数据区渲染）。
  *
@@ -236,15 +247,16 @@ function collectPanelEntries(source) {
   let match;
   while ((match = objectLiteral.exec(source)) !== null) {
     const body = match[1];
-    if (readLiteral(body, 'control') === undefined) continue;
+    const declaredControl = readLiteral(body, 'control');
+    if (declaredControl === undefined && readLiteral(body, 'target') === undefined) continue;
     const line = lineOf(source, match.index);
     const label = readLiteral(body, 'label');
     const control = readLiteral(body, 'control');
     const hidden =
       /(?<![\w$])advanced\s*:\s*true/.test(body) ||
       hiddenRanges.some(([start, end]) => match.index > start && match.index < end);
-    const style = readLiteral(body, 'style');
-    const prop = readLiteral(body, 'prop');
+    const style = declaredControl === undefined ? undefined : readLiteral(body, 'style');
+    const prop = declaredControl === undefined ? undefined : readLiteral(body, 'prop');
     if (style !== undefined) {
       entries.push({ origin: 'flat', target: 'style', key: style, label, control, hidden, line });
       continue;
@@ -314,6 +326,63 @@ function matchingClose(source, openIndex, open, close) {
 
 function readLiteral(body, name) {
   return new RegExp(`(?<![\\w$])${name}\\s*:\\s*'([^']*)'`).exec(body)?.[1];
+}
+
+/** 对象字面量的顶层文本（嵌套 `{}` 内容剔除），用来读节点自身的 `key`/`materialType`。 */
+function topLevelText(body) {
+  let depth = 0;
+  let text = '';
+  for (const char of body) {
+    if (char === '{') depth += 1;
+    else if (char === '}') depth -= 1;
+    else if (depth === 1) text += char;
+  }
+  return text;
+}
+
+/** 交付面声明的物料类型：manifest 的 `type: '...'` 字面量与 `*_TYPE = '...'` 常量。 */
+function collectDeclaredMaterialTypes(source, constants) {
+  const types = new Set();
+  for (const match of source.matchAll(/(?<![\w$])type\s*:\s*'([a-z][\w-]*(?:\.[\w-]+)+)'/g)) {
+    types.add(match[1]);
+  }
+  for (const match of source.matchAll(/(?<![\w$])type\s*:\s*([A-Z][A-Z0-9_]*)\b/g)) {
+    const value = constants.get(match[1]);
+    if (value !== undefined) types.add(value);
+  }
+  return types;
+}
+
+function collectStringConstants(source, constants) {
+  for (const match of source.matchAll(/\bconst\s+([A-Z][A-Z0-9_]*)\s*=\s*'([^']+)'/g)) {
+    constants.set(match[1], match[2]);
+  }
+}
+
+/**
+ * R10：分片节点。以每个 `materialType:` 所在的对象字面量为一个条目（外壳或节点），
+ * 读它顶层的 `key` 与 `materialType`（字面量或大写常量）。
+ */
+function collectFragmentEntries(source, constants) {
+  const entries = [];
+  for (const match of source.matchAll(/(?<![\w$])materialType\s*:/g)) {
+    const open = enclosingBrace(source, match.index);
+    if (open === -1) continue;
+    const close = matchingClose(source, open, '{', '}');
+    if (close === -1) continue;
+    const own = topLevelText(source.slice(open, close + 1));
+    const literal = /(?<![\w$])materialType\s*:\s*'([^']*)'/.exec(own)?.[1];
+    const identifier = /(?<![\w$])materialType\s*:\s*([A-Za-z_$][\w$]*)/.exec(own)?.[1];
+    const materialType =
+      literal ?? (identifier === undefined ? undefined : constants.get(identifier));
+    entries.push({
+      key: /(?<![\w$])key\s*:\s*'([^']*)'/.exec(own)?.[1],
+      materialType,
+      reference: literal ?? identifier ?? '?',
+      line: lineOf(source, match.index),
+    });
+  }
+  return entries;
 }
 
 function lineOf(source, index) {
@@ -423,6 +492,7 @@ function checkParadigm(root) {
     violations.push({ rule, file: rel, key, text: `${rel}:${line} [${rule}] ${message}` });
   };
   const seen = new Set();
+  checkFragments(root, report);
 
   for (const glob of PARADIGM_GLOBS) {
     for (const file of filesUnder(root, glob)) {
@@ -505,6 +575,68 @@ function checkParadigm(root) {
     }
   }
   return { violations, warnings };
+}
+
+/** R10：ADR-0100 分片规则。需要整个交付面的类型声明，因此先通读一遍再逐个分片检查。 */
+function checkFragments(root, report) {
+  const sources = new Map();
+  for (const glob of PARADIGM_GLOBS) {
+    for (const file of filesUnder(root, glob)) {
+      const rel = relative(root, file).replace(/\\/g, '/');
+      if (!sources.has(rel)) sources.set(rel, readFileSync(file, 'utf8'));
+    }
+  }
+  const constants = new Map();
+  for (const source of sources.values()) collectStringConstants(source, constants);
+  const declaredBy = new Map();
+  for (const [rel, source] of sources) {
+    declaredBy.set(rel, collectDeclaredMaterialTypes(source, constants));
+  }
+  const declared = new Set([...declaredBy.values()].flatMap((types) => [...types]));
+  const pluginOf = (rel) => /^plugins\/([^/]+)\//.exec(rel)?.[1];
+  const pluginTypes = (plugin) =>
+    new Set(
+      [...declaredBy]
+        .filter(([rel]) => pluginOf(rel) === plugin)
+        .flatMap(([, types]) => [...types]),
+    );
+
+  for (const [rel, source] of sources) {
+    if (!FRAGMENT_SOURCE_MARKER.test(source)) continue;
+    const plugin = pluginOf(rel);
+    const owned = plugin === undefined ? undefined : pluginTypes(plugin);
+    for (const entry of collectFragmentEntries(source, constants)) {
+      const { key, materialType, reference, line } = entry;
+      const id = key ?? reference;
+      if (materialType === undefined) {
+        const message = `分片节点 ${id} 的 materialType ${reference} 无法静态解析；用字面量或 *_TYPE 常量`;
+        report('R10', rel, line, `fragment:${id}`, message);
+        continue;
+      }
+      if (!declared.has(materialType)) {
+        const message = `分片节点 ${id} 引用的物料 ${materialType} 在交付面找不到声明`;
+        report('R10', rel, line, `fragment:${id}`, message);
+        continue;
+      }
+      if (
+        owned !== undefined &&
+        !materialType.startsWith(OFFICIAL_TYPE_PREFIX) &&
+        !owned.has(materialType)
+      ) {
+        const message = `插件分片 ${id} 引用了其他插件的物料 ${materialType}；只能引用本插件或官方物料（F8）`;
+        report('R10', rel, line, `fragment:${id}`, message);
+        continue;
+      }
+      if (
+        key !== undefined &&
+        FRAGMENT_TEXT_NODE_KEY.test(key) &&
+        materialType !== OFFICIAL_TEXT_TYPE
+      ) {
+        const message = `分片文案节点 ${key} 使用了 ${materialType}；标题与说明由 base.text 承担（F3）`;
+        report('R10', rel, line, `fragment:${key}`, message);
+      }
+    }
+  }
 }
 
 /**

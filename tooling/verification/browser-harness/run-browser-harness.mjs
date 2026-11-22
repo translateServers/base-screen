@@ -11,6 +11,7 @@ import {
   assertSizeEntry,
 } from './authoring/assert-inspector.mjs';
 import { assertInspectorDataTabCapability } from './authoring/assert-inspector-data-tab.mjs';
+import { assertInspectorFormConsistency } from './authoring/assert-inspector-form-consistency.mjs';
 import {
   assertAuthoringMarquee,
   assertAuthoringSelection,
@@ -122,6 +123,8 @@ export async function runBrowserHarness(serverPort) {
       await assertTextAutoWidth(browser, baseUrl);
       await assertImageDensitySize(browser, baseUrl);
       await assertInspectorDataTabCapability(browser, baseUrl);
+      // 检查器表单控件视觉一致性（ADR-0102）：同一控件类型在任何物料里外观必须相同。
+      await assertInspectorFormConsistency(browser, baseUrl);
       // 固定值 / 变量配置态回到来源浮层的那一行：没有它，这两类形态再也接不上数据集。
       await assertStaticSourceSwitch(browser, baseUrl);
       await assertAgentHostResourceProposal(baseUrl, browser);

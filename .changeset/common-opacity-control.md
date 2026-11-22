@@ -8,3 +8,6 @@
 此前公共区却只在物料 `styleSchema` 申报了 `opacity` 时才出现，未申报的物料（如全部大屏插件物料）因此没有入口。
 物料申报的 schema 仍用于收窄取值。官方形状、容器、分割线与图片物料移除了 `stylePanel` 中不生效的 `opacity` 项，
 并不再在渲染路径自行写宿主元素的 `opacity`；文档中的 `opacity` 值与渲染结果不变。
+
+检查器几何区的水平 / 垂直翻转按钮同样改为对所有物料显示：翻转也是引擎级保留样式，Renderer 本就统一写入 transform，
+此前只有在 `styleSchema` 申报了 `flipX` / `flipY` 的物料才有入口；提交侧同样回落到保留 schema。

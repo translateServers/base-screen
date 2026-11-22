@@ -122,6 +122,23 @@ const DESCRIPTOR = {
     expect(check().failures).toEqual([expect.stringMatching(/\[R6\] 面板声明了保留样式 flipX/)]);
   });
 
+  // ADR-0102 D2：描述符字段可以省略 control（解析期按语义推导），静态规则照样要识别它们。
+  it('recognizes descriptor fields that leave the control to inference', () => {
+    write(
+      'plugins/demo/src/inferred.ts',
+      `${material()}
+const DESCRIPTOR = {
+  appearance: [{ id: 'a', label: '外观', fields: [
+    { id: 'flip', target: 'style', path: ['flipX'], label: '水平翻转' },
+    { id: 'width', target: 'style', path: ['lineWeight'], label: '线宽', unit: 'px' },
+  ] }],
+};`,
+    );
+    const failures = check().failures.join('\n');
+    expect(failures).toMatch(/\[R6\] 面板声明了保留样式 flipX/);
+    expect(failures).toMatch(/\[R4\] style 键 lineWeight/);
+  });
+
   it('R7 rejects hand-typed field mapping props', () => {
     write(
       'plugins/demo/src/board.ts',
@@ -220,6 +237,82 @@ const DESCRIPTOR = {
       }),
     );
     expect(check().failures).toEqual([]);
+  });
+});
+
+describe('component fragment rules (ADR-0100 R10)', () => {
+  function official(): void {
+    write(
+      'packages/material/src/official.ts',
+      "export const TEXT = { type: 'base.text' };\nexport const BOX = { type: 'base.container' };\n",
+    );
+    write(
+      'plugins/alpha/src/identity.ts',
+      "export const ALPHA_GAUGE_TYPE = 'alpha.gauge';\nexport const M = { type: ALPHA_GAUGE_TYPE };\n",
+    );
+    write('plugins/beta/src/identity.ts', "export const M = { type: 'beta.flop' };\n");
+  }
+
+  function fragment(nodes: string): string {
+    return `import type { BaseScreenFragmentDefinition } from 'base-screen/plugin-core';
+export const CARD: BaseScreenFragmentDefinition = {
+  id: 'alpha.card',
+  name: 'Card',
+  category: 'Cards',
+  keywords: [],
+  shell: { key: 'card', materialType: 'base.container', style: { fill: 'transparent' } },
+  nodes: [${nodes}],
+};
+`;
+  }
+
+  it('accepts a plugin fragment built from its own and official materials', () => {
+    official();
+    write(
+      'plugins/alpha/src/fragments.ts',
+      fragment(
+        "{ key: 'title', materialType: 'base.text', offset: { x: 0, y: 0 } }, { key: 'value', materialType: ALPHA_GAUGE_TYPE }",
+      ),
+    );
+    expect(check().failures).toEqual([]);
+  });
+
+  it('rejects a reference to a material that no delivery surface declares', () => {
+    official();
+    write(
+      'plugins/alpha/src/fragments.ts',
+      fragment("{ key: 'value', materialType: 'alpha.ghost' }"),
+    );
+    expect(check().failures).toEqual([
+      expect.stringMatching(/plugins\/alpha\/src\/fragments\.ts:\d+ \[R10\] .*alpha\.ghost/),
+    ]);
+  });
+
+  it('rejects a plugin fragment that depends on another plugin (F8)', () => {
+    official();
+    write(
+      'plugins/alpha/src/fragments.ts',
+      fragment("{ key: 'value', materialType: 'beta.flop' }"),
+    );
+    expect(check().failures).toEqual([expect.stringMatching(/\[R10\] .*beta\.flop.*F8/)]);
+  });
+
+  it('requires caption-like nodes to be base.text (F3)', () => {
+    official();
+    write(
+      'plugins/alpha/src/fragments.ts',
+      fragment("{ key: 'title', materialType: ALPHA_GAUGE_TYPE }"),
+    );
+    expect(check().failures).toEqual([expect.stringMatching(/\[R10\] .*title.*F3/)]);
+  });
+
+  it('rejects a material type it cannot resolve statically', () => {
+    official();
+    write(
+      'examples/host/src/fragments.ts',
+      fragment("{ key: 'value', materialType: resolveType() }"),
+    );
+    expect(check().failures).toEqual([expect.stringMatching(/\[R10\] .*无法静态解析/)]);
   });
 });
 
