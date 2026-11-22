@@ -493,7 +493,32 @@
   text-align: left;
 }
 
-.properties .designer-inspector-batch-geometry > .designer-field[data-inspector-advanced] {
+/* 基础模式的隐藏提示：面板末尾一行弱文字按钮，不抢字段的注意力（ADR-0102 §7）。 */
+.properties .designer-inspector-hidden-hint {
+  display: block;
+  width: 100%;
+  margin: var(--designer-space-5) 0 0;
+  padding: var(--designer-space-3) 0;
+  border: 0;
+  border-top: 1px solid var(--designer-border-subtle);
+  background: none;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  text-align: center;
+  cursor: pointer;
+}
+
+.properties .designer-inspector-hidden-hint:hover {
+  color: var(--designer-text-secondary);
+}
+
+.properties .designer-inspector-hidden-hint:focus-visible {
+  border-radius: var(--designer-radius-2);
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
+}
+
+.properties .designer-inspector-batch-geometry > .designer-inspector-batch-rotation {
   margin: var(--designer-space-4) 0 0 calc(var(--designer-space-7) * 3 + var(--designer-space-5));
 }
 

@@ -70,6 +70,30 @@ export async function assertInspectorFormConsistency(browser, baseUrl) {
     expect(rows.length).toBeGreaterThan(200);
     const violations = findInspectorFormViolations(rows, sections);
     expect(violations, violations.join('\n')).toEqual([]);
+    // 基础 / 全量（ADR-0102 §7）：基础模式底部写明隐藏了几项，点一下切到全量、提示消失。
+    const tiers = await page.evaluate(async () => {
+      const designer = window.baseScreenHarness.designer;
+      const root = designer.shadowRoot;
+      root.querySelector('[data-inspector-density="basic"]').click();
+      designer.insertComponent({ materialType: 'board.digital-flop' });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const panel = root.querySelector('[data-properties]');
+      const hint = panel.querySelector(':scope > [data-inspector-hidden-hint]');
+      const hiddenFields = [...panel.querySelectorAll('[data-inspector-advanced] .designer-field')]
+        .length;
+      const before = { count: Number(hint?.dataset.inspectorHiddenHint ?? 0), hiddenFields };
+      hint?.click();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const after = {
+        density: root.querySelector('[data-right-panel]').dataset.inspectorDensity,
+        hint: root.querySelector('[data-properties] > [data-inspector-hidden-hint]') !== null,
+      };
+      root.querySelector('[data-inspector-density="basic"]').click();
+      return { before, after };
+    });
+    expect(tiers.before.count).toBeGreaterThan(0);
+    expect(tiers.before.count).toBe(tiers.before.hiddenFields);
+    expect(tiers.after).toEqual({ density: 'all', hint: false });
     expect(errors).toEqual([]);
   } finally {
     await page.close();

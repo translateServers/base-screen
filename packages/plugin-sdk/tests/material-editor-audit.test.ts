@@ -107,4 +107,27 @@ describe('auditBaseScreenMaterialEditorForm (ADR-0102 §13)', () => {
       ]),
     );
   });
+
+  it('enforces the basic / all tiers: no per-field advanced, only motion is advanced', () => {
+    const tiers = manifest([
+      {
+        id: 'format',
+        label: '读数格式',
+        advanced: true,
+        fields: [
+          { id: 'decimals', target: 'props', path: ['decimals'], label: '小数位', advanced: true },
+        ],
+      },
+      {
+        id: 'motion',
+        label: '动效',
+        fields: [{ id: 'visible', target: 'props', path: ['visible'], label: '启用动画' }],
+      },
+    ]);
+    const rules = auditBaseScreenMaterialEditorForm(tiers)
+      .filter((violation) => violation.rule === 'R15')
+      .map((violation) => violation.field ?? violation.message);
+    expect(rules).toHaveLength(3);
+    expect(rules).toContain('decimals');
+  });
 });

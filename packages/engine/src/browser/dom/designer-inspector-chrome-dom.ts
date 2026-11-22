@@ -117,6 +117,7 @@ export function applyDesignerInspectorFilters(
   for (const element of root.querySelectorAll<HTMLElement>('[data-inspector-advanced]')) {
     element.hidden = options.density === 'basic' && query === '';
   }
+  renderDesignerInspectorHiddenHints(root, options.density === 'basic' && query === '');
 
   const fields = [...root.querySelectorAll<HTMLElement>('[data-inspector-search-kind="field"]')];
   for (const field of fields) {
@@ -148,6 +149,41 @@ export function applyDesignerInspectorFilters(
   renderDesignerInspectorSearchResults(root, fields, sections, query);
   for (const control of root.querySelectorAll<HTMLButtonElement>('[data-inspector-density]')) {
     control.ariaPressed = String(control.dataset.inspectorDensity === options.density);
+  }
+}
+
+/**
+ * 基础模式的隐藏提示（ADR-0102 §7）：面板底部写明「已隐藏 N 项 · 显示全量」，点一下切到全量。
+ * 没有它，用户无从知道基础模式藏了东西，也就不会去找全量。N 是被藏起来的字段行数
+ * （整段隐藏的分区按其中字段计；分区里没有字段行时按 1 项计）。
+ */
+function renderDesignerInspectorHiddenHints(
+  root: ShadowRoot | HTMLElement,
+  basicWithoutSearch: boolean,
+): void {
+  for (const panel of root.querySelectorAll<HTMLElement>('[data-properties]')) {
+    panel.querySelector(':scope > [data-inspector-hidden-hint]')?.remove();
+    if (!basicWithoutSearch) continue;
+    let count = 0;
+    for (const hidden of panel.querySelectorAll<HTMLElement>('[data-inspector-advanced]')) {
+      if (hidden.parentElement?.closest('[data-inspector-advanced]') != null) continue;
+      if (hidden.classList.contains('designer-field')) {
+        count += 1;
+        continue;
+      }
+      const fields = [...hidden.querySelectorAll<HTMLElement>('.designer-field')].filter(
+        (field) => field.parentElement?.closest('.designer-field') == null,
+      );
+      count += Math.max(fields.length, 1);
+    }
+    if (count === 0) continue;
+    const hint = panel.ownerDocument.createElement('button');
+    hint.type = 'button';
+    hint.className = 'designer-inspector-hidden-hint';
+    hint.dataset.inspectorHiddenHint = String(count);
+    hint.dataset.inspectorRevealAll = 'true';
+    hint.textContent = DESIGNER_UI_TEXT.inspectorUi.hiddenByDensity(count);
+    panel.appendChild(hint);
   }
 }
 

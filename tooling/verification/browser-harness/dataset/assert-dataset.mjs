@@ -638,7 +638,7 @@ export async function assertDatasetAuthoring(designer, page) {
     );
   }
   await dataPanel.locator('[data-dataset-action="test"]').click();
-  // v7 把整段「高级设置」收成折叠组；先展开再操作复制/全屏等作者动作。
+  // v7 把整段「处理与刷新」（原「高级设置」）收成折叠组；先展开再操作复制/全屏等作者动作。
   const authoringGroup = dataPanel.locator('details[data-ds-group-section="authoring"]').first();
   if ((await authoringGroup.count()) > 0 && !(await authoringGroup.evaluate((node) => node.open))) {
     await authoringGroup.locator('summary').first().click();
@@ -825,7 +825,7 @@ export async function assertDatasetAuthoring(designer, page) {
   if ((await notifications.count()) !== notificationCount - 1) {
     throw new Error('BROWSER_HARNESS_NOTIFICATION_DISMISS_FAILED');
   }
-  await designer.getByRole('tab', { name: '\u9ad8\u7ea7' }).click();
+  await designer.getByRole('tab', { name: '\u4ea4\u4e92' }).click();
   const interaction = designer.locator('[data-inspector-pane=interaction]');
   const interactionText = await interaction.textContent();
   if (

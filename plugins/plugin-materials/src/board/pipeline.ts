@@ -260,6 +260,15 @@ function parsePipelineEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
               label: '节点边框色',
               control: 'color',
             },
+          ],
+        },
+        {
+          // 连接线样式很少改：默认收起，但基础模式可见（ADR-0102 §7「基础、默认收起」层）。
+          // 以前只把「连接线粗细」一个字段标成高级，基础模式下它凭空消失、颜色却还在。
+          id: 'connector',
+          label: '连接线',
+          collapsed: true,
+          fields: [
             {
               id: 'connectorColor',
               target: 'style',
@@ -276,7 +285,6 @@ function parsePipelineEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
               min: 1,
               max: 8,
               step: 0.5,
-              advanced: true,
             },
           ],
         },

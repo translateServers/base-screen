@@ -90,8 +90,8 @@ export function appendMultiSelectionControls(
   appendBatchQuickConfiguration(properties, context, interaction, catalog);
   appendBatchStyleControls(properties, context, document, interaction, catalog);
   const actions = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.groupActions);
+  // 编组、锁定 / 隐藏是多选的高频操作，基础可见（ADR-0102 §7）。
   actions.className += ' designer-inspector-batch-secondary-actions';
-  actions.dataset.inspectorAdvanced = 'true';
   appendActionButton(
     actions,
     DESIGNER_UI_TEXT.propertiesPanel.actionGroup,
@@ -112,7 +112,6 @@ function appendMultiSelectionStateActions(
 ): void {
   const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.selectionActions);
   section.className += ' designer-inspector-batch-secondary-actions';
-  section.dataset.inspectorAdvanced = 'true';
   const allLocked = context.components.every((component) => component.status.locked);
   const allHidden = context.components.every((component) => component.status.hidden);
   appendActionButton(
@@ -199,7 +198,7 @@ function appendBatchGeometryControls(
     disabled,
     hint,
   );
-  rotation.dataset.inspectorAdvanced = 'true';
+  rotation.classList.add('designer-inspector-batch-rotation');
 }
 
 function appendBatchQuickConfiguration(

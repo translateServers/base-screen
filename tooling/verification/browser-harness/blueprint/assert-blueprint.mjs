@@ -11,7 +11,7 @@ export async function assertBlueprintWorkbench(designer, page) {
       .querySelector('[data-layer-select="title"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   });
-  await designer.getByRole('tab', { name: '高级' }).click();
+  await designer.getByRole('tab', { name: '交互' }).click();
   const requestButton = designer.locator('[data-events-panel] [data-action="locate-blueprint"]');
 
   // 组件入口直接切换 Blueprint，并把定位请求投影到常驻宿主画布。
@@ -894,7 +894,7 @@ export async function assertSemanticChartAuthoring(designer, page) {
     return binding?.fields?.dimension?.[0] === 'category';
   });
   // AE-ED-C05 事件 tab：结构化事件声明 label 与能力提示。
-  await designer.getByRole('tab', { name: '\u9ad8\u7ea7' }).click();
+  await designer.getByRole('tab', { name: '\u4ea4\u4e92' }).click();
   const eventText = await events.textContent();
   if (
     eventText === null ||

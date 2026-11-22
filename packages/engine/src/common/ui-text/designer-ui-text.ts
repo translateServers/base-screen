@@ -131,8 +131,13 @@ export const DESIGNER_UI_TEXT = {
     locateSetting: '在配置项中定位',
     basic: '基础',
     all: '全量',
-    densityHint: '基础只显示常用设置；需要高级项时切到「全量」。',
-    advanced: '高级',
+    densityHint: '基础隐藏滤镜、动效等效果类设置；切到「全量」显示全部。',
+    /** 搜索结果上的标记：该项在「基础」下隐藏。 */
+    allOnly: '仅全量',
+    /** 基础模式面板底部：被隐藏的字段数 + 一键切到全量（ADR-0102 §7）。 */
+    hiddenByDensity: (count: number) => `已隐藏 ${count} 项 · 显示全量`,
+    /** 右栏第三个页签：组件能力、事件与蓝图。曾叫「高级」，与「基础 / 全量」的高级项混淆。 */
+    interactionTab: '交互',
     dataSource: '数据源',
     canvasConfiguration: '页面配置',
     componentConfiguration: '组件配置',
@@ -146,6 +151,9 @@ export const DESIGNER_UI_TEXT = {
     visible: '可见',
     mixed: '混合',
     autoValue: '自动',
+    /** 数值字段偏离默认时标签旁的复位按钮（ADR-0102 §8）：没有默认值的回到「自动」。 */
+    resetToAuto: (label: string) => `${label}：恢复自动`,
+    resetToDefault: (label: string) => `${label}：恢复默认`,
     searchPath: (tab: string, section: string, field: string) =>
       [tab, section, field].filter(Boolean).join(' / '),
   },
@@ -641,7 +649,8 @@ export const DESIGNER_UI_TEXT = {
     mappingSummary: (count: number) => `${count} 个字段已映射`,
     responseUnavailable: '尚未获取数据响应',
     configurationFlow: '数据接入流程',
-    advancedSettings: '高级设置',
+    /** 数据页「编辑方式 / 过滤器 / 刷新策略 / 复制与全屏编辑」一组。曾叫「高级设置」。 */
+    advancedSettings: '处理与刷新',
     authoringTitle: '数据配置',
     visualEditor: '可视化编辑',
     codeEditor: '代码编辑',

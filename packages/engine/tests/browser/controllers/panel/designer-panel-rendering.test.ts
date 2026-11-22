@@ -201,10 +201,11 @@ describe('designer panel rendering', () => {
     // 滑杆+数值双控件、行为/滤镜分区的三个开关、混合模式下拉与五组滑杆+数值双控件
     // （引擎级保留键，不依赖物料申报，ADR-0099 §2.3）。
     expect(propertyInputs.slice(8)).toHaveLength(36);
+    // 层级是几何的一部分，基础可见（ADR-0102 §7：不单独藏字段）。
     expect(
       descendants(properties).find((element) => element.dataset.propertySymbol === 'Z')?.dataset
         .inspectorAdvanced,
-    ).toBe('true');
+    ).toBeUndefined();
     // style.color 字段同样使用完整三段式调色板：渐变模式全部可用。
     const gradientModes = descendants(properties).filter(
       (element) => element.tagName === 'input' && element.dataset.colorPaletteField === 'mode',

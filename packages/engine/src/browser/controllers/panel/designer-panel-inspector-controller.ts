@@ -173,8 +173,12 @@ export class DesignerPanelInspectorController {
       closeDesignerInspectorSearchMenus(root);
       return true;
     }
-    const density = target.closest<HTMLButtonElement>('button[data-inspector-density]')?.dataset
-      .inspectorDensity;
+    // 基础模式底部的「已隐藏 N 项 · 显示全量」等同于点了「全量」。
+    const density =
+      target.closest<HTMLButtonElement>('button[data-inspector-reveal-all]') !== null
+        ? 'all'
+        : target.closest<HTMLButtonElement>('button[data-inspector-density]')?.dataset
+            .inspectorDensity;
     if (density === 'basic' || density === 'all') {
       this.#density = density;
       this.persistDensityPreference(target, density);

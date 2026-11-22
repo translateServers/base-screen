@@ -338,7 +338,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <div class="inspector-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.inspector}">
         <button type="button" class="designer-tab" id="designer-appearance-tab" role="tab" aria-controls="designer-appearance-panel" aria-selected="true" data-inspector-tab="appearance"><span>${DESIGNER_UI_TEXT.appearance}</span></button>
         <button type="button" class="designer-tab" id="designer-data-tab" role="tab" aria-controls="designer-data-panel" aria-selected="false" data-inspector-tab="data"><span>${DESIGNER_UI_TEXT.inspectorUi.dataSource}</span></button>
-        <button type="button" class="designer-tab" id="designer-interaction-tab" role="tab" aria-controls="designer-interaction-panel" aria-selected="false" data-inspector-tab="interaction"><span>${DESIGNER_UI_TEXT.inspectorUi.advanced}</span></button>
+        <button type="button" class="designer-tab" id="designer-interaction-tab" role="tab" aria-controls="designer-interaction-panel" aria-selected="false" data-inspector-tab="interaction"><span>${DESIGNER_UI_TEXT.inspectorUi.interactionTab}</span></button>
       </div>
       <div class="blueprint-inspector" data-blueprint-inspector hidden></div>
       <div class="inspector-context" data-inspector-context></div>

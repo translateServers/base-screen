@@ -15,7 +15,7 @@ import {
 
 /** 一条范式违规：规则号 + 可读说明（含物料类型与字段）。 */
 export interface BaseScreenMaterialEditorFormViolation {
-  readonly rule: 'R9' | 'R11' | 'R12' | 'R13' | 'R14';
+  readonly rule: 'R9' | 'R11' | 'R12' | 'R13' | 'R14' | 'R15';
   readonly materialType: string;
   readonly field?: string;
   readonly message: string;
@@ -37,7 +37,9 @@ const ARRAY_CONTROLS = new Set(['array', 'repeatable-array', 'reorderable-array'
  * - R12：不再声明扁平 `propertyPanel` / `stylePanel`，描述符是唯一的表单来源；
  * - R13：标签 ≤ 6 个汉字，不写「是否」，不带括号或单位，颜色字段以「色」结尾，开关不用否定句；
  * - R14：用到通用配置组的键（小数位、千分位、前缀、单位、标题、图例）必须走配置组：
- *   schema 类型与标签与配置组一致。
+ *   schema 类型与标签与配置组一致；
+ * - R15：「基础 / 全量」三层规则（ADR-0102 §7）：字段不能单独标 `advanced`（整段才能隐藏）；
+ *   物料分区里只有「动效」（id `motion`）是仅全量，且动效分区必须标 `advanced`。
  */
 export function auditBaseScreenMaterialEditorForm(
   manifest: BaseScreenMaterialManifest,
@@ -59,6 +61,14 @@ export function auditBaseScreenMaterialEditorForm(
     add('R12', '仍声明扁平 propertyPanel / stylePanel；改为 editorDescriptor。');
   }
   const descriptor = manifest.editorDescriptor;
+  for (const section of descriptor?.appearance ?? []) {
+    if (section.id === 'motion' && section.advanced !== true) {
+      add('R15', '「动效」分区应标 advanced：动效属于仅全量可见的效果类设置。');
+    }
+    if (section.id !== 'motion' && section.advanced === true) {
+      add('R15', `分区「${section.label}」不能标 advanced：物料分区里只有动效仅全量可见。`);
+    }
+  }
   const zones = [descriptor?.appearance, descriptor?.data, descriptor?.interaction];
   for (const sections of zones) {
     for (const section of sections ?? []) {
@@ -99,6 +109,9 @@ function auditField(
   add: AddViolation,
 ): void {
   const schema = root === undefined ? undefined : resolveSchema(field.path, root);
+  if (field.advanced === true) {
+    add('R15', `字段「${field.label}」不能单独标 advanced；整段隐藏或保持可见。`, field);
+  }
   const inferred = inferBaseScreenMaterialEditorControl(field, schema);
   if (inferred !== undefined && !isAllowedControl(field.control, inferred, schema)) {
     add('R11', `控件是 ${field.control}，按字段语义应为 ${inferred}（可省略 control）。`, field);

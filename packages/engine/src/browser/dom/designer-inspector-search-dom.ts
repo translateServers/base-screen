@@ -177,7 +177,7 @@ function appendSearchResult(
   pathButton.append(locateIcon, copy);
   if (target.closest('[data-inspector-advanced]') !== null) {
     createDesignerBadge(pathButton, {
-      text: DESIGNER_UI_TEXT.inspectorUi.advanced,
+      text: DESIGNER_UI_TEXT.inspectorUi.allOnly,
       tone: 'accent',
       className: 'inspector-search-result-badge',
     });
@@ -318,5 +318,5 @@ function directLabel(field: HTMLElement): string {
 export function inspectorSearchTabLabel(tab: 'appearance' | 'data' | 'interaction'): string {
   if (tab === 'appearance') return DESIGNER_UI_TEXT.appearance;
   if (tab === 'data') return DESIGNER_UI_TEXT.data.title;
-  return DESIGNER_UI_TEXT.inspectorUi.advanced;
+  return DESIGNER_UI_TEXT.inspectorUi.interactionTab;
 }
