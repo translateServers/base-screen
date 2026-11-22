@@ -253,6 +253,46 @@ export interface DesignerRangeField {
 }
 
 /**
+ * 数值字段的复位（ADR-0102 §8）：值偏离默认时在标签列尾放一个复位按钮。`resetValue` 为 `''` 时
+ * 是「恢复自动」——清空值载体，走与手动清空数字框同一条提交路径（可选数值清空即删除该键）；
+ * 否则是「恢复默认」——把物料默认值写回。两者都只派发一次 `change`，一次操作一条历史。
+ *
+ * 标签由「文字 + 动作」组成：文字先省略、按钮固定在列尾（与四边距的联动按钮同一落位）。
+ * 调用方必须把字段行造成 `span`：按钮落在 `<label>` 里会变成标签的被标注控件，点标签就会复位。
+ */
+export function appendDesignerFieldReset(
+  labelText: HTMLElement,
+  target: HTMLInputElement,
+  label: string,
+  resetValue = '',
+): HTMLButtonElement {
+  const ownerDocument = labelText.ownerDocument;
+  const content = ownerDocument.createElement('span');
+  content.className = 'designer-field-label-content';
+  content.textContent = labelText.textContent;
+  labelText.textContent = '';
+  labelText.classList.add('designer-field-label-with-action');
+  const button = ownerDocument.createElement('button');
+  button.type = 'button';
+  button.className = 'designer-field-reset';
+  button.dataset.fieldReset = 'true';
+  const text =
+    resetValue === ''
+      ? DESIGNER_UI_TEXT.inspectorUi.resetToAuto(label)
+      : DESIGNER_UI_TEXT.inspectorUi.resetToDefault(label);
+  button.setAttribute('aria-label', text);
+  button.dataset.tip = text;
+  button.innerHTML = designerIcon('reset');
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    target.value = resetValue;
+    target.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  });
+  labelText.append(content, button);
+  return button;
+}
+
+/**
  * 连续数值复合控件（原型 `.range-row`）：滑杆 + 数字读数。
  *
  * 只有数字读数携带值提交语义（调用方给它挂 `data-style` / `data-canvas-setting` 等标记）；
@@ -269,7 +309,7 @@ export function appendDesignerRangeField(
     control.appendChild(field.number);
   } else {
     const symbolField = ownerDocument.createElement('label');
-    symbolField.className = 'designer-geo-field';
+    symbolField.className = 'designer-geo-field designer-field-range-reading';
     symbolField.dataset.symbol = options.numberSymbol;
     symbolField.appendChild(field.number);
     control.appendChild(symbolField);

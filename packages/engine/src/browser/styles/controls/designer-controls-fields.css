@@ -371,6 +371,55 @@
   height: 18px;
 }
 
+/* 可选数值的「恢复自动」（ADR-0102 §8）：标签列尾的复位按钮。18px 命中区让四个汉字的标签
+   （52px）+ 按钮仍放得进 74px 标签列；只在已设置时出现，所以不常驻占位。 */
+.designer-field-label-text.designer-field-label-with-action {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
+}
+
+.designer-field-label-content {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-field-reset {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-2);
+  background: none;
+  color: var(--designer-text-muted);
+  cursor: pointer;
+}
+
+.designer-field-reset:hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.designer-field-reset:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 1px;
+}
+
+.designer-field-reset svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
 /* 标签由「文字 + 动作」组成：文字先省略，按钮固定在列尾。 */
 .designer-field-label-text.designer-spacing-label {
   display: flex;

@@ -374,12 +374,14 @@ export function createDesignerInput(
   input.type = options.type ?? inputTypeForAppearance(appearance);
   input.className = designerClassNames(inputClassNameForAppearance(appearance), options.className);
   applyDesignerSize(input, options.size);
-  if (options.value !== undefined) input.value = options.value;
-  if (options.placeholder !== undefined) input.placeholder = options.placeholder;
-  if (options.ariaLabel !== undefined) input.ariaLabel = options.ariaLabel;
+  // 先定范围再赋值：range 的默认区间是 0–100，先赋值会被浏览器按默认区间钳住
+  // （亮度 150、字号 120 的滑杆停在最右端 100 处），之后再设 max 也不会恢复。
   if (options.min !== undefined) input.min = String(options.min);
   if (options.max !== undefined) input.max = String(options.max);
   if (options.step !== undefined) input.step = String(options.step);
+  if (options.value !== undefined) input.value = options.value;
+  if (options.placeholder !== undefined) input.placeholder = options.placeholder;
+  if (options.ariaLabel !== undefined) input.ariaLabel = options.ariaLabel;
   if (options.disabled !== undefined) input.disabled = options.disabled;
   if (options.readOnly !== undefined) input.readOnly = options.readOnly;
   return input;

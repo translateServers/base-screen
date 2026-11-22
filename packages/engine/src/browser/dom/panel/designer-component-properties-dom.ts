@@ -204,7 +204,8 @@ function appendComponentControls(
     '1',
   );
   if (manifest !== undefined) appendFlipActions(geometryGrid, component, manifest);
-  const zIndex = appendInput(
+  // 层级是几何的一部分，基础可见（ADR-0102 §7：「仅全量」只能整段标，不藏单个字段）。
+  appendInput(
     geometryGrid,
     DESIGNER_UI_TEXT.propertiesPanel.zIndex,
     'zIndex',
@@ -212,7 +213,6 @@ function appendComponentControls(
     'number',
     '0',
   );
-  zIndex.dataset.inspectorAdvanced = 'true';
   if (context.kind === 'single-material' && component.type === 'base.image') {
     appendImageDensityActions(geometryGrid, component.id);
   }
@@ -825,12 +825,14 @@ function appendUniversalStyleSections(
     `${component.id}:style:blend`,
     false,
   );
-  for (const [key, label] of [
-    ['filterBlur', text.filterBlur],
-    ['filterBrightness', text.filterBrightness],
-    ['filterContrast', text.filterContrast],
-    ['filterSaturate', text.filterSaturate],
-    ['filterHueRotate', text.filterHueRotate],
+  // 滤镜分量都是可选键：缺省即不施加该滤镜（Renderer 只拼声明过的分量）。「自动」时滑杆停在
+  // 恒等值（模糊 0、亮度 / 对比度 / 饱和度 100%、色相 0°），已设置时可一键恢复自动。
+  for (const [key, label, unit, autoValue] of [
+    ['filterBlur', text.filterBlur, 'px', 0],
+    ['filterBrightness', text.filterBrightness, '%', 100],
+    ['filterContrast', text.filterContrast, '%', 100],
+    ['filterSaturate', text.filterSaturate, '%', 100],
+    ['filterHueRotate', text.filterHueRotate, '°', 0],
   ] as const) {
     appendStyleControl(
       filter,
@@ -841,6 +843,7 @@ function appendUniversalStyleSections(
       'number',
       `${component.id}:style:${key}`,
       false,
+      { optional: true, unit, autoValue },
     );
   }
 }
