@@ -28,3 +28,17 @@ export {
   type HostProjectAdapterOptions,
   type HttpProjectAdapterOptions,
 } from './project-adapter.js';
+export {
+  createSseSubscribe,
+  type HostKitEventSource,
+  type HostKitEventSourceConstructor,
+  type HostKitPushSnapshot,
+  type HostKitSseMessage,
+  type SseSubscribeOptions,
+} from './sse-subscribe.js';
+export {
+  createSubscriptionHub,
+  type HostKitSubscribe,
+  type HostKitSubscriptionHub,
+  type SubscriptionHubOptions,
+} from './subscription-hub.js';
