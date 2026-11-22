@@ -87,6 +87,9 @@ export const DESIGNER_UI_TEXT = {
       refreshManual: '手动',
       refreshOnce: '只请求一次',
       refreshEvery: (seconds: number) => `每 ${seconds} 秒`,
+      /** 推送实例（ADR-0104）：带回退间隔时一并说明断线后的行为。 */
+      refreshPush: '实时推送',
+      refreshPushFallback: (seconds: number) => `实时推送 · 断线每 ${seconds} 秒轮询`,
       /** 实例级字段只读：检查器里唯一的编辑入口是工作台。 */
       editInWorkbench: '在工作台修改',
       /** 同语义动作按钮：折叠摘要已经写了「在工作台修改」，按钮只表达动作。 */
@@ -676,6 +679,17 @@ export const DESIGNER_UI_TEXT = {
     refreshOnceNotice: '当前仅请求一次数据。',
     refreshAutoNotice: '当前会按配置间隔自动更新请求。',
     refreshManualNotice: '当前为手动更新，可通过刷新数据或事件蓝图重新请求。',
+    refreshPush: '实时推送',
+    /** 设计态不订阅（ADR-0104 §2.4）：作者在画布上看到的是一次性拉取的结果。 */
+    refreshPushNotice: '实时推送在预览与发布后生效；设计态只请求一次。',
+    pushFallbackLabel: '断线回退',
+    pushFallbackUnit: '秒/次（0 为不回退）',
+    pushRetainLabel: '保留最近',
+    pushRetainUnit: '行',
+    /** 写回文档（ADR-0104）：没有文档级实例可写时的说明，与「受控模式」等纯宿主设置区分开。 */
+    refreshPolicyPendingApply: '更新方式将在应用数据源后写入文档。',
+    refreshPolicyReadOnly: '该数据源由宿主声明为只读，更新方式未写入文档。',
+    refreshPushUnsupported: '当前来源不支持实时推送。',
     manualRefresh: '手动刷新',
     mappingStep: '字段映射',
     transformStep: '数据转换',

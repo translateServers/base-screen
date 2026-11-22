@@ -16,6 +16,7 @@ import {
   type ScreenHostResourceParameter,
   type ScreenJsonValue,
   type ScreenParseResult,
+  type ScreenUpdatePolicy,
   type ScreenValueRef,
 } from '@base-screen/contracts';
 import {
@@ -358,6 +359,11 @@ export function createDatasetDataSourceTransaction(
 export interface DesignerDatasetBindingOptions extends DesignerDatasetTransactionOptions {
   /** 文档里已有的实例 id：来自 dataValue 或用户的共享实例选择。 */
   readonly preferredInstanceId?: string | undefined;
+  /**
+   * 只在**新建**实例时写入的刷新策略（工作台里先选了更新方式、后应用绑定）。
+   * 复用已有实例时不覆盖它的策略：那份策略可能被其它组件共享。
+   */
+  readonly newInstanceUpdatePolicy?: ScreenUpdatePolicy | undefined;
 }
 
 /**
@@ -408,6 +414,9 @@ export function createDatasetBindingTransaction(
     name: reusable?.name ?? options.descriptor.name,
     source: { kind: 'dataset', datasetId: options.descriptor.datasetId },
     params: options.draft.params,
+    ...(reusable === undefined && options.newInstanceUpdatePolicy !== undefined
+      ? { updatePolicy: options.newInstanceUpdatePolicy }
+      : {}),
   };
   const dataSources =
     reusable === undefined

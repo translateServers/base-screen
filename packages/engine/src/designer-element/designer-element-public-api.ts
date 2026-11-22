@@ -47,7 +47,10 @@ export {
   type BaseScreenCanvasPresentationChangeEventDetail,
   type BaseScreenCanvasScaleMode,
 } from '../common/operations/canvas/canvas-presentation.js';
-export type { BaseScreenMaterialCatalogRefreshResult } from '../common/operations/catalog/designer-catalog-refresh.js';
+export type {
+  BaseScreenMaterialCatalogRefreshOptions,
+  BaseScreenMaterialCatalogRefreshResult,
+} from '../common/operations/catalog/designer-catalog-refresh.js';
 export {
   BASE_SCREEN_CHANGE_STATE_EVENT,
   type BaseScreenDesignerChangeProposalSummary,

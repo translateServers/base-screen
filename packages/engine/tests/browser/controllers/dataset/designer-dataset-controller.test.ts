@@ -317,6 +317,207 @@ describe('DesignerDatasetController', () => {
     ]);
   });
 
+  it('switches the refresh strategy to push and clamps push fallback / retain settings (ADR-0104)', async () => {
+    const actions: Array<{ action: string; detail?: Readonly<Record<string, unknown>> }> = [];
+    const controller = createController({
+      descriptor,
+      requestAuthoringAction: (action, detail) => {
+        actions.push(detail === undefined ? { action } : { action, detail });
+      },
+    });
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeSelect);
+    vi.stubGlobal('HTMLTextAreaElement', class {});
+
+    controller.onClick(resourceTarget('orders') as unknown as Element);
+    await waitForDescriptor(controller);
+
+    controller.onChange(
+      new FakeSelect({ datasetAuthoringSetting: 'refreshStrategy' }, [
+        'push',
+      ]) as unknown as EventTarget,
+    );
+    controller.onChange(
+      new FakeInput('-5', {
+        datasetAuthoringSetting: 'pushFallbackInterval',
+      }) as unknown as EventTarget,
+    );
+    controller.onChange(
+      new FakeInput('99999', {
+        datasetAuthoringSetting: 'pushRetainRows',
+      }) as unknown as EventTarget,
+    );
+    controller.onChange(
+      new FakeInput('abc', {
+        datasetAuthoringSetting: 'pushRetainRows',
+      }) as unknown as EventTarget,
+    );
+
+    expect(controller.authoring).toMatchObject({
+      refreshStrategy: 'push',
+      pushFallbackInterval: 0,
+      pushRetainRows: 10_000,
+    });
+    expect(actions).toEqual([
+      { action: 'update-settings', detail: { setting: 'refreshStrategy', value: 'push' } },
+      { action: 'update-settings', detail: { setting: 'pushFallbackInterval', value: 0 } },
+      { action: 'update-settings', detail: { setting: 'pushRetainRows', value: 10_000 } },
+    ]);
+  });
+
+  it('writes update policy changes back to the referenced document instance (ADR-0104)', () => {
+    let currentDocument: ScreenDocument = {
+      ...baseDocument,
+      components: [
+        {
+          ...baseDocument.components[0]!,
+          dataSource: null,
+          dataValue: { kind: 'data-source-field', dataSourceId: 'live-oee', path: [] },
+        },
+      ],
+      dataSources: [
+        {
+          id: 'live-oee',
+          name: 'live-oee',
+          source: { kind: 'host-resource', resourceType: 'demo_metric', resourceId: 'oee' },
+          params: {},
+          updatePolicy: {
+            mode: 'push',
+            fallbackIntervalSeconds: 30,
+            retain: { seconds: 600, timeField: 't' },
+          },
+        },
+      ],
+    };
+    const transactions: ScreenDocumentTransaction[] = [];
+    const actions: string[] = [];
+    const controller = createController({
+      descriptor,
+      getDocument: () => currentDocument,
+      executeTransaction: (transaction) => {
+        transactions.push(transaction);
+        const command = transaction.commands[0];
+        if (command?.type === 'replace-data-sources') {
+          currentDocument = { ...currentDocument, dataSources: command.dataSources };
+        }
+        return success(currentDocument);
+      },
+      requestAuthoringAction: (action, detail) => {
+        actions.push(`${action}:${String(detail?.setting)}`);
+      },
+    });
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeSelect);
+    vi.stubGlobal('HTMLTextAreaElement', class {});
+
+    // 聚焦即按实例策略回显，而不是从「手动」起步。
+    controller.render(undefined);
+    expect(controller.authoring).toMatchObject({
+      refreshStrategy: 'push',
+      pushFallbackInterval: 30,
+    });
+
+    controller.onChange(
+      new FakeInput('10', { datasetAuthoringSetting: 'pushFallbackInterval' }) as unknown as EventTarget,
+    );
+    expect(transactions).toHaveLength(1);
+    // 面板上没有控件的按时长保留原样保留。
+    expect(currentDocument.dataSources?.[0]?.updatePolicy).toEqual({
+      mode: 'push',
+      fallbackIntervalSeconds: 10,
+      retain: { seconds: 600, timeField: 't' },
+    });
+
+    // 受控模式不是文档字段：只发宿主事件，不产生事务。
+    controller.onChange(
+      new FakeInput('', { datasetAuthoringSetting: 'controlled' }, true) as unknown as EventTarget,
+    );
+    expect(transactions).toHaveLength(1);
+
+    // 切回「手动」写成省略字段（与缺省同义）。
+    controller.onChange(
+      new FakeSelect({ datasetAuthoringSetting: 'refreshStrategy' }, [
+        'manual',
+      ]) as unknown as EventTarget,
+    );
+    expect(transactions).toHaveLength(2);
+    expect(currentDocument.dataSources?.[0]).not.toHaveProperty('updatePolicy');
+    expect(actions).toEqual([
+      'update-settings:pushFallbackInterval',
+      'update-settings:controlled',
+      'update-settings:refreshStrategy',
+    ]);
+
+    // 撤销：文档回到推送策略，同一组件再同步时工作台跟着回显。
+    currentDocument = {
+      ...currentDocument,
+      dataSources: [
+        {
+          ...currentDocument.dataSources![0]!,
+          updatePolicy: { mode: 'push', fallbackIntervalSeconds: 10 },
+        },
+      ],
+    };
+    controller.render(undefined);
+    expect(controller.authoring).toMatchObject({
+      refreshStrategy: 'push',
+      pushFallbackInterval: 10,
+      controlled: true,
+    });
+  });
+
+  it('keeps inline and read-only instances out of the document and explains why', () => {
+    let currentDocument: ScreenDocument = {
+      ...baseDocument,
+      components: [
+        {
+          ...baseDocument.components[0]!,
+          dataSource: null,
+          dataValue: { kind: 'data-source-field', dataSourceId: 'locked', path: [] },
+        },
+      ],
+      dataSources: [
+        {
+          id: 'locked',
+          name: 'locked',
+          source: { kind: 'host-resource', resourceType: 'demo_metric', resourceId: 'oee' },
+          params: {},
+          updatePolicy: { mode: 'auto', intervalSeconds: 5 },
+          readOnly: true,
+        },
+      ],
+    };
+    const executeTransaction = vi.fn(() => success(currentDocument));
+    const controller = createController({
+      descriptor,
+      getDocument: () => currentDocument,
+      executeTransaction,
+    });
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeSelect);
+    vi.stubGlobal('HTMLTextAreaElement', class {});
+    controller.render(undefined);
+    controller.onChange(
+      new FakeSelect({ datasetAuthoringSetting: 'refreshStrategy' }, [
+        'once',
+      ]) as unknown as EventTarget,
+    );
+    expect(executeTransaction).not.toHaveBeenCalled();
+    // 只读实例：工作台退回文档里的策略，不留「显示 A、文档是 B」。
+    expect(controller.authoring).toMatchObject({ refreshStrategy: 'auto', refreshInterval: 5 });
+
+    currentDocument = baseDocument;
+    controller.render(undefined);
+    controller.onChange(
+      new FakeSelect({ datasetAuthoringSetting: 'refreshStrategy' }, [
+        'once',
+      ]) as unknown as EventTarget,
+    );
+    expect(executeTransaction).not.toHaveBeenCalled();
+    // 没有文档级实例：选择保留在工作台，等应用绑定时带进新实例。
+    expect(controller.authoring.refreshStrategy).toBe('once');
+  });
+
   it('copies a tested dataset response through the injected browser clipboard capability', async () => {
     const copyText = vi.fn(async () => true);
     const resolve = vi.fn<ScreenHostResourcePort['resolve']>(async () =>

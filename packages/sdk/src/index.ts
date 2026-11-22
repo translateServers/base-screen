@@ -68,6 +68,7 @@ export {
   type BaseScreenHostResourceSelectionRequest,
   type BaseScreenHostResourceSelectionRequestEventDetail,
   type BaseScreenHostResourceSelectionTarget,
+  type BaseScreenMaterialCatalogRefreshOptions,
   type BaseScreenMaterialCatalogRefreshResult,
   type BaseScreenMaterialLibraryAction,
   type BaseScreenMaterialLibraryActionEventDetail,

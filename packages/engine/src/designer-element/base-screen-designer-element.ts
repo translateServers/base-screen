@@ -45,7 +45,10 @@ import type {
   BaseScreenDesignerSetWorkbenchModeOptions,
   BaseScreenDesignerWorkbenchMode,
 } from '../common/operations/blueprint/designer-blueprint-protocol.js';
-import type { BaseScreenMaterialCatalogRefreshResult } from '../common/operations/catalog/designer-catalog-refresh.js';
+import type {
+  BaseScreenMaterialCatalogRefreshOptions,
+  BaseScreenMaterialCatalogRefreshResult,
+} from '../common/operations/catalog/designer-catalog-refresh.js';
 import type { DesignerChangeProposalInput } from '../common/operations/change/designer-change-proposal.js';
 import type { DesignerReviewMeta } from '../common/operations/change/designer-review.js';
 import type {
@@ -111,11 +114,14 @@ export class BaseScreenDesignerElement extends ElementBase {
   /**
    * 初始化后热刷新物料目录（ADR-0090）：全有或全无；changed 中的代码身份变化会重挂载，
    * Manifest-only 变化不重挂载；失败时 catalog、文档、DOM、历史与数据源状态保持原样。
+   * 配置了物料库分组的宿主新增 / 下架物料时，经 `options.materialLibraryGrouping` 让分组随
+   * catalog 一起交换（ADR-0105 P2）。
    */
   refreshCatalog(
     catalog: BaseScreenMaterialCatalog,
+    options?: BaseScreenMaterialCatalogRefreshOptions,
   ): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult> {
-    return this.#designerState.runtime.refreshCatalog(this, catalog);
+    return this.#designerState.runtime.refreshCatalog(this, catalog, options);
   }
 
   get workbenchMode(): BaseScreenDesignerWorkbenchMode {

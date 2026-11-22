@@ -250,6 +250,11 @@ export function refreshPolicyText(options: DesignerDataSourcePanelOptions): stri
   if (policy.mode === 'auto') {
     return DESIGNER_UI_TEXT.data.groups.refreshEvery(policy.intervalSeconds ?? 30);
   }
+  if (policy.mode === 'push') {
+    return policy.fallbackIntervalSeconds === undefined
+      ? DESIGNER_UI_TEXT.data.groups.refreshPush
+      : DESIGNER_UI_TEXT.data.groups.refreshPushFallback(policy.fallbackIntervalSeconds);
+  }
   return DESIGNER_UI_TEXT.data.groups.refreshManual;
 }
 
@@ -316,15 +321,19 @@ function authoringRefreshControls(options: DesignerDataSourcePanelOptions): HTML
   const strategyLabel = ownerDocument.createElement('span');
   strategyLabel.className = 'designer-dataset-authoring-setting-label';
   strategyLabel.textContent = DESIGNER_UI_TEXT.dataSource.refreshStrategyLabel;
+  // 「实时推送」只在来源声明了推送能力时出现（ADR-0104 §2.3）；实例已是 push 时如实显示，
+  // 否则下拉会把它错报成别的策略，作者也没法改回来。
+  const pushOffered =
+    options.pushDelivery !== undefined || options.authoring.refreshStrategy === 'push';
+  const strategies: [DesignerDatasetRefreshStrategy, string][] = [
+    ['once', DESIGNER_UI_TEXT.dataSource.refreshOnce],
+    ['manual', DESIGNER_UI_TEXT.dataSource.manualRefresh],
+    ['auto', DESIGNER_UI_TEXT.dataSource.refreshAuto],
+  ];
+  if (pushOffered) strategies.push(['push', DESIGNER_UI_TEXT.dataSource.refreshPush]);
   const select = createDesignerSelect(ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.dataSource.refreshStrategyLabel,
-    options: (
-      [
-        ['once', DESIGNER_UI_TEXT.dataSource.refreshOnce],
-        ['manual', DESIGNER_UI_TEXT.dataSource.manualRefresh],
-        ['auto', DESIGNER_UI_TEXT.dataSource.refreshAuto],
-      ] as const satisfies readonly [DesignerDatasetRefreshStrategy, string][]
-    ).map(([value, label]) => ({
+    options: strategies.map(([value, label]) => ({
       label,
       selected: options.authoring.refreshStrategy === value,
       value,
@@ -358,11 +367,74 @@ function authoringRefreshControls(options: DesignerDataSourcePanelOptions): HTML
   intervalControl.append(interval, unit);
   intervalRow.append(intervalLabel, intervalControl);
   wrap.append(strategy, intervalRow);
+  if (options.authoring.refreshStrategy === 'push') {
+    wrap.appendChild(
+      authoringNumberRow(ownerDocument, {
+        setting: 'pushFallbackInterval',
+        label: DESIGNER_UI_TEXT.dataSource.pushFallbackLabel,
+        unit: DESIGNER_UI_TEXT.dataSource.pushFallbackUnit,
+        min: 0,
+        max: 86_400,
+        value: options.authoring.pushFallbackInterval ?? 0,
+      }),
+    );
+    // 保留窗口只对会发增量的来源有意义；只发快照的来源每次整表替换。
+    if (options.pushDelivery?.append === true) {
+      wrap.appendChild(
+        authoringNumberRow(ownerDocument, {
+          setting: 'pushRetainRows',
+          label: DESIGNER_UI_TEXT.dataSource.pushRetainLabel,
+          unit: DESIGNER_UI_TEXT.dataSource.pushRetainUnit,
+          min: 1,
+          max: 10_000,
+          value: options.authoring.pushRetainRows ?? 1_000,
+        }),
+      );
+    }
+  }
   return wrap;
+}
+
+/** 推送设置的数字行：与「更新间隔」同一套行、标签与输入控件（检查器表单范式一致）。 */
+function authoringNumberRow(
+  ownerDocument: Document,
+  spec: {
+    readonly setting: 'pushFallbackInterval' | 'pushRetainRows';
+    readonly label: string;
+    readonly unit: string;
+    readonly min: number;
+    readonly max: number;
+    readonly value: number;
+  },
+): HTMLElement {
+  const row = ownerDocument.createElement('label');
+  row.className = 'designer-dataset-authoring-setting-row';
+  const label = ownerDocument.createElement('span');
+  label.className = 'designer-dataset-authoring-setting-label';
+  label.textContent = spec.label;
+  const control = ownerDocument.createElement('span');
+  control.className = 'designer-dataset-refresh-interval-control';
+  const input = createDesignerInput(ownerDocument, {
+    appearance: 'number',
+    ariaLabel: `${spec.label} · ${spec.unit}`,
+    className: 'designer-number-input',
+    max: spec.max,
+    min: spec.min,
+    step: 1,
+    value: String(spec.value),
+  });
+  input.dataset.datasetAuthoringSetting = spec.setting;
+  const unit = ownerDocument.createElement('span');
+  unit.textContent = spec.unit;
+  unit.setAttribute('aria-hidden', 'true');
+  control.append(input, unit);
+  row.append(label, control);
+  return row;
 }
 
 export function refreshStrategyNotice(authoring: DesignerDatasetAuthoringView): string {
   if (authoring.refreshStrategy === 'once') return DESIGNER_UI_TEXT.dataSource.refreshOnceNotice;
   if (authoring.refreshStrategy === 'auto') return DESIGNER_UI_TEXT.dataSource.refreshAutoNotice;
+  if (authoring.refreshStrategy === 'push') return DESIGNER_UI_TEXT.dataSource.refreshPushNotice;
   return DESIGNER_UI_TEXT.dataSource.refreshManualNotice;
 }

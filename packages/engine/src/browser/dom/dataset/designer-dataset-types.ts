@@ -3,6 +3,7 @@ import type {
   ScreenDatasetDefinition,
   ScreenDatasetEntry,
   ScreenHostResourceDataSource,
+  ScreenUpdatePolicy,
   ScreenValueRef,
   ScreenVariable,
 } from '@base-screen/contracts';
@@ -39,9 +40,7 @@ export interface DesignerDataSourceInstanceView {
   /** `ScreenDataSourceSource.kind` 原值透传，不做「能取到什么数据」的推断。 */
   readonly sourceKind: ScreenDataSourceSourceKind | undefined;
   /** 派生实例没有实例级策略时为 undefined（摘要走「手动」兜底）。 */
-  readonly updatePolicy:
-    | { readonly mode: 'once' | 'manual' | 'auto'; readonly intervalSeconds?: number }
-    | undefined;
+  readonly updatePolicy: ScreenUpdatePolicy | undefined;
   readonly processorId: string | undefined;
   readonly status: DesignerDataSourceInstanceStatus;
 }
@@ -97,7 +96,8 @@ export type DesignerDatasetWorkbenchStep =
 
 export type DesignerDatasetEditorMode = 'visual' | 'code';
 
-export type DesignerDatasetRefreshStrategy = 'once' | 'manual' | 'auto';
+/** `push`：实时推送（ADR-0104），只在来源声明了推送能力时可选。 */
+export type DesignerDatasetRefreshStrategy = 'once' | 'manual' | 'auto' | 'push';
 
 export type DesignerDatasetAuthoringAction =
   | 'open-code-editor'
@@ -124,6 +124,18 @@ export interface DesignerDatasetAuthoringView {
   readonly controlled: boolean;
   readonly refreshStrategy: DesignerDatasetRefreshStrategy;
   readonly refreshInterval: number;
+  /** 仅 `push`：断线回退轮询间隔（秒）；0 或缺省表示不回退。 */
+  readonly pushFallbackInterval?: number;
+  /** 仅 `push` 且来源声明 `append`：保留最近的行数；缺省由运行时取 1000。 */
+  readonly pushRetainRows?: number;
+}
+
+/**
+ * 当前实例来源的推送能力（ADR-0104 §2.3）。`undefined` 表示来源只支持拉取，
+ * 「实时推送」选项不出现（实例已是 push 时仍如实显示，便于改回）。
+ */
+export interface DesignerDataSourcePushDelivery {
+  readonly append: boolean;
 }
 
 export interface DesignerDataSourcePanelOptions {
@@ -184,6 +196,8 @@ export interface DesignerDataSourcePanelOptions {
   readonly preview: DesignerDatasetPreviewView;
   readonly activeStep: DesignerDatasetWorkbenchStep;
   readonly authoring: DesignerDatasetAuthoringView;
+  /** 当前实例来源的推送能力；缺省表示只支持拉取。 */
+  readonly pushDelivery?: DesignerDataSourcePushDelivery | undefined;
   /**
    * 取值浮层的宿主（段之外的顶层 overlay 容器）。
    *

@@ -64,7 +64,13 @@ export function evaluateDescriptorCondition(
   field: BaseScreenMaterialEditorField,
   context: DesignerDescriptorContext,
 ): boolean {
-  const value = readFieldTargetValue(field, condition.path, context);
+  // 条件可以读另一侧（ADR-0105 P1）：style 字段依赖 props 开关时写 `target: 'props'`。
+  const value =
+    condition.target === 'props'
+      ? readPath(context.component.props, condition.path)
+      : condition.target === 'style'
+        ? readPath(context.component.style, condition.path)
+        : readFieldTargetValue(field, condition.path, context);
   const exists = value !== undefined;
   switch (condition.operator) {
     case 'exists':

@@ -8,6 +8,7 @@ import type {
   ScreenHostResourcePort,
   ScreenJsonValue,
   ScreenParseResult,
+  ScreenUpdatePolicy,
   ScreenValueRef,
 } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
@@ -182,8 +183,14 @@ export interface DesignerDatasetControllerContext {
   ) => void;
 }
 
-export function createDatasetAuthoringView(): DesignerDatasetAuthoringView {
-  return {
+/**
+ * 工作台「更新方式」的初始值。给出实例的 `updatePolicy` 时如实回显（含 ADR-0104 的 push
+ * 回退间隔与保留行数）；没有实例级策略时按「手动」，与组头摘要同一口径。
+ */
+export function createDatasetAuthoringView(
+  policy?: ScreenUpdatePolicy | undefined,
+): DesignerDatasetAuthoringView {
+  const base: DesignerDatasetAuthoringView = {
     editorMode: 'visual',
     filterConfigured: false,
     loadingDisabled: false,
@@ -191,6 +198,21 @@ export function createDatasetAuthoringView(): DesignerDatasetAuthoringView {
     refreshStrategy: 'manual',
     refreshInterval: 30,
   };
+  if (policy === undefined) return base;
+  if (policy.mode === 'auto') {
+    return { ...base, refreshStrategy: 'auto', refreshInterval: policy.intervalSeconds ?? 30 };
+  }
+  if (policy.mode === 'push') {
+    return {
+      ...base,
+      refreshStrategy: 'push',
+      ...(policy.fallbackIntervalSeconds === undefined
+        ? {}
+        : { pushFallbackInterval: policy.fallbackIntervalSeconds }),
+      ...(policy.retain?.rows === undefined ? {} : { pushRetainRows: policy.retain.rows }),
+    };
+  }
+  return { ...base, refreshStrategy: policy.mode };
 }
 
 export function emptyDatasetPreview(open = false): DesignerDatasetPreviewView {

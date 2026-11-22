@@ -35,7 +35,10 @@ import type {
   BaseScreenDesignerSetWorkbenchModeOptions,
   BaseScreenDesignerWorkbenchMode,
 } from '../../common/operations/blueprint/designer-blueprint-protocol.js';
-import type { BaseScreenMaterialCatalogRefreshResult } from '../../common/operations/catalog/designer-catalog-refresh.js';
+import type {
+  BaseScreenMaterialCatalogRefreshOptions,
+  BaseScreenMaterialCatalogRefreshResult,
+} from '../../common/operations/catalog/designer-catalog-refresh.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
@@ -86,6 +89,7 @@ export interface DesignerElementHost extends HTMLElement {
   configure(configuration: BaseScreenDesignerConfiguration): ScreenParseResult<null>;
   refreshCatalog(
     catalog: BaseScreenMaterialCatalog,
+    options?: BaseScreenMaterialCatalogRefreshOptions,
   ): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult>;
   setWorkbenchMode(
     mode: BaseScreenDesignerWorkbenchMode,

@@ -31,7 +31,18 @@ import {
   createDatasetAuthoringView,
   emptyDatasetPreview,
 } from './designer-dataset-controller-context.js';
-import { syncDatasetSurface } from './designer-dataset-surface-controller.js';
+import { readDesignerDataSourceInstanceView } from './designer-dataset-instance-view.js';
+import {
+  readDesignerPushDelivery,
+  syncDatasetSurface,
+} from './designer-dataset-surface-controller.js';
+import {
+  authoringToUpdatePolicy,
+  authoringUpdatePolicyForNewInstance,
+  createUpdatePolicyTransaction,
+  readUpdatePolicyTarget,
+  reconcileAuthoringWithPolicy,
+} from './designer-update-policy-authoring.js';
 
 const AUTO_APPLY_DELAY_MS = 300;
 
@@ -199,12 +210,14 @@ export function applyDatasetDraft(
       context.setFeedback(DESIGNER_UI_TEXT.dataset.incomplete);
       return;
     }
+    const newInstancePolicy = authoringUpdatePolicyForNewInstance(context.state.authoring);
     transaction = createDatasetBindingTransaction({
       document,
       componentId: component.id,
       descriptor,
       draft,
       roles: context.currentEntry()?.manifest.dataBinding?.roles ?? [],
+      ...(newInstancePolicy === undefined ? {} : { newInstanceUpdatePolicy: newInstancePolicy }),
       ...(context.state.datasetInstanceId === null
         ? {}
         : { preferredInstanceId: context.state.datasetInstanceId }),
@@ -254,11 +267,32 @@ export function syncDraftToFocusedComponent(
     context.state.syncedDataSource = source;
     context.state.syncedInstanceId = instanceId;
     context.state.datasetInstanceId = instanceId;
+    // 撤销 / 重做 / 宿主改写了实例的 updatePolicy：「更新方式」跟着文档走。
+    // 只对文档级实例做——内联数据源的选择还没有落点，不能被「文档里没有策略」冲掉。
+    const target = readUpdatePolicyTarget(document, focusedId);
+    if (target.kind !== 'inline') {
+      context.state.authoring = reconcileAuthoringWithPolicy(
+        context.state.authoring,
+        target.instance.updatePolicy,
+        readDesignerPushDelivery(
+          context,
+          component === undefined ? null : readScreenComponentValueRef(component),
+        ),
+      );
+    }
     return;
   }
   const sameFocusedComponent = focusedId === context.state.focusedComponentId;
   const activeStep = sameFocusedComponent ? context.state.activeStep : 'source';
-  const authoring = sameFocusedComponent ? context.state.authoring : createDatasetAuthoringView();
+  // 换了组件：「更新方式」按该组件引用的实例策略回显，而不是一律从「手动」起步。
+  const authoring = sameFocusedComponent
+    ? context.state.authoring
+    : createDatasetAuthoringView(
+        component === undefined
+          ? undefined
+          : readDesignerDataSourceInstanceView(document, readScreenComponentValueRef(component))
+              ?.updatePolicy,
+      );
   context.state.focusedComponentId = focusedId;
   context.state.clearAutoApply();
   context.state.syncedDataSource = source;
@@ -623,4 +657,58 @@ export function availableModes(
 
 function sameJsonValue(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/**
+ * 工作台「更新方式」写回文档（ADR-0104）。
+ *
+ * 宿主事件（`update-settings`）照发，由调用方负责；这里只管文档：文档级实例走
+ * `replace-data-sources` 单条事务（一次改动 = 一个历史步骤）；没有落点时只给提示，不报错。
+ * 事务被拒时把工作台退回文档里的策略，避免「下拉显示 A、文档仍是 B」。
+ */
+export function commitAuthoringUpdatePolicy(context: DesignerDatasetControllerContext): void {
+  const document = context.callbacks.getDocument();
+  const component = context.currentComponent();
+  if (document === undefined || component === undefined) return;
+  const target = readUpdatePolicyTarget(document, component.id);
+  if (target.kind === 'inline') {
+    context.setFeedback(DESIGNER_UI_TEXT.dataSource.refreshPolicyPendingApply);
+    return;
+  }
+  if (target.kind === 'read-only') {
+    context.setFeedback(DESIGNER_UI_TEXT.dataSource.refreshPolicyReadOnly);
+    context.state.authoring = reconcileAuthoringWithPolicy(
+      context.state.authoring,
+      target.instance.updatePolicy,
+      undefined,
+    );
+    return;
+  }
+  const delivery = readDesignerPushDelivery(context, readScreenComponentValueRef(component));
+  const next = authoringToUpdatePolicy(
+    context.state.authoring,
+    target.instance.updatePolicy,
+    delivery,
+  );
+  const transaction = createUpdatePolicyTransaction(document, target.instance, next, delivery);
+  const revert = () => {
+    context.state.authoring = reconcileAuthoringWithPolicy(
+      context.state.authoring,
+      target.instance.updatePolicy,
+      delivery,
+    );
+  };
+  if (!transaction.ok) {
+    context.callbacks.report(transaction.diagnostics);
+    context.setFeedback(transaction.diagnostics[0]?.message ?? '');
+    revert();
+    return;
+  }
+  if (transaction.value === null) return;
+  const result = context.callbacks.executeTransaction(transaction.value);
+  if (!result.ok) {
+    context.callbacks.report(result.diagnostics);
+    context.setFeedback(result.diagnostics[0]?.message ?? '');
+    revert();
+  }
 }
