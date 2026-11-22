@@ -28,10 +28,10 @@ export interface BaseScreenNumberFormatConfigOptions {
   readonly maxDecimals?: number;
   /** 提供「显示千分位」开关；值是默认值。 */
   readonly thousandsSeparator?: boolean;
-  /** 提供「前缀」（货币符号等）。 */
-  readonly prefix?: boolean;
-  /** 提供「单位」（读数后缀）。 */
-  readonly unit?: boolean;
+  /** 提供「前缀」（货币符号等）；给字符串即同时作为默认值（ADR-0105 P3）。 */
+  readonly prefix?: boolean | string;
+  /** 提供「单位」（读数后缀）；给字符串即同时作为默认值，例如同比读数默认 `%`。 */
+  readonly unit?: boolean | string;
 }
 
 const MAX_AFFIX_LENGTH = 16;
@@ -47,14 +47,16 @@ export function createBaseScreenNumberFormatConfig(
   const defaults: Record<string, ScreenJsonValue> = {};
   const fields: BaseScreenMaterialEditorFieldInput[] = [];
   const required: string[] = ['decimals'];
-  if (options.prefix === true) {
+  const prefix = affixDefault(options.prefix);
+  if (prefix !== undefined) {
     properties.prefix = { kind: 'string', maxLength: MAX_AFFIX_LENGTH };
-    defaults.prefix = '';
+    defaults.prefix = prefix;
     fields.push(propsField('prefix', '前缀'));
   }
-  if (options.unit === true) {
+  const unit = affixDefault(options.unit);
+  if (unit !== undefined) {
     properties.unit = { kind: 'string', maxLength: MAX_AFFIX_LENGTH };
-    defaults.unit = '';
+    defaults.unit = unit;
     fields.push(propsField('unit', '单位'));
   }
   properties.decimals = { kind: 'number', minimum: 0, maximum: maxDecimals };
@@ -67,6 +69,12 @@ export function createBaseScreenNumberFormatConfig(
     fields.push(propsField('thousandsSeparator', '显示千分位'));
   }
   return { id: 'number-format', properties, required, defaults, fields };
+}
+
+/** `true` → 空默认值；字符串 → 以它为默认值（截到上限）；`false` / 省略 → 不提供该字段。 */
+function affixDefault(option: boolean | string | undefined): string | undefined {
+  if (typeof option === 'string') return [...option].slice(0, MAX_AFFIX_LENGTH).join('');
+  return option === true ? '' : undefined;
 }
 
 /** 图表标题：留空即不显示。 */

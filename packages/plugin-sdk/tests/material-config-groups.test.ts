@@ -58,6 +58,19 @@ describe('material config groups (ADR-0102 §11)', () => {
     ]);
   });
 
+  // ADR-0105 P3：同比读数默认单位是 %、金额默认前缀是 ¥，开关之外还能带默认值。
+  it('takes a string as both the switch and the default for prefix / unit', () => {
+    const group = createBaseScreenNumberFormatConfig({ prefix: '¥', unit: '%', decimals: 1 });
+    expect(group.defaults).toEqual({ prefix: '¥', unit: '%', decimals: 1 });
+    expect(group.fields.map((field) => field.path[0])).toEqual(['prefix', 'unit', 'decimals']);
+    expect(createBaseScreenNumberFormatConfig({ unit: 'x'.repeat(40) }).defaults.unit).toBe(
+      'x'.repeat(16),
+    );
+    expect(Object.keys(createBaseScreenNumberFormatConfig({ unit: false }).properties)).toEqual([
+      'decimals',
+    ]);
+  });
+
   it('rejects groups that claim the same props key', () => {
     expect(() =>
       mergeBaseScreenMaterialConfigGroups([
