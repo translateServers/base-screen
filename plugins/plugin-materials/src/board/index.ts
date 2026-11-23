@@ -79,6 +79,8 @@ export {
   PLUGIN_BOARD_STATUS_GRID_TYPE,
   PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME,
   PLUGIN_BOARD_STATUS_LEGEND_TYPE,
+  PLUGIN_BOARD_TABS_TAG_NAME,
+  PLUGIN_BOARD_TABS_TYPE,
   PLUGIN_BOARD_TITLE_DECOR_PICKER_ID,
   PLUGIN_BOARD_TITLE_DECOR_PICKER_TAG_NAME,
   PLUGIN_BOARD_TITLE_DECOR_TAG_NAME,
@@ -134,6 +136,15 @@ export {
   type StatusLegendCounts,
   statusLegendBarSegments,
 } from './status-legend.js';
+export {
+  type BoardTabItem,
+  definePluginBoardTabsMaterial,
+  PLUGIN_BOARD_TABS_MANIFEST,
+  PLUGIN_BOARD_TABS_TABULAR_DATA_ADAPTER,
+  PluginBoardTabsElement,
+  readBoardTabItems,
+  TABS_MAX_ITEMS,
+} from './tabs.js';
 export {
   type BoardStateRow,
   createBoardColumnsAdapter,

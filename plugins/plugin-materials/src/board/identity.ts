@@ -40,6 +40,9 @@ export const PLUGIN_BOARD_PIPELINE_TAG_NAME = 'base-screen-board-pipeline';
 export const PLUGIN_BOARD_TITLE_DECOR_TYPE = 'board.title-decor';
 export const PLUGIN_BOARD_TITLE_DECOR_TAG_NAME = 'base-screen-board-title-decor';
 
+export const PLUGIN_BOARD_TABS_TYPE = 'board.tabs';
+export const PLUGIN_BOARD_TABS_TAG_NAME = 'base-screen-board-tabs';
+
 /** 本插件自己的检查器控件：装饰边框的样式选择器，经 editorDescriptor 的 `control: 'custom'` 授权使用。 */
 export const PLUGIN_BOARD_BORDER_PICKER_ID = 'base-screen.board.border-style-picker';
 export const PLUGIN_BOARD_BORDER_PICKER_TAG_NAME = 'base-screen-board-border-picker';

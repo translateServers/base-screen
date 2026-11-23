@@ -29,6 +29,8 @@ import {
   PLUGIN_BOARD_STATUS_GRID_TYPE,
   PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME,
   PLUGIN_BOARD_STATUS_LEGEND_TYPE,
+  PLUGIN_BOARD_TABS_TAG_NAME,
+  PLUGIN_BOARD_TABS_TYPE,
   PLUGIN_BOARD_TITLE_DECOR_PICKER_ID,
   PLUGIN_BOARD_TITLE_DECOR_PICKER_TAG_NAME,
   PLUGIN_BOARD_TITLE_DECOR_TAG_NAME,
@@ -65,7 +67,7 @@ export const PLUGIN_ECHARTS_TOGGLE_COMMAND_ID = 'base-screen.echarts.toggle-seri
 export const PLUGIN_ECHARTS_SERIES_PICKER_ID = 'base-screen.echarts.series-picker';
 
 /**
- * 统一物料插件的 runtime：21 个物料、4 个组合分片、3 个检查器控件、2 条命令，外加原 metrics /
+ * 统一物料插件的 runtime：22 个物料、4 个组合分片、3 个检查器控件、2 条命令，外加原 metrics /
  * pipeline 两个插件的能力面（1 个数据资源类型、1 个蓝图能力、1 个数据处理器、
  * 1 个蓝图动作）。
  *
@@ -132,7 +134,7 @@ export function createPluginMaterialsRuntime(): BaseScreenPluginRuntime {
   return defined.value;
 }
 
-/** 21 个物料：10 个大屏组件 + 1 个通用图表 + 10 个图表家族。 */
+/** 22 个物料：11 个大屏组件 + 1 个通用图表 + 10 个图表家族。 */
 function materialContributions(): BaseScreenPluginContribution[] {
   const boardMaterials = [
     [PLUGIN_BOARD_DIGITAL_FLOP_TYPE, PLUGIN_BOARD_DIGITAL_FLOP_TAG_NAME],
@@ -145,6 +147,7 @@ function materialContributions(): BaseScreenPluginContribution[] {
     [PLUGIN_BOARD_STATUS_LEGEND_TYPE, PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME],
     [PLUGIN_BOARD_PIPELINE_TYPE, PLUGIN_BOARD_PIPELINE_TAG_NAME],
     [PLUGIN_BOARD_TITLE_DECOR_TYPE, PLUGIN_BOARD_TITLE_DECOR_TAG_NAME],
+    [PLUGIN_BOARD_TABS_TYPE, PLUGIN_BOARD_TABS_TAG_NAME],
   ] as const;
   return [
     ...boardMaterials.map(([type, tagName]) => ({ kind: 'material' as const, type, tagName })),

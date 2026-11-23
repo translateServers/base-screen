@@ -45,6 +45,8 @@ import {
   PLUGIN_BOARD_STATUS_GRID_TYPE,
   PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME,
   PLUGIN_BOARD_STATUS_LEGEND_TYPE,
+  PLUGIN_BOARD_TABS_TAG_NAME,
+  PLUGIN_BOARD_TABS_TYPE,
   PLUGIN_BOARD_TITLE_DECOR_PICKER_ID,
   PLUGIN_BOARD_TITLE_DECOR_PICKER_TAG_NAME,
   PLUGIN_BOARD_TITLE_DECOR_TAG_NAME,
@@ -61,6 +63,7 @@ import {
 import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../src/board/scroll-board.js';
 import { PLUGIN_BOARD_STATUS_GRID_MANIFEST } from '../../src/board/status-grid.js';
 import { PLUGIN_BOARD_STATUS_LEGEND_MANIFEST } from '../../src/board/status-legend.js';
+import { PLUGIN_BOARD_TABS_MANIFEST, readBoardTabItems } from '../../src/board/tabs.js';
 import { createBoardColumnsAdapter } from '../../src/board/tabular-columns-adapter.js';
 import { PLUGIN_BOARD_TITLE_DECOR_MANIFEST } from '../../src/board/title-decor.js';
 import { PLUGIN_BOARD_WATER_LEVEL_MANIFEST } from '../../src/board/water-level.js';
@@ -77,6 +80,7 @@ const MANIFESTS = [
   PLUGIN_BOARD_STATUS_LEGEND_MANIFEST,
   PLUGIN_BOARD_PIPELINE_MANIFEST,
   PLUGIN_BOARD_TITLE_DECOR_MANIFEST,
+  PLUGIN_BOARD_TABS_MANIFEST,
 ];
 
 function appearanceFields(manifest: BaseScreenMaterialManifest) {
@@ -114,6 +118,7 @@ describe('plugin-board-materials manifests', () => {
       [PLUGIN_BOARD_STATUS_LEGEND_TYPE, PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME],
       [PLUGIN_BOARD_PIPELINE_TYPE, PLUGIN_BOARD_PIPELINE_TAG_NAME],
       [PLUGIN_BOARD_TITLE_DECOR_TYPE, PLUGIN_BOARD_TITLE_DECOR_TAG_NAME],
+      [PLUGIN_BOARD_TABS_TYPE, PLUGIN_BOARD_TABS_TAG_NAME],
     ];
     expect(MANIFESTS.map((manifest) => [manifest.type, manifest.tagName])).toEqual(expected);
   });
@@ -174,6 +179,38 @@ describe('plugin-board-materials manifests', () => {
           item.tagName === PLUGIN_BOARD_TITLE_DECOR_PICKER_TAG_NAME,
       ),
     ).toBe(true);
+  });
+
+  it('reads tab labels and values from the bound columns', () => {
+    const data = {
+      columns: [
+        {
+          id: 'label',
+          label: '标签',
+          valueType: 'string' as const,
+          sortable: false,
+          filterable: false,
+        },
+        {
+          id: 'value',
+          label: '值',
+          valueType: 'string' as const,
+          sortable: false,
+          filterable: false,
+        },
+      ],
+      rows: [
+        { label: '总览', value: 'overview' },
+        { label: '  ', value: 'blank' },
+        { label: '安防', value: '' },
+      ],
+    };
+    // 空标签行跳过；值为空时回落到标签文字。
+    expect(readBoardTabItems(data)).toEqual([
+      { label: '总览', value: 'overview' },
+      { label: '安防', value: '安防' },
+    ]);
+    expect(PLUGIN_BOARD_TABS_MANIFEST.events).toEqual(['tabChange']);
   });
 
   it('the border style enum only lists styles the renderer actually implements', () => {
@@ -253,13 +290,13 @@ describe('plugin-materials runtime', () => {
     expect(runtime.manifest.id).toBe(PLUGIN_MATERIALS_ID);
   });
 
-  it('declares 21 materials, 3 inspector controls and 2 palette-only commands', () => {
+  it('declares 22 materials, 3 inspector controls and 2 palette-only commands', () => {
     const runtime = createPluginMaterialsRuntime();
     const counts = new Map<string, number>();
     for (const contribution of runtime.manifest.contributions) {
       counts.set(contribution.kind, (counts.get(contribution.kind) ?? 0) + 1);
     }
-    expect(counts.get('material')).toBe(21);
+    expect(counts.get('material')).toBe(22);
     expect(counts.get('inspectorControl')).toBe(3);
     expect(counts.get('fragment')).toBe(4);
     expect(counts.get('command')).toBe(2);

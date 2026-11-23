@@ -173,7 +173,9 @@ export class PluginBoardWaterLevelElement extends BoardMaterialElement {
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
 
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.overflow = 'hidden';
     this.style.boxSizing = 'border-box';
     this.style.backgroundColor = styleColor(model.style.backgroundColor, '#0b1a2b');
@@ -200,20 +202,21 @@ export class PluginBoardWaterLevelElement extends BoardMaterialElement {
 
     const root = doc.createElement('div');
     root.dataset.boardWaterLevel = '';
-    // 只放罐体：没有标题行，整块空间都给水位。列向 flex + 居中让圆形罐体的
-    // `aspect-ratio:1` 由高度反推宽度并保持居中，矩形则直接占满宽度。
+    // 只放罐体：没有标题行，整块空间都给水位。根节点是尺寸容器（container-type:size），
+    // 圆形罐体按 min(宽, 高) 取边长，矩形直接占满。
     root.style.cssText =
-      'display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;box-sizing:border-box;padding:8px;';
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;box-sizing:border-box;padding:8px;container-type:size;';
 
     const tank = doc.createElement('div');
     tank.dataset.boardWaterTank = shape;
-    // 圆形罐体固定为正方形（aspect-ratio），否则会在非等比的组件框里被拉成椭圆；
-    // 取 min(宽, 高) 由 flex 的收缩完成，不依赖异步测量。
+    // 圆形罐体的边长取容器内容区的 min(宽, 高)：之前用「高度撑满 + aspect-ratio:1」反推宽度，
+    // 组件比罐体窄时（默认 200×240 就是）圆会比组件宽，两侧被宿主的 overflow:hidden 切掉。
+    // 容器查询单位直接按内容区算，不依赖异步测量。
     const roundStyle =
       shape === 'circle'
-        ? 'aspect-ratio:1;border-radius:50%;max-height:100%;'
-        : 'border-radius:6px;width:100%;max-width:100%;';
-    tank.style.cssText = `position:relative;overflow:hidden;flex:1 1 auto;min-height:0;box-sizing:border-box;border:1px solid ${styleColor(model.style.borderColor, '#1e3a5f')};background:${styleColor(model.style.backgroundColor, '#0b1a2b')};${roundStyle}`;
+        ? 'flex:none;width:min(100cqw,100cqh);height:min(100cqw,100cqh);border-radius:50%;'
+        : 'flex:1 1 auto;min-height:0;border-radius:6px;width:100%;max-width:100%;';
+    tank.style.cssText = `position:relative;overflow:hidden;box-sizing:border-box;border:1px solid ${styleColor(model.style.borderColor, '#1e3a5f')};background:${styleColor(model.style.backgroundColor, '#0b1a2b')};${roundStyle}`;
 
     // 水体：以百分比高度贴底，高度即读数；波纹贴在水体顶边，随水体一起升降。
     const water = doc.createElement('div');
