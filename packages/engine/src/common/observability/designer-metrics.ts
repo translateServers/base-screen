@@ -18,8 +18,6 @@ export type DesignerMetricName =
   | 'guard_fail'
   | 'fix_preview'
   | 'fix_apply'
-  | 'scene_preview'
-  | 'scene_apply'
   | 'revert'
   | 'patch_record';
 

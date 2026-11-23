@@ -630,3 +630,19 @@ details:not([open]) .designer-panel-section-disclosure {
     outline-offset: 2px;
   }
 }
+
+/* 蓝图节点库条目状态（ADR-0107）：已在画布 ✓ 用成功色，可添加 + 悬停抬底；停用连线整行减淡。 */
+.blueprint-palette-item[data-placed="true"] .blueprint-palette-state {
+  color: var(--designer-success);
+}
+
+.blueprint-palette-item[data-placed="false"]
+  .blueprint-palette-primary:hover
+  .blueprint-palette-state {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.blueprint-relation-item[data-active="false"] {
+  opacity: 0.58;
+}

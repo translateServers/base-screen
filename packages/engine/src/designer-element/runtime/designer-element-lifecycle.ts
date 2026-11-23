@@ -84,11 +84,11 @@ export function releaseSurfaces(element: DesignerElementHost): void {
   elementState.errorConsoleController.release();
   elementState.guardController.release();
   elementState.changeController.release();
-  elementState.sceneController.release();
   elementState.presentationLockController.release();
   elementState.intentController.release();
   elementState.intentChoiceController.release();
   elementState.targetDisplayController.release();
+  elementState.artboardController.release();
   elementState.integrationController.release();
   elementState.importController.release();
   elementState.projectWorkspaceController.release();
@@ -149,30 +149,6 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
   if (draftBar !== null && changePane !== null && ghostLayer !== null && rightPanel !== null) {
     elementState.changeController.connect(draftBar, changePane, ghostLayer, rightPanel);
   }
-  const sceneBlock = shadow.querySelector<HTMLElement>('[data-scene-block]');
-  const sceneList = shadow.querySelector<HTMLElement>('[data-scene-list]');
-  const sceneCount = shadow.querySelector<HTMLElement>('[data-scene-count]');
-  const sceneNote = shadow.querySelector<HTMLElement>('[data-scene-note]');
-  const sceneBar = shadow.querySelector<HTMLElement>('[data-scene-preview-bar]');
-  const sceneBarName = shadow.querySelector<HTMLElement>('[data-scene-preview-name]');
-  if (
-    sceneBlock !== null &&
-    sceneList !== null &&
-    sceneCount !== null &&
-    sceneNote !== null &&
-    sceneBar !== null &&
-    sceneBarName !== null
-  ) {
-    elementState.sceneController.connect(
-      sceneBlock,
-      sceneList,
-      sceneCount,
-      sceneNote,
-      sceneBar,
-      sceneBarName,
-    );
-    elementState.sceneController.setInstanceId(elementState.instanceId);
-  }
   const intentInput = shadow.querySelector<HTMLTextAreaElement>('[data-intent-input]');
   const intentSubmit = shadow.querySelector<HTMLButtonElement>('[data-intent-submit]');
   const intentScope = shadow.querySelector<HTMLElement>('[data-intent-scope]');
@@ -211,13 +187,17 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
   if (displayPanel !== null && displayToggle !== null) {
     elementState.targetDisplayController.setPanel(displayPanel, displayToggle);
   }
+  const artboardStrip = shadow.querySelector<HTMLElement>('[data-canvas-tabs]');
+  const artboardMenu = shadow.querySelector<HTMLElement>('[data-artboard-menu]');
+  const artboardHost = shadow.querySelector<HTMLElement>('.workspace');
+  if (artboardStrip !== null && artboardMenu !== null && artboardHost !== null) {
+    elementState.artboardController.connect(artboardStrip, artboardMenu, artboardHost);
+  }
   const designerRoot = shadow.querySelector<HTMLElement>('.designer');
   const presentationHint = shadow.querySelector<HTMLElement>('[data-presentation-lock-hint]');
   if (designerRoot !== null && presentationHint !== null) {
     elementState.presentationLockController.connect(designerRoot, presentationHint, {
-      canEnter: () =>
-        elementState.changeController.pending === undefined &&
-        !elementState.sceneController.previewing,
+      canEnter: () => elementState.changeController.pending === undefined,
       notifyBlocked: () =>
         elementState.notificationController.notify(
           DESIGNER_UI_TEXT.presentationLock.blocked,

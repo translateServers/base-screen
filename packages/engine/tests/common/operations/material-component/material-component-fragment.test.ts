@@ -52,7 +52,7 @@ function documentWith(
     canvas: { width: 640, height: 480, backgroundColor: '#000000' },
     components: components as ScreenDocument['components'],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   } as ScreenDocument;
 }
 
@@ -393,15 +393,8 @@ describe('component fragment transaction with shared data and relations (ADR-010
         { id: 'sales', name: '已有', source: { kind: 'dataset', datasetId: 'x' }, params: {} },
       ],
       blueprint: {
-        relations: [
-          {
-            type: 'semantic',
-            id: 'link',
-            source: { kind: 'component', componentId: 'acme.text' },
-            target: { kind: 'component', componentId: 'acme.text' },
-            role: 'related',
-          },
-        ],
+        nodes: [{ kind: 'component', id: 'link', componentId: 'acme.text' }],
+        edges: [],
       },
     } as ScreenDocument;
   }
@@ -440,22 +433,28 @@ describe('component fragment transaction with shared data and relations (ADR-010
     });
   });
 
-  it('appends remapped relations after the components and dedupes relation ids', () => {
+  it('appends the remapped blueprint after the components and dedupes ids', () => {
     const built = build(
       {
         nodes: [
           { key: 'a', materialType: 'acme.text' },
           { key: 'b', materialType: 'acme.text', offset: { x: 0, y: 50 } },
         ],
-        relations: [
-          {
-            type: 'semantic',
-            id: 'link',
-            source: { kind: 'component', componentId: 'a' },
-            target: { kind: 'component', componentId: 'b' },
-            role: 'detail',
-          },
-        ],
+        blueprint: {
+          nodes: [
+            { kind: 'component', id: 'na', componentId: 'a' },
+            { kind: 'component', id: 'nb', componentId: 'b' },
+          ],
+          edges: [
+            {
+              kind: 'semantic',
+              id: 'link',
+              from: { node: 'na' },
+              to: { node: 'nb' },
+              role: 'detail',
+            },
+          ],
+        },
       },
       { x: 0, y: 0 },
       withExisting(),
@@ -465,13 +464,17 @@ describe('component fragment transaction with shared data and relations (ADR-010
     const commands = built.value.transaction.commands;
     expect(commands.at(-1)?.type).toBe('replace-blueprint');
     const blueprint = (commands.at(-1) as { blueprint: ScreenDocument['blueprint'] }).blueprint;
-    expect(blueprint.relations.map((relation) => relation.id)).toEqual(['link', 'link-2']);
-    const added = blueprint.relations[1] as {
-      source: { componentId: string };
-      target: { componentId: string };
+    // 已有节点占用了 id `link`：节点与连线共用 id 空间，分片连线去重为 `link-2`。
+    expect(blueprint.edges.map((edge) => edge.id)).toEqual(['link-2']);
+    const added = blueprint.edges[0]!;
+    const componentOf = (nodeId: string) => {
+      const node = blueprint.nodes.find((candidate) => candidate.id === nodeId);
+      return node?.kind === 'component' ? node.componentId : undefined;
     };
-    expect([added.source.componentId, added.target.componentId]).toEqual(built.value.componentIds);
-    expect(built.value.relationIds).toEqual(['link-2']);
+    expect([componentOf(added.from.node), componentOf(added.to.node)]).toEqual(
+      built.value.componentIds,
+    );
+    expect(built.value.edgeIds).toEqual(['link-2']);
   });
 
   it('applies an entry rotation to the created component', () => {

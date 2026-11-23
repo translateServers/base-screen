@@ -74,7 +74,7 @@ const document: ScreenDocument = {
     },
   ],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 
 function catalog(designCapabilities: {

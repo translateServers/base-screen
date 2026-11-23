@@ -32,7 +32,7 @@ function screenDocument(
     canvas: { width: 960, height: 540, backgroundColor: '#ffffff' },
     components: [...components],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 

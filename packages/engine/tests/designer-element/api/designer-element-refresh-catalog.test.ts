@@ -102,7 +102,7 @@ function document(): ScreenDocument {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
     components: [component()],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 
@@ -199,7 +199,10 @@ describe('BaseScreenDesignerElement.refreshCatalog', () => {
 
     expect(designer.refreshCatalog(next).ok).toBe(false);
     const nextGrouping: BaseScreenMaterialLibraryGrouping = {
-      groups: [...grouping.groups, { id: 'online', label: 'Online', materialTypes: ['acme.online'] }],
+      groups: [
+        ...grouping.groups,
+        { id: 'online', label: 'Online', materialTypes: ['acme.online'] },
+      ],
     };
     const result = designer.refreshCatalog(next, { materialLibraryGrouping: nextGrouping });
 

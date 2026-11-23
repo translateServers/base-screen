@@ -1,6 +1,10 @@
 import type {
+  ScreenBlueprintCondition,
   ScreenBlueprintLayoutNode,
   ScreenBlueprintLayoutViewport,
+  ScreenBlueprintSemanticRole,
+  ScreenBlueprintValueExpression,
+  ScreenBlueprintVisibilityTransition,
   ScreenDiagnostic,
   ScreenJsonValue,
 } from '@base-screen/contracts';
@@ -23,15 +27,22 @@ export type BaseScreenBlueprintCanvasNodeKind =
   | 'variable'
   | 'host'
   | 'lifecycle'
-  | 'timer';
-export type BaseScreenBlueprintCanvasEdgeKind =
-  | 'relation'
-  | 'semantic'
-  | 'containment'
-  | 'dependency';
+  | 'timer'
+  | 'condition'
+  | 'sub-canvas'
+  | 'main-canvas';
+export type BaseScreenBlueprintCanvasEdgeKind = 'flow' | 'semantic';
+/** 连线的作者面分类：交互联动、数据共享、流程控制、业务出口、语义关联。 */
+export type BaseScreenBlueprintCanvasEdgeCategory =
+  | 'interaction'
+  | 'data'
+  | 'flow'
+  | 'exit'
+  | 'semantic';
 
+/** 工作台聚焦目标：组件 / 变量定位到其节点，`node` / `edge` 直接给蓝图 id。 */
 export interface BaseScreenDesignerWorkbenchFocus {
-  readonly kind: 'component' | 'variable' | 'relation' | 'rule' | 'action';
+  readonly kind: 'component' | 'variable' | 'node' | 'edge';
   readonly id: string;
 }
 
@@ -45,11 +56,15 @@ export interface BaseScreenDesignerWorkbenchModeChangeEventDetail {
   readonly reason: BaseScreenDesignerWorkbenchModeChangeReason;
 }
 
-export interface BaseScreenBlueprintCanvasEventOption {
-  readonly name: string;
+/** 节点上的一个锚点。`id` 即文档里的锚点 id；语义锚点固定为 `semantic`，不进入 flow 连线。 */
+export interface BaseScreenBlueprintCanvasPort {
+  readonly id: string;
+  readonly direction: 'in' | 'out';
   readonly label: string;
+  /** 能力或声明缺失时为 false：可见但不可连，提示原因。 */
   readonly available: boolean;
-  readonly requiredCapability?: string;
+  readonly connected: boolean;
+  readonly unavailableReason?: string;
 }
 
 export interface BaseScreenBlueprintCanvasNode {
@@ -57,53 +72,50 @@ export interface BaseScreenBlueprintCanvasNode {
   readonly kind: BaseScreenBlueprintCanvasNodeKind;
   readonly x: number;
   readonly y: number;
-  readonly collapsed?: boolean;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly enabled: boolean;
+  /** 先输出后输入（LIGHT CHASER 卡片顺序）；语义锚点单列。 */
+  readonly outputs: readonly BaseScreenBlueprintCanvasPort[];
+  readonly inputs: readonly BaseScreenBlueprintCanvasPort[];
+  readonly semantic: boolean;
+  /** 仅定时器 / 条件可改名、可复制。 */
+  readonly renamable: boolean;
+  readonly duplicable: boolean;
   readonly componentId?: string;
-  readonly componentName?: string;
   readonly materialType?: string;
   readonly hidden?: boolean;
-  readonly parentId?: string;
-  readonly childCount?: number;
-  readonly isContainer?: boolean;
-  readonly events?: readonly BaseScreenBlueprintCanvasEventOption[];
   readonly variableId?: string;
-  readonly variableName?: string;
   readonly variableType?: 'static' | 'data-source' | 'url-query';
-  readonly variableDescription?: string;
-  readonly variableInitialValue?: ScreenJsonValue;
-  readonly relationCount?: number;
-  readonly inboundCount?: number;
-  readonly outboundCount?: number;
-  readonly readCount?: number;
-  readonly writeCount?: number;
-  readonly exitCount?: number;
-  /** timer 节点：触发间隔（秒）；lifecycle 节点没有该字段。 */
+  /** 从画布节点（ADR-0109）引用的从画布 id 与其显示方式（从画布缺失时无显示方式）。 */
+  readonly canvasId?: string;
+  readonly canvasDisplay?: 'page' | 'popup';
   readonly intervalSeconds?: number;
+  readonly name?: string;
+  readonly condition?: ScreenBlueprintCondition;
+  readonly inboundCount: number;
+  readonly outboundCount: number;
 }
 
 export interface BaseScreenBlueprintCanvasEdge {
   readonly id: string;
-  readonly source: string;
-  readonly target: string;
-  readonly sourceHandle: string;
-  readonly targetHandle: string;
   readonly kind: BaseScreenBlueprintCanvasEdgeKind;
-  readonly relationId?: string;
-  readonly relationKind?: 'behavior' | 'semantic';
-  readonly effectType?:
-    | 'component-visibility'
-    | 'request-component-data'
-    | 'set-variable'
-    | 'request-variable'
-    | 'emit-host-event'
-    | 'host-action';
-  readonly semanticRole?: 'related' | 'detail' | 'group' | 'drill-down';
-  readonly eventName?: string;
-  readonly operation?: 'show' | 'hide' | 'toggle';
-  readonly actionId?: string;
-  readonly variableId?: string;
-  readonly locked?: boolean;
-  readonly deletable?: boolean;
+  readonly category: BaseScreenBlueprintCanvasEdgeCategory;
+  readonly source: string;
+  readonly sourcePort: string;
+  readonly target: string;
+  readonly targetPort: string;
+  /** 悬停 / 选中时显示的短标签。 */
+  readonly label: string;
+  /** flow 连线：同源锚点内的执行序号（从 1 起）与同源总数。 */
+  readonly order?: number;
+  readonly siblingCount?: number;
+  readonly role?: ScreenBlueprintSemanticRole;
+  readonly value?: ScreenBlueprintValueExpression;
+  readonly payload?: ScreenBlueprintValueExpression;
+  readonly transition?: ScreenBlueprintVisibilityTransition;
+  /** 任一端点停用时为 false：连线淡显。 */
+  readonly active: boolean;
 }
 
 export interface BaseScreenBlueprintCanvasGraph {
@@ -129,35 +141,59 @@ export type BaseScreenBlueprintCanvasInsertNode =
       readonly position?: BaseScreenBlueprintCanvasNodePosition;
     }
   | {
-      readonly kind: 'host';
+      readonly kind: 'sub-canvas';
+      readonly canvasId: string;
       readonly position?: BaseScreenBlueprintCanvasNodePosition;
     }
-  | {
-      readonly kind: 'lifecycle';
-      readonly position?: BaseScreenBlueprintCanvasNodePosition;
-    }
+  | { readonly kind: 'main-canvas'; readonly position?: BaseScreenBlueprintCanvasNodePosition }
+  | { readonly kind: 'host'; readonly position?: BaseScreenBlueprintCanvasNodePosition }
+  | { readonly kind: 'lifecycle'; readonly position?: BaseScreenBlueprintCanvasNodePosition }
   | {
       readonly kind: 'timer';
-      readonly intervalSeconds: number;
+      readonly intervalSeconds?: number;
       readonly position?: BaseScreenBlueprintCanvasNodePosition;
-    };
+    }
+  | { readonly kind: 'condition'; readonly position?: BaseScreenBlueprintCanvasNodePosition };
 
-export type BaseScreenBlueprintCanvasSelection = {
-  readonly kind: 'node' | 'edge';
-  readonly id: string;
-} | null;
+/** 多选：节点与连线可同时选中；两者都空即无选择。 */
+export interface BaseScreenBlueprintCanvasSelection {
+  readonly nodes: readonly string[];
+  readonly edges: readonly string[];
+}
+
+export const EMPTY_BLUEPRINT_CANVAS_SELECTION: BaseScreenBlueprintCanvasSelection = {
+  nodes: [],
+  edges: [],
+};
+
+export interface BaseScreenBlueprintCanvasTraceStep {
+  readonly kind: 'trigger' | 'condition' | 'action' | 'cascade' | 'request' | 'error';
+  readonly nodeId?: string;
+  readonly edgeId?: string;
+  readonly passed?: boolean;
+  readonly depth: number;
+  readonly text: string;
+}
 
 export interface BaseScreenBlueprintCanvasTrace {
+  readonly trigger: { readonly nodeId: string; readonly port: string };
   readonly executedEdgeIds: readonly string[];
-  readonly failedRuleIds: readonly string[];
-  readonly failedRelationIds?: readonly string[];
-  readonly lines: readonly string[];
+  readonly visitedNodeIds: readonly string[];
+  readonly steps: readonly BaseScreenBlueprintCanvasTraceStep[];
+  readonly failed: boolean;
 }
 
 export interface BaseScreenBlueprintCanvasCommandResult {
   readonly commandId: string;
   readonly status: 'accepted' | 'rejected';
   readonly diagnostics: readonly ScreenDiagnostic[];
+}
+
+/** 可模拟的触发锚点：每个启用节点上有连线的事件 / 就绪 / tick / data-updated 输出。 */
+export interface BaseScreenBlueprintCanvasSimulationTrigger {
+  readonly nodeId: string;
+  readonly port: string;
+  readonly label: string;
 }
 
 export interface BaseScreenBlueprintCanvasState {
@@ -171,10 +207,12 @@ export interface BaseScreenBlueprintCanvasState {
   readonly selection: BaseScreenBlueprintCanvasSelection;
   readonly diagnostics: readonly ScreenDiagnostic[];
   readonly trace: BaseScreenBlueprintCanvasTrace | null;
+  readonly simulationTriggers: readonly BaseScreenBlueprintCanvasSimulationTrigger[];
+  readonly showSemantic: boolean;
   readonly viewRequest?: {
     readonly id: number;
-    readonly type: 'focus';
-    readonly targetId: string;
+    readonly type: 'focus' | 'fit' | 'auto-layout';
+    readonly targetId?: string;
   };
   readonly lastCommand?: BaseScreenBlueprintCanvasCommandResult;
 }
@@ -185,6 +223,11 @@ interface BaseScreenBlueprintCanvasCommandBase {
   readonly documentRevision: number;
 }
 
+export type BaseScreenBlueprintCanvasNodeUpdate =
+  | { readonly type: 'name'; readonly name: string | null }
+  | { readonly type: 'interval'; readonly intervalSeconds: number }
+  | { readonly type: 'enabled'; readonly enabled: boolean };
+
 export type BaseScreenBlueprintCanvasCommand =
   | (BaseScreenBlueprintCanvasCommandBase & { readonly type: 'ready' })
   | (BaseScreenBlueprintCanvasCommandBase & {
@@ -193,17 +236,29 @@ export type BaseScreenBlueprintCanvasCommand =
     })
   | (BaseScreenBlueprintCanvasCommandBase & {
       readonly type: 'connect';
-      readonly sourceNodeId: string;
-      readonly sourceHandle: string;
-      readonly targetNodeId: string;
-      readonly targetHandle: string;
+      readonly from: { readonly node: string; readonly port: string };
+      readonly to: { readonly node: string; readonly port: string };
     })
   | (BaseScreenBlueprintCanvasCommandBase & {
       readonly type: 'delete-selection';
-      readonly selection: Exclude<BaseScreenBlueprintCanvasSelection, null>;
+      readonly selection: BaseScreenBlueprintCanvasSelection;
     })
   | (BaseScreenBlueprintCanvasCommandBase &
       BaseScreenBlueprintCanvasInsertNode & { readonly type: 'insert-node' })
+  | (BaseScreenBlueprintCanvasCommandBase & {
+      readonly type: 'update-node';
+      readonly nodeIds: readonly string[];
+      readonly update: BaseScreenBlueprintCanvasNodeUpdate;
+    })
+  | (BaseScreenBlueprintCanvasCommandBase & {
+      readonly type: 'reorder-edge';
+      readonly edgeId: string;
+      readonly direction: 'earlier' | 'later';
+    })
+  | (BaseScreenBlueprintCanvasCommandBase & {
+      readonly type: 'duplicate-nodes';
+      readonly nodeIds: readonly string[];
+    })
   | (BaseScreenBlueprintCanvasCommandBase & {
       readonly type: 'commit-layout';
       readonly nodes: readonly ScreenBlueprintLayoutNode[];
@@ -217,10 +272,11 @@ export type BaseScreenBlueprintCanvasCommand =
   | (BaseScreenBlueprintCanvasCommandBase & { readonly type: 'history-redo' })
   | (BaseScreenBlueprintCanvasCommandBase & {
       readonly type: 'run-simulation';
-      readonly componentId: string;
-      readonly eventName: string;
+      readonly nodeId: string;
+      readonly port: string;
       readonly payload: ScreenJsonValue;
-    });
+    })
+  | (BaseScreenBlueprintCanvasCommandBase & { readonly type: 'clear-simulation' });
 
 export interface BaseScreenBlueprintCanvasStateEventDetail {
   readonly state: BaseScreenBlueprintCanvasState;

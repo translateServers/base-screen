@@ -29,7 +29,7 @@ function setup(components: readonly ScreenComponentNode[], selected: readonly st
     canvas: { width: 1000, height: 600, backgroundColor: '#000000' },
     components,
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
   const reduceSelection = vi.fn();
   const report = vi.fn();

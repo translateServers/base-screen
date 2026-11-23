@@ -1,6 +1,4 @@
 import type {
-  ScreenBlueprintRelation,
-  ScreenBlueprintValueExpression,
   ScreenComponentNode,
   ScreenDataSource,
   ScreenDiagnostic,
@@ -13,10 +11,10 @@ import {
   type BaseScreenFragmentBody,
   type BaseScreenFragmentDataSource,
   type BaseScreenFragmentNode,
-  type BaseScreenFragmentRelation,
   type BaseScreenMaterialCatalog,
   parseBaseScreenComponentFragmentInsertionIntent,
 } from '@base-screen/plugin-core';
+import { extractDesignerBlueprintFragment } from '../blueprint/designer-blueprint-graph.js';
 
 /** 「存为组合」请求事件：Engine 只产出分片组合，命名、归类与存储归宿主。 */
 export const BASE_SCREEN_FRAGMENT_SAVE_REQUEST_EVENT = 'base-screen-fragment-save-request' as const;
@@ -42,7 +40,7 @@ export interface BaseScreenFragmentSaveRequestEventDetail {
  * - 单个选中根且它接受子节点（容器 / 编组）且有后代 → 它成为外壳；否则所有组件都是节点；
  * - 几何以整片包围盒左上角为原点，props/style 原样带走（与 manifest 默认值浅合并后仍等于自身）；
  * - 读共享数据源的节点连同它引用的文档级数据源（含参数的传递依赖）一起带走；
- * - 端点全在选区内的蓝图关系一起带走，跨出选区的关系属于文档，不带走；
+ * - 端点全在选区内的蓝图节点与连线一起带走，跨出选区的连线属于文档，不带走；
  * - 分片不携带变量：任何变量引用都使提取失败关闭；
  * - 条件样式规则、锁定 / 隐藏状态不属于分片契约，以 warning 诊断告知被舍弃。
  */
@@ -161,13 +159,19 @@ export function extractBaseScreenComponentFragment(input: {
     }
   }
 
-  const relations = collectRelations(document, new Set(ordered.map((item) => item.id)), keyById);
-  if (relations.dropped > 0) {
+  const fragmentKeys = new Map(
+    ordered.flatMap((item) => {
+      const key = keyById.get(item.id);
+      return key === undefined ? [] : [[item.id, key] as const];
+    }),
+  );
+  const graph = extractDesignerBlueprintFragment(document.blueprint, fragmentKeys);
+  if (graph.dropped > 0) {
     warnings.push({
       severity: 'warning',
       code: 'AUTHORING_SOURCE_INVALID',
-      path: ['relations'],
-      message: `${relations.dropped} blueprint relation(s) reach outside the selection and are not saved.`,
+      path: ['blueprint'],
+      message: `${graph.dropped} blueprint edge(s) reach outside the selection and are not saved.`,
     });
   }
 
@@ -175,7 +179,9 @@ export function extractBaseScreenComponentFragment(input: {
     ...(shell === undefined ? {} : { shell }),
     nodes,
     ...(dataSources.length === 0 ? {} : { dataSources }),
-    ...(relations.value.length === 0 ? {} : { relations: relations.value }),
+    ...(graph.edges.length === 0 && graph.nodes.length === 0
+      ? {}
+      : { blueprint: { nodes: graph.nodes, edges: graph.edges } }),
   });
   if (!parsed.ok) return parsed;
   const { anchor: _anchor, ...body } = parsed.value;
@@ -264,86 +270,6 @@ function toFragmentDataSource(
     params: Object.fromEntries(
       Object.entries(source.params).map(([name, ref]) => [name, remapRef(ref, keys)]),
     ),
-  };
-}
-
-/** 端点全在选区内、且不引用变量的关系才属于这个组合；只要碰到选区的其余关系计为舍弃。 */
-function collectRelations(
-  document: ScreenDocument,
-  componentIds: ReadonlySet<string>,
-  keyById: ReadonlyMap<string, string>,
-): { readonly value: BaseScreenFragmentRelation[]; readonly dropped: number } {
-  const value: BaseScreenFragmentRelation[] = [];
-  const takenIds = new Set<string>();
-  let dropped = 0;
-  for (const relation of document.blueprint.relations) {
-    const endpoints = componentEndpoints(relation);
-    if (!endpoints.some((id) => componentIds.has(id))) continue;
-    if (!endpoints.every((id) => componentIds.has(id)) || relationUsesVariables(relation)) {
-      dropped++;
-      continue;
-    }
-    const id = uniqueKey(relation.id, takenIds);
-    takenIds.add(id);
-    value.push(remapRelation(relation, id, keyById));
-  }
-  return { value, dropped };
-}
-
-function componentEndpoints(relation: ScreenBlueprintRelation): string[] {
-  if (relation.type === 'semantic') {
-    return [relation.source.componentId, relation.target.componentId];
-  }
-  return [
-    ...(relation.source.kind === 'component' ? [relation.source.componentId] : []),
-    ...(relation.target.kind === 'component' ? [relation.target.componentId] : []),
-  ];
-}
-
-function relationUsesVariables(relation: ScreenBlueprintRelation): boolean {
-  if (relation.type === 'semantic') return false;
-  if (relation.source.kind === 'variable' || relation.target.kind === 'variable') return true;
-  const expressions = [
-    relation.condition?.left,
-    relation.condition?.right,
-    'value' in relation.effect ? relation.effect.value : undefined,
-    'payload' in relation.effect ? relation.effect.payload : undefined,
-  ];
-  return expressions.some((expression) => expression !== undefined && usesVariable(expression));
-}
-
-function usesVariable(expression: ScreenBlueprintValueExpression): boolean {
-  if (expression.kind === 'variable') return true;
-  if (expression.kind === 'array') return expression.items.some(usesVariable);
-  if (expression.kind === 'object') return Object.values(expression.properties).some(usesVariable);
-  return false;
-}
-
-function remapRelation(
-  relation: ScreenBlueprintRelation,
-  id: string,
-  keyById: ReadonlyMap<string, string>,
-): BaseScreenFragmentRelation {
-  const key = (componentId: string) => keyById.get(componentId) ?? componentId;
-  if (relation.type === 'semantic') {
-    return {
-      ...relation,
-      id,
-      source: { ...relation.source, componentId: key(relation.source.componentId) },
-      target: { ...relation.target, componentId: key(relation.target.componentId) },
-    };
-  }
-  return {
-    ...relation,
-    id,
-    source:
-      relation.source.kind === 'component'
-        ? { ...relation.source, componentId: key(relation.source.componentId) }
-        : relation.source,
-    target:
-      relation.target.kind === 'component'
-        ? { ...relation.target, componentId: key(relation.target.componentId) }
-        : relation.target,
   };
 }
 

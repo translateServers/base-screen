@@ -1,14 +1,20 @@
 import {
-  deriveScreenBlueprintRules,
   parseScreenDocument,
+  readScreenBlueprintEventPort,
+  resolveScreenStartPageId,
   type ScreenBlueprint,
+  type ScreenBlueprintAction,
+  type ScreenBlueprintRuleStep,
   type ScreenDiagnostic,
   type ScreenDocument,
+  type ScreenJsonObject,
   type ScreenJsonValue,
   type ScreenParseResult,
+  screenJsonEquals,
 } from '@base-screen/contracts';
 import {
   compileScreenBlueprint,
+  type ScreenBlueprintEvent,
   type ScreenDocumentCommand,
   traceScreenBlueprintEvent,
 } from '@base-screen/core';
@@ -16,22 +22,18 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
-import { connectDesignerBlueprintNodes } from '../../../common/operations/blueprint/designer-blueprint-connection.js';
 import {
-  buildDesignerBlueprintEventOptions,
+  buildDesignerBlueprintConnectionContext,
+  buildDesignerBlueprintSimulationTriggers,
   commitDesignerBlueprintLayout,
   commitDesignerBlueprintViewport,
-  componentBlueprintNodeId,
+  connectDesignerBlueprintPorts,
   deleteDesignerBlueprintSelection,
-  HOST_BLUEPRINT_NODE_ID,
-  insertDesignerBlueprintComponentNode,
-  insertDesignerBlueprintHostNode,
-  insertDesignerBlueprintLifecycleNode,
-  insertDesignerBlueprintTimerNode,
-  insertDesignerBlueprintVariableNode,
-  LIFECYCLE_BLUEPRINT_NODE_ID,
-  timerBlueprintNodeId,
-  variableBlueprintNodeId,
+  duplicateDesignerBlueprintNodes,
+  findBlueprintNode,
+  insertDesignerBlueprintNode,
+  reorderDesignerBlueprintEdge,
+  updateDesignerBlueprintNode,
 } from '../../../common/operations/blueprint/designer-blueprint-model.js';
 import {
   BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
@@ -43,7 +45,9 @@ import {
   type BaseScreenBlueprintCanvasState,
   type BaseScreenBlueprintCanvasStateEventDetail,
   type BaseScreenBlueprintCanvasTrace,
+  type BaseScreenBlueprintCanvasTraceStep,
   type BaseScreenDesignerWorkbenchMode,
+  EMPTY_BLUEPRINT_CANVAS_SELECTION,
   parseBaseScreenBlueprintCanvasCommand,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
@@ -58,12 +62,16 @@ import {
 } from './designer-blueprint-canvas-bridge-helpers.js';
 
 const MAX_PROCESSED_COMMANDS = 256;
+/** 与 viewer 的级联上限一致：变量写入引发的 data-updated 作为后续分派，最多 32 层。 */
+const MAX_SIMULATION_CASCADE = 32;
+const TEXT = DESIGNER_UI_TEXT.blueprint.graph;
 
 export interface DesignerBlueprintCanvasBridgeCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getGraph: () => BaseScreenBlueprintCanvasGraph;
   readonly getMode: () => BaseScreenDesignerWorkbenchMode;
   readonly getSelection: () => BaseScreenBlueprintCanvasSelection;
+  readonly getShowSemantic: () => boolean;
   readonly getViewRequest: () => BaseScreenBlueprintCanvasState['viewRequest'];
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
   readonly getRuntimeContributions: () => BaseScreenRuntimeContributionIndex | undefined;
@@ -80,6 +88,8 @@ export interface DesignerBlueprintCanvasBridgeCallbacks {
   readonly redo: () => ScreenParseResult<ScreenDocument>;
   readonly render: () => void;
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
+  /** 一次模拟产出轨迹后调用（画布模拟条与检查器「运行」页共用）。 */
+  readonly onSimulated?: () => void;
 }
 
 export class DesignerBlueprintCanvasBridge {
@@ -128,9 +138,14 @@ export class DesignerBlueprintCanvasBridge {
     this.#processedCommands.clear();
   }
 
+  clearTrace(): void {
+    this.#trace = null;
+  }
+
   dispatchState(graph = this.callbacks.getGraph()): void {
     const canvas = this.#canvas;
     if (canvas === undefined) return;
+    const document = this.callbacks.getDocument();
     const viewRequest = this.callbacks.getViewRequest();
     const state = cloneAndFreeze<BaseScreenBlueprintCanvasState>({
       generation: this.#generation,
@@ -143,6 +158,9 @@ export class DesignerBlueprintCanvasBridge {
       selection: this.callbacks.getSelection(),
       diagnostics: this.stateDiagnostics(),
       trace: this.#trace,
+      simulationTriggers:
+        document === undefined ? [] : buildDesignerBlueprintSimulationTriggers(graph, document),
+      showSemantic: this.callbacks.getShowSemantic(),
       ...(viewRequest === undefined ? {} : { viewRequest }),
       ...(this.#lastCommand === undefined ? {} : { lastCommand: this.#lastCommand }),
     });
@@ -161,13 +179,17 @@ export class DesignerBlueprintCanvasBridge {
     if (blueprint === null) {
       return failure('AUTHORING_REQUEST_INVALID', DESIGNER_UI_TEXT.blueprint.invalidCommand);
     }
-    if (JSON.stringify(blueprint) === JSON.stringify(document.blueprint)) {
+    if (
+      screenJsonEquals(
+        blueprint as unknown as ScreenJsonValue,
+        document.blueprint as unknown as ScreenJsonValue,
+      )
+    ) {
       return { ok: true, value: document, diagnostics: [] };
     }
     const parsed = parseScreenDocument({ ...document, blueprint });
     if (!parsed.ok) return parsed;
-    const compiled = compileScreenBlueprint(parsed.value, this.capabilities);
-    if (!compiled.ok) return { ok: false, diagnostics: compiled.diagnostics };
+    // 作者期不因能力缺失拒绝编辑：未授权能力由状态诊断提示，运行时失败关闭。
     return this.callbacks.executeCommand({
       type: 'replace-blueprint',
       blueprint: parsed.value.blueprint,
@@ -180,6 +202,15 @@ export class DesignerBlueprintCanvasBridge {
       document === undefined ? undefined : compileScreenBlueprint(document, this.capabilities);
     const compileDiagnostics = compiled !== undefined && !compiled.ok ? compiled.diagnostics : [];
     return [...compileDiagnostics, ...(this.#lastCommand?.diagnostics ?? [])];
+  }
+
+  /** 供面板与右键菜单直接调用的模拟入口（与画布命令同一实现）。 */
+  simulate(nodeId: string, port: string, payload: ScreenJsonValue): ScreenParseResult<null> {
+    const result = this.runSimulation(nodeId, port, payload);
+    if (result.ok) this.callbacks.onSimulated?.();
+    this.callbacks.render();
+    if (!result.ok) this.callbacks.emitDiagnostics(result.diagnostics);
+    return result;
   }
 
   private receive(event: Event): void {
@@ -201,9 +232,14 @@ export class DesignerBlueprintCanvasBridge {
       this.dispatchState();
       return;
     }
+    // 只读命令不受文档版本约束：选择与模拟不改文档。
+    const readOnly =
+      command.type === 'select' ||
+      command.type === 'run-simulation' ||
+      command.type === 'clear-simulation';
     if (
       command.generation !== this.#generation ||
-      command.documentRevision !== this.callbacks.getDocumentRevision()
+      (!readOnly && command.documentRevision !== this.callbacks.getDocumentRevision())
     ) {
       this.finish(command.commandId, 'rejected', [
         diagnostic('AUTHORING_EXPIRED', DESIGNER_UI_TEXT.blueprint.staleCommand),
@@ -231,13 +267,11 @@ export class DesignerBlueprintCanvasBridge {
         result = this.callbacks.select(command.selection, false);
         break;
       case 'connect': {
-        const connection = connectDesignerBlueprintNodes(
-          document,
-          command.sourceNodeId,
-          command.sourceHandle,
-          command.targetNodeId,
-          command.targetHandle,
-          buildDesignerBlueprintEventOptions(
+        const connection = connectDesignerBlueprintPorts(
+          document.blueprint,
+          command.from,
+          command.to,
+          buildDesignerBlueprintConnectionContext(
             document,
             this.callbacks.getCatalog(),
             this.callbacks.getRuntimeContributions(),
@@ -250,7 +284,7 @@ export class DesignerBlueprintCanvasBridge {
               designerBlueprintConnectionFailureMessage(connection.reason),
             );
         if (result.ok && connection.ok) {
-          result = this.callbacks.select(connection.selection, false);
+          result = this.callbacks.select({ nodes: [], edges: [connection.edgeId] }, false);
         }
         break;
       }
@@ -258,61 +292,52 @@ export class DesignerBlueprintCanvasBridge {
         result = this.commitBlueprint(
           deleteDesignerBlueprintSelection(document.blueprint, command.selection),
         );
-        if (result.ok) this.callbacks.select(null, false);
+        if (result.ok) this.callbacks.select(EMPTY_BLUEPRINT_CANVAS_SELECTION, false);
         break;
       case 'insert-node': {
-        let nodeId: string;
-        let blueprint: ScreenBlueprint | null;
-        if (command.kind === 'component') {
-          nodeId = componentBlueprintNodeId(command.componentId);
-          blueprint = insertDesignerBlueprintComponentNode(
-            document,
-            command.componentId,
-            command.position,
-          );
-        } else if (command.kind === 'variable') {
-          nodeId = variableBlueprintNodeId(command.variableId);
-          blueprint = insertDesignerBlueprintVariableNode(
-            document,
-            command.variableId,
-            command.position,
-          );
-        } else if (command.kind === 'host') {
-          nodeId = HOST_BLUEPRINT_NODE_ID;
-          blueprint = insertDesignerBlueprintHostNode(document.blueprint, command.position);
-        } else if (command.kind === 'lifecycle') {
-          nodeId = LIFECYCLE_BLUEPRINT_NODE_ID;
-          blueprint = insertDesignerBlueprintLifecycleNode(document.blueprint, command.position);
-        } else {
-          nodeId = timerBlueprintNodeId(command.intervalSeconds);
-          blueprint = insertDesignerBlueprintTimerNode(
-            document.blueprint,
-            command.intervalSeconds,
-            command.position,
-          );
+        const {
+          type: _type,
+          commandId: _id,
+          generation: _g,
+          documentRevision: _r,
+          position,
+          ...spec
+        } = command;
+        const inserted = insertDesignerBlueprintNode(document, spec, position);
+        result = this.commitBlueprint(inserted?.blueprint ?? null);
+        if (result.ok && inserted !== null) {
+          result = this.callbacks.select({ nodes: [inserted.nodeId], edges: [] }, false);
+        }
+        break;
+      }
+      case 'update-node': {
+        let blueprint: ScreenBlueprint | null = document.blueprint;
+        for (const nodeId of command.nodeIds) {
+          if (blueprint === null) break;
+          blueprint = updateDesignerBlueprintNode(blueprint, nodeId, command.update);
         }
         result = this.commitBlueprint(blueprint);
-        if (result.ok) {
-          result = this.callbacks.select({ kind: 'node', id: nodeId }, false);
+        break;
+      }
+      case 'reorder-edge':
+        result = this.commitBlueprint(
+          reorderDesignerBlueprintEdge(document.blueprint, command.edgeId, command.direction),
+        );
+        break;
+      case 'duplicate-nodes': {
+        const duplicated = duplicateDesignerBlueprintNodes(document.blueprint, command.nodeIds);
+        result = this.commitBlueprint(duplicated?.blueprint ?? null);
+        if (result.ok && duplicated !== null) {
+          result = this.callbacks.select({ nodes: duplicated.nodeIds, edges: [] }, false);
         }
         break;
       }
-      case 'commit-layout': {
-        const currentIds = new Set(this.callbacks.getGraph().nodes.map((node) => node.id));
-        const submittedIds = new Set(command.nodes.map((node) => node.id));
-        result =
-          currentIds.size !== submittedIds.size ||
-          [...currentIds].some((id) => !submittedIds.has(id))
-            ? failure('AUTHORING_REQUEST_INVALID', DESIGNER_UI_TEXT.blueprint.staleCommand)
-            : this.commitBlueprint(
-                commitDesignerBlueprintLayout(document.blueprint, command.nodes, command.viewport),
-              );
+      case 'commit-layout':
+        result = this.commitBlueprint(
+          commitDesignerBlueprintLayout(document.blueprint, command.nodes, command.viewport),
+        );
         break;
-      }
       case 'commit-viewport':
-        // 尚无物化布局时，viewport-only 提交会写入 layout.nodes: []，随后图节点被当作空布局隐藏。
-        // 视口只属会话，等首次拖动/自动布局写入完整 layout 后再持久化。
-        if ((document.blueprint.layout?.nodes.length ?? 0) === 0) break;
         result = this.commitBlueprint(
           commitDesignerBlueprintViewport(document.blueprint, command.viewport),
         );
@@ -324,61 +349,216 @@ export class DesignerBlueprintCanvasBridge {
         result = this.callbacks.redo();
         break;
       case 'run-simulation':
-        result = this.runSimulation(command.componentId, command.eventName, command.payload);
+        result = this.runSimulation(command.nodeId, command.port, command.payload);
+        if (result.ok) this.callbacks.onSimulated?.();
+        break;
+      case 'clear-simulation':
+        this.#trace = null;
         break;
     }
     this.finish(command.commandId, result.ok ? 'accepted' : 'rejected', result.diagnostics);
   }
 
+  /**
+   * 从一个触发锚点模拟（ADR-0107 §2.3、D6）：按编译后的规则深度优先执行；变量值改变后，
+   * 以新值为负载再分派该变量的 `data-updated`（级联上限 32）。请求类动作只登记，不发出。
+   */
   private runSimulation(
-    componentId: string,
-    eventName: string,
+    nodeId: string,
+    port: string,
     payload: ScreenJsonValue,
   ): ScreenParseResult<null> {
     const document = this.callbacks.getDocument();
-    if (document === undefined)
+    if (document === undefined) {
       return failure('AUTHORING_EXPIRED', DESIGNER_UI_TEXT.lifecycle.unloaded);
-    const compiled = compileScreenBlueprint(document, this.capabilities);
-    if (!compiled.ok) return compiled;
-    const traced = traceScreenBlueprintEvent(compiled.value, compiled.value.initialVariables, {
-      componentId,
-      name: eventName,
-      payload,
-    });
-    if (!traced.ok) return traced;
-    const executedEdgeIds: string[] = [];
-    const failedRuleIds: string[] = [];
-    const failedRelationIds: string[] = [];
-    const lines: string[] = [];
-    const rules = deriveScreenBlueprintRules(document.blueprint);
-    for (const ruleTrace of traced.value.ruleTraces) {
-      if (!ruleTrace.triggerMatched) continue;
-      const rule = rules.find((item) => item.id === ruleTrace.ruleId);
-      if (ruleTrace.condition === 'failed') {
-        failedRuleIds.push(ruleTrace.ruleId);
-        if (rule !== undefined) failedRelationIds.push(...rule.relationIds);
-      } else if (rule !== undefined) {
-        for (const action of ruleTrace.actions) {
-          const relationId = rule.relationIds[action.actionIndex];
-          if (relationId !== undefined) executedEdgeIds.push(`relation:${relationId}`);
-        }
-      }
-      const condition =
-        ruleTrace.condition === 'failed'
-          ? DESIGNER_UI_TEXT.blueprint.conditionStates.failed
-          : ruleTrace.condition === 'passed'
-            ? DESIGNER_UI_TEXT.blueprint.conditionStates.passed
-            : DESIGNER_UI_TEXT.blueprint.conditionStates.none;
-      lines.push(
-        DESIGNER_UI_TEXT.blueprint.simulationLine(
-          ruleTrace.ruleId,
-          condition,
-          ruleTrace.actions.length,
-        ),
-      );
     }
-    if (lines.length === 0) lines.push(DESIGNER_UI_TEXT.blueprint.simulationEmpty);
-    this.#trace = { executedEdgeIds, failedRuleIds, failedRelationIds, lines };
+    const node = findBlueprintNode(document.blueprint, nodeId);
+    const event = node === undefined ? undefined : simulationEvent(node, port, payload);
+    if (event === undefined) {
+      return failure('AUTHORING_REQUEST_INVALID', DESIGNER_UI_TEXT.blueprint.invalidCommand);
+    }
+    const compiled = compileScreenBlueprint(document, { hasBlueprintCapability: () => true });
+    if (!compiled.ok) return compiled;
+    const plan = compiled.value;
+    const steps: BaseScreenBlueprintCanvasTraceStep[] = [];
+    const executedEdgeIds = new Set<string>();
+    const visitedNodeIds = new Set<string>([nodeId]);
+    const titles = new Map(this.callbacks.getGraph().nodes.map((item) => [item.id, item.title]));
+    let variables: ScreenJsonObject = plan.initialVariables;
+    // 模拟里的从画布状态：弹框从全部关闭开始，页面从起始页开始；真正变化时才级联
+    // 「已打开 / 已关闭」与「页面已切换」（同查看器的顺序：先关弹框 → 旧页离开 → 新页进入）。
+    const openPopups = new Set<string>();
+    const pageIds = (document.subCanvases ?? [])
+      .filter((canvas) => canvas.display === 'page')
+      .map((canvas) => canvas.id);
+    let currentPage: string | null = resolveScreenStartPageId(document);
+    const pageHistory: string[] = [];
+    const enqueue = (next: ScreenBlueprintEvent, depth: number): void => {
+      queue.push({ event: next, depth });
+    };
+    const goPage = (
+      target: string | undefined,
+      payload: ScreenJsonValue | undefined,
+      remember: boolean,
+      depth: number,
+    ): void => {
+      if (target === undefined || target === currentPage || !pageIds.includes(target)) return;
+      for (const popupId of [...openPopups].reverse()) {
+        openPopups.delete(popupId);
+        enqueue({ type: 'canvas-event', canvasId: popupId, name: 'closed', payload: null }, depth);
+      }
+      const from = currentPage;
+      if (from !== null) {
+        if (remember) pageHistory.push(from);
+        enqueue({ type: 'canvas-event', canvasId: from, name: 'closed', payload: null }, depth);
+      }
+      currentPage = target;
+      enqueue(
+        { type: 'canvas-event', canvasId: target, name: 'opened', payload: payload ?? null },
+        depth,
+      );
+      enqueue({ type: 'page-changed', name: 'page-changed', payload: { from, to: target } }, depth);
+    };
+    let failed = false;
+    const queue: { readonly event: ScreenBlueprintEvent; readonly depth: number }[] = [
+      { event, depth: 0 },
+    ];
+    while (queue.length > 0) {
+      const { event: current, depth } = queue.shift()!;
+      if (depth > MAX_SIMULATION_CASCADE) {
+        steps.push({ kind: 'error', depth, text: TEXT.simulation.depthExceeded });
+        failed = true;
+        break;
+      }
+      const traced = traceScreenBlueprintEvent(plan, variables, current);
+      if (!traced.ok) {
+        steps.push({
+          kind: 'error',
+          depth,
+          text: traced.diagnostics[0]?.message ?? DESIGNER_UI_TEXT.blueprint.invalidCommand,
+        });
+        failed = true;
+        break;
+      }
+      for (const ruleTrace of traced.value.ruleTraces) {
+        if (!ruleTrace.triggerMatched) continue;
+        const rule = plan.rules.find((candidate) => candidate.id === ruleTrace.ruleId);
+        if (rule === undefined) continue;
+        visitedNodeIds.add(rule.nodeId);
+        steps.push({
+          kind: depth === 0 ? 'trigger' : 'cascade',
+          nodeId: rule.nodeId,
+          depth,
+          text: titles.get(rule.nodeId) ?? rule.nodeId,
+        });
+        const conditions = [...ruleTrace.conditions];
+        const actions = [...ruleTrace.actions];
+        const walk = (ruleSteps: readonly ScreenBlueprintRuleStep[], level: number): void => {
+          for (const step of ruleSteps) {
+            if (step.type === 'condition') {
+              const evaluated = conditions[0];
+              if (evaluated === undefined || evaluated.nodeId !== step.nodeId) return;
+              conditions.shift();
+              executedEdgeIds.add(step.edgeId);
+              visitedNodeIds.add(step.nodeId);
+              steps.push({
+                kind: 'condition',
+                nodeId: step.nodeId,
+                edgeId: step.edgeId,
+                passed: evaluated.passed,
+                depth: level,
+                text: `${titles.get(step.nodeId) ?? step.nodeId} · ${
+                  evaluated.passed ? TEXT.simulation.passed : TEXT.simulation.failed
+                }`,
+              });
+              walk(evaluated.passed ? step.yes : step.no, level + 1);
+              continue;
+            }
+            const executed = actions[0];
+            if (executed === undefined || executed.edgeId !== step.edgeId) continue;
+            actions.shift();
+            executedEdgeIds.add(step.edgeId);
+            const target = document.blueprint.edges.find((edge) => edge.id === step.edgeId)?.to
+              .node;
+            if (target !== undefined) visitedNodeIds.add(target);
+            steps.push({
+              kind:
+                step.action.type === 'request-variable' ||
+                step.action.type === 'request-component-data'
+                  ? 'request'
+                  : 'action',
+              edgeId: step.edgeId,
+              ...(target === undefined ? {} : { nodeId: target }),
+              depth: level,
+              text: describeAction(step.action, document),
+            });
+          }
+        };
+        walk(rule.steps, depth + 1);
+      }
+      const next = traced.value.variables;
+      for (const [variableId, value] of Object.entries(next)) {
+        if (screenJsonEquals(value, variables[variableId] ?? null) && variableId in variables) {
+          continue;
+        }
+        queue.push({
+          event: { type: 'variable-event', variableId, name: 'data-updated', payload: value },
+          depth: depth + 1,
+        });
+      }
+      variables = next;
+      for (const effect of traced.value.canvasEffects) {
+        if (effect.type === 'page-navigation') {
+          if (effect.operation === 'back') {
+            goPage(pageHistory.pop(), undefined, false, depth + 1);
+          } else {
+            const index = currentPage === null ? -1 : pageIds.indexOf(currentPage);
+            goPage(
+              pageIds[effect.operation === 'next' ? index + 1 : index - 1],
+              undefined,
+              true,
+              depth + 1,
+            );
+          }
+          continue;
+        }
+        if (pageIds.includes(effect.canvasId)) {
+          const open =
+            effect.operation === 'open' ||
+            (effect.operation === 'toggle' && effect.canvasId !== currentPage);
+          if (open) goPage(effect.canvasId, effect.payload, true, depth + 1);
+          else if (effect.canvasId === currentPage) {
+            goPage(pageHistory.pop(), undefined, false, depth + 1);
+          }
+          continue;
+        }
+        const open =
+          effect.operation === 'open'
+            ? true
+            : effect.operation === 'close'
+              ? false
+              : !openPopups.has(effect.canvasId);
+        if (open === openPopups.has(effect.canvasId)) continue;
+        if (open) openPopups.add(effect.canvasId);
+        else openPopups.delete(effect.canvasId);
+        enqueue(
+          {
+            type: 'canvas-event',
+            canvasId: effect.canvasId,
+            name: open ? 'opened' : 'closed',
+            payload: open ? (effect.payload ?? null) : null,
+          },
+          depth + 1,
+        );
+      }
+    }
+    this.#trace = {
+      trigger: { nodeId, port },
+      executedEdgeIds: [...executedEdgeIds],
+      visitedNodeIds: [...visitedNodeIds],
+      steps,
+      failed,
+    };
     return { ok: true, value: null, diagnostics: [] };
   }
 
@@ -409,5 +589,61 @@ export class DesignerBlueprintCanvasBridge {
 
   private get capabilities(): { readonly hasBlueprintCapability: (id: string) => boolean } {
     return blueprintCapabilityReader(this.callbacks.getRuntimeContributions);
+  }
+}
+
+/** 触发锚点 → 运行时事件；不是触发锚点时返回 `undefined`。 */
+function simulationEvent(
+  node: ScreenBlueprint['nodes'][number],
+  port: string,
+  payload: ScreenJsonValue,
+): ScreenBlueprintEvent | undefined {
+  if (node.kind === 'component') {
+    const name = readScreenBlueprintEventPort(port);
+    return name === undefined ? undefined : { componentId: node.componentId, name, payload };
+  }
+  if (node.kind === 'variable' && port === 'data-updated') {
+    return { type: 'variable-event', variableId: node.variableId, name: 'data-updated', payload };
+  }
+  if (node.kind === 'lifecycle' && port === 'ready') {
+    return { type: 'lifecycle', name: 'ready', payload };
+  }
+  if (node.kind === 'timer' && port === 'tick') {
+    return { type: 'timer', name: 'tick', intervalSeconds: node.intervalSeconds, payload };
+  }
+  if (node.kind === 'sub-canvas' && (port === 'opened' || port === 'closed')) {
+    return { type: 'canvas-event', canvasId: node.canvasId, name: port, payload };
+  }
+  if (node.kind === 'main-canvas' && port === 'page-changed') {
+    return { type: 'page-changed', name: 'page-changed', payload };
+  }
+  return undefined;
+}
+
+function describeAction(action: ScreenBlueprintAction, document: ScreenDocument): string {
+  const componentName = (id: string) =>
+    document.components.find((component) => component.id === id)?.name ?? id;
+  switch (action.type) {
+    case 'component-visibility':
+      return `${TEXT.ports[action.operation] ?? action.operation} · ${componentName(action.componentId)}`;
+    case 'request-component-data':
+      return TEXT.simulation.requested(componentName(action.componentId));
+    case 'request-variable':
+      return TEXT.simulation.requested(action.variableId);
+    case 'set-variable':
+      return DESIGNER_UI_TEXT.blueprint.setVariableAction(action.variableId);
+    case 'emit-host-event':
+      return DESIGNER_UI_TEXT.blueprint.emitHostEventAction(action.eventName);
+    case 'host-action':
+      return DESIGNER_UI_TEXT.blueprint.hostAction(action.actionId);
+    case 'canvas-visibility': {
+      const canvas = document.subCanvases?.find((candidate) => candidate.id === action.canvasId);
+      return DESIGNER_UI_TEXT.blueprint.canvasAction(
+        TEXT.subCanvasPorts[canvas?.display ?? 'popup'][action.operation] ?? action.operation,
+        canvas?.name ?? action.canvasId,
+      );
+    }
+    case 'page-navigation':
+      return TEXT.mainCanvasPorts[action.operation] ?? action.operation;
   }
 }

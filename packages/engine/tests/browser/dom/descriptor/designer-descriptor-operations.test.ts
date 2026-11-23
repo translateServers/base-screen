@@ -74,7 +74,7 @@ const document: ScreenDocument = {
     },
   ],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 
 const interaction = { selectedComponentIds: ['chart-1'], focusedComponentId: 'chart-1' };

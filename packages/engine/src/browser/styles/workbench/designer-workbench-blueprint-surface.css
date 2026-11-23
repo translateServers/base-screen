@@ -108,7 +108,6 @@
   grid-template-rows: var(--designer-row-height-comfortable) minmax(0, 1fr);
 }
 
-.designer[data-authoring-mode="blueprint"] .rail > .scenes,
 .designer[data-authoring-mode="blueprint"] .rail > .rail-tabs,
 .designer[data-authoring-mode="blueprint"] .rail > .rail-view:not(.host-left-panel-view),
 .designer[data-authoring-mode="blueprint"] .inspector-tabs,

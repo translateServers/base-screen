@@ -172,11 +172,7 @@ describe('DesignerWorkbenchController canvas state', () => {
     expect(measurements.map((child) => child.className)).toEqual(
       Array(3).fill('canvas-measurement canvas-measurement-equal'),
     );
-    expect(measurements.map((child) => child.children[0]?.textContent)).toEqual([
-      '47',
-      '47',
-      '47',
-    ]);
+    expect(measurements.map((child) => child.children[0]?.textContent)).toEqual(['47', '47', '47']);
   });
 
   it('R2 clears transient snap overlays when snapping or border guides are toggled', () => {
@@ -296,7 +292,7 @@ describe('DesignerWorkbenchController snap session', () => {
       canvas: { width: 800, height: 600, backgroundColor: '#000000' },
       components: [componentNode('a', left), componentNode('b', 300)],
       variables: [],
-      blueprint: { relations: [] },
+      blueprint: { nodes: [], edges: [] },
     };
   }
 

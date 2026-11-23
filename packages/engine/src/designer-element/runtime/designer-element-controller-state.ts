@@ -1,3 +1,4 @@
+import { resolveScreenStartPageId } from '@base-screen/contracts';
 import { DesignerBlueprintWorkbenchController } from '../../browser/controllers/blueprint/designer-blueprint-workbench-controller.js';
 import { DesignerDatasetPanelController } from '../../browser/controllers/dataset/designer-dataset-panel-controller.js';
 import { DesignerCanvasRuntimeController } from '../../browser/controllers/designer-canvas-runtime-controller.js';
@@ -5,7 +6,10 @@ import { DesignerCommandPaletteController } from '../../browser/controllers/desi
 import { DesignerImportController } from '../../browser/controllers/designer-import-controller.js';
 import { DesignerIntegrationController } from '../../browser/controllers/designer-integration-controller.js';
 import { DesignerIntentChoiceController } from '../../browser/controllers/designer-intent-choice-controller.js';
+import { DesignerPagePreviewController } from '../../browser/controllers/designer-page-preview-controller.js';
+import { DesignerPopupPreviewController } from '../../browser/controllers/designer-popup-preview-controller.js';
 import { DesignerPreviewController } from '../../browser/controllers/designer-preview-controller.js';
+import { DesignerReferenceLayerController } from '../../browser/controllers/designer-reference-layer-controller.js';
 import { DesignerTextEditController } from '../../browser/controllers/designer-text-edit-controller.js';
 import { DesignerTopbarController } from '../../browser/controllers/designer-topbar-controller.js';
 import { DesignerViewportController } from '../../browser/controllers/designer-viewport-controller.js';
@@ -35,10 +39,6 @@ import {
   type BaseScreenDesignerChangeStateDetail,
 } from '../../common/operations/change/designer-change-events.js';
 import type { DesignerParameterPatch } from '../../common/operations/intent/designer-parameter-intent.js';
-import {
-  BASE_SCREEN_SCENE_CHANGE_EVENT,
-  type BaseScreenSceneChangeDetail,
-} from '../../common/operations/scene/designer-scene.js';
 import {
   BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT,
   type BaseScreenDesignerBackRequestEventDetail,
@@ -79,6 +79,36 @@ export function initializeDesignerElementControllers(
         }),
       ),
     emitDiagnostics: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
+    applyCanvasEffects: (effects, variables) => {
+      state.popupPreviewController.apply(effects, variables);
+      state.pagePreviewController.apply(effects);
+    },
+    resetPopups: () => state.popupPreviewController.reset(),
+  });
+  state.referenceLayerController = new DesignerReferenceLayerController({
+    createRenderer: (root) => state.runtime.createReferenceRenderer(element, root),
+    getRendererKey: () => state.catalog,
+    getDocument: () => state.session.fullDocument,
+    getReferenceCanvas: () => state.artboardController.referenceCanvas(),
+    getContentRoot: () =>
+      state.canvas?.querySelector<HTMLElement>('[data-canvas-content]') ?? undefined,
+    getVariables: () => state.canvasRuntimeController.readVariables(),
+  });
+  state.pagePreviewController = new DesignerPagePreviewController({
+    getDocument: () => state.session.fullDocument,
+    getArtboard: () => state.session.artboard,
+    setArtboard: (artboard) => state.session.setArtboard(artboard),
+    isEnabled: () => state.workbenchController.nativeEventsEnabled && !isPopupArtboard(state),
+    onChange: (change) => state.canvasRuntimeController.handleCanvasChange(change),
+  });
+  state.popupPreviewController = new DesignerPopupPreviewController({
+    createRenderer: (root, onMaterialEvent, onCanvasChange) =>
+      state.runtime.createPopupPreviewRenderer(element, root, onMaterialEvent, onCanvasChange),
+    getRendererKey: () => state.catalog,
+    getDocument: () => state.session.fullDocument,
+    isEnabled: () => state.workbenchController.nativeEventsEnabled && !isPopupArtboard(state),
+    onMaterialEvent: (event) => state.runtime.forwardNativeMaterialEvent(element, event),
+    onPopupChange: (change) => state.canvasRuntimeController.handleCanvasChange(change),
   });
   state.topbarController = new DesignerTopbarController({
     getHost: () => element,
@@ -108,6 +138,8 @@ export function initializeDesignerElementControllers(
     emitChange: (document) => {
       state.documentGeneration++;
       state.blueprintWorkbenchController.dispatchState();
+      state.artboardController.render();
+      state.referenceLayerController.sync();
       // 文档提交/撤销/重做/替换都不经 renderInteraction，面板必须在这里也拿到新快照。
       state.runtime.syncDesignerPluginPanels(element);
       state.runtime.emitChange(element, document);
@@ -138,6 +170,21 @@ export function initializeDesignerElementControllers(
       );
     },
     onConflict: () => element.dispatchEvent(new CustomEvent('base-screen-project-conflict')),
+    onArtboardChange: (artboard) => {
+      state.popupPreviewController.reset();
+      state.artboardController.render();
+      state.referenceLayerController.sync();
+      element.toggleAttribute('data-artboard-popup', isPopupArtboard(state));
+      element.toggleAttribute('data-artboard-sub', artboard !== null);
+      state.runtime.renderControls(element);
+      element.dispatchEvent(
+        new CustomEvent('base-screen-artboard-change', {
+          bubbles: true,
+          composed: true,
+          detail: { artboard },
+        }),
+      );
+    },
     onReady: ({ projectId, revision }) => {
       state.runtime.resetSessionSurfaces(element);
       state.lastSavedAt = Date.now();
@@ -151,7 +198,7 @@ export function initializeDesignerElementControllers(
     getProjectCatalogPort: () => state.projectCatalogPort,
     getProjectPreviewPort: () => state.projectPreviewPort,
     getProjectSnapshotPort: () => state.projectSnapshotPort,
-    getDocument: () => state.session.document,
+    getDocument: () => state.session.fullDocument,
     getProject: () => state.session.project,
     replaceDocument: (document) => element.replaceDocument(document),
     loadProject: (projectId) => state.session.load(projectId),
@@ -265,7 +312,7 @@ export function initializeDesignerElementControllers(
   });
   state.previewController = new DesignerPreviewController({
     getCatalog: () => state.catalog,
-    getDocument: () => state.session.document,
+    getDocument: () => state.session.fullDocument,
     getResourcePort: () => state.resourcePort,
     getHostCatalogPort: () => state.hostCatalogPort,
     getDatasetPort: () => state.datasetPort,
@@ -339,8 +386,32 @@ export function initializeDesignerElementControllers(
     report: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
     notify: (message) => state.notificationController.notify(message, 'success'),
   });
+  state.artboardController.setContext({
+    getDocument: () => state.session.fullDocument,
+    getArtboard: () => state.session.artboard,
+    setArtboard: (artboard) => state.session.setArtboard(artboard),
+    execute: (transaction) => state.session.executeFullTransaction(transaction),
+    reportDiagnostics: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
+    notify: (message) => state.notificationController.notify(message, 'success'),
+    // 换画板后按首屏口径重放：放得下就 100% 居中，放不下才适应窗口（弹框通常比主画布小）。
+    fit: () => {
+      state.viewportController.reset();
+      state.viewportController.fitOnFirstRender();
+    },
+    onReferenceChange: () => state.referenceLayerController.sync(),
+  });
   state.panelController = new DesignerPanelController({
     getCatalog: () => state.catalog,
+    getArtboardSubCanvas: () => {
+      const artboard = state.session.artboard;
+      return artboard === null
+        ? undefined
+        : state.session.fullDocument?.subCanvases?.find((canvas) => canvas.id === artboard);
+    },
+    getStartPageId: () => {
+      const document = state.session.fullDocument;
+      return document === undefined ? null : resolveScreenStartPageId(document);
+    },
     getMaterialLibraryItems: () => state.resolvedMaterialLibraryItems,
     getMaterialLibraryGrouping: () => state.materialLibraryGrouping,
     getMaterialLibraryFragments: () => state.runtime.listMaterialLibraryFragmentItems(element),
@@ -587,28 +658,6 @@ export function initializeDesignerElementControllers(
       ...(diagnostic === undefined ? {} : { reason: designerDiagnosticSummary(diagnostic.code) }),
     };
   });
-  // 场景切换 = 宿主提供命令 + 引擎预览，应用时仍走一次普通事务（可撤销、可回退）。
-  state.sceneController.setContext({
-    getDocument: () => state.session.document,
-    canPreview: () => state.changeController.pending === undefined,
-    notify: (message, tone) => state.notificationController.notify(message, tone),
-    apply: (commands, provenance) => {
-      const result = state.runtime.executeDesignerTransaction(element, { commands, provenance });
-      state.runtime.report(element, result);
-      return result.ok;
-    },
-    previewed: () => emitMetric('scene_preview'),
-    applied: (sceneId, label) => {
-      emitMetric('scene_apply');
-      element.dispatchEvent(
-        new CustomEvent<BaseScreenSceneChangeDetail>(BASE_SCREEN_SCENE_CHANGE_EVENT, {
-          bubbles: true,
-          composed: true,
-          detail: { sceneId, label },
-        }),
-      );
-    },
-  });
 }
 
 /** 数值意图命中后写回组件的补丁：只改命中的那一个字段，其余样式原样带上。 */
@@ -629,4 +678,14 @@ function parameterComponentPatch(
     return { size: { ...component.size, width: patch.value } };
   }
   return { size: { ...component.size, height: patch.value } };
+}
+
+/** 当前画板是不是弹框：弹框画板上不预览别的弹框、也不切页。 */
+function isPopupArtboard(state: DesignerElementState): boolean {
+  const artboard = state.session.artboard;
+  if (artboard === null) return false;
+  return (
+    state.session.fullDocument?.subCanvases?.find((canvas) => canvas.id === artboard)?.display ===
+    'popup'
+  );
 }

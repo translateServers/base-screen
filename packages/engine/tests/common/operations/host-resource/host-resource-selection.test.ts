@@ -36,7 +36,7 @@ function document(
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
     components: [source],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
     ...(dataSources === undefined ? {} : { dataSources }),
   };
 }

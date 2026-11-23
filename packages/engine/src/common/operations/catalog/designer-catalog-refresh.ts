@@ -1,4 +1,8 @@
-import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
+import {
+  readScreenBlueprintEventPort,
+  type ScreenDiagnostic,
+  type ScreenDocument,
+} from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialCatalogDiff,
@@ -54,19 +58,28 @@ export function collectCatalogCompatibilityDiagnostics(
   }
 
   const componentsById = new Map(document.components.map((component) => [component.id, component]));
-  const relations = document.blueprint.relations;
-  for (let relationIndex = 0; relationIndex < relations.length; relationIndex++) {
-    const relation = relations[relationIndex]!;
-    if (relation.type !== 'behavior' || relation.source.kind !== 'component') continue;
-    const source = relation.source;
+  const nodes = new Map(document.blueprint.nodes.map((node) => [node.id, node]));
+  const edges = document.blueprint.edges;
+  for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex++) {
+    const edge = edges[edgeIndex]!;
+    if (edge.kind !== 'flow') continue;
+    const source = nodes.get(edge.from.node);
+    if (source?.kind !== 'component') continue;
     const component = componentsById.get(source.componentId);
     if (component === undefined || !changedTypes.has(component.type)) continue;
     const entry = catalog.get(component.type);
-    if (entry === undefined || entry.manifest.events.includes(source.event.eventName)) continue;
+    const eventName = readScreenBlueprintEventPort(edge.from.port);
+    if (
+      entry === undefined ||
+      eventName === undefined ||
+      entry.manifest.events.includes(eventName)
+    ) {
+      continue;
+    }
     diagnostics.push({
       severity: 'error',
       code: 'PLUGIN_CORE_EVENT_PAYLOAD_INVALID',
-      path: ['blueprint', 'relations', relationIndex, 'source', 'event', 'eventName'],
+      path: ['blueprint', 'edges', edgeIndex, 'from', 'port'],
       message: 'Blueprint references an event that is no longer declared by the material.',
     });
   }

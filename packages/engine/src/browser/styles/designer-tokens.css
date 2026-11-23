@@ -149,6 +149,59 @@
   /* 提示气泡必须压在全部弹层之上：菜单/对话框打开时其内部控件仍可悬停出提示。 */
   --designer-z-popover: 35;
   --designer-z-tooltip: 40;
+  /* ── 蓝图节点图（ADR-0107 §2.6 / D5）──
+     与设计器其余部分同一套语言：中性灰阶，强调色只给「选中」与「模拟轨迹」。
+     连线是中性细线 + 线中方向箭头；选中节点 / 连线时，所在链路换强调色、其余退后；
+     模拟轨迹在强调色上叠流动虚线。卡片见下方卡片配方。只被蓝图画布引用，不是宿主覆盖位，
+     所以放在共享块而不进主题块（designer-styles.mjs 要求主题块令牌带覆盖位）。 */
+  --designer-blueprint-edge: color-mix(in srgb, var(--designer-text-primary) 32%, transparent);
+  --designer-blueprint-edge-hover: var(--designer-text-secondary);
+  --designer-blueprint-edge-active: var(--designer-accent);
+  --designer-blueprint-edge-semantic: color-mix(
+    in srgb,
+    var(--designer-text-primary) 26%,
+    transparent
+  );
+  --designer-blueprint-edge-connecting: var(--designer-accent);
+  --designer-blueprint-edge-width: 1.5px;
+  --designer-blueprint-edge-width-active: 2px;
+  --designer-blueprint-edge-dim: 0.3;
+  /* 卡片沿用设计器的卡片配方（物料卡片同款）：raised 底 + 1px 中性描边 + 圆角 8 + 浮起阴影；
+     选中与设计画布选中框同一画法（2px 强调色描边），不加光晕。 */
+  --designer-blueprint-port: var(--designer-border-active);
+  --designer-blueprint-port-surface: var(--designer-surface-raised);
+  --designer-blueprint-port-snap: var(--designer-accent);
+  --designer-blueprint-selection: var(--designer-accent);
+  --designer-blueprint-node-surface: var(--designer-surface-raised);
+  --designer-blueprint-node-border: var(--designer-border-default);
+  --designer-blueprint-node-border-hover: var(--designer-border-active);
+  --designer-blueprint-node-shadow: var(--designer-shadow-float);
+  --designer-blueprint-node-header-divider: var(--designer-border-subtle);
+  --designer-blueprint-node-dim: 0.55;
+  --designer-blueprint-label-shadow: var(--designer-shadow-float);
+  --designer-blueprint-marquee: var(--designer-accent);
+  --designer-blueprint-marquee-fill: color-mix(in srgb, var(--designer-accent) 12%, transparent);
+  --designer-blueprint-accent-component: #5b8def;
+  --designer-blueprint-accent-variable: #3fb871;
+  --designer-blueprint-accent-host: #f08a3c;
+  --designer-blueprint-accent-lifecycle: #27b3a2;
+  --designer-blueprint-accent-timer: #9a83f2;
+  --designer-blueprint-accent-condition: #33b2dc;
+  /* 卡片几何：圆角取 radius-4（与物料卡片一致）；标题栏 44px、左右 12px、图标块 24。
+     标题栏高与锚点行高不能只改这里——连线端点由画布按 HEADER_HEIGHT / ROW_HEIGHT 计算，
+     节点高度估算在 designer-blueprint-model.ts 的 CARD_HEADER，三处同步。 */
+  --designer-blueprint-node-radius: var(--designer-radius-4);
+  --designer-blueprint-node-icon: 24px;
+  --designer-blueprint-node-header-height: 44px;
+  --designer-blueprint-node-header-gap: 10px;
+  --designer-blueprint-node-header-inline: 12px;
+  --designer-blueprint-node-content-padding: 12px 13px 13px;
+  /* 锚点骑在卡片外缘：圆心落在边框上，连线直接接到卡片边（而不是伸进卡片内部）。
+     -(内容区左右内距 13 + 边框 1 + 圆点半径 6)；改内距必须同步这里。 */
+  --designer-blueprint-port-offset: -20px;
+  --designer-blueprint-port-gap: 8px;
+  --designer-blueprint-label-radius: 6px;
+  --designer-blueprint-label-inline: 8px;
 }
 
 /* 浅色：宿主显式写 theme="light" 才生效。 */

@@ -1,5 +1,4 @@
 import type {
-  ScreenBlueprintRelation,
   ScreenComponentNode,
   ScreenDataSource,
   ScreenDiagnostic,
@@ -17,13 +16,13 @@ import {
   type BaseScreenComponentFragmentInsertionIntent,
   type BaseScreenFragmentDataSource,
   type BaseScreenFragmentNode,
-  type BaseScreenFragmentRelation,
   type BaseScreenMaterialCatalog,
   type BaseScreenMaterialManifest,
   resolveBaseScreenMaterialDefaultStyle,
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
+import { mergeDesignerBlueprintFragment } from '../blueprint/designer-blueprint-graph.js';
 import { roundScreenGeometry } from '../element/designer-geometry.js';
 import {
   createMaterialComponent,
@@ -61,8 +60,8 @@ export interface BaseScreenComponentFragmentInsertion {
   readonly focusedComponentId: string;
   /** 本次生成的文档级数据源 id（分片 key 重映射后），按声明顺序。 */
   readonly dataSourceIds: readonly string[];
-  /** 本次追加的蓝图关系 id（分片 key 重映射后），按声明顺序。 */
-  readonly relationIds: readonly string[];
+  /** 本次追加的蓝图连线 id（分片 key 重映射后），按声明顺序。 */
+  readonly edgeIds: readonly string[];
 }
 
 /** 分片落点策略，见 `createBaseScreenComponentFragmentTransaction`。 */
@@ -194,9 +193,12 @@ export function createBaseScreenComponentFragmentTransaction(input: {
       y: roundScreenGeometry(component.position.y + top),
     },
   }));
-  const relations = remapRelations(document, intent.relations ?? [], idsByFragmentKey);
+  const merged =
+    intent.blueprint === undefined
+      ? undefined
+      : mergeDesignerBlueprintFragment(document.blueprint, intent.blueprint, idsByFragmentKey);
 
-  // 顺序即依赖：数据源先于读取它的组件，蓝图关系最后（端点必须已存在）。整片仍是一个事务。
+  // 顺序即依赖：数据源先于读取它的组件，蓝图最后（组件节点引用的组件必须已存在）。整片仍是一个事务。
   const commands: ScreenDocumentCommand[] = [];
   if (dataSources.length > 0) {
     commands.push({
@@ -205,14 +207,8 @@ export function createBaseScreenComponentFragmentTransaction(input: {
     });
   }
   for (const component of components) commands.push({ type: 'add-component', component });
-  if (relations.length > 0) {
-    commands.push({
-      type: 'replace-blueprint',
-      blueprint: {
-        ...document.blueprint,
-        relations: [...document.blueprint.relations, ...relations],
-      },
-    });
+  if (merged !== undefined && merged.blueprint !== document.blueprint) {
+    commands.push({ type: 'replace-blueprint', blueprint: merged.blueprint });
   }
   const createdIds = new Set(components.map((component) => component.id));
   const selectionIds = components
@@ -226,7 +222,7 @@ export function createBaseScreenComponentFragmentTransaction(input: {
       selectionIds,
       focusedComponentId: selectionIds[0] ?? components[0]!.id,
       dataSourceIds: dataSources.map((source) => source.id),
-      relationIds: relations.map((relation) => relation.id),
+      edgeIds: merged?.edgeIds ?? [],
     },
     diagnostics: [],
   };
@@ -256,40 +252,6 @@ function remapDataSources(
 function remapValueRef(ref: ScreenValueRef, idsByKey: ReadonlyMap<string, string>): ScreenValueRef {
   if (ref.kind !== 'data-source-field') return ref;
   return { ...ref, dataSourceId: idsByKey.get(ref.dataSourceId) ?? ref.dataSourceId };
-}
-
-/** 关系端点改写为真实组件 id，关系 id 在文档内去重。解析器已保证端点全在分片内、不含变量。 */
-function remapRelations(
-  document: ScreenDocument,
-  relations: readonly BaseScreenFragmentRelation[],
-  idsByKey: ReadonlyMap<string, string>,
-): ScreenBlueprintRelation[] {
-  const taken = new Set(document.blueprint.relations.map((relation) => relation.id));
-  const component = (key: string) => idsByKey.get(key) ?? key;
-  return relations.map((relation) => {
-    const id = uniqueIdentifier(relation.id, taken);
-    taken.add(id);
-    if (relation.type === 'semantic') {
-      return {
-        ...relation,
-        id,
-        source: { ...relation.source, componentId: component(relation.source.componentId) },
-        target: { ...relation.target, componentId: component(relation.target.componentId) },
-      };
-    }
-    return {
-      ...relation,
-      id,
-      source:
-        relation.source.kind === 'component'
-          ? { ...relation.source, componentId: component(relation.source.componentId) }
-          : relation.source,
-      target:
-        relation.target.kind === 'component'
-          ? { ...relation.target, componentId: component(relation.target.componentId) }
-          : relation.target,
-    };
-  });
 }
 
 /** 与组件 id 同一词法（≤128）：分片 key ≤64，加 `-N` 后缀不会越界。 */

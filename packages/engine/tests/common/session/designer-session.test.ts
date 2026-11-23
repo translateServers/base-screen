@@ -27,7 +27,7 @@ function document(name = '文本'): ScreenDocument {
       },
     ],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 

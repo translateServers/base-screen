@@ -61,7 +61,7 @@ function documentWith(partial: Partial<ScreenDocument>): ScreenDocument {
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
     ...partial,
   };
 }
@@ -97,19 +97,24 @@ const CARD = documentWith({
     { id: 'unused', name: '无关', source: { kind: 'dataset', datasetId: 'x' }, params: {} },
   ],
   blueprint: {
-    relations: [
+    nodes: [
+      { kind: 'component', id: 'component:title', componentId: 'title' },
+      { kind: 'component', id: 'component:value', componentId: 'value' },
+      { kind: 'component', id: 'component:elsewhere', componentId: 'elsewhere' },
+    ],
+    edges: [
       {
-        type: 'semantic',
+        kind: 'semantic',
         id: 'inside',
-        source: { kind: 'component', componentId: 'title' },
-        target: { kind: 'component', componentId: 'value' },
+        from: { node: 'component:title' },
+        to: { node: 'component:value' },
         role: 'detail',
       },
       {
-        type: 'semantic',
+        kind: 'semantic',
         id: 'outside',
-        source: { kind: 'component', componentId: 'title' },
-        target: { kind: 'component', componentId: 'elsewhere' },
+        from: { node: 'component:title' },
+        to: { node: 'component:elsewhere' },
         role: 'related',
       },
     ],
@@ -150,12 +155,16 @@ describe('extractBaseScreenComponentFragment', () => {
     expect(extracted.value.nodes[1]?.dataBinding).toEqual({ fields: { value: ['amount'] } });
   });
 
-  it('keeps relations inside the selection and warns about the ones that reach outside', () => {
+  it('keeps edges inside the selection and warns about the ones that reach outside', () => {
     const extracted = extract(CARD, ['card']);
     if (!extracted.ok) throw new Error('extract failed');
-    expect(extracted.value.relations?.map((relation) => relation.id)).toEqual(['inside']);
+    expect(extracted.value.blueprint?.edges.map((edge) => edge.id)).toEqual(['inside']);
+    expect(extracted.value.blueprint?.nodes.map((node) => node.id)).toEqual([
+      'component:title',
+      'component:value',
+    ]);
     expect(extracted.diagnostics).toEqual([
-      expect.objectContaining({ severity: 'warning', path: ['relations'] }),
+      expect.objectContaining({ severity: 'warning', path: ['blueprint'] }),
     ]);
   });
 
@@ -172,7 +181,7 @@ describe('extractBaseScreenComponentFragment', () => {
     if (!built.ok) return;
     expect(built.value.componentIds).toHaveLength(3);
     expect(built.value.dataSourceIds).toEqual(['sales-2', 'detail-2']);
-    expect(built.value.relationIds).toEqual(['inside-2']);
+    expect(built.value.edgeIds).toEqual(['inside-2']);
   });
 
   it('treats several selected roots as plain nodes without a shell', () => {

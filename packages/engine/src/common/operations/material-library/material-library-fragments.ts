@@ -169,7 +169,7 @@ export function fragmentBody(fragment: BaseScreenFragmentBody): BaseScreenFragme
     ...(fragment.shell === undefined ? {} : { shell: fragment.shell }),
     nodes: fragment.nodes,
     ...(fragment.dataSources === undefined ? {} : { dataSources: fragment.dataSources }),
-    ...(fragment.relations === undefined ? {} : { relations: fragment.relations }),
+    ...(fragment.blueprint === undefined ? {} : { blueprint: fragment.blueprint }),
   };
 }
 
@@ -244,7 +244,7 @@ function trialDocument(): ScreenDocument {
     canvas: { width: TRIAL_CANVAS_EXTENT, height: TRIAL_CANVAS_EXTENT, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 

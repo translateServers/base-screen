@@ -303,7 +303,23 @@ describe('designer panel rendering', () => {
           ...entry,
           manifest: {
             ...entry.manifest,
-            editorDescriptor: { appearance: [{ id: 'text', label: 'Text', fields: [] }] },
+            editorDescriptor: {
+              appearance: [
+                {
+                  id: 'text',
+                  label: 'Text',
+                  fields: [
+                    {
+                      id: 'color',
+                      target: 'style',
+                      path: ['color'],
+                      label: 'Color',
+                      control: 'color',
+                    },
+                  ],
+                },
+              ],
+            },
           },
         };
       },
@@ -330,7 +346,7 @@ describe('designer panel rendering', () => {
     const all = descendants(properties);
     // 描述符取代扁平外观区：扁平 prop 控件不再出现……
     expect(all.some((element) => element.dataset.prop === 'title')).toBe(false);
-    // ……但条件样式与宿主条件样式按 stylePanel 颜色键照常出现。
+    // ……条件样式与宿主条件样式按描述符开放的颜色字段出现（ADR-0102 D1：外观字段表唯一来源）。
     expect(
       all.some((element) => element.className.includes('designer-conditional-style-section')),
     ).toBe(true);

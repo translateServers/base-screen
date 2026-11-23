@@ -42,7 +42,7 @@ function documentWith(dataSources: readonly ScreenDataSource[], dataValue = true
       },
     ],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
     dataSources,
   } as ScreenDocument;
 }
@@ -50,12 +50,18 @@ function documentWith(dataSources: readonly ScreenDataSource[], dataValue = true
 describe('authoringToUpdatePolicy', () => {
   it('maps once / manual / auto', () => {
     const base = createDatasetAuthoringView();
-    expect(authoringToUpdatePolicy({ ...base, refreshStrategy: 'once' }, undefined, undefined)).toEqual({
+    expect(
+      authoringToUpdatePolicy({ ...base, refreshStrategy: 'once' }, undefined, undefined),
+    ).toEqual({
       mode: 'once',
     });
     expect(authoringToUpdatePolicy(base, undefined, undefined)).toEqual({ mode: 'manual' });
     expect(
-      authoringToUpdatePolicy({ ...base, refreshStrategy: 'auto', refreshInterval: 12 }, undefined, undefined),
+      authoringToUpdatePolicy(
+        { ...base, refreshStrategy: 'auto', refreshInterval: 12 },
+        undefined,
+        undefined,
+      ),
     ).toEqual({ mode: 'auto', intervalSeconds: 12 });
   });
 
@@ -90,18 +96,18 @@ describe('sameUpdatePolicy', () => {
         { fallbackIntervalSeconds: 5, mode: 'push', retain: { rows: 3 } },
       ),
     ).toBe(true);
-    expect(sameUpdatePolicy({ mode: 'auto', intervalSeconds: 5 }, { mode: 'auto', intervalSeconds: 6 })).toBe(
-      false,
-    );
+    expect(
+      sameUpdatePolicy({ mode: 'auto', intervalSeconds: 5 }, { mode: 'auto', intervalSeconds: 6 }),
+    ).toBe(false);
   });
 });
 
 describe('readUpdatePolicyTarget', () => {
   it('only document instances are writable', () => {
     expect(readUpdatePolicyTarget(documentWith([instance]), 'c1').kind).toBe('document');
-    expect(
-      readUpdatePolicyTarget(documentWith([{ ...instance, readOnly: true }]), 'c1').kind,
-    ).toBe('read-only');
+    expect(readUpdatePolicyTarget(documentWith([{ ...instance, readOnly: true }]), 'c1').kind).toBe(
+      'read-only',
+    );
     // 旧形态内联数据源：派生实例不在 dataSources 里。
     expect(readUpdatePolicyTarget(documentWith([], false), 'c1').kind).toBe('inline');
     expect(readUpdatePolicyTarget(documentWith([instance]), 'missing').kind).toBe('inline');
@@ -110,7 +116,12 @@ describe('readUpdatePolicyTarget', () => {
 
 describe('createUpdatePolicyTransaction', () => {
   it('is a no-op when the policy is unchanged', () => {
-    const result = createUpdatePolicyTransaction(documentWith([instance]), instance, { mode: 'manual' }, undefined);
+    const result = createUpdatePolicyTransaction(
+      documentWith([instance]),
+      instance,
+      { mode: 'manual' },
+      undefined,
+    );
     expect(result).toEqual({ ok: true, value: null, diagnostics: [] });
   });
 
@@ -133,9 +144,15 @@ describe('createUpdatePolicyTransaction', () => {
   });
 
   it('rejects switching to push when the source cannot push, but keeps existing push instances editable', () => {
-    const rejected = createUpdatePolicyTransaction(documentWith([instance]), instance, { mode: 'push' }, undefined);
+    const rejected = createUpdatePolicyTransaction(
+      documentWith([instance]),
+      instance,
+      { mode: 'push' },
+      undefined,
+    );
     expect(rejected.ok).toBe(false);
-    if (!rejected.ok) expect(rejected.diagnostics[0]?.code).toBe('DATA_SOURCE_UPDATE_POLICY_INVALID');
+    if (!rejected.ok)
+      expect(rejected.diagnostics[0]?.code).toBe('DATA_SOURCE_UPDATE_POLICY_INVALID');
     const pushing = { ...instance, updatePolicy: { mode: 'push' as const } };
     const kept = createUpdatePolicyTransaction(
       documentWith([pushing]),
@@ -163,7 +180,11 @@ describe('reconcileAuthoringWithPolicy', () => {
       pushFallbackInterval: 9,
       pushRetainRows: 7,
     });
-    const back = reconcileAuthoringWithPolicy(reseeded, { mode: 'auto', intervalSeconds: 3 }, undefined);
+    const back = reconcileAuthoringWithPolicy(
+      reseeded,
+      { mode: 'auto', intervalSeconds: 3 },
+      undefined,
+    );
     expect(back).toMatchObject({ refreshStrategy: 'auto', refreshInterval: 3 });
     expect(back).not.toHaveProperty('pushFallbackInterval');
     expect(back).not.toHaveProperty('pushRetainRows');
@@ -174,9 +195,15 @@ describe('authoringUpdatePolicyForNewInstance', () => {
   it('carries once / auto, skips manual and push (dataset sources cannot push)', () => {
     const base = createDatasetAuthoringView();
     expect(authoringUpdatePolicyForNewInstance(base)).toBeUndefined();
-    expect(authoringUpdatePolicyForNewInstance({ ...base, refreshStrategy: 'push' })).toBeUndefined();
     expect(
-      authoringUpdatePolicyForNewInstance({ ...base, refreshStrategy: 'auto', refreshInterval: 20 }),
+      authoringUpdatePolicyForNewInstance({ ...base, refreshStrategy: 'push' }),
+    ).toBeUndefined();
+    expect(
+      authoringUpdatePolicyForNewInstance({
+        ...base,
+        refreshStrategy: 'auto',
+        refreshInterval: 20,
+      }),
     ).toEqual({ mode: 'auto', intervalSeconds: 20 });
   });
 });

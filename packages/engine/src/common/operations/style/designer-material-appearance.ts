@@ -7,7 +7,6 @@ import {
   inferBaseScreenMaterialEditorControl,
   resolveSchema,
 } from '@base-screen/plugin-core';
-import { DESIGNER_UI_TEXT } from '../../ui-text/designer-ui-text.js';
 
 /**
  * 外观区的唯一来源（base-screen-docs ADR-0102 D1）。
@@ -17,7 +16,23 @@ import { DESIGNER_UI_TEXT } from '../../ui-text/designer-ui-text.js';
  * 宿主条件样式都从这里取字段，不再各自读扁平面板。
  *
  * 结果按 manifest 引用缓存：catalog 里的 manifest 是不可变值，热刷新换的是新引用。
+ *
+ * 扁平面板转换出的两个分区标题是作者面文案：common/operations 不依赖 ui-text 子层（engine-import 门禁），
+ * 由渲染方经 `labels` 传入；不传时分区标题为分区 id（只读字段表的调用方用不到标题）。
  */
+export interface DesignerMaterialAppearanceLabels {
+  readonly content: string;
+  readonly style: string;
+}
+
+const synthesizedSections = new WeakSet<readonly BaseScreenMaterialEditorSection[]>();
+const labelledCache = new WeakMap<
+  readonly BaseScreenMaterialEditorSection[],
+  {
+    readonly labels: DesignerMaterialAppearanceLabels;
+    readonly sections: readonly BaseScreenMaterialEditorSection[];
+  }
+>();
 const appearanceCache = new WeakMap<
   BaseScreenMaterialManifest,
   readonly BaseScreenMaterialEditorSection[]
@@ -26,14 +41,28 @@ const keyCache = new WeakMap<BaseScreenMaterialManifest, readonly DesignerMateri
 
 export function designerMaterialAppearance(
   manifest: BaseScreenMaterialManifest,
+  labels?: DesignerMaterialAppearanceLabels,
 ): readonly BaseScreenMaterialEditorSection[] {
-  const cached = appearanceCache.get(manifest);
-  if (cached !== undefined) return cached;
-  const declared = manifest.editorDescriptor?.appearance;
-  const sections =
-    declared !== undefined && declared.length > 0 ? declared : flatPanelSections(manifest);
-  appearanceCache.set(manifest, sections);
-  return sections;
+  let sections = appearanceCache.get(manifest);
+  if (sections === undefined) {
+    const declared = manifest.editorDescriptor?.appearance;
+    if (declared !== undefined && declared.length > 0) {
+      sections = declared;
+    } else {
+      sections = flatPanelSections(manifest);
+      synthesizedSections.add(sections);
+    }
+    appearanceCache.set(manifest, sections);
+  }
+  if (labels === undefined || !synthesizedSections.has(sections)) return sections;
+  const labelled = labelledCache.get(sections);
+  if (labelled !== undefined && labelled.labels === labels) return labelled.sections;
+  const titled = sections.map((section) => ({
+    ...section,
+    label: section.id === 'content' ? labels.content : labels.style,
+  }));
+  labelledCache.set(sections, { labels, sections: titled });
+  return titled;
 }
 
 /** 外观区里一个顶层 props / style 键对应的字段。 */
@@ -103,7 +132,7 @@ function flatPanelSections(
   if (content.length > 0) {
     sections.push({
       id: 'content',
-      label: DESIGNER_UI_TEXT.propertiesPanel.content,
+      label: 'content',
       fields: content,
     });
   }
@@ -119,7 +148,7 @@ function flatPanelSections(
       : [flatField('style', item.style, item.label, item.control, item.allowGradient, schema)];
   });
   if (style.length > 0) {
-    sections.push({ id: 'style', label: DESIGNER_UI_TEXT.propertiesPanel.style, fields: style });
+    sections.push({ id: 'style', label: 'style', fields: style });
   }
   return sections;
 }

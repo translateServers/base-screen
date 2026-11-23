@@ -157,6 +157,8 @@ export function initializeDesignerElementOperations(
     getSelectedComponentIds: () => state.session.interaction.selectedComponentIds,
     getOperationState: (id) => state.operations.getState(id, undefined),
     getPluginCommandItems: (menu) => state.runtime.listPluginCommandItems(element, menu),
+    getCanvasMenuSection: (componentIds) =>
+      state.artboardController.contextMenuSection(componentIds),
   });
   state.surfaceRouter = new DesignerSurfaceRouter();
 }

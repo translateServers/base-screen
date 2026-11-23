@@ -25,6 +25,12 @@
   font-size: var(--designer-font-size-base);
 }
 
+/* 开关 / 复选框字段行没有控件列，同样落在 30px 一档行盒上；横向排布由检查器层负责。 */
+.inspector-pane .designer-field:has(> .designer-switch),
+.inspector-pane .designer-field:has(> .designer-checkbox) {
+  min-height: var(--designer-control-height);
+}
+
 /* 滑杆读数是一个普通数字框：高度、内距、字体与数字输入同一档（ADR-0102 §3.2/§3.4），
    以前这里是 28px + 12px 等宽，紧挨着 30px 的数字框一眼能看出矮一截。 */
 .inspector-pane .designer-field-range-value {

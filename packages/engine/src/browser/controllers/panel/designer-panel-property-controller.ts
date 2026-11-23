@@ -45,6 +45,8 @@ export class DesignerPanelPropertyController {
       this.callbacks.getInspectorControls?.(),
       this.callbacks.getHostConditionalStyleAuthoring?.(),
       this.callbacks.refreshConditionalStyles,
+      this.callbacks.getArtboardSubCanvas?.(),
+      this.callbacks.getStartPageId?.() ?? null,
     );
     restoreInspectorFocus(properties, focus);
   }

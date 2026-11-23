@@ -5,6 +5,7 @@ import {
   type ScreenInteractionState,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { listDesignerArtboardComponentIds } from '../../../common/session/designer-artboard.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerIconName } from '../../dom/designer-icons.js';
 import { materialCategoryIcon } from '../material-library/designer-material-library-dom.js';
@@ -105,7 +106,13 @@ export function createDesignerLayerView(
   const byId = new Map(document.components.map((component) => [component.id, component]));
   const order = new Map(document.components.map((component, index) => [component.id, index]));
   const children = new Map<string | null, string[]>();
+  // 只列当前画板的组件（ADR-0109）：别的画板的组件在视图里只是被隐藏锁定。
+  const onArtboard =
+    (document.subCanvases?.length ?? 0) > 0
+      ? listDesignerArtboardComponentIds(document)
+      : undefined;
   for (const component of document.components) {
+    if (onArtboard !== undefined && !onArtboard.has(component.id)) continue;
     const siblings = children.get(component.parentId) ?? [];
     siblings.push(component.id);
     children.set(component.parentId, siblings);
@@ -133,18 +140,16 @@ export function createDesignerLayerView(
   };
 }
 
-/** 出现在任何蓝图关系（触发器源、目标、动作目标）里的组件 id。 */
+/** 在蓝图里有节点且至少连了一条线的组件 id。 */
 function collectInteractedComponents(document: ScreenDocument): ReadonlySet<string> {
+  const connected = new Set<string>();
+  for (const edge of document.blueprint.edges) {
+    connected.add(edge.from.node);
+    connected.add(edge.to.node);
+  }
   const ids = new Set<string>();
-  for (const relation of document.blueprint.relations) {
-    if (relation.type === 'semantic') {
-      ids.add(relation.source.componentId);
-      ids.add(relation.target.componentId);
-      continue;
-    }
-    // effect 只描述「做什么」，作用对象由 source / target 承载，不另带组件 id。
-    if ('componentId' in relation.source) ids.add(relation.source.componentId);
-    if ('componentId' in relation.target) ids.add(relation.target.componentId);
+  for (const node of document.blueprint.nodes) {
+    if (node.kind === 'component' && connected.has(node.id)) ids.add(node.componentId);
   }
   return ids;
 }

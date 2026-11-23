@@ -27,8 +27,6 @@ export function submitChangeProposal(
   const elementState = getDesignerElementState(element);
   const document = elementState.session.document;
   if (document === undefined) return { ok: false, diagnostics: [] };
-  // 场景预览也是「未写入」提示：提案到达时先静默撤掉它，避免两条提示互相矛盾。
-  elementState.sceneController.cancelPreview(true);
   elementState.changeGeneration += 1;
   const id = `change-${elementState.changeGeneration}`;
   const prepared = prepareDesignerChangeProposal(document, input, id);

@@ -1,4 +1,9 @@
-import type { ScreenComponentNode, ScreenDocument, ScreenJsonValue } from '@base-screen/contracts';
+import type {
+  ScreenComponentNode,
+  ScreenDocument,
+  ScreenJsonValue,
+  ScreenSubCanvas,
+} from '@base-screen/contracts';
 import { MAX_STYLE_RULES_PER_COMPONENT } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import { isScreenComponentEffectivelyLocked } from '@base-screen/core';
@@ -72,6 +77,8 @@ export function renderDesignerProperties(
   inspectorControls?: BaseScreenPluginInspectorControlCatalog | undefined,
   hostConditionalStyleAuthoring?: BaseScreenHostConditionalStyleAuthoringPort,
   refreshConditionalStyles?: (componentIds: readonly string[]) => void,
+  artboardSubCanvas?: ScreenSubCanvas,
+  startPageId?: string | null,
 ): void {
   properties.replaceChildren();
   const context = getDesignerInspectorContext(document, interaction, catalog);
@@ -82,6 +89,8 @@ export function renderDesignerProperties(
         document,
         hostResourceSelectionButtonVisible,
         canvasPresentation,
+        artboardSubCanvas,
+        startPageId,
       );
     }
     return;
@@ -255,13 +264,17 @@ function appendComponentControls(
   appendDesignerQuickStyle(properties, manifest, { components: [component] });
 
   // 外观区只有一条渲染路径（ADR-0102 D1）：扁平面板先转换成描述符分区再渲染。
-  renderDesignerDescriptorZone(properties, designerMaterialAppearance(manifest), {
-    document,
-    interaction,
-    catalog,
-    getDatasetFields,
-    inspectorControls,
-  });
+  renderDesignerDescriptorZone(
+    properties,
+    designerMaterialAppearance(manifest, DESIGNER_UI_TEXT.propertiesPanel),
+    {
+      document,
+      interaction,
+      catalog,
+      getDatasetFields,
+      inspectorControls,
+    },
+  );
   // 条件样式与宿主条件样式从同一份外观字段表识别可绑字段。
   appendConditionalStyleSection(properties, component, manifest);
   if (

@@ -1,8 +1,9 @@
 import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
 import {
-  buildDesignerBlueprintComponentLibrary,
   buildDesignerBlueprintGraph,
-  insertDesignerBlueprintVariableNode,
+  findComponentBlueprintNode,
+  findVariableBlueprintNode,
+  insertDesignerBlueprintNode,
 } from '../../../common/operations/blueprint/designer-blueprint-model.js';
 import {
   BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT,
@@ -14,6 +15,7 @@ import {
   type BaseScreenDesignerWorkbenchMode,
   type BaseScreenDesignerWorkbenchModeChangeEventDetail,
   type BaseScreenDesignerWorkbenchModeChangeReason,
+  EMPTY_BLUEPRINT_CANVAS_SELECTION,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { parseDesignerWorkbenchModeRequest } from '../../../common/operations/workbench/designer-workbench-mode.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
@@ -26,15 +28,33 @@ import { DesignerBlueprintCanvasBridge } from './designer-blueprint-canvas-bridg
 import { DesignerBlueprintPanelsController } from './designer-blueprint-panels-controller.js';
 import type { DesignerBlueprintWorkbenchCallbacks } from './designer-blueprint-workbench-callbacks.js';
 
+const EMPTY_GRAPH: BaseScreenBlueprintCanvasGraph = Object.freeze({
+  nodes: Object.freeze([]),
+  edges: Object.freeze([]),
+}) as unknown as BaseScreenBlueprintCanvasGraph;
+
 export class DesignerBlueprintWorkbenchPanel {
   #root: ShadowRoot | undefined;
   #slot: HTMLSlotElement | undefined;
   #defaultCanvasHost: HTMLElement | undefined;
   #defaultCanvas: DesignerBlueprintDefaultCanvasHandle | undefined;
   #mode: BaseScreenDesignerWorkbenchMode = 'canvas';
-  #selection: BaseScreenBlueprintCanvasSelection = null;
+  #selection: BaseScreenBlueprintCanvasSelection = EMPTY_BLUEPRINT_CANVAS_SELECTION;
+  #showSemantic = true;
   #viewRequest: BaseScreenBlueprintCanvasState['viewRequest'];
   #viewRequestId = 0;
+  #graphCache:
+    | {
+        readonly document: NonNullable<
+          ReturnType<DesignerBlueprintWorkbenchCallbacks['getDocument']>
+        >;
+        readonly catalog: ReturnType<DesignerBlueprintWorkbenchCallbacks['getCatalog']>;
+        readonly contributions: ReturnType<
+          DesignerBlueprintWorkbenchCallbacks['getRuntimeContributions']
+        >;
+        readonly graph: BaseScreenBlueprintCanvasGraph;
+      }
+    | undefined;
   readonly #bridge: DesignerBlueprintCanvasBridge;
   readonly #panels: DesignerBlueprintPanelsController;
   readonly #onSlotChange = (): void => this.resolveCanvas();
@@ -45,6 +65,7 @@ export class DesignerBlueprintWorkbenchPanel {
       getGraph: () => this.graph,
       getMode: () => this.#mode,
       getSelection: () => this.#selection,
+      getShowSemantic: () => this.#showSemantic,
       getViewRequest: () => this.#viewRequest,
       getCatalog: callbacks.getCatalog,
       getRuntimeContributions: callbacks.getRuntimeContributions,
@@ -58,13 +79,29 @@ export class DesignerBlueprintWorkbenchPanel {
       redo: callbacks.redo,
       render: () => this.render(),
       emitDiagnostics: callbacks.emitDiagnostics,
+      // 模拟后检查器切到「运行」页：作者不用再找轨迹在哪。
+      onSimulated: () => this.#panels.showTrace(),
     });
     this.#panels = new DesignerBlueprintPanelsController({
       getDocument: callbacks.getDocument,
       getGraph: () => this.graph,
       getCatalog: callbacks.getCatalog,
-      getComponentLibrary: () => this.componentLibrary,
+      getRuntimeContributions: callbacks.getRuntimeContributions,
       getSelection: () => this.#selection,
+      getShowSemantic: () => this.#showSemantic,
+      setShowSemantic: (value) => {
+        this.#showSemantic = value;
+        this.render();
+      },
+      requestView: (type) => {
+        this.#viewRequest = { id: ++this.#viewRequestId, type };
+        this.render();
+      },
+      simulate: (nodeId, port, payload) => this.#bridge.simulate(nodeId, port, payload),
+      clearTrace: () => {
+        this.#bridge.clearTrace();
+        this.render();
+      },
       getDiagnostics: () => this.#bridge.stateDiagnostics(),
       getTrace: () => this.#bridge.trace,
       getLeftPanelGroups: callbacks.getLeftPanelGroups,
@@ -147,9 +184,12 @@ export class DesignerBlueprintWorkbenchPanel {
   addVariableNode(variableId: string): void {
     const document = this.callbacks.getDocument();
     if (document === undefined) return;
-    const blueprint = insertDesignerBlueprintVariableNode(document, variableId);
-    if (blueprint !== null) {
-      const result = this.callbacks.executeCommand({ type: 'replace-blueprint', blueprint });
+    const inserted = insertDesignerBlueprintNode(document, { kind: 'variable', variableId });
+    if (inserted?.created === true) {
+      const result = this.callbacks.executeCommand({
+        type: 'replace-blueprint',
+        blueprint: inserted.blueprint,
+      });
       if (!result.ok) {
         this.callbacks.emitDiagnostics(result.diagnostics);
         return;
@@ -159,7 +199,8 @@ export class DesignerBlueprintWorkbenchPanel {
   }
 
   resetSession(): void {
-    this.#selection = null;
+    this.#selection = EMPTY_BLUEPRINT_CANVAS_SELECTION;
+    this.#showSemantic = true;
     this.#viewRequest = undefined;
     this.#panels.reset();
     this.#bridge.reset();
@@ -186,11 +227,15 @@ export class DesignerBlueprintWorkbenchPanel {
       return failure('BLUEPRINT_CAPABILITY_UNAVAILABLE', DESIGNER_UI_TEXT.blueprint.noHostCanvas);
     }
     if (options.focus !== undefined) {
+      const inserted = this.ensureFocusNode(options.focus);
+      if (!inserted.ok) return inserted;
       const targetId = this.resolveFocus(options.focus);
       if (targetId === undefined) {
         return failure('AUTHORING_REQUEST_INVALID', DESIGNER_UI_TEXT.blueprint.invalidSelection);
       }
-      this.#selection = { kind: this.graphHasEdge(targetId) ? 'edge' : 'node', id: targetId };
+      this.#selection = this.graphHasEdge(targetId)
+        ? { nodes: [], edges: [targetId] }
+        : { nodes: [targetId], edges: [] };
       this.#viewRequest = { id: ++this.#viewRequestId, type: 'focus', targetId };
     }
     const previousMode = this.#mode;
@@ -227,12 +272,11 @@ export class DesignerBlueprintWorkbenchPanel {
     const paletteTarget = target.closest<HTMLElement>('[data-blueprint-search-id]')?.dataset
       .blueprintSearchId;
     if (paletteTarget !== undefined) {
-      const selected = this.select(
-        { kind: this.graphHasEdge(paletteTarget) ? 'edge' : 'node', id: paletteTarget },
-        true,
-      );
-      if (!selected.ok) this.callbacks.emitDiagnostics(selected.diagnostics);
-      const switched = this.setMode('blueprint', {}, 'user');
+      const focus = parseBlueprintSearchId(paletteTarget);
+      const switched =
+        focus === undefined
+          ? failure<null>('AUTHORING_REQUEST_INVALID', DESIGNER_UI_TEXT.blueprint.invalidSelection)
+          : this.focusOrInsert(focus);
       if (!switched.ok) this.callbacks.emitDiagnostics(switched.diagnostics);
       return true;
     }
@@ -279,26 +323,58 @@ export class DesignerBlueprintWorkbenchPanel {
     return true;
   }
 
+  /**
+   * 画布投影只取决于文档、物料目录与插件贡献（三者都是不可变快照，换内容即换引用）。
+   * 一次选中切换会经 render → 面板 / 桥接多次读取它，按引用缓存，避免每次点击重建整张图。
+   */
   private get graph(): BaseScreenBlueprintCanvasGraph {
     const document = this.callbacks.getDocument();
-    return document === undefined
-      ? { nodes: [], edges: [] }
-      : buildDesignerBlueprintGraph(
-          document,
-          this.callbacks.getCatalog(),
-          this.callbacks.getRuntimeContributions(),
-        );
+    if (document === undefined) return EMPTY_GRAPH;
+    const catalog = this.callbacks.getCatalog();
+    const contributions = this.callbacks.getRuntimeContributions();
+    const cached = this.#graphCache;
+    if (
+      cached !== undefined &&
+      cached.document === document &&
+      cached.catalog === catalog &&
+      cached.contributions === contributions
+    ) {
+      return cached.graph;
+    }
+    const graph = buildDesignerBlueprintGraph(
+      document,
+      catalog,
+      contributions,
+      DESIGNER_UI_TEXT.blueprint,
+    );
+    this.#graphCache = { document, catalog, contributions, graph };
+    return graph;
   }
 
-  private get componentLibrary(): BaseScreenBlueprintCanvasGraph['nodes'] {
+  /** 搜索结果 / 引用列表定位：组件与变量不在图中时先加入节点，再切到蓝图并聚焦。 */
+  private focusOrInsert(focus: BaseScreenDesignerWorkbenchFocus): ScreenParseResult<null> {
+    return this.setMode('blueprint', { focus }, 'user');
+  }
+
+  /** 定位组件 / 变量时它们可能还没有节点：先以一条文档命令加入，再解析聚焦目标。 */
+  private ensureFocusNode(focus: BaseScreenDesignerWorkbenchFocus): ScreenParseResult<null> {
     const document = this.callbacks.getDocument();
-    return document === undefined
-      ? []
-      : buildDesignerBlueprintComponentLibrary(
-          document,
-          this.callbacks.getCatalog(),
-          this.callbacks.getRuntimeContributions(),
-        );
+    if (document !== undefined && (focus.kind === 'component' || focus.kind === 'variable')) {
+      const inserted = insertDesignerBlueprintNode(
+        document,
+        focus.kind === 'component'
+          ? { kind: 'component', componentId: focus.id }
+          : { kind: 'variable', variableId: focus.id },
+      );
+      if (inserted?.created === true) {
+        const result = this.callbacks.executeCommand({
+          type: 'replace-blueprint',
+          blueprint: inserted.blueprint,
+        });
+        if (!result.ok) return { ok: false, diagnostics: result.diagnostics };
+      }
+    }
+    return success(null);
   }
 
   private mountDefaultCanvas(): void {
@@ -350,55 +426,50 @@ export class DesignerBlueprintWorkbenchPanel {
     selection: BaseScreenBlueprintCanvasSelection,
     requestView: boolean,
   ): ScreenParseResult<null> {
-    if (selection !== null) {
-      const exists =
-        selection.kind === 'node'
-          ? this.graph.nodes.some((node) => node.id === selection.id)
-          : this.graph.edges.some((edge) => edge.id === selection.id);
-      if (!exists) {
-        return failure('AUTHORING_REQUEST_INVALID', DESIGNER_UI_TEXT.blueprint.invalidSelection);
-      }
+    const graph = this.graph;
+    const nodeIds = new Set(graph.nodes.map((node) => node.id));
+    const edgeIds = new Set(graph.edges.map((edge) => edge.id));
+    if (
+      selection.nodes.some((id) => !nodeIds.has(id)) ||
+      selection.edges.some((id) => !edgeIds.has(id))
+    ) {
+      return failure('AUTHORING_REQUEST_INVALID', DESIGNER_UI_TEXT.blueprint.invalidSelection);
     }
-    this.#selection = selection;
-    if (requestView && selection !== null) {
-      this.#viewRequest = { id: ++this.#viewRequestId, type: 'focus', targetId: selection.id };
+    this.#selection = { nodes: [...selection.nodes], edges: [...selection.edges] };
+    const target = selection.nodes[0] ?? selection.edges[0];
+    if (requestView && target !== undefined) {
+      this.#viewRequest = { id: ++this.#viewRequestId, type: 'focus', targetId: target };
     }
     this.render();
     return success(null);
   }
 
   private reconcileSelection(graph: BaseScreenBlueprintCanvasGraph): void {
-    if (this.#selection === null) return;
-    const exists =
-      this.#selection.kind === 'node'
-        ? graph.nodes.some((node) => node.id === this.#selection?.id)
-        : graph.edges.some((edge) => edge.id === this.#selection?.id);
-    if (!exists) this.#selection = null;
+    const nodeIds = new Set(graph.nodes.map((node) => node.id));
+    const edgeIds = new Set(graph.edges.map((edge) => edge.id));
+    const nodes = this.#selection.nodes.filter((id) => nodeIds.has(id));
+    const edges = this.#selection.edges.filter((id) => edgeIds.has(id));
+    if (
+      nodes.length !== this.#selection.nodes.length ||
+      edges.length !== this.#selection.edges.length
+    ) {
+      this.#selection = { nodes, edges };
+    }
   }
 
   private resolveFocus(focus: BaseScreenDesignerWorkbenchFocus): string | undefined {
-    const graph = this.graph;
+    const document = this.callbacks.getDocument();
+    if (document === undefined) return undefined;
     if (focus.kind === 'component') {
-      const id = `component:${focus.id}`;
-      return graph.nodes.some((node) => node.id === id) ? id : undefined;
+      return findComponentBlueprintNode(document.blueprint, focus.id)?.id;
     }
     if (focus.kind === 'variable') {
-      const id = `variable:${focus.id}`;
-      return graph.nodes.some((node) => node.id === id) ? id : undefined;
+      return findVariableBlueprintNode(document.blueprint, focus.id)?.id;
     }
-    if (focus.kind === 'relation') {
-      return (
-        graph.edges.find((edge) => edge.relationId === focus.id)?.id ??
-        (this.graphHasEdge(focus.id) ? focus.id : undefined)
-      );
+    if (focus.kind === 'node') {
+      return document.blueprint.nodes.some((node) => node.id === focus.id) ? focus.id : undefined;
     }
-    if (focus.kind === 'rule') {
-      return graph.edges.find((edge) => edge.relationId === focus.id)?.id;
-    }
-    if (graph.nodes.some((node) => node.id === focus.id) || this.graphHasEdge(focus.id)) {
-      return focus.id;
-    }
-    return undefined;
+    return this.graphHasEdge(focus.id) ? focus.id : undefined;
   }
 
   private graphHasEdge(id: string): boolean {
@@ -412,13 +483,12 @@ export class DesignerBlueprintWorkbenchPanel {
     const problems = this.#bridge
       .stateDiagnostics()
       .filter((item) => item.severity === 'error').length;
-    const relations = document?.blueprint.relations ?? [];
+    const edges = document?.blueprint.edges ?? [];
     renderDesignerBlueprintWorkbenchChrome(root, this.#mode, this.available, {
-      nodes: this.componentLibrary.length,
-      relations: relations.length,
-      semantic: relations.filter((relation) => relation.type === 'semantic').length,
-      structural:
-        document?.components.filter((component) => component.parentId !== null).length ?? 0,
+      nodes: document?.blueprint.nodes.length ?? 0,
+      relations: edges.filter((edge) => edge.kind === 'flow').length,
+      semantic: edges.filter((edge) => edge.kind === 'semantic').length,
+      structural: 0,
       problems,
     });
   }
@@ -449,4 +519,16 @@ function success<T>(value: T): ScreenParseResult<T> {
 
 function failure<T>(code: ScreenDiagnostic['code'], message: string): ScreenParseResult<T> {
   return { ok: false, diagnostics: [diagnostic(code, message)] };
+}
+
+/** `data-blueprint-search-id` 的四种写法：`component:<id>`、`variable:<id>`、`node:<id>`、`edge:<id>`。 */
+function parseBlueprintSearchId(value: string): BaseScreenDesignerWorkbenchFocus | undefined {
+  const separator = value.indexOf(':');
+  if (separator <= 0) return undefined;
+  const kind = value.slice(0, separator);
+  const id = value.slice(separator + 1);
+  if (id === '') return undefined;
+  return kind === 'component' || kind === 'variable' || kind === 'node' || kind === 'edge'
+    ? { kind, id }
+    : undefined;
 }

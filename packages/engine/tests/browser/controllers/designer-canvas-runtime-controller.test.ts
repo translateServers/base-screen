@@ -12,7 +12,7 @@ import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-cor
 import type { BaseScreenRenderer } from '@base-screen/renderer';
 import { describe, expect, it, vi } from 'vitest';
 import { DesignerCanvasRuntimeController } from '../../../src/browser/controllers/designer-canvas-runtime-controller.js';
-import { relationsFromRules } from '../../__fixtures__/blueprint-relations.js';
+import { graphFromRules } from '../../__fixtures__/blueprint-graph.js';
 
 class FakeRenderer implements BaseScreenRenderer {
   readonly calls: string[] = [];
@@ -86,6 +86,18 @@ class FakeRenderer implements BaseScreenRenderer {
   }
 
   resetBlueprintVisibility(): void {}
+  applyBlueprintCanvasEffects(): void {}
+  openCanvas(): boolean {
+    return false;
+  }
+  closeCanvas(): boolean {
+    return false;
+  }
+  announceStartPage(): void {}
+  isCanvasOpen(): boolean {
+    return false;
+  }
+  readonly currentPage = null;
   clear(): void {}
   dispose(): void {}
 }
@@ -98,7 +110,7 @@ function documentWith(
     canvas: { width: 960, height: 540, backgroundColor },
     components: [],
     variables,
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 
@@ -507,7 +519,7 @@ describe('DesignerCanvasRuntimeController', () => {
     const document: ScreenDocument = {
       ...documentWith([{ type: 'static', id: 'status', name: 'status', initialValue: 'idle' }]),
       blueprint: {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'run-on-click',
             trigger: { type: 'material-event', componentId: 'button', eventName: 'valueClick' },
@@ -567,7 +579,7 @@ describe('DesignerCanvasRuntimeController', () => {
         { type: 'static', id: 'mirror-id', name: 'mirror', initialValue: 'idle' },
       ]),
       blueprint: {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'mirror-status',
             trigger: {
@@ -611,7 +623,7 @@ describe('DesignerCanvasRuntimeController', () => {
     const document: ScreenDocument = {
       ...documentWith([]),
       blueprint: {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'unsupported-visibility',
             trigger: { type: 'material-event', componentId: 'button', eventName: 'valueClick' },

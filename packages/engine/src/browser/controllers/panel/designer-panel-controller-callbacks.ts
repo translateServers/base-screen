@@ -4,6 +4,7 @@ import type {
   ScreenHostResourcePort,
   ScreenParseResult,
   ScreenSize,
+  ScreenSubCanvas,
 } from '@base-screen/contracts';
 import type {
   ScreenDocumentCommand,
@@ -32,6 +33,10 @@ export interface DesignerPanelControllerCallbacks {
   /** 把一份分片插到可见画布中心；失败诊断由实现方上报，成功后整片成为选中项。 */
   readonly insertMaterialLibraryFragment?: (fragmentId: string) => void;
   readonly getDocument: () => ScreenDocument | undefined;
+  /** 当前画板是从画布时返回它（ADR-0109）；检查器据此在画布段之前给出从画布设置。 */
+  readonly getArtboardSubCanvas?: () => ScreenSubCanvas | undefined;
+  /** 起始页 id（页面设置里标出「当前起始页」）。 */
+  readonly getStartPageId?: () => string | null;
   /**
    * 设计器表面是否存在非折叠文本选区：有选区时复制快捷键必须让位给浏览器原生复制，
    * 否则面板/只读文本选中后按 Ctrl+C 会被"复制选中组件"吞掉。

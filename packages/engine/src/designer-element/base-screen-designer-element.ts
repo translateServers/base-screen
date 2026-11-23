@@ -69,10 +69,6 @@ import type { BaseScreenComponentInsertionIntent } from '../common/operations/ma
 import { type BaseScreenMaterialLibraryGrouping } from '../common/operations/material-library/material-library-grouping.js';
 import { type BaseScreenMaterialLibraryItem } from '../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../common/operations/material-library/material-library-state.js';
-import type {
-  DesignerSceneDescriptor,
-  DesignerSceneHandler,
-} from '../common/operations/scene/designer-scene.js';
 import { type BaseScreenDesignerLeftPanelGroup } from '../common/operations/workbench/designer-left-panel-groups.js';
 import type { ScreenProjectState } from '../common/project/project-controller.js';
 import { type DesignerToolMaterialTypes } from '../common/tools/designer-tools.js';
@@ -382,6 +378,16 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.getDocument(this);
   }
 
+  /** 当前编辑的画板（ADR-0108）：`null` 是主画布，其余是弹框 id。 */
+  get artboard(): string | null {
+    return this.#designerState.session.artboard;
+  }
+
+  /** 切换编辑画板；不改文档、不进历史。弹框不存在时失败关闭。 */
+  setArtboard(artboard: string | null): ScreenParseResult<null> {
+    return this.#designerState.session.setArtboard(artboard);
+  }
+
   replaceDocument(document: ScreenDocument): ScreenParseResult<ScreenDocument> {
     return this.#designerState.runtime.replaceDocument(this, document);
   }
@@ -620,37 +626,6 @@ export class BaseScreenDesignerElement extends ElementBase {
    */
   requestComponentChoice(candidateIds: readonly string[], prompt = ''): Promise<string | null> {
     return this.#designerState.runtime.requestComponentChoice(this, candidateIds, prompt);
-  }
-
-  /**
-   * 宿主提供的场景目录（左栏顶部）：只包含身份与展示名，内容由 `setSceneHandler` 产出。
-   * 传 `undefined` 清除目录；`activeSceneId` 用于标记当前场景。
-   */
-  setSceneCatalog(
-    scenes: readonly DesignerSceneDescriptor[] | undefined,
-    activeSceneId?: string,
-  ): ScreenParseResult<null> {
-    return this.#designerState.runtime.setSceneCatalog(this, scenes, activeSceneId);
-  }
-
-  setActiveScene(sceneId: string | undefined): void {
-    this.#designerState.runtime.setActiveScene(this, sceneId);
-  }
-
-  get activeSceneId(): string | undefined {
-    return this.#designerState.runtime.readActiveSceneId(this);
-  }
-
-  get sceneAvailable(): boolean {
-    return this.#designerState.runtime.readSceneAvailable(this);
-  }
-
-  /**
-   * 绑定场景处理器：宿主把目标场景翻译成一批文档命令。引擎在副本上试算后只挂预览，
-   * 用户点「应用」才走一次事务；不调用模型、不按场景名推断内容。
-   */
-  setSceneHandler(handler: DesignerSceneHandler | undefined): void {
-    this.#designerState.runtime.setSceneHandler(this, handler);
   }
 
   /** 进入评审态：画布只读、右栏固定为智能体页签，逐条批准/驳回。 */

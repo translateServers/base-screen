@@ -637,12 +637,11 @@
 }
 
 /* 开关字段行（`createDesignerSwitchField`，ADR-0102 §5）：页面配置、组件检查器、描述符、多选批量
-   都是这一行——标签在左、开关贴右、整行可点且显示手型。行高与其他字段同为 30px；标签不受
-   74px 标签列限制，长标签换行而不是被截断。 */
+   都是这一行——标签在左、开关贴右、整行可点且显示手型。行高（30px）属于字段行骨架，在控件层
+   designer-controls-fields.css；标签不受 74px 标签列限制，长标签换行而不是被截断。 */
 .properties .inspector-pane .designer-field:has(> .designer-switch),
 .properties .inspector-pane .designer-field:has(> .designer-checkbox) {
   display: flex;
-  min-height: var(--designer-control-height);
   align-items: center;
   justify-content: space-between;
   gap: var(--designer-space-4);

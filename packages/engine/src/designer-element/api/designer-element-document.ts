@@ -19,7 +19,7 @@ import {
 export function getDocument(element: DesignerElementHost): ScreenDocument | undefined {
   const elementState = getDesignerElementState(element);
 
-  return elementState.session.document;
+  return elementState.session.fullDocument;
 }
 
 export function getSelection(element: DesignerElementHost): ScreenInteractionState {

@@ -1,43 +1,50 @@
-import {
-  type ScreenBlueprint,
-  type ScreenBlueprintRelationEffect,
-  type ScreenDocument,
-  type ScreenParseResult,
+import type {
+  ScreenBlueprint,
+  ScreenBlueprintCondition,
+  ScreenBlueprintValueExpression,
+  ScreenDocument,
+  ScreenJsonValue,
+  ScreenParseResult,
 } from '@base-screen/contracts';
-import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { parseScreenJsonValue } from '@base-screen/contracts';
+import type {
+  BaseScreenMaterialCatalog,
+  BaseScreenRuntimeContributionIndex,
+} from '@base-screen/plugin-core';
 import {
-  componentBlueprintNodeId,
+  buildDesignerBlueprintComponentLibrary,
+  buildDesignerBlueprintVariableLibrary,
+  type DesignerBlueprintNodeSpec,
   deleteDesignerBlueprintSelection,
-  HOST_BLUEPRINT_NODE_ID,
-  insertDesignerBlueprintComponentNode,
-  insertDesignerBlueprintHostNode,
-  insertDesignerBlueprintLifecycleNode,
-  insertDesignerBlueprintTimerNode,
-  insertDesignerBlueprintVariableNode,
-  LIFECYCLE_BLUEPRINT_NODE_ID,
-  removeDesignerBlueprintCondition,
-  timerBlueprintNodeId,
-  timerIntervalFromBlueprintNodeId,
-  updateDesignerBlueprintCondition,
-  updateDesignerBlueprintEffect,
-  updateDesignerBlueprintSemanticRole,
-  updateDesignerBlueprintSourceEvent,
-  updateDesignerBlueprintTimerInterval,
-  variableBlueprintNodeId,
+  findBlueprintEdge,
+  findBlueprintNode,
+  insertDesignerBlueprintNode,
+  reorderDesignerBlueprintEdge,
+  setDesignerBlueprintNodesEnabled,
+  updateDesignerBlueprintEdge,
+  updateDesignerBlueprintNode,
 } from '../../../common/operations/blueprint/designer-blueprint-model.js';
 import type {
   BaseScreenBlueprintCanvasGraph,
   BaseScreenBlueprintCanvasInsertNode,
-  BaseScreenBlueprintCanvasNode,
   BaseScreenBlueprintCanvasSelection,
   BaseScreenBlueprintCanvasTrace,
   BaseScreenDesignerWorkbenchMode,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
-import { BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
+import {
+  BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME,
+  EMPTY_BLUEPRINT_CANVAS_SELECTION,
+} from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
+import {
+  designerBlueprintEventFieldPaths,
+  parseDesignerBlueprintEventFieldPath,
+} from '../../../common/operations/blueprint/designer-blueprint-value-sources.js';
+import { readDesignerVariableViews } from '../../../common/operations/designer-variable-view.js';
 import {
   type BaseScreenDesignerLeftPanelGroup,
   baseScreenDesignerLeftPanelGroupSupportsMode,
 } from '../../../common/operations/workbench/designer-left-panel-groups.js';
+import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { syncDesignerBlueprintHostLeftPanel } from '../../dom/blueprint/designer-blueprint-host-left-panel-dom.js';
 import {
   type DesignerBlueprintInspectorTab,
@@ -52,18 +59,26 @@ import {
   hostLeftPanelGroupId,
   hostLeftPanelTab,
 } from '../../dom/designer-left-panel-groups-dom.js';
-import {
-  isDesignerBlueprintConditionOperator,
-  updateDesignerBlueprintEffectFromTarget,
-} from './designer-blueprint-panel-mutations.js';
 import { isInspectorTab, isLibraryTab } from './designer-blueprint-panel-tabs.js';
+
+const OPERATORS = new Set(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'exists']);
+const EVENT_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 
 export interface DesignerBlueprintPanelsCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getGraph: () => BaseScreenBlueprintCanvasGraph;
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
-  readonly getComponentLibrary: () => readonly BaseScreenBlueprintCanvasNode[];
+  readonly getRuntimeContributions: () => BaseScreenRuntimeContributionIndex | undefined;
   readonly getSelection: () => BaseScreenBlueprintCanvasSelection;
+  readonly getShowSemantic: () => boolean;
+  readonly setShowSemantic: (value: boolean) => void;
+  readonly requestView: (type: 'fit' | 'auto-layout') => void;
+  readonly simulate: (
+    nodeId: string,
+    port: string,
+    payload: ScreenJsonValue,
+  ) => ScreenParseResult<null>;
+  readonly clearTrace: () => void;
   readonly getDiagnostics: () => ScreenParseResult<unknown>['diagnostics'];
   readonly getTrace: () => BaseScreenBlueprintCanvasTrace | null;
   readonly getLeftPanelGroups: () => readonly BaseScreenDesignerLeftPanelGroup[] | undefined;
@@ -77,6 +92,7 @@ export interface DesignerBlueprintPanelsCallbacks {
   readonly emitDiagnostics: (diagnostics: ScreenParseResult<unknown>['diagnostics']) => void;
 }
 
+/** 左侧节点库与右侧检查器：渲染与表单写回。写回一律经 `commitBlueprint`（解析 + 单条命令）。 */
 export class DesignerBlueprintPanelsController {
   #library: HTMLElement | undefined;
   #inspector: HTMLElement | undefined;
@@ -102,6 +118,11 @@ export class DesignerBlueprintPanelsController {
     this.#inspectorTab = 'configuration';
   }
 
+  /** 模拟完成后切到「运行」页，让作者直接看到轨迹。 */
+  showTrace(): void {
+    this.#inspectorTab = 'trace';
+  }
+
   get selectedLeftPanelGroupId(): string | undefined {
     return hostLeftPanelGroupId(this.#libraryTab);
   }
@@ -124,18 +145,28 @@ export class DesignerBlueprintPanelsController {
     this.reconcileLibraryTab();
     const document = this.callbacks.getDocument();
     const graph = this.callbacks.getGraph();
-    const componentLibrary = this.callbacks.getComponentLibrary();
     const selection = this.callbacks.getSelection();
-    renderDesignerBlueprintLibrary(
-      this.#library,
+    const components =
+      document === undefined
+        ? []
+        : buildDesignerBlueprintComponentLibrary(
+            document,
+            this.callbacks.getCatalog(),
+            this.callbacks.getRuntimeContributions(),
+          );
+    renderDesignerBlueprintLibrary(this.#library, {
       document,
       graph,
-      componentLibrary,
+      components,
+      variables:
+        document === undefined
+          ? []
+          : buildDesignerBlueprintVariableLibrary(document, DESIGNER_UI_TEXT.blueprint),
       selection,
-      this.#search,
-      this.#libraryTab,
-      this.callbacks.getLeftPanelGroups(),
-    );
+      query: this.#search,
+      activeTab: this.#libraryTab,
+      groups: this.callbacks.getLeftPanelGroups(),
+    });
     renderDesignerBlueprintInspector(
       this.#inspector,
       document,
@@ -154,7 +185,7 @@ export class DesignerBlueprintPanelsController {
       syncDesignerBlueprintHostLeftPanel(
         this.#library.getRootNode() as ShadowRoot,
         this.blueprintHostGroup(this.selectedLeftPanelGroupId),
-        componentLibrary.length,
+        graph.nodes.length,
       );
       this.callbacks.onActiveLeftPanelGroupChange();
     }
@@ -187,177 +218,81 @@ export class DesignerBlueprintPanelsController {
         ?.focus();
       return true;
     }
-    const selectedNode = target.closest<HTMLElement>('[data-blueprint-select-node]')?.dataset
-      .blueprintSelectNode;
-    if (selectedNode !== undefined) {
-      this.callbacks.select({ kind: 'node', id: selectedNode }, true);
+    const element = target.closest<HTMLElement>(
+      '[data-blueprint-select-node], [data-blueprint-select-edge], [data-blueprint-add-component], [data-blueprint-add-variable], [data-blueprint-add-canvas], [data-blueprint-insert-node], [data-blueprint-delete], [data-blueprint-nodes-enabled], [data-blueprint-edge-order], [data-blueprint-clear-trace]',
+    );
+    if (element === null) return false;
+    const data = element.dataset;
+    if (data.blueprintSelectNode !== undefined) {
+      this.callbacks.select({ nodes: [data.blueprintSelectNode], edges: [] }, true);
       return true;
     }
-    const componentId = target.closest<HTMLElement>('[data-blueprint-add-component]')?.dataset
-      .blueprintAddComponent;
-    if (componentId !== undefined) {
-      const document = this.callbacks.getDocument();
-      const id = componentBlueprintNodeId(componentId);
-      if (this.callbacks.getGraph().nodes.some((node) => node.id === id)) {
-        this.callbacks.select({ kind: 'node', id }, true);
-        return true;
-      }
-      const result = this.callbacks.commitBlueprint(
-        document === undefined ? null : insertDesignerBlueprintComponentNode(document, componentId),
+    if (data.blueprintSelectEdge !== undefined) {
+      this.callbacks.select({ nodes: [], edges: [data.blueprintSelectEdge] }, true);
+      return true;
+    }
+    if (data.blueprintAddComponent !== undefined) {
+      this.insert({ kind: 'component', componentId: data.blueprintAddComponent });
+      return true;
+    }
+    if (data.blueprintAddVariable !== undefined) {
+      this.insert({ kind: 'variable', variableId: data.blueprintAddVariable });
+      return true;
+    }
+    if (data.blueprintAddCanvas !== undefined) {
+      this.insert(
+        data.blueprintAddCanvas === ''
+          ? { kind: 'main-canvas' }
+          : { kind: 'sub-canvas', canvasId: data.blueprintAddCanvas },
       );
-      if (result.ok) this.callbacks.select({ kind: 'node', id }, true);
+      return true;
+    }
+    const insertKind = data.blueprintInsertNode;
+    if (
+      insertKind === 'host' ||
+      insertKind === 'lifecycle' ||
+      insertKind === 'timer' ||
+      insertKind === 'condition'
+    ) {
+      this.insert({ kind: insertKind });
+      return true;
+    }
+    if (data.blueprintClearTrace !== undefined) {
+      this.callbacks.clearTrace();
+      return true;
+    }
+    const document = this.callbacks.getDocument();
+    if (document === undefined) return true;
+    if (data.blueprintDelete !== undefined) {
+      const result = this.callbacks.commitBlueprint(
+        deleteDesignerBlueprintSelection(document.blueprint, this.callbacks.getSelection()),
+      );
+      if (result.ok) this.callbacks.select(EMPTY_BLUEPRINT_CANVAS_SELECTION, false);
       this.report(result);
       return true;
     }
-    const variableId = target.closest<HTMLElement>('[data-blueprint-add-variable]')?.dataset
-      .blueprintAddVariable;
-    if (variableId !== undefined) {
-      const document = this.callbacks.getDocument();
-      const id = variableBlueprintNodeId(variableId);
-      if (this.callbacks.getGraph().nodes.some((node) => node.id === id)) {
-        this.callbacks.select({ kind: 'node', id }, true);
-        return true;
-      }
-      const result = this.callbacks.commitBlueprint(
-        document === undefined ? null : insertDesignerBlueprintVariableNode(document, variableId),
+    if (data.blueprintNodesEnabled !== undefined) {
+      this.report(
+        this.callbacks.commitBlueprint(
+          setDesignerBlueprintNodesEnabled(
+            document.blueprint,
+            new Set(this.callbacks.getSelection().nodes),
+            data.blueprintNodesEnabled === 'true',
+          ),
+        ),
       );
-      if (result.ok) this.callbacks.select({ kind: 'node', id }, true);
-      this.report(result);
       return true;
     }
-    const insertHost = target.closest<HTMLButtonElement>('[data-blueprint-insert-host]');
-    if (insertHost !== null) {
-      const document = this.callbacks.getDocument();
-      if (document !== undefined) {
-        const result = this.callbacks.commitBlueprint(
-          insertDesignerBlueprintHostNode(document.blueprint),
-        );
-        if (result.ok) {
-          this.callbacks.select({ kind: 'node', id: HOST_BLUEPRINT_NODE_ID }, true);
-        }
-        this.report(result);
-      }
-      return true;
-    }
-    const insertLifecycle = target.closest<HTMLButtonElement>('[data-blueprint-insert-lifecycle]');
-    if (insertLifecycle !== null) {
-      const document = this.callbacks.getDocument();
-      if (document !== undefined) {
-        const result = this.callbacks.commitBlueprint(
-          insertDesignerBlueprintLifecycleNode(document.blueprint),
-        );
-        if (result.ok) {
-          this.callbacks.select({ kind: 'node', id: LIFECYCLE_BLUEPRINT_NODE_ID }, true);
-        }
-        this.report(result);
-      }
-      return true;
-    }
-    const insertTimer = target.closest<HTMLButtonElement>('[data-blueprint-insert-timer]');
-    if (insertTimer !== null) {
-      const document = this.callbacks.getDocument();
-      if (document !== undefined) {
-        const blueprint = insertDesignerBlueprintTimerNode(document.blueprint);
-        if (blueprint !== null) {
-          const result = this.callbacks.commitBlueprint(blueprint);
-          if (result.ok) {
-            this.callbacks.select({ kind: 'node', id: timerBlueprintNodeId(5) }, true);
-          }
-          this.report(result);
-        }
-      }
-      return true;
-    }
-    const effectButton = target.closest<HTMLButtonElement>('[data-blueprint-effect-type]');
-    if (effectButton !== null) {
-      const relationId = effectButton.dataset.relationId;
-      const document = this.callbacks.getDocument();
-      if (relationId !== undefined && document !== undefined) {
-        const relation = document.blueprint.relations.find(
-          (candidate) => candidate.id === relationId,
-        );
-        if (relation?.type === 'behavior') {
-          const effect = blueprintEffectForType(
-            effectButton.dataset.blueprintEffectType,
-            relation.target.kind,
-          );
-          if (effect !== null) {
-            this.report(
-              this.callbacks.commitBlueprint(
-                updateDesignerBlueprintEffect(document.blueprint, relationId, effect),
-              ),
-            );
-          }
-        }
-      }
-      return true;
-    }
-    const roleButton = target.closest<HTMLButtonElement>('[data-blueprint-semantic-role]');
-    if (roleButton !== null) {
-      const relationId = roleButton.dataset.relationId;
-      const role = roleButton.dataset.blueprintSemanticRole;
-      const document = this.callbacks.getDocument();
-      if (
-        relationId !== undefined &&
-        document !== undefined &&
-        (role === 'related' || role === 'detail' || role === 'group' || role === 'drill-down')
-      ) {
-        this.report(
-          this.callbacks.commitBlueprint(
-            updateDesignerBlueprintSemanticRole(document.blueprint, relationId, role),
-          ),
-        );
-      }
-      return true;
-    }
-    const addCondition = target.closest<HTMLElement>('[data-blueprint-add-condition]');
-    if (addCondition !== null) {
-      const relationId = addCondition.dataset.relationId;
-      const document = this.callbacks.getDocument();
-      if (relationId !== undefined && document !== undefined) {
-        this.report(
-          this.callbacks.commitBlueprint(
-            updateDesignerBlueprintCondition(document.blueprint, relationId, {
-              left: { kind: 'event-payload', path: [] },
-              operator: 'exists',
-            }),
-          ),
-        );
-      }
-      return true;
-    }
-    const removeCondition = target.closest<HTMLElement>('[data-blueprint-remove-condition]');
-    if (removeCondition !== null) {
-      const relationId = removeCondition.dataset.relationId;
-      const document = this.callbacks.getDocument();
-      if (relationId !== undefined && document !== undefined) {
-        this.report(
-          this.callbacks.commitBlueprint(
-            removeDesignerBlueprintCondition(document.blueprint, relationId),
-          ),
-        );
-      }
-      return true;
-    }
-    const selectRelation = target.closest<HTMLElement>('[data-blueprint-select-relation]');
-    if (selectRelation !== null) {
-      const id = selectRelation.dataset.blueprintSelectRelation;
-      if (id !== undefined) this.callbacks.select({ kind: 'edge', id }, true);
-      return true;
-    }
-    if (target.closest('[data-blueprint-delete]') !== null) {
-      const document = this.callbacks.getDocument();
-      const selection = this.callbacks.getSelection();
-      const result = this.callbacks.commitBlueprint(
-        document === undefined || selection === null
-          ? null
-          : deleteDesignerBlueprintSelection(document.blueprint, selection),
+    const order = data.blueprintEdgeOrder;
+    if ((order === 'earlier' || order === 'later') && data.edgeId !== undefined) {
+      this.report(
+        this.callbacks.commitBlueprint(
+          reorderDesignerBlueprintEdge(document.blueprint, data.edgeId, order),
+        ),
       );
-      if (result.ok) this.callbacks.select(null, false);
-      this.report(result);
       return true;
     }
-    return false;
+    return true;
   }
 
   onDragStart(event: DragEvent): boolean {
@@ -371,6 +306,17 @@ export class DesignerBlueprintPanelsController {
       payload = { kind, componentId: source.dataset.componentId };
     } else if (kind === 'variable' && source.dataset.variableId !== undefined) {
       payload = { kind, variableId: source.dataset.variableId };
+    } else if (kind === 'sub-canvas' && source.dataset.canvasId !== undefined) {
+      payload = { kind, canvasId: source.dataset.canvasId };
+    } else if (kind === 'main-canvas') {
+      payload = { kind };
+    } else if (
+      kind === 'host' ||
+      kind === 'lifecycle' ||
+      kind === 'timer' ||
+      kind === 'condition'
+    ) {
+      payload = { kind };
     }
     if (payload === undefined) return false;
     transfer.effectAllowed = 'copy';
@@ -426,79 +372,234 @@ export class DesignerBlueprintPanelsController {
   }
 
   onChange(target: Element): boolean {
-    const timerNodeId = (target as HTMLElement).dataset.blueprintTimerIntervalNode;
-    if (timerNodeId !== undefined) {
-      const document = this.callbacks.getDocument();
-      const fromSeconds = timerIntervalFromBlueprintNodeId(timerNodeId);
-      const next = Number((target as HTMLInputElement).value);
-      if (document === undefined || fromSeconds === undefined) return true;
-      if (!Number.isInteger(next) || next < 1 || next > 86_400) {
-        (target as HTMLInputElement).value = String(fromSeconds);
-        return true;
-      }
-      const blueprint = updateDesignerBlueprintTimerInterval(document.blueprint, fromSeconds, next);
-      if (blueprint === null) {
-        (target as HTMLInputElement).value = String(fromSeconds);
-        return true;
-      }
-      const result = this.callbacks.commitBlueprint(blueprint);
-      if (result.ok) this.callbacks.select({ kind: 'node', id: timerBlueprintNodeId(next) }, true);
-      this.report(result);
-      return true;
-    }
-    const relationId = (target as HTMLElement).dataset.relationId;
-    if (relationId === undefined) return false;
     const document = this.callbacks.getDocument();
-    if (document === undefined) return true;
-    const relation = document.blueprint.relations.find((item) => item.id === relationId);
-    if (relation === undefined) return true;
-    if ((target as HTMLElement).dataset.blueprintSourceEvent !== undefined) {
-      this.report(
-        this.callbacks.commitBlueprint(
-          updateDesignerBlueprintSourceEvent(
-            document.blueprint,
-            relationId,
-            (target as HTMLSelectElement).value,
-          ),
-        ),
-      );
+    const element = target as HTMLInputElement | HTMLSelectElement;
+    const expressionHost = target.closest<HTMLElement>('[data-blueprint-expression]');
+    if (expressionHost !== null) {
+      if (document !== undefined) this.changeExpression(document, expressionHost, element);
       return true;
     }
-    if (target.matches('[data-blueprint-condition-operator]')) {
-      const value = (target as HTMLSelectElement).value;
-      this.report(
-        this.callbacks.commitBlueprint(
-          relation.type !== 'behavior' ||
-            relation.condition === undefined ||
-            !isDesignerBlueprintConditionOperator(value)
-            ? null
-            : updateDesignerBlueprintCondition(document.blueprint, relationId, {
-                ...relation.condition,
-                operator: value,
-              }),
-        ),
-      );
+    const nodeField = element.dataset.blueprintNodeField;
+    const nodeId = element.dataset.nodeId;
+    if (nodeField !== undefined && nodeId !== undefined) {
+      // 启用状态是开关（checkbox）：取勾选态，不取 `value`（未设置时恒为 "on"）。
+      const value =
+        element instanceof HTMLInputElement && element.type === 'checkbox'
+          ? String(element.checked)
+          : element.value;
+      if (document !== undefined) this.changeNode(document, nodeId, nodeField, value);
       return true;
     }
-    if (relation.type !== 'behavior') return true;
-    const updated = updateDesignerBlueprintEffectFromTarget(
-      target,
-      document,
-      relation,
-      this.callbacks.getCatalog(),
-    );
-    if (!updated.ok) {
-      this.callbacks.emitDiagnostics(updated.diagnostics);
+    const edgeField = element.dataset.blueprintEdgeField;
+    const edgeId = element.dataset.edgeId;
+    if (edgeField !== undefined && edgeId !== undefined) {
+      const value =
+        element instanceof HTMLInputElement && element.type === 'checkbox'
+          ? String(element.checked)
+          : element.value;
+      if (document !== undefined) this.changeEdge(document, edgeId, edgeField, value);
       return true;
     }
-    if (updated.value !== null) {
-      this.report(
-        this.callbacks.commitBlueprint(
-          updateDesignerBlueprintEffect(document.blueprint, relationId, updated.value),
-        ),
-      );
+    return false;
+  }
+
+  private insert(spec: DesignerBlueprintNodeSpec): void {
+    const document = this.callbacks.getDocument();
+    if (document === undefined) return;
+    const inserted = insertDesignerBlueprintNode(document, spec);
+    if (inserted === null) {
+      this.report({
+        ok: false,
+        diagnostics: [
+          {
+            severity: 'error',
+            code: 'AUTHORING_REQUEST_INVALID',
+            path: [],
+            message: DESIGNER_UI_TEXT.blueprint.invalidCommand,
+          },
+        ],
+      });
+      return;
     }
-    return true;
+    const result = inserted.created
+      ? this.callbacks.commitBlueprint(inserted.blueprint)
+      : { ok: true as const, value: document, diagnostics: [] };
+    if (result.ok) this.callbacks.select({ nodes: [inserted.nodeId], edges: [] }, true);
+    this.report(result);
+  }
+
+  private changeNode(document: ScreenDocument, nodeId: string, field: string, value: string): void {
+    const node = findBlueprintNode(document.blueprint, nodeId);
+    if (node === undefined) return;
+    let next: ScreenBlueprint | null = null;
+    if (field === 'name') {
+      next = updateDesignerBlueprintNode(document.blueprint, nodeId, { type: 'name', name: value });
+    } else if (field === 'enabled') {
+      next = updateDesignerBlueprintNode(document.blueprint, nodeId, {
+        type: 'enabled',
+        enabled: value === 'true',
+      });
+    } else if (field === 'interval') {
+      next = updateDesignerBlueprintNode(document.blueprint, nodeId, {
+        type: 'interval',
+        intervalSeconds: Number(value),
+      });
+    } else if (field === 'operator' && node.kind === 'condition' && OPERATORS.has(value)) {
+      const operator = value as ScreenBlueprintCondition['operator'];
+      const condition: ScreenBlueprintCondition =
+        operator === 'exists'
+          ? { left: node.condition.left, operator }
+          : {
+              left: node.condition.left,
+              operator,
+              right: node.condition.right ?? { kind: 'literal', value: null },
+            };
+      next = updateDesignerBlueprintNode(document.blueprint, nodeId, {
+        type: 'condition',
+        condition,
+      });
+    }
+    this.commitOrRestore(next);
+  }
+
+  private changeEdge(document: ScreenDocument, edgeId: string, field: string, value: string): void {
+    const edge = findBlueprintEdge(document.blueprint, edgeId);
+    if (edge === undefined) return;
+    let next: ScreenBlueprint | null = null;
+    if (
+      field === 'role' &&
+      (value === 'related' || value === 'detail' || value === 'group' || value === 'drill-down')
+    ) {
+      next = updateDesignerBlueprintEdge(document.blueprint, edgeId, { type: 'role', role: value });
+    } else if (field === 'target-port') {
+      next = updateDesignerBlueprintEdge(document.blueprint, edgeId, {
+        type: 'target-port',
+        port: value,
+      });
+    } else if (field === 'host-event' && EVENT_NAME.test(value.trim())) {
+      next = updateDesignerBlueprintEdge(document.blueprint, edgeId, {
+        type: 'target-port',
+        port: `event:${value.trim()}`,
+      });
+    } else if (field === 'payload-enabled' && edge.kind === 'flow') {
+      next = updateDesignerBlueprintEdge(document.blueprint, edgeId, {
+        type: 'payload',
+        payload: value === 'true' ? { kind: 'event-payload', path: [] } : null,
+      });
+    } else if (field === 'transition-effect' && edge.kind === 'flow') {
+      next = updateDesignerBlueprintEdge(document.blueprint, edgeId, {
+        type: 'transition',
+        transition:
+          value === 'appear' || value === 'fade' || value === 'slide-up'
+            ? {
+                effect: value,
+                durationMs: edge.transition?.durationMs ?? 200,
+                easing: edge.transition?.easing ?? 'ease-in-out-quad',
+              }
+            : null,
+      });
+    } else if (
+      field === 'transition-duration' &&
+      edge.kind === 'flow' &&
+      edge.transition !== undefined
+    ) {
+      const durationMs = Number(value);
+      if (Number.isInteger(durationMs) && durationMs >= 0 && durationMs <= 10_000) {
+        next = updateDesignerBlueprintEdge(document.blueprint, edgeId, {
+          type: 'transition',
+          transition: { ...edge.transition, durationMs },
+        });
+      }
+    }
+    this.commitOrRestore(next);
+  }
+
+  /** 表达式编辑器写回：来源切换给默认值，其余部件按来源解析当前输入。 */
+  private changeExpression(
+    document: ScreenDocument,
+    host: HTMLElement,
+    changed: HTMLInputElement | HTMLSelectElement,
+  ): void {
+    const slot = host.dataset.blueprintExpression;
+    const owner = host.dataset.expressionOwner;
+    const ownerId = host.dataset.expressionOwnerId;
+    if (slot === undefined || ownerId === undefined) return;
+    const part = changed.dataset.expressionPart;
+    let expression: ScreenBlueprintValueExpression | undefined;
+    if (part === 'source') {
+      const source = changed.value;
+      if (source === 'literal') expression = { kind: 'literal', value: null };
+      else if (source === 'event') expression = { kind: 'event-payload', path: [] };
+      else if (source === 'event-field') {
+        const fields =
+          owner === 'edge'
+            ? designerBlueprintEventFieldPaths(document, ownerId, this.callbacks.getCatalog())
+            : [];
+        expression = { kind: 'event-payload', path: fields[0] ?? ['value'] };
+      } else if (source === 'variable') {
+        const first = readDesignerVariableViews(document)[0];
+        if (first !== undefined) expression = { kind: 'variable', variableId: first.id };
+      }
+    } else if (part === 'literal') {
+      try {
+        const parsed = parseScreenJsonValue(JSON.parse(changed.value) as unknown);
+        if (parsed.ok) expression = { kind: 'literal', value: parsed.value };
+      } catch {
+        expression = undefined;
+      }
+    } else if (part === 'field') {
+      const path = parseDesignerBlueprintEventFieldPath(changed.value);
+      if (path !== null) expression = { kind: 'event-payload', path };
+    } else if (part === 'variable') {
+      expression = { kind: 'variable', variableId: changed.value };
+    }
+    if (expression === undefined) {
+      this.report({
+        ok: false,
+        diagnostics: [
+          {
+            severity: 'error',
+            code: 'AUTHORING_REQUEST_INVALID',
+            path: [],
+            message:
+              part === 'field'
+                ? DESIGNER_UI_TEXT.blueprint.eventFieldInvalid
+                : DESIGNER_UI_TEXT.blueprint.graph.simulation.invalidPayload,
+          },
+        ],
+      });
+      this.render();
+      return;
+    }
+    let next: ScreenBlueprint | null = null;
+    if (owner === 'edge' && (slot === 'value' || slot === 'payload')) {
+      next = updateDesignerBlueprintEdge(
+        document.blueprint,
+        ownerId,
+        slot === 'value'
+          ? { type: 'value', value: expression }
+          : { type: 'payload', payload: expression },
+      );
+    } else if (owner === 'node' && (slot === 'left' || slot === 'right')) {
+      const node = findBlueprintNode(document.blueprint, ownerId);
+      if (node?.kind === 'condition') {
+        next = updateDesignerBlueprintNode(document.blueprint, ownerId, {
+          type: 'condition',
+          condition: { ...node.condition, [slot]: expression },
+        });
+      }
+    }
+    this.commitOrRestore(next);
+  }
+
+  private commitOrRestore(next: ScreenBlueprint | null): void {
+    if (next === null) {
+      this.render();
+      return;
+    }
+    const result = this.callbacks.commitBlueprint(next);
+    if (!result.ok) this.render();
+    this.report(result);
   }
 
   private report(result: ScreenParseResult<unknown>): void {
@@ -529,37 +630,4 @@ export class DesignerBlueprintPanelsController {
           group.id === groupId && baseScreenDesignerLeftPanelGroupSupportsMode(group, 'blueprint'),
       );
   }
-}
-
-function blueprintEffectForType(
-  value: string | undefined,
-  targetKind: 'component' | 'variable' | 'host',
-): ScreenBlueprintRelationEffect | null {
-  if (value === undefined) return null;
-  if (targetKind === 'component') {
-    if (value === 'component-visibility') {
-      return {
-        type: 'component-visibility',
-        operation: 'show',
-        transition: { effect: 'fade', durationMs: 200, easing: 'ease-in-out-quad' },
-      };
-    }
-    if (value === 'request-component-data') return { type: 'request-component-data' };
-    return null;
-  }
-  if (targetKind === 'variable') {
-    if (value === 'set-variable') {
-      return { type: 'set-variable', value: { kind: 'literal', value: null } };
-    }
-    if (value === 'request-variable') return { type: 'request-variable' };
-    return null;
-  }
-  if (value === 'emit-host-event') {
-    return {
-      type: 'emit-host-event',
-      eventName: 'host_event',
-      payload: { kind: 'event-payload', path: [] },
-    };
-  }
-  return null;
 }

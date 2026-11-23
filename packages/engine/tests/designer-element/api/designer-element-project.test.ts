@@ -18,7 +18,7 @@ const document = (): ScreenDocument => ({
   canvas: { width: 800, height: 600, backgroundColor: '#000000' },
   components: [],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 });
 
 const envelope = (revision = 'rev-1', value = document()): ScreenProjectEnvelope => ({

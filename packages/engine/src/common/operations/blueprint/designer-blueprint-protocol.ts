@@ -1,5 +1,7 @@
 import {
+  MAX_BLUEPRINT_NODE_NAME_CODE_POINTS,
   parseScreenJsonValue,
+  SCREEN_BLUEPRINT_PORT_PATTERN,
   type ScreenBlueprintLayoutNode,
   type ScreenBlueprintLayoutViewport,
   type ScreenParseResult,
@@ -18,6 +20,7 @@ import {
 import type {
   BaseScreenBlueprintCanvasCommand,
   BaseScreenBlueprintCanvasNodePosition,
+  BaseScreenBlueprintCanvasNodeUpdate,
   BaseScreenBlueprintCanvasSelection,
 } from './designer-blueprint-protocol-types.js';
 
@@ -26,6 +29,7 @@ export * from './designer-blueprint-protocol-types.js';
 const MAX_COMMAND_ID_LENGTH = 128;
 const MAX_LAYOUT_NODES = 4096;
 const MAX_SIMULATION_PAYLOAD_BYTES = 256 * 1024;
+const MAX_NODE_NAME_LENGTH = MAX_BLUEPRINT_NODE_NAME_CODE_POINTS * 2;
 const COMMON_FIELDS = new Set(['type', 'commandId', 'generation', 'documentRevision']);
 
 export function parseBaseScreenBlueprintCanvasCommand(
@@ -49,125 +53,135 @@ export function parseBaseScreenBlueprintCanvasCommand(
   switch (input.type) {
     case 'ready':
     case 'history-undo':
-    case 'history-redo': {
+    case 'history-redo':
+    case 'clear-simulation': {
       const unknown = firstUnknownField(input, COMMON_FIELDS);
       return unknown === undefined
         ? success({ ...base, type: input.type })
         : failure([unknown], 'Unknown Blueprint canvas command field.');
     }
-    case 'select': {
-      const unknown = firstUnknownField(input, new Set([...COMMON_FIELDS, 'selection']));
-      if (unknown !== undefined) return failure([unknown], 'Unknown selection command field.');
-      const selection = parseSelection(input.selection, true);
-      return selection.ok
-        ? success({ ...base, type: input.type, selection: selection.value })
-        : selection;
-    }
-    case 'connect': {
-      const unknown = firstUnknownField(
-        input,
-        new Set([...COMMON_FIELDS, 'sourceNodeId', 'sourceHandle', 'targetNodeId', 'targetHandle']),
-      );
-      if (unknown !== undefined) return failure([unknown], 'Unknown connection command field.');
-      if (
-        !isIdentifier(input.sourceNodeId) ||
-        !isIdentifier(input.sourceHandle) ||
-        !isIdentifier(input.targetNodeId) ||
-        !isIdentifier(input.targetHandle)
-      ) {
-        return failure([], 'Blueprint connection command is invalid.');
-      }
-      return success({
-        ...base,
-        type: input.type,
-        sourceNodeId: input.sourceNodeId,
-        sourceHandle: input.sourceHandle,
-        targetNodeId: input.targetNodeId,
-        targetHandle: input.targetHandle,
-      });
-    }
+    case 'select':
     case 'delete-selection': {
       const unknown = firstUnknownField(input, new Set([...COMMON_FIELDS, 'selection']));
-      if (unknown !== undefined) return failure([unknown], 'Unknown delete command field.');
-      const selection = parseSelection(input.selection, false);
-      if (!selection.ok || selection.value === null)
+      if (unknown !== undefined) return failure([unknown], 'Unknown selection command field.');
+      const selection = parseSelection(input.selection);
+      if (!selection.ok) return selection;
+      if (
+        input.type === 'delete-selection' &&
+        selection.value.nodes.length === 0 &&
+        selection.value.edges.length === 0
+      ) {
         return failure(['selection'], 'Selection is required.');
+      }
       return success({ ...base, type: input.type, selection: selection.value });
     }
+    case 'connect': {
+      const unknown = firstUnknownField(input, new Set([...COMMON_FIELDS, 'from', 'to']));
+      if (unknown !== undefined) return failure([unknown], 'Unknown connection command field.');
+      const from = parsePortRef(input.from);
+      const to = parsePortRef(input.to);
+      if (from === undefined || to === undefined) {
+        return failure([], 'Blueprint connection command is invalid.');
+      }
+      return success({ ...base, type: input.type, from, to });
+    }
     case 'insert-node': {
-      if (input.kind === 'component') {
-        const unknown = firstUnknownField(
-          input,
-          new Set([...COMMON_FIELDS, 'kind', 'componentId', 'position']),
-        );
-        if (unknown !== undefined) return failure([unknown], 'Unknown insert command field.');
-        const position = parseOptionalPosition(input.position);
-        if (!isIdentifier(input.componentId) || !position.ok) {
-          return failure([], 'Blueprint insert command is invalid.');
-        }
-        return success({
-          ...base,
-          type: input.type,
-          kind: input.kind,
-          componentId: input.componentId,
-          ...(position.value === undefined ? {} : { position: position.value }),
-        });
-      }
-      if (input.kind === 'variable') {
-        const unknown = firstUnknownField(
-          input,
-          new Set([...COMMON_FIELDS, 'kind', 'variableId', 'position']),
-        );
-        const position = parseOptionalPosition(input.position);
-        if (unknown !== undefined || !isIdentifier(input.variableId) || !position.ok) {
-          return failure([], 'Blueprint insert command is invalid.');
-        }
-        return success({
-          ...base,
-          type: input.type,
-          kind: input.kind,
-          variableId: input.variableId,
-          ...(position.value === undefined ? {} : { position: position.value }),
-        });
-      }
-      if (input.kind === 'timer') {
-        const unknown = firstUnknownField(
-          input,
-          new Set([...COMMON_FIELDS, 'kind', 'intervalSeconds', 'position']),
-        );
-        const position = parseOptionalPosition(input.position);
-        const interval = input.intervalSeconds;
-        if (
-          unknown !== undefined ||
-          !position.ok ||
-          typeof interval !== 'number' ||
-          !Number.isInteger(interval) ||
-          interval < 1 ||
-          interval > 86_400
-        ) {
-          return failure([], 'Blueprint insert command is invalid.');
-        }
-        return success({
-          ...base,
-          type: input.type,
-          kind: input.kind,
-          intervalSeconds: interval,
-          ...(position.value === undefined ? {} : { position: position.value }),
-        });
-      }
-      if (input.kind !== 'host' && input.kind !== 'lifecycle') {
-        return failure([], 'Blueprint insert command is invalid.');
-      }
-      const unknown = firstUnknownField(input, new Set([...COMMON_FIELDS, 'kind', 'position']));
+      const fields: Record<string, readonly string[]> = {
+        component: ['componentId'],
+        variable: ['variableId'],
+        'sub-canvas': ['canvasId'],
+        'main-canvas': [],
+        host: [],
+        lifecycle: [],
+        timer: ['intervalSeconds'],
+        condition: [],
+      };
+      const kind = typeof input.kind === 'string' ? input.kind : '';
+      const extra = fields[kind];
+      if (extra === undefined) return failure(['kind'], 'Blueprint insert command is invalid.');
+      const unknown = firstUnknownField(
+        input,
+        new Set([...COMMON_FIELDS, 'kind', 'position', ...extra]),
+      );
       if (unknown !== undefined) return failure([unknown], 'Unknown insert command field.');
       const position = parseOptionalPosition(input.position);
-      if (!position.ok) return failure([], 'Blueprint insert command is invalid.');
+      if (!position.ok) return position;
+      const at = position.value === undefined ? {} : { position: position.value };
+      if (kind === 'component') {
+        if (!isIdentifier(input.componentId))
+          return failure([], 'Blueprint insert command is invalid.');
+        return success({
+          ...base,
+          type: 'insert-node',
+          kind,
+          componentId: input.componentId,
+          ...at,
+        });
+      }
+      if (kind === 'variable') {
+        if (!isIdentifier(input.variableId))
+          return failure([], 'Blueprint insert command is invalid.');
+        return success({ ...base, type: 'insert-node', kind, variableId: input.variableId, ...at });
+      }
+      if (kind === 'sub-canvas') {
+        if (!isIdentifier(input.canvasId))
+          return failure([], 'Blueprint insert command is invalid.');
+        return success({ ...base, type: 'insert-node', kind, canvasId: input.canvasId, ...at });
+      }
+      if (kind === 'timer') {
+        const interval = input.intervalSeconds;
+        if (interval !== undefined && !isInterval(interval)) {
+          return failure(['intervalSeconds'], 'Blueprint insert command is invalid.');
+        }
+        return success({
+          ...base,
+          type: 'insert-node',
+          kind,
+          ...(interval === undefined ? {} : { intervalSeconds: interval as number }),
+          ...at,
+        });
+      }
+      return success({
+        ...base,
+        type: 'insert-node',
+        kind: kind as 'host' | 'lifecycle' | 'condition' | 'main-canvas',
+        ...at,
+      });
+    }
+    case 'update-node': {
+      const unknown = firstUnknownField(input, new Set([...COMMON_FIELDS, 'nodeIds', 'update']));
+      if (unknown !== undefined) return failure([unknown], 'Unknown node update field.');
+      const nodeIds = parseIdList(input.nodeIds);
+      const update = parseNodeUpdate(input.update);
+      if (nodeIds === undefined || nodeIds.length === 0 || update === undefined) {
+        return failure([], 'Blueprint node update is invalid.');
+      }
+      return success({ ...base, type: input.type, nodeIds, update });
+    }
+    case 'reorder-edge': {
+      const unknown = firstUnknownField(input, new Set([...COMMON_FIELDS, 'edgeId', 'direction']));
+      if (unknown !== undefined) return failure([unknown], 'Unknown reorder field.');
+      if (
+        !isIdentifier(input.edgeId) ||
+        (input.direction !== 'earlier' && input.direction !== 'later')
+      ) {
+        return failure([], 'Blueprint edge reorder is invalid.');
+      }
       return success({
         ...base,
         type: input.type,
-        kind: input.kind,
-        ...(position.value === undefined ? {} : { position: position.value }),
+        edgeId: input.edgeId,
+        direction: input.direction,
       });
+    }
+    case 'duplicate-nodes': {
+      const unknown = firstUnknownField(input, new Set([...COMMON_FIELDS, 'nodeIds']));
+      if (unknown !== undefined) return failure([unknown], 'Unknown duplicate field.');
+      const nodeIds = parseIdList(input.nodeIds);
+      if (nodeIds === undefined || nodeIds.length === 0) {
+        return failure(['nodeIds'], 'Blueprint duplicate command is invalid.');
+      }
+      return success({ ...base, type: input.type, nodeIds });
     }
     case 'commit-layout': {
       const unknown = firstUnknownField(input, new Set([...COMMON_FIELDS, 'nodes', 'viewport']));
@@ -197,10 +211,10 @@ export function parseBaseScreenBlueprintCanvasCommand(
     case 'run-simulation': {
       const unknown = firstUnknownField(
         input,
-        new Set([...COMMON_FIELDS, 'componentId', 'eventName', 'payload']),
+        new Set([...COMMON_FIELDS, 'nodeId', 'port', 'payload']),
       );
       if (unknown !== undefined) return failure([unknown], 'Unknown simulation command field.');
-      if (!isIdentifier(input.componentId) || !isIdentifier(input.eventName)) {
+      if (!isIdentifier(input.nodeId) || !isPort(input.port)) {
         return failure([], 'Simulation trigger is invalid.');
       }
       const payload = parseScreenJsonValue(input.payload, {
@@ -210,8 +224,8 @@ export function parseBaseScreenBlueprintCanvasCommand(
       return success({
         ...base,
         type: input.type,
-        componentId: input.componentId,
-        eventName: input.eventName,
+        nodeId: input.nodeId,
+        port: input.port,
         payload: payload.value,
       });
     }
@@ -220,21 +234,74 @@ export function parseBaseScreenBlueprintCanvasCommand(
   }
 }
 
-function parseSelection(
+const PORT_PATTERN = new RegExp(SCREEN_BLUEPRINT_PORT_PATTERN);
+const MAX_SELECTION_IDS = 4096;
+
+function isPort(value: unknown): value is string {
+  return typeof value === 'string' && PORT_PATTERN.test(value);
+}
+
+function isInterval(value: unknown): boolean {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 86_400;
+}
+
+function parsePortRef(
   input: unknown,
-  nullable: boolean,
-): ScreenParseResult<BaseScreenBlueprintCanvasSelection> {
-  if (input === null && nullable) return success(null);
-  if (!isRecord(input)) return failure(['selection'], 'Blueprint selection is invalid.');
-  const unknown = firstUnknownField(input, new Set(['kind', 'id']));
-  if (
-    unknown !== undefined ||
-    (input.kind !== 'node' && input.kind !== 'edge') ||
-    !isIdentifier(input.id)
-  ) {
+): { readonly node: string; readonly port: string } | undefined {
+  if (!isRecord(input) || firstUnknownField(input, new Set(['node', 'port'])) !== undefined) {
+    return undefined;
+  }
+  return isIdentifier(input.node) && isPort(input.port)
+    ? { node: input.node, port: input.port }
+    : undefined;
+}
+
+function parseIdList(input: unknown): readonly string[] | undefined {
+  if (!Array.isArray(input) || input.length > MAX_SELECTION_IDS) return undefined;
+  const ids: string[] = [];
+  for (const item of input) {
+    if (!isIdentifier(item)) return undefined;
+    if (!ids.includes(item)) ids.push(item);
+  }
+  return ids;
+}
+
+function parseNodeUpdate(input: unknown): BaseScreenBlueprintCanvasNodeUpdate | undefined {
+  if (!isRecord(input)) return undefined;
+  if (input.type === 'name') {
+    if (firstUnknownField(input, new Set(['type', 'name'])) !== undefined) return undefined;
+    if (input.name === null) return { type: 'name', name: null };
+    return isBoundedString(input.name, MAX_NODE_NAME_LENGTH)
+      ? { type: 'name', name: input.name }
+      : undefined;
+  }
+  if (input.type === 'interval') {
+    if (firstUnknownField(input, new Set(['type', 'intervalSeconds'])) !== undefined) {
+      return undefined;
+    }
+    return isInterval(input.intervalSeconds)
+      ? { type: 'interval', intervalSeconds: input.intervalSeconds as number }
+      : undefined;
+  }
+  if (input.type === 'enabled') {
+    if (firstUnknownField(input, new Set(['type', 'enabled'])) !== undefined) return undefined;
+    return typeof input.enabled === 'boolean'
+      ? { type: 'enabled', enabled: input.enabled }
+      : undefined;
+  }
+  return undefined;
+}
+
+function parseSelection(input: unknown): ScreenParseResult<BaseScreenBlueprintCanvasSelection> {
+  if (!isRecord(input) || firstUnknownField(input, new Set(['nodes', 'edges'])) !== undefined) {
     return failure(['selection'], 'Blueprint selection is invalid.');
   }
-  return success({ kind: input.kind, id: input.id });
+  const nodes = parseIdList(input.nodes);
+  const edges = parseIdList(input.edges);
+  if (nodes === undefined || edges === undefined) {
+    return failure(['selection'], 'Blueprint selection is invalid.');
+  }
+  return success({ nodes, edges });
 }
 
 function parseLayoutNodes(input: unknown): ScreenParseResult<readonly ScreenBlueprintLayoutNode[]> {

@@ -823,9 +823,8 @@
   height: 100%;
 }
 
-/* 草案条与场景预览条：声明「未写入」，采纳/放弃与对比旧版都从这里进出。 */
-.designer-draft-bar,
-.designer-scene-bar {
+/* 草案条：声明「未写入」，采纳/放弃与对比旧版都从这里进出。 */
+.designer-draft-bar {
   position: absolute;
   top: var(--designer-space-4);
   left: 50%;
@@ -845,7 +844,7 @@
   white-space: nowrap;
 }
 
-/* 智能体草案条：与场景预览条共用悬浮位置，但按 Vercel 式信息分段组织。 */
+/* 智能体草案条：按 Vercel 式信息分段组织。 */
 .designer-draft-bar {
   min-height: 42px;
   gap: 0;
@@ -909,19 +908,14 @@
   text-overflow: ellipsis;
 }
 
-.designer-draft-bar[hidden],
-.designer-scene-bar[hidden] {
+.designer-draft-bar[hidden] {
   display: none;
 }
 
-.draft-actions,
-.scene-bar-actions {
+.draft-actions {
   display: flex;
   align-items: center;
   gap: var(--designer-space-2);
-}
-
-.draft-actions {
   padding-left: var(--designer-space-3);
   border-left: 1px solid var(--designer-border-subtle);
 }
@@ -930,26 +924,6 @@
    只靠 4px 等距时，两个实心块会和前两个文字键连成一片。 */
 .draft-actions [data-change-action="discard"] {
   margin-left: var(--designer-space-2);
-}
-
-.scene-bar-dot {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: var(--designer-radius-pill);
-  background: var(--designer-warning);
-}
-
-.scene-bar-label {
-  color: var(--designer-warning);
-  font-weight: 600;
-}
-
-.scene-bar-name {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--designer-text-primary);
-  text-overflow: ellipsis;
 }
 
 /* 目标屏叠加：安全区 / 拼接缝 / 3m 标注。只做显示，不参与布局、不接收指针事件。 */
@@ -1066,4 +1040,262 @@
   font-size: var(--designer-font-size-xs);
   color: var(--designer-text-muted);
   line-height: 1.5;
+}
+
+/* ── 画布标签条（ADR-0109 §2.5）───────────────────────────────────────────
+   画布底部浮起一条「主画布 | 页面… | 弹框…」：选中标签用控件按下态 + 底部强调色条，起始页带星标；
+   「+」新建页面 / 弹框（菜单挂在工作区上，贴按钮向上展开），末尾是参照底图开关。 */
+.designer-canvas-tabs {
+  position: absolute;
+  bottom: var(--designer-space-3);
+  left: calc(var(--designer-ruler-size) + var(--designer-space-3));
+  z-index: var(--designer-z-workspace-overlay);
+  display: flex;
+  max-width: calc(100% - var(--designer-ruler-size) - var(--designer-space-6));
+  align-items: center;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-1);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
+}
+
+.designer-canvas-tabs:empty {
+  display: none;
+}
+
+/* 有标签条时，画布底部的首次提示上移到标签条之上，二者不叠在一起。 */
+.canvas-stage:has(> .designer-canvas-tabs:not(:empty)) .canvas-hint {
+  bottom: calc(var(--designer-space-3) + 36px + var(--designer-space-3));
+}
+
+.designer-canvas-tabs-list {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.designer-canvas-tabs-list::-webkit-scrollbar {
+  display: none;
+}
+
+.designer-canvas-tab {
+  position: relative;
+  display: inline-flex;
+  max-width: 180px;
+  height: 28px;
+  min-height: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-3);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+}
+
+.designer-canvas-tab-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--designer-text-muted);
+}
+
+.designer-canvas-tab-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-canvas-tab-start {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--designer-warning);
+}
+
+.designer-canvas-tab-start svg {
+  width: 12px;
+  height: 12px;
+}
+
+.designer-canvas-tab[aria-selected="true"] {
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  font-weight: 600;
+}
+
+.designer-canvas-tab[aria-selected="true"] .designer-canvas-tab-icon {
+  color: var(--designer-accent);
+}
+
+.designer-canvas-tab[aria-selected="true"]::after {
+  position: absolute;
+  right: var(--designer-space-3);
+  bottom: 0;
+  left: var(--designer-space-3);
+  height: 2px;
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-accent);
+  content: "";
+}
+
+.designer-canvas-tabs-add {
+  flex: 0 0 auto;
+}
+
+.designer-canvas-tabs-divider {
+  width: 1px;
+  height: 16px;
+  flex: 0 0 auto;
+  background: var(--designer-border-default);
+}
+
+.designer-canvas-tabs-reference {
+  display: inline-flex;
+  height: 28px;
+  min-height: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-3);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.designer-canvas-tabs-reference[aria-pressed="true"] {
+  color: var(--designer-text-primary);
+}
+
+.designer-canvas-tabs-reference[aria-pressed="true"] svg {
+  color: var(--designer-accent);
+}
+
+.designer-artboard-menu {
+  min-width: 200px;
+  max-height: 360px;
+  overflow-y: auto;
+  transform-origin: bottom left;
+}
+
+/* 参照底图：挂在主渲染器挂载根的最前面，画板背景 → 32% 的参照内容 → 当前画板组件；只读，不拦截指针。 */
+.canvas-reference {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.canvas-reference[hidden] {
+  display: none;
+}
+
+.canvas-reference-root {
+  width: 100%;
+  height: 100%;
+  opacity: 0.32;
+}
+
+/* 从画布设置段（ADR-0109）：显示方式分段、起始页标记、操作按钮并排。 */
+.designer-sub-canvas-display {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-1);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+}
+
+.designer-sub-canvas-display-option {
+  min-width: 64px;
+  height: 24px;
+  min-height: 0;
+  padding: 0 var(--designer-space-3);
+}
+
+.designer-sub-canvas-display-option[aria-checked="true"] {
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  font-weight: 600;
+}
+
+.designer-sub-canvas-start {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--designer-space-2);
+  border-radius: var(--designer-radius-pill);
+  background: color-mix(in srgb, var(--designer-accent) 16%, transparent);
+  color: var(--designer-accent);
+  font: var(--designer-font-small);
+  line-height: 20px;
+}
+
+.designer-sub-canvas-actions {
+  display: flex;
+  gap: var(--designer-space-2);
+}
+
+.designer-sub-canvas-actions > * {
+  flex: 1 1 0;
+}
+
+/* 弹框位置九宫格：3×3 图钉，选中格亮起强调色圆点（ADR-0108 §2.6）。 */
+.designer-popup-anchor-grid {
+  display: grid;
+  width: max-content;
+  grid-template-columns: repeat(3, 24px);
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-1);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+}
+
+.designer-popup-anchor {
+  display: grid;
+  width: 24px;
+  min-width: 0;
+  height: 24px;
+  min-height: 0;
+  place-items: center;
+  padding: 0;
+}
+
+.designer-popup-anchor::before {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-border-strong);
+  content: "";
+}
+
+.designer-popup-anchor[aria-checked="true"] {
+  background: var(--designer-surface-control-active);
+}
+
+.designer-popup-anchor[aria-checked="true"]::before {
+  width: 8px;
+  height: 8px;
+  background: var(--designer-accent);
+}
+
+/* 设计态弹框预览（ADR-0108 §2.7）：状态栏「事件」开着时，蓝图打开的弹框以运行时浮层盖在画布上，
+   层级高于选区与参考线；没有弹框打开时整层隐藏，不挡画布编辑。 */
+.canvas-popup-preview {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--designer-z-canvas-selection) + 2);
+  overflow: clip;
+  border-radius: inherit;
+}
+
+.canvas-popup-preview[hidden] {
+  display: none;
+}
+
+.canvas-popup-preview-root {
+  width: 100%;
+  height: 100%;
 }

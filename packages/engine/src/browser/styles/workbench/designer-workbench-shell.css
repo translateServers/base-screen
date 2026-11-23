@@ -379,7 +379,7 @@
 .rail {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
-  /* 列头 / 场景区 / 面板内容：场景由宿主提供时才占一行，缺省 hidden 不占高度。 */
+  /* 列头 / 空行（保留原有三行网格，内容区仍在第 3 行）/ 面板内容。 */
   grid-template-rows: var(--designer-row-height-comfortable) auto minmax(0, 1fr);
   border-right: 1px solid var(--designer-border-default);
 }
@@ -525,13 +525,8 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
-.designer[data-left-collapsed="true"] .rail-view,
-.designer[data-left-collapsed="true"] .scenes {
+.designer[data-left-collapsed="true"] .rail-view {
   grid-row: 1;
-}
-
-.designer[data-left-collapsed="true"] .scenes {
-  display: none;
 }
 
 /* 折叠后列头整体退场（画布与蓝图一致），图标 tab 轨贯通整列顶部。 */
@@ -642,146 +637,6 @@
 .rail-view {
   grid-column: 2;
   grid-row: 3;
-}
-
-/* 场景区（原型 .scenario-block）：左栏顶部一等公民，不随素材/图层页签切换。 */
-.scenes {
-  display: flex;
-  grid-column: 2;
-  grid-row: 2;
-  flex-direction: column;
-  gap: var(--designer-space-2);
-  padding: var(--designer-space-3) var(--designer-space-4);
-  border-bottom: 1px solid var(--designer-border-subtle);
-  background: var(--designer-surface-panel);
-}
-
-.scenes[hidden] {
-  display: none;
-}
-
-.scene-heading {
-  display: flex;
-  align-items: center;
-  gap: var(--designer-space-2);
-}
-
-.scene-label {
-  color: var(--designer-text-muted);
-  font: var(--designer-font-numeric);
-  font-size: var(--designer-font-size-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.scene-count {
-  margin-left: auto;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-numeric);
-}
-
-.scene-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--designer-space-1);
-  /* 场景超过两条时内部滚动：左栏首屏的高度要留给素材网格，
-     场景是低频切换项，三条铺满会把物料卡挤出一屏之外。
-     限高取「两行 30px + 一行间隙 4px + 余量」，滚动条只在真正溢出时出现。 */
-  max-height: 68px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.scene-row {
-  display: flex;
-  /* 行不参与 flex 收缩：场景列表靠 max-height 溢出滚动，
-     允许收缩只会把多出来的行压扁进同一块高度里，滚动条永远不会出现。 */
-  flex: 0 0 auto;
-  width: 100%;
-  height: 30px;
-  align-items: center;
-  gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-2);
-  border: 0;
-  border-radius: var(--designer-radius-control);
-  background: transparent;
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  text-align: left;
-  cursor: pointer;
-}
-
-.scene-row:hover:not(:disabled) {
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-text-primary);
-}
-
-.scene-row[aria-pressed="true"],
-.scene-row[data-scene-state="preview"] {
-  background: var(--designer-surface-control-active);
-  box-shadow: inset 0 0 0 1px var(--designer-border-default);
-  color: var(--designer-text-primary);
-}
-
-.scene-row:disabled {
-  color: var(--designer-text-disabled);
-  cursor: not-allowed;
-}
-
-.scene-row:disabled .scene-row-state {
-  color: var(--designer-text-disabled);
-}
-
-.scene-row:disabled .scene-row-mark {
-  background: var(--designer-text-disabled);
-}
-
-.scene-row-mark {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: var(--designer-radius-pill);
-  background: var(--designer-border-strong);
-}
-
-.scene-row[aria-pressed="true"] .scene-row-mark {
-  background: var(--designer-text-primary);
-}
-
-.scene-row[data-scene-state="preview"] .scene-row-mark {
-  background: var(--designer-warning);
-}
-
-.scene-row-name {
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.scene-row-state {
-  flex: 0 0 auto;
-  /* 未选中行的底色是 control-active，muted 落在上面只有 3.86。
-     这是"当前/可用"这类状态字，读不清就等于没有状态——用 secondary 一档，
-     与行名的主文字仍差 2 级。 */
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-numeric);
-}
-
-.scene-row[aria-pressed="true"] .scene-row-state,
-.scene-row[data-scene-state="preview"] .scene-row-state {
-  color: var(--designer-text-secondary);
-}
-
-.scene-note {
-  margin: 0;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-}
-
-.scene-note[hidden] {
-  display: none;
 }
 
 .rail-view[data-materials] {
@@ -1756,7 +1611,6 @@
 
 /* 评审态：画布只读，隐藏意图输入与编辑工具条；右栏固定为智能体页签（只留提案与评审）。 */
 .designer[data-review-mode="true"] .designer-intent,
-.designer[data-review-mode="true"] .scenes,
 .designer[data-review-mode="true"] .workspace-local-toolbar,
 .designer[data-review-mode="true"] .draft-actions,
 .designer[data-review-mode="true"] .canvas-hint,

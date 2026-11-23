@@ -1,12 +1,14 @@
 import type { ScreenBlueprintValueExpression, ScreenDocument } from '@base-screen/contracts';
 import {
   MAX_VALUE_REF_PATH_SEGMENTS,
+  readScreenBlueprintEventPort,
   VALUE_REF_PATH_SEGMENT_PATTERN,
 } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialObjectSchema,
 } from '@base-screen/plugin-core';
+import { designerBlueprintEdgeTriggers } from './designer-blueprint-graph.js';
 
 export type DesignerBlueprintSetVariableSource =
   | 'literal'
@@ -17,13 +19,20 @@ export type DesignerBlueprintSetVariableSource =
 
 const EVENT_FIELD_SEGMENT = new RegExp(VALUE_REF_PATH_SEGMENT_PATTERN);
 
-/** 触发事件能否提供事件字段：只有组件来源的物料事件可以填写字段路径。 */
+/**
+ * 连线能否取事件字段：上游（越过条件节点）至少有一个组件事件触发锚点，
+ * 或从画布「已打开」（负载是打开参数）/ 主画布「页面已切换」（负载 `{ from, to }`）锚点。
+ */
 export function designerBlueprintTriggerSupportsEventField(
   document: ScreenDocument,
-  relationId: string,
+  edgeId: string,
 ): boolean {
-  const relation = document.blueprint.relations.find((candidate) => candidate.id === relationId);
-  return relation?.type === 'behavior' && relation.source.kind === 'component';
+  return designerBlueprintEdgeTriggers(document.blueprint, edgeId).some(
+    (trigger) =>
+      trigger.node.kind === 'component' ||
+      (trigger.node.kind === 'sub-canvas' && trigger.port === 'opened') ||
+      (trigger.node.kind === 'main-canvas' && trigger.port === 'page-changed'),
+  );
 }
 
 /**
@@ -53,21 +62,31 @@ export function designerBlueprintSetVariableSource(
   return 'advanced';
 }
 
+/** 上游组件事件声明的负载字段（并集，去重）；物料未声明 payloadSchema 时为空。 */
 export function designerBlueprintEventFieldPaths(
   document: ScreenDocument,
-  relationId: string,
+  edgeId: string,
   catalog: BaseScreenMaterialCatalog | undefined,
 ): readonly (readonly string[])[] {
-  const relation = document.blueprint.relations.find((candidate) => candidate.id === relationId);
-  if (relation?.type !== 'behavior' || relation.source.kind !== 'component') return [];
-  const source = relation.source;
-  const component = document.components.find((candidate) => candidate.id === source.componentId);
-  const schema = catalog
-    ?.get(component?.type ?? '')
-    ?.manifest.editorDescriptor?.events?.find(
-      (event) => event.name === source.event.eventName,
-    )?.payloadSchema;
-  return schema === undefined ? [] : collectObjectPaths(schema);
+  const paths: (readonly string[])[] = [];
+  const seen = new Set<string>();
+  for (const trigger of designerBlueprintEdgeTriggers(document.blueprint, edgeId)) {
+    if (trigger.node.kind !== 'component') continue;
+    const componentId = trigger.node.componentId;
+    const eventName = readScreenBlueprintEventPort(trigger.port);
+    const component = document.components.find((candidate) => candidate.id === componentId);
+    const schema = catalog
+      ?.get(component?.type ?? '')
+      ?.manifest.editorDescriptor?.events?.find((event) => event.name === eventName)?.payloadSchema;
+    if (schema === undefined) continue;
+    for (const path of collectObjectPaths(schema)) {
+      const key = path.join('.');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      paths.push(path);
+    }
+  }
+  return paths;
 }
 
 function collectObjectPaths(

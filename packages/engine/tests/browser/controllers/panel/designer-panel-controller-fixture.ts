@@ -169,7 +169,7 @@ export function document(
       },
     ],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 

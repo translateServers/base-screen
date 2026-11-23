@@ -51,7 +51,9 @@ function renderSubmenuVisibility(menu: HTMLElement): void {
     const trigger = wrapper.querySelector<HTMLButtonElement>('[data-submenu-toggle]');
     if (submenu === null || trigger === null) continue;
     const hasAvailableItem = Array.from(
-      submenu.querySelectorAll<HTMLButtonElement>('[data-menu-action], [data-plugin-command]'),
+      submenu.querySelectorAll<HTMLButtonElement>(
+        '[data-menu-action], [data-plugin-command], [data-move-to-canvas]',
+      ),
     ).some((item) => !item.hidden);
     wrapper.hidden = !hasAvailableItem;
     if (!hasAvailableItem) {

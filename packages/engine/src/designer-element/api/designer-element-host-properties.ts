@@ -260,7 +260,8 @@ export function writeProjectSnapshotPort(
 export function readDocument(element: DesignerElementHost): ScreenDocument | undefined {
   const elementState = getDesignerElementState(element);
 
-  return elementState.session.document;
+  // 宿主读到的是完整文档（含全部弹框画板），不是当前画板视图（ADR-0108）。
+  return elementState.session.fullDocument;
 }
 
 export function writeDocument(element: DesignerElementHost, value: ScreenDocument | undefined) {

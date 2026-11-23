@@ -97,7 +97,7 @@ export function redo(element: DesignerElementHost): ScreenParseResult<ScreenDocu
 export function exportDocument(element: DesignerElementHost): ScreenParseResult<string> {
   const elementState = getDesignerElementState(element);
 
-  const document = elementState.session.document;
+  const document = elementState.session.fullDocument;
   if (document === undefined)
     return { ok: false, diagnostics: [lifecycleDiagnostic('No document to export.')] };
   try {

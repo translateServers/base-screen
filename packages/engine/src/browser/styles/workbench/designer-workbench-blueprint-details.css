@@ -547,10 +547,6 @@
 }
 
 @container designer-shell (max-width: 1279px) {
-  .blueprint-palette-primary {
-    grid-template-columns: 22px minmax(0, 1fr);
-  }
-
   .blueprint-palette-primary em,
   .blueprint-palette-inline-add {
     display: none;
@@ -562,3 +558,302 @@
 }
 
 /* 组件列表按容器父子缩进，表达结构层级（只读）；缩进外观归 chrome 层。 */
+
+/* ── 蓝图检查器「配置」页（ADR-0107）────────────────────────────────────────
+   分区与字段行沿用设计视图检查器（chrome 层的 designer-inspector-section、控件层的
+   designer-field），这里只补蓝图独有的内容块：锚点行、只读值、上下游连线行、执行顺序。 */
+.blueprint-inspector-shell > .blueprint-panel-scroll.inspector-pane {
+  padding: var(--designer-space-4) var(--designer-space-6) var(--designer-space-7);
+}
+
+.blueprint-config,
+.blueprint-config-content {
+  min-width: 0;
+  display: grid;
+}
+
+.blueprint-config-content {
+  gap: var(--designer-space-2);
+}
+
+.blueprint-config-summary,
+.blueprint-config-empty {
+  margin: 0;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  line-height: 1.5;
+}
+
+.blueprint-config-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--designer-space-2);
+}
+
+.blueprint-config-value {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+}
+
+.blueprint-config-value > span,
+.blueprint-anchor-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blueprint-config-value code,
+.blueprint-anchor code {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blueprint-anchor-list,
+.blueprint-config-edges {
+  display: grid;
+  gap: var(--designer-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 锚点行：方向徽标 + 名称 + 锚点 id（LIGHT CHASER 节点配置面板的锚点信息）。 */
+.blueprint-anchor {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--designer-space-3);
+  min-height: var(--designer-control-height-compact);
+  padding: 0 var(--designer-space-2);
+  border-radius: var(--designer-radius-3);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+}
+
+.blueprint-anchor:hover {
+  background: var(--designer-surface-control-hover);
+}
+
+.blueprint-anchor[data-connected="true"] .blueprint-anchor-label {
+  color: var(--designer-text-primary);
+}
+
+.blueprint-anchor[data-available="false"],
+.blueprint-anchor[data-available="false"] .blueprint-anchor-label {
+  color: var(--designer-text-disabled);
+}
+
+/* 上下游连线行：点击切到该连线的检查器。 */
+.blueprint-config-link {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--designer-space-3);
+  min-height: var(--designer-row-height-comfortable);
+  padding: var(--designer-space-1) var(--designer-space-3);
+  border: 0;
+  border-radius: var(--designer-radius-3);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.blueprint-config-link:hover {
+  background: var(--designer-surface-control-hover);
+}
+
+.blueprint-config-link:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
+}
+
+.blueprint-config-link-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.blueprint-config-link-copy strong,
+.blueprint-config-link-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blueprint-config-link-copy strong {
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+  font-weight: 600;
+}
+
+.blueprint-config-link-copy small {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  font-size: var(--designer-font-size-xs);
+}
+
+.blueprint-config-link-arrow {
+  display: inline-flex;
+  color: var(--designer-text-muted);
+}
+
+.blueprint-config-link-arrow svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* 取值表达式：来源下拉 + 值输入上下排列在控件列；标签与第一行控件对齐。 */
+.blueprint-config .blueprint-config-field.blueprint-expression-row {
+  align-items: start;
+}
+
+.blueprint-expression-label {
+  display: flex;
+  align-items: center;
+  min-height: var(--designer-control-height);
+}
+
+.blueprint-expression-stack {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: var(--designer-space-2);
+}
+
+/* 增强后的下拉是行内壳：在上下堆叠里拉满控件列，和下方输入同宽。 */
+.blueprint-expression-stack > * {
+  width: 100%;
+  min-width: 0;
+}
+
+.blueprint-config-order {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-1);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+}
+
+.blueprint-config-order > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blueprint-config-footer {
+  padding-top: var(--designer-space-5);
+  border-top: 1px solid var(--designer-border-subtle);
+}
+
+.blueprint-inspector-shell .blueprint-config-footer .blueprint-delete-button {
+  width: 100%;
+  margin: 0;
+}
+
+/* 「运行」页的步数是中性计数；只有「问题」用告警红。 */
+.blueprint-inspector-mode em[data-tone="neutral"] {
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-secondary);
+}
+
+/* 问题 / 运行页：滚动区已带检查器内距，状态块本身不再加。 */
+.blueprint-inspector-shell .inspector-pane > .blueprint-inspector-status {
+  display: grid;
+  gap: var(--designer-space-3);
+  padding: 0;
+}
+
+/* 轨迹按深度缩进：级联与条件分支一眼能看出层级。 */
+.blueprint-trace-steps li {
+  margin-left: calc(var(--bp-trace-depth, 0) * var(--designer-space-4));
+}
+
+.blueprint-trace-steps li[data-kind="condition"][data-passed="true"] {
+  border-left: 2px solid var(--designer-success);
+}
+
+.blueprint-trace-steps li[data-kind="condition"][data-passed="false"] {
+  border-left: 2px solid var(--designer-warning);
+}
+
+.blueprint-trace-step {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.blueprint-trace-step:hover {
+  color: var(--designer-text-primary);
+}
+
+.blueprint-trace-step:focus-visible {
+  border-radius: var(--designer-radius-1);
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── 蓝图节点库条目（ADR-0107）────────────────────────────────────────────
+   条目只有一颗主按钮：图标 / 名称 + 说明 / 状态（已在画布 ✓、可添加 +）三列。
+   不再预留行尾 24px 动作列——定位与添加都由主按钮承担。 */
+.blueprint-palette-item,
+.blueprint-relation-item {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.blueprint-palette-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.blueprint-palette-state {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: var(--designer-radius-3);
+  color: var(--designer-text-muted);
+}
+
+.blueprint-palette-state svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* 关系列表：左侧色条与画布连线同色（五类连线强调色）。 */
+.blueprint-relation-item .blueprint-palette-primary {
+  grid-template-columns: 4px minmax(0, 1fr);
+}
+
+.blueprint-relation-swatch {
+  width: 4px;
+  height: 24px;
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-blueprint-edge-hover);
+}
+
+.blueprint-relation-item[data-category="semantic"] .blueprint-relation-swatch {
+  background: var(--designer-blueprint-edge-semantic);
+}

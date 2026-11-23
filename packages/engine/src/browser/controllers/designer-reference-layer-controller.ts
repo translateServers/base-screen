@@ -1,0 +1,141 @@
+import type { ScreenDocument, ScreenJsonObject } from '@base-screen/contracts';
+import type { BaseScreenRenderer } from '@base-screen/renderer';
+import {
+  type DesignerArtboardId,
+  listDesignerCanvasComponentIds,
+} from '../../common/session/designer-artboard.js';
+
+export interface DesignerReferenceLayerCallbacks {
+  /** 建一个只读的参照渲染器（预览模式、不可交互），挂在 `root` 上。 */
+  readonly createRenderer: (root: HTMLElement) => BaseScreenRenderer | undefined;
+  /** 渲染器的身份（物料目录）：变化时丢弃旧渲染器、按新目录重建。 */
+  readonly getRendererKey: () => unknown;
+  /** 完整文档（含全部从画布）。 */
+  readonly getDocument: () => ScreenDocument | undefined;
+  /** 要垫哪块画布（`null` = 主画布）；`undefined` = 不垫（开关关闭、弹框画板、没有页面）。 */
+  readonly getReferenceCanvas: () => DesignerArtboardId | undefined;
+  /** 设计器主渲染器的挂载根：参照层作为它的第一个子节点，画在画布背景之上、组件之下。 */
+  readonly getContentRoot: () => HTMLElement | undefined;
+  /** 画布当前的变量值：参照内容与画布同口径取值。 */
+  readonly getVariables: () => ScreenJsonObject;
+}
+
+/**
+ * 参照底图（ADR-0109 §2.5）：编辑页面时把主画布的公共内容（标题、导航、边框）以 32% 不透明度
+ * 垫在画布上；编辑主画布时垫最近编辑的页面。只读：不拦截指针、不进图层、不可选。
+ *
+ * 用独立的只读渲染器画参照内容：参照文档只含参照画布的组件，去掉从画布归属与蓝图，画布背景透明。
+ * 参照层挂成主渲染器挂载根的第一个子节点，叠放即「画板背景 → 参照 → 当前画板组件」。
+ * 参照组件的 id 一律加 `ref:` 前缀：设计器按 `data-base-screen-component-id` 查元素（拖动、对比度、
+ * 自动宽度等），参照元素不能与真实组件同名。
+ */
+export class DesignerReferenceLayerController {
+  #host: HTMLElement | undefined;
+  #root: HTMLElement | undefined;
+  #renderer: BaseScreenRenderer | undefined;
+  #rendererKey: unknown;
+  #source: ScreenDocument | undefined;
+  #canvas: DesignerArtboardId | undefined;
+
+  constructor(private readonly callbacks: DesignerReferenceLayerCallbacks) {}
+
+  connect(host: HTMLElement, root: HTMLElement): void {
+    if (this.#host === host && this.#root === root) return;
+    this.release();
+    this.#host = host;
+    this.#root = root;
+    host.hidden = true;
+    this.sync();
+  }
+
+  release(): void {
+    this.#renderer?.dispose();
+    this.#renderer = undefined;
+    this.#host = undefined;
+    this.#root = undefined;
+    this.#source = undefined;
+    this.#canvas = undefined;
+  }
+
+  /** 文档、画板或开关变化后调用：按需重画或收起。 */
+  sync(): void {
+    const host = this.#host;
+    if (host === undefined) return;
+    const source = this.callbacks.getDocument();
+    const canvas = this.callbacks.getReferenceCanvas();
+    if (source === undefined || canvas === undefined) {
+      this.#hide(host);
+      this.#canvas = undefined;
+      return;
+    }
+    const renderer = this.#ensureRenderer();
+    if (renderer === undefined) {
+      this.#hide(host);
+      return;
+    }
+    if (source !== this.#source || canvas !== this.#canvas) {
+      this.#source = source;
+      this.#canvas = canvas;
+      renderer.setVariables(this.callbacks.getVariables());
+      const rendered = renderer.render(referenceDocument(source, canvas), { trigger: 'manual' });
+      if (!rendered.ok) {
+        this.#hide(host);
+        return;
+      }
+    }
+    host.style.width = `${source.canvas.width}px`;
+    host.style.height = `${source.canvas.height}px`;
+    const content = this.callbacks.getContentRoot();
+    if (content !== undefined && host.parentElement !== content) {
+      content.insertBefore(host, content.firstChild);
+    }
+    host.hidden = false;
+  }
+
+  #hide(host: HTMLElement): void {
+    host.hidden = true;
+  }
+
+  #ensureRenderer(): BaseScreenRenderer | undefined {
+    const key = this.callbacks.getRendererKey();
+    if (this.#renderer !== undefined && this.#rendererKey === key) return this.#renderer;
+    this.#renderer?.dispose();
+    this.#renderer = undefined;
+    this.#source = undefined;
+    const root = this.#root;
+    if (root === undefined) return undefined;
+    this.#rendererKey = key;
+    this.#renderer = this.callbacks.createRenderer(root);
+    return this.#renderer;
+  }
+}
+
+/**
+ * 参照文档：只含参照画布的组件（去掉画布归属，id 加 `ref:` 前缀），没有从画布与蓝图，画布背景透明。
+ */
+function referenceDocument(source: ScreenDocument, canvas: DesignerArtboardId): ScreenDocument {
+  const inside = listDesignerCanvasComponentIds(source, canvas);
+  const { subCanvases: _subCanvases, startCanvasId: _start, ...rest } = source;
+  const refId = (id: string): string => `${REFERENCE_ID_PREFIX}${id}`.slice(0, 128);
+  return {
+    ...rest,
+    canvas: {
+      width: source.canvas.width,
+      height: source.canvas.height,
+      backgroundColor: 'transparent',
+    },
+    components: source.components
+      .filter((component) => inside.has(component.id))
+      .map((component) => {
+        const { canvasId: _canvasId, belowSubCanvas: _below, ...plain } = component;
+        return {
+          ...plain,
+          id: refId(component.id),
+          parentId: component.parentId === null ? null : refId(component.parentId),
+        };
+      }),
+    blueprint: { nodes: [], edges: [] },
+  };
+}
+
+const REFERENCE_ID_PREFIX = 'ref:';

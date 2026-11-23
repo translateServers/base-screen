@@ -38,7 +38,7 @@ const baseDocument: ScreenDocument = {
     },
   ],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 
 const descriptor: ScreenDatasetDefinition = {
@@ -418,7 +418,9 @@ describe('DesignerDatasetController', () => {
     });
 
     controller.onChange(
-      new FakeInput('10', { datasetAuthoringSetting: 'pushFallbackInterval' }) as unknown as EventTarget,
+      new FakeInput('10', {
+        datasetAuthoringSetting: 'pushFallbackInterval',
+      }) as unknown as EventTarget,
     );
     expect(transactions).toHaveLength(1);
     // 面板上没有控件的按时长保留原样保留。

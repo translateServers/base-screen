@@ -70,7 +70,7 @@ describe('renderDesignerSelection', () => {
         },
       ],
       variables: [],
-      blueprint: { relations: [] },
+      blueprint: { nodes: [], edges: [] },
     };
     const catalog = {
       get: () =>
@@ -144,7 +144,7 @@ describe('renderDesignerSelection', () => {
       canvas: { width: 960, height: 540, backgroundColor: '#000000' },
       components: [node('card', null, 0, 0, 200, 100), node('child', 'card', 20, 20, 40, 30)],
       variables: [],
-      blueprint: { relations: [] },
+      blueprint: { nodes: [], edges: [] },
     };
     const catalog = {
       get: () => ({ manifest: { designCapabilities: { resize: true, rotate: true } } }) as unknown,
@@ -219,7 +219,7 @@ describe('renderDesignerSelection', () => {
         },
       ],
       variables: [],
-      blueprint: { relations: [] },
+      blueprint: { nodes: [], edges: [] },
     };
     const catalog = {
       get: () =>

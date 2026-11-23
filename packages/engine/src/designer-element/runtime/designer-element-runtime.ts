@@ -166,13 +166,6 @@ import {
   unload,
 } from '../api/designer-element-project.js';
 import { enterReviewMode, exitReviewMode, readReviewing } from '../api/designer-element-review.js';
-import {
-  readActiveSceneId,
-  readSceneAvailable,
-  setActiveScene,
-  setSceneCatalog,
-  setSceneHandler,
-} from '../api/designer-element-scene.js';
 import { readWorkbenchMode, setWorkbenchMode } from '../api/designer-element-workbench.js';
 import {
   executeDesignerCommand,
@@ -201,6 +194,8 @@ import {
 } from './designer-element-plugin-commands.js';
 import {
   applyNativeEvents,
+  createPopupPreviewRenderer,
+  createReferenceRenderer,
   createRenderer,
   executeOperationFromTarget,
   forwardNativeMaterialEvent,
@@ -327,11 +322,6 @@ export const designerElementRuntime = {
   setIntentReferenceCatalog,
   readIntentAvailable,
   requestComponentChoice,
-  setSceneCatalog,
-  setSceneHandler,
-  setActiveScene,
-  readActiveSceneId,
-  readSceneAvailable,
   enterReviewMode,
   exitReviewMode,
   readReviewing,
@@ -407,6 +397,8 @@ export const designerElementRuntime = {
   renderLayers,
   renderProperties,
   renderInspectorInteraction,
+  createPopupPreviewRenderer,
+  createReferenceRenderer,
   createRenderer,
   applyNativeEvents,
   forwardNativeMaterialEvent,

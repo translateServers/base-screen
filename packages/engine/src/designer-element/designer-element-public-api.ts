@@ -1,11 +1,11 @@
 // 分片形状契约的唯一所有者是 plugin-core（ADR-0100）；engine 公共面继续转发，宿主导入路径不变。
 export {
   type BaseScreenComponentFragmentInsertionIntent,
+  type BaseScreenFragmentBlueprint,
   type BaseScreenFragmentBody,
   type BaseScreenFragmentDataSource,
   type BaseScreenFragmentDefinition,
   type BaseScreenFragmentNode,
-  type BaseScreenFragmentRelation,
   type BaseScreenFragmentShell,
   parseBaseScreenComponentFragmentInsertionIntent,
 } from '@base-screen/plugin-core';
@@ -26,15 +26,19 @@ export {
   type BaseScreenBlueprintCanvasCommandEventDetail,
   type BaseScreenBlueprintCanvasCommandResult,
   type BaseScreenBlueprintCanvasEdge,
-  type BaseScreenBlueprintCanvasEventOption,
+  type BaseScreenBlueprintCanvasEdgeCategory,
   type BaseScreenBlueprintCanvasGraph,
   type BaseScreenBlueprintCanvasInsertNode,
   type BaseScreenBlueprintCanvasNode,
   type BaseScreenBlueprintCanvasNodePosition,
+  type BaseScreenBlueprintCanvasNodeUpdate,
+  type BaseScreenBlueprintCanvasPort,
   type BaseScreenBlueprintCanvasSelection,
+  type BaseScreenBlueprintCanvasSimulationTrigger,
   type BaseScreenBlueprintCanvasState,
   type BaseScreenBlueprintCanvasStateEventDetail,
   type BaseScreenBlueprintCanvasTrace,
+  type BaseScreenBlueprintCanvasTraceStep,
   type BaseScreenDesignerSetWorkbenchModeOptions,
   type BaseScreenDesignerWorkbenchFocus,
   type BaseScreenDesignerWorkbenchMode,
@@ -118,17 +122,6 @@ export {
   type BaseScreenMaterialLibraryStatus,
   parseBaseScreenMaterialLibraryState,
 } from '../common/operations/material-library/material-library-state.js';
-export {
-  BASE_SCREEN_SCENE_CHANGE_EVENT,
-  type BaseScreenSceneChangeDetail,
-  type DesignerSceneDescriptor,
-  type DesignerSceneHandler,
-  type DesignerScenePlan,
-  type DesignerScenePrepareResult,
-  type DesignerScenePreview,
-  type DesignerSceneRequest,
-  prepareDesignerScenePreview,
-} from '../common/operations/scene/designer-scene.js';
 export {
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS,

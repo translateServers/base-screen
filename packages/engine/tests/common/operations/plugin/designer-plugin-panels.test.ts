@@ -12,7 +12,7 @@ function panelDocument(): ScreenDocument {
     canvas: { width: 960, height: 540, backgroundColor: '#17212b' },
     components: [{ id: 'title', type: 'base.text', position: { x: 80, y: 80 } }],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   } as unknown as ScreenDocument;
 }
 

@@ -8,7 +8,7 @@ function designDocument(): ScreenDocument {
     canvas: { width: 960, height: 540, backgroundColor: '#17212b' },
     components: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   } as unknown as ScreenDocument;
 }
 

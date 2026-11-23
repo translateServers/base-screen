@@ -166,21 +166,27 @@ describe('fragment library trial run', () => {
               dataValue: { kind: 'data-source-field', dataSourceId: 'sales', path: [] },
             },
           ],
-          relations: [
-            {
-              type: 'semantic',
-              id: 'detail',
-              source: { kind: 'component', componentId: 'title' },
-              target: { kind: 'component', componentId: 'value' },
-              role: 'detail',
-            },
-          ],
+          blueprint: {
+            nodes: [
+              { kind: 'component', id: 'title-node', componentId: 'title' },
+              { kind: 'component', id: 'value-node', componentId: 'value' },
+            ],
+            edges: [
+              {
+                kind: 'semantic',
+                id: 'detail',
+                from: { node: 'title-node' },
+                to: { node: 'value-node' },
+                role: 'detail',
+              },
+            ],
+          },
         }),
       ],
     });
     expect(resolved.diagnostics).toEqual([]);
     expect(resolved.items[0]?.fragment.dataSources?.[0]?.key).toBe('sales');
-    expect(resolved.items[0]?.fragment.relations?.[0]?.id).toBe('detail');
+    expect(resolved.items[0]?.fragment.blueprint?.edges[0]?.id).toBe('detail');
   });
 
   it('keeps host fragments first, strips plugin contribution fields and drops duplicate ids', () => {

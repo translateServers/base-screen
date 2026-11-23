@@ -18,16 +18,14 @@ const document: ScreenDocument = {
     { ...node('hidden', 'frame', 150, 300), status: { locked: false, hidden: true } },
   ],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 
 describe('resolveDesignerSnapScope', () => {
   it('uses the common parent of the selection roots, ignoring dragged descendants', () => {
     expect(resolveDesignerSnapScope(document, new Set(['a']))).toBe('frame');
     expect(resolveDesignerSnapScope(document, new Set(['b', 'b-child']))).toBe('frame');
-    expect(resolveDesignerSnapScope(document, new Set(['frame', 'a', 'b', 'b-child']))).toBe(
-      null,
-    );
+    expect(resolveDesignerSnapScope(document, new Set(['frame', 'a', 'b', 'b-child']))).toBe(null);
   });
 
   it('falls back to the canvas root for mixed parents and for no selection', () => {
@@ -56,14 +54,7 @@ describe('collectDesignerSnapComponentBounds scope', () => {
   });
 });
 
-function node(
-  id: string,
-  parentId: string | null,
-  x: number,
-  y: number,
-  width = 100,
-  height = 40,
-) {
+function node(id: string, parentId: string | null, x: number, y: number, width = 100, height = 40) {
   return {
     id,
     type: 'base.rectangle',

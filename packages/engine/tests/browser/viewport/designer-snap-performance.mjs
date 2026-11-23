@@ -76,6 +76,6 @@ function createDocument(count) {
       dataSource: null,
     })),
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }

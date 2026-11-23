@@ -68,6 +68,20 @@ describe('designerMaterialAppearance (ADR-0102 D1)', () => {
     ]);
   });
 
+  it('titles synthesized sections only with labels supplied by the renderer', () => {
+    const flat = manifest();
+    const labels = { content: 'Content', style: 'Style' };
+    expect(designerMaterialAppearance(flat, labels).map((section) => section.label)).toEqual([
+      'Content',
+      'Style',
+    ]);
+    expect(designerMaterialAppearance(flat, labels)).toBe(designerMaterialAppearance(flat, labels));
+    expect(designerMaterialAppearance(flat).map((section) => section.label)).toEqual([
+      'content',
+      'style',
+    ]);
+  });
+
   it('prefers a declared descriptor appearance and caches per manifest', () => {
     const declared = manifest({
       editorDescriptor: {
@@ -82,7 +96,7 @@ describe('designerMaterialAppearance (ADR-0102 D1)', () => {
         ],
       },
     });
-    const sections = designerMaterialAppearance(declared);
+    const sections = designerMaterialAppearance(declared, { content: 'C', style: 'S' });
     expect(sections).toBe(declared.editorDescriptor?.appearance);
     expect(designerMaterialAppearance(declared)).toBe(sections);
     // 描述符没有开放的键不再因为扁平面板里有它就可写。

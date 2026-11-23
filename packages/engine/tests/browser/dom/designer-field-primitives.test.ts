@@ -234,7 +234,8 @@ describe('designer field primitives', () => {
 
     const symbolField = fake(control).children[1];
     expect(symbolField?.tagName).toBe('label');
-    expect(symbolField?.className).toBe('designer-geo-field');
+    // 读数外壳与描述符滑杆同一类名：`designer-field-range-reading` 收窄读数列宽（designer-controls-fields.css）。
+    expect(symbolField?.className).toBe('designer-geo-field designer-field-range-reading');
     expect(symbolField?.dataset.symbol).toBe('%');
     expect(symbolField?.children).toEqual([number]);
   });

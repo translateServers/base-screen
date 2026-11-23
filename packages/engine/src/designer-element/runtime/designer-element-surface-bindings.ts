@@ -16,8 +16,8 @@ export function initializeDesignerElementSurfaceBindings(
       (target) => state.errorConsoleController.onClick(target as Element),
       (target) => state.guardController.onClick(target as Element),
       (target) => state.targetDisplayController.onClick(target as Element),
+      (target) => state.artboardController.onClick(target as Element),
       (target) => state.changeController.onClick(target as Element),
-      (target) => state.sceneController.onClick(target as Element),
       (target) => state.presentationLockController.onClick(target as Element),
       // 选择会话的取消按钮在自己的问句里：先于意图区的动作分发，避免被当成意图动作吞掉。
       (target) => state.intentChoiceController.onClick(target as Element),
@@ -34,6 +34,12 @@ export function initializeDesignerElementSurfaceBindings(
         state.menuController.closeContextMenu();
         return false;
       },
+      // 右键「移到…」「置于从画布下方」（ADR-0109）：菜单已收起，按当前选区执行。
+      (target) =>
+        state.artboardController.onContextMenuClick(
+          target as Element,
+          state.session.interaction.selectedComponentIds,
+        ),
       (target) => state.runtime.executeToolFromTarget(element, target as Element),
       (target) => state.runtime.executeOperationFromTarget(element, target as Element),
       (target) => state.runtime.onStatusZoomPreset(element, target as Element),
@@ -120,6 +126,7 @@ export function initializeDesignerElementSurfaceBindings(
       return false;
     },
     change: [
+      (target) => state.artboardController.onChange(target as Element),
       (target) => state.blueprintWorkbenchController.onChange(target as Element),
       (target) => state.coordinateEntryController.onChange(target),
       (target) => state.sizeEntryController.onChange(target),
@@ -251,12 +258,11 @@ export function initializeDesignerElementSurfaceBindings(
       (_target, event) => state.commandPaletteController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.errorConsoleController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.guardController.onKeyDown(event as KeyboardEvent),
-      // 意图区必须排在「面板级 Esc」之前：智能体页签、场景预览、演示锁都会把 Esc 当成
+      // 意图区必须排在「面板级 Esc」之前：智能体页签、演示锁都会把 Esc 当成
       // 「退回去」，而生成中的 Esc 是「停手」。被它们先吃掉时，用户按下 Esc 只会看到
       // 右栏切回检查器，请求照样跑完——取消按钮此时反而成了唯一的出口。
       (_target, event) => state.intentController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.changeController.onKeyDown(event as KeyboardEvent),
-      (_target, event) => state.sceneController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.presentationLockController.onKeyDown(event as KeyboardEvent),
       // 意图区自己的问句（点选会话）排在生成取消之后：先停手，再收拾画布上的候选。
       (_target, event) => state.intentChoiceController.onKeyDown(event as KeyboardEvent),
