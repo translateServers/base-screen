@@ -179,6 +179,7 @@ function isChartFurnitureExempt(relativePath) {
  */
 function collectDeclaredKeys(source) {
   const keys = new Set();
+  const unresolved = [];
   const marker = /properties\s*:\s*\{/g;
   let match;
   while ((match = marker.exec(source)) !== null) {
@@ -194,10 +195,49 @@ function collectDeclaredKeys(source) {
         const rest = source.slice(index);
         const keyMatch = /^([A-Za-z_$][\w$]*)\s*:/.exec(rest);
         if (keyMatch !== null) keys.add(keyMatch[1]);
+        // `...GROUP.properties`：plugin-sdk 配置组工厂产出的字段（如数值格式的 prefix/unit/
+        // decimals/thousandsSeparator），按工厂调用的字面量参数静态还原。
+        const spread = /^\.\.\.\s*([A-Za-z_$][\w$]*)\.properties\b/.exec(rest);
+        if (spread !== null && source[index - 1] !== '.') {
+          const groupKeys = resolveConfigGroupKeys(source, spread[1]);
+          if (groupKeys === undefined) unresolved.push(spread[1]);
+          else for (const key of groupKeys) keys.add(key);
+          index += spread[0].length - 1;
+        }
       }
     }
   }
-  return keys;
+  return Object.assign(keys, { unresolved });
+}
+
+/**
+ * plugin-sdk 配置组工厂（`packages/plugin-sdk/src/material-config-groups.ts`）产出的 props 键。
+ * 与工厂实现一一对应；工厂新增或改键时同步这里（`tests/tooling/material-atomicity.test.ts` 锁定）。
+ */
+const CONFIG_GROUP_FACTORIES = {
+  createBaseScreenNumberFormatConfig(options) {
+    const keys = ['decimals'];
+    // 前缀/单位：`true` 或字符串即开启；`false` / 省略不提供。千分位：给出即提供。
+    for (const affix of ['prefix', 'unit']) {
+      if (new RegExp(`(?<![\\w$])${affix}\\s*:\\s*(?:true|'|")`).test(options)) keys.push(affix);
+    }
+    if (/(?<![\w$])thousandsSeparator\s*:/.test(options)) keys.push('thousandsSeparator');
+    return keys;
+  },
+  createBaseScreenChartTitleConfig: () => ['titleText'],
+  createBaseScreenChartLegendConfig: () => ['showLegend'],
+};
+
+/** `const NAME = createXxxConfig({...})` → 该配置组的 props 键；认不出工厂时返回 undefined。 */
+function resolveConfigGroupKeys(source, name) {
+  const declaration = new RegExp(
+    `\\bconst\\s+${name}\\s*=\\s*(${Object.keys(CONFIG_GROUP_FACTORIES).join('|')})\\s*\\(`,
+  ).exec(source);
+  if (declaration === null) return undefined;
+  const open = declaration.index + declaration[0].length - 1;
+  const close = matchingClose(source, open, '(', ')');
+  if (close === -1) return undefined;
+  return CONFIG_GROUP_FACTORIES[declaration[1]](source.slice(open + 1, close));
 }
 
 /**
@@ -315,6 +355,16 @@ function enclosingBrace(source, index) {
   return -1;
 }
 
+/** `from` 与 `index` 之间是否有未闭合的 `(`：用来识别函数参数列表里的类型标注。 */
+function insideOpenParenthesis(source, from, index) {
+  let depth = 0;
+  for (let cursor = from; cursor < index; cursor += 1) {
+    if (source[cursor] === '(') depth += 1;
+    else if (source[cursor] === ')') depth = Math.max(0, depth - 1);
+  }
+  return depth > 0;
+}
+
 function matchingClose(source, openIndex, open, close) {
   let depth = 0;
   for (let cursor = openIndex; cursor < source.length; cursor += 1) {
@@ -371,6 +421,8 @@ function collectFragmentEntries(source, constants) {
   for (const match of source.matchAll(/(?<![\w$])materialType\s*:/g)) {
     const open = enclosingBrace(source, match.index);
     if (open === -1) continue;
+    // 参数列表里的 `materialType: string` 是类型标注，不是分片节点。
+    if (insideOpenParenthesis(source, open, match.index)) continue;
     const close = matchingClose(source, open, '{', '}');
     if (close === -1) continue;
     const own = topLevelText(source.slice(open, close + 1));
@@ -459,7 +511,14 @@ function checkDeclaredContract(root, failures) {
       // 组件自己的 `props.X` 不是 model 读取。
       if (source.includes('renderMaterial')) {
         const declared = collectDeclaredKeys(source);
-        for (const { key, index } of collectReads(source)) {
+        // 认不出来源的 properties 展开会让声明集合不完整：失败关闭，而不是把读取全报成未声明。
+        for (const name of declared.unresolved) {
+          failures.push(
+            `${rel} 的 properties 展开 ...${name}.properties 无法静态解析；用 plugin-sdk 配置组工厂常量`,
+          );
+        }
+        const reads = declared.unresolved.length > 0 ? [] : collectReads(source);
+        for (const { key, index } of reads) {
           if (declared.size > 0 && !declared.has(key)) {
             const line = lineOf(source, index);
             failures.push(`${rel}:${line} 读取了未在 manifest 声明的 ${key}`);

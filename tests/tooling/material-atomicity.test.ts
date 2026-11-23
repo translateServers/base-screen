@@ -227,6 +227,33 @@ const DESCRIPTOR = {
     expect(check()).toEqual({ failures: [], warnings: [] });
   });
 
+  it('resolves props spread from plugin-sdk config group factories', () => {
+    write(
+      'plugins/demo/src/flop.ts',
+      `const NF = createBaseScreenNumberFormatConfig({ prefix: true, unit: false, thousandsSeparator: true });\n${material(
+        {
+          props: '...NF.properties',
+          render:
+            'void model.props.prefix; void model.props.decimals; void model.props.thousandsSeparator; void model.props.unit;',
+        },
+      )}`,
+    );
+    // prefix / decimals / thousandsSeparator 由配置组声明；unit: false 不提供该字段。
+    expect(check().failures).toEqual([
+      expect.stringMatching(/plugins\/demo\/src\/flop\.ts:\d+ 读取了未在 manifest 声明的 unit$/),
+    ]);
+  });
+
+  it('fails closed on a props spread it cannot resolve', () => {
+    write(
+      'plugins/demo/src/opaque.ts',
+      `const GROUP = buildSomething();\n${material({ props: '...GROUP.properties' })}`,
+    );
+    expect(check().failures).toEqual([
+      expect.stringMatching(/opaque\.ts 的 properties 展开 \.\.\.GROUP\.properties 无法静态解析/),
+    ]);
+  });
+
   it('does not apply paradigm rules to browser-harness demo materials', () => {
     write(
       'tooling/verification/browser-harness/demo.ts',
@@ -313,6 +340,20 @@ export const CARD: BaseScreenFragmentDefinition = {
       fragment("{ key: 'value', materialType: resolveType() }"),
     );
     expect(check().failures).toEqual([expect.stringMatching(/\[R10\] .*无法静态解析/)]);
+  });
+
+  it('ignores materialType type annotations in function parameters', () => {
+    official();
+    write(
+      'examples/host/src/fragments.ts',
+      `${fragment("{ key: 'value', materialType: 'base.text' }")}
+export function cover(): void {
+  const sizeOf = (materialType: string, size: number | undefined): number => size ?? materialType.length;
+  void sizeOf;
+}
+`,
+    );
+    expect(check().failures).toEqual([]);
   });
 });
 
