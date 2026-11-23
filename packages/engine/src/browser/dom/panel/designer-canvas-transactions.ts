@@ -4,7 +4,11 @@ import type {
   ScreenParseResult,
   ScreenThemeSlot,
 } from '@base-screen/contracts';
-import { isBoundedScreenImageUrl, isScreenThemeSlot } from '@base-screen/contracts';
+import {
+  isBoundedScreenImageUrl,
+  isScreenThemeSlot,
+  SCREEN_THEME_STATUS_DEFAULTS,
+} from '@base-screen/contracts';
 import type { ScreenDocumentTransaction } from '@base-screen/core';
 import type { BaseScreenCanvasScaleMode } from '../../../common/operations/canvas/canvas-presentation.js';
 import { roundScreenGeometry } from '../../../common/operations/element/designer-geometry.js';
@@ -19,13 +23,19 @@ import { success } from './designer-panel-transaction-utils.js';
 export type DesignerCanvasScaleMode = BaseScreenCanvasScaleMode;
 
 /** 作者面初始化色板的中性默认值；预设库与换肤策略仍归宿主（ADR-0098）。 */
-export const SCREEN_THEME_AUTHORING_DEFAULT_PALETTE: Readonly<Record<ScreenThemeSlot, string>> = {
+const SCREEN_THEME_AUTHORING_BASE_PALETTE = {
   primary: '#38bdf8',
   text: '#e5e7eb',
   textSecondary: '#9ca3af',
   background: '#0f172a',
   accent: '#22d3ee',
   accentSecondary: '#a78bfa',
+} as const;
+
+/** 状态色位（ADR-0110 §2.6.4）沿用内置默认色；色板里省略时也按它们解析。 */
+export const SCREEN_THEME_AUTHORING_DEFAULT_PALETTE: Readonly<Record<ScreenThemeSlot, string>> = {
+  ...SCREEN_THEME_AUTHORING_BASE_PALETTE,
+  ...SCREEN_THEME_STATUS_DEFAULTS,
 };
 
 /** 色板编辑一次提交整副色板：半套色板会让 theme: 引用解析到空洞，命令层也拒绝。 */
@@ -35,7 +45,8 @@ export function createThemePaletteTransaction(
   value: string,
 ): ScreenParseResult<ScreenDocumentTransaction> | undefined {
   if (!isScreenThemeSlot(slot) || value.trim() === '') return undefined;
-  const base = document.theme?.palette ?? SCREEN_THEME_AUTHORING_DEFAULT_PALETTE;
+  // 没有色板时只落六个基础色位：状态色位省略即取默认色，不必写进文档。
+  const base = document.theme?.palette ?? SCREEN_THEME_AUTHORING_BASE_PALETTE;
   return success({
     commands: [{ type: 'update-theme', patch: { ...base, [slot]: value } }],
   });
@@ -177,6 +188,19 @@ export function createCanvasTransaction(
     }
     return success({
       commands: [{ type: 'update-canvas', patch: { backgroundImageFit: target.value } }],
+    });
+  }
+  if (property === 'size') {
+    // 尺寸预设：值形如 `1920x1080`；「自定义」等其他值不提交，由宽高输入框单独改。
+    const match = /^(\d+)x(\d+)$/.exec(target.value);
+    if (match === null) return undefined;
+    return success({
+      commands: [
+        {
+          type: 'update-canvas',
+          patch: { width: Number(match[1]), height: Number(match[2]) },
+        },
+      ],
     });
   }
   const value = Number(target.value);

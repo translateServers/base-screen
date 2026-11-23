@@ -1,5 +1,14 @@
-import type { ScreenDocument, ScreenPopupCanvas, ScreenSubCanvas } from '@base-screen/contracts';
-import { SCREEN_POPUP_ANCHORS, SCREEN_THEME_SLOTS } from '@base-screen/contracts';
+import type {
+  ScreenDocument,
+  ScreenPopupCanvas,
+  ScreenSubCanvas,
+  ScreenThemeSlot,
+} from '@base-screen/contracts';
+import {
+  readScreenThemeColor,
+  SCREEN_POPUP_ANCHORS,
+  SCREEN_THEME_SLOTS,
+} from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
 import {
@@ -22,6 +31,7 @@ import {
   type DesignerCanvasScaleMode,
   SCREEN_THEME_AUTHORING_DEFAULT_PALETTE,
 } from './designer-canvas-transactions.js';
+import { appendDesignerColorGroup } from './designer-color-group-dom.js';
 import { appendSection } from './designer-panel-primitives.js';
 
 /**
@@ -308,28 +318,56 @@ function appendPopupPlacementFields(section: HTMLElement, popup: ScreenPopupCanv
 }
 
 /**
- * 文档级主题色板（ADR-0098）：六个语义槽各复用统一颜色控件，默认折叠。
- * 标记挂调色板根节点（色标增删会重建控件列表），提交走 update-theme 整副色板。
+ * 文档级主题色板（ADR-0098）与状态色位（ADR-0110 §2.6.4），默认折叠。
+ * 与组件外观区同一套色板组（色卡 + 一个编辑器，见 `designer-color-group-dom`）：基础色位一组、
+ * 状态色位一组。标记挂调色板根节点（色标增删会重建控件列表），提交走 update-theme 整副色板。
  */
 function appendCanvasThemeSection(parent: HTMLElement, document: ScreenDocument): void {
   const section = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.theme, true, false);
-  for (const slot of SCREEN_THEME_SLOTS) {
-    const { field, control } = createDesignerFieldRow(parent.ownerDocument, {
-      label: DESIGNER_UI_TEXT.propertiesPanel.themeSlots[slot],
-      tagName: 'span',
-      stacked: true,
+  const statusIndex = SCREEN_THEME_SLOTS.indexOf('danger');
+  const groups = [
+    { key: 'base', slots: SCREEN_THEME_SLOTS.slice(0, statusIndex) },
+    { key: 'status', slots: SCREEN_THEME_SLOTS.slice(statusIndex) },
+  ];
+  for (const group of groups) {
+    if (group.key === 'status') {
+      // 状态色位：组件状态与等级着色共用，改一处全屏一起变。
+      const heading = parent.ownerDocument.createElement('p');
+      heading.className = 'designer-inspector-subheading';
+      heading.textContent = DESIGNER_UI_TEXT.propertiesPanel.themeStatusSlots;
+      section.appendChild(heading);
+    }
+    appendDesignerColorGroup(section, {
+      groupKey: `canvas:theme:${group.key}`,
+      entries: group.slots.map((slot) => ({
+        key: slot,
+        label: DESIGNER_UI_TEXT.propertiesPanel.themeSlots[slot],
+        value: themeSlotColor(document, slot),
+      })),
+      renderField: (container, entry) => {
+        const slot = entry.key as ScreenThemeSlot;
+        const { field, control } = createDesignerFieldRow(parent.ownerDocument, {
+          label: entry.label,
+          tagName: 'span',
+          stacked: true,
+        });
+        const palette = createDesignerColorPalette(
+          parent.ownerDocument,
+          themeSlotColor(document, slot),
+          `canvas:theme:${slot}`,
+          { allowGradient: false },
+        );
+        palette.element.dataset.canvasProperty = `theme.${slot}`;
+        control.appendChild(palette.element);
+        appendDesignerFieldMessage(field, palette.controls[0]!, `canvas-theme-${slot}`);
+        container.appendChild(field);
+      },
     });
-    const palette = createDesignerColorPalette(
-      parent.ownerDocument,
-      document.theme?.palette[slot] ?? SCREEN_THEME_AUTHORING_DEFAULT_PALETTE[slot],
-      `canvas:theme:${slot}`,
-      { allowGradient: false },
-    );
-    palette.element.dataset.canvasProperty = `theme.${slot}`;
-    control.appendChild(palette.element);
-    appendDesignerFieldMessage(field, palette.controls[0]!, `canvas-theme-${slot}`);
-    section.appendChild(field);
   }
+}
+
+function themeSlotColor(document: ScreenDocument, slot: ScreenThemeSlot): string {
+  return readScreenThemeColor(document.theme, slot) ?? SCREEN_THEME_AUTHORING_DEFAULT_PALETTE[slot];
 }
 
 /** 几何输入：符号内嵌在输入框右缘（与组件几何网格同形），免去 W / H 这类前置小标题。 */
@@ -370,12 +408,59 @@ function createCanvasFieldRow(
   return createDesignerFieldRow(ownerDocument, { ...options, tagName: 'div' });
 }
 
+/**
+ * 常用画布尺寸。键对应文案表 `canvasSizePresetNames`；宽高与预设都不一致时下拉显示「自定义」，
+ * 下面的 W / H 始终可直接改，改完自动回落到对应预设或「自定义」。
+ */
+export const DESIGNER_CANVAS_SIZE_PRESETS = [
+  ['fhd', 1920, 1080],
+  ['qhd', 2560, 1440],
+  ['uhd', 3840, 2160],
+  ['hd', 1280, 720],
+  ['laptop', 1366, 768],
+  ['standard', 1024, 768],
+  ['portrait', 1080, 1920],
+  ['dual', 3840, 1080],
+  ['triple', 5760, 1080],
+] as const;
+
+export const DESIGNER_CANVAS_SIZE_CUSTOM = 'custom';
+
 function appendCanvasSizeField(parent: HTMLElement, document: ScreenDocument): void {
-  const { field, control } = createCanvasFieldRow(parent.ownerDocument, {
+  const ownerDocument = parent.ownerDocument;
+  const { field, control } = createCanvasFieldRow(ownerDocument, {
     label: DESIGNER_UI_TEXT.propertiesPanel.canvasDimensions,
     className: 'designer-canvas-size-field',
     controlClassName: 'designer-canvas-size-controls',
   });
+  const matched = DESIGNER_CANVAS_SIZE_PRESETS.find(
+    ([, presetWidth, presetHeight]) =>
+      presetWidth === document.canvas.width && presetHeight === document.canvas.height,
+  );
+  const names = DESIGNER_UI_TEXT.propertiesPanel.canvasSizePresetNames;
+  const select = createDesignerSelect(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.canvasSizePreset,
+    options: [
+      ...DESIGNER_CANVAS_SIZE_PRESETS.map(([key, presetWidth, presetHeight]) => ({
+        value: `${presetWidth}x${presetHeight}`,
+        label: DESIGNER_UI_TEXT.propertiesPanel.canvasSizePresetLabel(
+          names[key],
+          presetWidth,
+          presetHeight,
+        ),
+      })),
+      {
+        value: DESIGNER_CANVAS_SIZE_CUSTOM,
+        label: DESIGNER_UI_TEXT.propertiesPanel.canvasSizeCustom,
+      },
+    ],
+    value: matched === undefined ? DESIGNER_CANVAS_SIZE_CUSTOM : `${matched[1]}x${matched[2]}`,
+  });
+  // 走 canvasProperty 通道：选中预设一次提交宽高；选「自定义」不提交，直接在下方输入。
+  select.dataset.canvasProperty = 'size';
+  const preset = enhanceDesignerSelect(select).element;
+  preset.classList.add('designer-canvas-size-preset');
+  control.appendChild(preset);
   createCanvasGeoInput(
     control,
     'W',

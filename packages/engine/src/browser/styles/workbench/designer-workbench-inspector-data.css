@@ -524,6 +524,11 @@
   gap: var(--designer-space-3);
 }
 
+/* 常用尺寸下拉占满一行，W / H 在下一行。 */
+.properties .designer-canvas-size-preset {
+  grid-column: 1 / -1;
+}
+
 /* 不透明度：几何沿用滑杆字段的公共规则（`.designer-field-control:has(> .designer-range)`），
    这里只补“读数内嵌 % 符号”需要让出的右内边距。读数读作「100%」而不是裸数字。
    特异性要压过公共读数规则（`.designer-field-range-value` 的 padding），否则 % 会压住数字。 */

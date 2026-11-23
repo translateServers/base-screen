@@ -453,6 +453,28 @@ describe('DesignerPanelController canvas background drafts', () => {
     ]);
   });
 
+  it('commits a canvas size preset as one width and height patch', () => {
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeInput);
+    const { controller, transactions } = createCanvasController(() => ({
+      ok: true,
+      value: document(),
+      diagnostics: [],
+    }));
+
+    controller.onPropertyChange({
+      target: new FakeInput('size', '1920x1080', 'canvasProperty'),
+    } as unknown as Event);
+    // 「自定义」只是提示用户改下面的宽高，不提交任何东西。
+    controller.onPropertyChange({
+      target: new FakeInput('size', 'custom', 'canvasProperty'),
+    } as unknown as Event);
+
+    expect(transactions).toEqual([
+      { commands: [{ type: 'update-canvas', patch: { width: 1920, height: 1080 } }] },
+    ]);
+  });
+
   it('clears the background image and its fit when the URL draft is empty', () => {
     vi.stubGlobal('HTMLInputElement', FakeInput);
     const { controller, transactions } = createCanvasController(() => ({
