@@ -135,7 +135,8 @@ export class BaseScreenTableMaterialElement extends BaseScreenOfficialMaterialEl
     if (model === undefined || !this.isConnected) return;
     this.replaceChildren();
     this.replaceChildren();
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.overflow = 'auto';
     // 滚动条出现/消失会改变内容宽度；预留轨道避免数据变化时表格抖动。
     this.style.scrollbarGutter = 'stable';

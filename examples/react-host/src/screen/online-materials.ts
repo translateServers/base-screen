@@ -848,7 +848,8 @@ class OnlineMaterial extends HTMLElement {
     const value = state.status === 'ready' ? formatValue(state.value) : state.status === 'loading' ? '…' : '--';
     const background = typeof style.background === 'string' ? style.background : DEFAULT_BACKGROUND;
     const accent = typeof style.accent === 'string' ? style.accent : DEFAULT_ACCENT;
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+    if (this.style.display !== 'none') this.style.display = 'block';
     const root = this.#root;
     root.replaceChildren();
     const sheet = document.createElement('style');

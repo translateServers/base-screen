@@ -92,12 +92,6 @@ export function initialize(element: DesignerElementHost): void {
     shadow.querySelector<HTMLElement>('[data-error-console]')!,
     shadow.querySelector<HTMLButtonElement>('[data-error-console-toggle]')!,
   );
-  elementState.guardController.connect(
-    shadow.querySelector<HTMLButtonElement>('[data-guard-toggle]')!,
-    shadow.querySelector<HTMLElement>('[data-guard-popover]')!,
-    elementState.canvas,
-    shadow.querySelector<HTMLElement>('[data-canvas-content]')!,
-  );
   elementState.changeController.connect(
     shadow.querySelector<HTMLElement>('[data-draft-bar]')!,
     shadow.querySelector<HTMLElement>('[data-change-pane]')!,
@@ -330,7 +324,6 @@ export function renderDocument(
     elementState.workbenchController.invalidateGeometry();
     elementState.runtime.syncCanvasFrameSize(element, document);
     elementState.previewController.sync(document);
-    elementState.guardController.schedule(document);
     elementState.targetDisplayController.setDocument(document);
     // 首个文档首次落定：画布尺寸此时才是准的，按它决定要不要退到「适应窗口」。
     // 只做一次——之后的文档变更（改属性、加组件、切场景）都不许动用户当前的缩放。
@@ -529,14 +522,18 @@ export function createRenderer(element: DesignerElementHost): void {
       ? {}
       : { hostCatalogPort: elementState.hostCatalogPort }),
     ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
-    ...(elementState.conditionalStylePort === undefined
-      ? {}
-      : { conditionalStylePort: elementState.conditionalStylePort }),
     // 设计态渲染器获得设计执行上下文（RB2）：design mode，不绑定项目。
     executionMode: 'design',
     ...(elementState.runtimeContributions === undefined
       ? {}
       : { contributionIndex: elementState.runtimeContributions }),
+    // 组件状态改变（ADR-0110）：正在检查的组件换了状态时重绘检查器，「当前 x → 状态」与生效标记跟上画布。
+    onComponentStateChange: (change) => {
+      const selected = elementState.session.interaction.selectedComponentIds;
+      if (selected.length === 1 && selected[0] === change.componentId) {
+        elementState.runtime.renderProperties(element);
+      }
+    },
   });
   createGhostRenderer(elementState);
   const previewHost = elementState.canvas.querySelector<HTMLElement>('[data-popup-preview-layer]');
@@ -554,7 +551,8 @@ export function createRenderer(element: DesignerElementHost): void {
 }
 
 /**
- * 参照底图渲染器（ADR-0109 §2.5）：同一份目录与端口，预览模式、不可交互；只读地画参照画布的组件。
+ * 参照底图渲染器（ADR-0109 §2.5）：同一份目录与端口，预览模式；默认不可交互，「事件」开着时由参照层
+ * 控制器切成可交互，物料事件经控制器还原组件 id 后进蓝图。
  */
 export function createReferenceRenderer(
   element: DesignerElementHost,
@@ -567,16 +565,12 @@ export function createReferenceRenderer(
     catalog: elementState.catalog,
     mode: 'preview',
     interactive: false,
-    // 参照内容只读：物料事件一律丢弃。
-    onMaterialEvent: () => undefined,
+    onMaterialEvent: (event) => elementState.referenceLayerController.handleMaterialEvent(event),
     resourcePort: elementState.resourcePort,
     ...(elementState.hostCatalogPort === undefined
       ? {}
       : { hostCatalogPort: elementState.hostCatalogPort }),
     ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
-    ...(elementState.conditionalStylePort === undefined
-      ? {}
-      : { conditionalStylePort: elementState.conditionalStylePort }),
     executionMode: 'design',
     ...(elementState.runtimeContributions === undefined
       ? {}
@@ -608,9 +602,6 @@ export function createPopupPreviewRenderer(
       ? {}
       : { hostCatalogPort: elementState.hostCatalogPort }),
     ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
-    ...(elementState.conditionalStylePort === undefined
-      ? {}
-      : { conditionalStylePort: elementState.conditionalStylePort }),
     executionMode: 'design',
     ...(elementState.runtimeContributions === undefined
       ? {}
@@ -641,9 +632,6 @@ function createGhostRenderer(elementState: DesignerElementState): void {
       ? {}
       : { hostCatalogPort: elementState.hostCatalogPort }),
     ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
-    ...(elementState.conditionalStylePort === undefined
-      ? {}
-      : { conditionalStylePort: elementState.conditionalStylePort }),
     executionMode: 'design',
     ...(elementState.runtimeContributions === undefined
       ? {}
@@ -664,6 +652,8 @@ export function applyNativeEvents(element: DesignerElementHost, enabled: boolean
     elementState.popupPreviewController.reset();
     elementState.pagePreviewController.reset();
   }
+  // 参照层随「事件」在只读底图与实况之间切换。
+  elementState.referenceLayerController.sync();
   const renderer = elementState.renderer;
   if (renderer === undefined) return;
   const result = renderer.setInteractive(enabled);

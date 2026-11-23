@@ -8,6 +8,9 @@ export interface DesignerPagePreviewCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getArtboard: () => DesignerArtboardId;
   readonly setArtboard: (artboard: DesignerArtboardId) => ScreenParseResult<null>;
+  /** 编辑主画布时垫在下面的页面（设计态的「当前页」）。 */
+  readonly getPreviewPage: () => string | null;
+  readonly setPreviewPage: (pageId: string) => void;
   /** 状态栏「事件」开着且当前不是弹框画板时才切页。 */
   readonly isEnabled: () => boolean;
   /** 切页完成后按顺序回调（旧页离开 → 新页进入 → 页面已切换），用于分派蓝图事件。 */
@@ -16,10 +19,11 @@ export interface DesignerPagePreviewCallbacks {
 
 /**
  * 设计态的页面切换（ADR-0109 §2.5）：「事件」开着时，蓝图里的「打开页面 / 上一页 / 下一页 / 返回」
- * 直接把设计器切到对应页面的画板，所见即查看器里的那一页。弹框仍由弹框预览层呈现。
+ * 与查看器一样换页，弹框仍由弹框预览层呈现：
+ * - 正在编辑主画布：只换垫在下面的页面（实况参照层），主画布组件不重建，标签页的选中项等状态保留；
+ * - 正在编辑某个页面：切到目标页面的画板，主画布内容由实况参照层叠在上面，照样能点。
  *
- * 切画板会重新渲染画布，所以切换推迟到本轮蓝图分派结束之后（微任务）再做，避免在分派途中替换渲染。
- * 「当前页」取当前画板：正在编辑主画布时视为还没有页面，「下一页」进入第一页。
+ * 换页会重新渲染画布，所以推迟到本轮蓝图分派结束之后（微任务）再做，避免在分派途中替换渲染。
  */
 export class DesignerPagePreviewController {
   #history: string[] = [];
@@ -85,8 +89,12 @@ export class DesignerPagePreviewController {
     const pages = this.#pageIds();
     const from = this.#currentPage(pages);
     if (pageId === from || !pages.includes(pageId)) return;
-    const result = this.callbacks.setArtboard(pageId);
-    if (!result.ok) return;
+    if (this.callbacks.getArtboard() === null) {
+      this.callbacks.setPreviewPage(pageId);
+    } else {
+      const result = this.callbacks.setArtboard(pageId);
+      if (!result.ok) return;
+    }
     if (from !== null && remember) this.#history.push(from);
     if (from !== null) {
       this.callbacks.onChange({
@@ -116,6 +124,10 @@ export class DesignerPagePreviewController {
 
   #currentPage(pages: readonly string[]): string | null {
     const artboard = this.callbacks.getArtboard();
-    return artboard !== null && pages.includes(artboard) ? artboard : null;
+    if (artboard === null) {
+      const preview = this.callbacks.getPreviewPage();
+      return preview !== null && pages.includes(preview) ? preview : null;
+    }
+    return pages.includes(artboard) ? artboard : null;
   }
 }

@@ -1,4 +1,5 @@
 import { resolveScreenStartPageId } from '@base-screen/contracts';
+import type { ScreenDocumentTransaction } from '@base-screen/core';
 import { DesignerBlueprintWorkbenchController } from '../../browser/controllers/blueprint/designer-blueprint-workbench-controller.js';
 import { DesignerDatasetPanelController } from '../../browser/controllers/dataset/designer-dataset-panel-controller.js';
 import { DesignerCanvasRuntimeController } from '../../browser/controllers/designer-canvas-runtime-controller.js';
@@ -39,6 +40,7 @@ import {
   type BaseScreenDesignerChangeStateDetail,
 } from '../../common/operations/change/designer-change-events.js';
 import type { DesignerParameterPatch } from '../../common/operations/intent/designer-parameter-intent.js';
+import { redirectDesignerStyleTransaction } from '../../common/operations/style/designer-component-states.js';
 import {
   BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT,
   type BaseScreenDesignerBackRequestEventDetail,
@@ -50,7 +52,6 @@ import {
 } from '../../common/project/project-controller.js';
 import { DesignerSession } from '../../common/session/designer-session.js';
 import { designerDiagnosticSummary } from '../../common/ui-text/designer-ui-text.js';
-import { BASE_SCREEN_GUARD_CHANGE_EVENT } from '../../common/validation/designer-guard.js';
 import { getDesignerGeometryDocument } from './designer-element-geometry.js';
 import type { DesignerElementHost, DesignerElementState } from './designer-element-state.js';
 
@@ -93,11 +94,15 @@ export function initializeDesignerElementControllers(
     getContentRoot: () =>
       state.canvas?.querySelector<HTMLElement>('[data-canvas-content]') ?? undefined,
     getVariables: () => state.canvasRuntimeController.readVariables(),
+    isLive: () => state.workbenchController.nativeEventsEnabled && !isPopupArtboard(state),
+    onMaterialEvent: (event) => state.runtime.forwardNativeMaterialEvent(element, event),
   });
   state.pagePreviewController = new DesignerPagePreviewController({
     getDocument: () => state.session.fullDocument,
     getArtboard: () => state.session.artboard,
     setArtboard: (artboard) => state.session.setArtboard(artboard),
+    getPreviewPage: () => state.artboardController.referencePage(),
+    setPreviewPage: (pageId) => state.artboardController.setReferencePage(pageId),
     isEnabled: () => state.workbenchController.nativeEventsEnabled && !isPopupArtboard(state),
     onChange: (change) => state.canvasRuntimeController.handleCanvasChange(change),
   });
@@ -316,7 +321,6 @@ export function initializeDesignerElementControllers(
     getResourcePort: () => state.resourcePort,
     getHostCatalogPort: () => state.hostCatalogPort,
     getDatasetPort: () => state.datasetPort,
-    getConditionalStylePort: () => state.conditionalStylePort,
     getRuntimeContributions: () => state.runtimeContributions,
     isViewerRegistered: () =>
       element.ownerDocument.defaultView?.customElements.get('base-screen-viewer') !== undefined,
@@ -399,6 +403,7 @@ export function initializeDesignerElementControllers(
       state.viewportController.fitOnFirstRender();
     },
     onReferenceChange: () => state.referenceLayerController.sync(),
+    isLive: () => state.workbenchController.nativeEventsEnabled,
   });
   state.panelController = new DesignerPanelController({
     getCatalog: () => state.catalog,
@@ -427,16 +432,29 @@ export function initializeDesignerElementControllers(
     getImageNaturalSize: (componentId) => readDesignerImageNaturalSize(state.canvas, componentId),
     getDatasetFields: () => state.datasetController.getFocusedDatasetFields(),
     getInspectorControls: () => state.inspectorControls,
-    getHostConditionalStyleAuthoring: () => state.hostConditionalStyleAuthoring,
-    refreshConditionalStyles: (componentIds) =>
-      state.runtime.refreshConditionalStyles(element, componentIds),
+    componentStateEditing: state.componentStateEditing,
+    previewComponentState: (componentId, stateId) =>
+      state.canvasRuntimeController.previewComponentState(componentId, stateId),
+    readComponentStateRuntime: (componentId) => state.renderer?.readComponentState(componentId),
+    readLevelScales: (dataSourceId) => {
+      const source = state.session.fullDocument?.dataSources?.find(
+        (candidate) => candidate.id === dataSourceId,
+      )?.source;
+      return source?.kind === 'host-resource'
+        ? state.runtimeContributions?.getResourceType(source.resourceType)?.levelScales
+        : undefined;
+    },
     getGroupMaterialType: () => state.groupMaterialType,
     getInteraction: () => state.session.interaction,
     getResourcePort: () => state.resourcePort,
     getRuntimeContributions: () => state.runtimeContributions,
     executeCommand: (command) => state.runtime.executeDesignerCommand(element, command),
+    // 编辑非默认状态时（ADR-0110 §2.5），检查器落到该组件 style 的改动改写成该状态的覆盖。
     executeTransaction: (transaction) =>
-      state.runtime.executeDesignerTransaction(element, transaction),
+      state.runtime.executeDesignerTransaction(
+        element,
+        redirectEditingStateStyle(state, transaction),
+      ),
     reduceSelection: (action) => state.session.reduceSelection(action),
     redo: () => state.session.redo(),
     setZoom: (zoom) => state.viewportController.setZoomCentered(zoom),
@@ -561,23 +579,6 @@ export function initializeDesignerElementControllers(
     report: (result) => state.runtime.report(element, result),
     focusViewport: () => state.viewportController.focus(),
   });
-  // 守卫修复走一次 update-components 事务：与手动改色同一条路径，因此可撤销。
-  state.guardController.setApplyHandler((componentId, color) => {
-    const document = state.session.document;
-    const component = document?.components.find((item) => item.id === componentId);
-    if (document === undefined || component === undefined) return false;
-    const result = state.runtime.executeDesignerTransaction(element, {
-      commands: [
-        {
-          type: 'update-components',
-          componentIds: [componentId],
-          patch: { style: { ...component.style, color } },
-        },
-      ],
-    });
-    state.runtime.report(element, result);
-    return result.ok;
-  });
   // 采纳提案 = 一次普通事务（带 provenance）：必须与手动编辑共享历史与修订号。
   state.changeController.setDocumentReader(() => state.session.document);
   state.changeController.setIntentScopeReader(() => state.intentController.scope);
@@ -610,7 +611,6 @@ export function initializeDesignerElementControllers(
     );
   };
   state.changeController.setMetricHandler(emitMetric);
-  state.guardController.setMetricHandler(emitMetric);
   // 指代歧义的点选会话：选区是画布高亮的唯一来源，把候选放进选区就等于一起高亮；
   // 收敛后的选区原样留在画布上，取消时才放回提问前的那一份。
   state.intentChoiceController = new DesignerIntentChoiceController({
@@ -637,15 +637,6 @@ export function initializeDesignerElementControllers(
     const result = state.runtime.executeDesignerTransaction(element, { commands });
     state.runtime.report(element, result);
     return result.ok;
-  });
-  state.guardController.setChangeHandler((snapshot) => {
-    element.dispatchEvent(
-      new CustomEvent(BASE_SCREEN_GUARD_CHANGE_EVENT, {
-        bubbles: true,
-        composed: true,
-        detail: snapshot,
-      }),
-    );
   });
   state.changeController.setAdoptHandler((commands, provenance) => {
     const result = state.runtime.executeDesignerTransaction(element, { commands, provenance });
@@ -688,4 +679,17 @@ function isPopupArtboard(state: DesignerElementState): boolean {
     state.session.fullDocument?.subCanvases?.find((canvas) => canvas.id === artboard)?.display ===
     'popup'
   );
+}
+
+function redirectEditingStateStyle(
+  state: DesignerElementState,
+  transaction: ScreenDocumentTransaction,
+): ScreenDocumentTransaction {
+  const document = state.session.document;
+  const selected = state.session.interaction.selectedComponentIds;
+  if (document === undefined || selected.length !== 1) return transaction;
+  const component = document.components.find((item) => item.id === selected[0]);
+  if (component === undefined) return transaction;
+  const stateId = state.componentStateEditing.get(component);
+  return redirectDesignerStyleTransaction(document, component.id, stateId, transaction);
 }

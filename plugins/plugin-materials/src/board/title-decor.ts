@@ -155,7 +155,9 @@ export class PluginBoardTitleDecorElement extends BoardMaterialElement {
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
 
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.boxSizing = 'border-box';
     this.style.overflow = 'hidden';
     this.style.backgroundColor = styleColor(model.style.backgroundColor, 'transparent');

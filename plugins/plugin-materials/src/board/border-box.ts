@@ -179,7 +179,8 @@ export class PluginBoardBorderBoxElement extends BoardMaterialElement {
 
     // 边框不接数据，但仍可能是 dataset 之类的旧文档：一律按"无数据"渲染外观，
     // 不显示数据态占位，否则一个装饰元素会因为宿主给了数据集而变成错误提示。
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.boxSizing = 'border-box';
     this.style.overflow = 'hidden';
     this.style.backgroundColor = styleColor(model.style.backgroundColor, 'transparent');

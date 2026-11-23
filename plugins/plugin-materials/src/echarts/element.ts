@@ -68,7 +68,8 @@ export class PluginEchartsElement extends HTMLElement {
     }
     // 只设 display：宿主元素的宽高由渲染器按 canonical `component.size` 写死，
     // 这里再写 `100%` 会把组件撑满画布（曾被 E2E 的几何门禁捕获）。
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.backgroundColor = readString(model.style.backgroundColor, 'transparent');
     // 实例化（echarts 按需加载 + init + 首次 setOption）按帧预算排队：多图表同屏时
     // 首帧只出轻量内容，图表随后逐帧补齐；已实例化的图表仍走同步更新。

@@ -1,5 +1,5 @@
 import type { ScreenDocument, ScreenJsonObject } from '@base-screen/contracts';
-import type { BaseScreenRenderer } from '@base-screen/renderer';
+import type { BaseScreenMaterialEvent, BaseScreenRenderer } from '@base-screen/renderer';
 import {
   type DesignerArtboardId,
   listDesignerCanvasComponentIds,
@@ -18,6 +18,13 @@ export interface DesignerReferenceLayerCallbacks {
   readonly getContentRoot: () => HTMLElement | undefined;
   /** 画布当前的变量值：参照内容与画布同口径取值。 */
   readonly getVariables: () => ScreenJsonObject;
+  /**
+   * 状态栏「事件」是否开着。开着时参照层变成「实况」：不透明、可交互，物料事件（去掉 `ref:`
+   * 前缀后）照常进蓝图；编辑页面时主画布内容叠在页面之上（与查看器同序），标签页、导航按钮能点。
+   */
+  readonly isLive: () => boolean;
+  /** 实况参照层的物料事件（组件 id 已还原）。 */
+  readonly onMaterialEvent: (event: BaseScreenMaterialEvent) => void;
 }
 
 /**
@@ -36,6 +43,7 @@ export class DesignerReferenceLayerController {
   #rendererKey: unknown;
   #source: ScreenDocument | undefined;
   #canvas: DesignerArtboardId | undefined;
+  #live = false;
 
   constructor(private readonly callbacks: DesignerReferenceLayerCallbacks) {}
 
@@ -83,13 +91,38 @@ export class DesignerReferenceLayerController {
         return;
       }
     }
+    const live = this.callbacks.isLive();
+    if (live !== this.#live) {
+      this.#live = live;
+      const result = renderer.setInteractive(live);
+      if (!result.ok) {
+        this.#hide(host);
+        return;
+      }
+    }
+    host.toggleAttribute('data-live', live);
     host.style.width = `${source.canvas.width}px`;
     host.style.height = `${source.canvas.height}px`;
     const content = this.callbacks.getContentRoot();
-    if (content !== undefined && host.parentElement !== content) {
-      content.insertBefore(host, content.firstChild);
+    if (content !== undefined) {
+      // 叠放与查看器一致：主画布内容在页面之上。实况且参照的是主画布（正在编辑页面）时放到最后，
+      // 否则垫在最前（编辑主画布时页面在下）。
+      const onTop = live && canvas === null;
+      if (onTop ? host !== content.lastElementChild : host !== content.firstElementChild) {
+        if (onTop) content.appendChild(host);
+        else content.insertBefore(host, content.firstChild);
+      }
     }
     host.hidden = false;
+  }
+
+  /** 实况参照层抛出的物料事件：把 `ref:` 前缀还原成真实组件 id 再交给设计器。 */
+  handleMaterialEvent(event: BaseScreenMaterialEvent): void {
+    if (!this.#live || !event.componentId.startsWith(REFERENCE_ID_PREFIX)) return;
+    this.callbacks.onMaterialEvent({
+      ...event,
+      componentId: event.componentId.slice(REFERENCE_ID_PREFIX.length),
+    });
   }
 
   #hide(host: HTMLElement): void {
@@ -105,6 +138,7 @@ export class DesignerReferenceLayerController {
     const root = this.#root;
     if (root === undefined) return undefined;
     this.#rendererKey = key;
+    this.#live = false;
     this.#renderer = this.callbacks.createRenderer(root);
     return this.#renderer;
   }
