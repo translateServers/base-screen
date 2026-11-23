@@ -33,7 +33,9 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
-    await page.goto(`${baseUrl}/?designer&material-group-stress`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}/?designer&verify&material-group-stress`, {
+      waitUntil: 'networkidle',
+    });
     const designer = page.locator('base-screen-designer');
     const canvas = await designer.locator('[data-canvas]').elementHandle();
     const materials = await designer.locator('[data-base-screen-component-id]').elementHandles();
@@ -794,6 +796,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     'board.status-grid',
     'board.status-legend',
     'board.title-decor',
+    'board.tabs',
     ...PLUGIN_FRAGMENT_CARDS,
     'harness.react-button',
     'harness.vue-button',
@@ -997,6 +1000,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
         'board.status-grid',
         'board.status-legend',
         'board.title-decor',
+        'board.tabs',
         ...PLUGIN_FRAGMENT_CARDS,
         'base.text',
         'base.rectangle',
@@ -1473,7 +1477,7 @@ export async function assertImageDensitySize(browser, baseUrl) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
-    await page.goto(`${baseUrl}/?designer`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}/?designer&verify`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.baseScreenHarness?.designer?.document !== undefined);
     const designer = page.locator('base-screen-designer').first();
     expect(

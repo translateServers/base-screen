@@ -1,6 +1,11 @@
 import { createElement } from 'react';
 import { h } from 'vue';
-import type { ScreenJsonObject, ScreenJsonValue } from '../../../packages/contracts/src/index.ts';
+import type {
+  ScreenComponentNode,
+  ScreenDocument,
+  ScreenJsonObject,
+  ScreenJsonValue,
+} from '../../../packages/contracts/src/index.ts';
 import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '../../../packages/contracts/src/index.ts';
 import {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
@@ -37,6 +42,7 @@ import {
   createBaseScreenMaterialCatalog,
   type PluginCommandPort,
   type PluginDesignReadPort,
+  resolveBaseScreenMaterialDefaultStyle,
 } from '../../../packages/plugin-core/src/index.ts';
 import {
   createBaseScreenPluginContributionCommandPort,
@@ -107,6 +113,19 @@ const draftMaterialPackage = hostedModule.draftMaterialPackage;
 const hostedDatasetRankingManifest = hostedModule.hostedDatasetRankingManifest;
 
 const harnessSearch = new URLSearchParams(window.location.search);
+/**
+ * `?designer` 默认是「范式组件展示」：画布与物料库只放交付面的范式物料（ADR-0099/0102：
+ * `packages/material` 与 `plugins`），不出现 harness 自带的演示/验证夹具物料。
+ * 浏览器断言依赖的验证文档（桥接按钮、语义图表、排行卡、蓝图与变量样例）改由
+ * `?designer&verify` 打开；专项案例、物料分组压力页、组件工坊仍用验证文档。
+ */
+const tabsDemoMode = harnessSearch.has('tabs-demo');
+const showcaseMode =
+  tabsDemoMode ||
+  (harnessSearch.has('designer') &&
+    !['verify', 'case', 'cases', 'material-group-stress', 'workshop'].some((flag) =>
+      harnessSearch.has(flag),
+    ));
 if (harnessSearch.has('designer') || harnessSearch.has('case') || harnessSearch.has('cases')) {
   document.body.dataset.layout = 'designer';
 }
@@ -570,6 +589,7 @@ const materialLibraryGrouping = {
         'board.status-grid',
         'board.status-legend',
         'board.title-decor',
+        'board.tabs',
       ],
       // plugin-materials 贡献的组合分片（ADR-0100）：排在本组物料之后。
       fragmentIds: [
@@ -640,6 +660,7 @@ const materialLibraryStressGrouping = {
         'board.status-grid',
         'board.status-legend',
         'board.title-decor',
+        'board.tabs',
       ],
       // plugin-materials 贡献的组合分片（ADR-0100）：排在本组物料之后。
       fragmentIds: [
@@ -661,11 +682,33 @@ const materialLibraryStressGrouping = {
     },
   ],
 } as const;
-const activeMaterialLibraryGrouping = new URLSearchParams(window.location.search).has(
-  'material-group-stress',
-)
+/** 范式展示用分组：去掉只含 harness 夹具物料的「桥接」「最佳实践」，图表组不含语义图表。 */
+const showcaseMaterialLibraryGrouping = {
+  groups: materialLibraryGrouping.groups
+    .filter((group) => group.id !== 'bridges' && group.id !== 'best-practices')
+    .map((group) =>
+      group.id !== 'data'
+        ? group
+        : {
+            ...group,
+            children: group.children.map((child) => ({
+              ...child,
+              materialTypes: child.materialTypes.filter(
+                (type) => !isHarnessFixtureMaterialType(type),
+              ),
+            })),
+          },
+    ),
+};
+/** harness 自带的演示/验证夹具物料（桥接、语义图表、排行卡、检查器样例、草稿包）。 */
+function isHarnessFixtureMaterialType(type: string): boolean {
+  return type.startsWith('harness.') || type.startsWith('hosted.') || type.startsWith('draft.');
+}
+const activeMaterialLibraryGrouping = harnessSearch.has('material-group-stress')
   ? materialLibraryStressGrouping
-  : materialLibraryGrouping;
+  : showcaseMode
+    ? showcaseMaterialLibraryGrouping
+    : materialLibraryGrouping;
 
 // --- 宿主托管物料包（ADR-0029 演示）---
 // 宿主加载并审核独立物料模块后，显式 define() 并一次性构建只含该包的 catalog。
@@ -706,6 +749,278 @@ if (!draftDefinitions.ok) {
 const draftEntries = draftDefinitions.value;
 const draftCatalog = createBaseScreenMaterialCatalog(draftEntries);
 const combinedDraftCatalog = createBaseScreenMaterialCatalog([...hostedEntries, ...draftEntries]);
+
+/**
+ * 范式组件展示：1920×1080 画布上摆出项目自带的原子物料（ADR-0099/0102），按物料 manifest 的
+ * 默认属性、默认样式与默认数据生成，和从物料库拖进来的结果一致。左上角原有演示组件保持原位
+ * （蓝图、变量与断言都按 id 引用它们），展示组件铺在右上、中部与下方。
+ */
+type ShowcaseSlot = readonly [
+  id: string,
+  type: string,
+  name: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+];
+const SHOWCASE_SLOTS: readonly ShowcaseSlot[] = [
+  // 左上：文本、图片与其余图表
+  ['showcase-title', 'base.text', '标题', 80, 26, 640, 44],
+  ['showcase-image', 'base.image', '图片', 80, 96, 260, 240],
+  ['showcase-chart-scatter', 'plugin.chart.scatter', '散点图', 356, 96, 282, 240],
+  ['showcase-chart-heatmap', 'plugin.chart.heatmap', '热力图', 654, 96, 282, 240],
+  ['showcase-chart-base', 'base.chart', '图表', 80, 356, 420, 184],
+  ['showcase-echarts', 'plugin.echarts', 'ECharts 图表', 516, 356, 420, 184],
+  // 右上：指标与装饰
+  ['showcase-board-title', 'board.title-decor', '标题装饰', 960, 36, 400, 32],
+  ['showcase-tabs', 'board.tabs', '标签页', 1400, 28, 480, 40],
+  ['showcase-board-rule', 'base.rule', '分割线', 80, 76, 1800, 2],
+  ['showcase-digital-flop', 'board.digital-flop', '数字翻牌器', 960, 96, 320, 120],
+  ['showcase-status-grid', 'board.status-grid', '状态灯阵', 1300, 96, 340, 84],
+  ['showcase-water-level', 'board.water-level', '水位图', 1680, 96, 200, 240],
+  ['showcase-status-legend', 'board.status-legend', '状态分布', 1300, 192, 340, 48],
+  ['showcase-capsule-progress', 'board.capsule-progress', '胶囊进度', 960, 236, 680, 34],
+  ['showcase-scroll-board', 'board.scroll-board', '轮播列表', 960, 290, 420, 250],
+  ['showcase-border-box', 'board.border-box', '装饰边框', 1400, 356, 480, 184],
+  ['showcase-rectangle', 'base.rectangle', '矩形', 1440, 396, 180, 104],
+  ['showcase-ellipse', 'base.ellipse', '椭圆', 1660, 396, 180, 104],
+  // 中部：滚动字幕
+  ['showcase-marquee', 'board.marquee', '滚动字幕', 80, 576, 1800, 40],
+  // 下方：产线、表格与图表
+  ['showcase-pipeline', 'board.pipeline', '产线工序链', 80, 640, 604, 200],
+  ['showcase-table', 'base.table', '表格', 80, 856, 604, 184],
+  ['showcase-chart-bar', 'plugin.chart.bar', '柱状图', 704, 640, 282, 192],
+  ['showcase-chart-line', 'plugin.chart.line', '折线图', 1002, 640, 282, 192],
+  ['showcase-chart-area', 'plugin.chart.area', '面积图', 1300, 640, 282, 192],
+  ['showcase-chart-hbar', 'plugin.chart.hbar', '条形图', 1598, 640, 282, 192],
+  ['showcase-chart-pie', 'plugin.chart.pie', '饼图', 704, 848, 282, 192],
+  ['showcase-chart-donut', 'plugin.chart.donut', '环形图', 1002, 848, 282, 192],
+  ['showcase-chart-gauge', 'plugin.chart.gauge', '仪表盘', 1300, 848, 282, 192],
+  ['showcase-chart-radar', 'plugin.chart.radar', '雷达图', 1598, 848, 282, 192],
+];
+/** 只有标题文案和图片地址需要覆盖默认数据，其余组件一律用物料自带的示例数据。 */
+const SHOWCASE_STATIC_VALUES: Readonly<Record<string, ScreenJsonValue>> = {
+  'showcase-title': '范式组件 · 1920 × 1080',
+  'showcase-image': '/cover.svg',
+};
+const SHOWCASE_STYLE_OVERRIDES: Readonly<Record<string, ScreenJsonObject>> = {
+  'showcase-title': { color: '#e9f2ff', fontSize: 30, fontWeight: '700' },
+};
+interface HarnessComponentOptions {
+  readonly value?: ScreenJsonValue;
+  readonly style?: ScreenJsonObject;
+  readonly props?: ScreenJsonObject;
+  /** 所在从画布（ADR-0109）；省略即主画布。 */
+  readonly canvasId?: string;
+}
+
+/** 按物料 manifest 的默认属性、样式与示例数据生成组件，和从物料库拖进来的结果一致。 */
+function createHarnessMaterialComponent(
+  [id, type, name, x, y, width, height]: ShowcaseSlot,
+  zIndex: number,
+  options: HarnessComponentOptions = {},
+): ScreenComponentNode {
+  const manifest = designerCatalog.list().find((entry) => entry.manifest.type === type)?.manifest;
+  if (manifest === undefined) {
+    throw new Error(`Browser harness showcase material is not catalogued: ${type}`);
+  }
+  return {
+    id,
+    type,
+    name,
+    parentId: null,
+    ...(options.canvasId === undefined ? {} : { canvasId: options.canvasId }),
+    position: { x, y },
+    size: { width, height },
+    rotation: 0,
+    zIndex,
+    status: { locked: false, hidden: false },
+    props: { ...structuredClone(manifest.defaultProps), ...options.props },
+    style: {
+      ...structuredClone(resolveBaseScreenMaterialDefaultStyle(manifest, undefined)),
+      ...options.style,
+    },
+    dataSource:
+      manifest.defaultData === undefined
+        ? null
+        : {
+            type: 'static' as const,
+            value: structuredClone(options.value ?? manifest.defaultData),
+            ...(manifest.staticData?.kind === 'tabular'
+              ? { binding: structuredClone(manifest.staticData.defaultBinding) }
+              : {}),
+          },
+  };
+}
+
+const showcaseComponents: ScreenComponentNode[] = SHOWCASE_SLOTS.map((slot, index) => {
+  const value = SHOWCASE_STATIC_VALUES[slot[0]];
+  const style = SHOWCASE_STYLE_OVERRIDES[slot[0]];
+  return createHarnessMaterialComponent(slot, 20 + index, {
+    ...(value === undefined ? {} : { value }),
+    ...(style === undefined ? {} : { style }),
+  });
+});
+
+/**
+ * 标签页切换画布示例（`?tabs-demo`，ADR-0109）：主画布放标题与「标签页」，三个页面各放一组组件。
+ * 蓝图把标签页的 `tabChange` 按 `value` 分三路判断，命中的一路打开对应页面；切页由运行时完成
+ * （关闭弹框 → 旧页 closed → 新页 opened → page-changed）。标签值就是页面 id，便于对照。
+ */
+const TABS_DEMO_PAGES = [
+  { id: 'overview', name: '总览' },
+  { id: 'security', name: '安防' },
+  { id: 'energy', name: '能耗' },
+] as const;
+const TABS_DEMO_TAB_ROWS = TABS_DEMO_PAGES.map((page) => ({ label: page.name, value: page.id }));
+const tabsDemoComponents: ScreenComponentNode[] = [
+  createHarnessMaterialComponent(['tabs-demo-title', 'base.text', '标题', 80, 34, 640, 48], 1, {
+    value: '园区运营中心',
+    style: { color: '#e9f2ff', fontSize: 34, fontWeight: '700' },
+  }),
+  createHarnessMaterialComponent(
+    ['tabs-demo-tabs', 'board.tabs', '页面标签', 1260, 38, 580, 44],
+    2,
+    {
+      value: {
+        fields: [
+          { id: 'label', label: '标签', valueType: 'string', nullable: false },
+          { id: 'value', label: '值', valueType: 'string', nullable: false },
+        ],
+        rows: TABS_DEMO_TAB_ROWS,
+      },
+      style: { fontSize: 18 },
+    },
+  ),
+  createHarnessMaterialComponent(['tabs-demo-rule', 'base.rule', '分割线', 80, 104, 1760, 2], 3),
+  // 总览
+  createHarnessMaterialComponent(
+    ['overview-flop', 'board.digital-flop', '今日产值', 80, 150, 420, 140],
+    10,
+    { canvasId: 'overview' },
+  ),
+  createHarnessMaterialComponent(
+    ['overview-progress', 'board.capsule-progress', '目标完成', 80, 320, 420, 34],
+    11,
+    { canvasId: 'overview' },
+  ),
+  createHarnessMaterialComponent(
+    ['overview-bar', 'plugin.chart.bar', '区域产值', 540, 150, 640, 420],
+    12,
+    { canvasId: 'overview' },
+  ),
+  createHarnessMaterialComponent(
+    ['overview-board', 'board.scroll-board', '区域排行', 1220, 150, 620, 420],
+    13,
+    { canvasId: 'overview' },
+  ),
+  createHarnessMaterialComponent(
+    ['overview-line', 'plugin.chart.line', '产值趋势', 80, 610, 1760, 420],
+    14,
+    { canvasId: 'overview' },
+  ),
+  // 安防
+  createHarnessMaterialComponent(
+    ['security-grid', 'board.status-grid', '摄像头状态', 80, 150, 860, 260],
+    10,
+    { canvasId: 'security' },
+  ),
+  createHarnessMaterialComponent(
+    ['security-legend', 'board.status-legend', '状态分布', 80, 430, 860, 56],
+    11,
+    { canvasId: 'security' },
+  ),
+  createHarnessMaterialComponent(
+    ['security-board', 'board.scroll-board', '告警列表', 980, 150, 860, 400],
+    12,
+    { canvasId: 'security' },
+  ),
+  createHarnessMaterialComponent(
+    ['security-pie', 'plugin.chart.pie', '告警类型', 80, 610, 860, 420],
+    13,
+    { canvasId: 'security' },
+  ),
+  createHarnessMaterialComponent(
+    ['security-hbar', 'plugin.chart.hbar', '区域告警', 980, 610, 860, 420],
+    14,
+    { canvasId: 'security' },
+  ),
+  // 能耗
+  createHarnessMaterialComponent(
+    ['energy-water', 'board.water-level', '储能水位', 80, 150, 320, 360],
+    10,
+    { canvasId: 'energy' },
+  ),
+  createHarnessMaterialComponent(
+    ['energy-gauge', 'plugin.chart.gauge', '实时负荷', 440, 150, 420, 360],
+    11,
+    { canvasId: 'energy' },
+  ),
+  createHarnessMaterialComponent(
+    ['energy-area', 'plugin.chart.area', '用电趋势', 900, 150, 940, 360],
+    12,
+    { canvasId: 'energy' },
+  ),
+  createHarnessMaterialComponent(
+    ['energy-pipeline', 'board.pipeline', '供能链路', 80, 560, 860, 240],
+    13,
+    { canvasId: 'energy' },
+  ),
+  createHarnessMaterialComponent(
+    ['energy-radar', 'plugin.chart.radar', '能效评估', 980, 560, 860, 470],
+    14,
+    { canvasId: 'energy' },
+  ),
+];
+const tabsDemoDocument = {
+  canvas: { width: 1920, height: 1080, backgroundColor: '#0b1220' },
+  components: tabsDemoComponents,
+  subCanvases: TABS_DEMO_PAGES.map((page) => ({ ...page, display: 'page' as const })),
+  startCanvasId: 'overview',
+  variables: [],
+  blueprint: {
+    nodes: [
+      { kind: 'component' as const, id: 'component:tabs-demo-tabs', componentId: 'tabs-demo-tabs' },
+      ...TABS_DEMO_PAGES.flatMap((page) => [
+        {
+          kind: 'condition' as const,
+          id: `condition-${page.id}`,
+          name: `选中${page.name}`,
+          condition: {
+            left: { kind: 'event-payload' as const, path: ['value'] },
+            operator: 'eq' as const,
+            right: { kind: 'literal' as const, value: page.id },
+          },
+        },
+        { kind: 'sub-canvas' as const, id: `canvas:${page.id}`, canvasId: page.id },
+      ]),
+    ],
+    edges: TABS_DEMO_PAGES.flatMap((page) => [
+      {
+        kind: 'flow' as const,
+        id: `edge-judge-${page.id}`,
+        from: { node: 'component:tabs-demo-tabs', port: 'event:tabChange' },
+        to: { node: `condition-${page.id}`, port: 'judge' },
+      },
+      {
+        kind: 'flow' as const,
+        id: `edge-open-${page.id}`,
+        from: { node: `condition-${page.id}`, port: 'yes' },
+        to: { node: `canvas:${page.id}`, port: 'open' },
+      },
+    ]),
+    layout: {
+      nodes: [
+        { id: 'component:tabs-demo-tabs', x: 80, y: 220 },
+        ...TABS_DEMO_PAGES.flatMap((page, index) => [
+          { id: `condition-${page.id}`, x: 360, y: 80 + index * 180 },
+          { id: `canvas:${page.id}`, x: 640, y: 80 + index * 180 },
+        ]),
+      ],
+    },
+  },
+};
 
 const screenDocument = {
   canvas: { width: 960, height: 540, backgroundColor: '#17212b' },
@@ -759,7 +1074,7 @@ const screenDocument = {
       },
     },
     {
-      // 条件样式预警演示（ADR-0058）：宿主指标 >100 时变红加粗，回落自动恢复基础样式。
+      // 组件状态演示（ADR-0110）：宿主指标 >100 时切到「预警」状态（变红加粗），回落自动恢复默认。
       id: 'metric-warning',
       type: 'base.text',
       name: '指标预警',
@@ -771,32 +1086,13 @@ const screenDocument = {
       status: { locked: false, hidden: false },
       props: {},
       style: { color: '#9fb1c9', fontSize: 28, fontWeight: '400', textAlign: 'left' },
-      styleRules: [
-        {
-          id: 'over-100',
-          when: { path: [], operator: 'gt' as const, value: 100 },
-          style: { color: '#ff4d4f', fontWeight: '700' },
+      states: {
+        items: [{ id: 'over-100', name: '预警', style: { color: '#ff4d4f', fontWeight: '700' } }],
+        judge: {
+          input: { kind: 'component-data' as const, path: [] },
+          cases: [{ operator: 'gt' as const, value: 100, stateId: 'over-100' }],
         },
-      ],
-      dataSource: {
-        type: 'variable' as const,
-        variableId: 'metric-value',
       },
-    },
-    {
-      // 条件样式端口演示（ADR-0059）：文档零告警知识（无 styleRules），阈值与视觉映射
-      // 全部归宿主端口；宿主指标 >100 时变橙加粗，回落自动恢复基础样式。
-      id: 'port-warning',
-      type: 'base.text',
-      name: '宿主端口预警',
-      parentId: null,
-      position: { x: 560, y: 288 },
-      size: { width: 340, height: 32 },
-      rotation: 0,
-      zIndex: 8,
-      status: { locked: false, hidden: false },
-      props: {},
-      style: { color: '#9fb1c9', fontSize: 16, fontWeight: '400', textAlign: 'left' },
       dataSource: {
         type: 'variable' as const,
         variableId: 'metric-value',
@@ -1393,33 +1689,21 @@ designer.designerHostAdapter = {
     },
   },
 };
-let hostAlarmActive = false;
-const conditionalStylePort = {
-  resolve({
-    componentId,
-    dataState,
-  }: {
-    readonly componentId: string;
-    readonly dataState: { readonly status: string; readonly value?: unknown };
-  }) {
-    if (componentId !== 'port-warning' || dataState.status !== 'ready') return undefined;
-    // 宿主告警快照优先于数据阈值：推送到达后只调用 refreshConditionalStyles，
-    // dataState 与请求都不变。
-    if (hostAlarmActive) return { color: '#f5222d', fontWeight: '700' };
-    return typeof dataState.value === 'number' && dataState.value > 100
-      ? { color: '#ffa940', fontWeight: '700' }
-      : undefined;
-  },
-};
-designer.conditionalStylePort = conditionalStylePort;
-designer.catalog = designerCatalog;
+designer.catalog = showcaseMode
+  ? createBaseScreenMaterialCatalog(
+      designerCatalog.list().filter((entry) => !isHarnessFixtureMaterialType(entry.manifest.type)),
+    )
+  : designerCatalog;
 designer.materialLibraryGrouping = activeMaterialLibraryGrouping;
-designer.materialLibraryState = {
-  status: 'partial',
-  failedCount: 1,
-  draftTypes: ['harness.semantic-chart'],
-  unavailableTypes: ['base.table'],
-};
+// 「部分加载失败 / 草稿 / 不可用」是验证物料库状态条的样例数据，展示页不带。
+if (!showcaseMode) {
+  designer.materialLibraryState = {
+    status: 'partial',
+    failedCount: 1,
+    draftTypes: ['harness.semantic-chart'],
+    unavailableTypes: ['base.table'],
+  };
+}
 const materialLibraryActions: string[] = [];
 designer.addEventListener(BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT, (event) => {
   materialLibraryActions.push((event as CustomEvent<{ action: string }>).detail.action);
@@ -1443,7 +1727,6 @@ const viewerConfigured = viewer.configure({
   resourcePort,
   datasetPort,
   hostCatalogPort: hostCatalog,
-  conditionalStylePort,
   runtimeContributions,
   blueprintRuntimePort: {
     emit: (event) => {
@@ -1454,12 +1737,23 @@ const viewerConfigured = viewer.configure({
 if (!viewerConfigured.ok) {
   throw new Error('Browser Harness Viewer configuration failed.');
 }
+/** 范式组件展示文档：只有画布与范式物料组件，不带验证用的变量、数据源与蓝图。 */
+const showcaseDocument = {
+  canvas: { width: 1920, height: 1080, backgroundColor: '#17212b' },
+  components: showcaseComponents,
+  variables: [],
+  blueprint: { nodes: [], edges: [] },
+};
 let envelope = {
   projectId: 'browser-harness',
   revision: '1',
-  name: '浏览器验证',
+  name: tabsDemoMode ? '标签页切换画布' : showcaseMode ? '范式组件展示' : '浏览器验证',
   description: null,
-  document: screenDocument,
+  document: (tabsDemoMode
+    ? tabsDemoDocument
+    : showcaseMode
+      ? showcaseDocument
+      : screenDocument) as ScreenDocument,
   metadata: {},
 };
 let nextSaveFailure: 'PROJECT_CONFLICT' | 'PROJECT_UNAVAILABLE' | undefined;
@@ -1692,12 +1986,6 @@ Object.assign(window, {
       metricValue = value;
       designer.getVariable('metric-value')?.set(value);
       viewer.getVariable('metric-value')?.set(value);
-    },
-    /** 模拟宿主告警推送：只改端口背后的快照，再显式失效样式。 */
-    setHostAlarm: (active: boolean) => {
-      hostAlarmActive = active;
-      designer.refreshConditionalStyles();
-      viewer.refreshConditionalStyles();
     },
     createDatasetDemo: () => {
       const demo = document.createElement('base-screen-viewer') as typeof viewer;

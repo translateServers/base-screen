@@ -12,7 +12,7 @@ import {
 export async function assertInitialCanvasPointerFocus(browser, baseUrl) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   try {
-    await page.goto(`${baseUrl}/?designer`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}/?designer&verify`, { waitUntil: 'networkidle' });
     const designer = page.locator('base-screen-designer');
     const component = designer.locator('[data-base-screen-component-id=title]');
     const viewport = designer.locator('[data-viewport]');

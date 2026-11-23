@@ -11,7 +11,9 @@ export async function assertCompositeInsertion(browser, baseUrl) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
-    await page.goto(`${baseUrl}/?designer&case=composite-insertion`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}/?designer&verify&case=composite-insertion`, {
+      waitUntil: 'networkidle',
+    });
     await page.waitForFunction(() => window.baseScreenHarness?.designer?.document !== undefined);
 
     const fragment = await page.evaluate((shellName) => {

@@ -55,7 +55,8 @@ pnpm dev:browser-harness  # 浏览器验证矩阵（tooling/verification/browser
 ```
 
 打开终端输出的本地地址即可查看浏览器组合示例；专项案例导航页是 `/cases.html`，`?designer` 为
-验收用全屏设计器。示例自带演示文档与模拟宿主能力。
+1920 × 1080 的范式组件展示（画布与物料库只含范式物料），`?designer&verify` 为验收用全屏设计器。
+示例自带演示文档与模拟宿主能力。
 
 ## 在你的应用中使用
 

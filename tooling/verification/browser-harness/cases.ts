@@ -17,9 +17,14 @@ interface BaselineEntry {
 
 const BASELINES: readonly BaselineEntry[] = [
   {
-    title: '全屏设计器',
-    summary: 'Playwright 设计器布局，无案例舱。',
+    title: '范式组件展示',
+    summary: '1920 × 1080 画布，只放交付面的范式物料；物料库同样只列范式物料。',
     href: './?designer',
+  },
+  {
+    title: '全屏设计器（验证文档）',
+    summary: 'Playwright 设计器布局，无案例舱；浏览器断言用的验证文档。',
+    href: './?designer&verify',
   },
   {
     title: '设计系统清单',
