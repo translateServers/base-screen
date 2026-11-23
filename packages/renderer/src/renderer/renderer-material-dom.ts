@@ -90,7 +90,11 @@ export function applyMaterialHostStyle(
 ): void {
   const style = element.style;
   // 行为 / 滤镜是引擎级保留键：物料不接管这些宿主级 CSS，渲染器统一写、同值守卫。
-  const pointerEvents = model.style.passThrough === true ? 'none' : '';
+  // 事件穿透是运行时行为：设计态（未开「事件」）不写，否则设计器按指针下的元素判定点选，
+  // 穿透组件会点不中、点击落到下层组件或空白。查看器、预览与设计态「事件」开启时照常生效。
+  const passThrough =
+    model.style.passThrough === true && (model.mode !== 'design' || model.interactive);
+  const pointerEvents = passThrough ? 'none' : '';
   if (style.pointerEvents !== pointerEvents) style.pointerEvents = pointerEvents;
   const cursor = model.style.hoverPointer === true ? 'pointer' : '';
   if (style.cursor !== cursor) style.cursor = cursor;
