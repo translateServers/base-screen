@@ -27,6 +27,7 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer, createBaseScreenRenderer } from '../renderer/renderer.js';
+import type { BaseScreenCanvasChange } from '../sub-canvas-layer.js';
 import { applyBlueprintDispatchToRenderer } from './viewer-blueprint-runtime.js';
 import { ViewerBlueprintTimerScheduler } from './viewer-blueprint-timer-scheduler.js';
 import {
@@ -81,6 +82,11 @@ export class BaseScreenViewerElement extends ElementBase {
   #rendered = false;
   /** 当前文档是否已发射过 `lifecycle:ready`；装载/替换时重新武装，变量刷新不重复。 */
   #lifecycleReadyFired = false;
+  /** 正在分发的蓝图事件深度；分发期间产生的从画布事件排队，结束后按深度 +1 再分发。 */
+  #dispatchDepth: number | undefined;
+  #pendingCanvasEvents: BaseScreenCanvasChange[] = [];
+  /** 宿主指定的起始页（ADR-0109 §2.3）。 */
+  #initialPageId: string | undefined;
   #projectId: string | undefined;
   #documentRevision: string | undefined;
   readonly #variableHandles = new ViewerVariableHandles({
@@ -137,6 +143,7 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#observer = value.observer;
     this.#projectId = value.projectId;
     this.#documentRevision = value.documentRevision;
+    this.#initialPageId = value.initialPageId;
     this.initialize();
     this.#variableRuntime.start(undefined, false, true);
     this.#scheduler.sync(this.#document);
@@ -414,6 +421,22 @@ export class BaseScreenViewerElement extends ElementBase {
       ...(this.#hostCatalogPort === undefined ? {} : { hostCatalogPort: this.#hostCatalogPort }),
       onDataSourceSettled: (dataSourceId) =>
         this.#variableRuntime.handleDataSourceSettled(dataSourceId),
+      ...(this.#initialPageId === undefined ? {} : { initialPageId: this.#initialPageId }),
+      onCanvasChange: (change) => {
+        this.dispatchEvent(
+          new CustomEvent('base-screen-canvas-change', {
+            bubbles: true,
+            composed: true,
+            detail: change,
+          }),
+        );
+        // 从画布事件（ADR-0109）：蓝图动作引起的变化排到本次分发之后，其余（遮罩、Esc、宿主）直接分发。
+        if (this.#dispatchDepth === undefined) {
+          this.handleBlueprintEvent(canvasBlueprintEvent(change));
+        } else {
+          this.#pendingCanvasEvents.push(change);
+        }
+      },
       ...(this.#conditionalStylePort === undefined
         ? {}
         : { conditionalStylePort: this.#conditionalStylePort }),
@@ -525,6 +548,24 @@ export class BaseScreenViewerElement extends ElementBase {
     if (this.#blueprintPlan === undefined || this.#lifecycleReadyFired) return;
     this.#lifecycleReadyFired = true;
     this.handleBlueprintEvent({ type: 'lifecycle', name: 'ready', payload: null });
+    // 先发实例就绪，再发起始页的「已打开」与「页面已切换」（ADR-0109 §2.3）。
+    this.#renderer?.announceStartPage();
+  }
+
+  /** 当前页（ADR-0109）；文档没有页面或尚未渲染时为 null。 */
+  get currentPage(): string | null {
+    return this.#renderer?.currentPage ?? null;
+  }
+
+  /** 宿主打开从画布：页面 = 切页（先关全部弹框），弹框 = 打开浮层；返回是否发生了变化。 */
+  openCanvas(canvasId: string, payload?: ScreenJsonValue): boolean {
+    if (payload !== undefined && !parseScreenJsonValue(payload).ok) return false;
+    return this.#renderer?.openCanvas(canvasId, payload, 'host') ?? false;
+  }
+
+  /** 宿主关闭从画布：弹框 = 关闭浮层，当前页 = 返回上一页。 */
+  closeCanvas(canvasId: string): boolean {
+    return this.#renderer?.closeCanvas(canvasId, 'host') ?? false;
   }
 
   private handleMaterialEvent(event: {
@@ -552,6 +593,8 @@ export class BaseScreenViewerElement extends ElementBase {
       this.emitLifecycleDiagnostic('Blueprint event payload is invalid.');
       return;
     }
+    const outerDepth = this.#dispatchDepth;
+    this.#dispatchDepth = depth;
     const renderer = this.#renderer;
     const document = this.#document;
     // 派生变量的写入在这里统一回滚：蓝图分发不做权限判断（它不知道文档），
@@ -570,6 +613,9 @@ export class BaseScreenViewerElement extends ElementBase {
       );
       if (diagnostics.length > 0) this.emitDiagnostics(diagnostics);
     }
+    this.#dispatchDepth = outerDepth;
+    const canvasEvents = this.#pendingCanvasEvents;
+    this.#pendingCanvasEvents = [];
     for (const hostEvent of result.value.hostEvents) {
       if (this.#blueprintRuntimePort === undefined) {
         this.dispatchEvent(new CustomEvent('base-screen-blueprint-event', { detail: hostEvent }));
@@ -606,6 +652,9 @@ export class BaseScreenViewerElement extends ElementBase {
         },
         depth + 1,
       );
+    }
+    for (const change of canvasEvents) {
+      this.handleBlueprintEvent(canvasBlueprintEvent(change), depth + 1);
     }
   }
 
@@ -682,4 +731,24 @@ export class BaseScreenViewerElement extends ElementBase {
       { severity: 'error', code: 'PLUGIN_CORE_LIFECYCLE_INVALID', path: [], message },
     ]);
   }
+}
+
+/**
+ * 从画布事件的负载：「已打开」带打开参数（未写参数时为 null），「已关闭」恒为 null；
+ * 「页面已切换」带 `{ from, to }`。
+ */
+function canvasBlueprintEvent(change: BaseScreenCanvasChange): ScreenBlueprintEvent {
+  if (change.type === 'page-changed') {
+    return {
+      type: 'page-changed',
+      name: 'page-changed',
+      payload: { from: change.from, to: change.to },
+    };
+  }
+  return {
+    type: 'canvas-event',
+    canvasId: change.canvasId,
+    name: change.open ? 'opened' : 'closed',
+    payload: change.open ? (change.payload ?? null) : null,
+  };
 }

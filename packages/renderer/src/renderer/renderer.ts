@@ -16,7 +16,11 @@ import {
   type ScreenValueRef,
 } from '@base-screen/contracts';
 import type { ScreenValueRefEvaluation } from '@base-screen/core';
-import { getPainterOrder, type ScreenBlueprintVisibilityEffect } from '@base-screen/core';
+import {
+  getPainterOrder,
+  type ScreenBlueprintCanvasEffect,
+  type ScreenBlueprintVisibilityEffect,
+} from '@base-screen/core';
 import type {
   BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
@@ -28,6 +32,7 @@ import type {
 import { diffBaseScreenMaterialCatalogs } from '@base-screen/plugin-core';
 import { applyCanvasBackground } from '../canvas-background.js';
 import { createMountedProjectionState } from '../resource/resource-state.js';
+import type { BaseScreenCanvasChange, BaseScreenCanvasChangeReason } from '../sub-canvas-layer.js';
 import {
   type ComponentDataResolution,
   type ComponentFailurePolicy,
@@ -87,6 +92,10 @@ export interface CreateBaseScreenRendererOptions {
    * 不重复发请求（实例缓存已在运行时里）。
    */
   readonly onDataSourceSettled?: (dataSourceId: string) => void;
+  /** 从画布开合与页面切换后回调（ADR-0109），按发生顺序；设计态不建页面层与浮层，也不会回调。 */
+  readonly onCanvasChange?: (change: BaseScreenCanvasChange) => void;
+  /** 起始页（宿主指定）；不存在或不是页面时回落到文档的起始页。 */
+  readonly initialPageId?: string;
 }
 
 /** 单次解析的执行上下文（trigger/traceId 由调用方按操作派生，不复用可变全局状态）。 */
@@ -158,6 +167,20 @@ export interface BaseScreenRenderer {
     effects: readonly ScreenBlueprintVisibilityEffect[],
   ): ScreenParseResult<null>;
   resetBlueprintVisibility(): void;
+  /** 执行蓝图从画布动作与页面导航（ADR-0109）。 */
+  applyBlueprintCanvasEffects(effects: readonly ScreenBlueprintCanvasEffect[]): void;
+  /** 宿主打开 / 关闭从画布（页面 = 切页 / 返回）；返回是否发生了变化。 */
+  openCanvas(
+    canvasId: string,
+    payload?: ScreenJsonValue,
+    reason?: BaseScreenCanvasChangeReason,
+  ): boolean;
+  closeCanvas(canvasId: string, reason?: BaseScreenCanvasChangeReason): boolean;
+  /** 发起始页的「已打开」与「页面已切换」（「实例就绪」之后调用一次）。 */
+  announceStartPage(): void;
+  isCanvasOpen(canvasId: string): boolean;
+  /** 当前页；文档没有页面时为 null。 */
+  readonly currentPage: string | null;
   clear(): void;
   dispose(): void;
 }
@@ -176,6 +199,14 @@ class Renderer implements BaseScreenRenderer {
   constructor(options: CreateBaseScreenRendererOptions) {
     this.#state = createRendererState(options);
     this.#state.onDataSourceChanged = (dataSourceId) => this.#handleDataSourceChanged(dataSourceId);
+    this.#state.requestRender = () => {
+      const input = this.#state.lastValidatedInput;
+      if (input !== undefined && !this.#state.disposed) this.render(input);
+    };
+  }
+
+  get currentPage(): string | null {
+    return this.#state.subCanvases.currentPage;
   }
 
   render(
@@ -192,6 +223,9 @@ class Renderer implements BaseScreenRenderer {
     if (!parsedDocument.ok) {
       return parsedDocument;
     }
+    // 先同步从画布（ADR-0109）：只挂载主画布、当前页与弹框的组件，别的页不渲染、不投影。
+    this.#state.subCanvases.prepare(parsedDocument.value);
+    const view = this.#state.subCanvases.visibleDocument(parsedDocument.value);
     const renderContext: ResolveContext = {
       trigger: context?.trigger ?? 'manual',
       traceId: context?.traceId ?? '',
@@ -199,9 +233,9 @@ class Renderer implements BaseScreenRenderer {
     // 先确保实例状态与请求：候选投影要从实例运行时读结果，所以这一步必须在
     // prepareCandidates 之前。请求本身是异步的，首帧材料先落 loading。
     this.#state.dataSources.ensure(parsedDocument.value, this.#state.variables, renderContext);
-    this.#readers = collectReaders(parsedDocument.value);
+    this.#readers = collectReaders(view);
     const prepared = prepareCandidates(
-      parsedDocument.value,
+      view,
       this.#state.catalog,
       this.#state.options.mode,
       this.#state.interactive,
@@ -214,9 +248,9 @@ class Renderer implements BaseScreenRenderer {
       return prepared;
     }
     const painterIndex = new Map(
-      getPainterOrder(parsedDocument.value).map((componentId, index) => [componentId, index]),
+      getPainterOrder(view).map((componentId, index) => [componentId, index]),
     );
-    this.#state.visibility.prepare(parsedDocument.value);
+    this.#state.visibility.prepare(view);
     const candidates = [...prepared.value].sort(
       (left, right) => painterIndex.get(left.component.id)! - painterIndex.get(right.component.id)!,
     );
@@ -238,6 +272,14 @@ class Renderer implements BaseScreenRenderer {
           runtimeDiagnostics.push(
             renderFailure(candidate, 'Material model update raised an exception.'),
           );
+        }
+        // 组件换了归属（主画布 / 页面 / 弹框 / 下方层）时把已挂载元素搬到新容器；归属不变时不碰 DOM，
+        // 重新 append 会打断物料正在处理的浏览器事件帧。
+        const panel = this.#state.subCanvases.containerFor(candidate.component.id);
+        const current = existing.element.parentElement ?? undefined;
+        const root = this.#state.options.root;
+        if (panel !== undefined ? current !== panel : current !== undefined && current !== root) {
+          (panel ?? root).appendChild(existing.element);
         }
         next.set(candidate.component.id, existing);
         continue;
@@ -277,7 +319,9 @@ class Renderer implements BaseScreenRenderer {
         runtimeDiagnostics.push(renderFailure(candidate, 'Material render raised an exception.'));
         continue;
       }
-      this.#state.options.root.appendChild(element);
+      (
+        this.#state.subCanvases.containerFor(candidate.component.id) ?? this.#state.options.root
+      ).appendChild(element);
       const mounted: MountedMaterial = {
         type: candidate.component.type,
         element,
@@ -309,6 +353,8 @@ class Renderer implements BaseScreenRenderer {
       this.#state.options.root.style.overflow = 'hidden';
     }
     applyCanvasBackground(this.#state.options.root, parsedDocument.value.canvas);
+    // 弹框打开期间新挂到画布根上的组件同样不可交互（ADR-0108 §2.3）。
+    this.#state.subCanvases.syncInert();
     this.#state.mounted = next;
     this.#state.candidates = new Map(
       candidates.map((candidate) => [candidate.component.id, candidate]),
@@ -427,6 +473,35 @@ class Renderer implements BaseScreenRenderer {
 
   resetBlueprintVisibility(): void {
     this.#state.visibility.reset();
+    this.#state.subCanvases.reset();
+  }
+
+  applyBlueprintCanvasEffects(effects: readonly ScreenBlueprintCanvasEffect[]): void {
+    if (this.#state.disposed) return;
+    this.#state.subCanvases.apply(effects);
+  }
+
+  openCanvas(
+    canvasId: string,
+    payload?: ScreenJsonValue,
+    reason: BaseScreenCanvasChangeReason = 'host',
+  ): boolean {
+    if (this.#state.disposed) return false;
+    return this.#state.subCanvases.open(canvasId, payload, reason);
+  }
+
+  closeCanvas(canvasId: string, reason: BaseScreenCanvasChangeReason = 'host'): boolean {
+    if (this.#state.disposed) return false;
+    return this.#state.subCanvases.close(canvasId, reason);
+  }
+
+  announceStartPage(): void {
+    if (this.#state.disposed) return;
+    this.#state.subCanvases.announceStartPage();
+  }
+
+  isCanvasOpen(canvasId: string): boolean {
+    return this.#state.subCanvases.isOpen(canvasId);
   }
 
   suspendData(): void {
@@ -557,6 +632,7 @@ class Renderer implements BaseScreenRenderer {
   dispose(): void {
     if (!this.#state.disposed) {
       this.clear();
+      this.#state.subCanvases.dispose();
       this.#state.disposed = true;
     }
   }

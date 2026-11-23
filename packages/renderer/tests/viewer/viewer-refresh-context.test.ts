@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { relationsFromRules } from '../__fixtures__/blueprint-relations.js';
+import { graphFromRules } from '../__fixtures__/blueprint-graph.js';
 import {
   component,
   createDeferredResourcePort,
@@ -39,7 +39,7 @@ describe('BaseScreenViewerElement refresh execution context', () => {
         },
       ],
       {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'set-region',
             trigger: { type: 'material-event', componentId: 'trigger', eventName: 'change' },
@@ -100,7 +100,7 @@ describe('BaseScreenViewerElement refresh execution context', () => {
         },
       ],
       {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'set-region',
             trigger: { type: 'material-event', componentId: 'trigger', eventName: 'change' },

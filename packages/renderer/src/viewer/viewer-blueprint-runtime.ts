@@ -27,5 +27,6 @@ export function applyBlueprintDispatchToRenderer(
     const visibility = renderer.applyBlueprintVisibilityEffects(result.visibilityEffects);
     if (!visibility.ok) diagnostics.push(...visibility.diagnostics);
   }
+  if (result.canvasEffects.length > 0) renderer.applyBlueprintCanvasEffects(result.canvasEffects);
   return diagnostics;
 }

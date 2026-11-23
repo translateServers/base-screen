@@ -144,7 +144,7 @@ export function document(components: readonly ScreenComponentNode[]): ScreenDocu
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
     components,
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 

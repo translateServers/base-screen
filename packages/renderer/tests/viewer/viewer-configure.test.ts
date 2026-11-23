@@ -262,7 +262,7 @@ describe('BaseScreenViewerElement resourceTimeoutMs legacy setter (RB3)', () => 
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 
   async function createViewerWithEvents(): Promise<{

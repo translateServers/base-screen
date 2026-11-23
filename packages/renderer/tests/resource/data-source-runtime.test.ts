@@ -107,7 +107,7 @@ function document(
     components,
     dataSources,
     variables,
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 

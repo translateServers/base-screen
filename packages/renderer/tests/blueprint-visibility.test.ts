@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createBaseScreenRenderer } from '../src/renderer/renderer.js';
-import { relationsFromRules } from './__fixtures__/blueprint-relations.js';
+import { graphFromRules } from './__fixtures__/blueprint-graph.js';
 import {
   component,
   createHostResourceCatalog,
@@ -65,7 +65,7 @@ describe('blueprint component visibility', () => {
       [component('trigger'), component('target'), component('unrelated')],
       [],
       {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'toggle-target',
             trigger: { type: 'material-event', componentId: 'trigger', eventName: 'click' },

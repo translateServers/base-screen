@@ -21,6 +21,7 @@ import {
   SourceQueryPort,
   type SourceQueryRequest,
 } from '../resource/source-query-port.js';
+import { SubCanvasController } from '../sub-canvas-layer.js';
 import type { CreateBaseScreenRendererOptions } from './renderer.js';
 import type {
   ComponentValidationCache,
@@ -45,8 +46,12 @@ export interface RendererState {
   /** 数据源实例运行时：请求身份、缓存、代际的唯一所有者。 */
   readonly dataSources: DataSourceRuntime;
   readonly visibility: BlueprintVisibilityController;
+  /** 从画布运行时（ADR-0109）；设计态不建页面层与浮层。 */
+  readonly subCanvases: SubCanvasController;
   /** 实例状态变化后由 Renderer 注入的重投影钩子（构造期先给空实现）。 */
   onDataSourceChanged: (dataSourceId: string) => void;
+  /** 切页后按同一文档重新渲染；由 Renderer 注入。 */
+  requestRender: () => void;
 }
 
 export function createRendererState(options: CreateBaseScreenRendererOptions): RendererState {
@@ -104,7 +109,15 @@ export function createRendererState(options: CreateBaseScreenRendererOptions): R
     sourceQueries,
     dataSources,
     visibility: new BlueprintVisibilityController(options.root),
+    subCanvases: new SubCanvasController({
+      root: options.root,
+      enabled: options.mode !== 'design',
+      onChange: options.onCanvasChange,
+      requestRender: () => state.requestRender(),
+      ...(options.initialPageId === undefined ? {} : { initialPageId: options.initialPageId }),
+    }),
     onDataSourceChanged: () => {},
+    requestRender: () => {},
   };
   return state;
 }

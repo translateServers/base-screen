@@ -248,7 +248,7 @@ export function hostVariable(name: string, variableId: string): ScreenVariableEn
 export function document(
   components: readonly ScreenComponentNode[],
   variables: readonly ScreenVariableEntry[] = [],
-  blueprint: ScreenDocument['blueprint'] = { relations: [] },
+  blueprint: ScreenDocument['blueprint'] = { nodes: [], edges: [] },
 ): ScreenDocument {
   return {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },

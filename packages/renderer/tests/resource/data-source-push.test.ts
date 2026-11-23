@@ -70,7 +70,7 @@ function screen(dataSource: ScreenDataSource): ScreenDocument {
     components: [reader()],
     dataSources: [dataSource],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 
@@ -297,9 +297,7 @@ describe('push · 增量、合帧与窗口', () => {
 
   it('按 retain.seconds 以数据里最新一行的时间为基准裁剪', async () => {
     const { host, renderer, dataState } = setup();
-    renderer.render(
-      screen(instance({ mode: 'push', retain: { seconds: 2, timeField: 't' } })),
-    );
+    renderer.render(screen(instance({ mode: 'push', retain: { seconds: 2, timeField: 't' } })));
     host.push({ type: 'snapshot', value: table(1, 2, 3) });
     host.push({ type: 'append', rows: [row(5)] });
     await frame();

@@ -43,6 +43,11 @@ export interface BaseScreenViewerConfiguration {
   /** 非持久化执行上下文附加信息（RB2）：提供时流入每次 resolve 与 observer 事件。 */
   readonly projectId?: string;
   readonly documentRevision?: string;
+  /**
+   * 起始页（ADR-0109 §2.3）：宿主按路由等指定；不存在或不是页面时回落到文档的 `startCanvasId`
+   * / 第一个页面。只在装载时生效，之后用 `openCanvas()` 切页。
+   */
+  readonly initialPageId?: string;
 }
 
 export type BaseScreenViewerRefreshOptions = {
@@ -113,6 +118,12 @@ export function parseBaseScreenViewerConfiguration(
     !isScreenBlueprintHostActionPort(configuration.blueprintHostActionPort)
   ) {
     return lifecycleFailure('Viewer blueprint host action port 必须是含 execute 的对象。');
+  }
+  if (
+    configuration.initialPageId !== undefined &&
+    typeof configuration.initialPageId !== 'string'
+  ) {
+    return lifecycleFailure('Viewer initialPageId 必须是字符串。');
   }
   return {
     ok: true,
