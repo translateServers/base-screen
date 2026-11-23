@@ -4,14 +4,85 @@
 
 ```ts
 
+import { BaseScreenFragmentDefinition } from '@base-screen/plugin-core';
+import { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import { BaseScreenMaterialConstructor } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialDataState } from '@base-screen/plugin-core';
 import { BaseScreenMaterialEditorDescriptor } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialEditorFieldInput } from '@base-screen/plugin-core';
 import { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialMode } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialPropSchema } from '@base-screen/plugin-core';
+import { BaseScreenMaterialTabularDataAdapter } from '@base-screen/plugin-core';
+import { BaseScreenPluginFragmentContribution } from '@base-screen/plugin-core';
 import { BaseScreenPluginRuntime } from '@base-screen/plugin-core';
+import { ScreenJsonObject } from '@base-screen/contracts';
+import { ScreenJsonValue } from '@base-screen/contracts';
 import type { ScreenMaterialErrorCode } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
+import { ScreenSize } from '@base-screen/contracts';
+
+// @public
+export function auditBaseScreenFragment(input: unknown, catalog?: BaseScreenMaterialCatalog): readonly BaseScreenAuthoringFinding[];
+
+// @public
+export function auditBaseScreenMaterialEditorForm(manifest: BaseScreenMaterialManifest): readonly BaseScreenMaterialEditorFormViolation[];
+
+// @public
+export function auditBaseScreenMaterialSpec(input: unknown, options?: AuditBaseScreenMaterialSpecOptions): readonly BaseScreenAuthoringFinding[];
+
+// @public (undocumented)
+export interface AuditBaseScreenMaterialSpecOptions {
+    readonly renderSource?: string;
+}
+
+// @public
+export const BASE_SCREEN_DESCRIPTIVE_TEXT_KEYS: readonly string[];
+
+// @public
+export const BASE_SCREEN_MATERIAL_SPEC_SECTIONS: readonly {
+    readonly id: BaseScreenMaterialSpecSection;
+    readonly label: string;
+    readonly target: 'props' | 'style';
+    readonly collapsed?: true;
+    readonly advanced?: true;
+}[];
+
+// @public
+export const BASE_SCREEN_REGISTERED_STYLE_KEYS: ReadonlySet<string>;
+
+// @public
+export const BASE_SCREEN_STYLE_KEY_DICTIONARY: ReadonlySet<string>;
+
+// @public
+export interface BaseScreenAuthoringFinding {
+    // (undocumented)
+    readonly message: string;
+    readonly path?: readonly (string | number)[];
+    // (undocumented)
+    readonly rule: string;
+    // (undocumented)
+    readonly severity: 'error' | 'warning';
+}
+
+// @public
+export interface BaseScreenMaterialConfigGroup {
+    // (undocumented)
+    readonly defaults: Readonly<Record<string, ScreenJsonValue>>;
+    // (undocumented)
+    readonly fields: readonly BaseScreenMaterialEditorFieldInput[];
+    // (undocumented)
+    readonly id: BaseScreenMaterialConfigGroupId;
+    // (undocumented)
+    readonly properties: Readonly<Record<string, BaseScreenMaterialPropSchema>>;
+    // (undocumented)
+    readonly required: readonly string[];
+}
+
+// @public (undocumented)
+export type BaseScreenMaterialConfigGroupId = 'number-format' | 'chart-title' | 'chart-legend';
 
 // @public (undocumented)
 export interface BaseScreenMaterialDefinition {
@@ -21,6 +92,18 @@ export interface BaseScreenMaterialDefinition {
     readonly element: BaseScreenMaterialConstructor;
     // (undocumented)
     readonly manifest: BaseScreenMaterialManifest;
+}
+
+// @public
+export interface BaseScreenMaterialEditorFormViolation {
+    // (undocumented)
+    readonly field?: string;
+    // (undocumented)
+    readonly materialType: string;
+    // (undocumented)
+    readonly message: string;
+    // (undocumented)
+    readonly rule: 'R9' | 'R11' | 'R12' | 'R13' | 'R14' | 'R15';
 }
 
 // @public
@@ -52,9 +135,124 @@ export interface BaseScreenMaterialPackage {
 }
 
 // @public
+export interface BaseScreenMaterialRenderContext {
+    // (undocumented)
+    readonly document: Document;
+    formatNumber(value: unknown): string;
+    // (undocumented)
+    readonly mode: BaseScreenMaterialMode;
+    // (undocumented)
+    readonly props: ScreenJsonObject;
+    readonly root: HTMLElement;
+    readonly rows: readonly BaseScreenMaterialSpecRow[];
+    // (undocumented)
+    readonly size: ScreenSize;
+    // (undocumented)
+    readonly style: ScreenJsonObject;
+    readonly value: number | string | null;
+}
+
+// @public (undocumented)
+export type BaseScreenMaterialRenderFunction = (context: BaseScreenMaterialRenderContext) => void;
+
+// @public (undocumented)
+export interface BaseScreenMaterialSpec {
+    // (undocumented)
+    readonly category: string;
+    // (undocumented)
+    readonly data: BaseScreenMaterialSpecData;
+    // (undocumented)
+    readonly defaultSize: ScreenSize;
+    // (undocumented)
+    readonly fields: readonly BaseScreenMaterialSpecField[];
+    // (undocumented)
+    readonly keywords: readonly string[];
+    // (undocumented)
+    readonly name: string;
+    readonly numberFormat?: BaseScreenMaterialSpecNumberFormat;
+    readonly rotate?: boolean;
+    // (undocumented)
+    readonly type: string;
+}
+
+// @public (undocumented)
+export type BaseScreenMaterialSpecData = {
+    readonly kind: 'none';
+} | {
+    readonly kind: 'scalar';
+    readonly valueType: 'number' | 'string';
+    readonly sample: number | string;
+} | {
+    readonly kind: 'rows';
+    readonly roles: readonly BaseScreenMaterialSpecRole[];
+    readonly sample: readonly ScreenJsonObject[];
+};
+
+// @public (undocumented)
+export interface BaseScreenMaterialSpecField {
+    readonly allowGradient?: boolean;
+    readonly default: string | number | boolean;
+    // (undocumented)
+    readonly help?: string;
+    readonly key: string;
+    // (undocumented)
+    readonly kind: BaseScreenMaterialSpecFieldKind;
+    // (undocumented)
+    readonly label: string;
+    // (undocumented)
+    readonly max?: number;
+    readonly min?: number;
+    readonly options?: readonly string[];
+    // (undocumented)
+    readonly section: BaseScreenMaterialSpecSection;
+    // (undocumented)
+    readonly step?: number;
+    readonly unit?: string;
+    readonly visibleWhen?: {
+        readonly key: string;
+        readonly equals: string | number | boolean;
+    };
+}
+
+// @public (undocumented)
+export type BaseScreenMaterialSpecFieldKind = 'number' | 'text' | 'boolean' | 'color' | 'choice';
+
+// @public
+export interface BaseScreenMaterialSpecNumberFormat extends BaseScreenNumberFormatConfigOptions {
+    // (undocumented)
+    readonly visibleWhen?: BaseScreenMaterialSpecField['visibleWhen'];
+}
+
+// @public (undocumented)
+export interface BaseScreenMaterialSpecRole {
+    readonly id: string;
+    // (undocumented)
+    readonly label: string;
+    // (undocumented)
+    readonly optional?: boolean;
+    // (undocumented)
+    readonly valueType: 'number' | 'string';
+}
+
+// @public
+export type BaseScreenMaterialSpecRow = Readonly<Record<string, string | number | null>>;
+
+// @public
+export type BaseScreenMaterialSpecSection = 'format' | 'structure' | 'text' | 'surface' | 'semantic' | 'motion';
+
+// @public
 export interface BaseScreenMaterialStateViewOptions {
     readonly emptyLabel?: string;
     readonly label?: string;
+}
+
+// @public (undocumented)
+export interface BaseScreenNumberFormatConfigOptions {
+    readonly decimals?: number;
+    readonly maxDecimals?: number;
+    readonly prefix?: boolean | string;
+    readonly thousandsSeparator?: boolean;
+    readonly unit?: boolean | string;
 }
 
 // @public (undocumented)
@@ -94,6 +292,38 @@ export interface BaseScreenPluginRegistrationElement {
     readonly tagName: string;
 }
 
+// @public (undocumented)
+export interface BaseScreenRenderedMaterialOptions {
+    // (undocumented)
+    readonly data: BaseScreenMaterialSpecData;
+    // (undocumented)
+    readonly render: BaseScreenMaterialRenderFunction;
+}
+
+// @public (undocumented)
+export interface BaseScreenRenderedMaterialPresenter {
+    update(model: BaseScreenMaterialModel): void;
+}
+
+// @public
+export function compileBaseScreenMaterialSpec(input: unknown, options: CompileBaseScreenMaterialSpecOptions): ScreenParseResult<BaseScreenMaterialManifest>;
+
+// @public (undocumented)
+export interface CompileBaseScreenMaterialSpecOptions {
+    // (undocumented)
+    readonly cover?: string;
+    readonly libraryVisible?: boolean;
+    readonly tagName: string;
+}
+
+// @public
+export function createBaseScreenChartLegendConfig(options?: {
+    readonly showLegend?: boolean;
+}): BaseScreenMaterialConfigGroup;
+
+// @public
+export function createBaseScreenChartTitleConfig(): BaseScreenMaterialConfigGroup;
+
 // @public
 export function createBaseScreenMaterialEditorDescriptor(input: unknown, options?: {
     readonly propsSchema?: BaseScreenMaterialManifest['propsSchema'];
@@ -117,7 +347,45 @@ export function createBaseScreenMaterialLoadingContainer(ownerDocument: Document
 export function createBaseScreenMaterialLoadingElement(ownerDocument: Document, options?: BaseScreenMaterialLoadingOptions): HTMLElement;
 
 // @public
+export function createBaseScreenMaterialSpecDataAdapter(data: BaseScreenMaterialSpecData): BaseScreenMaterialTabularDataAdapter | undefined;
+
+// @public
+export function createBaseScreenMaterialSpecSampleDataset(data: Extract<BaseScreenMaterialSpecData, {
+    readonly kind: 'rows';
+}>): ScreenJsonObject;
+
+// @public
 export function createBaseScreenMaterialStateView(ownerDocument: Document, dataState: BaseScreenMaterialDataState, options?: BaseScreenMaterialStateViewOptions): HTMLElement | undefined;
+
+// @public
+export function createBaseScreenNumberFormatConfig(options?: BaseScreenNumberFormatConfigOptions): BaseScreenMaterialConfigGroup;
+
+// @public
+export function createBaseScreenRenderedMaterialElement(options: {
+    readonly manifest: BaseScreenMaterialManifest;
+    readonly data: BaseScreenMaterialSpecData;
+    readonly render: BaseScreenMaterialRenderFunction;
+}): BaseScreenMaterialConstructor;
+
+// @public
+export function createBaseScreenRenderedMaterialPresenter(mount: ShadowRoot | HTMLElement, options: BaseScreenRenderedMaterialOptions): BaseScreenRenderedMaterialPresenter;
+
+// @public
+export function createBaseScreenSpecMaterialDefinition(options: CreateBaseScreenSpecMaterialDefinitionOptions): ScreenParseResult<BaseScreenMaterialDefinition>;
+
+// @public (undocumented)
+export interface CreateBaseScreenSpecMaterialDefinitionOptions {
+    // (undocumented)
+    readonly cover?: string;
+    // (undocumented)
+    readonly libraryVisible?: boolean;
+    // (undocumented)
+    readonly render: BaseScreenMaterialRenderFunction;
+    // (undocumented)
+    readonly spec: BaseScreenMaterialSpec;
+    // (undocumented)
+    readonly tagName: string;
+}
 
 // @public (undocumented)
 export function createMaterialDefinition(options: CreateMaterialDefinitionOptions): ScreenParseResult<BaseScreenMaterialDefinition>;
@@ -168,8 +436,36 @@ export interface CreatePluginRegistrationOptions {
     };
 }
 
+// @public
+export function defineBaseScreenFragment(definition: BaseScreenFragmentDefinition): ScreenParseResult<BaseScreenPluginFragmentContribution>;
+
 // @public (undocumented)
 export function definePlugin(runtime: BaseScreenPluginRuntime): ScreenParseResult<BaseScreenPluginRuntime>;
+
+// @public
+export function formatBaseScreenMaterialNumber(input: unknown, props: ScreenJsonObject): string;
+
+// @public
+export function hasBaseScreenAuthoringErrors(findings: readonly BaseScreenAuthoringFinding[]): boolean;
+
+// @public
+export function mergeBaseScreenMaterialConfigGroups(groups: readonly BaseScreenMaterialConfigGroup[]): {
+    readonly properties: Readonly<Record<string, BaseScreenMaterialPropSchema>>;
+    readonly required: readonly string[];
+    readonly defaults: Readonly<Record<string, ScreenJsonValue>>;
+};
+
+// @public
+export function normalizeBaseScreenMaterialSpecValue(data: BaseScreenMaterialSpecData, value: ScreenJsonValue | undefined): {
+    readonly value: number | string | null;
+    readonly rows: readonly BaseScreenMaterialSpecRow[];
+};
+
+// @public
+export function parseBaseScreenMaterialSpec(input: unknown): ScreenParseResult<BaseScreenMaterialSpec>;
+
+// @public
+export function sortBaseScreenAuthoringFindings(findings: readonly BaseScreenAuthoringFinding[]): readonly BaseScreenAuthoringFinding[];
 
 // (No @packageDocumentation comment for this package)
 

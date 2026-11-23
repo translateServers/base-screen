@@ -19,6 +19,12 @@ export function createHttpProjectAdapter(options: HttpProjectAdapterOptions): Sc
 // @public
 export function createRestDatasetPort(options: RestDatasetPortOptions): ScreenHostDatasetPort;
 
+// @public
+export function createSseSubscribe<Request>(options: SseSubscribeOptions<Request>): HostKitSubscribe<Request>;
+
+// @public
+export function createSubscriptionHub<Request>(options: SubscriptionHubOptions<Request>): HostKitSubscriptionHub<Request>;
+
 // @public (undocumented)
 type DescribeRequest = Parameters<ScreenHostDatasetPort['describe']>[0];
 
@@ -42,6 +48,24 @@ export interface HostDatasetPortOptions<GroupsPayload = unknown, ListPayload = u
     // (undocumented)
     readonly query: HostKitOperation<QueryRequest, QueryPayload>;
 }
+
+// @public
+export interface HostKitEventSource {
+    // (undocumented)
+    addEventListener(type: string, listener: (event: {
+        readonly data?: unknown;
+        readonly lastEventId?: string;
+    }) => void): void;
+    // (undocumented)
+    close(): void;
+    // (undocumented)
+    readonly readyState: number;
+}
+
+// @public (undocumented)
+export type HostKitEventSourceConstructor = new (url: string, init?: {
+    readonly withCredentials?: boolean;
+}) => HostKitEventSource;
 
 // @public (undocumented)
 export interface HostKitHttp {
@@ -135,6 +159,33 @@ export type HostKitOperationResult<Payload> = {
     readonly error: HostKitOperationError;
 };
 
+// @public
+export interface HostKitPushSnapshot {
+    // (undocumented)
+    readonly cursor?: ScreenPushCursor;
+    // (undocumented)
+    readonly value: ScreenJsonValue;
+}
+
+// @public
+export interface HostKitSseMessage {
+    // (undocumented)
+    readonly data: unknown;
+    readonly event: string;
+    // (undocumented)
+    readonly lastEventId: string;
+}
+
+// @public
+export type HostKitSubscribe<Request> = (request: Request, sink: ScreenSourcePushSink, options: ScreenHostSubscribeOptions) => ScreenParseResult<null>;
+
+// @public (undocumented)
+export interface HostKitSubscriptionHub<Request> {
+    channelCount(): number;
+    dispose(): void;
+    readonly subscribe: HostKitSubscribe<Request>;
+}
+
 // @public (undocumented)
 export interface HostProjectAdapterOptions<LoadPayload = unknown, SavePayload = unknown> {
     // (undocumented)
@@ -193,27 +244,19 @@ interface ScreenAbortSignal {
 // @public (undocumented)
 interface ScreenBlueprint {
     // (undocumented)
+    readonly edges: readonly ScreenBlueprintEdge[];
+    // (undocumented)
     readonly layout?: ScreenBlueprintLayout;
     // (undocumented)
-    readonly relations: readonly ScreenBlueprintRelation[];
+    readonly nodes: readonly ScreenBlueprintNode[];
 }
 
-// @public
-interface ScreenBlueprintBehaviorRelation {
+// @public (undocumented)
+interface ScreenBlueprintComponentNode extends ScreenBlueprintNodeBase {
     // (undocumented)
-    readonly condition?: ScreenBlueprintCondition;
+    readonly componentId: string;
     // (undocumented)
-    readonly effect: ScreenBlueprintRelationEffect;
-    // (undocumented)
-    readonly id: string;
-    // (undocumented)
-    readonly requiredCapabilities?: readonly string[];
-    // (undocumented)
-    readonly source: ScreenBlueprintRelationSource;
-    // (undocumented)
-    readonly target: ScreenBlueprintRelationTarget;
-    // (undocumented)
-    readonly type: 'behavior';
+    readonly kind: 'component';
 }
 
 // @public (undocumented)
@@ -224,6 +267,45 @@ interface ScreenBlueprintCondition {
     readonly operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists';
     // (undocumented)
     readonly right?: ScreenBlueprintValueExpression;
+}
+
+// @public (undocumented)
+interface ScreenBlueprintConditionNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly condition: ScreenBlueprintCondition;
+    // (undocumented)
+    readonly kind: 'condition';
+    // (undocumented)
+    readonly name?: string;
+}
+
+// @public (undocumented)
+type ScreenBlueprintEdge = ScreenBlueprintFlowEdge | ScreenBlueprintSemanticEdge;
+
+// @public
+interface ScreenBlueprintFlowEdge {
+    // (undocumented)
+    readonly from: ScreenBlueprintPortRef;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: 'flow';
+    // (undocumented)
+    readonly payload?: ScreenBlueprintValueExpression;
+    // (undocumented)
+    readonly requiredCapabilities?: readonly string[];
+    // (undocumented)
+    readonly to: ScreenBlueprintPortRef;
+    // (undocumented)
+    readonly transition?: ScreenBlueprintVisibilityTransition;
+    // (undocumented)
+    readonly value?: ScreenBlueprintValueExpression;
+}
+
+// @public (undocumented)
+interface ScreenBlueprintHostNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly kind: 'host';
 }
 
 // @public (undocumented)
@@ -257,93 +339,73 @@ interface ScreenBlueprintLayoutViewport {
 }
 
 // @public (undocumented)
-type ScreenBlueprintRelation = ScreenBlueprintBehaviorRelation | ScreenBlueprintSemanticRelation;
-
-// @public (undocumented)
-type ScreenBlueprintRelationEffect = {
-    readonly type: 'component-visibility';
-    readonly operation: ScreenBlueprintVisibilityOperation;
-    readonly transition?: ScreenBlueprintVisibilityTransition;
-} | {
-    readonly type: 'request-component-data';
-} | {
-    readonly type: 'set-variable';
-    readonly value: ScreenBlueprintValueExpression;
-} | {
-    readonly type: 'request-variable';
-} | {
-    readonly type: 'emit-host-event';
-    readonly eventName: string;
-    readonly payload: ScreenBlueprintValueExpression;
-} | {
-    readonly type: 'host-action';
-    readonly actionId: string;
-    readonly payload: ScreenBlueprintValueExpression;
-};
-
-// @public (undocumented)
-type ScreenBlueprintRelationSource = {
-    readonly kind: 'component';
-    readonly componentId: string;
-    readonly event: {
-        readonly type: 'material-event';
-        readonly eventName: string;
-    };
-} | {
-    readonly kind: 'variable';
-    readonly variableId: string;
-    readonly event: {
-        readonly type: 'variable-event';
-        readonly eventName: 'data-updated' | 'request-state';
-    };
-} | {
+interface ScreenBlueprintLifecycleNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
     readonly kind: 'lifecycle';
-    readonly event: {
-        readonly type: 'lifecycle';
-        readonly eventName: 'ready';
-    };
-} | {
-    readonly kind: 'timer';
-    readonly intervalSeconds: number;
-    readonly event: {
-        readonly type: 'timer';
-        readonly eventName: 'tick';
-    };
-};
-
-// @public (undocumented)
-type ScreenBlueprintRelationTarget = {
-    readonly kind: 'component';
-    readonly componentId: string;
-} | {
-    readonly kind: 'variable';
-    readonly variableId: string;
-} | {
-    readonly kind: 'host';
-};
+}
 
 // @public
-interface ScreenBlueprintSemanticRelation {
+interface ScreenBlueprintMainCanvasNode extends ScreenBlueprintNodeBase {
     // (undocumented)
-    readonly id: string;
-    // (undocumented)
-    readonly role: ScreenBlueprintSemanticRelationRole;
-    // (undocumented)
-    readonly source: {
-        readonly kind: 'component';
-        readonly componentId: string;
-    };
-    // (undocumented)
-    readonly target: {
-        readonly kind: 'component';
-        readonly componentId: string;
-    };
-    // (undocumented)
-    readonly type: 'semantic';
+    readonly kind: 'main-canvas';
 }
 
 // @public (undocumented)
-type ScreenBlueprintSemanticRelationRole = 'related' | 'detail' | 'group' | 'drill-down';
+type ScreenBlueprintNode = ScreenBlueprintComponentNode | ScreenBlueprintVariableNode | ScreenBlueprintHostNode | ScreenBlueprintLifecycleNode | ScreenBlueprintTimerNode | ScreenBlueprintConditionNode | ScreenBlueprintSubCanvasNode | ScreenBlueprintMainCanvasNode;
+
+// @public (undocumented)
+interface ScreenBlueprintNodeBase {
+    readonly enabled?: false;
+    // (undocumented)
+    readonly id: string;
+}
+
+// @public (undocumented)
+interface ScreenBlueprintPortRef {
+    // (undocumented)
+    readonly node: string;
+    // (undocumented)
+    readonly port: string;
+}
+
+// @public
+interface ScreenBlueprintSemanticEdge {
+    // (undocumented)
+    readonly from: {
+        readonly node: string;
+    };
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: 'semantic';
+    // (undocumented)
+    readonly role: ScreenBlueprintSemanticRole;
+    // (undocumented)
+    readonly to: {
+        readonly node: string;
+    };
+}
+
+// @public (undocumented)
+type ScreenBlueprintSemanticRole = 'related' | 'detail' | 'group' | 'drill-down';
+
+// @public
+interface ScreenBlueprintSubCanvasNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly canvasId: string;
+    // (undocumented)
+    readonly kind: 'sub-canvas';
+}
+
+// @public (undocumented)
+interface ScreenBlueprintTimerNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly intervalSeconds: number;
+    // (undocumented)
+    readonly kind: 'timer';
+    // (undocumented)
+    readonly name?: string;
+}
 
 // @public (undocumented)
 type ScreenBlueprintValueExpression = {
@@ -364,7 +426,12 @@ type ScreenBlueprintValueExpression = {
 };
 
 // @public (undocumented)
-type ScreenBlueprintVisibilityOperation = 'show' | 'hide' | 'toggle';
+interface ScreenBlueprintVariableNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly kind: 'variable';
+    // (undocumented)
+    readonly variableId: string;
+}
 
 // @public (undocumented)
 interface ScreenBlueprintVisibilityTransition {
@@ -431,6 +498,8 @@ type ScreenComponentDataSource = ScreenStaticDataSource | ScreenDatasetDataSourc
 
 // @public (undocumented)
 interface ScreenComponentNode {
+    readonly belowSubCanvas?: true;
+    readonly canvasId?: string;
     readonly dataBinding?: ScreenDataBinding | null;
     readonly dataSource: ScreenComponentDataSource | null;
     readonly dataValue?: ScreenValueRef | null;
@@ -697,6 +766,8 @@ interface ScreenDocument {
     // (undocumented)
     readonly components: readonly ScreenComponentNode[];
     readonly dataSources?: readonly ScreenDataSource[];
+    readonly startCanvasId?: string;
+    readonly subCanvases?: readonly ScreenSubCanvas[];
     readonly theme?: ScreenTheme;
     // (undocumented)
     readonly variables: readonly ScreenVariableEntry[];
@@ -750,6 +821,15 @@ interface ScreenHostResourceResolveOptions {
     readonly signal: ScreenAbortSignal;
 }
 
+// @public
+interface ScreenHostSubscribeOptions {
+    // (undocumented)
+    readonly context?: ScreenResourceExecutionContext;
+    readonly retain?: ScreenPushRetainPolicy;
+    // (undocumented)
+    readonly signal: ScreenAbortSignal;
+}
+
 // @public (undocumented)
 type ScreenJsonObject = Readonly<Record<string, ScreenJsonValue>>;
 
@@ -765,10 +845,12 @@ interface ScreenMigrationDecision {
     // (undocumented)
     readonly createdDataSourceId?: string;
     // (undocumented)
+    readonly createdEdgeIds?: readonly string[];
+    // (undocumented)
     readonly createdRelationIds?: readonly string[];
     readonly detail: string;
     // (undocumented)
-    readonly kind: 'component-value' | 'component-binding' | 'variable' | 'parameter' | 'blueprint-relation' | 'blueprint-layout';
+    readonly kind: 'component-value' | 'component-binding' | 'variable' | 'parameter' | 'blueprint-relation' | 'blueprint-node' | 'blueprint-edge' | 'blueprint-layout';
     readonly path: readonly (string | number)[];
 }
 
@@ -785,6 +867,16 @@ type ScreenMigrationResult = {
     readonly diagnostics: readonly ScreenDiagnostic[];
 };
 
+// @public
+interface ScreenPageCanvas extends ScreenSubCanvasBase {
+    // (undocumented)
+    readonly background?: ScreenCanvasBackground;
+    // (undocumented)
+    readonly backgroundColor?: string;
+    // (undocumented)
+    readonly display: 'page';
+}
+
 // @public (undocumented)
 type ScreenParseResult<T> = {
     readonly ok: true;
@@ -794,6 +886,37 @@ type ScreenParseResult<T> = {
     readonly ok: false;
     readonly diagnostics: readonly ScreenDiagnostic[];
 };
+
+// @public
+type ScreenPopupAnchor = 'top-left' | 'top' | 'top-right' | 'left' | 'center' | 'right' | 'bottom-left' | 'bottom' | 'bottom-right';
+
+// @public
+interface ScreenPopupCanvas extends ScreenSubCanvasBase {
+    // (undocumented)
+    readonly background?: ScreenCanvasBackground;
+    // (undocumented)
+    readonly backgroundColor: string;
+    readonly borderRadius: number;
+    readonly closeOnEscape: boolean;
+    readonly closeOnMaskClick: boolean;
+    // (undocumented)
+    readonly display: 'popup';
+    // (undocumented)
+    readonly height: number;
+    readonly maskColor: string;
+    readonly placement?: ScreenPopupPlacement;
+    // (undocumented)
+    readonly width: number;
+}
+
+// @public (undocumented)
+interface ScreenPopupPlacement {
+    // (undocumented)
+    readonly anchor: ScreenPopupAnchor;
+    readonly offsetX: number;
+    // (undocumented)
+    readonly offsetY: number;
+}
 
 // @public (undocumented)
 interface ScreenPosition {
@@ -863,6 +986,21 @@ interface ScreenProjectSaveRequest {
     readonly signal: ScreenAbortSignal;
 }
 
+// @public
+interface ScreenPushCursor {
+    // (undocumented)
+    readonly epoch: string;
+    // (undocumented)
+    readonly revision: number;
+}
+
+// @public
+interface ScreenPushRetainPolicy {
+    readonly rows?: number;
+    readonly seconds?: number;
+    readonly timeField?: string;
+}
+
 // @public (undocumented)
 interface ScreenResourceExecutionContext {
     // (undocumented)
@@ -882,8 +1020,8 @@ interface ScreenResourceExecutionContext {
 // @public
 type ScreenResourceExecutionMode = 'design' | 'preview' | 'viewer';
 
-// @public (undocumented)
-type ScreenResourceExecutionTrigger = 'initial' | 'manual' | 'polling' | 'variable' | 'document-change';
+// @public
+type ScreenResourceExecutionTrigger = 'initial' | 'manual' | 'polling' | 'variable' | 'document-change' | 'push';
 
 // @public (undocumented)
 interface ScreenSize {
@@ -891,6 +1029,44 @@ interface ScreenSize {
     readonly height: number;
     // (undocumented)
     readonly width: number;
+}
+
+// @public
+type ScreenSourceConnectionStatus = 'connecting' | 'open' | 'reconnecting' | 'suspended' | 'failed';
+
+// @public
+type ScreenSourcePushEvent =
+/** 全量快照，替换实例结果。每次（重新）订阅后的首个数据事件必须是它。 */
+    {
+    readonly type: 'snapshot';
+    readonly value: ScreenJsonValue;
+    readonly cursor?: ScreenPushCursor;
+}
+/** 增量追加：仅当当前结果是表格数据集（fields + rows）时合法，rows 必须符合现有 fields。 */
+| {
+    readonly type: 'append';
+    readonly rows: readonly ScreenJsonObject[];
+    readonly cursor?: ScreenPushCursor;
+}
+/** 请重新获取快照：基座按同一请求键 resolve 一次，期间保留当前值。 */
+| {
+    readonly type: 'invalidate';
+}
+/** 连接状态；`failed` 时可附诊断（只进诊断通道，不直接展示给观众）。 */
+| {
+    readonly type: 'status';
+    readonly status: ScreenSourceConnectionStatus;
+    readonly diagnostic?: ScreenDiagnostic;
+}
+/** 心跳：不带数据，只刷新静默计时。 */
+| {
+    readonly type: 'heartbeat';
+};
+
+// @public (undocumented)
+interface ScreenSourcePushSink {
+    // (undocumented)
+    push(event: ScreenSourcePushEvent): void;
 }
 
 // @public (undocumented)
@@ -907,6 +1083,17 @@ interface ScreenStaticDataSource {
 interface ScreenStaticVariable extends ScreenVariableBase {
     // (undocumented)
     readonly type: 'static';
+}
+
+// @public
+type ScreenSubCanvas = ScreenPageCanvas | ScreenPopupCanvas;
+
+// @public (undocumented)
+interface ScreenSubCanvasBase {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly name: string;
 }
 
 // @public (undocumented)
@@ -930,13 +1117,15 @@ type ScreenThemeSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'ac
 
 // @public
 interface ScreenUpdatePolicy {
+    readonly fallbackIntervalSeconds?: number;
     readonly intervalSeconds?: number;
     // (undocumented)
     readonly mode: ScreenUpdatePolicyMode;
+    readonly retain?: ScreenPushRetainPolicy;
 }
 
 // @public (undocumented)
-type ScreenUpdatePolicyMode = 'once' | 'manual' | 'auto';
+type ScreenUpdatePolicyMode = 'once' | 'manual' | 'auto' | 'push';
 
 // @public (undocumented)
 interface ScreenUrlQueryVariable extends ScreenVariableBase {
@@ -1013,6 +1202,27 @@ interface ScreenVariableRecord {
     readonly name: string;
     // (undocumented)
     readonly value: ScreenValueRef;
+}
+
+// @public (undocumented)
+export interface SseSubscribeOptions<Request> {
+    readonly cursorFromEventId?: boolean;
+    readonly events?: readonly string[];
+    readonly EventSource?: HostKitEventSourceConstructor;
+    readonly fetchSnapshot?: (request: Request, signal: AbortSignal) => Promise<ScreenParseResult<HostKitPushSnapshot>>;
+    readonly mapEvent?: (message: HostKitSseMessage, request: Request) => ScreenSourcePushEvent | readonly ScreenSourcePushEvent[] | undefined;
+    readonly suspendAfterMs?: number;
+    readonly url: (request: Request) => string | undefined;
+    // (undocumented)
+    readonly withCredentials?: boolean;
+}
+
+// @public (undocumented)
+export interface SubscriptionHubOptions<Request> {
+    readonly keyOf: (request: Request) => string;
+    readonly lingerMs?: number;
+    readonly open: HostKitSubscribe<Request>;
+    readonly replayRows?: number;
 }
 
 // @public

@@ -68,6 +68,7 @@ interface BaseScreenMaterialEditorCondition {
     readonly operator: BaseScreenMaterialEditorConditionOperator;
     // (undocumented)
     readonly path: readonly BaseScreenMaterialEditorPathSegment[];
+    readonly target?: 'props' | 'style';
     // (undocumented)
     readonly value?: ScreenJsonValue;
 }
@@ -221,6 +222,7 @@ interface BaseScreenMaterialManifest {
     readonly styleSchema: BaseScreenMaterialObjectSchema;
     // (undocumented)
     readonly tagName: string;
+    readonly themeStyle?: Readonly<Record<string, ScreenThemeSlot>>;
     // (undocumented)
     readonly type: string;
 }
@@ -409,6 +411,9 @@ interface ScreenTabularDataset {
     // (undocumented)
     readonly totalRowCount?: number;
 }
+
+// @public
+type ScreenThemeSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
 
 // (No @packageDocumentation comment for this package)
 
