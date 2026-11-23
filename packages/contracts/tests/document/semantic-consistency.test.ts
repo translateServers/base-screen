@@ -38,6 +38,17 @@ function document(overrides: Record<string, unknown> = {}): Record<string, unkno
 }
 
 describe('parseScreenDocument RB4 semantic consistency', () => {
+  it.each(['canvas', 'blueprint'])(
+    'fails closed when the required %s field is missing',
+    (field) => {
+      const input = document();
+      delete input[field];
+      const result = parseScreenDocument(input);
+      expect(result.ok).toBe(false);
+      expect(result.diagnostics.some((diagnostic) => diagnostic.path[0] === field)).toBe(true);
+    },
+  );
+
   it('rejects duplicate component ids', () => {
     const result = parseScreenDocument(
       document({
