@@ -777,48 +777,35 @@ export const BOARD_AIR_QUALITY_DOCUMENT = {
     },
   ],
   blueprint: {
-    relations: [
+    // 节点图（ADR-0107）：城市表 rowClick → 写 city；两个时间窗文本 valueClick → 写 hours。
+    nodes: [
+      { kind: 'component' as const, id: 'component:city-board', componentId: 'city-board' },
+      { kind: 'component' as const, id: 'component:window-24-text', componentId: 'window-24-text' },
+      { kind: 'component' as const, id: 'component:window-48-text', componentId: 'window-48-text' },
+      { kind: 'variable' as const, id: 'variable:city', variableId: 'city' },
+      { kind: 'variable' as const, id: 'variable:hours', variableId: 'hours' },
+    ],
+    edges: [
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'rule-city',
-        source: {
-          kind: 'component' as const,
-          componentId: 'city-board',
-          event: { type: 'material-event' as const, eventName: 'rowClick' },
-        },
-        target: { kind: 'variable' as const, variableId: 'city' },
-        effect: {
-          type: 'set-variable' as const,
-          value: { kind: 'event-payload' as const, path: ['row', 'city'] },
-        },
+        from: { node: 'component:city-board', port: 'event:rowClick' },
+        to: { node: 'variable:city', port: 'set' },
+        value: { kind: 'event-payload' as const, path: ['row', 'city'] },
       },
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'rule-window-24',
-        source: {
-          kind: 'component' as const,
-          componentId: 'window-24-text',
-          event: { type: 'material-event' as const, eventName: 'valueClick' },
-        },
-        target: { kind: 'variable' as const, variableId: 'hours' },
-        effect: {
-          type: 'set-variable' as const,
-          value: { kind: 'literal' as const, value: 24 },
-        },
+        from: { node: 'component:window-24-text', port: 'event:valueClick' },
+        to: { node: 'variable:hours', port: 'set' },
+        value: { kind: 'literal' as const, value: 24 },
       },
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'rule-window-48',
-        source: {
-          kind: 'component' as const,
-          componentId: 'window-48-text',
-          event: { type: 'material-event' as const, eventName: 'valueClick' },
-        },
-        target: { kind: 'variable' as const, variableId: 'hours' },
-        effect: {
-          type: 'set-variable' as const,
-          value: { kind: 'literal' as const, value: 48 },
-        },
+        from: { node: 'component:window-48-text', port: 'event:valueClick' },
+        to: { node: 'variable:hours', port: 'set' },
+        value: { kind: 'literal' as const, value: 48 },
       },
     ],
   },

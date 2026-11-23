@@ -284,7 +284,7 @@ const parsed = parseScreenDocument({
     },
   ],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 });
 if (!parsed.ok) {
   throw new Error(\`Screen Document invalid: \${formatDiagnostics(parsed.diagnostics)}\`);
@@ -1034,7 +1034,7 @@ const app = createApp({
     mountOptions: {
       document: {
         canvas: { width: 640, height: 360, backgroundColor: '#111827' },
-        components: [], variables: [], blueprint: { relations: [] },
+        components: [], variables: [], blueprint: { nodes: [], edges: [] },
       },
     },
     onDiagnostics: (items) => { diagnostics.splice(0, diagnostics.length, ...items.map(item => item.message)); },

@@ -41,7 +41,7 @@ export async function assertBlueprintWorkbench(designer, page) {
       documentComponentCount: designer.document.components.length,
       canAddSemanticChart:
         designer.shadowRoot.querySelector(
-          '[data-blueprint-select-node="component:semantic-chart-demo"]',
+          '[data-blueprint-add-component="semantic-chart-demo"]',
         ) !== null,
       frozen:
         Object.isFrozen(state) &&
@@ -55,7 +55,7 @@ export async function assertBlueprintWorkbench(designer, page) {
   if (
     initialWorkbench.mode !== 'blueprint' ||
     !initialWorkbench.active ||
-    initialWorkbench.selected?.id !== 'component:title' ||
+    initialWorkbench.selected?.nodes?.[0] !== 'component:title' ||
     !initialWorkbench.titlePlaced ||
     initialWorkbench.libraryComponentCount !== initialWorkbench.documentComponentCount ||
     !initialWorkbench.canAddSemanticChart ||
@@ -135,7 +135,7 @@ export async function assertBlueprintWorkbench(designer, page) {
   // 未放置组件通过有界协议直接加入图中，不依赖已有规则上下文。
   const insertStarted = await page.evaluate(() => {
     const harness = window.baseScreenHarness;
-    const rules = harness.designer.document.blueprint.relations.length;
+    const rules = harness.designer.document.blueprint.edges.length;
     const sent = harness.sendBlueprintCanvasCommand(
       {
         type: 'insert-node',
@@ -169,8 +169,8 @@ export async function assertBlueprintWorkbench(designer, page) {
     );
     return {
       selected: state.selection,
-      seriesClickAvailable: semanticChart?.events?.some(
-        (event) => event.name === 'seriesClick' && event.available,
+      seriesClickAvailable: semanticChart?.outputs?.some(
+        (port) => port.id === 'event:seriesClick' && port.available,
       ),
       layoutNode: harness.designer.document.blueprint.layout?.nodes.find(
         (node) => node.id === 'component:semantic-chart-demo',
@@ -178,7 +178,7 @@ export async function assertBlueprintWorkbench(designer, page) {
     };
   });
   if (
-    inserted.selected?.id !== 'component:semantic-chart-demo' ||
+    inserted.selected?.nodes?.[0] !== 'component:semantic-chart-demo' ||
     !inserted.seriesClickAvailable ||
     inserted.layoutNode?.x !== 180 ||
     inserted.layoutNode?.y !== 260
@@ -190,14 +190,12 @@ export async function assertBlueprintWorkbench(designer, page) {
   const connectStarted = await page.evaluate(() => {
     const harness = window.baseScreenHarness;
     const state = harness.blueprintCanvasState();
-    const rules = harness.designer.document.blueprint.relations.length;
+    const rules = harness.designer.document.blueprint.edges.length;
     const sent = harness.sendBlueprintCanvasCommand(
       {
         type: 'connect',
-        sourceNodeId: 'component:semantic-chart-demo',
-        sourceHandle: 'event:seriesClick',
-        targetNodeId: 'component:title',
-        targetHandle: 'visibility:toggle',
+        from: { node: 'component:semantic-chart-demo', port: 'event:seriesClick' },
+        to: { node: 'component:title', port: 'toggle' },
       },
       'browser-connect-command',
     );
@@ -214,35 +212,33 @@ export async function assertBlueprintWorkbench(designer, page) {
     );
   }
   await page.waitForFunction(
-    (rules) => window.baseScreenHarness.designer.document.blueprint.relations.length === rules + 1,
+    (rules) => window.baseScreenHarness.designer.document.blueprint.edges.length === rules + 1,
     connectStarted.rules,
   );
   const connected = await page.evaluate((beforeRevision) => {
     const harness = window.baseScreenHarness;
     const state = harness.blueprintCanvasState();
     const dirty = harness.designer.shadowRoot.querySelector('[data-topbar-save-status]');
-    const relation = harness.designer.document.blueprint.relations.find(
+    const relation = harness.designer.document.blueprint.edges.find(
       (item) =>
-        item.type === 'behavior' &&
-        item.source.kind === 'component' &&
-        item.source.componentId === 'semantic-chart-demo' &&
-        item.source.event.eventName === 'seriesClick',
+        item.kind === 'flow' &&
+        item.from.node === 'component:semantic-chart-demo' &&
+        item.from.port === 'event:seriesClick',
     );
     return {
       revisionAdvanced: state.documentRevision > beforeRevision,
       lastStatus: state.lastCommand?.status,
       dirty: dirty?.dataset.state,
       selection: state.selection,
-      effect: relation?.type === 'behavior' ? relation.effect : undefined,
+      targetPort: relation?.kind === 'flow' ? relation.to.port : undefined,
     };
   }, connectStarted.revision);
   if (
     !connected.revisionAdvanced ||
     connected.lastStatus !== 'accepted' ||
     connected.dirty !== 'dirty' ||
-    connected.selection?.kind !== 'edge' ||
-    connected.effect?.type !== 'component-visibility' ||
-    connected.effect?.operation !== 'toggle'
+    connected.selection?.edges?.length !== 1 ||
+    connected.targetPort !== 'toggle'
   ) {
     throw new Error(`BROWSER_HARNESS_BLUEPRINT_CONNECT_FAILED:${JSON.stringify(connected)}`);
   }
@@ -253,7 +249,7 @@ export async function assertBlueprintWorkbench(designer, page) {
     const selected = harness.blueprintCanvasState().selection;
     const toCanvas = harness.designer.setWorkbenchMode('canvas');
     const inactive = harness.blueprintCanvasState().active;
-    const relationsInCanvas = harness.designer.document.blueprint.relations.length;
+    const relationsInCanvas = harness.designer.document.blueprint.edges.length;
     const toBlueprint = harness.designer.setWorkbenchMode('blueprint');
     return {
       toCanvas: toCanvas.ok,
@@ -283,14 +279,14 @@ export async function assertBlueprintWorkbench(designer, page) {
     window.baseScreenHarness.sendBlueprintCanvasCommand({ type: 'history-undo' }),
   );
   await page.waitForFunction(
-    (rules) => window.baseScreenHarness.designer.document.blueprint.relations.length === rules,
+    (rules) => window.baseScreenHarness.designer.document.blueprint.edges.length === rules,
     connectStarted.rules,
   );
   await page.evaluate(() =>
     window.baseScreenHarness.sendBlueprintCanvasCommand({ type: 'history-redo' }),
   );
   await page.waitForFunction(
-    (rules) => window.baseScreenHarness.designer.document.blueprint.relations.length === rules + 1,
+    (rules) => window.baseScreenHarness.designer.document.blueprint.edges.length === rules + 1,
     connectStarted.rules,
   );
 
@@ -298,15 +294,15 @@ export async function assertBlueprintWorkbench(designer, page) {
     const harness = window.baseScreenHarness;
     harness.sendBlueprintCanvasCommand({
       type: 'run-simulation',
-      componentId: 'semantic-chart-demo',
-      eventName: 'seriesClick',
+      nodeId: 'component:semantic-chart-demo',
+      port: 'event:seriesClick',
       payload: { value: 42 },
     });
     const state = harness.blueprintCanvasState();
     return {
-      rules: harness.designer.document.blueprint.relations.length,
+      rules: harness.designer.document.blueprint.edges.length,
       status: state.lastCommand?.status,
-      lines: state.trace?.lines ?? [],
+      lines: state.trace?.steps ?? [],
       executed: state.trace?.executedEdgeIds ?? [],
     };
   });
@@ -341,7 +337,7 @@ export async function assertBlueprintWorkbench(designer, page) {
     return {
       status: result?.status,
       code: result?.diagnostics?.[0]?.code,
-      rules: harness.designer.document.blueprint.relations.length,
+      rules: harness.designer.document.blueprint.edges.length,
     };
   });
   if (

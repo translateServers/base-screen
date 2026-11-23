@@ -296,7 +296,8 @@ export async function createScreenProvider(screenFile) {
         maxDepth,
         dataBindings: bindings,
         styleRules,
-        blueprintRelations: doc.blueprint.relations.length,
+        blueprintNodes: doc.blueprint.nodes.length,
+        blueprintEdges: doc.blueprint.edges.length,
       };
       const violations = [];
       if (metrics.components > limits.maxComponents)
@@ -420,8 +421,10 @@ function diffScreenDocuments(apis, before, after) {
     variables: diffById(apis, before.variables ?? [], after.variables ?? []),
     blueprint: {
       changed: !apis.screenJsonEquals(before.blueprint, after.blueprint),
-      beforeRelations: before.blueprint.relations.length,
-      afterRelations: after.blueprint.relations.length,
+      beforeNodes: before.blueprint.nodes.length,
+      afterNodes: after.blueprint.nodes.length,
+      beforeEdges: before.blueprint.edges.length,
+      afterEdges: after.blueprint.edges.length,
     },
   };
 }
@@ -561,7 +564,8 @@ function auditComplexity(apis, document) {
     materialTypes,
     dataSources: dataSources.length,
     variables: variables.length,
-    blueprintRelations: document.blueprint.relations.length,
+    blueprintNodes: document.blueprint.nodes.length,
+    blueprintEdges: document.blueprint.edges.length,
     styleRules,
   };
 }
@@ -576,7 +580,8 @@ function summarizeScreenDocument(apis, document) {
       components: document.components.length,
       dataSources: dataSources.length,
       variables: variables.length,
-      blueprintRelations: document.blueprint.relations.length,
+      blueprintNodes: document.blueprint.nodes.length,
+      blueprintEdges: document.blueprint.edges.length,
     },
     components: document.components.map((component) => ({
       id: component.id,

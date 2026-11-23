@@ -216,7 +216,7 @@ function createPushDocument(): ScreenDocument {
       liveText('push-quiet', '静默超时', 208, 'live-quiet'),
       liveText('pull-metric', '拉取对照', 288, 'pull-metric'),
     ],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
     variables: [],
     dataSources: [
       {

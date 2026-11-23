@@ -69,7 +69,15 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
       ) {
         throw new Error(`MATERIAL_GROUP_RESPONSIVE_FAILED:${JSON.stringify({ width, before })}`);
       }
-      if (!compact && before.navigation.width !== 108) {
+      // 内联导航是独占首行的横向 chip 条（designer-base-material-groups.css）：它落在内容区里、
+      // 不再吃掉 108px 横向宽度，卡片区与内容区同宽。
+      if (
+        !compact &&
+        (before.navigation.left < before.content.left ||
+          before.navigation.right > before.content.right + 0.5 ||
+          before.navigation.bottom > before.grid.top + 0.5 ||
+          before.grid.width < before.content.width - 1)
+      ) {
         throw new Error(`MATERIAL_GROUP_COLUMN_WIDTH_FAILED:${JSON.stringify(before)}`);
       }
       if (compact) {
@@ -86,7 +94,10 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
         throw new Error('MATERIAL_GROUP_BRANCH_CLOSED');
       await designer.locator('[data-material-group="semantic-chart"]').click();
       const leaf = await measure(designer);
-      assertSameBox(before.grid, leaf.grid, 'MATERIAL_GROUP_SELECTION_REFLOW');
+      // 弹层模式选择不得改变卡片区；内联 chip 模式选中带子分组的根会多出一行 secondary chip，
+      // 卡片区只允许整体下移（左缘、宽度、底边不变）。
+      if (compact) assertSameBox(before.grid, leaf.grid, 'MATERIAL_GROUP_SELECTION_REFLOW');
+      else assertSameColumn(before.grid, leaf.grid, 'MATERIAL_GROUP_SELECTION_REFLOW');
       if (
         !leaf.overlayHidden ||
         leaf.visible.join(',') !== 'harness.semantic-chart' ||
@@ -252,6 +263,11 @@ async function resizePanel(page, designer, width) {
   await page.mouse.up();
 }
 
+function assertSameColumn(before, after, code) {
+  if (before.left !== after.left || before.width !== after.width || before.bottom !== after.bottom)
+    throw new Error(`${code}:${JSON.stringify({ before, after })}`);
+}
+
 function assertSameBox(before, after, code) {
   if (JSON.stringify(before) !== JSON.stringify(after))
     throw new Error(`${code}:${JSON.stringify({ before, after })}`);
@@ -283,14 +299,16 @@ function measure(designer) {
       visible: [...root.querySelectorAll('[data-material-card]:not([hidden])')].map(
         (card) => card.dataset.materialCard,
       ),
+      // 内联 chip 行（.material-group-inline 内的 roots / children）按设计横向滚动，不算溢出；
+      // 弹层里的 Miller 列与内容区、卡片区不允许横向溢出。
       horizontalOverflow: [
         '[data-material-library-content]',
         '[data-material-grid]',
-        '.material-group-roots',
-        '.material-group-children',
+        '.material-group-popover .material-group-roots',
+        '.material-group-popover .material-group-children',
       ].some((selector) => {
         const target = node(selector);
-        return target.clientWidth > 0 && target.scrollWidth > target.clientWidth;
+        return target !== null && target.clientWidth > 0 && target.scrollWidth > target.clientWidth;
       }),
       popupWithinBounds:
         popup.left >= Math.max(layout.left, 0) &&
@@ -557,7 +575,10 @@ export async function assertMaterialGroupUsability(page, designer) {
   if (
     backBounds === null ||
     backBounds.height !== 28 ||
-    backBounds.width < secondaryBounds.width - 1 ||
+    // 内联 chip 行里「返回」是 28px 圆形 chip（designer-base-material-groups.css），落在 secondary 行内。
+    backBounds.width < 28 ||
+    backBounds.left < secondaryBounds.x - 1 ||
+    backBounds.left + backBounds.width > secondaryBounds.x + secondaryBounds.width + 1 ||
     !(await back.getAttribute('data-tip')).includes('数据可视化')
   ) {
     throw new Error('MATERIAL_GROUP_BACK_TARGET_FAILED');
@@ -1478,7 +1499,7 @@ export async function assertImageDensitySize(browser, baseUrl) {
             },
           ],
           variables: [],
-          blueprint: { relations: [] },
+          blueprint: { nodes: [], edges: [] },
         }).ok;
       }),
     ).toBe(true);

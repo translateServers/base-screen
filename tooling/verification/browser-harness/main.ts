@@ -2,7 +2,6 @@ import { createElement } from 'react';
 import { h } from 'vue';
 import type { ScreenJsonObject, ScreenJsonValue } from '../../../packages/contracts/src/index.ts';
 import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '../../../packages/contracts/src/index.ts';
-import type { ScreenDocumentCommand } from '../../../packages/core/src/index.ts';
 import {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
   BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
@@ -916,67 +915,48 @@ const screenDocument = {
     },
   ],
   blueprint: {
-    relations: [
+    nodes: [
+      { kind: 'component' as const, id: 'component:title', componentId: 'title' },
+      { kind: 'component' as const, id: 'component:subtitle', componentId: 'subtitle' },
+      { kind: 'variable' as const, id: 'variable:harness-tick', variableId: 'harness-tick' },
+      { kind: 'host' as const, id: 'host' },
+    ],
+    edges: [
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'title-click',
-        source: {
-          kind: 'component' as const,
-          componentId: 'title',
-          event: { type: 'material-event' as const, eventName: 'valueClick' },
-        },
-        target: { kind: 'host' as const },
-        effect: {
-          type: 'emit-host-event' as const,
-          eventName: 'titleClick',
-          payload: { kind: 'literal' as const, value: { source: 'harness' } },
-        },
+        from: { node: 'component:title', port: 'event:valueClick' },
+        to: { node: 'host', port: 'event:titleClick' },
+        payload: { kind: 'literal' as const, value: { source: 'harness' } },
       },
       {
         // ADR-0076：引用插件声明的宿主动作。已声明即走宿主动作端口，未声明会被 manager
-        // 失败关闭；这条关系同时是端到端断言的入口（点标题 → 动作执行）。
-        type: 'behavior' as const,
+        // 失败关闭；这条连线同时是端到端断言的入口（点标题 → 动作执行）。
+        kind: 'flow' as const,
         id: 'plugin-action-demo',
-        source: {
-          kind: 'component' as const,
-          componentId: 'subtitle',
-          event: { type: 'material-event' as const, eventName: 'valueClick' },
-        },
-        target: { kind: 'host' as const },
-        effect: {
-          type: 'host-action' as const,
-          actionId: PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
-          payload: {
-            kind: 'object' as const,
-            properties: {
-              color: { kind: 'literal' as const, value: '#ffa940' },
-              strokeWidth: { kind: 'literal' as const, value: 3 },
-            },
+        from: { node: 'component:subtitle', port: 'event:valueClick' },
+        to: { node: 'host', port: `action:${PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID}` },
+        payload: {
+          kind: 'object' as const,
+          properties: {
+            color: { kind: 'literal' as const, value: '#ffa940' },
+            strokeWidth: { kind: 'literal' as const, value: 3 },
           },
         },
       },
       {
-        // 组合路径模板·计时器触发：宿主定时器/推送写变量 → 本关系触发 → 插件动作。
-        // 成熟大屏产品上"计时器节点"承载的功能由此闭环，且**不需要** Base Screen 新增触发器节点：
-        // 缺的从来是作者面形态，不是功能。`harnessTick` 初值 0 时关系也会触发一次，
-        // 因此断言观察的是动作事件次数在启动定时器之后的增量。
-        type: 'behavior' as const,
+        // 组合路径模板·计时器触发：宿主定时器/推送写变量 → 变量值更新锚点 → 插件动作。
+        // `harnessTick` 初值 0 时连线也会触发一次，因此断言观察的是动作事件次数在启动
+        // 定时器之后的增量。
+        kind: 'flow' as const,
         id: 'variable-trigger-demo',
-        source: {
-          kind: 'variable' as const,
-          variableId: 'harness-tick',
-          event: { type: 'variable-event' as const, eventName: 'data-updated' },
-        },
-        target: { kind: 'host' as const },
-        effect: {
-          type: 'host-action' as const,
-          actionId: PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
-          payload: {
-            kind: 'object' as const,
-            properties: {
-              color: { kind: 'literal' as const, value: '#39c5bb' },
-              strokeWidth: { kind: 'literal' as const, value: 1 },
-            },
+        from: { node: 'variable:harness-tick', port: 'data-updated' },
+        to: { node: 'host', port: `action:${PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID}` },
+        payload: {
+          kind: 'object' as const,
+          properties: {
+            color: { kind: 'literal' as const, value: '#39c5bb' },
+            strokeWidth: { kind: 'literal' as const, value: 1 },
           },
         },
       },
@@ -1009,10 +989,8 @@ function renderBlueprintCanvasState(state: BaseScreenBlueprintCanvasState): void
   const detail = document.createElement('span');
   detail.textContent = `generation ${state.generation} · revision ${state.documentRevision}`;
   const selection = document.createElement('span');
-  selection.textContent =
-    state.selection === null
-      ? '未选择图元素'
-      : `已选择 ${state.selection.kind}: ${state.selection.id}`;
+  const picked = [...state.selection.nodes, ...state.selection.edges];
+  selection.textContent = picked.length === 0 ? '未选择图元素' : `已选择 ${picked.join(', ')}`;
   blueprintGraph.replaceChildren(heading, detail, selection);
 }
 
@@ -1460,55 +1438,6 @@ designer.toolMaterialTypes = {
 };
 // 编组使用显式配置的容器物料（children=true），缺失时 Group 命令按 ADR-0012 保持禁用。
 designer.groupMaterialType = 'base.container';
-// 场景切换：目录与内容都归宿主；引擎只负责预览、应用与历史。这里用画布底色与首段文本
-// 演示「整套替换」，不写入任何场景语义到 Screen Document。
-const SCENE_BACKGROUNDS: Record<string, string> = {
-  daily: '#111827',
-  emergency: '#1f1212',
-  report: '#101a17',
-};
-const SCENE_OFFSETS: Record<string, number> = {
-  daily: 0,
-  emergency: 24,
-  report: 48,
-};
-const sceneRequests: string[] = [];
-const sceneEvents: Array<{ readonly sceneId: string; readonly label: string }> = [];
-designer.addEventListener('base-screen-scene-change', (event) => {
-  sceneEvents.push((event as CustomEvent<{ sceneId: string; label: string }>).detail);
-});
-const sceneCatalogReady = designer.setSceneCatalog(
-  [
-    { id: 'daily', label: '日常监控' },
-    { id: 'emergency', label: '应急指挥' },
-    { id: 'report', label: '汇报展示' },
-  ],
-  'daily',
-);
-if (!sceneCatalogReady.ok) throw new Error('Scene catalog configuration failed.');
-designer.setSceneHandler(async ({ sceneId, document }) => {
-  sceneRequests.push(sceneId);
-  const commands: ScreenDocumentCommand[] = [
-    {
-      type: 'update-canvas',
-      patch: { backgroundColor: SCENE_BACKGROUNDS[sceneId] ?? '#111827' },
-    },
-  ];
-  const target = document.components[0];
-  if (target !== undefined) {
-    commands.push({
-      type: 'update-components',
-      componentIds: [target.id],
-      patch: {
-        position: {
-          x: target.position.x + (SCENE_OFFSETS[sceneId] ?? 0),
-          y: target.position.y,
-        },
-      },
-    });
-  }
-  return { ok: true, value: { commands }, diagnostics: [] };
-});
 const viewerConfigured = viewer.configure({
   catalog: designerCatalog,
   resourcePort,
@@ -1684,8 +1613,6 @@ Object.assign(window, {
     catalog: designerCatalog,
     designer,
     pluginManager,
-    sceneRequests,
-    sceneEvents,
     // ADR-0076：运行期贡献的观察点。
     pluginActionRequests,
     applyPluginDataProcessor: (request) => pluginManager.applyDataProcessor(request),
@@ -1842,7 +1769,7 @@ Object.assign(window, {
             controlled: true,
           },
         ],
-        blueprint: { relations: [] },
+        blueprint: { nodes: [], edges: [] },
       };
       document.body.appendChild(demo);
       return demo;
@@ -1876,7 +1803,7 @@ Object.assign(window, {
           },
         ],
         variables: [],
-        blueprint: { relations: [] },
+        blueprint: { nodes: [], edges: [] },
       };
       document.body.appendChild(draftDesigner);
       return draftDesigner;
@@ -1913,7 +1840,7 @@ Object.assign(window, {
           },
         ],
         variables: [],
-        blueprint: { relations: [] },
+        blueprint: { nodes: [], edges: [] },
       };
       // 探针必须落在受支持档位：降级档（<896 宽或 <640 高）会把整个工作台换成提示，
       // 卡片永远不可见。固定 1200×720 让封面缩略图断言与宿主视口无关。
@@ -1945,7 +1872,7 @@ Object.assign(window, {
           },
         ],
         variables: [],
-        blueprint: { relations: [] },
+        blueprint: { nodes: [], edges: [] },
       };
       document.body.appendChild(demo);
       return demo;

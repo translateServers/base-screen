@@ -124,7 +124,7 @@ describe('host assets (e2e)', () => {
             },
           ],
           variables: [],
-          blueprint: { relations: [] },
+          blueprint: { nodes: [], edges: [] },
         }),
       },
     });
@@ -154,7 +154,7 @@ describe('host assets (e2e)', () => {
           },
           components: [],
           variables: [],
-          blueprint: { relations: [] },
+          blueprint: { nodes: [], edges: [] },
         }),
       },
     });
@@ -314,12 +314,12 @@ function emptyScreenDocument(): {
   canvas: { width: number; height: number; backgroundColor: string };
   components: unknown[];
   variables: unknown[];
-  blueprint: { relations: unknown[] };
+  blueprint: { nodes: unknown[]; edges: unknown[] };
 } {
   return {
     canvas: { width: 100, height: 100, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }

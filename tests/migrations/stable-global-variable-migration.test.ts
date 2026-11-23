@@ -83,7 +83,7 @@ describe('stable global variable migration', () => {
             },
           },
         ],
-        blueprint: { relations: [] },
+        blueprint: { nodes: [], edges: [] },
       }),
     ).toThrow('VARIABLE_MIGRATION_REFERENCE_UNKNOWN');
   });

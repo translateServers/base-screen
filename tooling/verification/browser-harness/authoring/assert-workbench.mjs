@@ -621,32 +621,24 @@ async function assertNativeEventsToggle(designer, page) {
       ],
       variables: [],
       blueprint: {
-        relations: [
+        nodes: [
+          { kind: 'component', id: 'component:probe-text', componentId: 'probe-text' },
+          { kind: 'component', id: 'component:probe-chart', componentId: 'probe-chart' },
+          { kind: 'host', id: 'host' },
+        ],
+        edges: [
           {
-            type: 'behavior',
+            kind: 'flow',
             id: 'probe-native-events-blueprint',
-            source: {
-              kind: 'component',
-              componentId: 'probe-text',
-              event: { type: 'material-event', eventName: 'valueClick' },
-            },
-            target: { kind: 'component', componentId: 'probe-chart' },
-            effect: { type: 'component-visibility', operation: 'toggle' },
+            from: { node: 'component:probe-text', port: 'event:valueClick' },
+            to: { node: 'component:probe-chart', port: 'toggle' },
           },
           {
-            type: 'behavior',
+            kind: 'flow',
             id: 'probe-native-events-blueprint-host',
-            source: {
-              kind: 'component',
-              componentId: 'probe-text',
-              event: { type: 'material-event', eventName: 'valueClick' },
-            },
-            target: { kind: 'host' },
-            effect: {
-              type: 'emit-host-event',
-              eventName: 'probe_blueprint_ran',
-              payload: { kind: 'literal', value: true },
-            },
+            from: { node: 'component:probe-text', port: 'event:valueClick' },
+            to: { node: 'host', port: 'event:probe_blueprint_ran' },
+            payload: { kind: 'literal', value: true },
           },
         ],
       },

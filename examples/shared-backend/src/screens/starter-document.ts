@@ -128,7 +128,7 @@ const STARTER_DOCUMENT = {
     },
   ],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 } as const;
 
 /**

@@ -39,7 +39,7 @@ const DOCUMENT: ScreenDocument = {
   canvas: { width: 1920, height: 1080, backgroundColor: '#0b1020' },
   components: [],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 
 /**

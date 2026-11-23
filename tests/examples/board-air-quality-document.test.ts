@@ -235,66 +235,46 @@ describe('air quality document', () => {
     const components = new Map(document.components.map((component) => [component.id, component]));
 
     expect([...variables.keys()]).toEqual(['city', 'hours']);
-    expect(document.blueprint.relations).toHaveLength(3);
+    const blueprint = document.blueprint;
+    expect(blueprint.edges).toHaveLength(3);
+    const nodes = new Map(blueprint.nodes.map((node) => [node.id, node]));
+    const edge = (id: string) => {
+      const found = blueprint.edges.find((candidate) => candidate.id === id);
+      if (found?.kind !== 'flow') throw new Error(`${id} must be a flow edge`);
+      const source = nodes.get(found.from.node);
+      const target = nodes.get(found.to.node);
+      if (source?.kind !== 'component' || target?.kind !== 'variable') {
+        throw new Error(`${id} must connect a component to a variable`);
+      }
+      return { edge: found, source, target };
+    };
 
-    const cityRelation = document.blueprint.relations.find(
-      (relation) => relation.id === 'rule-city',
-    );
-    const hours24Relation = document.blueprint.relations.find(
-      (relation) => relation.id === 'rule-window-24',
-    );
-    const hours48Relation = document.blueprint.relations.find(
-      (relation) => relation.id === 'rule-window-48',
-    );
-    if (cityRelation?.type !== 'behavior' || cityRelation.source.kind !== 'component') {
-      throw new Error('city relation must be a component behavior relation');
+    const city = edge('rule-city');
+    expect(city.source.componentId).toBe('city-board');
+    expect(city.edge.from.port).toBe('event:rowClick');
+    expect(city.edge.to.port).toBe('set');
+    expect(city.target.variableId).toBe('city');
+    const cityValue = city.edge.value;
+    if (cityValue?.kind !== 'event-payload') {
+      throw new Error('city edge must write a variable from the row payload');
     }
-    expect(cityRelation.source).toMatchObject({
-      kind: 'component',
-      componentId: 'city-board',
-      event: { type: 'material-event', eventName: 'rowClick' },
-    });
-    const cityEffect = cityRelation.effect;
-    if (cityEffect.type !== 'set-variable' || cityEffect.value.kind !== 'event-payload') {
-      throw new Error('city relation must write a variable from the row payload');
-    }
-    expect(cityRelation.target).toEqual({ kind: 'variable', variableId: 'city' });
-    expect(cityEffect.value.path).toEqual(['row', 'city']);
+    expect(cityValue.path).toEqual(['row', 'city']);
     // 榜单数据源必须真的返回 city 字段，且每个路径段都能通过同一标识符规则。
     expect(DATASET_FIELDS['custom.air-rank']?.some((field) => field.id === 'city')).toBe(true);
-    for (const segment of cityEffect.value.path) {
+    for (const segment of cityValue.path) {
       expect(COLUMN_ID_PATTERN.test(segment), `path segment ${segment}`).toBe(true);
     }
 
-    if (hours24Relation?.type !== 'behavior' || hours24Relation.source.kind !== 'component') {
-      throw new Error('24h relation must be a component behavior relation');
+    for (const [id, componentId, hours] of [
+      ['rule-window-24', 'window-24-text', 24],
+      ['rule-window-48', 'window-48-text', 48],
+    ] as const) {
+      const window = edge(id);
+      expect(window.source.componentId).toBe(componentId);
+      expect(window.edge.from.port).toBe('event:valueClick');
+      expect(window.target.variableId).toBe('hours');
+      expect(window.edge.value).toEqual({ kind: 'literal', value: hours });
     }
-    expect(hours24Relation.source).toMatchObject({
-      kind: 'component',
-      componentId: 'window-24-text',
-      event: { type: 'material-event', eventName: 'valueClick' },
-    });
-    const hours24Effect = hours24Relation.effect;
-    if (hours24Effect.type !== 'set-variable' || hours24Effect.value.kind !== 'literal') {
-      throw new Error('24h relation must write a literal variable value');
-    }
-    expect(hours24Relation.target).toEqual({ kind: 'variable', variableId: 'hours' });
-    expect(hours24Effect.value.value).toBe(24);
-
-    if (hours48Relation?.type !== 'behavior' || hours48Relation.source.kind !== 'component') {
-      throw new Error('48h relation must be a component behavior relation');
-    }
-    expect(hours48Relation.source).toMatchObject({
-      kind: 'component',
-      componentId: 'window-48-text',
-      event: { type: 'material-event', eventName: 'valueClick' },
-    });
-    const hours48Effect = hours48Relation.effect;
-    if (hours48Effect.type !== 'set-variable' || hours48Effect.value.kind !== 'literal') {
-      throw new Error('48h relation must write a literal variable value');
-    }
-    expect(hours48Relation.target).toEqual({ kind: 'variable', variableId: 'hours' });
-    expect(hours48Effect.value.value).toBe(48);
     expect(components.has('window-24-text')).toBe(true);
     expect(components.has('window-48-text')).toBe(true);
   });

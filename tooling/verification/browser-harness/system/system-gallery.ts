@@ -42,7 +42,7 @@ const EMPTY_DOCUMENT: ScreenDocument = {
   canvas: { width: 960, height: 540, backgroundColor: '#17212b' },
   components: [],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 
 /** 清单页自己的排版骨架。只做布局，不重画任何组件的外观；取值全部来自令牌。 */

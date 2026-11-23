@@ -241,7 +241,7 @@ async function assertCanvasContentClipping(page) {
         },
       ],
       variables: [],
-      blueprint: { relations: [] },
+      blueprint: { nodes: [], edges: [] },
     };
     probe.style.cssText =
       'position:fixed;inset:0;z-index:999;width:1400px;height:800px;background:#10151d;';

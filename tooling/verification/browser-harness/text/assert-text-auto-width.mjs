@@ -40,7 +40,7 @@ export async function assertTextAutoWidth(browser, baseUrl) {
             },
           ],
           variables: [],
-          blueprint: { relations: [] },
+          blueprint: { nodes: [], edges: [] },
         }).ok;
       }),
     ).toBe(true);

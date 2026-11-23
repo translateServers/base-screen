@@ -461,7 +461,7 @@ const document = (components) => ({
   canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
   components,
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 });
 const hostResource = (binding, includeBinding) => ({
   type: 'host-resource',
@@ -519,7 +519,7 @@ const document = {
   canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
   components: [],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 const command = applyScreenDocumentCommand(document, {
   type: 'update-canvas',
@@ -591,7 +591,7 @@ let document = {
   canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
   components: [],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 const controller = new ScreenProjectController({
   getDocument: () => document,

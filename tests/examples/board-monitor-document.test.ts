@@ -391,33 +391,35 @@ describe('production monitor document', () => {
       parsed.value.components.map((component) => [component.id, component]),
     );
     const variableIds = new Set(parsed.value.variables.map((variable) => variable.id));
-    const relations = parsed.value.blueprint.relations;
-    expect(relations.map((relation) => relation.id)).toEqual([
+    const blueprint = parsed.value.blueprint;
+    const nodes = new Map(blueprint.nodes.map((node) => [node.id, node]));
+    expect(blueprint.edges.map((edge) => edge.id)).toEqual([
       'rule-line',
       'rule-window',
       'rule-severity',
     ]);
 
-    for (const relation of relations) {
-      expect(relation.type).toBe('behavior');
-      if (relation.type !== 'behavior') continue;
-      expect(relation.source.kind).toBe('component');
-      if (relation.source.kind !== 'component') continue;
-      const component = componentById.get(relation.source.componentId);
-      expect(component, `${relation.id} → ${relation.source.componentId}`).toBeDefined();
+    for (const edge of blueprint.edges) {
+      expect(edge.kind).toBe('flow');
+      if (edge.kind !== 'flow') continue;
+      const source = nodes.get(edge.from.node);
+      expect(source?.kind).toBe('component');
+      if (source?.kind !== 'component') continue;
+      const component = componentById.get(source.componentId);
+      expect(component, `${edge.id} → ${source.componentId}`).toBeDefined();
       if (component === undefined) continue;
       const manifest = MANIFESTS.find((item) => item.type === component.type);
-      // eventName 必须是该物料真实声明的事件，否则关系永远不会触发。
-      expect(manifest?.events).toContain(relation.source.event.eventName);
-      expect(relation.target.kind).toBe('variable');
-      if (relation.target.kind !== 'variable') continue;
-      expect(variableIds.has(relation.target.variableId)).toBe(true);
-      expect(relation.effect.type).toBe('set-variable');
-      if (relation.effect.type !== 'set-variable') continue;
-      expect(relation.effect.value.kind).toBe('event-payload');
-      if (relation.effect.value.kind !== 'event-payload') continue;
+      // 事件锚点必须是该物料真实声明的事件，否则连线永远不会触发。
+      expect(manifest?.events).toContain(edge.from.port.slice('event:'.length));
+      const target = nodes.get(edge.to.node);
+      expect(target?.kind).toBe('variable');
+      if (target?.kind !== 'variable') continue;
+      expect(variableIds.has(target.variableId)).toBe(true);
+      expect(edge.to.port).toBe('set');
+      expect(edge.value?.kind).toBe('event-payload');
+      if (edge.value?.kind !== 'event-payload') continue;
       // 取值路径从物料事件 payload（`{ rowIndex, row }`）里取。
-      expect(relation.effect.value.path).toEqual(['row', expect.any(String)]);
+      expect(edge.value.path).toEqual(['row', expect.any(String)]);
     }
   });
 

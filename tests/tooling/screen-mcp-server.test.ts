@@ -131,7 +131,8 @@ describe('screen MCP provider', () => {
       components: 1,
       dataSources: 1,
       variables: 0,
-      blueprintRelations: 0,
+      blueprintNodes: 0,
+      blueprintEdges: 0,
     });
     expect(summary.value.data.components[0]).toMatchObject({
       id: 'title',
@@ -154,7 +155,7 @@ describe('screen MCP provider', () => {
         canvas: { width: 0, height: 1080, backgroundColor: '#000000' },
         components: [],
         variables: [],
-        blueprint: { relations: [] },
+        blueprint: { nodes: [], edges: [] },
       },
     });
     expect(draft.ok).toBe(false);
@@ -207,7 +208,7 @@ describe('screen MCP provider', () => {
           }),
         ],
         variables: [],
-        blueprint: { relations: [] },
+        blueprint: { nodes: [], edges: [] },
       },
     });
     expect(imported.ok).toBe(true);
@@ -261,7 +262,7 @@ describe('screen MCP provider', () => {
         canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
         components: [component({ position: { x: 1900, y: 0 }, size: { width: 200, height: 100 } })],
         variables: [],
-        blueprint: { relations: [] },
+        blueprint: { nodes: [], edges: [] },
       },
     });
     expect(audit.value.geometry.outsideCanvas).toEqual([
@@ -358,7 +359,7 @@ describe('screen MCP provider', () => {
         canvas: { width: 0, height: 1080, backgroundColor: '#000000' },
         components: [],
         variables: [],
-        blueprint: { relations: [] },
+        blueprint: { nodes: [], edges: [] },
       }),
     );
     await expect(createScreenProvider(file)).rejects.toThrow(/invalid/u);

@@ -937,50 +937,37 @@ export const BOARD_MONITOR_DOCUMENT = {
     },
   ],
   blueprint: {
-    // 三条关系形态完全一致：选择器表格 rowClick → set-variable。
+    // 三条连线形态完全一致：选择器表格 rowClick → 变量 set。
     // `event-payload` 的路径取自物料事件 payload：`{ rowIndex, row }`。
-    relations: [
+    nodes: [
+      { kind: 'component' as const, id: 'component:sel-line', componentId: 'sel-line' },
+      { kind: 'component' as const, id: 'component:sel-window', componentId: 'sel-window' },
+      { kind: 'component' as const, id: 'component:sel-severity', componentId: 'sel-severity' },
+      { kind: 'variable' as const, id: 'variable:line', variableId: 'line' },
+      { kind: 'variable' as const, id: 'variable:window', variableId: 'window' },
+      { kind: 'variable' as const, id: 'variable:severity', variableId: 'severity' },
+    ],
+    edges: [
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'rule-line',
-        source: {
-          kind: 'component' as const,
-          componentId: 'sel-line',
-          event: { type: 'material-event' as const, eventName: 'rowClick' },
-        },
-        target: { kind: 'variable' as const, variableId: 'line' },
-        effect: {
-          type: 'set-variable' as const,
-          value: { kind: 'event-payload' as const, path: ['row', 'line'] },
-        },
+        from: { node: 'component:sel-line', port: 'event:rowClick' },
+        to: { node: 'variable:line', port: 'set' },
+        value: { kind: 'event-payload' as const, path: ['row', 'line'] },
       },
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'rule-window',
-        source: {
-          kind: 'component' as const,
-          componentId: 'sel-window',
-          event: { type: 'material-event' as const, eventName: 'rowClick' },
-        },
-        target: { kind: 'variable' as const, variableId: 'window' },
-        effect: {
-          type: 'set-variable' as const,
-          value: { kind: 'event-payload' as const, path: ['row', 'window'] },
-        },
+        from: { node: 'component:sel-window', port: 'event:rowClick' },
+        to: { node: 'variable:window', port: 'set' },
+        value: { kind: 'event-payload' as const, path: ['row', 'window'] },
       },
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'rule-severity',
-        source: {
-          kind: 'component' as const,
-          componentId: 'sel-severity',
-          event: { type: 'material-event' as const, eventName: 'rowClick' },
-        },
-        target: { kind: 'variable' as const, variableId: 'severity' },
-        effect: {
-          type: 'set-variable' as const,
-          value: { kind: 'event-payload' as const, path: ['row', 'level'] },
-        },
+        from: { node: 'component:sel-severity', port: 'event:rowClick' },
+        to: { node: 'variable:severity', port: 'set' },
+        value: { kind: 'event-payload' as const, path: ['row', 'level'] },
       },
     ],
   },

@@ -890,42 +890,46 @@ export async function assertVariableListThemeQuality(page) {
 }
 
 // ---- 源模块：assert-variable-blueprint-source.mjs ----
+// 节点图（ADR-0107）：在演示图表的 seriesClick 锚点上连一条「写入 region」的连线，
+// 经检查器把写入值改成事件字段 seriesName，再在画布模式触发事件，确认运行时写入只
+// 改变量运行值、不回写文档。
 export async function assertVariableBlueprintSource(designer, page) {
   const prepared = await page.evaluate(() => {
     const { designer } = window.baseScreenHarness;
     const original = structuredClone(designer.document.blueprint);
-    const sourceRelation = designer.document.blueprint.relations.find(
-      (relation) =>
-        relation.type === 'behavior' &&
-        relation.source.kind === 'component' &&
-        relation.source.componentId === 'semantic-chart-demo' &&
-        relation.source.event.eventName === 'seriesClick',
-    );
-    if (sourceRelation === undefined) return { ok: false };
-    const relationId = 'variable-source-demo';
-    const relation = {
-      type: 'behavior',
-      id: relationId,
-      source: structuredClone(sourceRelation.source),
-      target: { kind: 'variable', variableId: 'region' },
-      effect: {
-        type: 'set-variable',
-        value: { kind: 'literal', value: 'north' },
-      },
+    const blueprint = designer.document.blueprint;
+    const chartNode =
+      blueprint.nodes.find(
+        (node) => node.kind === 'component' && node.componentId === 'semantic-chart-demo',
+      ) ?? null;
+    const variableNode =
+      blueprint.nodes.find((node) => node.kind === 'variable' && node.variableId === 'region') ??
+      null;
+    const nodes = [...blueprint.nodes];
+    const chartId = chartNode?.id ?? 'component:semantic-chart-demo';
+    const variableId = variableNode?.id ?? 'variable:region';
+    if (chartNode === null) {
+      nodes.push({ kind: 'component', id: chartId, componentId: 'semantic-chart-demo' });
+    }
+    if (variableNode === null)
+      nodes.push({ kind: 'variable', id: variableId, variableId: 'region' });
+    const edgeId = 'variable-source-demo';
+    const edge = {
+      kind: 'flow',
+      id: edgeId,
+      from: { node: chartId, port: 'event:seriesClick' },
+      to: { node: variableId, port: 'set' },
+      value: { kind: 'literal', value: 'north' },
     };
     const result = designer.executeCommand({
       type: 'replace-blueprint',
       blueprint: {
-        ...designer.document.blueprint,
-        relations: [
-          ...designer.document.blueprint.relations.filter(
-            (candidate) => candidate.id !== relationId,
-          ),
-          relation,
-        ],
+        ...blueprint,
+        nodes,
+        edges: [...blueprint.edges.filter((candidate) => candidate.id !== edgeId), edge],
       },
     });
-    return { ok: result.ok, original, relationId };
+    return { ok: result.ok, original, edgeId };
   });
   if (!prepared.ok) throw new Error('BROWSER_HARNESS_VARIABLE_BLUEPRINT_PREPARE_FAILED');
 
@@ -934,18 +938,18 @@ export async function assertVariableBlueprintSource(designer, page) {
     () => window.baseScreenHarness.blueprintCanvasState()?.active === true,
   );
   const selected = await page.evaluate(
-    ({ relationId }) =>
+    ({ edgeId }) =>
       window.baseScreenHarness.sendBlueprintCanvasCommand({
         type: 'select',
-        selection: { kind: 'edge', id: `relation:${relationId}` },
+        selection: { nodes: [], edges: [edgeId] },
       }),
     prepared,
   );
   if (!selected) throw new Error('BROWSER_HARNESS_VARIABLE_BLUEPRINT_SELECT_FAILED');
   try {
     await page.waitForFunction(
-      ({ relationId }) =>
-        window.baseScreenHarness.blueprintCanvasState()?.selection?.id === `relation:${relationId}`,
+      ({ edgeId }) =>
+        window.baseScreenHarness.blueprintCanvasState()?.selection?.edges?.[0] === edgeId,
       prepared,
       { timeout: 5_000 },
     );
@@ -960,8 +964,9 @@ export async function assertVariableBlueprintSource(designer, page) {
     });
     throw new Error(`BROWSER_HARNESS_VARIABLE_BLUEPRINT_SELECTION_FAILED:${JSON.stringify(state)}`);
   }
-  const source = designer.locator('[data-blueprint-action-value-source]').first();
-  await source.waitFor();
+  const sourceSelector = '[data-blueprint-expression="value"] [data-expression-part="source"]';
+  const source = designer.locator(sourceSelector).first();
+  await source.waitFor({ state: 'attached' });
   const sourceControl = await source.evaluate((element) => ({
     tagName: element.tagName,
     labels: [...element.options].map((option) => option.textContent),
@@ -972,21 +977,21 @@ export async function assertVariableBlueprintSource(designer, page) {
     );
   }
   // 检查器里的原生 select 在渲染后会被增强成自绘下拉；交互走可见触发器。
-  const sourceField = designer.locator(
-    '.designer-select-control:has([data-blueprint-action-value-source])',
-  );
+  const sourceField = designer.locator(`.designer-select-control:has(${sourceSelector})`);
   await sourceField.locator('.designer-select-trigger').click();
   await sourceField.locator('.designer-select-option[data-value="event-field"]').click();
-  const eventField = designer.locator('[data-blueprint-action-event-path]').first();
+  const eventField = designer
+    .locator('[data-blueprint-expression="value"] [data-expression-part="field"]')
+    .first();
   await eventField.waitFor();
   await eventField.fill('seriesName');
   await eventField.press('Enter');
   await eventField.blur();
-  await page.waitForFunction(({ relationId }) => {
-    const relation = window.baseScreenHarness.designer.document.blueprint.relations.find(
-      (candidate) => candidate.id === relationId,
+  await page.waitForFunction(({ edgeId }) => {
+    const edge = window.baseScreenHarness.designer.document.blueprint.edges.find(
+      (candidate) => candidate.id === edgeId,
     );
-    const value = relation?.type === 'behavior' ? relation.effect.value : undefined;
+    const value = edge?.kind === 'flow' ? edge.value : undefined;
     return value?.kind === 'event-payload' && value.path.join('.') === 'seriesName';
   }, prepared);
 
