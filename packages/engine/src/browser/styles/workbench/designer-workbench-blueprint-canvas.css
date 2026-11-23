@@ -22,6 +22,13 @@
   display: none;
 }
 
+/* 自带 display 的浮层（空态提示、模拟条）选择器同为两级，样式文件又排在后面，
+   上面那条会被它们的 display 盖掉：这里多一级专门把 hidden 收回来。 */
+.designer-blueprint-canvas .bp-empty[hidden],
+.designer-blueprint-canvas .bp-simulation[hidden] {
+  display: none;
+}
+
 .designer-blueprint-canvas .bp-toolbar {
   position: relative;
   z-index: var(--designer-z-workspace-overlay);
