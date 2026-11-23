@@ -54,7 +54,8 @@ export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
       propsSchema: { kind: 'object', properties: { autoWidth: { kind: 'boolean' } }, required: [] },
       propertyPanel: [],
       events: ['valueClick'],
-      dataCapabilities: ['static', 'dataset', 'variable'],
+      // 读数文本可直接读宿主资源（推送 / 拉取指标）；不开放宿主资源选择入口，选择入口仍只给图片。
+      dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
       dataBinding: {
         roles: [
           {

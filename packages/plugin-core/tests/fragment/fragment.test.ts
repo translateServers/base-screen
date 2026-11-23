@@ -256,35 +256,43 @@ describe('fragment data sources, value references and relations (ADR-0100 phase 
     expect(malformed.diagnostics[0]?.path.slice(0, 3)).toEqual(['dataSources', 0, 'source']);
   });
 
-  it('accepts relations between fragment entries and rejects outside endpoints or variables', () => {
-    const relation = {
-      type: 'behavior',
-      id: 'reveal',
-      source: {
-        kind: 'component',
-        componentId: 'title',
-        event: { type: 'material-event', eventName: 'valueClick' },
-      },
-      target: { kind: 'component', componentId: 'value' },
-      effect: { type: 'component-visibility', operation: 'toggle' },
-    };
-    expect(intent({ relations: [relation] }).ok).toBe(true);
-    const outside = intent({
-      relations: [{ ...relation, target: { kind: 'component', componentId: 'elsewhere' } }],
-    });
-    expect(outside.diagnostics[0]?.path).toEqual(['relations', 0, 'target', 'componentId']);
-    const variable = intent({
-      relations: [
+  it('accepts a blueprint between fragment entries and rejects outside endpoints or variables', () => {
+    const blueprint = {
+      nodes: [
+        { kind: 'component', id: 'title-node', componentId: 'title' },
+        { kind: 'component', id: 'value-node', componentId: 'value' },
+      ],
+      edges: [
         {
-          ...relation,
-          target: { kind: 'variable', variableId: 'region' },
-          effect: { type: 'request-variable' },
+          kind: 'flow',
+          id: 'reveal',
+          from: { node: 'title-node', port: 'event:valueClick' },
+          to: { node: 'value-node', port: 'toggle' },
         },
       ],
+    };
+    expect(intent({ blueprint }).ok).toBe(true);
+    const outside = intent({
+      blueprint: {
+        ...blueprint,
+        nodes: [
+          blueprint.nodes[0],
+          { kind: 'component', id: 'value-node', componentId: 'elsewhere' },
+        ],
+      },
     });
-    expect(variable.diagnostics[0]?.path).toEqual(['relations', 0, 'target']);
-    const duplicated = intent({ relations: [relation, relation] });
-    expect(duplicated.diagnostics[0]?.path).toEqual(['relations', 1, 'id']);
+    expect(outside.diagnostics[0]?.path).toEqual(['blueprint', 'nodes', 1, 'componentId']);
+    const variable = intent({
+      blueprint: {
+        nodes: [...blueprint.nodes, { kind: 'variable', id: 'region-node', variableId: 'region' }],
+        edges: blueprint.edges,
+      },
+    });
+    expect(variable.diagnostics[0]?.path).toEqual(['blueprint', 'nodes', 2, 'kind']);
+    const duplicated = intent({
+      blueprint: { ...blueprint, edges: [...blueprint.edges, blueprint.edges[0]] },
+    });
+    expect(duplicated.diagnostics[0]?.path).toEqual(['blueprint', 'edges', 1, 'id']);
   });
 
   it('accepts a bounded rotation on entries', () => {

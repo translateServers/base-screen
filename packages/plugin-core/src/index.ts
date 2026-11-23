@@ -123,6 +123,7 @@ export type {
   BaseScreenMaterialEventDescriptor,
 } from './editor/editor-descriptor.js';
 export {
+  inferBaseScreenMaterialEditorControl,
   MAX_EDITOR_CONDITION_VALUES,
   MAX_EDITOR_CONDITIONS,
   MAX_EDITOR_EVENTS,
@@ -132,18 +133,17 @@ export {
   MAX_EDITOR_ITEM_PATH_DEPTH,
   MAX_EDITOR_PATH_DEPTH,
   MAX_EDITOR_SECTIONS_PER_ZONE,
-  inferBaseScreenMaterialEditorControl,
   parseBaseScreenMaterialEditorDescriptor,
   resolveSchema,
 } from './editor/editor-descriptor.js';
 export {
   type BaseScreenComponentFragmentInsertionIntent,
+  type BaseScreenFragmentBlueprint,
   type BaseScreenFragmentBody,
   type BaseScreenFragmentDataSource,
   type BaseScreenFragmentDefinition,
   type BaseScreenFragmentEntry,
   type BaseScreenFragmentNode,
-  type BaseScreenFragmentRelation,
   type BaseScreenFragmentShell,
   isBaseScreenBoundedName,
   parseBaseScreenComponentFragmentInsertionIntent,

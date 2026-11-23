@@ -1,12 +1,13 @@
 import {
   isBoundedScreenImageUrl,
   isScreenMaterialType,
-  parseScreenBlueprintRelation,
+  parseScreenBlueprintGraph,
   parseScreenDataBinding,
   parseScreenDataSource,
   parseScreenDataSourceInstance,
   parseScreenValueRef,
-  type ScreenBlueprintRelation,
+  type ScreenBlueprintEdge,
+  type ScreenBlueprintNode,
   type ScreenBlueprintValueExpression,
   type ScreenComponentDataSource,
   type ScreenDataBinding,
@@ -35,7 +36,7 @@ import { isDisplayString, isFiniteNumber } from '../material/material-validation
 
 type DiagnosticPath = ScreenDiagnostic['path'];
 
-const BODY_FIELDS = ['shell', 'nodes', 'dataSources', 'relations'] as const;
+const BODY_FIELDS = ['shell', 'nodes', 'dataSources', 'blueprint'] as const;
 const INTENT_FIELDS = new Set(['anchor', ...BODY_FIELDS]);
 const DEFINITION_FIELDS = new Set(['id', 'name', 'category', 'keywords', 'cover', ...BODY_FIELDS]);
 const SHELL_FIELDS = new Set([
@@ -57,9 +58,11 @@ const DATA_SOURCE_FIELDS = new Set([
   'updatePolicy',
   'processorId',
 ]);
-/** 分片自带的文档级数据源与蓝图关系上限：分片是一张卡片级的组合，不是页面模板（F6）。 */
+/** 分片自带的文档级数据源与蓝图节点 / 连线上限：分片是一张卡片级的组合，不是页面模板（F6）。 */
 const MAX_FRAGMENT_DATA_SOURCES = 16;
-const MAX_FRAGMENT_RELATIONS = 32;
+const MAX_FRAGMENT_BLUEPRINT_NODES = 32;
+const MAX_FRAGMENT_BLUEPRINT_EDGES = 32;
+const FRAGMENT_BLUEPRINT_FIELDS = new Set(['nodes', 'edges']);
 const POSITION_FIELDS = new Set(['x', 'y']);
 const SIZE_FIELDS = new Set(['width', 'height']);
 const FRAGMENT_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
@@ -82,7 +85,7 @@ export interface BaseScreenComponentFragmentInsertionIntent {
   /** 1 至 64 个节点；被引用为父级的节点必须先于子节点声明。 */
   readonly nodes: readonly BaseScreenFragmentNode[];
   readonly dataSources?: readonly BaseScreenFragmentDataSource[];
-  readonly relations?: readonly BaseScreenFragmentRelation[];
+  readonly blueprint?: BaseScreenFragmentBlueprint;
 }
 
 /** 分片条目共有的键、物料与几何/外观覆盖。 */
@@ -128,10 +131,14 @@ export interface BaseScreenFragmentDataSource extends Omit<ScreenDataSource, 'id
 }
 
 /**
- * 分片内蓝图关系（ADR-0100 F5）：形状即文档的 `ScreenBlueprintRelation`，`id` 是分片内 key，
- * 组件端点写外壳 / 节点的 `key`；插入时一并重映射。不得引用变量，端点必须落在分片之内。
+ * 分片内蓝图节点图（ADR-0100 F5、ADR-0107）：形状即文档 `blueprint` 的 `nodes` / `edges`，
+ * 节点与连线 id 是分片内 key，组件节点的 `componentId` 写外壳 / 节点的 `key`；插入时一并重映射，
+ * 宿主与实例就绪节点并入文档已有的单例。分片不携带变量：不得有变量节点，表达式不得引用变量。
  */
-export type BaseScreenFragmentRelation = ScreenBlueprintRelation;
+export interface BaseScreenFragmentBlueprint {
+  readonly nodes: readonly ScreenBlueprintNode[];
+  readonly edges: readonly ScreenBlueprintEdge[];
+}
 
 /**
  * 可复用的分片定义：物料库条目的展示信息 + 与插入意图同构的组合（不含落点）。
@@ -148,7 +155,7 @@ export interface BaseScreenFragmentDefinition {
   readonly shell?: BaseScreenFragmentShell;
   readonly nodes: readonly BaseScreenFragmentNode[];
   readonly dataSources?: readonly BaseScreenFragmentDataSource[];
-  readonly relations?: readonly BaseScreenFragmentRelation[];
+  readonly blueprint?: BaseScreenFragmentBlueprint;
 }
 
 /** 分片的组合部分：插入意图与分片定义共用，「将选区存为分片」产出的也是它。 */
@@ -156,7 +163,7 @@ export interface BaseScreenFragmentBody {
   readonly shell?: BaseScreenFragmentShell;
   readonly nodes: readonly BaseScreenFragmentNode[];
   readonly dataSources?: readonly BaseScreenFragmentDataSource[];
-  readonly relations?: readonly BaseScreenFragmentRelation[];
+  readonly blueprint?: BaseScreenFragmentBlueprint;
 }
 
 /**
@@ -306,7 +313,7 @@ function parseFragmentBody(
     }
     nodes.push({ ...parsed.value, ...data.value });
   }
-  const relations = parseFragmentRelations(input.relations, keys, diagnostics);
+  const blueprint = parseFragmentBlueprint(input.blueprint, keys, diagnostics);
   if (diagnostics.length > 0) return { ok: false, diagnostics };
   return {
     ok: true,
@@ -314,7 +321,7 @@ function parseFragmentBody(
       ...(shell === undefined ? {} : { shell }),
       nodes,
       ...(dataSources === undefined ? {} : { dataSources }),
-      ...(relations === undefined ? {} : { relations }),
+      ...(blueprint === undefined ? {} : { blueprint }),
     },
     diagnostics: [],
   };
@@ -453,92 +460,90 @@ function parseFragmentDataSources(
   return sources;
 }
 
-function parseFragmentRelations(
+function parseFragmentBlueprint(
   input: unknown,
   entryKeys: ReadonlySet<string>,
   diagnostics: ScreenDiagnostic[],
-): readonly BaseScreenFragmentRelation[] | undefined {
+): BaseScreenFragmentBlueprint | undefined {
   if (input === undefined) return undefined;
-  if (!Array.isArray(input)) {
-    diagnostics.push(...payloadFailure('Fragment relations must be an array.', ['relations']));
+  if (!isRecord(input)) {
+    diagnostics.push(...payloadFailure('Fragment blueprint must be an object.', ['blueprint']));
     return undefined;
   }
-  if (input.length > MAX_FRAGMENT_RELATIONS) {
+  for (const key of Object.keys(input)) {
+    if (!FRAGMENT_BLUEPRINT_FIELDS.has(key)) {
+      diagnostics.push(
+        ...payloadFailure(`Unknown fragment blueprint field "${key}".`, ['blueprint', key]),
+      );
+      return undefined;
+    }
+  }
+  const nodeCount = Array.isArray(input.nodes) ? input.nodes.length : 0;
+  const edgeCount = Array.isArray(input.edges) ? input.edges.length : 0;
+  if (nodeCount > MAX_FRAGMENT_BLUEPRINT_NODES || edgeCount > MAX_FRAGMENT_BLUEPRINT_EDGES) {
     diagnostics.push(
       ...failure<never>(
         'AUTHORING_LIMIT_EXCEEDED',
-        `Fragment must declare at most ${MAX_FRAGMENT_RELATIONS} relations.`,
-        ['relations'],
+        `Fragment blueprint must declare at most ${MAX_FRAGMENT_BLUEPRINT_NODES} nodes and ${MAX_FRAGMENT_BLUEPRINT_EDGES} edges.`,
+        ['blueprint'],
       ).diagnostics,
     );
     return undefined;
   }
-  const ids = new Set<string>();
-  const relations: BaseScreenFragmentRelation[] = [];
-  for (const [index, candidate] of input.entries()) {
-    const path: DiagnosticPath = ['relations', index];
-    const parsed = parseScreenBlueprintRelation(candidate);
-    if (!parsed.ok) {
-      diagnostics.push(...repathFailure<never>(parsed.diagnostics, path).diagnostics);
-      continue;
+  const parsed = parseScreenBlueprintGraph(input);
+  if (!parsed.ok) {
+    diagnostics.push(...repathFailure<never>(parsed.diagnostics, ['blueprint']).diagnostics);
+    return undefined;
+  }
+  const graph = parsed.value;
+  let clean = true;
+  graph.nodes.forEach((node, index) => {
+    const path: DiagnosticPath = ['blueprint', 'nodes', index];
+    if (node.kind === 'variable') {
+      diagnostics.push(
+        ...payloadFailure('Fragment blueprint must not contain variable nodes.', [...path, 'kind']),
+      );
+      clean = false;
+    } else if (node.kind === 'component' && !entryKeys.has(node.componentId)) {
+      diagnostics.push(
+        ...payloadFailure('Fragment blueprint node must reference a fragment entry key.', [
+          ...path,
+          'componentId',
+        ]),
+      );
+      clean = false;
+    } else if (
+      node.kind === 'condition' &&
+      (referencesVariable(node.condition.left) ||
+        (node.condition.right !== undefined && referencesVariable(node.condition.right)))
+    ) {
+      diagnostics.push(
+        ...payloadFailure('Fragment blueprint must not reference variables.', [
+          ...path,
+          'condition',
+        ]),
+      );
+      clean = false;
     }
-    const relation = parsed.value;
-    if (ids.has(relation.id)) {
-      diagnostics.push(...payloadFailure('Fragment relation id must be unique.', [...path, 'id']));
-      continue;
+  });
+  graph.edges.forEach((edge, index) => {
+    if (edge.kind !== 'flow') return;
+    for (const field of ['value', 'payload'] as const) {
+      const expression = edge[field];
+      if (expression !== undefined && referencesVariable(expression)) {
+        diagnostics.push(
+          ...payloadFailure('Fragment blueprint must not reference variables.', [
+            'blueprint',
+            'edges',
+            index,
+            field,
+          ]),
+        );
+        clean = false;
+      }
     }
-    ids.add(relation.id);
-    const problem = checkRelationEndpoints(relation, entryKeys, path);
-    if (problem !== undefined) {
-      diagnostics.push(problem);
-      continue;
-    }
-    relations.push(relation);
-  }
-  return relations;
-}
-
-/** 分片内关系只连接分片自己的节点，且不涉及变量（分片不携带变量）。 */
-function checkRelationEndpoints(
-  relation: ScreenBlueprintRelation,
-  entryKeys: ReadonlySet<string>,
-  path: DiagnosticPath,
-): ScreenDiagnostic | undefined {
-  const outside = (key: string, at: DiagnosticPath) =>
-    entryKeys.has(key)
-      ? undefined
-      : payloadFailure('Fragment relation must reference a fragment entry key.', at)[0];
-  const variable = (at: DiagnosticPath) =>
-    payloadFailure('Fragment relations must not reference variables.', at)[0];
-  if (relation.type === 'semantic') {
-    return (
-      outside(relation.source.componentId, [...path, 'source', 'componentId']) ??
-      outside(relation.target.componentId, [...path, 'target', 'componentId'])
-    );
-  }
-  if (relation.source.kind === 'variable') return variable([...path, 'source']);
-  if (relation.source.kind === 'component') {
-    const problem = outside(relation.source.componentId, [...path, 'source', 'componentId']);
-    if (problem !== undefined) return problem;
-  }
-  if (relation.target.kind === 'variable') return variable([...path, 'target']);
-  if (relation.target.kind === 'component') {
-    const problem = outside(relation.target.componentId, [...path, 'target', 'componentId']);
-    if (problem !== undefined) return problem;
-  }
-  const expressions: [ScreenBlueprintValueExpression | undefined, DiagnosticPath][] = [
-    [relation.condition?.left, [...path, 'condition', 'left']],
-    [relation.condition?.right, [...path, 'condition', 'right']],
-    ['value' in relation.effect ? relation.effect.value : undefined, [...path, 'effect', 'value']],
-    [
-      'payload' in relation.effect ? relation.effect.payload : undefined,
-      [...path, 'effect', 'payload'],
-    ],
-  ];
-  for (const [expression, at] of expressions) {
-    if (expression !== undefined && referencesVariable(expression)) return variable(at);
-  }
-  return undefined;
+  });
+  return clean ? { nodes: graph.nodes, edges: graph.edges } : undefined;
 }
 
 function referencesVariable(expression: ScreenBlueprintValueExpression): boolean {
