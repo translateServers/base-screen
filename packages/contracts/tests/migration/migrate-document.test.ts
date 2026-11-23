@@ -32,7 +32,7 @@ function document(overrides: Record<string, unknown> = {}): Record<string, unkno
     canvas,
     components: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
     ...overrides,
   };
 }

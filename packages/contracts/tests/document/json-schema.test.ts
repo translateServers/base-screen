@@ -41,6 +41,8 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
     expect(Object.keys(propertiesOf(schema))).toEqual([
       'canvas',
       'components',
+      'subCanvases',
+      'startCanvasId',
       'dataSources',
       'variables',
       'blueprint',
@@ -147,12 +149,12 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
 
   it('expresses Blueprint condition and expression limits', () => {
     const blueprint = propertiesOf(schema).blueprint as Record<string, unknown>;
-    const relations = propertiesOf(blueprint).relations as { items: { oneOf: unknown[] } };
-    const behavior = relations.items.oneOf.find(
+    const nodes = propertiesOf(blueprint).nodes as { items: { oneOf: unknown[] } };
+    const conditionNode = nodes.items.oneOf.find(
       (branch) =>
-        (propertiesOf(branch).type as { const?: string } | undefined)?.const === 'behavior',
+        (propertiesOf(branch).kind as { const?: string } | undefined)?.const === 'condition',
     ) as Record<string, unknown>;
-    const condition = propertiesOf(behavior).condition as { allOf: unknown[] };
+    const condition = propertiesOf(conditionNode).condition as { allOf: unknown[] };
     expect(condition.allOf).toEqual([
       {
         if: { properties: { operator: { const: 'exists' } }, required: ['operator'] },

@@ -70,8 +70,8 @@ export function generateScreenDocumentJsonSchema(): ScreenJsonObject {
   ];
   const retain = getObject(getObject(updatePolicy.properties).retain);
   retain.dependentRequired = { seconds: ['timeField'], timeField: ['seconds'] };
-  const behaviorRelation = findObjectWithTypeConst(generated, 'behavior');
-  const condition = getObject(getObject(behaviorRelation.properties).condition);
+  const conditionNode = findObjectWithConst(generated, 'kind', 'condition');
+  const condition = getObject(getObject(conditionNode.properties).condition);
   condition.allOf = [
     {
       if: { properties: { operator: { const: 'exists' } }, required: ['operator'] },
@@ -111,45 +111,51 @@ function isExpressionSchema(value: unknown): boolean {
   });
 }
 
-function findObjectWithTypeConst(root: unknown, constant: string): Record<string, unknown> {
-  const found = searchObjectWithTypeConst(root, constant);
+function findObjectWithConst(
+  root: unknown,
+  field: string,
+  constant: string,
+): Record<string, unknown> {
+  const found = searchObjectWithConst(root, field, constant);
   if (found === undefined) {
-    throw new Error(`Schema branch with type "${constant}" is missing.`);
+    throw new Error(`Schema branch with ${field} "${constant}" is missing.`);
   }
   return found;
 }
 
-function searchObjectWithTypeConst(
+function searchObjectWithConst(
   value: unknown,
+  field: string,
   constant: string,
 ): Record<string, unknown> | undefined {
   if (value === null || typeof value !== 'object') return undefined;
   if (Array.isArray(value)) {
     for (const item of value) {
-      const found = searchObjectWithTypeConst(item, constant);
+      const found = searchObjectWithConst(item, field, constant);
       if (found !== undefined) return found;
     }
     return undefined;
   }
-  const direct = tryFindObjectWithTypeConst(value, constant);
+  const direct = tryFindObjectWithConst(value, field, constant);
   if (direct !== undefined) return direct;
   for (const child of Object.values(value)) {
-    const found = searchObjectWithTypeConst(child, constant);
+    const found = searchObjectWithConst(child, field, constant);
     if (found !== undefined) return found;
   }
   return undefined;
 }
 
-function tryFindObjectWithTypeConst(
+function tryFindObjectWithConst(
   value: unknown,
+  field: string,
   constant: string,
 ): Record<string, unknown> | undefined {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const properties = (value as { properties?: unknown }).properties;
   if (properties === null || typeof properties !== 'object') return undefined;
-  const type = (properties as { type?: unknown }).type;
-  if (type === null || typeof type !== 'object') return undefined;
-  return (type as { const?: unknown }).const === constant
+  const discriminator = (properties as Record<string, unknown>)[field];
+  if (discriminator === null || typeof discriminator !== 'object') return undefined;
+  return (discriminator as { const?: unknown }).const === constant
     ? (value as Record<string, unknown>)
     : undefined;
 }

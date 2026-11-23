@@ -74,7 +74,7 @@ export function parseScreenDataSource(
       },
     ],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   });
   if (!parsed.ok) {
     return {

@@ -138,17 +138,17 @@ describe('parseScreenDocument', () => {
       ],
       variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
       blueprint: {
-        relations: [
+        nodes: [
+          { kind: 'component', id: 'button-node', componentId: 'button' },
+          { kind: 'variable', id: 'count-node', variableId: 'count' },
+        ],
+        edges: [
           {
-            type: 'behavior',
+            kind: 'flow',
             id: 'refresh',
-            source: {
-              kind: 'component',
-              componentId: 'button',
-              event: { type: 'material-event', eventName: 'valueClick' },
-            },
-            target: { kind: 'variable', variableId: 'count' },
-            effect: { type: 'set-variable', value: { kind: 'literal', value: 1 } },
+            from: { node: 'button-node', port: 'event:valueClick' },
+            to: { node: 'count-node', port: 'set' },
+            value: { kind: 'literal', value: 1 },
           },
         ],
       },
@@ -158,23 +158,8 @@ describe('parseScreenDocument', () => {
       parse(
         document({
           blueprint: {
-            relations: [
-              {
-                type: 'behavior',
-                id: 'bad',
-                source: {
-                  kind: 'component',
-                  componentId: 'missing',
-                  event: { type: 'material-event', eventName: 'click' },
-                },
-                target: { kind: 'host' },
-                effect: {
-                  type: 'emit-host-event',
-                  eventName: 'notify',
-                  payload: { kind: 'literal', value: null },
-                },
-              },
-            ],
+            nodes: [{ kind: 'component', id: 'missing-node', componentId: 'missing' }],
+            edges: [],
           },
         }),
       ).ok,

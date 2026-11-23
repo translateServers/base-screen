@@ -37,6 +37,8 @@ const COMPONENT_FIELDS = new Set([
   'dataSource',
   'dataValue',
   'dataBinding',
+  'canvasId',
+  'belowSubCanvas',
 ]);
 /** 组件位上经手工校验的字段：zod 只负责其余字段，避免同一字段两套口径。 */
 const MANUALLY_VALIDATED_COMPONENT_FIELDS = new Set(['dataValue', 'dataBinding']);

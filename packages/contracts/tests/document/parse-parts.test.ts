@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  parseScreenBlueprintRelation,
+  parseScreenBlueprintGraph,
   parseScreenDataBinding,
   parseScreenDataSourceInstance,
   parseScreenValueRef,
@@ -49,16 +49,21 @@ describe('standalone document part parsers', () => {
     expect(invalid.diagnostics[0]?.path[0]).toBe('source');
   });
 
-  it('parses a single blueprint relation', () => {
-    const parsed = parseScreenBlueprintRelation({
-      type: 'semantic',
-      id: 'detail',
-      source: { kind: 'component', componentId: 'a' },
-      target: { kind: 'component', componentId: 'b' },
-      role: 'detail',
+  it('parses a standalone blueprint graph', () => {
+    const parsed = parseScreenBlueprintGraph({
+      nodes: [
+        { kind: 'component', id: 'a', componentId: 'card-a' },
+        { kind: 'component', id: 'b', componentId: 'card-b' },
+      ],
+      edges: [
+        { kind: 'semantic', id: 'detail', from: { node: 'a' }, to: { node: 'b' }, role: 'detail' },
+      ],
     });
     expect(parsed.ok).toBe(true);
-    const invalid = parseScreenBlueprintRelation({ type: 'semantic', id: 'detail' });
+    const invalid = parseScreenBlueprintGraph({
+      nodes: [],
+      edges: [{ kind: 'semantic', id: 'detail' }],
+    });
     expect(invalid.ok).toBe(false);
     expect(invalid.diagnostics.every((item) => item.path[0] !== 'blueprint')).toBe(true);
   });

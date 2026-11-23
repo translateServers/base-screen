@@ -32,7 +32,7 @@ function document(overrides: Record<string, unknown> = {}): Record<string, unkno
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
     ...overrides,
   };
 }
@@ -126,96 +126,63 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
     }
   });
 
-  it('rejects duplicate blueprint relation ids', () => {
-    const relation = {
-      type: 'behavior',
+  it('rejects duplicate blueprint edge ids', () => {
+    const edge = {
+      kind: 'flow',
       id: 'on-click',
-      source: {
-        kind: 'component',
-        componentId: 'card-a',
-        event: { type: 'material-event', eventName: 'click' },
-      },
-      target: { kind: 'component', componentId: 'card-a' },
-      effect: { type: 'request-component-data' },
+      from: { node: 'a', port: 'event:click' },
+      to: { node: 'b', port: 'request-data' },
     };
     const result = parseScreenDocument(
       document({
-        components: [component({ id: 'card-a' })],
-        blueprint: { relations: [relation, { ...relation }] },
+        components: [component({ id: 'card-a' }), component({ id: 'card-b' })],
+        blueprint: {
+          nodes: [
+            { kind: 'component', id: 'a', componentId: 'card-a' },
+            { kind: 'component', id: 'b', componentId: 'card-b' },
+          ],
+          edges: [edge, { ...edge, to: { node: 'b', port: 'show' } }],
+        },
       }),
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.diagnostics[0]?.code).toBe('DOCUMENT_FIELD_INVALID');
-      expect(result.diagnostics[0]?.path).toEqual(['blueprint', 'relations', 1, 'id']);
+      expect(result.diagnostics[0]?.path).toEqual(['blueprint', 'edges', 1, 'id']);
     }
   });
 
-  it('rejects a material-event source referencing an unknown component', () => {
+  it('rejects a component node referencing an unknown component', () => {
     const result = parseScreenDocument(
       document({
         components: [component({ id: 'card-a' })],
         blueprint: {
-          relations: [
-            {
-              type: 'behavior',
-              id: 'on-click',
-              source: {
-                kind: 'component',
-                componentId: 'ghost',
-                event: { type: 'material-event', eventName: 'click' },
-              },
-              target: { kind: 'component', componentId: 'card-a' },
-              effect: { type: 'request-component-data' },
-            },
-          ],
+          nodes: [{ kind: 'component', id: 'ghost-node', componentId: 'ghost' }],
+          edges: [],
         },
       }),
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.diagnostics[0]?.code).toBe('COMPONENT_PARENT_MISSING');
-      expect(result.diagnostics[0]?.path).toEqual([
-        'blueprint',
-        'relations',
-        0,
-        'source',
-        'componentId',
-      ]);
+      expect(result.diagnostics[0]?.path).toEqual(['blueprint', 'nodes', 0, 'componentId']);
     }
   });
 
-  it('rejects a set-variable effect referencing an unknown variable', () => {
+  it('rejects a variable node referencing an unknown variable', () => {
     const result = parseScreenDocument(
       document({
         components: [component({ id: 'card-a' })],
         blueprint: {
-          relations: [
-            {
-              type: 'behavior',
-              id: 'on-click',
-              source: {
-                kind: 'component',
-                componentId: 'card-a',
-                event: { type: 'material-event', eventName: 'click' },
-              },
-              target: { kind: 'variable', variableId: 'ghost' },
-              effect: { type: 'set-variable', value: { kind: 'literal', value: 1 } },
-            },
-          ],
+          nodes: [{ kind: 'variable', id: 'ghost-node', variableId: 'ghost' }],
+          edges: [],
         },
       }),
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.diagnostics[0]?.code).toBe('VARIABLE_NAME_INVALID');
-      expect(result.diagnostics[0]?.path).toEqual([
-        'blueprint',
-        'relations',
-        0,
-        'target',
-        'variableId',
-      ]);
+      expect(result.diagnostics[0]?.path).toEqual(['blueprint', 'nodes', 0, 'variableId']);
     }
   });
 
@@ -225,17 +192,17 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
         components: [component({ id: 'child', parentId: 'parent' }), component({ id: 'parent' })],
         variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
         blueprint: {
-          relations: [
+          nodes: [
+            { kind: 'component', id: 'child-node', componentId: 'child' },
+            { kind: 'variable', id: 'count-node', variableId: 'count' },
+          ],
+          edges: [
             {
-              type: 'behavior',
+              kind: 'flow',
               id: 'on-click',
-              source: {
-                kind: 'component',
-                componentId: 'child',
-                event: { type: 'material-event', eventName: 'click' },
-              },
-              target: { kind: 'variable', variableId: 'count' },
-              effect: { type: 'set-variable', value: { kind: 'literal', value: 1 } },
+              from: { node: 'child-node', port: 'event:click' },
+              to: { node: 'count-node', port: 'set' },
+              value: { kind: 'literal', value: 1 },
             },
           ],
         },
@@ -262,21 +229,17 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
           },
         ],
         blueprint: {
-          relations: [
+          nodes: [
+            { kind: 'component', id: 'a', componentId: 'card-a' },
+            { kind: 'host', id: 'host' },
+          ],
+          edges: [
             {
-              type: 'behavior',
+              kind: 'flow',
               id: 'notify',
-              source: {
-                kind: 'component',
-                componentId: 'card-a',
-                event: { type: 'material-event', eventName: 'click' },
-              },
-              target: { kind: 'host' },
-              effect: {
-                type: 'host-action',
-                actionId: 'project.notify',
-                payload: { kind: 'variable', variableId: 'tenant' },
-              },
+              from: { node: 'a', port: 'event:click' },
+              to: { node: 'host', port: 'action:project.notify' },
+              payload: { kind: 'variable', variableId: 'tenant' },
             },
           ],
         },

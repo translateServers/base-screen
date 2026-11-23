@@ -58,6 +58,64 @@ export function validateReferences(
   if (!findParentCycles(document, at, collector, phase)) {
     clean = false;
   }
+  // 从画布（ADR-0109）：id 唯一；`canvasId` 只能写在根组件上，且必须指向已声明的从画布；
+  // `belowSubCanvas` 只属于主画布根组件；`startCanvasId` 必须是页面从画布。
+  const subCanvasIds = new Set<string>();
+  const pageIds = new Set<string>();
+  (document.subCanvases ?? []).forEach((subCanvas, index) => {
+    if (subCanvasIds.has(subCanvas.id)) {
+      collector.add(
+        'DOCUMENT_FIELD_INVALID',
+        at(['subCanvases', index, 'id']),
+        phase,
+        `Duplicate sub canvas id "${truncateKey(subCanvas.id)}".`,
+      );
+      clean = false;
+    } else {
+      subCanvasIds.add(subCanvas.id);
+      if (subCanvas.display === 'page') pageIds.add(subCanvas.id);
+    }
+  });
+  if (document.startCanvasId !== undefined && !pageIds.has(document.startCanvasId)) {
+    collector.add(
+      'DOCUMENT_FIELD_INVALID',
+      at(['startCanvasId']),
+      phase,
+      'startCanvasId must reference a page sub canvas.',
+    );
+    clean = false;
+  }
+  document.components.forEach((component, index) => {
+    if (component.belowSubCanvas !== undefined) {
+      if (component.parentId !== null || component.canvasId !== undefined) {
+        collector.add(
+          'DOCUMENT_FIELD_INVALID',
+          at(['components', index, 'belowSubCanvas']),
+          phase,
+          'Only root components of the main canvas may declare belowSubCanvas.',
+        );
+        clean = false;
+      }
+    }
+    if (component.canvasId === undefined) return;
+    if (component.parentId !== null) {
+      collector.add(
+        'DOCUMENT_FIELD_INVALID',
+        at(['components', index, 'canvasId']),
+        phase,
+        'Only root components may declare canvasId; children follow their root.',
+      );
+      clean = false;
+    } else if (!subCanvasIds.has(component.canvasId)) {
+      collector.add(
+        'DOCUMENT_FIELD_INVALID',
+        at(['components', index, 'canvasId']),
+        phase,
+        `Component references unknown sub canvas id "${truncateKey(component.canvasId)}".`,
+      );
+      clean = false;
+    }
+  });
   const names = new Set<string>();
   const variableIds = new Set<string>();
   document.variables.forEach((variable, index) => {
@@ -165,96 +223,46 @@ export function validateReferences(
       clean = false;
     }
   });
-  const relationIds = new Set<string>();
-  document.blueprint.relations.forEach((relation, index) => {
-    const base: DiagnosticSegment[] = ['blueprint', 'relations', index];
-    if (relationIds.has(relation.id)) {
-      collector.add(
-        'DOCUMENT_FIELD_INVALID',
-        at([...base, 'id']),
-        phase,
-        `Duplicate blueprint relation id "${truncateKey(relation.id)}".`,
-      );
-      clean = false;
-    } else {
-      relationIds.add(relation.id);
-    }
-    if (relation.type === 'semantic') {
-      if (!idToIndex.has(relation.source.componentId)) {
-        collector.add(
-          'COMPONENT_PARENT_MISSING',
-          at([...base, 'source', 'componentId']),
-          phase,
-          `Blueprint semantic relation references unknown source component id "${truncateKey(relation.source.componentId)}".`,
-        );
-        clean = false;
-      }
-      if (!idToIndex.has(relation.target.componentId)) {
-        collector.add(
-          'COMPONENT_PARENT_MISSING',
-          at([...base, 'target', 'componentId']),
-          phase,
-          `Blueprint semantic relation references unknown target component id "${truncateKey(relation.target.componentId)}".`,
-        );
-        clean = false;
-      }
-      return;
-    }
-    if (relation.source.kind === 'component') {
-      if (!idToIndex.has(relation.source.componentId)) {
-        collector.add(
-          'COMPONENT_PARENT_MISSING',
-          at([...base, 'source', 'componentId']),
-          phase,
-          `Blueprint relation references unknown source component id "${truncateKey(relation.source.componentId)}".`,
-        );
-        clean = false;
-      }
-    } else if (
-      relation.source.kind === 'variable' &&
-      !variableIds.has(relation.source.variableId)
-    ) {
-      collector.add(
-        'VARIABLE_NAME_INVALID',
-        at([...base, 'source', 'variableId']),
-        phase,
-        `Blueprint relation references unknown source variable id "${truncateKey(relation.source.variableId)}".`,
-      );
-      clean = false;
-    }
-    const target = relation.target;
-    if (target.kind === 'component' && !idToIndex.has(target.componentId)) {
+  document.blueprint.nodes.forEach((node, index) => {
+    const base: DiagnosticSegment[] = ['blueprint', 'nodes', index];
+    if (node.kind === 'component' && !idToIndex.has(node.componentId)) {
       collector.add(
         'COMPONENT_PARENT_MISSING',
-        at([...base, 'target', 'componentId']),
+        at([...base, 'componentId']),
         phase,
-        `Blueprint relation references unknown target component id "${truncateKey(target.componentId)}".`,
+        `Blueprint node references unknown component id "${truncateKey(node.componentId)}".`,
       );
       clean = false;
-    }
-    if (target.kind === 'variable' && !variableIds.has(target.variableId)) {
+    } else if (node.kind === 'sub-canvas' && !subCanvasIds.has(node.canvasId)) {
+      collector.add(
+        'DOCUMENT_FIELD_INVALID',
+        at([...base, 'canvasId']),
+        phase,
+        `Blueprint node references unknown sub canvas id "${truncateKey(node.canvasId)}".`,
+      );
+      clean = false;
+    } else if (node.kind === 'variable' && !variableIds.has(node.variableId)) {
       collector.add(
         'VARIABLE_NAME_INVALID',
-        at([...base, 'target', 'variableId']),
+        at([...base, 'variableId']),
         phase,
-        `Blueprint relation references unknown target variable id "${truncateKey(target.variableId)}".`,
+        `Blueprint node references unknown variable id "${truncateKey(node.variableId)}".`,
       );
       clean = false;
-    }
-    if (relation.condition !== undefined) {
+    } else if (node.kind === 'condition') {
       clean =
         validateExpressionVariables(
-          relation.condition.left,
+          node.condition.left,
           variableIds,
           [...base, 'condition', 'left'],
           at,
           collector,
           phase,
         ) && clean;
-      if (relation.condition.right !== undefined) {
+      if (node.condition.right !== undefined) {
         clean =
           validateExpressionVariables(
-            relation.condition.right,
+            node.condition.right,
             variableIds,
             [...base, 'condition', 'right'],
             at,
@@ -263,19 +271,17 @@ export function validateReferences(
           ) && clean;
       }
     }
-    const effect = relation.effect;
-    const expression =
-      effect.type === 'set-variable'
-        ? effect.value
-        : effect.type === 'emit-host-event' || effect.type === 'host-action'
-          ? effect.payload
-          : undefined;
-    if (expression !== undefined) {
+  });
+  document.blueprint.edges.forEach((edge, index) => {
+    if (edge.kind !== 'flow') return;
+    for (const field of ['value', 'payload'] as const) {
+      const expression = edge[field];
+      if (expression === undefined) continue;
       clean =
         validateExpressionVariables(
           expression,
           variableIds,
-          [...base, 'effect', effect.type === 'set-variable' ? 'value' : 'payload'],
+          ['blueprint', 'edges', index, field],
           at,
           collector,
           phase,

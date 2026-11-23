@@ -2,7 +2,7 @@ import { DiagnosticCollector, type DiagnosticSegment } from '../diagnostics/coll
 import { parseScreenJsonValue } from '../json/parse.js';
 import type { ScreenDiagnostic, ScreenParseResult } from '../types/diagnostics.js';
 import type {
-  ScreenBlueprintRelation,
+  ScreenBlueprint,
   ScreenDataBinding,
   ScreenDataSource,
   ScreenValueRef,
@@ -13,7 +13,7 @@ import { validateDataSource } from './validate-data-source.js';
 import type { DocumentDiagnosticPath } from './validate-support.js';
 
 /**
- * 文档片段的独立解析入口：取值引用、字段映射、文档级数据源实例与单条蓝图关系。
+ * 文档片段的独立解析入口：取值引用、字段映射、文档级数据源实例与蓝图节点图。
  *
  * 这些值此前只能经整份文档校验；需要在文档之外先验证一个片段的调用方（组合分片、宿主写入路径）
  * 要么自己拼装信封，要么另写一份规则。这里直接复用文档校验里对应位置的校验函数——接受/拒绝与
@@ -52,11 +52,13 @@ export function parseScreenDataSourceInstance(input: unknown): ScreenParseResult
   );
 }
 
-export function parseScreenBlueprintRelation(
-  input: unknown,
-): ScreenParseResult<ScreenBlueprintRelation> {
-  return parsePart(input, ['blueprint', 'relations', 0], (value, collector) =>
-    validateBlueprint({ relations: [value] }, identity, collector, 'root'),
+/**
+ * 独立的蓝图节点图（`{ nodes, edges, layout? }`），组合分片等文档外调用方使用。
+ * 图结构（锚点、唯一性、条件无环、上限）与写进文档后完全一致；实体引用不在此判定。
+ */
+export function parseScreenBlueprintGraph(input: unknown): ScreenParseResult<ScreenBlueprint> {
+  return parsePart(input, ['blueprint'], (value, collector) =>
+    validateBlueprint(value, identity, collector, 'root'),
   );
 }
 
