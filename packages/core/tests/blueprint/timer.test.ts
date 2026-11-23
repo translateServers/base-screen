@@ -10,28 +10,16 @@ function timerDocument() {
   return makeDocument({
     components: [panel],
     blueprint: {
-      relations: [
+      rules: [
         {
           id: 'five-hide',
-          type: 'behavior',
-          source: {
-            kind: 'timer',
-            intervalSeconds: 5,
-            event: { type: 'timer', eventName: 'tick' },
-          },
-          target: { kind: 'component', componentId: 'panel' },
-          effect: { type: 'component-visibility', operation: 'hide' },
+          trigger: { type: 'timer', eventName: 'tick', intervalSeconds: 5 },
+          actions: [{ type: 'component-visibility', componentId: 'panel', operation: 'hide' }],
         },
         {
           id: 'ten-show',
-          type: 'behavior',
-          source: {
-            kind: 'timer',
-            intervalSeconds: 10,
-            event: { type: 'timer', eventName: 'tick' },
-          },
-          target: { kind: 'component', componentId: 'panel' },
-          effect: { type: 'component-visibility', operation: 'show' },
+          trigger: { type: 'timer', eventName: 'tick', intervalSeconds: 10 },
+          actions: [{ type: 'component-visibility', componentId: 'panel', operation: 'show' }],
         },
       ],
     },

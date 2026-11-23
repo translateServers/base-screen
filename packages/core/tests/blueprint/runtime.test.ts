@@ -174,7 +174,7 @@ describe('Blueprint runtime', () => {
               },
               {
                 type: 'emit-host-event',
-                eventName: 'count-updated',
+                eventName: 'countUpdated',
                 payload: { kind: 'variable', variableId: 'count' },
               },
             ],
@@ -194,7 +194,7 @@ describe('Blueprint runtime', () => {
 
     expect(result).toMatchObject({
       ok: true,
-      value: { variables: { count: 2 }, hostEvents: [{ name: 'count-updated', payload: 2 }] },
+      value: { variables: { count: 2 }, hostEvents: [{ name: 'countUpdated', payload: 2 }] },
     });
   });
 

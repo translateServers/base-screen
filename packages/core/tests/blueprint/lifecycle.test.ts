@@ -9,13 +9,11 @@ function lifecycleDocument() {
   return makeDocument({
     components: [makeComponent({ id: 'panel' })],
     blueprint: {
-      relations: [
+      rules: [
         {
           id: 'ready-hide',
-          type: 'behavior',
-          source: { kind: 'lifecycle', event: { type: 'lifecycle', eventName: 'ready' } },
-          target: { kind: 'component', componentId: 'panel' },
-          effect: { type: 'component-visibility', operation: 'hide' },
+          trigger: { type: 'lifecycle', eventName: 'ready' },
+          actions: [{ type: 'component-visibility', componentId: 'panel', operation: 'hide' }],
         },
       ],
     },

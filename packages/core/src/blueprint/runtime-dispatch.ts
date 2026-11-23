@@ -1,7 +1,9 @@
 import {
   parseScreenJsonValue,
+  type ScreenBlueprintAction,
   type ScreenBlueprintHostEvent,
   type ScreenBlueprintRule,
+  type ScreenBlueprintRuleStep,
   type ScreenJsonObject,
   type ScreenJsonValue,
   type ScreenParseResult,
@@ -9,7 +11,8 @@ import {
 import { cloneObject, evaluateCondition, evaluateExpression } from './runtime-json.js';
 import type {
   ScreenBlueprintActionTrace,
-  ScreenBlueprintConditionTraceState,
+  ScreenBlueprintCanvasEffect,
+  ScreenBlueprintConditionTrace,
   ScreenBlueprintDispatchResult,
   ScreenBlueprintEvent,
   ScreenBlueprintPlan,
@@ -39,6 +42,25 @@ export function traceScreenBlueprintEvent(
   ) as ScreenParseResult<ScreenBlueprintTraceResult>;
 }
 
+/** 一条规则执行期间的暂存输出；规则成功后整体提交，失败时整次分派失败。 */
+interface RuleOutputs {
+  readonly variables: Record<string, ScreenJsonValue>;
+  readonly hostEvents: ScreenBlueprintHostEvent[];
+  readonly hostActions: ScreenBlueprintHostEvent[];
+  readonly visibilityEffects: ScreenBlueprintVisibilityEffect[];
+  readonly canvasEffects: ScreenBlueprintCanvasEffect[];
+  readonly variableRequests: string[];
+  readonly componentDataRequests: string[];
+  readonly conditions: ScreenBlueprintConditionTrace[];
+  readonly actions: ScreenBlueprintActionTrace[];
+}
+
+/**
+ * 分派一次事件（ADR-0107 §2.3）：按规则顺序找出触发器匹配的规则，逐条深度优先执行其步骤树。
+ * 条件在到达时用当前事件负载与当前变量求值（同一次分派中先前 `set-variable` 写入的值可见），
+ * 再执行对应分支。一条规则的输出在规则成功后整体提交；任一表达式或条件求值失败则整次分派失败。
+ * 变量写入引发的 `data-updated` 不在本函数内展开，由宿主（viewer）作为后续分派逐个处理。
+ */
 function evaluateScreenBlueprintEvent(
   plan: ScreenBlueprintPlan,
   state: ScreenJsonObject,
@@ -47,185 +69,264 @@ function evaluateScreenBlueprintEvent(
 ): ScreenParseResult<ScreenBlueprintDispatchResult | ScreenBlueprintTraceResult> {
   const parsedPayload = parseScreenJsonValue(event.payload, { maxBytes: 256 * 1024 });
   if (!parsedPayload.ok) return parsedPayload;
+  const payload = parsedPayload.value;
   const variables = cloneObject(state);
   const hostEvents: ScreenBlueprintHostEvent[] = [];
   const hostActions: ScreenBlueprintHostEvent[] = [];
   const visibilityEffects: ScreenBlueprintVisibilityEffect[] = [];
+  const canvasEffects: ScreenBlueprintCanvasEffect[] = [];
   const variableRequests: string[] = [];
   const componentDataRequests: string[] = [];
   const ruleTraces: ScreenBlueprintRuleTrace[] = [];
   for (const [ruleIndex, rule] of plan.rules.entries()) {
-    const actions: ScreenBlueprintActionTrace[] = [];
-    const ruleTrace: MutableRuleTrace = {
-      ruleId: rule.id,
-      triggerMatched: false,
-      condition: 'not-evaluated',
-      actions,
-    };
     if (!triggerMatches(rule.trigger, event)) {
-      if (withTrace) ruleTraces.push(ruleTrace);
+      if (withTrace) {
+        ruleTraces.push({
+          ruleId: rule.id,
+          nodeId: rule.nodeId,
+          triggerMatched: false,
+          conditions: [],
+          actions: [],
+        });
+      }
       continue;
     }
-    ruleTrace.triggerMatched = true;
-    if (rule.condition) {
-      const condition = evaluateCondition(rule.condition, parsedPayload.value, variables);
-      if (!condition.ok) {
-        return indexedFailure(condition, [ruleIndex]);
-      }
-      ruleTrace.condition = condition.value ? 'passed' : 'failed';
-      if (!condition.value) {
-        if (withTrace) ruleTraces.push(ruleTrace);
-        continue;
-      }
-    } else {
-      ruleTrace.condition = 'none';
-    }
-    const nextVariables = { ...variables };
-    const nextEvents = [...hostEvents];
-    const nextActions = [...hostActions];
-    const nextVisibilityEffects = [...visibilityEffects];
-    const nextVariableRequests = [...variableRequests];
-    const nextComponentDataRequests = [...componentDataRequests];
-    for (const [actionIndex, action] of rule.actions.entries()) {
-      if (action.type === 'component-visibility') {
-        nextVisibilityEffects.push({
-          componentId: action.componentId,
-          operation: action.operation,
-          ...(action.transition === undefined ? {} : { transition: { ...action.transition } }),
-        });
-        if (withTrace) {
-          actions.push({
-            type: 'component-visibility',
-            actionIndex,
-            componentId: action.componentId,
-            operation: action.operation,
-            output: { componentId: action.componentId, operation: action.operation },
-            detached: {
-              type: 'component-visibility',
-              actionIndex,
-              componentId: action.componentId,
-              operation: action.operation,
-            },
-          });
-        }
-        continue;
-      }
-      if (action.type === 'request-variable') {
-        nextVariableRequests.push(action.variableId);
-        if (withTrace) {
-          const output = { variableId: action.variableId };
-          actions.push({
-            type: 'request-variable',
-            actionIndex,
-            variableId: action.variableId,
-            output,
-            detached: { type: 'request-variable', actionIndex, variableId: action.variableId },
-          });
-        }
-        continue;
-      }
-      if (action.type === 'request-component-data') {
-        nextComponentDataRequests.push(action.componentId);
-        if (withTrace) {
-          const output = { componentId: action.componentId };
-          actions.push({
-            type: 'request-component-data',
-            actionIndex,
-            componentId: action.componentId,
-            output,
-            detached: {
-              type: 'request-component-data',
-              actionIndex,
-              componentId: action.componentId,
-            },
-          });
-        }
-        continue;
-      }
-      const expression = action.type === 'set-variable' ? action.value : action.payload;
-      const value = evaluateExpression(expression, parsedPayload.value, nextVariables);
-      if (!value.ok) {
-        return indexedFailure(value, [ruleIndex, actionIndex]);
-      }
-      if (action.type === 'set-variable') nextVariables[action.variableId] = value.value;
-      else if (action.type === 'emit-host-event')
-        nextEvents.push({ name: action.eventName, payload: value.value });
-      else nextActions.push({ name: action.actionId, payload: value.value });
-      if (withTrace) {
-        const trace = createActionTrace(action, actionIndex, value.value);
-        if (trace !== undefined) actions.push(trace);
-      }
-    }
-    Object.assign(variables, nextVariables);
-    hostEvents.push(...nextEvents.slice(hostEvents.length));
-    hostActions.push(...nextActions.slice(hostActions.length));
-    visibilityEffects.push(...nextVisibilityEffects.slice(visibilityEffects.length));
-    variableRequests.push(...nextVariableRequests.slice(variableRequests.length));
-    componentDataRequests.push(...nextComponentDataRequests.slice(componentDataRequests.length));
-    if (withTrace) ruleTraces.push(ruleTrace);
-  }
-  if (!withTrace) {
-    return {
-      ok: true,
-      value: {
-        variables,
-        hostEvents,
-        hostActions,
-        visibilityEffects,
-        variableRequests,
-        componentDataRequests,
-      },
-      diagnostics: [],
+    const outputs: RuleOutputs = {
+      variables: { ...variables },
+      hostEvents: [],
+      hostActions: [],
+      visibilityEffects: [],
+      canvasEffects: [],
+      variableRequests: [],
+      componentDataRequests: [],
+      conditions: [],
+      actions: [],
     };
+    const failed = runSteps(rule.steps, payload, outputs, withTrace);
+    if (failed !== undefined) return indexedFailure(failed, [ruleIndex]);
+    Object.assign(variables, outputs.variables);
+    hostEvents.push(...outputs.hostEvents);
+    hostActions.push(...outputs.hostActions);
+    visibilityEffects.push(...outputs.visibilityEffects);
+    canvasEffects.push(...outputs.canvasEffects);
+    variableRequests.push(...outputs.variableRequests);
+    componentDataRequests.push(...outputs.componentDataRequests);
+    if (withTrace) {
+      ruleTraces.push({
+        ruleId: rule.id,
+        nodeId: rule.nodeId,
+        triggerMatched: true,
+        conditions: outputs.conditions,
+        actions: outputs.actions,
+      });
+    }
   }
+  const result: ScreenBlueprintDispatchResult = {
+    variables,
+    hostEvents,
+    hostActions,
+    visibilityEffects,
+    canvasEffects,
+    variableRequests,
+    componentDataRequests,
+  };
   return {
     ok: true,
-    value: {
-      variables,
-      hostEvents,
-      hostActions,
-      visibilityEffects,
-      variableRequests,
-      componentDataRequests,
-      ruleTraces,
-    },
+    value: withTrace ? { ...result, ruleTraces } : result,
     diagnostics: [],
   };
 }
 
-function createActionTrace(
-  action: Extract<
-    ScreenBlueprintRule['actions'][number],
-    { readonly type: 'set-variable' | 'emit-host-event' | 'host-action' }
-  >,
-  actionIndex: number,
-  output: ScreenJsonValue,
-): ScreenBlueprintActionTrace | undefined {
+/** 深度优先执行步骤；失败时返回失败结果，成功时返回 `undefined`。 */
+function runSteps(
+  steps: readonly ScreenBlueprintRuleStep[],
+  payload: ScreenJsonValue,
+  outputs: RuleOutputs,
+  withTrace: boolean,
+): ScreenParseResult<unknown> | undefined {
+  for (const step of steps) {
+    if (step.type === 'condition') {
+      const condition = evaluateCondition(step.condition, payload, outputs.variables);
+      if (!condition.ok) return condition;
+      if (withTrace) {
+        outputs.conditions.push({
+          nodeId: step.nodeId,
+          edgeId: step.edgeId,
+          passed: condition.value,
+        });
+      }
+      const failed = runSteps(condition.value ? step.yes : step.no, payload, outputs, withTrace);
+      if (failed !== undefined) return failed;
+      continue;
+    }
+    const failed = runAction(step.action, step.edgeId, payload, outputs, withTrace);
+    if (failed !== undefined) return failed;
+  }
+  return undefined;
+}
+
+function runAction(
+  action: ScreenBlueprintAction,
+  edgeId: string,
+  payload: ScreenJsonValue,
+  outputs: RuleOutputs,
+  withTrace: boolean,
+): ScreenParseResult<unknown> | undefined {
+  const actionIndex = outputs.actions.length;
+  if (action.type === 'component-visibility') {
+    outputs.visibilityEffects.push({
+      componentId: action.componentId,
+      operation: action.operation,
+      ...(action.transition === undefined ? {} : { transition: { ...action.transition } }),
+    });
+    if (withTrace) {
+      outputs.actions.push({
+        type: 'component-visibility',
+        actionIndex,
+        edgeId,
+        componentId: action.componentId,
+        operation: action.operation,
+        output: { componentId: action.componentId, operation: action.operation },
+        detached: {
+          type: 'component-visibility',
+          actionIndex,
+          componentId: action.componentId,
+          operation: action.operation,
+        },
+      });
+    }
+    return undefined;
+  }
+  if (action.type === 'canvas-visibility') {
+    let parameters: ScreenJsonValue | undefined;
+    if (action.payload !== undefined) {
+      const value = evaluateExpression(action.payload, payload, outputs.variables);
+      if (!value.ok) return value;
+      parameters = value.value;
+    }
+    const effect = {
+      type: 'canvas-visibility' as const,
+      canvasId: action.canvasId,
+      operation: action.operation,
+      ...(parameters === undefined ? {} : { payload: parameters }),
+    };
+    outputs.canvasEffects.push(effect);
+    if (withTrace) {
+      const { type: _type, ...output } = effect;
+      outputs.actions.push({
+        type: 'canvas-visibility',
+        actionIndex,
+        edgeId,
+        canvasId: action.canvasId,
+        operation: action.operation,
+        output,
+        detached: { type: 'canvas-visibility', actionIndex, ...output },
+      });
+    }
+    return undefined;
+  }
+  if (action.type === 'page-navigation') {
+    outputs.canvasEffects.push({ type: 'page-navigation', operation: action.operation });
+    if (withTrace) {
+      outputs.actions.push({
+        type: 'page-navigation',
+        actionIndex,
+        edgeId,
+        operation: action.operation,
+        output: { operation: action.operation },
+        detached: { type: 'page-navigation', actionIndex, operation: action.operation },
+      });
+    }
+    return undefined;
+  }
+  if (action.type === 'request-variable') {
+    outputs.variableRequests.push(action.variableId);
+    if (withTrace) {
+      outputs.actions.push({
+        type: 'request-variable',
+        actionIndex,
+        edgeId,
+        variableId: action.variableId,
+        output: { variableId: action.variableId },
+        detached: { type: 'request-variable', actionIndex, variableId: action.variableId },
+      });
+    }
+    return undefined;
+  }
+  if (action.type === 'request-component-data') {
+    outputs.componentDataRequests.push(action.componentId);
+    if (withTrace) {
+      outputs.actions.push({
+        type: 'request-component-data',
+        actionIndex,
+        edgeId,
+        componentId: action.componentId,
+        output: { componentId: action.componentId },
+        detached: {
+          type: 'request-component-data',
+          actionIndex,
+          componentId: action.componentId,
+        },
+      });
+    }
+    return undefined;
+  }
+  const expression = action.type === 'set-variable' ? action.value : action.payload;
+  const value = evaluateExpression(expression, payload, outputs.variables);
+  if (!value.ok) return value;
   if (action.type === 'set-variable') {
-    return {
-      type: 'set-variable',
-      actionIndex,
-      variableId: action.variableId,
-      output,
-      detached: { type: 'set-variable', actionIndex, variableId: action.variableId, output },
-    };
+    outputs.variables[action.variableId] = value.value;
+    if (withTrace) {
+      outputs.actions.push({
+        type: 'set-variable',
+        actionIndex,
+        edgeId,
+        variableId: action.variableId,
+        output: value.value,
+        detached: {
+          type: 'set-variable',
+          actionIndex,
+          variableId: action.variableId,
+          output: value.value,
+        },
+      });
+    }
+  } else if (action.type === 'emit-host-event') {
+    outputs.hostEvents.push({ name: action.eventName, payload: value.value });
+    if (withTrace) {
+      outputs.actions.push({
+        type: 'emit-host-event',
+        actionIndex,
+        edgeId,
+        eventName: action.eventName,
+        output: value.value,
+        detached: {
+          type: 'emit-host-event',
+          actionIndex,
+          eventName: action.eventName,
+          output: value.value,
+        },
+      });
+    }
+  } else {
+    outputs.hostActions.push({ name: action.actionId, payload: value.value });
+    if (withTrace) {
+      outputs.actions.push({
+        type: 'host-action',
+        actionIndex,
+        edgeId,
+        actionId: action.actionId,
+        output: value.value,
+        detached: {
+          type: 'host-action',
+          actionIndex,
+          actionId: action.actionId,
+          output: value.value,
+        },
+      });
+    }
   }
-  if (action.type === 'emit-host-event') {
-    return {
-      type: 'emit-host-event',
-      actionIndex,
-      eventName: action.eventName,
-      output,
-      detached: { type: 'emit-host-event', actionIndex, eventName: action.eventName, output },
-    };
-  }
-  return {
-    type: 'host-action',
-    actionIndex,
-    actionId: action.actionId,
-    output,
-    detached: { type: 'host-action', actionIndex, actionId: action.actionId, output },
-  };
+  return undefined;
 }
 
 function triggerMatches(
@@ -242,14 +343,9 @@ function triggerMatches(
         ? true
         : trigger.type === 'timer' && event.type === 'timer'
           ? trigger.intervalSeconds === event.intervalSeconds
-          : false;
-}
-
-interface MutableRuleTrace {
-  readonly ruleId: string;
-  triggerMatched: boolean;
-  condition: ScreenBlueprintConditionTraceState;
-  readonly actions: ScreenBlueprintActionTrace[];
+          : trigger.type === 'canvas-event' && event.type === 'canvas-event'
+            ? trigger.canvasId === event.canvasId
+            : trigger.type === 'page-changed' && event.type === 'page-changed';
 }
 
 function indexedFailure<T>(

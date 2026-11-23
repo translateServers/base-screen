@@ -6,8 +6,11 @@
 
 import { SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY } from '@base-screen/contracts';
 import type { ScreenBlueprint } from '@base-screen/contracts';
+import type { ScreenBlueprintCanvasEventName } from '@base-screen/contracts';
+import type { ScreenBlueprintCanvasOperation } from '@base-screen/contracts';
 import type { ScreenBlueprintComponentVisibilityAction } from '@base-screen/contracts';
 import type { ScreenBlueprintHostEvent } from '@base-screen/contracts';
+import type { ScreenBlueprintPageNavigationOperation } from '@base-screen/contracts';
 import type { ScreenBlueprintRule } from '@base-screen/contracts';
 import { ScreenCanvas } from '@base-screen/contracts';
 import type { ScreenCanvasBackground } from '@base-screen/contracts';
@@ -30,6 +33,7 @@ import { ScreenPosition } from '@base-screen/contracts';
 import { ScreenSize } from '@base-screen/contracts';
 import { ScreenStaticDataSource } from '@base-screen/contracts';
 import { ScreenStaticVariable } from '@base-screen/contracts';
+import type { ScreenSubCanvas } from '@base-screen/contracts';
 import type { ScreenThemeSlot } from '@base-screen/contracts';
 import { ScreenValueRef } from '@base-screen/contracts';
 import { ScreenVariable } from '@base-screen/contracts';
@@ -65,7 +69,7 @@ export function collectScreenValueRefDependencies(refs: ScreenValueRef | null | 
 // @public (undocumented)
 export function commitScreenHistory(history: ScreenHistoryState, document: ScreenDocument, limit?: number, provenance?: ScreenTransactionProvenance): ScreenHistoryState;
 
-// @public (undocumented)
+// @public
 export function compileScreenBlueprint(document: ScreenDocument, capabilities?: ScreenBlueprintCapabilityIndex): ScreenParseResult<ScreenBlueprintPlan>;
 
 // @public (undocumented)
@@ -217,7 +221,47 @@ export interface ScreenAlignmentDelta {
 export type ScreenAxis = 'x' | 'y';
 
 // @public (undocumented)
-export type ScreenBlueprintActionTrace = ScreenBlueprintSetVariableActionTrace | ScreenBlueprintRequestVariableActionTrace | ScreenBlueprintRequestComponentDataActionTrace | ScreenBlueprintEmitHostEventActionTrace | ScreenBlueprintHostActionTrace | ScreenBlueprintComponentVisibilityActionTrace;
+export type ScreenBlueprintActionTrace = ScreenBlueprintSetVariableActionTrace | ScreenBlueprintRequestVariableActionTrace | ScreenBlueprintRequestComponentDataActionTrace | ScreenBlueprintEmitHostEventActionTrace | ScreenBlueprintHostActionTrace | ScreenBlueprintComponentVisibilityActionTrace | ScreenBlueprintCanvasVisibilityActionTrace | ScreenBlueprintPageNavigationActionTrace;
+
+// @public (undocumented)
+export type ScreenBlueprintCanvasEffect = {
+    readonly type: 'canvas-visibility';
+    readonly canvasId: string;
+    readonly operation: ScreenBlueprintCanvasOperation;
+    readonly payload?: ScreenJsonValue;
+} | {
+    readonly type: 'page-navigation';
+    readonly operation: ScreenBlueprintPageNavigationOperation;
+};
+
+// @public
+export interface ScreenBlueprintCanvasEvent {
+    // (undocumented)
+    readonly canvasId: string;
+    // (undocumented)
+    readonly name: ScreenBlueprintCanvasEventName;
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'canvas-event';
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintCanvasVisibilityActionTrace {
+    // (undocumented)
+    readonly actionIndex: number;
+    // (undocumented)
+    readonly canvasId: string;
+    // (undocumented)
+    readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
+    // (undocumented)
+    readonly operation: ScreenBlueprintCanvasOperation;
+    // (undocumented)
+    readonly output: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'canvas-visibility';
+}
 
 // @public (undocumented)
 interface ScreenBlueprintCapabilityIndex {
@@ -233,6 +277,7 @@ export interface ScreenBlueprintComponentVisibilityActionTrace {
     readonly componentId: string;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly operation: ScreenBlueprintComponentVisibilityAction['operation'];
     // (undocumented)
@@ -241,11 +286,19 @@ export interface ScreenBlueprintComponentVisibilityActionTrace {
     readonly type: 'component-visibility';
 }
 
-// @public (undocumented)
-export type ScreenBlueprintConditionTraceState = 'not-evaluated' | 'none' | 'passed' | 'failed';
+// @public
+export interface ScreenBlueprintConditionTrace {
+    // (undocumented)
+    readonly edgeId: string;
+    // (undocumented)
+    readonly nodeId: string;
+    // (undocumented)
+    readonly passed: boolean;
+}
 
 // @public (undocumented)
 export interface ScreenBlueprintDispatchResult {
+    readonly canvasEffects: readonly ScreenBlueprintCanvasEffect[];
     // (undocumented)
     readonly componentDataRequests: readonly string[];
     // (undocumented)
@@ -266,6 +319,7 @@ export interface ScreenBlueprintEmitHostEventActionTrace {
     readonly actionIndex: number;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly eventName: string;
     // (undocumented)
@@ -275,7 +329,7 @@ export interface ScreenBlueprintEmitHostEventActionTrace {
 }
 
 // @public (undocumented)
-export type ScreenBlueprintEvent = ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent | ScreenBlueprintLifecycleEvent | ScreenBlueprintTimerEvent;
+export type ScreenBlueprintEvent = ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent | ScreenBlueprintLifecycleEvent | ScreenBlueprintTimerEvent | ScreenBlueprintCanvasEvent | ScreenBlueprintPageChangedEvent;
 
 // @public (undocumented)
 export interface ScreenBlueprintHostActionTrace {
@@ -285,6 +339,7 @@ export interface ScreenBlueprintHostActionTrace {
     readonly actionIndex: number;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly output: ScreenJsonValue;
     // (undocumented)
@@ -313,6 +368,31 @@ interface ScreenBlueprintMaterialEvent {
     readonly type?: 'material-event';
 }
 
+// @public
+export interface ScreenBlueprintPageChangedEvent {
+    // (undocumented)
+    readonly name: 'page-changed';
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'page-changed';
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintPageNavigationActionTrace {
+    // (undocumented)
+    readonly actionIndex: number;
+    // (undocumented)
+    readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
+    // (undocumented)
+    readonly operation: ScreenBlueprintPageNavigationOperation;
+    // (undocumented)
+    readonly output: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'page-navigation';
+}
+
 // @public (undocumented)
 export interface ScreenBlueprintPlan {
     // (undocumented)
@@ -329,6 +409,7 @@ interface ScreenBlueprintRequestComponentDataActionTrace {
     readonly componentId: string;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly output: ScreenJsonValue;
     // (undocumented)
@@ -341,6 +422,7 @@ interface ScreenBlueprintRequestVariableActionTrace {
     readonly actionIndex: number;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly output: ScreenJsonValue;
     // (undocumented)
@@ -353,8 +435,8 @@ interface ScreenBlueprintRequestVariableActionTrace {
 export interface ScreenBlueprintRuleTrace {
     // (undocumented)
     readonly actions: readonly ScreenBlueprintActionTrace[];
-    // (undocumented)
-    readonly condition: ScreenBlueprintConditionTraceState;
+    readonly conditions: readonly ScreenBlueprintConditionTrace[];
+    readonly nodeId: string;
     // (undocumented)
     readonly ruleId: string;
     // (undocumented)
@@ -367,6 +449,7 @@ export interface ScreenBlueprintSetVariableActionTrace {
     readonly actionIndex: number;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly output: ScreenJsonValue;
     // (undocumented)
@@ -396,7 +479,7 @@ export interface ScreenBlueprintTraceResult extends ScreenBlueprintDispatchResul
 // @public (undocumented)
 interface ScreenBlueprintVariableEvent {
     // (undocumented)
-    readonly name: 'data-updated' | 'request-state';
+    readonly name: 'data-updated';
     // (undocumented)
     readonly payload: ScreenJsonValue;
     // (undocumented)
@@ -455,6 +538,7 @@ export { ScreenComponentNode }
 
 // @public (undocumented)
 export interface ScreenComponentPatch {
+    readonly belowSubCanvas?: true | null;
     readonly dataBinding?: ScreenDataBinding | null;
     // (undocumented)
     readonly dataSource?: ScreenComponentDataSource | null;
@@ -562,6 +646,24 @@ export type ScreenDocumentCommand = {
 } | {
     readonly type: 'replace-variables';
     readonly variables: readonly ScreenVariableEntry[];
+}
+/**
+* 整体替换从画布集合（ADR-0109）；空数组删除字段。`startCanvasId`：缺省保持原值，`null` 删除。
+* 组件归属、起始页与蓝图引用由文档校验把关。
+*/
+| {
+    readonly type: 'replace-sub-canvases';
+    readonly subCanvases: readonly ScreenSubCanvas[];
+    readonly startCanvasId?: string | null;
+}
+/**
+* 把根组件移到另一块画布（`null` = 主画布，ADR-0109）：写 / 删 `canvasId`、移出主画布时去掉
+* `belowSubCanvas`、移入弹框时把位置夹进面板范围。子组件随根组件移动，不能单独移动。
+*/
+| {
+    readonly type: 'move-components';
+    readonly componentIds: readonly string[];
+    readonly canvasId: string | null;
 } | {
     readonly type: 'rename-variable';
     readonly variableId: string;

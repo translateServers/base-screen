@@ -85,17 +85,19 @@ describe('EB-R7-C01 Core trace equivalence', () => {
     expect(traced.hostEvents).toEqual(dispatch.value.hostEvents);
     expect(traced.hostActions).toEqual(dispatch.value.hostActions);
 
-    expect(traced.ruleTraces).toHaveLength(3);
-    const [other, guard, react] = traced.ruleTraces;
+    // guard 与 react 共用「按钮点击」触发锚点，节点图里编为同一条规则：先过 guard 条件，再执行 react 的三个动作。
+    expect(traced.ruleTraces).toHaveLength(2);
+    const [other, react] = traced.ruleTraces;
     expect(other).toEqual({
-      ruleId: 'other',
+      ruleId: 'component:other/event:click',
+      nodeId: 'component:other',
       triggerMatched: false,
-      condition: 'not-evaluated',
+      conditions: [],
       actions: [],
     });
-    expect(guard?.condition).toBe('failed');
-    expect(guard?.actions).toEqual([]);
-    expect(react?.condition).toBe('none');
+    expect(react?.conditions).toEqual([
+      { nodeId: 'guard:condition', edgeId: 'guard:judge', passed: false },
+    ]);
     expect(react?.actions).toHaveLength(3);
     expect(react?.actions[0]).toMatchObject({
       type: 'set-variable',
@@ -150,7 +152,7 @@ describe('EB-R7-C01 Core trace equivalence', () => {
     expect(trace.ok).toBe(true);
     if (!trace.ok) return;
     const traced = trace.value as ScreenBlueprintTraceResult;
-    expect(traced.ruleTraces[0]?.condition).toBe('passed');
+    expect(traced.ruleTraces[0]?.conditions.map((condition) => condition.passed)).toEqual([true]);
     expect(traced.ruleTraces[0]?.actions[0]?.detached).toEqual({
       type: 'emit-host-event',
       actionIndex: 0,
@@ -193,7 +195,7 @@ describe('EB-R7-C01 Core trace equivalence', () => {
     if (dispatch.ok || trace.ok) return;
     expect(trace.diagnostics[0]?.code).toBe(dispatch.diagnostics[0]?.code);
     expect(trace.diagnostics[0]?.path).toEqual(dispatch.diagnostics[0]?.path);
-    expect(trace.diagnostics[0]?.path).toEqual([0, 0]);
+    expect(trace.diagnostics[0]?.path).toEqual([0]);
   });
 
   it('EB-R7-C02 keeps trace output detached from plan and state', () => {
@@ -211,7 +213,7 @@ describe('EB-R7-C01 Core trace equivalence', () => {
     if (!trace.ok) return;
     const traced = trace.value as ScreenBlueprintTraceResult;
     (traced.variables as Record<string, unknown>).count = 'mutated';
-    (traced.ruleTraces[2]?.actions[0] as { output: unknown }).output = 'mutated';
+    (traced.ruleTraces[1]?.actions[0] as { output: unknown }).output = 'mutated';
     expect(plan.initialVariables).toEqual(initialState);
     expect(JSON.stringify(initialState)).not.toContain('mutated');
     const replayed = traceScreenBlueprintEvent(plan, initialState, {
@@ -223,7 +225,7 @@ describe('EB-R7-C01 Core trace equivalence', () => {
     if (!replayed.ok) return;
     const replayedTraced = replayed.value as ScreenBlueprintTraceResult;
     expect(replayedTraced.variables.count).toBe(3);
-    expect(replayedTraced.ruleTraces[2]?.actions[0]?.output).toBe(3);
+    expect(replayedTraced.ruleTraces[1]?.actions[0]?.output).toBe(3);
   });
 
   it('EB-R7-C02 rejects payload beyond the event budget without host calls', () => {
