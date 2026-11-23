@@ -254,7 +254,6 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           <span class="status-revision" data-project-revision></span>
           <span class="status-feedback" data-status-feedback role="status" aria-live="polite"></span>
         </div>
-        <button type="button" class="statusbar-guard" data-guard-toggle data-state="pass" aria-haspopup="dialog" aria-expanded="false" aria-controls="designer-guard-popover" aria-label="${DESIGNER_UI_TEXT.guard.stripAria(0)}"></button>
         <div class="statusbar-group statusbar-end">
           <span class="status-components" data-status-components></span>
           <span class="status-divider" aria-hidden="true"></span>
@@ -273,7 +272,6 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             ${DESIGNER_ZOOM_PRESETS.map((percent) => `<button type="button" class="designer-control designer-button designer-menu-item" data-status-zoom-preset="${percent}" role="menuitem"><span class="menu-item-label">${percent}%</span></button>`).join('')}
           </div>
         </div>
-        <section class="designer-guard-popover" id="designer-guard-popover" data-guard-popover role="dialog" aria-label="${DESIGNER_UI_TEXT.guard.dialogTitle}" hidden></section>
       </footer>
       <div class="designer-notifications" data-notifications aria-label="${DESIGNER_UI_TEXT.notifications}"></div>
       <div class="designer-tooltip" id="designer-tooltip" data-tooltip role="tooltip" data-side="top"></div>
