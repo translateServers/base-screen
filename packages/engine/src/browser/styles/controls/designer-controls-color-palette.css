@@ -8,8 +8,9 @@
   overflow: visible;
 }
 
+/* 层级走令牌：弹层（popover）低于工具提示（tooltip），色卡与按钮的提示才能浮在弹层上面。 */
 .designer-color-palette[data-color-palette-open="true"] {
-  z-index: 100;
+  z-index: var(--designer-z-popover);
 }
 
 /* 触发器是「字段形态的按钮」：基座 `.designer-button` 来自 actions.css，import 顺序在本文件
@@ -152,7 +153,7 @@
 
 .designer-color-popover {
   position: fixed;
-  z-index: 200;
+  z-index: var(--designer-z-popover);
   box-sizing: border-box;
   width: 280px;
   max-height: 560px;
@@ -827,6 +828,12 @@
   cursor: pointer;
 }
 
+/* 主题色位（ADR-0098）：引用只对纯色有意义，渐变模式下整排隐藏；当前引用的色位带强调环。 */
+.designer-color-palette:not([data-color-palette-mode="solid"]) .designer-color-palette-theme {
+  display: none;
+}
+
+.designer-fill-color-swatch[aria-pressed="true"],
 .designer-fill-color-swatch:hover,
 .designer-fill-color-swatch:focus-visible {
   /* 无 border 后强调态只能走 inset 环：内 2px accent + 外 accent 淡环。 */

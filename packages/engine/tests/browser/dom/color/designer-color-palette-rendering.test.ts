@@ -220,6 +220,11 @@ describe('compact palette layout', () => {
       'a',
     ]);
     expect(quickColors).toHaveLength(9);
+    // 每个常用颜色都有悬停提示：颜色名 + 色值。
+    expect(quickColors[0]?.attributes.get('data-tip')).toBe('科技蓝 · #2483FF');
+    expect(quickColors.every((swatch) => swatch.attributes.get('data-tip') !== undefined)).toBe(
+      true,
+    );
     expect(palette.controls.some((control) => control.dataset.colorPaletteField === 'solid')).toBe(
       true,
     );

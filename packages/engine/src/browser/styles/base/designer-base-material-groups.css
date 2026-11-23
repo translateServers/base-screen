@@ -386,7 +386,7 @@
 /* 弹层：overlay + backdrop + popover。 */
 .material-group-overlay {
   position: absolute;
-  z-index: 200;
+  z-index: var(--designer-z-popover);
   inset: 0;
 }
 
