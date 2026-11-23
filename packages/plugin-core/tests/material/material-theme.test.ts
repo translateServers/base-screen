@@ -94,8 +94,6 @@ describe('material theme style', () => {
         undefined,
       ),
     ).toBe(defaultStyle);
-    expect(resolveBaseScreenMaterialDefaultStyle({ defaultStyle }, { palette })).toBe(
-      defaultStyle,
-    );
+    expect(resolveBaseScreenMaterialDefaultStyle({ defaultStyle }, { palette })).toBe(defaultStyle);
   });
 });

@@ -263,7 +263,13 @@ export const ATOMIC_COMPONENT_TEMPLATES: readonly AtomicComponentTemplate[] = [
           visibleWhen: { key: 'showValue', equals: true },
         },
         fields: [
-          { key: 'showValue', label: '显示读数', section: 'format', kind: 'boolean', default: true },
+          {
+            key: 'showValue',
+            label: '显示读数',
+            section: 'format',
+            kind: 'boolean',
+            default: true,
+          },
           {
             key: 'color',
             label: '读数色',
@@ -283,8 +289,20 @@ export const ATOMIC_COMPONENT_TEMPLATES: readonly AtomicComponentTemplate[] = [
             unit: 'px',
             visibleWhen: { key: 'showValue', equals: true },
           },
-          { key: 'trackColor', label: '轨道色', section: 'surface', kind: 'color', default: '#132f4c' },
-          { key: 'fillColor', label: '填充色', section: 'surface', kind: 'color', default: '#38bdf8' },
+          {
+            key: 'trackColor',
+            label: '轨道色',
+            section: 'surface',
+            kind: 'color',
+            default: '#132f4c',
+          },
+          {
+            key: 'fillColor',
+            label: '填充色',
+            section: 'surface',
+            kind: 'color',
+            default: '#38bdf8',
+          },
           {
             key: 'strokeWidth',
             label: '线宽',
@@ -382,8 +400,20 @@ export const ATOMIC_COMPONENT_TEMPLATES: readonly AtomicComponentTemplate[] = [
             max: 32,
             unit: 'px',
           },
-          { key: 'trackColor', label: '轨道色', section: 'surface', kind: 'color', default: '#132f4c' },
-          { key: 'fillColor', label: '填充色', section: 'surface', kind: 'color', default: '#38bdf8' },
+          {
+            key: 'trackColor',
+            label: '轨道色',
+            section: 'surface',
+            kind: 'color',
+            default: '#132f4c',
+          },
+          {
+            key: 'fillColor',
+            label: '填充色',
+            section: 'surface',
+            kind: 'color',
+            default: '#38bdf8',
+          },
         ],
         data: {
           kind: 'rows',
@@ -413,7 +443,13 @@ export const ATOMIC_COMPONENT_TEMPLATES: readonly AtomicComponentTemplate[] = [
         keywords: ['状态', '设备'],
         defaultSize: { width: 120, height: 28 },
         fields: [
-          { key: 'showText', label: '显示状态文字', section: 'structure', kind: 'boolean', default: true },
+          {
+            key: 'showText',
+            label: '显示状态文字',
+            section: 'structure',
+            kind: 'boolean',
+            default: true,
+          },
           {
             key: 'color',
             label: '文字色',
@@ -433,11 +469,41 @@ export const ATOMIC_COMPONENT_TEMPLATES: readonly AtomicComponentTemplate[] = [
             unit: 'px',
             visibleWhen: { key: 'showText', equals: true },
           },
-          { key: 'runningColor', label: '运行', section: 'semantic', kind: 'color', default: '#2f9e6f' },
-          { key: 'standbyColor', label: '待机', section: 'semantic', kind: 'color', default: '#5b7a99' },
-          { key: 'faultColor', label: '故障', section: 'semantic', kind: 'color', default: '#f05252' },
-          { key: 'offlineColor', label: '离线', section: 'semantic', kind: 'color', default: '#4b5563' },
-          { key: 'unknownColor', label: '未知', section: 'semantic', kind: 'color', default: '#9ca3af' },
+          {
+            key: 'runningColor',
+            label: '运行',
+            section: 'semantic',
+            kind: 'color',
+            default: '#2f9e6f',
+          },
+          {
+            key: 'standbyColor',
+            label: '待机',
+            section: 'semantic',
+            kind: 'color',
+            default: '#5b7a99',
+          },
+          {
+            key: 'faultColor',
+            label: '故障',
+            section: 'semantic',
+            kind: 'color',
+            default: '#f05252',
+          },
+          {
+            key: 'offlineColor',
+            label: '离线',
+            section: 'semantic',
+            kind: 'color',
+            default: '#4b5563',
+          },
+          {
+            key: 'unknownColor',
+            label: '未知',
+            section: 'semantic',
+            kind: 'color',
+            default: '#9ca3af',
+          },
         ],
         data: { kind: 'scalar', valueType: 'string', sample: '运行' },
       }),
@@ -680,7 +746,9 @@ export function findingTarget(finding: BaseScreenAuthoringFinding): FindingTarge
 export async function auditAtomicComponent(
   source: AtomicComponentSource,
 ): Promise<readonly BaseScreenAuthoringFinding[]> {
-  const findings = [...auditBaseScreenMaterialSpec(source.spec, { renderSource: source.renderBody })];
+  const findings = [
+    ...auditBaseScreenMaterialSpec(source.spec, { renderSource: source.renderBody }),
+  ];
   if (hasBaseScreenAuthoringErrors(findings)) return findings;
   const parsed = parseBaseScreenMaterialSpec(source.spec);
   if (!parsed.ok) return findings;

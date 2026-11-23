@@ -557,9 +557,8 @@ export class DataSourceRuntime {
           code:
             settled.kind === 'timeout'
               ? 'HOST_RESOURCE_TIMEOUT'
-              : normalizeScreenMaterialError(
-                  settled.diagnostics.diagnostics[0] ?? genericFailure(),
-                ).code,
+              : normalizeScreenMaterialError(settled.diagnostics.diagnostics[0] ?? genericFailure())
+                  .code,
         });
         return;
       }

@@ -36,7 +36,9 @@ export interface HostComponentEntryHandle {
   dispose(): void;
 }
 
-export function attachHostComponentEntry(options: HostComponentEntryOptions): HostComponentEntryHandle {
+export function attachHostComponentEntry(
+  options: HostComponentEntryOptions,
+): HostComponentEntryHandle {
   const { designer, screenId } = options;
   let disposed = false;
 
@@ -87,7 +89,10 @@ export function attachHostComponentEntry(options: HostComponentEntryOptions): Ho
     dialog.setAttribute('aria-label', '存为组合');
     const title = document.createElement('h2');
     title.textContent = '存为组合';
-    const nameInput = input('名称', detail.suggestedName.trim() === '' ? '我的组合' : detail.suggestedName);
+    const nameInput = input(
+      '名称',
+      detail.suggestedName.trim() === '' ? '我的组合' : detail.suggestedName,
+    );
     const categoryInput = input('分类', '我的组合');
     const note = document.createElement('p');
     note.className = 'host-component-dialog__note';
@@ -139,7 +144,8 @@ export function attachHostComponentEntry(options: HostComponentEntryOptions): Ho
         const runtime = await loadHostRuntime();
         const findings = auditBaseScreenFragment(definition, runtime.catalog);
         if (hasBaseScreenAuthoringErrors(findings)) {
-          status.textContent = findings.find((item) => item.severity === 'error')?.message ?? '组合不合规。';
+          status.textContent =
+            findings.find((item) => item.severity === 'error')?.message ?? '组合不合规。';
           confirm.disabled = false;
           return;
         }
@@ -184,7 +190,9 @@ export function attachHostComponentEntry(options: HostComponentEntryOptions): Ho
     dispose() {
       disposed = true;
       designer.removeEventListener(BASE_SCREEN_FRAGMENT_SAVE_REQUEST_EVENT, onSaveRequest);
-      for (const node of document.querySelectorAll('[data-host-component-dialog], .host-component-toast-link')) {
+      for (const node of document.querySelectorAll(
+        '[data-host-component-dialog], .host-component-toast-link',
+      )) {
         node.remove();
       }
       panel.remove();
@@ -192,7 +200,10 @@ export function attachHostComponentEntry(options: HostComponentEntryOptions): Ho
   };
 }
 
-function input(label: string, value: string): { readonly row: HTMLElement; readonly control: HTMLInputElement } {
+function input(
+  label: string,
+  value: string,
+): { readonly row: HTMLElement; readonly control: HTMLInputElement } {
   const row = document.createElement('label');
   row.className = 'host-component-dialog__row';
   const caption = document.createElement('span');

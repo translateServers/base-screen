@@ -4,9 +4,9 @@ import {
 } from './authoring-finding.js';
 import { auditBaseScreenMaterialEditorForm } from './material-editor-audit.js';
 import {
+  BASE_SCREEN_MATERIAL_SPEC_SECTIONS,
   type BaseScreenMaterialSpec,
   type BaseScreenMaterialSpecField,
-  BASE_SCREEN_MATERIAL_SPEC_SECTIONS,
   compileBaseScreenMaterialSpec,
   parseBaseScreenMaterialSpec,
 } from './material-spec.js';
@@ -23,7 +23,10 @@ export interface AuditBaseScreenMaterialSpecOptions {
 
 /** 体检编译时用的占位标签：只为让 Manifest 解析通过，不注册。 */
 const AUDIT_TAG_NAME = 'base-screen-spec-audit';
-const DESCRIPTIVE_KEYS: ReadonlySet<string> = new Set([...BASE_SCREEN_DESCRIPTIVE_TEXT_KEYS, 'label']);
+const DESCRIPTIVE_KEYS: ReadonlySet<string> = new Set([
+  ...BASE_SCREEN_DESCRIPTIVE_TEXT_KEYS,
+  'label',
+]);
 const DESCRIPTIVE_LABEL = /标题|副标题|说明|描述|备注|注释/;
 const STATE_TEXT_KEY = /^(?:empty|loading|error)(?:Text|Label|Message)$/;
 const LARGE_WIDTH = 1920;
@@ -125,7 +128,9 @@ function auditField(
       path: [...path, 'key'],
     });
   }
-  const target = BASE_SCREEN_MATERIAL_SPEC_SECTIONS.find((item) => item.id === field.section)?.target;
+  const target = BASE_SCREEN_MATERIAL_SPEC_SECTIONS.find(
+    (item) => item.id === field.section,
+  )?.target;
   if (field.kind === 'color' && target === 'props') {
     findings.push({
       rule: 'P2',
@@ -154,7 +159,8 @@ const RENDER_RULES: readonly {
   readonly message: string;
 }[] = [
   {
-    pattern: /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bEventSource\b|\bsendBeacon\b|\bimport\s*\(/,
+    pattern:
+      /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bEventSource\b|\bsendBeacon\b|\bimport\s*\(/,
     severity: 'error',
     message: '渲染代码不自行取数或加载代码：数据经数据源进入 value / rows。',
   },
@@ -164,7 +170,8 @@ const RENDER_RULES: readonly {
     message: '渲染代码不读写浏览器存储：组件状态只来自 props / style / 数据。',
   },
   {
-    pattern: /getRootNode\s*\(|\.host\b|ownerDocument\.body|document\.(?:body|head|documentElement)/,
+    pattern:
+      /getRootNode\s*\(|\.host\b|ownerDocument\.body|document\.(?:body|head|documentElement)/,
     severity: 'error',
     message: '只在 root 里绘制：宿主元素与页面归渲染器所有（物料渲染盒不变式）。',
   },

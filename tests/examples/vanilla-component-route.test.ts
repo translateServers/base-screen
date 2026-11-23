@@ -30,7 +30,9 @@ describe('ADR-0106 · component library routes', () => {
       name: 'component-fragment',
       id: undefined,
     });
-    expect(parseRoute(`#/components/fragment/${encodeURIComponent('host-app.fragment-x:1')}`)).toEqual({
+    expect(
+      parseRoute(`#/components/fragment/${encodeURIComponent('host-app.fragment-x:1')}`),
+    ).toEqual({
       name: 'component-fragment',
       id: 'host-app.fragment-x:1',
     });

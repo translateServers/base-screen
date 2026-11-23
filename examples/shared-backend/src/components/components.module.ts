@@ -9,7 +9,11 @@ import { ComponentsService } from './components.service';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [ComponentDraftsController, ComponentFragmentsController, ComponentLibraryController],
+  controllers: [
+    ComponentDraftsController,
+    ComponentFragmentsController,
+    ComponentLibraryController,
+  ],
   providers: [ComponentsService],
 })
 export class ComponentsModule {}

@@ -1,4 +1,8 @@
-import { type ScreenJsonValue, type ScreenParseResult, screenJsonEquals } from 'base-screen/contracts';
+import {
+  type ScreenJsonValue,
+  type ScreenParseResult,
+  screenJsonEquals,
+} from 'base-screen/contracts';
 import type {
   BaseScreenComponentFragmentInsertionIntent,
   BaseScreenFragmentBody,
@@ -86,7 +90,8 @@ export function readSpecMaterialModule(
   const specEnd = code.indexOf(SPEC_END);
   const bodyStart = code.indexOf(`${RENDER_BEGIN}\n`);
   const bodyEnd = code.lastIndexOf(`\n${RENDER_END}`);
-  if (specStart < 0 || specEnd < specStart || bodyStart < 0 || bodyEnd < bodyStart) return undefined;
+  if (specStart < 0 || specEnd < specStart || bodyStart < 0 || bodyEnd < bodyStart)
+    return undefined;
   try {
     return {
       spec: JSON.parse(code.slice(specStart + SPEC_BEGIN.length, specEnd)) as unknown,
@@ -98,9 +103,7 @@ export function readSpecMaterialModule(
 }
 
 /** 宿主受控加载（ADR-0029）：blob `import()` 一个规格模块，校验导出形状。 */
-export async function importSpecMaterialModule(
-  code: string,
-): Promise<
+export async function importSpecMaterialModule(code: string): Promise<
   ScreenParseResult<{
     readonly spec: BaseScreenMaterialSpec;
     readonly render: BaseScreenMaterialRenderFunction;
@@ -238,8 +241,10 @@ export function createMemoryWorkshopMaterialStore(
       return { ok: true, value: packages };
     },
     async save(input) {
-      const existing = input.id === undefined ? undefined : packages.find((pkg) => pkg.id === input.id);
-      if (input.id !== undefined && existing === undefined) return { ok: false, message: '组件包不存在。' };
+      const existing =
+        input.id === undefined ? undefined : packages.find((pkg) => pkg.id === input.id);
+      if (input.id !== undefined && existing === undefined)
+        return { ok: false, message: '组件包不存在。' };
       if (existing !== undefined && existing.revision !== input.revision) {
         return { ok: false, message: '组件包已被其他会话更新，请重新打开。' };
       }
@@ -366,7 +371,10 @@ export function withWorkshopLibraryGroup(
   grouping: WorkshopLibraryGrouping,
   onlineTypes: ReadonlySet<string>,
   visibleTypes: readonly string[],
-  group: { readonly id: string; readonly label: string } = { id: 'online-components', label: '在线组件' },
+  group: { readonly id: string; readonly label: string } = {
+    id: 'online-components',
+    label: '在线组件',
+  },
 ): WorkshopLibraryGrouping {
   const strip = (items: readonly WorkshopLibraryGroup[]): WorkshopLibraryGroup[] =>
     items.map((item) => {
@@ -383,7 +391,10 @@ export function withWorkshopLibraryGroup(
   const index = groups.findIndex((item) => item.id === group.id);
   if (index >= 0) {
     const existing = groups[index]!;
-    groups[index] = { ...existing, materialTypes: [...(existing.materialTypes ?? []), ...visibleTypes] };
+    groups[index] = {
+      ...existing,
+      materialTypes: [...(existing.materialTypes ?? []), ...visibleTypes],
+    };
   } else if (visibleTypes.length > 0) {
     groups.push({ id: group.id, label: group.label, materialTypes: [...visibleTypes] });
   }
@@ -401,7 +412,9 @@ export interface ComponentWorkshopDesigner {
   insertComponentFragment(
     intent: BaseScreenComponentFragmentInsertionIntent,
   ): ScreenParseResult<unknown>;
-  createComponentFragment(componentIds?: readonly string[]): ScreenParseResult<BaseScreenFragmentBody>;
+  createComponentFragment(
+    componentIds?: readonly string[],
+  ): ScreenParseResult<BaseScreenFragmentBody>;
   addEventListener(type: string, listener: EventListener): void;
   removeEventListener(type: string, listener: EventListener): void;
 }
@@ -518,7 +531,10 @@ const nextUid = (): number => {
 
 /** 新建组件的起点：一个符合范式的「环形进度」（单值、读数格式、跟随开关的读数样式）。 */
 function starterDraft(type: string): MaterialDraft {
-  const field = (input: Omit<FieldDraft, 'uid' | 'visibleKey' | 'visibleEquals'>, follow = ''): FieldDraft => ({
+  const field = (
+    input: Omit<FieldDraft, 'uid' | 'visibleKey' | 'visibleEquals'>,
+    follow = '',
+  ): FieldDraft => ({
     ...input,
     uid: nextUid(),
     visibleKey: follow,
@@ -541,15 +557,54 @@ function starterDraft(type: string): MaterialDraft {
     formatThousands: false,
     formatFollow: 'showValue',
     fields: [
-      field({ key: 'showValue', label: '显示读数', section: 'format', kind: 'boolean', default: true }),
-      field({ key: 'color', label: '读数色', section: 'text', kind: 'color', default: '#e6f1ff' }, 'showValue'),
+      field({
+        key: 'showValue',
+        label: '显示读数',
+        section: 'format',
+        kind: 'boolean',
+        default: true,
+      }),
       field(
-        { key: 'fontSize', label: '读数字号', section: 'text', kind: 'number', default: 26, min: 10, max: 72, unit: 'px' },
+        { key: 'color', label: '读数色', section: 'text', kind: 'color', default: '#e6f1ff' },
         'showValue',
       ),
-      field({ key: 'trackColor', label: '轨道色', section: 'surface', kind: 'color', default: '#132f4c' }),
-      field({ key: 'fillColor', label: '填充色', section: 'surface', kind: 'color', default: '#38bdf8' }),
-      field({ key: 'strokeWidth', label: '线宽', section: 'surface', kind: 'number', default: 12, min: 2, max: 40, unit: 'px' }),
+      field(
+        {
+          key: 'fontSize',
+          label: '读数字号',
+          section: 'text',
+          kind: 'number',
+          default: 26,
+          min: 10,
+          max: 72,
+          unit: 'px',
+        },
+        'showValue',
+      ),
+      field({
+        key: 'trackColor',
+        label: '轨道色',
+        section: 'surface',
+        kind: 'color',
+        default: '#132f4c',
+      }),
+      field({
+        key: 'fillColor',
+        label: '填充色',
+        section: 'surface',
+        kind: 'color',
+        default: '#38bdf8',
+      }),
+      field({
+        key: 'strokeWidth',
+        label: '线宽',
+        section: 'surface',
+        kind: 'number',
+        default: 12,
+        min: 2,
+        max: 40,
+        unit: 'px',
+      }),
     ],
     dataKind: 'scalar',
     scalarType: 'number',
@@ -596,7 +651,9 @@ if (props.showValue) {
   root.append(reading);
 }`;
 
-export function createComponentWorkshop(options: ComponentWorkshopOptions): ComponentWorkshopHandle {
+export function createComponentWorkshop(
+  options: ComponentWorkshopOptions,
+): ComponentWorkshopHandle {
   const { designer, materials, runtime, fragments } = options;
   const typePrefix = options.typePrefix ?? DEFAULT_TYPE_PREFIX;
   const tagPrefix = options.tagPrefix ?? DEFAULT_TAG_PREFIX;
@@ -621,7 +678,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
   // —— 框架：页头 / 左侧列表 / 编辑区
   const head = el('header', 'ws-head');
   const title = el('div', 'ws-title');
-  title.append(el('strong', '', '组件工坊'), el('span', 'ws-subtitle', '在线制作原子组件与组合组件；体检通过后发布到物料库，无需刷新页面。'));
+  title.append(
+    el('strong', '', '组件工坊'),
+    el('span', 'ws-subtitle', '在线制作原子组件与组合组件；体检通过后发布到物料库，无需刷新页面。'),
+  );
   const close = button('关闭', 'ws-button ws-ghost');
   head.append(title, close);
   const body = el('div', 'ws-body');
@@ -682,23 +742,37 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     list.replaceChildren();
     if (tab === 'materials') {
       for (const pkg of packages) {
-        const visible = (pkg.manifest as { readonly libraryVisible?: unknown }).libraryVisible !== false;
+        const visible =
+          (pkg.manifest as { readonly libraryVisible?: unknown }).libraryVisible !== false;
         list.append(
-          listItem(pkg.name, pkg.type, `第 ${pkg.revision} 版 · ${visible ? '已上架' : '已下架'}`, draft?.id === pkg.id, () =>
-            openPackage(pkg),
+          listItem(
+            pkg.name,
+            pkg.type,
+            `第 ${pkg.revision} 版 · ${visible ? '已上架' : '已下架'}`,
+            draft?.id === pkg.id,
+            () => openPackage(pkg),
           ),
         );
       }
-      if (packages.length === 0) list.append(el('p', 'ws-empty', '还没有在线组件。点「新建组件」从模板开始。'));
+      if (packages.length === 0)
+        list.append(el('p', 'ws-empty', '还没有在线组件。点「新建组件」从模板开始。'));
       return;
     }
     for (const preset of presets) {
-      list.append(listItem(preset.name, preset.category, '预置 · 只读', fragmentDraft?.id === preset.id, () => openFragment(preset, true)));
+      list.append(
+        listItem(preset.name, preset.category, '预置 · 只读', fragmentDraft?.id === preset.id, () =>
+          openFragment(preset, true),
+        ),
+      );
     }
     for (const item of fragments.list()) {
       list.append(
-        listItem(item.name, item.category, `${item.nodes.length + (item.shell === undefined ? 0 : 1)} 个组件`, fragmentDraft?.id === item.id, () =>
-          openFragment(item, false),
+        listItem(
+          item.name,
+          item.category,
+          `${item.nodes.length + (item.shell === undefined ? 0 : 1)} 个组件`,
+          fragmentDraft?.id === item.id,
+          () => openFragment(item, false),
         ),
       );
     }
@@ -707,10 +781,20 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     }
   };
 
-  const listItem = (name: string, meta: string, detail: string, selected: boolean, onClick: () => void): HTMLElement => {
+  const listItem = (
+    name: string,
+    meta: string,
+    detail: string,
+    selected: boolean,
+    onClick: () => void,
+  ): HTMLElement => {
     const item = button('', 'ws-item');
     item.classList.toggle('is-selected', selected);
-    item.append(el('strong', 'ws-item-name', name), el('span', 'ws-item-meta', meta), el('span', 'ws-item-meta', detail));
+    item.append(
+      el('strong', 'ws-item-name', name),
+      el('span', 'ws-item-meta', meta),
+      el('span', 'ws-item-meta', detail),
+    );
     item.addEventListener('click', onClick);
     return item;
   };
@@ -746,7 +830,11 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       draft = undefined;
       renderList();
       main.replaceChildren(
-        el('p', 'ws-empty', `「${pkg.name}」不是组件工坊生成的包（例如旧模板生成的在线物料），只能在物料库里使用。`),
+        el(
+          'p',
+          'ws-empty',
+          `「${pkg.name}」不是组件工坊生成的包（例如旧模板生成的在线物料），只能在物料库里使用。`,
+        ),
       );
       return;
     }
@@ -757,7 +845,11 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     setStatus(`正在编辑「${pkg.name}」。`);
   };
 
-  const draftFromSpec = (spec: BaseScreenMaterialSpec, renderBody: string, pkg: WorkshopMaterialPackage): MaterialDraft => {
+  const draftFromSpec = (
+    spec: BaseScreenMaterialSpec,
+    renderBody: string,
+    pkg: WorkshopMaterialPackage,
+  ): MaterialDraft => {
     const data = spec.data;
     return {
       id: pkg.id,
@@ -772,7 +864,8 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       formatEnabled: spec.numberFormat !== undefined,
       formatDecimals: spec.numberFormat?.decimals ?? 0,
       formatPrefix: spec.numberFormat?.prefix !== undefined && spec.numberFormat.prefix !== false,
-      formatPrefixDefault: typeof spec.numberFormat?.prefix === 'string' ? spec.numberFormat.prefix : '',
+      formatPrefixDefault:
+        typeof spec.numberFormat?.prefix === 'string' ? spec.numberFormat.prefix : '',
       formatUnit: spec.numberFormat?.unit !== undefined && spec.numberFormat.unit !== false,
       formatUnitDefault: typeof spec.numberFormat?.unit === 'string' ? spec.numberFormat.unit : '',
       formatThousands: spec.numberFormat?.thousandsSeparator !== undefined,
@@ -792,7 +885,8 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       roles: data.kind === 'rows' ? data.roles.map((role) => ({ ...role, uid: nextUid() })) : [],
       rowsSample: data.kind === 'rows' ? JSON.stringify(data.sample, null, 2) : '[]',
       renderBody,
-      libraryVisible: (pkg.manifest as { readonly libraryVisible?: unknown }).libraryVisible !== false,
+      libraryVisible:
+        (pkg.manifest as { readonly libraryVisible?: unknown }).libraryVisible !== false,
     };
   };
 
@@ -817,7 +911,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
           ? {
               kind: 'scalar',
               valueType: current.scalarType,
-              sample: current.scalarType === 'number' ? Number(current.scalarSample) : current.scalarSample,
+              sample:
+                current.scalarType === 'number'
+                  ? Number(current.scalarSample)
+                  : current.scalarSample,
             }
           : {
               kind: 'rows',
@@ -840,12 +937,23 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
         ? {
             numberFormat: {
               decimals: current.formatDecimals,
-              ...(current.formatPrefix ? { prefix: current.formatPrefixDefault === '' ? true : current.formatPrefixDefault } : {}),
-              ...(current.formatUnit ? { unit: current.formatUnitDefault === '' ? true : current.formatUnitDefault } : {}),
+              ...(current.formatPrefix
+                ? {
+                    prefix: current.formatPrefixDefault === '' ? true : current.formatPrefixDefault,
+                  }
+                : {}),
+              ...(current.formatUnit
+                ? { unit: current.formatUnitDefault === '' ? true : current.formatUnitDefault }
+                : {}),
               ...(current.formatThousands ? { thousandsSeparator: true } : {}),
               ...(current.formatFollow === ''
                 ? {}
-                : { visibleWhen: { key: current.formatFollow, equals: conditionValue(current.formatFollow, 'true') } }),
+                : {
+                    visibleWhen: {
+                      key: current.formatFollow,
+                      equals: conditionValue(current.formatFollow, 'true'),
+                    },
+                  }),
             },
           }
         : {}),
@@ -853,7 +961,11 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
         const { uid: _uid, visibleKey, visibleEquals, ...rest } = field;
         return {
           ...cleanField(rest),
-          ...(visibleKey === '' ? {} : { visibleWhen: { key: visibleKey, equals: conditionValue(visibleKey, visibleEquals) } }),
+          ...(visibleKey === ''
+            ? {}
+            : {
+                visibleWhen: { key: visibleKey, equals: conditionValue(visibleKey, visibleEquals) },
+              }),
         };
       }),
       data,
@@ -882,9 +994,21 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     basics.append(
       textField('名称', current.name, (value) => (current.name = value), 'name'),
       textField('分类', current.category, (value) => (current.category = value), 'category'),
-      textField('关键词', current.keywords, (value) => (current.keywords = value), 'keywords', '用逗号分隔'),
+      textField(
+        '关键词',
+        current.keywords,
+        (value) => (current.keywords = value),
+        'keywords',
+        '用逗号分隔',
+      ),
       current.id === undefined
-        ? textField('物料类型', current.type, (value) => (current.type = value.trim()), 'type', `${typePrefix}…`)
+        ? textField(
+            '物料类型',
+            current.type,
+            (value) => (current.type = value.trim()),
+            'type',
+            `${typePrefix}…`,
+          )
         : readonlyField('物料类型', current.type),
       numberField('默认宽', current.width, (value) => (current.width = value), 'width'),
       numberField('默认高', current.height, (value) => (current.height = value), 'height'),
@@ -909,7 +1033,14 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
             { uid: nextUid(), id: 'name', label: '名称', valueType: 'string' },
             { uid: nextUid(), id: 'value', label: '数值', valueType: 'number' },
           ];
-          current.rowsSample = JSON.stringify([{ name: '一号线', value: 82 }, { name: '二号线', value: 64 }], null, 2);
+          current.rowsSample = JSON.stringify(
+            [
+              { name: '一号线', value: 82 },
+              { name: '二号线', value: 64 },
+            ],
+            null,
+            2,
+          );
         }
         renderMaterialEditor();
       },
@@ -918,8 +1049,22 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     data.append(kind);
     if (current.dataKind === 'scalar') {
       data.append(
-        selectField('值类型', current.scalarType, [['number', '数字'], ['string', '文本']], (value) => (current.scalarType = value as 'number' | 'string'), 'scalarType'),
-        textField('示例值', current.scalarSample, (value) => (current.scalarSample = value), 'scalarSample'),
+        selectField(
+          '值类型',
+          current.scalarType,
+          [
+            ['number', '数字'],
+            ['string', '文本'],
+          ],
+          (value) => (current.scalarType = value as 'number' | 'string'),
+          'scalarType',
+        ),
+        textField(
+          '示例值',
+          current.scalarSample,
+          (value) => (current.scalarSample = value),
+          'scalarSample',
+        ),
       );
     }
     if (current.dataKind === 'rows') {
@@ -930,8 +1075,17 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
         row.append(
           inlineText(role.id, (value) => replaceRole(role.uid, { id: value }), '角色 id'),
           inlineText(role.label, (value) => replaceRole(role.uid, { label: value }), '角色名'),
-          inlineSelect(role.valueType, [['number', '数字'], ['string', '文本']], (value) => replaceRole(role.uid, { valueType: value as 'number' | 'string' })),
-          inlineCheck('可选', role.optional === true, (value) => replaceRole(role.uid, value ? { optional: true } : { optional: false })),
+          inlineSelect(
+            role.valueType,
+            [
+              ['number', '数字'],
+              ['string', '文本'],
+            ],
+            (value) => replaceRole(role.uid, { valueType: value as 'number' | 'string' }),
+          ),
+          inlineCheck('可选', role.optional === true, (value) =>
+            replaceRole(role.uid, value ? { optional: true } : { optional: false }),
+          ),
           removeButton(() => {
             current.roles = current.roles.filter((item) => item.uid !== role.uid);
             renderMaterialEditor();
@@ -941,38 +1095,107 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       }
       const addRole = button('添加角色', 'ws-button ws-ghost');
       addRole.addEventListener('click', () => {
-        current.roles = [...current.roles, { uid: nextUid(), id: `role${current.roles.length + 1}`, label: '新角色', valueType: 'string' }];
+        current.roles = [
+          ...current.roles,
+          {
+            uid: nextUid(),
+            id: `role${current.roles.length + 1}`,
+            label: '新角色',
+            valueType: 'string',
+          },
+        ];
         renderMaterialEditor();
       });
-      data.append(roles, addRole, codeField('示例行（JSON，键为角色 id）', current.rowsSample, (value) => (current.rowsSample = value), 'rowsSample', 6));
+      data.append(
+        roles,
+        addRole,
+        codeField(
+          '示例行（JSON，键为角色 id）',
+          current.rowsSample,
+          (value) => (current.rowsSample = value),
+          'rowsSample',
+          6,
+        ),
+      );
     }
 
     // 读数格式
-    const format = section('读数格式', '通用配置组（ADR-0102 §11）：小数位、前缀、单位、千分位在所有组件里同键同控件。');
+    const format = section(
+      '读数格式',
+      '通用配置组（ADR-0102 §11）：小数位、前缀、单位、千分位在所有组件里同键同控件。',
+    );
     const followOptions: [string, string][] = [
       ['', '始终显示'],
-      ...current.fields.filter((field) => field.section === 'format' && field.kind === 'boolean').map((field): [string, string] => [field.key, `跟随「${field.label}」`]),
+      ...current.fields
+        .filter((field) => field.section === 'format' && field.kind === 'boolean')
+        .map((field): [string, string] => [field.key, `跟随「${field.label}」`]),
     ];
     format.append(
-      checkField('启用读数格式', current.formatEnabled, (value) => {
-        current.formatEnabled = value;
-        renderMaterialEditor();
-      }, 'formatEnabled'),
+      checkField(
+        '启用读数格式',
+        current.formatEnabled,
+        (value) => {
+          current.formatEnabled = value;
+          renderMaterialEditor();
+        },
+        'formatEnabled',
+      ),
     );
     if (current.formatEnabled) {
       format.append(
-        numberField('默认小数位', current.formatDecimals, (value) => (current.formatDecimals = value), 'formatDecimals'),
-        checkField('前缀', current.formatPrefix, (value) => (current.formatPrefix = value), 'formatPrefix'),
-        textField('默认前缀', current.formatPrefixDefault, (value) => (current.formatPrefixDefault = value), 'formatPrefixDefault', '例如 ¥'),
-        checkField('单位', current.formatUnit, (value) => (current.formatUnit = value), 'formatUnit'),
-        textField('默认单位', current.formatUnitDefault, (value) => (current.formatUnitDefault = value), 'formatUnitDefault', '例如 %'),
-        checkField('千分位', current.formatThousands, (value) => (current.formatThousands = value), 'formatThousands'),
-        selectField('显示条件', current.formatFollow, followOptions, (value) => (current.formatFollow = value), 'formatFollow'),
+        numberField(
+          '默认小数位',
+          current.formatDecimals,
+          (value) => (current.formatDecimals = value),
+          'formatDecimals',
+        ),
+        checkField(
+          '前缀',
+          current.formatPrefix,
+          (value) => (current.formatPrefix = value),
+          'formatPrefix',
+        ),
+        textField(
+          '默认前缀',
+          current.formatPrefixDefault,
+          (value) => (current.formatPrefixDefault = value),
+          'formatPrefixDefault',
+          '例如 ¥',
+        ),
+        checkField(
+          '单位',
+          current.formatUnit,
+          (value) => (current.formatUnit = value),
+          'formatUnit',
+        ),
+        textField(
+          '默认单位',
+          current.formatUnitDefault,
+          (value) => (current.formatUnitDefault = value),
+          'formatUnitDefault',
+          '例如 %',
+        ),
+        checkField(
+          '千分位',
+          current.formatThousands,
+          (value) => (current.formatThousands = value),
+          'formatThousands',
+        ),
+        selectField(
+          '显示条件',
+          current.formatFollow,
+          followOptions,
+          (value) => (current.formatFollow = value),
+          'formatFollow',
+        ),
       );
     }
 
     // 字段
-    const fieldsSection = section('可调项', '分区决定落在 props 还是 style、出现在检查器哪一段；控件按语义自动推导（ADR-0102）。');
+    const fieldsSection = section(
+      '可调项',
+      '分区决定落在 props 还是 style、出现在检查器哪一段；控件按语义自动推导（ADR-0102）。',
+    );
     const fieldList = el('div', 'ws-fields');
     fieldList.dataset.workshopFields = '';
     current.fields.forEach((field, index) => fieldList.append(fieldCard(current, field, index)));
@@ -981,15 +1204,37 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     addField.addEventListener('click', () => {
       current.fields = [
         ...current.fields,
-        { uid: nextUid(), key: `field${current.fields.length + 1}`, label: '新可调项', section: 'structure', kind: 'number', default: 0, min: 0, max: 100, visibleKey: '', visibleEquals: '' },
+        {
+          uid: nextUid(),
+          key: `field${current.fields.length + 1}`,
+          label: '新可调项',
+          section: 'structure',
+          kind: 'number',
+          default: 0,
+          min: 0,
+          max: 100,
+          visibleKey: '',
+          visibleEquals: '',
+        },
       ];
       renderMaterialEditor();
     });
     fieldsSection.append(fieldList, addField);
 
     // 渲染代码
-    const code = section('渲染代码', `函数体可直接使用：${SPEC_RENDER_CONTEXT_NAMES.join('、')}。数据就绪时才会被调用；只在 root 里绘制。`);
-    code.append(codeField('render(context)', current.renderBody, (value) => (current.renderBody = value), 'renderBody', 18));
+    const code = section(
+      '渲染代码',
+      `函数体可直接使用：${SPEC_RENDER_CONTEXT_NAMES.join('、')}。数据就绪时才会被调用；只在 root 里绘制。`,
+    );
+    code.append(
+      codeField(
+        'render(context)',
+        current.renderBody,
+        (value) => (current.renderBody = value),
+        'renderBody',
+        18,
+      ),
+    );
 
     form.append(basics, data, format, fieldsSection, code);
 
@@ -1003,7 +1248,8 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       option.setAttribute('aria-pressed', String(previewState === state.id));
       option.addEventListener('click', () => {
         previewState = state.id;
-        for (const item of states.querySelectorAll('button')) item.setAttribute('aria-pressed', String(item === option));
+        for (const item of states.querySelectorAll('button'))
+          item.setAttribute('aria-pressed', String(item === option));
         scheduleRefresh(0);
       });
       states.append(option);
@@ -1014,7 +1260,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     previewPresenter = undefined;
     previewStage.append(previewHost);
     previewSection.append(states, previewStage);
-    const formSection = section('检查器', '发布后选中组件时检查器的样子：分区、字段与推导出的控件。');
+    const formSection = section(
+      '检查器',
+      '发布后选中组件时检查器的样子：分区、字段与推导出的控件。',
+    );
     formPreview = el('div', 'ws-form-preview');
     formPreview.dataset.workshopFormPreview = '';
     formSection.append(formPreview);
@@ -1023,7 +1272,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     auditList.dataset.workshopAudit = '';
     auditSection.append(auditList);
     const actions = el('div', 'ws-actions');
-    publishButton = button(current.id === undefined ? '发布' : '发布新版本', 'ws-button ws-primary');
+    publishButton = button(
+      current.id === undefined ? '发布' : '发布新版本',
+      'ws-button ws-primary',
+    );
     publishButton.dataset.workshopPublish = '';
     insertButton = button('插入画布', 'ws-button');
     insertButton.dataset.workshopInsert = '';
@@ -1061,17 +1313,26 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     const card = el('div', 'ws-field');
     card.dataset.workshopField = field.key;
     const update = (patch: Partial<FieldDraft>, rerender = false): void => {
-      current.fields = current.fields.map((item) => (item.uid === field.uid ? ({ ...item, ...patch } as FieldDraft) : item));
+      current.fields = current.fields.map((item) =>
+        item.uid === field.uid ? ({ ...item, ...patch } as FieldDraft) : item,
+      );
       if (rerender) renderMaterialEditor();
     };
     const top = el('div', 'ws-row');
     top.append(
       inlineText(field.key, (value) => update({ key: value }), '键名'),
       inlineText(field.label, (value) => update({ label: value }), '标签'),
-      inlineSelect(field.section, BASE_SCREEN_MATERIAL_SPEC_SECTIONS.map((item): [string, string] => [item.id, `${item.label} · ${item.target}`]), (value) =>
-        update({ section: value as FieldDraft['section'] }, true),
+      inlineSelect(
+        field.section,
+        BASE_SCREEN_MATERIAL_SPEC_SECTIONS.map((item): [string, string] => [
+          item.id,
+          `${item.label} · ${item.target}`,
+        ]),
+        (value) => update({ section: value as FieldDraft['section'] }, true),
       ),
-      inlineSelect(field.kind, Object.entries(KIND_LABEL), (value) => update(retypeField(field, value as FieldDraft['kind']), true)),
+      inlineSelect(field.kind, Object.entries(KIND_LABEL), (value) =>
+        update(retypeField(field, value as FieldDraft['kind']), true),
+      ),
       moveButton('↑', index > 0, () => moveField(current, index, -1)),
       moveButton('↓', index < current.fields.length - 1, () => moveField(current, index, 1)),
       removeButton(() => {
@@ -1083,18 +1344,38 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     bottom.append(defaultEditor(field, update));
     if (field.kind === 'number') {
       bottom.append(
-        inlineNumber(field.min, (value) => update(value === undefined ? withoutKey('min') : { min: value }), '最小'),
-        inlineNumber(field.max, (value) => update(value === undefined ? withoutKey('max') : { max: value }), '最大'),
-        inlineText(field.unit ?? '', (value) => update(value === '' ? withoutKey('unit') : { unit: value }), '单位'),
+        inlineNumber(
+          field.min,
+          (value) => update(value === undefined ? withoutKey('min') : { min: value }),
+          '最小',
+        ),
+        inlineNumber(
+          field.max,
+          (value) => update(value === undefined ? withoutKey('max') : { max: value }),
+          '最大',
+        ),
+        inlineText(
+          field.unit ?? '',
+          (value) => update(value === '' ? withoutKey('unit') : { unit: value }),
+          '单位',
+        ),
       );
     }
     if (field.kind === 'choice') {
       bottom.append(
-        inlineText((field.options ?? []).join(', '), (value) => update({ options: splitKeywords(value) }), '选项（逗号分隔）'),
+        inlineText(
+          (field.options ?? []).join(', '),
+          (value) => update({ options: splitKeywords(value) }),
+          '选项（逗号分隔）',
+        ),
       );
     }
     if (field.kind === 'color') {
-      bottom.append(inlineCheck('渐变', field.allowGradient === true, (value) => update(value ? { allowGradient: true } : withoutKey('allowGradient'))));
+      bottom.append(
+        inlineCheck('渐变', field.allowGradient === true, (value) =>
+          update(value ? { allowGradient: true } : withoutKey('allowGradient')),
+        ),
+      );
     }
     const dependencies = current.fields
       .slice(0, index)
@@ -1102,13 +1383,21 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     bottom.append(
       inlineSelect(
         field.visibleKey,
-        [['', '始终显示'], ...dependencies.map((item): [string, string] => [item.key, `当「${item.label}」=`])],
+        [
+          ['', '始终显示'],
+          ...dependencies.map((item): [string, string] => [item.key, `当「${item.label}」=`]),
+        ],
         (value) => {
           const dependency = dependencies.find((item) => item.key === value);
           update(
             {
               visibleKey: value,
-              visibleEquals: dependency === undefined ? '' : dependency.kind === 'boolean' ? 'true' : String(dependency.options?.[0] ?? ''),
+              visibleEquals:
+                dependency === undefined
+                  ? ''
+                  : dependency.kind === 'boolean'
+                    ? 'true'
+                    : String(dependency.options?.[0] ?? ''),
             },
             true,
           );
@@ -1119,8 +1408,19 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       const dependency = dependencies.find((item) => item.key === field.visibleKey);
       bottom.append(
         dependency?.kind === 'choice'
-          ? inlineSelect(field.visibleEquals, (dependency.options ?? []).map((option): [string, string] => [option, option]), (value) => update({ visibleEquals: value }))
-          : inlineSelect(field.visibleEquals, [['true', '开'], ['false', '关']], (value) => update({ visibleEquals: value })),
+          ? inlineSelect(
+              field.visibleEquals,
+              (dependency.options ?? []).map((option): [string, string] => [option, option]),
+              (value) => update({ visibleEquals: value }),
+            )
+          : inlineSelect(
+              field.visibleEquals,
+              [
+                ['true', '开'],
+                ['false', '关'],
+              ],
+              (value) => update({ visibleEquals: value }),
+            ),
       );
     }
     card.append(top, bottom);
@@ -1146,9 +1446,13 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     const current = draft;
     if (current === undefined) return [];
     const spec = specFromDraft(current);
-    const findings: BaseScreenAuthoringFinding[] = [...auditBaseScreenMaterialSpec(spec, { renderSource: current.renderBody })];
+    const findings: BaseScreenAuthoringFinding[] = [
+      ...auditBaseScreenMaterialSpec(spec, { renderSource: current.renderBody }),
+    ];
     const parsed = parseBaseScreenMaterialSpec(spec);
-    const compiled = parsed.ok ? compileBaseScreenMaterialSpec(parsed.value, { tagName: PREVIEW_TAG }) : undefined;
+    const compiled = parsed.ok
+      ? compileBaseScreenMaterialSpec(parsed.value, { tagName: PREVIEW_TAG })
+      : undefined;
     renderFormPreview(compiled?.ok === true ? compiled.value : undefined);
     if (parsed.ok && compiled?.ok === true) {
       const token = ++previewToken;
@@ -1160,7 +1464,8 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
         previewRender = imported.ok ? imported.value.render : undefined;
         previewError = imported.ok ? undefined : imported.diagnostics[0]?.message;
       }
-      if (previewError !== undefined) findings.unshift({ rule: 'RENDER', severity: 'error', message: previewError });
+      if (previewError !== undefined)
+        findings.unshift({ rule: 'RENDER', severity: 'error', message: previewError });
       renderPreview(parsed.value, compiled.value);
     } else {
       previewHost?.replaceChildren(el('p', 'ws-empty', '规格有错误，修正后显示预览。'));
@@ -1170,7 +1475,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     return findings;
   };
 
-  const renderPreview = (spec: BaseScreenMaterialSpec, manifest: BaseScreenMaterialManifest): void => {
+  const renderPreview = (
+    spec: BaseScreenMaterialSpec,
+    manifest: BaseScreenMaterialManifest,
+  ): void => {
     const stage = previewStage;
     const mountHost = previewHost;
     if (stage === undefined || mountHost === undefined) return;
@@ -1180,13 +1488,20 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       previewPresenter = undefined;
       return;
     }
-    const scale = Math.min(1, PREVIEW_BOX.width / spec.defaultSize.width, PREVIEW_BOX.height / spec.defaultSize.height);
+    const scale = Math.min(
+      1,
+      PREVIEW_BOX.width / spec.defaultSize.width,
+      PREVIEW_BOX.height / spec.defaultSize.height,
+    );
     mountHost.style.width = `${spec.defaultSize.width}px`;
     mountHost.style.height = `${spec.defaultSize.height}px`;
     mountHost.style.transform = `scale(${scale})`;
     // 每次重新挂载：渲染函数换了，旧 presenter 持有的是旧函数。
     const mount = mountHost.shadowRoot ?? mountHost.attachShadow({ mode: 'open' });
-    previewPresenter = createBaseScreenRenderedMaterialPresenter(mount, { data: spec.data, render });
+    previewPresenter = createBaseScreenRenderedMaterialPresenter(mount, {
+      data: spec.data,
+      render,
+    });
     previewPresenter.update({
       componentId: 'workshop-preview',
       mode: 'design',
@@ -1198,16 +1513,23 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     });
   };
 
-  const previewDataState = (spec: BaseScreenMaterialSpec, manifest: BaseScreenMaterialManifest): BaseScreenMaterialDataState => {
+  const previewDataState = (
+    spec: BaseScreenMaterialSpec,
+    manifest: BaseScreenMaterialManifest,
+  ): BaseScreenMaterialDataState => {
     switch (previewState) {
       case 'loading':
         return { status: 'loading' };
       case 'error':
         return { status: 'error', code: 'HOST_RESOURCE_FAILED', message: '示例：数据源请求失败。' };
       case 'empty':
-        return spec.data.kind === 'scalar' ? { status: 'idle' } : { status: 'ready', value: { rows: [], total: 0 } };
+        return spec.data.kind === 'scalar'
+          ? { status: 'idle' }
+          : { status: 'ready', value: { rows: [], total: 0 } };
       default:
-        return spec.data.kind === 'none' ? { status: 'idle' } : { status: 'ready', value: manifest.defaultData ?? null };
+        return spec.data.kind === 'none'
+          ? { status: 'idle' }
+          : { status: 'ready', value: manifest.defaultData ?? null };
     }
   };
 
@@ -1220,16 +1542,27 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       target.append(el('p', 'ws-empty', '规格有错误，修正后显示。'));
       return;
     }
-    target.append(el('div', 'ws-form-common', '公共区：位置、尺寸、旋转、不透明度、翻转、滤镜（引擎统一提供，组件不声明）'));
+    target.append(
+      el(
+        'div',
+        'ws-form-common',
+        '公共区：位置、尺寸、旋转、不透明度、翻转、滤镜（引擎统一提供，组件不声明）',
+      ),
+    );
     for (const item of sections) {
       const block = el('div', 'ws-form-section');
-      const tier = item.advanced === true ? ' · 仅全量' : item.collapsed === true ? ' · 默认收起' : '';
+      const tier =
+        item.advanced === true ? ' · 仅全量' : item.collapsed === true ? ' · 默认收起' : '';
       block.append(el('div', 'ws-form-section-title', `${item.label}${tier}`));
       for (const field of item.fields) {
         const row = el('div', 'ws-form-row');
         row.append(
           el('span', 'ws-form-label', field.label),
-          el('span', 'ws-form-control', `${CONTROL_LABEL[field.control] ?? field.control}${field.unit === undefined ? '' : ` · ${field.unit}`}${field.when === undefined ? '' : ' · 条件显示'}`),
+          el(
+            'span',
+            'ws-form-control',
+            `${CONTROL_LABEL[field.control] ?? field.control}${field.unit === undefined ? '' : ` · ${field.unit}`}${field.when === undefined ? '' : ' · 条件显示'}`,
+          ),
         );
         block.append(row);
       }
@@ -1237,7 +1570,13 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     }
     if (manifest.dataCapabilities.length > 0) {
       const roles = manifest.dataBinding?.roles.map((role) => role.id).join('、') ?? '';
-      target.append(el('div', 'ws-form-common', `数据页：静态数据${manifest.dataCapabilities.includes('dataset') ? ' / 数据集' : ''}${manifest.dataCapabilities.includes('variable') ? ' / 变量' : ''}；绑定角色 ${roles}`));
+      target.append(
+        el(
+          'div',
+          'ws-form-common',
+          `数据页：静态数据${manifest.dataCapabilities.includes('dataset') ? ' / 数据集' : ''}${manifest.dataCapabilities.includes('variable') ? ' / 变量' : ''}；绑定角色 ${roles}`,
+        ),
+      );
     }
   };
 
@@ -1260,7 +1599,8 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       item.append(el('span', 'ws-audit-rule', finding.rule), el('span', '', finding.message));
       target.append(item);
     }
-    if (publishButton !== undefined) publishButton.dataset.blocked = String(hasBaseScreenAuthoringErrors(findings));
+    if (publishButton !== undefined)
+      publishButton.dataset.blocked = String(hasBaseScreenAuthoringErrors(findings));
   };
 
   const currentPackage = (): WorkshopMaterialPackage | undefined =>
@@ -1268,7 +1608,9 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
 
   const syncMaterialActions = (): void => {
     const pkg = currentPackage();
-    const visible = (pkg?.manifest as { readonly libraryVisible?: unknown } | undefined)?.libraryVisible !== false;
+    const visible =
+      (pkg?.manifest as { readonly libraryVisible?: unknown } | undefined)?.libraryVisible !==
+      false;
     if (publishButton !== undefined) publishButton.disabled = busy;
     if (insertButton !== undefined) insertButton.disabled = busy || pkg === undefined || !visible;
     if (visibilityButton !== undefined) {
@@ -1279,7 +1621,8 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     if (deleteButton !== undefined) {
       deleteButton.hidden = pkg === undefined;
       deleteButton.disabled = busy;
-      deleteButton.textContent = armedDelete !== undefined && armedDelete === pkg?.id ? '确认删除' : '删除';
+      deleteButton.textContent =
+        armedDelete !== undefined && armedDelete === pkg?.id ? '确认删除' : '删除';
     }
   };
 
@@ -1302,7 +1645,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       window.clearTimeout(refreshTimer);
       const findings = await refreshMaterial();
       if (hasBaseScreenAuthoringErrors(findings)) {
-        setStatus(`体检有 ${findings.filter((item) => item.severity === 'error').length} 个错误，修正后再发布。`, 'error');
+        setStatus(
+          `体检有 ${findings.filter((item) => item.severity === 'error').length} 个错误，修正后再发布。`,
+          'error',
+        );
         return;
       }
       if (!current.type.startsWith(typePrefix)) {
@@ -1334,7 +1680,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       }
       const applied = await runtime.apply(saved.value);
       if (!applied.ok) {
-        setStatus(`已保存，但装载进物料库失败：${applied.diagnostics[0]?.message ?? '未知错误'}`, 'error');
+        setStatus(
+          `已保存，但装载进物料库失败：${applied.diagnostics[0]?.message ?? '未知错误'}`,
+          'error',
+        );
         return;
       }
       packages = [saved.value, ...packages.filter((pkg) => pkg.id !== saved.value.id)];
@@ -1373,14 +1722,20 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     if (current === undefined) return;
     const materialType = current.type;
     const result = designer.insertComponent({ materialType });
-    setStatus(result.ok ? `已插入「${current.name}」：在检查器里调整可调项。` : (result.diagnostics[0]?.message ?? '插入失败。'), result.ok ? 'success' : 'error');
+    setStatus(
+      result.ok
+        ? `已插入「${current.name}」：在检查器里调整可调项。`
+        : (result.diagnostics[0]?.message ?? '插入失败。'),
+      result.ok ? 'success' : 'error',
+    );
   };
 
   const toggleVisibility = (): Promise<void> =>
     withBusy(async () => {
       const pkg = currentPackage();
       if (pkg === undefined || draft === undefined) return;
-      const visible = (pkg.manifest as { readonly libraryVisible?: unknown }).libraryVisible === false;
+      const visible =
+        (pkg.manifest as { readonly libraryVisible?: unknown }).libraryVisible === false;
       const saved = await materials.setVisibility(pkg.id, visible);
       if (!saved.ok) {
         setStatus(`操作失败：${saved.message}`, 'error');
@@ -1395,7 +1750,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       draft.libraryVisible = visible;
       draft.revision = saved.value.revision;
       renderList();
-      setStatus(visible ? '已上架：物料库重新显示该组件。' : '已下架：物料库隐藏该组件，已有组件继续渲染。', 'success');
+      setStatus(
+        visible ? '已上架：物料库重新显示该组件。' : '已下架：物料库隐藏该组件，已有组件继续渲染。',
+        'success',
+      );
     });
 
   const deleteMaterial = (): Promise<void> =>
@@ -1410,7 +1768,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       armedDelete = undefined;
       const removed = await runtime.remove(pkg.type);
       if (!removed.ok) {
-        setStatus(`不能删除：${removed.diagnostics[0]?.message ?? '组件仍被引用'}。可以先下架。`, 'error');
+        setStatus(
+          `不能删除：${removed.diagnostics[0]?.message ?? '组件仍被引用'}。可以先下架。`,
+          'error',
+        );
         return;
       }
       const deleted = await materials.remove(pkg.id);
@@ -1445,9 +1806,13 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       setStatus(extractionMessage(extracted.diagnostics), 'error');
       return;
     }
-    openFragmentBody(extracted.value, extracted.value.shell?.name ?? extracted.value.nodes[0]?.name ?? '');
+    openFragmentBody(
+      extracted.value,
+      extracted.value.shell?.name ?? extracted.value.nodes[0]?.name ?? '',
+    );
     const dropped = extracted.diagnostics.filter((item) => item.severity === 'warning');
-    if (dropped.length > 0) setStatus(`已从选区提取；${dropped.map((item) => item.message).join('；')}`);
+    if (dropped.length > 0)
+      setStatus(`已从选区提取；${dropped.map((item) => item.message).join('；')}`);
   };
 
   const openFragmentBody = (fragmentBody: BaseScreenFragmentBody, suggestedName: string): void => {
@@ -1466,7 +1831,14 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
 
   const openFragment = (definition: BaseScreenFragmentDefinition, preset: boolean): void => {
     const { id, name, category, keywords, cover: _cover, ...fragmentBody } = definition;
-    fragmentDraft = { id, preset, name, category, keywords: keywords.join(', '), body: fragmentBody };
+    fragmentDraft = {
+      id,
+      preset,
+      name,
+      category,
+      keywords: keywords.join(', '),
+      body: fragmentBody,
+    };
     renderList();
     renderFragmentEditor();
     setStatus(preset ? `「${name}」是宿主预置组合，只能插入。` : `正在编辑「${name}」。`);
@@ -1488,8 +1860,19 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     const basics = section('基本信息');
     basics.append(
       textField('名称', current.name, (value) => (current.name = value), 'fragmentName'),
-      textField('分类', current.category, (value) => (current.category = value), 'fragmentCategory'),
-      textField('关键词', current.keywords, (value) => (current.keywords = value), 'fragmentKeywords', '用逗号分隔'),
+      textField(
+        '分类',
+        current.category,
+        (value) => (current.category = value),
+        'fragmentCategory',
+      ),
+      textField(
+        '关键词',
+        current.keywords,
+        (value) => (current.keywords = value),
+        'fragmentKeywords',
+        '用逗号分隔',
+      ),
     );
     if (current.preset) for (const input of basics.querySelectorAll('input')) input.disabled = true;
     const outline = section('组成', '插入后展开为这些普通组件；外壳承担卡片底板（ADR-0100 F2）。');
@@ -1497,10 +1880,17 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     nodes.dataset.workshopOutline = '';
     const catalog = designer.catalog;
     const entries = [
-      ...(current.body.shell === undefined ? [] : [{ entry: current.body.shell, role: '外壳', depth: 0 }]),
+      ...(current.body.shell === undefined
+        ? []
+        : [{ entry: current.body.shell, role: '外壳', depth: 0 }]),
       ...current.body.nodes.map((node) => ({
         entry: node,
-        role: node.parent === undefined ? (current.body.shell === undefined ? '节点' : '子节点') : '子节点',
+        role:
+          node.parent === undefined
+            ? current.body.shell === undefined
+              ? '节点'
+              : '子节点'
+            : '子节点',
         depth: node.parent === undefined ? (current.body.shell === undefined ? 0 : 1) : 2,
       })),
     ];
@@ -1511,12 +1901,22 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
       row.append(
         el('span', 'ws-outline-role', role),
         el('strong', '', entry.name ?? entry.key),
-        el('span', 'ws-item-meta', `${materialName}${entry.size === undefined ? '' : ` · ${entry.size.width}×${entry.size.height}`}`),
+        el(
+          'span',
+          'ws-item-meta',
+          `${materialName}${entry.size === undefined ? '' : ` · ${entry.size.width}×${entry.size.height}`}`,
+        ),
       );
       nodes.append(row);
     }
     if ((current.body.dataSources?.length ?? 0) > 0) {
-      nodes.append(el('div', 'ws-form-common', `共享数据源 ${current.body.dataSources?.length} 个：插入时一并生成，节点经字段引用读取。`));
+      nodes.append(
+        el(
+          'div',
+          'ws-form-common',
+          `共享数据源 ${current.body.dataSources?.length} 个：插入时一并生成，节点经字段引用读取。`,
+        ),
+      );
     }
     outline.append(nodes);
     form.append(basics, outline);
@@ -1533,7 +1933,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     replace.dataset.workshopReplaceFragment = '';
     const insert = button('插入画布', 'ws-button');
     insert.dataset.workshopInsertFragment = '';
-    const remove = button(armedDelete !== undefined && armedDelete === current.id ? '确认删除' : '删除', 'ws-button ws-danger');
+    const remove = button(
+      armedDelete !== undefined && armedDelete === current.id ? '确认删除' : '删除',
+      'ws-button ws-danger',
+    );
     remove.dataset.workshopDeleteFragment = '';
     save.hidden = current.preset;
     replace.hidden = current.preset;
@@ -1551,7 +1954,12 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     });
     insert.addEventListener('click', () => {
       const result = designer.insertComponentFragment({ ...current.body });
-      setStatus(result.ok ? `已插入「${current.name}」。` : (result.diagnostics[0]?.message ?? '插入失败。'), result.ok ? 'success' : 'error');
+      setStatus(
+        result.ok
+          ? `已插入「${current.name}」。`
+          : (result.diagnostics[0]?.message ?? '插入失败。'),
+        result.ok ? 'success' : 'error',
+      );
     });
     remove.addEventListener('click', () => {
       if (current.id === undefined) return;
@@ -1575,7 +1983,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     layout.append(form, aside);
     main.replaceChildren(layout);
     const refresh = (): void =>
-      renderAudit(auditBaseScreenFragment(fragmentDefinition(current), designer.catalog), '符合范式，可以保存。');
+      renderAudit(
+        auditBaseScreenFragment(fragmentDefinition(current), designer.catalog),
+        '符合范式，可以保存。',
+      );
     form.addEventListener('input', refresh);
     refresh();
   };
@@ -1595,7 +2006,10 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
     syncFragmentsToDesigner();
     renderList();
     renderFragmentEditor();
-    setStatus(`已保存组合「${definition.name}」：物料库「${definition.category}」分类里可以拖入。`, 'success');
+    setStatus(
+      `已保存组合「${definition.name}」：物料库「${definition.category}」分类里可以拖入。`,
+      'success',
+    );
   };
 
   // —— 事件
@@ -1615,7 +2029,12 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
   };
 
   const onSaveRequest = (event: Event): void => {
-    const detail = (event as CustomEvent<{ readonly fragment: BaseScreenFragmentBody; readonly suggestedName: string }>).detail;
+    const detail = (
+      event as CustomEvent<{
+        readonly fragment: BaseScreenFragmentBody;
+        readonly suggestedName: string;
+      }>
+    ).detail;
     if (!dialog.open) dialog.showModal();
     void loadPackages();
     openFragmentBody(detail.fragment, detail.suggestedName);
@@ -1625,7 +2044,9 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
   close.addEventListener('click', () => dialog.close());
   materialTab.addEventListener('click', () => switchTab('materials'));
   fragmentTab.addEventListener('click', () => switchTab('fragments'));
-  sideAction.addEventListener('click', () => (tab === 'materials' ? startMaterial() : startFragmentFromSelection()));
+  sideAction.addEventListener('click', () =>
+    tab === 'materials' ? startMaterial() : startFragmentFromSelection(),
+  );
   dialog.addEventListener('cancel', (event) => {
     event.preventDefault();
     dialog.close();
@@ -1653,7 +2074,9 @@ export function createComponentWorkshop(options: ComponentWorkshopOptions): Comp
 // ———————————————————————————— 小工具 ————————————————————————————
 
 /** 选区提取失败的宿主文案：没选中是最常见的情况，其余沿用引擎诊断。 */
-function extractionMessage(diagnostics: readonly { readonly code: string; readonly message: string }[]): string {
+function extractionMessage(
+  diagnostics: readonly { readonly code: string; readonly message: string }[],
+): string {
   const first = diagnostics[0];
   if (first === undefined || first.code === 'AUTHORING_SOURCE_INVALID') {
     return '先在画布上选中要组合的组件（外壳或全部组件）。';
@@ -1681,7 +2104,9 @@ function retypeField(field: FieldDraft, kind: FieldDraft['kind']): Partial<Field
 }
 
 /** 按类型去掉不适用的键（切换类型后残留的范围、选项等）。 */
-function cleanField(field: Omit<FieldDraft, 'uid' | 'visibleKey' | 'visibleEquals'>): BaseScreenMaterialSpecField {
+function cleanField(
+  field: Omit<FieldDraft, 'uid' | 'visibleKey' | 'visibleEquals'>,
+): BaseScreenMaterialSpecField {
   const { min, max, step, unit, options, allowGradient, help, ...rest } = field;
   return {
     ...rest,
@@ -1704,7 +2129,10 @@ function withoutKey(key: 'min' | 'max' | 'unit' | 'allowGradient'): Partial<Fiel
   return { [key]: undefined } as unknown as Partial<FieldDraft>;
 }
 
-function sameManifest(left: BaseScreenMaterialManifest, right: BaseScreenMaterialManifest): boolean {
+function sameManifest(
+  left: BaseScreenMaterialManifest,
+  right: BaseScreenMaterialManifest,
+): boolean {
   return screenJsonEquals(comparableManifest(left), comparableManifest(right));
 }
 
@@ -1717,20 +2145,40 @@ function comparableManifest(manifest: BaseScreenMaterialManifest): ScreenJsonVal
   return (libraryVisible === false ? manifest : rest) as unknown as ScreenJsonValue;
 }
 
-function defaultEditor(field: FieldDraft, update: (patch: Partial<FieldDraft>) => void): HTMLElement {
+function defaultEditor(
+  field: FieldDraft,
+  update: (patch: Partial<FieldDraft>) => void,
+): HTMLElement {
   switch (field.kind) {
     case 'boolean':
-      return inlineSelect(String(field.default), [['true', '默认开'], ['false', '默认关']], (value) => update({ default: value === 'true' }));
+      return inlineSelect(
+        String(field.default),
+        [
+          ['true', '默认开'],
+          ['false', '默认关'],
+        ],
+        (value) => update({ default: value === 'true' }),
+      );
     case 'number':
-      return inlineNumber(typeof field.default === 'number' ? field.default : 0, (value) => update({ default: value ?? 0 }), '默认值');
+      return inlineNumber(
+        typeof field.default === 'number' ? field.default : 0,
+        (value) => update({ default: value ?? 0 }),
+        '默认值',
+      );
     case 'color': {
       const wrap = el('span', 'ws-color');
       const picker = document.createElement('input');
       picker.type = 'color';
       picker.className = 'ws-input ws-swatch';
-      const text = inlineText(String(field.default), (value) => update({ default: value }), '默认颜色');
+      const text = inlineText(
+        String(field.default),
+        (value) => update({ default: value }),
+        '默认颜色',
+      );
       const textInput = text as HTMLInputElement;
-      picker.value = /^#[0-9a-f]{6}$/i.test(String(field.default)) ? String(field.default) : '#000000';
+      picker.value = /^#[0-9a-f]{6}$/i.test(String(field.default))
+        ? String(field.default)
+        : '#000000';
       picker.addEventListener('input', () => {
         textInput.value = picker.value;
         update({ default: picker.value });
@@ -1739,7 +2187,11 @@ function defaultEditor(field: FieldDraft, update: (patch: Partial<FieldDraft>) =
       return wrap;
     }
     case 'choice':
-      return inlineSelect(String(field.default), (field.options ?? []).map((option): [string, string] => [option, `默认 ${option}`]), (value) => update({ default: value }));
+      return inlineSelect(
+        String(field.default),
+        (field.options ?? []).map((option): [string, string] => [option, `默认 ${option}`]),
+        (value) => update({ default: value }),
+      );
     default:
       return inlineText(String(field.default), (value) => update({ default: value }), '默认值');
   }
@@ -1759,7 +2211,13 @@ function labelled(labelText: string, control: HTMLElement, key: string): HTMLEle
   return wrapper;
 }
 
-function textField(labelText: string, value: string, onInput: (value: string) => void, key: string, placeholder = ''): HTMLElement {
+function textField(
+  labelText: string,
+  value: string,
+  onInput: (value: string) => void,
+  key: string,
+  placeholder = '',
+): HTMLElement {
   return labelled(labelText, inlineText(value, onInput, placeholder), key);
 }
 
@@ -1769,11 +2227,25 @@ function readonlyField(labelText: string, value: string): HTMLElement {
   return labelled(labelText, input, 'type');
 }
 
-function numberField(labelText: string, value: number, onInput: (value: number) => void, key: string): HTMLElement {
-  return labelled(labelText, inlineNumber(value, (next) => onInput(next ?? 0), ''), key);
+function numberField(
+  labelText: string,
+  value: number,
+  onInput: (value: number) => void,
+  key: string,
+): HTMLElement {
+  return labelled(
+    labelText,
+    inlineNumber(value, (next) => onInput(next ?? 0), ''),
+    key,
+  );
 }
 
-function checkField(labelText: string, value: boolean, onChange: (value: boolean) => void, key: string): HTMLElement {
+function checkField(
+  labelText: string,
+  value: boolean,
+  onChange: (value: boolean) => void,
+  key: string,
+): HTMLElement {
   const wrapper = el('label', 'ws-labelled ws-check');
   wrapper.dataset.workshopInput = key;
   const input = document.createElement('input');
@@ -1784,11 +2256,23 @@ function checkField(labelText: string, value: boolean, onChange: (value: boolean
   return wrapper;
 }
 
-function selectField(labelText: string, value: string, options: readonly (readonly [string, string])[], onChange: (value: string) => void, key: string): HTMLElement {
+function selectField(
+  labelText: string,
+  value: string,
+  options: readonly (readonly [string, string])[],
+  onChange: (value: string) => void,
+  key: string,
+): HTMLElement {
   return labelled(labelText, inlineSelect(value, options, onChange), key);
 }
 
-function codeField(labelText: string, value: string, onInput: (value: string) => void, key: string, rows: number): HTMLElement {
+function codeField(
+  labelText: string,
+  value: string,
+  onInput: (value: string) => void,
+  key: string,
+  rows: number,
+): HTMLElement {
   const area = document.createElement('textarea');
   area.className = 'ws-input ws-code';
   area.rows = rows;
@@ -1807,7 +2291,11 @@ function codeField(labelText: string, value: string, onInput: (value: string) =>
   return wrapper;
 }
 
-function inlineText(value: string, onInput: (value: string) => void, placeholder: string): HTMLElement {
+function inlineText(
+  value: string,
+  onInput: (value: string) => void,
+  placeholder: string,
+): HTMLElement {
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'ws-input';
@@ -1818,7 +2306,11 @@ function inlineText(value: string, onInput: (value: string) => void, placeholder
   return input;
 }
 
-function inlineNumber(value: number | undefined, onInput: (value: number | undefined) => void, placeholder: string): HTMLElement {
+function inlineNumber(
+  value: number | undefined,
+  onInput: (value: number | undefined) => void,
+  placeholder: string,
+): HTMLElement {
   const input = document.createElement('input');
   input.type = 'number';
   input.className = 'ws-input ws-number';
@@ -1832,7 +2324,11 @@ function inlineNumber(value: number | undefined, onInput: (value: number | undef
   return input;
 }
 
-function inlineSelect(value: string, options: readonly (readonly [string, string])[], onChange: (value: string) => void): HTMLElement {
+function inlineSelect(
+  value: string,
+  options: readonly (readonly [string, string])[],
+  onChange: (value: string) => void,
+): HTMLElement {
   const select = document.createElement('select');
   select.className = 'ws-input';
   for (const [optionValue, label] of options) {
@@ -1846,7 +2342,11 @@ function inlineSelect(value: string, options: readonly (readonly [string, string
   return select;
 }
 
-function inlineCheck(labelText: string, value: boolean, onChange: (value: boolean) => void): HTMLElement {
+function inlineCheck(
+  labelText: string,
+  value: boolean,
+  onChange: (value: boolean) => void,
+): HTMLElement {
   const wrapper = el('label', 'ws-inline-check');
   const input = document.createElement('input');
   input.type = 'checkbox';
@@ -1871,7 +2371,11 @@ function moveButton(text: string, enabled: boolean, onClick: () => void): HTMLEl
   return control;
 }
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className: string,
+  text?: string,
+): HTMLElementTagNameMap[K] {
   const element = document.createElement(tag);
   if (className !== '') element.className = className;
   if (text !== undefined) element.textContent = text;
@@ -1918,7 +2422,10 @@ function ok<T>(value: T): ScreenParseResult<T> {
 }
 
 function workshopFailure(
-  code: 'PLUGIN_CORE_LIFECYCLE_INVALID' | 'PLUGIN_CORE_IDENTITY_CONFLICT' | 'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+  code:
+    | 'PLUGIN_CORE_LIFECYCLE_INVALID'
+    | 'PLUGIN_CORE_IDENTITY_CONFLICT'
+    | 'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
   message: string,
 ): ScreenParseResult<never> {
   return { ok: false, diagnostics: [{ severity: 'error', code, path: [], message }] };

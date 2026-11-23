@@ -72,7 +72,8 @@ export function applyMaterialDataMarker(
 ): void {
   const stale = model.dataState.status === 'ready' && model.dataState.stale === true;
   if (stale) {
-    if (element.dataset.baseScreenDataStale !== 'true') element.dataset.baseScreenDataStale = 'true';
+    if (element.dataset.baseScreenDataStale !== 'true')
+      element.dataset.baseScreenDataStale = 'true';
   } else if (element.dataset.baseScreenDataStale !== undefined) {
     delete element.dataset.baseScreenDataStale;
   }

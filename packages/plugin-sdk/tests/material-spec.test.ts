@@ -17,7 +17,15 @@ const RING: BaseScreenMaterialSpec = {
   numberFormat: { decimals: 1, unit: '%', visibleWhen: { key: 'showValue', equals: true } },
   fields: [
     { key: 'showValue', label: '显示读数', section: 'format', kind: 'boolean', default: true },
-    { key: 'segments', label: '刻度数', section: 'structure', kind: 'number', default: 12, min: 4, max: 24 },
+    {
+      key: 'segments',
+      label: '刻度数',
+      section: 'structure',
+      kind: 'number',
+      default: 12,
+      min: 4,
+      max: 24,
+    },
     {
       key: 'color',
       label: '读数色',
@@ -169,13 +177,19 @@ describe('material spec (ADR-0105 §2.2)', () => {
 
   it('normalizes static, variable and dataset values to one shape', () => {
     expect(normalizeBaseScreenMaterialSpecValue(RING.data, '12')).toEqual({ value: 12, rows: [] });
-    expect(normalizeBaseScreenMaterialSpecValue(RING.data, 'n/a')).toEqual({ value: null, rows: [] });
-    expect(normalizeBaseScreenMaterialSpecValue(RANK.data, { rows: [{ name: 'A', value: '2' }] }).rows).toEqual([
-      { name: 'A', value: 2, note: null },
-    ]);
+    expect(normalizeBaseScreenMaterialSpecValue(RING.data, 'n/a')).toEqual({
+      value: null,
+      rows: [],
+    });
+    expect(
+      normalizeBaseScreenMaterialSpecValue(RANK.data, { rows: [{ name: 'A', value: '2' }] }).rows,
+    ).toEqual([{ name: 'A', value: 2, note: null }]);
     // 静态表格数据集形状（fields + rows）也按角色键读取。
     expect(
-      normalizeBaseScreenMaterialSpecValue(RANK.data, { fields: [], rows: [{ name: 'B', value: 1 }] }).rows,
+      normalizeBaseScreenMaterialSpecValue(RANK.data, {
+        fields: [],
+        rows: [{ name: 'B', value: 1 }],
+      }).rows,
     ).toEqual([{ name: 'B', value: 1, note: null }]);
   });
 
@@ -186,18 +200,26 @@ describe('material spec (ADR-0105 §2.2)', () => {
     };
     const field = (patch: Record<string, unknown>) => ({
       ...RING,
-      fields: [{ key: 'size', label: '尺寸', section: 'structure', kind: 'number', default: 1, ...patch }],
+      fields: [
+        { key: 'size', label: '尺寸', section: 'structure', kind: 'number', default: 1, ...patch },
+      ],
     });
     expect(paths(field({ key: 'opacity' }))).toContain('fields.0.key');
     expect(paths(field({ key: 'decimals' }))).toContain('fields.0.key');
     expect(paths(field({ default: 30, max: 20 }))).toContain('fields.0.default');
-    expect(paths(field({ kind: 'choice', default: 'c', options: ['a', 'b'] }))).toContain('fields.0.default');
-    expect(paths(field({ section: 'chrome' }))).toContain('fields.0.section');
-    expect(paths(field({ visibleWhen: { key: 'missing', equals: true } }))).toContain('fields.0.visibleWhen');
-    expect(paths({ ...RING, numberFormat: { visibleWhen: { key: 'segments', equals: true } } })).toContain(
-      'numberFormat.visibleWhen',
+    expect(paths(field({ kind: 'choice', default: 'c', options: ['a', 'b'] }))).toContain(
+      'fields.0.default',
     );
-    expect(paths({ ...RANK, data: { ...RANK.data, sample: [{ city: 'x' }] } })).toContain('data.sample.0.city');
+    expect(paths(field({ section: 'chrome' }))).toContain('fields.0.section');
+    expect(paths(field({ visibleWhen: { key: 'missing', equals: true } }))).toContain(
+      'fields.0.visibleWhen',
+    );
+    expect(
+      paths({ ...RING, numberFormat: { visibleWhen: { key: 'segments', equals: true } } }),
+    ).toContain('numberFormat.visibleWhen');
+    expect(paths({ ...RANK, data: { ...RANK.data, sample: [{ city: 'x' }] } })).toContain(
+      'data.sample.0.city',
+    );
     expect(paths({ ...RING, type: 'Not A Type' })).toContain('type');
     expect(paths({ ...RING, extra: true })).toContain('extra');
   });

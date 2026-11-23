@@ -12,7 +12,10 @@ import { createLogger } from '../lib/logger';
 import { goToList } from '../lib/navigation';
 import type { Route, ViewModule } from '../router';
 import { createHostAssetLibrary, HOST_ASSET_LIBRARY_GROUP_ID } from '../screen/asset-library';
-import { attachHostComponentEntry, HOST_COMPONENT_LIBRARY_GROUP_ID } from '../screen/component-entry';
+import {
+  attachHostComponentEntry,
+  HOST_COMPONENT_LIBRARY_GROUP_ID,
+} from '../screen/component-entry';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
   createHostAlarmStyleAuthoring,

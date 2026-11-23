@@ -484,7 +484,9 @@ export const api = {
   deleteMaterialPackage: (id: string): Promise<ApiResult<{ deleted: true; id: string }>> =>
     request(`/material-packages/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   // ---- 组件库（ADR-0106）：原子组件草稿、组合与引用 ----
-  listComponentDrafts: (signal?: AbortSignal): Promise<ApiResult<{ drafts: ComponentDraftShape[] }>> =>
+  listComponentDrafts: (
+    signal?: AbortSignal,
+  ): Promise<ApiResult<{ drafts: ComponentDraftShape[] }>> =>
     request('/component-drafts', signal === undefined ? {} : { signal }),
   saveComponentDraft: (
     type: string,

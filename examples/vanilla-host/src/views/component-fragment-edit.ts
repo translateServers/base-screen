@@ -11,7 +11,11 @@ import type {
   ScreenSize,
 } from 'base-screen/contracts';
 import type { BaseScreenFragmentBody, BaseScreenFragmentDefinition } from 'base-screen/plugin-core';
-import { auditBaseScreenFragment, type BaseScreenAuthoringFinding, hasBaseScreenAuthoringErrors } from 'base-screen/plugins';
+import {
+  auditBaseScreenFragment,
+  type BaseScreenAuthoringFinding,
+  hasBaseScreenAuthoringErrors,
+} from 'base-screen/plugins';
 import { createAppShell } from '../components/app-shell';
 import { showToast } from '../components/toast';
 import { el } from '../lib/dom';
@@ -44,7 +48,12 @@ const OUTLINE_INTERVAL = 800;
 
 /** 新建组合的起点：一个空容器外壳，作者把组件拖进去。 */
 const STARTER_BODY: BaseScreenFragmentBody = {
-  shell: { key: 'shell', materialType: 'base.container', name: '卡片', size: { width: 320, height: 180 } },
+  shell: {
+    key: 'shell',
+    materialType: 'base.container',
+    name: '卡片',
+    size: { width: 320, height: 180 },
+  },
   nodes: [
     {
       key: 'title',
@@ -90,7 +99,10 @@ export const componentFragmentEditView: ViewModule = {
       name = nameInput.value;
       markDirty();
     });
-    const status = el('span', { class: 'component-editor__save', attrs: { 'aria-live': 'polite' } });
+    const status = el('span', {
+      class: 'component-editor__save',
+      attrs: { 'aria-live': 'polite' },
+    });
     const saveButton = el('button', {
       class: 'button button--primary',
       text: '保存',
@@ -117,8 +129,14 @@ export const componentFragmentEditView: ViewModule = {
       deleteButton,
       saveButton,
     ]);
-    const canvasHost = el('div', { class: 'component-fragment__canvas', attrs: { 'data-fragment-canvas': '' } });
-    const side = el('aside', { class: 'component-fragment__side', attrs: { 'aria-label': '组成' } });
+    const canvasHost = el('div', {
+      class: 'component-fragment__canvas',
+      attrs: { 'data-fragment-canvas': '' },
+    });
+    const side = el('aside', {
+      class: 'component-fragment__side',
+      attrs: { 'aria-label': '组成' },
+    });
     const page = el('div', { class: 'component-editor component-editor--fragment' }, [
       topbar,
       el('div', { class: 'component-fragment__workspace' }, [canvasHost, side]),
@@ -159,31 +177,52 @@ export const componentFragmentEditView: ViewModule = {
       }
       for (const node of body.nodes) {
         outline.append(
-          el('li', { attrs: { 'data-nested': String(node.parent !== undefined || body.shell !== undefined) } }, [
-            el('span', { text: node.name ?? '（未命名）' }),
-            el('span', { class: 'component-hint', text: ` ${node.materialType}` }),
-          ]),
+          el(
+            'li',
+            {
+              attrs: {
+                'data-nested': String(node.parent !== undefined || body.shell !== undefined),
+              },
+            },
+            [
+              el('span', { text: node.name ?? '（未命名）' }),
+              el('span', { class: 'component-hint', text: ` ${node.materialType}` }),
+            ],
+          ),
         );
       }
       const errors = findings.filter((item) => item.severity === 'error').length;
       side.replaceChildren(
         el('section', { class: 'component-block' }, [
           el('h3', { class: 'component-block__title', text: '组合信息' }),
-          labelled('分类', textField(category, preset, (value) => {
-            category = value;
-            markDirty();
-          })),
-          labelled('关键词', textField(keywords.join('，'), preset, (value) => {
-            keywords = value.split(/[,，、\s]+/).map((item) => item.trim()).filter(Boolean).slice(0, 16);
-            markDirty();
-          })),
+          labelled(
+            '分类',
+            textField(category, preset, (value) => {
+              category = value;
+              markDirty();
+            }),
+          ),
+          labelled(
+            '关键词',
+            textField(keywords.join('，'), preset, (value) => {
+              keywords = value
+                .split(/[,，、\s]+/)
+                .map((item) => item.trim())
+                .filter(Boolean)
+                .slice(0, 16);
+              markDirty();
+            }),
+          ),
           el('p', {
             class: 'component-hint',
             text: '插入大屏后展开为普通组件；修改组合不会影响已插入的副本。',
           }),
         ]),
         el('section', { class: 'component-block' }, [
-          el('h3', { class: 'component-block__title', text: `组成 · ${body.nodes.length + (body.shell === undefined ? 0 : 1)} 个节点` }),
+          el('h3', {
+            class: 'component-block__title',
+            text: `组成 · ${body.nodes.length + (body.shell === undefined ? 0 : 1)} 个节点`,
+          }),
           outline,
           el('p', {
             class: 'component-hint',
@@ -193,19 +232,26 @@ export const componentFragmentEditView: ViewModule = {
         el('section', { class: 'component-block', attrs: { 'data-fragment-audit': '' } }, [
           el('h3', {
             class: 'component-block__title',
-            text: findings.length === 0 ? '体检通过' : `体检 ${errors} 错误 · ${findings.length - errors} 警告`,
+            text:
+              findings.length === 0
+                ? '体检通过'
+                : `体检 ${errors} 错误 · ${findings.length - errors} 警告`,
           }),
           el(
             'ul',
             { class: 'component-problems__list' },
             findings.map((finding) =>
-              el('li', { class: 'component-problems__item', attrs: { 'data-severity': finding.severity } }, [
-                el('span', {
-                  class: 'component-problems__severity',
-                  text: finding.severity === 'error' ? '错误' : '警告',
-                }),
-                el('span', { class: 'component-problems__message', text: finding.message }),
-              ]),
+              el(
+                'li',
+                { class: 'component-problems__item', attrs: { 'data-severity': finding.severity } },
+                [
+                  el('span', {
+                    class: 'component-problems__severity',
+                    text: finding.severity === 'error' ? '错误' : '警告',
+                  }),
+                  el('span', { class: 'component-problems__message', text: finding.message }),
+                ],
+              ),
             ),
           ),
         ]),
@@ -229,7 +275,13 @@ export const componentFragmentEditView: ViewModule = {
       lastDocument = current;
       const extracted = extract(element);
       if (!extracted.ok) {
-        findings = [{ rule: 'SPEC', severity: 'error', message: extracted.diagnostics[0]?.message ?? '画布内容不能存为组合。' }];
+        findings = [
+          {
+            rule: 'SPEC',
+            severity: 'error',
+            message: extracted.diagnostics[0]?.message ?? '画布内容不能存为组合。',
+          },
+        ];
         renderSide();
         return;
       }
@@ -267,7 +319,10 @@ export const componentFragmentEditView: ViewModule = {
           handle.onDispose(() => {
             if (designer === element) designer = undefined;
           });
-          const inserted = element.insertComponentFragment({ anchor: { x: CANVAS_MARGIN, y: CANVAS_MARGIN }, ...body });
+          const inserted = element.insertComponentFragment({
+            anchor: { x: CANVAS_MARGIN, y: CANVAS_MARGIN },
+            ...body,
+          });
           if (!inserted.ok) {
             showToast(`组合无法展开：${inserted.diagnostics[0]?.message ?? '未知错误'}`, 'error');
           }
@@ -293,7 +348,12 @@ export const componentFragmentEditView: ViewModule = {
         renderStatus();
         const copyId = createFragmentId();
         const result = await saveFragmentDefinition({
-          definition: { ...definition(), id: copyId, name: `${definition().name} 副本`, category: '我的组合' },
+          definition: {
+            ...definition(),
+            id: copyId,
+            name: `${definition().name} 副本`,
+            category: '我的组合',
+          },
           revision: undefined,
         });
         busy = false;
@@ -359,7 +419,14 @@ export const componentFragmentEditView: ViewModule = {
       name = item.name;
       category = item.category;
       keywords = item.keywords;
-      const { id: _id, name: _name, category: _category, keywords: _keywords, cover: _cover, ...rest } = item.definition;
+      const {
+        id: _id,
+        name: _name,
+        category: _category,
+        keywords: _keywords,
+        cover: _cover,
+        ...rest
+      } = item.definition;
       body = rest;
     };
 
@@ -367,13 +434,19 @@ export const componentFragmentEditView: ViewModule = {
       if (routeId !== undefined) {
         const library = await loadComponentLibrary(controllerAbort.signal);
         if (disposed) return;
-        const item = library.ok ? library.value.fragments.find((candidate) => candidate.id === routeId) : undefined;
+        const item = library.ok
+          ? library.value.fragments.find((candidate) => candidate.id === routeId)
+          : undefined;
         if (item === undefined) {
           page.replaceChildren(
             el('div', { class: 'page ds-page' }, [
               el('div', { class: 'error-banner', attrs: { role: 'alert' } }, [
                 el('span', { class: 'error-banner__message', text: '组合不存在或已被删除。' }),
-                el('button', { class: 'button', text: '返回组件库', on: { click: goToComponents } }),
+                el('button', {
+                  class: 'button',
+                  text: '返回组件库',
+                  on: { click: goToComponents },
+                }),
               ]),
             ]),
           );
@@ -411,11 +484,20 @@ export const componentFragmentEditView: ViewModule = {
 /** 组合画布里的全部根组件（连同后代）提取为分片：单个可容纳子节点的根成为外壳。 */
 function extract(element: BaseScreenDesignerElement): ScreenParseResult<BaseScreenFragmentBody> {
   const document = element.getDocument();
-  const roots = (document?.components ?? []).filter((component) => component.parentId === null).map((component) => component.id);
+  const roots = (document?.components ?? [])
+    .filter((component) => component.parentId === null)
+    .map((component) => component.id);
   if (roots.length === 0) {
     return {
       ok: false,
-      diagnostics: [{ severity: 'error', code: 'AUTHORING_SOURCE_INVALID', path: [], message: '画布是空的：至少放一个组件。' }],
+      diagnostics: [
+        {
+          severity: 'error',
+          code: 'AUTHORING_SOURCE_INVALID',
+          path: [],
+          message: '画布是空的：至少放一个组件。',
+        },
+      ],
     };
   }
   return element.createComponentFragment(roots);
@@ -423,13 +505,16 @@ function extract(element: BaseScreenDesignerElement): ScreenParseResult<BaseScre
 
 function canvasSize(
   body: BaseScreenFragmentBody,
-  catalog: { get(type: string): { readonly manifest: { readonly defaultSize: ScreenSize } } | undefined },
+  catalog: {
+    get(type: string): { readonly manifest: { readonly defaultSize: ScreenSize } } | undefined;
+  },
 ): ScreenSize {
   const entries = [...(body.shell === undefined ? [] : [body.shell]), ...body.nodes];
   let width = 0;
   let height = 0;
   for (const entry of entries) {
-    const size = entry.size ?? catalog.get(entry.materialType)?.manifest.defaultSize ?? { width: 80, height: 32 };
+    const size = entry.size ??
+      catalog.get(entry.materialType)?.manifest.defaultSize ?? { width: 80, height: 32 };
     width = Math.max(width, (entry.offset?.x ?? 0) + size.width);
     height = Math.max(height, (entry.offset?.y ?? 0) + size.height);
   }
@@ -444,7 +529,7 @@ function emptyDocument(size: ScreenSize): ScreenDocument {
     canvas: { width: size.width, height: size.height, backgroundColor: '#0b1020' },
     components: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 
@@ -472,10 +557,17 @@ function createMemoryProjectAdapter(initial: ScreenDocument): ScreenProjectAdapt
 }
 
 function labelled(label: string, control: HTMLElement): HTMLElement {
-  return el('label', { class: 'component-row' }, [el('span', { class: 'component-row__label', text: label }), control]);
+  return el('label', { class: 'component-row' }, [
+    el('span', { class: 'component-row__label', text: label }),
+    control,
+  ]);
 }
 
-function textField(value: string, readOnly: boolean, onInput: (value: string) => void): HTMLInputElement {
+function textField(
+  value: string,
+  readOnly: boolean,
+  onInput: (value: string) => void,
+): HTMLInputElement {
   const input = el('input', { class: 'field component-input', attrs: { type: 'text' } });
   input.value = value;
   input.readOnly = readOnly;

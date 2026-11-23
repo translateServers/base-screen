@@ -112,7 +112,12 @@ export const PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
           label: '动效',
           advanced: true,
           fields: [
-            { id: 'flipAnimation', target: 'props', path: ['flipAnimation'], label: '启用翻牌动画' },
+            {
+              id: 'flipAnimation',
+              target: 'props',
+              path: ['flipAnimation'],
+              label: '启用翻牌动画',
+            },
           ],
         },
       ],

@@ -38,9 +38,9 @@ describe('official material editor descriptors (ADR-0099 §2.4)', () => {
   });
 
   it('conforms to the inspector form paradigm (ADR-0102 R9/R11–R14)', () => {
-    expect(OFFICIAL_MANIFESTS.flatMap((manifest) => auditBaseScreenMaterialEditorForm(manifest))).toEqual(
-      [],
-    );
+    expect(
+      OFFICIAL_MANIFESTS.flatMap((manifest) => auditBaseScreenMaterialEditorForm(manifest)),
+    ).toEqual([]);
   });
 
   it('keeps the descriptor as the only form source (ADR-0102 D1)', () => {

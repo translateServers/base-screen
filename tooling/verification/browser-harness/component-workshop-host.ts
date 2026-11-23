@@ -1,3 +1,11 @@
+import {
+  createComponentWorkshop,
+  createLocalWorkshopFragmentStore,
+  createLocalWorkshopMaterialStore,
+  loadSpecMaterialEntry,
+  type WorkshopMaterialRuntime,
+  withWorkshopLibraryGroup,
+} from '../../../examples/vanilla-host/src/screen/component-workshop.ts';
 import type { ScreenParseResult } from '../../../packages/contracts/src/index.ts';
 import {
   BASE_SCREEN_FRAGMENT_SAVE_REQUEST_EVENT,
@@ -7,14 +15,6 @@ import {
   type BaseScreenMaterialCatalogEntry,
   createBaseScreenMaterialCatalog,
 } from '../../../packages/plugin-core/src/index.ts';
-import {
-  createComponentWorkshop,
-  createLocalWorkshopFragmentStore,
-  createLocalWorkshopMaterialStore,
-  loadSpecMaterialEntry,
-  type WorkshopMaterialRuntime,
-  withWorkshopLibraryGroup,
-} from '../../../examples/vanilla-host/src/screen/component-workshop.ts';
 
 /**
  * browser-harness 的组件工坊宿主（`?designer&workshop`）：与三端示例同一份工坊实现，
@@ -46,7 +46,9 @@ export async function mountHarnessComponentWorkshop(
       createBaseScreenMaterialCatalog([...base, ...next.values()]),
       grouping === undefined
         ? {}
-        : { materialLibraryGrouping: withWorkshopLibraryGroup(grouping, onlineTypes, visibleTypes) },
+        : {
+            materialLibraryGrouping: withWorkshopLibraryGroup(grouping, onlineTypes, visibleTypes),
+          },
     );
     if (refreshed.ok) {
       online.clear();

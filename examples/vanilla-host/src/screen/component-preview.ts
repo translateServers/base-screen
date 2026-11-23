@@ -41,17 +41,27 @@ const renderCache = new Map<string, Promise<BaseScreenMaterialRenderFunction | s
 export async function compilePreview(source: AtomicComponentSource): Promise<CompilePreviewResult> {
   const parsed = parseBaseScreenMaterialSpec(source.spec);
   if (!parsed.ok) {
-    return { ok: false, stage: 'spec', message: parsed.diagnostics[0]?.message ?? '组件定义有错误。' };
+    return {
+      ok: false,
+      stage: 'spec',
+      message: parsed.diagnostics[0]?.message ?? '组件定义有错误。',
+    };
   }
   const manifest = compileBaseScreenMaterialSpec(parsed.value, { tagName: PREVIEW_TAG });
   if (!manifest.ok) {
-    return { ok: false, stage: 'spec', message: manifest.diagnostics[0]?.message ?? '组件定义有错误。' };
+    return {
+      ok: false,
+      stage: 'spec',
+      message: manifest.diagnostics[0]?.message ?? '组件定义有错误。',
+    };
   }
   const code = buildSpecMaterialModule(parsed.value, source.renderBody);
   let pending = renderCache.get(code);
   if (pending === undefined) {
     pending = importSpecMaterialModule(code).then((imported) =>
-      imported.ok ? imported.value.render : (imported.diagnostics[0]?.message ?? '渲染代码无法加载。'),
+      imported.ok
+        ? imported.value.render
+        : (imported.diagnostics[0]?.message ?? '渲染代码无法加载。'),
     );
     renderCache.set(code, pending);
     if (renderCache.size > 64) renderCache.delete(renderCache.keys().next().value as string);
@@ -152,7 +162,12 @@ export function renderFragmentCover(
     size ?? catalog?.get(materialType)?.manifest.defaultSize ?? { width: 80, height: 32 };
   if (definition.shell !== undefined) {
     const size = sizeOf(definition.shell.materialType, definition.shell.size);
-    rects.push({ x: definition.shell.offset?.x ?? 0, y: definition.shell.offset?.y ?? 0, ...size, shell: true });
+    rects.push({
+      x: definition.shell.offset?.x ?? 0,
+      y: definition.shell.offset?.y ?? 0,
+      ...size,
+      shell: true,
+    });
   }
   for (const node of definition.nodes) {
     const size = sizeOf(node.materialType, node.size);

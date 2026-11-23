@@ -475,9 +475,8 @@ export function readDesignerPushDelivery(
   );
   const source = instance?.source;
   if (source?.kind === 'host-resource') {
-    const push = context.callbacks
-      .getRuntimeContributions()
-      ?.getResourceType(source.resourceType)?.delivery?.push;
+    const push = context.callbacks.getRuntimeContributions()?.getResourceType(source.resourceType)
+      ?.delivery?.push;
     if (push === undefined) return undefined;
     if (typeof context.callbacks.getResourcePort()?.subscribe !== 'function') return undefined;
     return { append: push.append === true };

@@ -116,10 +116,7 @@ describe('createSubscriptionHub', () => {
     up.emit({ type: 'invalidate' });
     const late = recorder();
     hub.subscribe({ resourceId: 'oee' }, late, subscription().options);
-    expect(late.events).toEqual([
-      { type: 'snapshot', value: table(2, 3) },
-      { type: 'invalidate' },
-    ]);
+    expect(late.events).toEqual([{ type: 'snapshot', value: table(2, 3) }, { type: 'invalidate' }]);
   });
 
   it('最后一个订阅者离开后 linger 到期才关闭；期间重新订阅直接复用', async () => {

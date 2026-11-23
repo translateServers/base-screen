@@ -57,7 +57,9 @@ interface PageState {
   statusFilter: StatusFilter;
   layout: Layout;
   pendingDelete: string | undefined;
-  blocked: { readonly key: string; readonly references: readonly ComponentScreenReferenceShape[] } | undefined;
+  blocked:
+    | { readonly key: string; readonly references: readonly ComponentScreenReferenceShape[] }
+    | undefined;
   busy: string | undefined;
 }
 
@@ -95,14 +97,24 @@ export const componentListView: ViewModule = {
         },
       },
     });
-    const kindFilters = filterGroup('按类型筛选', KIND_FILTERS, () => state.kind, (id) => {
-      state.kind = id;
-      renderBody();
-    });
-    const statusFilters = filterGroup('按状态筛选', STATUS_FILTERS, () => state.statusFilter, (id) => {
-      state.statusFilter = id;
-      renderBody();
-    });
+    const kindFilters = filterGroup(
+      '按类型筛选',
+      KIND_FILTERS,
+      () => state.kind,
+      (id) => {
+        state.kind = id;
+        renderBody();
+      },
+    );
+    const statusFilters = filterGroup(
+      '按状态筛选',
+      STATUS_FILTERS,
+      () => state.statusFilter,
+      (id) => {
+        state.statusFilter = id;
+        renderBody();
+      },
+    );
     const layoutToggle = filterGroup(
       '视图',
       [
@@ -162,7 +174,13 @@ export const componentListView: ViewModule = {
     const notices = el('div');
     const body = el('div', { class: 'component-library__body' });
     main.append(
-      el('div', { class: 'page ds-page component-library' }, [header, toolbar, meta, notices, body]),
+      el('div', { class: 'page ds-page component-library' }, [
+        header,
+        toolbar,
+        meta,
+        notices,
+        body,
+      ]),
     );
 
     // ———————— 数据 ————————
@@ -199,7 +217,9 @@ export const componentListView: ViewModule = {
       return all.filter((item) => {
         if (state.statusFilter !== 'all') {
           if (item.kind === 'fragment') return false;
-          if (state.statusFilter === 'draft' ? !item.hasDraft : item.status !== state.statusFilter) {
+          if (
+            state.statusFilter === 'draft' ? !item.hasDraft : item.status !== state.statusFilter
+          ) {
             return false;
           }
         }
@@ -243,7 +263,10 @@ export const componentListView: ViewModule = {
             'div',
             { class: 'component-grid' },
             Array.from({ length: 6 }, () =>
-              el('article', { class: 'component-card component-card--skeleton', attrs: { 'aria-hidden': 'true' } }),
+              el('article', {
+                class: 'component-card component-card--skeleton',
+                attrs: { 'aria-hidden': 'true' },
+              }),
             ),
           ),
         );
@@ -261,36 +284,46 @@ export const componentListView: ViewModule = {
           : [el('span', { class: 'ds-meta__hint', text: `筛选后 ${visible.length} 个` })]),
       );
       if (visible.length === 0) {
-        const nothing = (snapshot?.atomic.length ?? 0) === 0 && state.query === '' && state.kind !== 'fragment';
+        const nothing =
+          (snapshot?.atomic.length ?? 0) === 0 && state.query === '' && state.kind !== 'fragment';
         body.replaceChildren(
-          el('div', { class: 'empty-state component-library__empty', attrs: { 'data-component-empty': '' } }, [
-            el('p', {
-              text: nothing ? '还没有在线组件。从一个模板开始，几分钟就能做出第一个。' : '没有符合条件的组件。',
-            }),
-            ...(nothing
-              ? [
-                  el('button', {
-                    class: 'button button--primary',
-                    text: '从模板新建',
-                    on: { click: () => openTemplatePicker() },
-                  }),
-                ]
-              : [
-                  el('button', {
-                    class: 'button',
-                    text: '清除筛选',
-                    on: {
-                      click: () => {
-                        state.query = '';
-                        search.value = '';
-                        state.kind = 'all';
-                        state.statusFilter = 'all';
-                        renderBody();
+          el(
+            'div',
+            {
+              class: 'empty-state component-library__empty',
+              attrs: { 'data-component-empty': '' },
+            },
+            [
+              el('p', {
+                text: nothing
+                  ? '还没有在线组件。从一个模板开始，几分钟就能做出第一个。'
+                  : '没有符合条件的组件。',
+              }),
+              ...(nothing
+                ? [
+                    el('button', {
+                      class: 'button button--primary',
+                      text: '从模板新建',
+                      on: { click: () => openTemplatePicker() },
+                    }),
+                  ]
+                : [
+                    el('button', {
+                      class: 'button',
+                      text: '清除筛选',
+                      on: {
+                        click: () => {
+                          state.query = '';
+                          search.value = '';
+                          state.kind = 'all';
+                          state.statusFilter = 'all';
+                          renderBody();
+                        },
                       },
-                    },
-                  }),
-                ]),
-          ]),
+                    }),
+                  ]),
+            ],
+          ),
         );
         return;
       }
@@ -584,14 +617,24 @@ export const componentListView: ViewModule = {
         ),
       );
       overlay.append(
-        el('div', { class: 'ds-dialog component-template-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': '选择模板' } }, [
-          el('h2', { class: 'ds-dialog__title', text: '从模板新建原子组件' }),
-          el('p', { class: 'ds-desc', text: '模板都已符合组件范式；进入编辑器后可以改可调项、数据与代码。' }),
-          el('div', { class: 'component-template-grid' }, choices),
-          el('div', { class: 'ds-dialog__actions' }, [
-            el('button', { class: 'button', text: '取消', on: { click: close } }),
-          ]),
-        ]),
+        el(
+          'div',
+          {
+            class: 'ds-dialog component-template-dialog',
+            attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': '选择模板' },
+          },
+          [
+            el('h2', { class: 'ds-dialog__title', text: '从模板新建原子组件' }),
+            el('p', {
+              class: 'ds-desc',
+              text: '模板都已符合组件范式；进入编辑器后可以改可调项、数据与代码。',
+            }),
+            el('div', { class: 'component-template-grid' }, choices),
+            el('div', { class: 'ds-dialog__actions' }, [
+              el('button', { class: 'button', text: '取消', on: { click: close } }),
+            ]),
+          ],
+        ),
       );
       overlay.addEventListener('click', (event) => {
         if (event.target === overlay) close();
@@ -611,7 +654,8 @@ export const componentListView: ViewModule = {
     void load();
     return () => {
       controller.abort();
-      for (const overlay of document.querySelectorAll('[data-component-templates]')) overlay.remove();
+      for (const overlay of document.querySelectorAll('[data-component-templates]'))
+        overlay.remove();
     };
   },
 };
@@ -626,7 +670,9 @@ function badges(item: ComponentItem): HTMLElement[] {
     text: item.kind === 'atomic' ? '原子' : '组合',
   });
   if (item.kind === 'fragment') {
-    return item.preset ? [kind, el('span', { class: 'ds-badge ds-badge--draft', text: '预置' })] : [kind];
+    return item.preset
+      ? [kind, el('span', { class: 'ds-badge ds-badge--draft', text: '预置' })]
+      : [kind];
   }
   const status =
     item.status === 'listed'
@@ -635,7 +681,11 @@ function badges(item: ComponentItem): HTMLElement[] {
         ? el('span', { class: 'ds-badge ds-badge--draft', text: '已下架' })
         : el('span', { class: 'ds-badge ds-badge--draft', text: '未发布' });
   return item.hasDraft && item.status !== 'unpublished'
-    ? [kind, status, el('span', { class: 'ds-badge component-badge--changed', text: '有未发布改动' })]
+    ? [
+        kind,
+        status,
+        el('span', { class: 'ds-badge component-badge--changed', text: '有未发布改动' }),
+      ]
     : [kind, status];
 }
 

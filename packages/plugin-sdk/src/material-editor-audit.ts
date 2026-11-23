@@ -148,9 +148,7 @@ function isAllowedControl(
 }
 
 function auditConfigGroups(manifest: BaseScreenMaterialManifest, add: AddViolation): void {
-  const fields = (manifest.editorDescriptor?.appearance ?? []).flatMap(
-    (section) => section.fields,
-  );
+  const fields = (manifest.editorDescriptor?.appearance ?? []).flatMap((section) => section.fields);
   for (const [key, canonical] of CONFIG_GROUP_KEYS) {
     const schema = manifest.propsSchema.properties[key];
     if (schema === undefined) continue;

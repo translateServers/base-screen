@@ -27,7 +27,9 @@ export function goToAtomicComponent(type: string | undefined, template?: string)
 
 export function goToFragmentComponent(id: string | undefined): void {
   window.location.hash =
-    id === undefined ? '#/components/fragment/new' : `#/components/fragment/${encodeURIComponent(id)}`;
+    id === undefined
+      ? '#/components/fragment/new'
+      : `#/components/fragment/${encodeURIComponent(id)}`;
 }
 
 export function goToEdit(id: string): void {

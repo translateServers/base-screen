@@ -11,19 +11,19 @@ import type {
 import { ONLINE_MATERIAL_TYPE_PREFIX } from '../material-packages/material-package.types';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  type CreateComponentFragmentDto,
-  isComponentDraftType,
-  isComponentFragmentId,
-  type SaveComponentDraftDto,
-  type UpdateComponentFragmentDto,
-} from './dto/component.dto';
-import {
   type ComponentDraftShape,
   type ComponentFragmentShape,
   type ComponentScreenReference,
   MAX_COMPONENT_SOURCE_BYTES,
   MAX_FRAGMENT_DEFINITION_BYTES,
 } from './component.types';
+import {
+  type CreateComponentFragmentDto,
+  isComponentDraftType,
+  isComponentFragmentId,
+  type SaveComponentDraftDto,
+  type UpdateComponentFragmentDto,
+} from './dto/component.dto';
 
 const MAX_DISPLAY_LENGTH = 256;
 
@@ -55,12 +55,17 @@ export class ComponentsService {
     }
     const name = dto.name.trim();
     if (name.length === 0) {
-      throw new BadRequestException({ error: 'COMPONENT_NAME_INVALID', message: '组件名称不能为空。' });
+      throw new BadRequestException({
+        error: 'COMPONENT_NAME_INVALID',
+        message: '组件名称不能为空。',
+      });
     }
     const existing = await this.prisma.componentDraft.findUnique({ where: { type } });
     if (existing === null) {
       if (dto.revision !== 0) throw revisionConflict();
-      const row = await this.prisma.componentDraft.create({ data: { type, name, source: dto.source } });
+      const row = await this.prisma.componentDraft.create({
+        data: { type, name, source: dto.source },
+      });
       return toDraftShape(row);
     }
     if (dto.revision !== existing.revision) throw revisionConflict();
@@ -103,7 +108,10 @@ export class ComponentsService {
     return requireFragmentShape(row);
   }
 
-  async updateFragment(id: string, dto: UpdateComponentFragmentDto): Promise<ComponentFragmentShape> {
+  async updateFragment(
+    id: string,
+    dto: UpdateComponentFragmentDto,
+  ): Promise<ComponentFragmentShape> {
     const meta = readFragmentMeta(dto.definition);
     if (meta.id !== id) {
       throw new BadRequestException({
@@ -194,7 +202,10 @@ function readFragmentMeta(definition: Record<string, unknown>): {
 } {
   const { id, name, category } = definition;
   if (typeof id !== 'string' || !isComponentFragmentId(id)) {
-    throw new BadRequestException({ error: 'COMPONENT_FRAGMENT_INVALID', message: '组合 id 不合法。' });
+    throw new BadRequestException({
+      error: 'COMPONENT_FRAGMENT_INVALID',
+      message: '组合 id 不合法。',
+    });
   }
   if (!isDisplayText(name) || !isDisplayText(category)) {
     throw new BadRequestException({
@@ -219,7 +230,9 @@ function readFragmentMeta(definition: Record<string, unknown>): {
 }
 
 function isDisplayText(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0 && [...value].length <= MAX_DISPLAY_LENGTH;
+  return (
+    typeof value === 'string' && value.trim().length > 0 && [...value].length <= MAX_DISPLAY_LENGTH
+  );
 }
 
 function collectTypes(value: unknown, out: Set<string>): void {
@@ -253,7 +266,8 @@ function toFragmentShape(row: ComponentFragmentRecord): ComponentFragmentShape |
   } catch {
     return undefined;
   }
-  if (definition === null || typeof definition !== 'object' || Array.isArray(definition)) return undefined;
+  if (definition === null || typeof definition !== 'object' || Array.isArray(definition))
+    return undefined;
   return {
     id: row.id,
     name: row.name,
@@ -268,7 +282,10 @@ function toFragmentShape(row: ComponentFragmentRecord): ComponentFragmentShape |
 function requireFragmentShape(row: ComponentFragmentRecord): ComponentFragmentShape {
   const shape = toFragmentShape(row);
   if (shape === undefined) {
-    throw new BadRequestException({ error: 'COMPONENT_FRAGMENT_INVALID', message: '组合定义无法解析。' });
+    throw new BadRequestException({
+      error: 'COMPONENT_FRAGMENT_INVALID',
+      message: '组合定义无法解析。',
+    });
   }
   return shape;
 }

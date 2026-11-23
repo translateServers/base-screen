@@ -130,7 +130,6 @@ function dataModel(value: ScreenJsonValue): BaseScreenMaterialModel {
   };
 }
 
-
 function appearanceField(manifest: BaseScreenMaterialManifest, key: string) {
   return (manifest.editorDescriptor?.appearance ?? [])
     .flatMap((section) => section.fields)
@@ -166,12 +165,12 @@ describe('shape material visual capabilities', () => {
     expect(schema.properties.borderRadius).toEqual({ kind: 'number', minimum: 0, maximum: 512 });
     expect(schema.properties.shadowColor).toEqual({ kind: 'string' });
     expect(schema.properties.shadowBlur).toEqual({ kind: 'number', minimum: 0, maximum: 100 });
-    expect(
-      appearanceKeys(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST).includes('borderRadius'),
-    ).toBe(true);
-    expect(
-      appearanceKeys(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST).includes('shadowBlur'),
-    ).toBe(true);
+    expect(appearanceKeys(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST).includes('borderRadius')).toBe(
+      true,
+    );
+    expect(appearanceKeys(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST).includes('shadowBlur')).toBe(
+      true,
+    );
     expect(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.defaultStyle.borderRadius).toBe(0);
     expect(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.defaultStyle.shadowColor).toBe('');
     expect(
@@ -297,9 +296,9 @@ describe('shape material visual capabilities', () => {
       styleModel({ fill: '#ff0000', borderWidth: 0, borderRadius: 12 }),
     );
     expect(style.borderRadius).toBe('50%');
-    expect(
-      appearanceKeys(BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST).includes('borderRadius'),
-    ).toBe(false);
+    expect(appearanceKeys(BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST).includes('borderRadius')).toBe(
+      false,
+    );
   });
 
   it('renders a gradient container background', () => {

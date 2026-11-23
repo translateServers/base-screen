@@ -55,9 +55,9 @@ describe('inferBaseScreenMaterialEditorControl (ADR-0102 §4)', () => {
       inferBaseScreenMaterialEditorControl({ ...style('strokeWidth'), unit: 'px' }, bounded),
     ).toBe('number');
     // props 上带单位的有界值是长度不是计数。
-    expect(
-      inferBaseScreenMaterialEditorControl({ ...props('gap'), unit: 'px' }, bounded),
-    ).toBe('number');
+    expect(inferBaseScreenMaterialEditorControl({ ...props('gap'), unit: 'px' }, bounded)).toBe(
+      'number',
+    );
     // 无界：有单位 → 带单位数字，无单位 → 数字框。
     expect(
       inferBaseScreenMaterialEditorControl({ ...props('offset'), unit: 'px' }, { kind: 'number' }),
@@ -74,9 +74,9 @@ describe('inferBaseScreenMaterialEditorControl (ADR-0102 §4)', () => {
       }),
     ).toBe('number');
     // 小数步长不是计数。
-    expect(
-      inferBaseScreenMaterialEditorControl({ ...props('ratio'), step: 0.5 }, bounded),
-    ).toBe('number');
+    expect(inferBaseScreenMaterialEditorControl({ ...props('ratio'), step: 0.5 }, bounded)).toBe(
+      'number',
+    );
   });
 
   it('routes custom tags and data bindings without needing a schema', () => {
@@ -90,7 +90,10 @@ describe('inferBaseScreenMaterialEditorControl (ADR-0102 §4)', () => {
       ),
     ).toBe('field-selector');
     expect(
-      inferBaseScreenMaterialEditorControl({ target: 'data', path: ['params', 'limit'] }, undefined),
+      inferBaseScreenMaterialEditorControl(
+        { target: 'data', path: ['params', 'limit'] },
+        undefined,
+      ),
     ).toBeUndefined();
   });
 });
@@ -173,6 +176,13 @@ describe('parseBaseScreenMaterialEditorDescriptor control normalization (ADR-010
     );
     expect(parsed.ok).toBe(false);
     if (parsed.ok) return;
-    expect(parsed.diagnostics[0]?.path).toEqual(['editorDescriptor', 'data', 0, 'fields', 0, 'control']);
+    expect(parsed.diagnostics[0]?.path).toEqual([
+      'editorDescriptor',
+      'data',
+      0,
+      'fields',
+      0,
+      'control',
+    ]);
   });
 });

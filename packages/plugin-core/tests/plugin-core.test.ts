@@ -839,8 +839,7 @@ describe('plugin manifests and catalogs', () => {
         expect(
           invalid.diagnostics.some(
             (item) =>
-              item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID' &&
-              item.path.includes('delivery'),
+              item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID' && item.path.includes('delivery'),
           ),
         ).toBe(true);
       }

@@ -177,7 +177,11 @@ describe('source delivery declaration', () => {
       listScreenSourceDeliveryIssues({
         push: { append: 'yes', inactivityTimeoutSeconds: 0, url: 'ws://x' },
       }).map((issue) => issue.path),
-    ).toEqual([['push', 'url'], ['push', 'append'], ['push', 'inactivityTimeoutSeconds']]);
+    ).toEqual([
+      ['push', 'url'],
+      ['push', 'append'],
+      ['push', 'inactivityTimeoutSeconds'],
+    ]);
   });
 
   it('parses delivery on a host catalog descriptor', () => {

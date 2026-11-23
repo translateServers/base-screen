@@ -85,7 +85,9 @@ function appearanceFields(manifest: BaseScreenMaterialManifest) {
 
 describe('plugin-board-materials manifests', () => {
   it('conforms to the inspector form paradigm (ADR-0102 R9/R11–R14)', () => {
-    expect(MANIFESTS.flatMap((manifest) => auditBaseScreenMaterialEditorForm(manifest))).toEqual([]);
+    expect(MANIFESTS.flatMap((manifest) => auditBaseScreenMaterialEditorForm(manifest))).toEqual(
+      [],
+    );
   });
 
   it('every material manifest parses as canonical', () => {

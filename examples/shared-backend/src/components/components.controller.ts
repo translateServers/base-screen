@@ -56,7 +56,9 @@ export class ComponentFragmentsController {
   @Post()
   @ApiOperation({ summary: '新建组合（id 取自定义）' })
   @ApiResponse({ status: 409, description: 'COMPONENT_FRAGMENT_EXISTS' })
-  async create(@Body() dto: CreateComponentFragmentDto): Promise<{ fragment: ComponentFragmentShape }> {
+  async create(
+    @Body() dto: CreateComponentFragmentDto,
+  ): Promise<{ fragment: ComponentFragmentShape }> {
     return { fragment: await this.components.createFragment(dto) };
   }
 

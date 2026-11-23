@@ -1,4 +1,7 @@
-import type { BaseScreenMaterialDataState, BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type {
+  BaseScreenMaterialDataState,
+  BaseScreenMaterialModel,
+} from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
   type BaseScreenMaterialRenderContext,
@@ -60,7 +63,10 @@ const ROWS: BaseScreenMaterialSpecData = {
   sample: [],
 };
 
-function present(data: BaseScreenMaterialSpecData, render: (context: BaseScreenMaterialRenderContext) => void) {
+function present(
+  data: BaseScreenMaterialSpecData,
+  render: (context: BaseScreenMaterialRenderContext) => void,
+) {
   const { mount, frame } = fakeMount();
   const presenter = createBaseScreenRenderedMaterialPresenter(mount as unknown as HTMLElement, {
     data,
@@ -144,12 +150,16 @@ describe('spec material definition', () => {
     expect(definition.ok).toBe(true);
     if (!definition.ok) return;
     expect(definition.value.manifest.tagName).toBe('host-online-static-test-1');
-    expect(Object.getOwnPropertyDescriptor(definition.value.element, 'manifest')?.configurable).toBe(true);
     expect(
-      (definition.value.element as unknown as { readonly tabularDataAdapter?: unknown }).tabularDataAdapter,
+      Object.getOwnPropertyDescriptor(definition.value.element, 'manifest')?.configurable,
+    ).toBe(true);
+    expect(
+      (definition.value.element as unknown as { readonly tabularDataAdapter?: unknown })
+        .tabularDataAdapter,
     ).toBeDefined();
     expect(
-      createBaseScreenSpecMaterialDefinition({ spec, render: 'nope' as never, tagName: 'host-x-1' }).ok,
+      createBaseScreenSpecMaterialDefinition({ spec, render: 'nope' as never, tagName: 'host-x-1' })
+        .ok,
     ).toBe(false);
     const element = createBaseScreenRenderedMaterialElement({
       manifest: definition.value.manifest,

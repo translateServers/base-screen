@@ -22,7 +22,6 @@ import {
   updateDatasetParameterValue,
 } from './designer-dataset-draft-controller.js';
 import { setDatasetPreviewTab } from './designer-dataset-preview-controller.js';
-import { UPDATE_POLICY_SETTINGS } from './designer-update-policy-authoring.js';
 import {
   dismissDatasetBindingMenu,
   isDatasetWorkbenchStep,
@@ -35,6 +34,7 @@ import {
   handleStaticClick,
   handleStaticInput,
 } from './designer-static-data-events.js';
+import { UPDATE_POLICY_SETTINGS } from './designer-update-policy-authoring.js';
 
 export function handleDatasetInput(
   context: DesignerDatasetControllerContext,

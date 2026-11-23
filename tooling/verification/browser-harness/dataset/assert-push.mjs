@@ -35,7 +35,8 @@ function table(rows, withTime = false) {
 
 function seriesRows(from, to) {
   const rows = [];
-  for (let value = from; value <= to; value++) rows.push({ t: `00:${String(value).padStart(2, '0')}`, value });
+  for (let value = from; value <= to; value++)
+    rows.push({ t: `00:${String(value).padStart(2, '0')}`, value });
   return rows;
 }
 
@@ -187,7 +188,10 @@ async function assertSnapshotAndCoalescedAppend(page) {
   }
 
   const pushedBefore = await page.evaluate(
-    (type) => window.basePushHarness.observed.filter((item) => item.type === 'pushed' && item.resourceType === type).length,
+    (type) =>
+      window.basePushHarness.observed.filter(
+        (item) => item.type === 'pushed' && item.resourceType === type,
+      ).length,
     SERIES,
   );
   // 同一个任务里：开连接 + 快照 + 4 条增量。运行时按帧合并，物料只重投影一次。
@@ -202,7 +206,10 @@ async function assertSnapshotAndCoalescedAppend(page) {
   // 保留 3 行：窗口是 [3, 4, 5]，文本读首行。
   await waitForViewer(page, 'push-series-head', { status: 'ready', value: '3' }, 'SERIES_WINDOW');
   const pushed = await page.evaluate(
-    (type) => window.basePushHarness.observed.filter((item) => item.type === 'pushed' && item.resourceType === type),
+    (type) =>
+      window.basePushHarness.observed.filter(
+        (item) => item.type === 'pushed' && item.resourceType === type,
+      ),
     SERIES,
   );
   const batch = pushed.slice(pushedBefore);
@@ -213,9 +220,13 @@ async function assertSnapshotAndCoalescedAppend(page) {
 
 // 3. 游标：重复丢弃，跳号重同步
 async function assertCursorDuplicateAndResync(page) {
-  await emit(page, SERIES, [{ type: 'append', rows: [{ t: 'dup', value: 99 }], cursor: cursor(5) }]);
+  await emit(page, SERIES, [
+    { type: 'append', rows: [{ t: 'dup', value: 99 }], cursor: cursor(5) },
+  ]);
   // 重复事件不触发重投影：等两帧确认值没变。
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   const duplicate = await readViewerComponent(page, 'push-series-head');
   if (duplicate.value !== '3' || duplicate.attrStale !== null) fail('DUPLICATE_APPLIED', duplicate);
 
@@ -225,7 +236,10 @@ async function assertCursorDuplicateAndResync(page) {
   // 重同步期间保留旧值（不清空、不进 error），只标过期。
   if (resyncing.value !== '3' || resyncing.attrStale !== 'true') fail('RESYNC_STATE', resyncing);
   const resync = await page.evaluate(
-    (type) => window.basePushHarness.observed.some((item) => item.type === 'resync' && item.resourceType === type),
+    (type) =>
+      window.basePushHarness.observed.some(
+        (item) => item.type === 'resync' && item.resourceType === type,
+      ),
     SERIES,
   );
   if (!resync) fail('RESYNC_NOT_OBSERVED', {});
@@ -263,17 +277,21 @@ async function assertReconnectingIndicator(page) {
   const hidden = await page.evaluate(() => {
     const viewer = window.basePushHarness.viewer;
     viewer.style.setProperty('--base-screen-stale-indicator-display', 'none');
-    const element = viewer.shadowRoot.querySelector('[data-base-screen-component-id="push-metric"]');
+    const element = viewer.shadowRoot.querySelector(
+      '[data-base-screen-component-id="push-metric"]',
+    );
     const display = getComputedStyle(element, '::after').display;
     viewer.style.removeProperty('--base-screen-stale-indicator-display');
     return { display, attr: element.getAttribute('data-base-screen-data-stale') };
   });
-  if (hidden.display !== 'none' || hidden.attr !== 'true') fail('STALE_INDICATOR_NOT_OVERRIDABLE', hidden);
+  if (hidden.display !== 'none' || hidden.attr !== 'true')
+    fail('STALE_INDICATOR_NOT_OVERRIDABLE', hidden);
 
   await emit(page, METRIC, [{ type: 'status', status: 'open' }]);
   await waitForViewer(page, 'push-metric', { stale: false }, 'RECONNECTED_FRESH');
   const fresh = await readViewerComponent(page, 'push-metric');
-  if (fresh.attrStale !== null || fresh.indicator.display === 'block') fail('STALE_NOT_CLEARED', fresh);
+  if (fresh.attrStale !== null || fresh.indicator.display === 'block')
+    fail('STALE_NOT_CLEARED', fresh);
   const connections = await page.evaluate(
     (type) =>
       window.basePushHarness.observed
@@ -307,13 +325,7 @@ async function assertSuspendedFallback(page) {
   await emit(page, METRIC, [{ type: 'status', status: 'suspended' }]);
   await waitForViewer(page, 'push-metric', { stale: true }, 'SUSPENDED_STALE');
   // 回退间隔 1 秒：拉取到的值替换推送值，但仍标过期（连接还没恢复）。
-  await waitForViewer(
-    page,
-    'push-metric',
-    { value: '64', stale: true },
-    'FALLBACK_POLLED',
-    4_000,
-  );
+  await waitForViewer(page, 'push-metric', { value: '64', stale: true }, 'FALLBACK_POLLED', 4_000);
   await emit(page, METRIC, [{ type: 'status', status: 'open' }]);
   await waitForViewer(page, 'push-metric', { stale: false }, 'FALLBACK_RECOVERED');
   const before = resolvesOf(await viewerLog(page), METRIC).length;
@@ -353,9 +365,12 @@ async function assertFailedAndAbortedSink(page) {
       ]),
     [SERIES, table(seriesRows(20, 22), true)],
   );
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   const ignored = await readViewerComponent(page, 'push-series-head');
-  if (delivered < 1 || ignored.status !== 'error') fail('ABORTED_SINK_ACCEPTED', { delivered, ignored });
+  if (delivered < 1 || ignored.status !== 'error')
+    fail('ABORTED_SINK_ACCEPTED', { delivered, ignored });
 }
 
 // 8. 离开 DOM → 全部退订
@@ -377,7 +392,8 @@ async function assertDesignerAuthoring(page) {
     .first();
   await facts.waitFor({ state: 'attached' });
   const factText = await facts.textContent();
-  if (!factText?.includes('实时推送 · 断线每 1 秒轮询')) fail('INSPECTOR_POLICY_TEXT', { factText });
+  if (!factText?.includes('实时推送 · 断线每 1 秒轮询'))
+    fail('INSPECTOR_POLICY_TEXT', { factText });
 
   const metric = await readWorkbenchRefresh(page, designer);
   if (
@@ -423,7 +439,9 @@ async function readWorkbenchRefresh(page, designer) {
   const workbench = designer.locator('[data-data-workbench]');
   await workbench.waitFor({ state: 'visible' });
   await openGroup(workbench, 'refresh');
-  await workbench.locator('[data-dataset-authoring-setting="refreshStrategy"]').waitFor({ state: 'attached' });
+  await workbench
+    .locator('[data-dataset-authoring-setting="refreshStrategy"]')
+    .waitFor({ state: 'attached' });
   const view = await designer.evaluate((element) => {
     const host = element.shadowRoot.querySelector('[data-data-workbench]');
     const select = host.querySelector('select[data-dataset-authoring-setting="refreshStrategy"]');
@@ -454,8 +472,9 @@ async function assertWorkbenchWriteBack(page, designer) {
   const policyOf = () =>
     page.evaluate(
       () =>
-        window.basePushHarness.designer.document.dataSources.find((item) => item.id === 'live-metric')
-          ?.updatePolicy ?? null,
+        window.basePushHarness.designer.document.dataSources.find(
+          (item) => item.id === 'live-metric',
+        )?.updatePolicy ?? null,
     );
   const before = await policyOf();
   await designer.locator('[data-inspector-tab="data"]').click();
@@ -470,13 +489,16 @@ async function assertWorkbenchWriteBack(page, designer) {
   const fallback = workbench.locator('[data-dataset-authoring-setting="pushFallbackInterval"]');
   await fallback.fill('5');
   await fallback.dispatchEvent('change');
-  await page.waitForFunction(
-    () =>
-      window.basePushHarness.designer.document.dataSources.find((item) => item.id === 'live-metric')
-        ?.updatePolicy?.fallbackIntervalSeconds === 5,
-    undefined,
-    { timeout: 5_000 },
-  ).catch(async () => fail('WRITE_BACK_MISSING', { before, after: await policyOf() }));
+  await page
+    .waitForFunction(
+      () =>
+        window.basePushHarness.designer.document.dataSources.find(
+          (item) => item.id === 'live-metric',
+        )?.updatePolicy?.fallbackIntervalSeconds === 5,
+      undefined,
+      { timeout: 5_000 },
+    )
+    .catch(async () => fail('WRITE_BACK_MISSING', { before, after: await policyOf() }));
   await workbench.locator('[data-dataset-action="close-workbench"]').click();
   await workbench.waitFor({ state: 'hidden' });
   const written = await policyOf();
@@ -486,5 +508,6 @@ async function assertWorkbenchWriteBack(page, designer) {
   // 撤销一步回到原策略；设计器仍然零订阅（写回不改设计态取数方式）。
   await page.evaluate(() => window.basePushHarness.designer.undo());
   const undone = await policyOf();
-  if (JSON.stringify(undone) !== JSON.stringify(before)) fail('WRITE_BACK_UNDO', { before, undone });
+  if (JSON.stringify(undone) !== JSON.stringify(before))
+    fail('WRITE_BACK_UNDO', { before, undone });
 }

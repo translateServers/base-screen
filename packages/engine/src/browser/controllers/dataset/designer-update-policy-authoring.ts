@@ -90,7 +90,11 @@ function canonical(policy: ScreenUpdatePolicy | undefined): string {
     retain:
       retain === undefined
         ? null
-        : { rows: retain.rows ?? null, seconds: retain.seconds ?? null, timeField: retain.timeField ?? null },
+        : {
+            rows: retain.rows ?? null,
+            seconds: retain.seconds ?? null,
+            timeField: retain.timeField ?? null,
+          },
   });
 }
 
@@ -135,7 +139,9 @@ export function createUpdatePolicyTransaction(
   if (next.mode === 'push' && delivery === undefined && instance.updatePolicy?.mode !== 'push') {
     return {
       ok: false,
-      diagnostics: [policyDiagnostic(instance.id, DESIGNER_UI_TEXT.dataSource.refreshPushUnsupported)],
+      diagnostics: [
+        policyDiagnostic(instance.id, DESIGNER_UI_TEXT.dataSource.refreshPushUnsupported),
+      ],
     };
   }
   const { updatePolicy: _previous, ...rest } = instance;
@@ -167,7 +173,8 @@ function policyDiagnostic(instanceId: string, message: string): ScreenDiagnostic
 export function authoringUpdatePolicyForNewInstance(
   authoring: DesignerDatasetAuthoringView,
 ): ScreenUpdatePolicy | undefined {
-  if (authoring.refreshStrategy === 'manual' || authoring.refreshStrategy === 'push') return undefined;
+  if (authoring.refreshStrategy === 'manual' || authoring.refreshStrategy === 'push')
+    return undefined;
   return authoringToUpdatePolicy(authoring, undefined, undefined);
 }
 
@@ -184,11 +191,7 @@ export function reconcileAuthoringWithPolicy(
   if (sameUpdatePolicy(authoringToUpdatePolicy(authoring, policy, delivery), policy)) {
     return authoring;
   }
-  const {
-    pushFallbackInterval: _fallback,
-    pushRetainRows: _rows,
-    ...local
-  } = authoring;
+  const { pushFallbackInterval: _fallback, pushRetainRows: _rows, ...local } = authoring;
   const mode = policy?.mode ?? 'manual';
   return {
     ...local,

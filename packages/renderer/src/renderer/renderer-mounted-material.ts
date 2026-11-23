@@ -3,8 +3,8 @@ import { parseBaseScreenMaterialEventDetail } from '@base-screen/plugin-core';
 import { resolveEffectiveModel } from './renderer-effective-style.js';
 import {
   applyMaterial,
-  applyMaterialDisplay,
   applyMaterialDataMarker,
+  applyMaterialDisplay,
   applyMaterialFrame,
   applyMaterialHostStyle,
 } from './renderer-material-dom.js';

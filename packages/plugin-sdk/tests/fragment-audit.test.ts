@@ -22,7 +22,11 @@ function catalog(
       },
     ]),
   );
-  return { get: (type) => map.get(type), has: (type) => map.has(type), list: () => [...map.values()] };
+  return {
+    get: (type) => map.get(type),
+    has: (type) => map.has(type),
+    list: () => [...map.values()],
+  };
 }
 
 const CATALOG = catalog([
@@ -38,9 +42,20 @@ const CARD = {
   name: 'KPI 卡',
   category: '指标卡',
   keywords: ['KPI'],
-  shell: { key: 'card', materialType: 'base.container', name: '卡片', size: { width: 320, height: 160 } },
+  shell: {
+    key: 'card',
+    materialType: 'base.container',
+    name: '卡片',
+    size: { width: 320, height: 160 },
+  },
   nodes: [
-    { key: 'title', materialType: 'base.text', name: '标题', offset: { x: 16, y: 12 }, size: { width: 200, height: 24 } },
+    {
+      key: 'title',
+      materialType: 'base.text',
+      name: '标题',
+      offset: { x: 16, y: 12 },
+      size: { width: 200, height: 24 },
+    },
     {
       key: 'value',
       materialType: 'board.digital-flop',
@@ -61,9 +76,15 @@ describe('fragment audit (ADR-0105 §2.6)', () => {
 
   it('reports shape errors and catalog problems', () => {
     expect(rules({ ...CARD, name: '' })).toContain('error:SPEC');
-    expect(rules({ ...CARD, nodes: [{ ...CARD.nodes[0], materialType: 'acme.missing' }] })).toContain('error:F8');
-    expect(rules({ ...CARD, nodes: [{ ...CARD.nodes[0], materialType: 'board.legacy' }] })).toContain('warning:F8');
-    expect(rules({ ...CARD, shell: { ...CARD.shell, materialType: 'base.rectangle' } })).toContain('error:F8');
+    expect(
+      rules({ ...CARD, nodes: [{ ...CARD.nodes[0], materialType: 'acme.missing' }] }),
+    ).toContain('error:F8');
+    expect(
+      rules({ ...CARD, nodes: [{ ...CARD.nodes[0], materialType: 'board.legacy' }] }),
+    ).toContain('warning:F8');
+    expect(rules({ ...CARD, shell: { ...CARD.shell, materialType: 'base.rectangle' } })).toContain(
+      'error:F8',
+    );
   });
 
   it('suggests a container shell instead of a backdrop rectangle', () => {

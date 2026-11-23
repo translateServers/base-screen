@@ -132,8 +132,7 @@ function auditSharedData(
     if (source.type !== 'dataset' && source.type !== 'host-resource') continue;
     // 比较对象取全集类型：static 等其他来源因 type 不同直接判否。
     const sameSource = (other: (typeof sources)[number]): boolean =>
-      other.type === source.type &&
-      screenJsonEquals(withoutBinding(other), withoutBinding(source));
+      other.type === source.type && screenJsonEquals(withoutBinding(other), withoutBinding(source));
     if (sources.slice(0, index).some(sameSource)) continue;
     if (sources.slice(index + 1).some(sameSource)) {
       findings.push({

@@ -106,7 +106,6 @@ function modelWithStyle(style: BaseScreenMaterialModel['style']): BaseScreenMate
   };
 }
 
-
 function textAppearanceFields() {
   return (BASE_SCREEN_TEXT_MATERIAL_MANIFEST.editorDescriptor?.appearance ?? []).flatMap(
     (section) => section.fields,

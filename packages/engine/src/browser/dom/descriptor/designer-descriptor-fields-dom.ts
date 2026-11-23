@@ -9,12 +9,12 @@ import {
   createDesignerFieldRow,
   createDesignerSwitchField,
 } from '../designer-field-primitives.js';
+import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';
 import {
   appendDesignerColorGroup,
   segmentDesignerColorFields,
   shouldGroupColorFields,
 } from '../panel/designer-color-group-dom.js';
-import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';
 import { appendDescriptorArrayControls } from './designer-descriptor-array-fields-dom.js';
 import {
   applyFieldDataset,
@@ -158,8 +158,7 @@ function appendDescriptorField(
     labelText,
   } = createDesignerFieldRow(ownerDocument, {
     label: field.label,
-    tagName:
-      palette === undefined && field.control !== 'spacing' && !resettable ? 'label' : 'span',
+    tagName: palette === undefined && field.control !== 'spacing' && !resettable ? 'label' : 'span',
     stacked,
   });
   applyFieldSearch(row, field);

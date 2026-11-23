@@ -33,7 +33,12 @@ export function attachHostComponentWorkshop(
         : { ok: false, message: result.error.message };
     },
     async save(input) {
-      const body = { type: input.type, name: input.name, manifest: { ...input.manifest }, code: input.code };
+      const body = {
+        type: input.type,
+        name: input.name,
+        manifest: { ...input.manifest },
+        code: input.code,
+      };
       const result =
         input.id === undefined
           ? await api.createMaterialPackage(body)

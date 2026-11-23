@@ -174,7 +174,10 @@ export const componentAtomicEditView: ViewModule = {
     });
 
     const stageFrame = el('div', { class: 'component-stage__frame' });
-    const stageBox = el('div', { class: 'component-stage__box', attrs: { 'data-component-preview': '' } });
+    const stageBox = el('div', {
+      class: 'component-stage__box',
+      attrs: { 'data-component-preview': '' },
+    });
     const stageMount = el('div', { class: 'component-stage__mount' });
     const sizeHandle = el('span', {
       class: 'component-stage__handle',
@@ -190,7 +193,11 @@ export const componentAtomicEditView: ViewModule = {
     const codeHost = el('div', { class: 'component-code__host' });
     const codeSplit = el('div', {
       class: 'component-code__split',
-      attrs: { role: 'separator', 'aria-orientation': 'horizontal', 'aria-label': '拖动调整代码面板高度' },
+      attrs: {
+        role: 'separator',
+        'aria-orientation': 'horizontal',
+        'aria-label': '拖动调整代码面板高度',
+      },
     });
     const codeHead = el('div', { class: 'component-code__head' }, [
       el('strong', { text: '渲染代码' }),
@@ -255,7 +262,11 @@ export const componentAtomicEditView: ViewModule = {
       if (saveState !== 'dirty' || type === '') return;
       saveState = 'saving';
       renderSaveBadge();
-      const result = await saveAtomicDraft({ type, source: source(), revision: draft?.revision ?? 0 });
+      const result = await saveAtomicDraft({
+        type,
+        source: source(),
+        revision: draft?.revision ?? 0,
+      });
       if (disposed) return;
       if (!result.ok) {
         saveState = result.code === 'REVISION_CONFLICT' ? 'conflict' : 'failed';
@@ -312,16 +323,15 @@ export const componentAtomicEditView: ViewModule = {
         ...(pkg === undefined
           ? []
           : [
-              menuItem(pkg.manifest.libraryVisible === false ? '上架' : '下架', () =>
-                void toggleVisibility(),
+              menuItem(
+                pkg.manifest.libraryVisible === false ? '上架' : '下架',
+                () => void toggleVisibility(),
               ),
             ]),
         ...(pkg !== undefined && draft !== undefined
           ? [menuItem('放弃改动，回到已发布版本', () => void discard())]
           : []),
-        ...(saveState === 'conflict'
-          ? [menuItem('重新载入', () => window.location.reload())]
-          : []),
+        ...(saveState === 'conflict' ? [menuItem('重新载入', () => window.location.reload())] : []),
         menuItem('删除组件', () => void remove(), true),
       ];
       menu.replaceChildren(...items);
@@ -353,7 +363,8 @@ export const componentAtomicEditView: ViewModule = {
         el('div', { class: 'component-problems__head' }, [
           el('strong', { text: '体检' }),
           el('span', {
-            text: findings.length === 0 ? '符合组件范式，可以发布。' : '错误会阻止发布，警告只提示。',
+            text:
+              findings.length === 0 ? '符合组件范式，可以发布。' : '错误会阻止发布，警告只提示。',
           }),
           el('button', {
             class: 'button',
@@ -371,19 +382,23 @@ export const componentAtomicEditView: ViewModule = {
           'ul',
           { class: 'component-problems__list' },
           findings.map((finding) =>
-            el('li', { class: 'component-problems__item', attrs: { 'data-severity': finding.severity } }, [
-              el('span', {
-                class: 'component-problems__severity',
-                text: finding.severity === 'error' ? '错误' : '警告',
-              }),
-              el('span', { class: 'component-problems__message', text: finding.message }),
-              el('button', {
-                class: 'button component-problems__locate',
-                text: '定位',
-                attrs: { type: 'button' },
-                on: { click: () => locate(finding) },
-              }),
-            ]),
+            el(
+              'li',
+              { class: 'component-problems__item', attrs: { 'data-severity': finding.severity } },
+              [
+                el('span', {
+                  class: 'component-problems__severity',
+                  text: finding.severity === 'error' ? '错误' : '警告',
+                }),
+                el('span', { class: 'component-problems__message', text: finding.message }),
+                el('button', {
+                  class: 'button component-problems__locate',
+                  text: '定位',
+                  attrs: { type: 'button' },
+                  on: { click: () => locate(finding) },
+                }),
+              ],
+            ),
           ),
         ),
       );
@@ -508,10 +523,16 @@ export const componentAtomicEditView: ViewModule = {
         ...data.roles.map((role, index) =>
           el('div', { class: 'component-roles__row' }, [
             textInput(role.label, (value) =>
-              update(data.roles.map((item, at) => (at === index ? { ...item, label: value } : item)), false),
+              update(
+                data.roles.map((item, at) => (at === index ? { ...item, label: value } : item)),
+                false,
+              ),
             ),
             textInput(role.id, (value) =>
-              update(data.roles.map((item, at) => (at === index ? { ...item, id: value } : item)), false),
+              update(
+                data.roles.map((item, at) => (at === index ? { ...item, id: value } : item)),
+                false,
+              ),
             ),
             select(
               [
@@ -523,7 +544,10 @@ export const componentAtomicEditView: ViewModule = {
                 update(
                   data.roles.map((item, at) =>
                     at === index
-                      ? { ...item, valueType: value === 'string' ? ('string' as const) : ('number' as const) }
+                      ? {
+                          ...item,
+                          valueType: value === 'string' ? ('string' as const) : ('number' as const),
+                        }
                       : item,
                   ),
                 ),
@@ -541,7 +565,11 @@ export const componentAtomicEditView: ViewModule = {
             click: () =>
               update([
                 ...data.roles,
-                { id: uniqueKey('column', new Set(data.roles.map((role) => role.id))), label: '新列', valueType: 'string' },
+                {
+                  id: uniqueKey('column', new Set(data.roles.map((role) => role.id))),
+                  label: '新列',
+                  valueType: 'string',
+                },
               ]),
           },
         }),
@@ -607,7 +635,8 @@ export const componentAtomicEditView: ViewModule = {
         ]);
       };
       const followable = spec.fields.filter(
-        (field) => field.section === 'format' && (field.kind === 'boolean' || field.kind === 'choice'),
+        (field) =>
+          field.section === 'format' && (field.kind === 'boolean' || field.kind === 'choice'),
       );
       block.append(
         row(
@@ -627,7 +656,10 @@ export const componentAtomicEditView: ViewModule = {
           select(
             [
               { value: '', label: '始终显示' },
-              ...followable.map((field) => ({ value: field.key, label: `「${field.label}」打开时` })),
+              ...followable.map((field) => ({
+                value: field.key,
+                label: `「${field.label}」打开时`,
+              })),
             ],
             format.visibleWhen?.key ?? '',
             (value) => {
@@ -640,7 +672,8 @@ export const componentAtomicEditView: ViewModule = {
                       ...rest,
                       visibleWhen: {
                         key: dependency.key,
-                        equals: dependency.kind === 'boolean' ? true : (dependency.options?.[0] ?? ''),
+                        equals:
+                          dependency.kind === 'boolean' ? true : (dependency.options?.[0] ?? ''),
                       },
                     },
               );
@@ -664,9 +697,11 @@ export const componentAtomicEditView: ViewModule = {
           .map((field, index) => ({ field, index }))
           .filter((item) => item.field.section === section.id);
         if (members.length === 0) continue;
-        const group = el('div', { class: 'component-field-group', attrs: { 'data-section': section.id } }, [
-          el('div', { class: 'component-field-group__title', text: section.label }),
-        ]);
+        const group = el(
+          'div',
+          { class: 'component-field-group', attrs: { 'data-section': section.id } },
+          [el('div', { class: 'component-field-group__title', text: section.label })],
+        );
         for (const { field, index } of members) group.append(fieldRow(field, index));
         block.append(group);
       }
@@ -675,7 +710,11 @@ export const componentAtomicEditView: ViewModule = {
         ...COMPONENT_FIELD_KIND_OPTIONS.map((kind) =>
           el('button', {
             class: 'button component-add-kind',
-            attrs: { type: 'button', title: `添加${kind.label}`, 'data-component-add-field': kind.id },
+            attrs: {
+              type: 'button',
+              title: `添加${kind.label}`,
+              'data-component-add-field': kind.id,
+            },
             text: `${kind.glyph} ${kind.label}`,
             on: { click: () => addField(kind.id) },
           }),
@@ -714,18 +753,30 @@ export const componentAtomicEditView: ViewModule = {
             dragover: (event) => event.preventDefault(),
             drop: (event) => {
               event.preventDefault();
-              const from = Number((event as DragEvent).dataTransfer?.getData('text/x-component-field'));
+              const from = Number(
+                (event as DragEvent).dataTransfer?.getData('text/x-component-field'),
+              );
               if (Number.isInteger(from) && from !== index) reorder(from, index);
             },
           },
         },
         [
-          el('span', { class: 'component-field__glyph', text: kind?.glyph ?? '?', attrs: { 'aria-hidden': 'true' } }),
+          el('span', {
+            class: 'component-field__glyph',
+            text: kind?.glyph ?? '?',
+            attrs: { 'aria-hidden': 'true' },
+          }),
           el('span', { class: 'component-field__label', text: field.label }),
           el('span', { class: 'component-field__default', text: defaultSummary(field) }),
           ...(field.visibleWhen === undefined
             ? []
-            : [el('span', { class: 'component-field__when', text: '条件', attrs: { title: '仅在条件满足时显示' } })]),
+            : [
+                el('span', {
+                  class: 'component-field__when',
+                  text: '条件',
+                  attrs: { title: '仅在条件满足时显示' },
+                }),
+              ]),
         ],
       );
       return item;
@@ -736,11 +787,16 @@ export const componentAtomicEditView: ViewModule = {
       renderLeft();
       renderRight();
       if (index !== undefined) {
-        left.querySelector<HTMLElement>(`[data-component-field="${spec.fields[index]?.key ?? ''}"]`)?.focus();
+        left
+          .querySelector<HTMLElement>(`[data-component-field="${spec.fields[index]?.key ?? ''}"]`)
+          ?.focus();
       }
     };
 
-    const setFields = (fields: readonly Field[], redraw: { left: boolean; right: boolean }): void => {
+    const setFields = (
+      fields: readonly Field[],
+      redraw: { left: boolean; right: boolean },
+    ): void => {
       spec = { ...spec, fields: sortBySection(fields) };
       changed(redraw);
     };
@@ -748,7 +804,13 @@ export const componentAtomicEditView: ViewModule = {
     const addField = (kind: Field['kind']): void => {
       const keys = new Set(spec.fields.map((field) => field.key));
       const field = retype(
-        { key: uniqueKey(kind === 'color' ? 'color' : 'option', keys), label: '新可调项', section: 'structure', kind: 'text', default: '' },
+        {
+          key: uniqueKey(kind === 'color' ? 'color' : 'option', keys),
+          label: '新可调项',
+          section: 'structure',
+          kind: 'text',
+          default: '',
+        },
         kind,
       );
       const fields = sortBySection([...spec.fields, field]);
@@ -788,7 +850,9 @@ export const componentAtomicEditView: ViewModule = {
       const target = fields[Math.min(to, fields.length - 1)];
       // 拖到别的分组里：跟随落点所在的分组（颜色字段只能落在外观类分组）。
       const section =
-        target !== undefined && target.section !== moved.section && !(moved.kind === 'color' && PROPS_SECTIONS.has(target.section))
+        target !== undefined &&
+        target.section !== moved.section &&
+        !(moved.kind === 'color' && PROPS_SECTIONS.has(target.section))
           ? target.section
           : moved.section;
       fields.splice(to, 0, { ...moved, section });
@@ -801,7 +865,11 @@ export const componentAtomicEditView: ViewModule = {
 
     const renderRight = (): void => {
       const field = selected === undefined ? undefined : spec.fields[selected];
-      right.replaceChildren(field === undefined || selected === undefined ? renderInspector() : renderFieldForm(field, selected));
+      right.replaceChildren(
+        field === undefined || selected === undefined
+          ? renderInspector()
+          : renderFieldForm(field, selected),
+      );
     };
 
     const renderFieldForm = (field: Field, index: number): HTMLElement => {
@@ -821,7 +889,9 @@ export const componentAtomicEditView: ViewModule = {
         changed({ left: true, right: redrawRight });
       };
       const keyInput = textInput(field.key, (value) => {
-        keyNote.textContent = KEY_PATTERN.test(value) ? '' : '小写字母开头，只用字母和数字（如 fillColor）。';
+        keyNote.textContent = KEY_PATTERN.test(value)
+          ? ''
+          : '小写字母开头，只用字母和数字（如 fillColor）。';
         replace({ ...field, key: value });
       });
       const keyNote = el('p', { class: 'component-hint component-hint--warn' });
@@ -832,113 +902,141 @@ export const componentAtomicEditView: ViewModule = {
         .slice(0, index)
         .filter((item) => item.kind === 'boolean' || item.kind === 'choice');
       const dependency = earlier.find((item) => item.key === field.visibleWhen?.key);
-      const form = el('div', { class: 'component-inspector', attrs: { 'data-component-field-form': field.key } }, [
-        el('div', { class: 'component-inspector__head' }, [
-          el('button', {
-            class: 'button',
-            text: '← 检查器',
-            attrs: { type: 'button' },
-            on: { click: () => selectField(undefined) },
-          }),
-          el('strong', { text: '可调项' }),
-          el('span', { class: 'component-library__spacer' }),
-          el('button', {
-            class: 'button button--danger',
-            text: '删除',
-            attrs: { type: 'button' },
-            on: { click: () => removeField(index) },
-          }),
-        ]),
-        row('名称', textInput(field.label, (value) => replace({ ...field, label: value }))),
-        row('代码里的名字', keyInput),
-        keyNote,
-        row(
-          '控件类型',
-          select(
-            COMPONENT_FIELD_KIND_OPTIONS.map((kind) => ({ value: kind.id, label: `${kind.glyph} ${kind.label}` })),
-            field.kind,
-            (value) => {
-              const kind = COMPONENT_FIELD_KIND_OPTIONS.find((item) => item.id === value)?.id ?? field.kind;
-              // 类型变了：依赖它的显示条件取值也会失效，一并去掉。
-              const next = retype(field, kind);
-              const fields = spec.fields.map((item, at) =>
-                at === index ? next : item.visibleWhen?.key === field.key ? withoutWhen(item) : item,
-              );
-              const sorted = sortBySection(fields);
-              selected = sorted.findIndex((item) => item.key === next.key);
-              spec = { ...spec, fields: sorted };
-              changed({ left: true, right: true });
-            },
+      const form = el(
+        'div',
+        { class: 'component-inspector', attrs: { 'data-component-field-form': field.key } },
+        [
+          el('div', { class: 'component-inspector__head' }, [
+            el('button', {
+              class: 'button',
+              text: '← 检查器',
+              attrs: { type: 'button' },
+              on: { click: () => selectField(undefined) },
+            }),
+            el('strong', { text: '可调项' }),
+            el('span', { class: 'component-library__spacer' }),
+            el('button', {
+              class: 'button button--danger',
+              text: '删除',
+              attrs: { type: 'button' },
+              on: { click: () => removeField(index) },
+            }),
+          ]),
+          row(
+            '名称',
+            textInput(field.label, (value) => replace({ ...field, label: value })),
           ),
-        ),
-        row(
-          '放在检查器的哪一组',
-          select(
-            sections.map((section) => ({ value: section.id, label: section.label })),
-            field.section,
-            (value) => {
-              const section = sections.find((item) => item.id === value)?.id ?? field.section;
-              replace({ ...field, section }, true);
-            },
+          row('代码里的名字', keyInput),
+          keyNote,
+          row(
+            '控件类型',
+            select(
+              COMPONENT_FIELD_KIND_OPTIONS.map((kind) => ({
+                value: kind.id,
+                label: `${kind.glyph} ${kind.label}`,
+              })),
+              field.kind,
+              (value) => {
+                const kind =
+                  COMPONENT_FIELD_KIND_OPTIONS.find((item) => item.id === value)?.id ?? field.kind;
+                // 类型变了：依赖它的显示条件取值也会失效，一并去掉。
+                const next = retype(field, kind);
+                const fields = spec.fields.map((item, at) =>
+                  at === index
+                    ? next
+                    : item.visibleWhen?.key === field.key
+                      ? withoutWhen(item)
+                      : item,
+                );
+                const sorted = sortBySection(fields);
+                selected = sorted.findIndex((item) => item.key === next.key);
+                spec = { ...spec, fields: sorted };
+                changed({ left: true, right: true });
+              },
+            ),
           ),
-        ),
-        row('默认值', defaultEditor(field, (value) => replace({ ...field, default: value } as Field))),
-        ...kindSpecificRows(field, (next) => replace(next, true)),
-        row(
-          '仅当……时显示',
-          select(
-            [
-              { value: '', label: '始终显示' },
-              ...earlier.map((item) => ({ value: item.key, label: `「${item.label}」` })),
-            ],
-            dependency?.key ?? '',
-            (value) => {
-              const target = earlier.find((item) => item.key === value);
-              replace(
-                target === undefined
-                  ? withoutWhen(field)
-                  : {
-                      ...field,
-                      visibleWhen: {
-                        key: target.key,
-                        equals: target.kind === 'boolean' ? true : (target.options?.[0] ?? ''),
+          row(
+            '放在检查器的哪一组',
+            select(
+              sections.map((section) => ({ value: section.id, label: section.label })),
+              field.section,
+              (value) => {
+                const section = sections.find((item) => item.id === value)?.id ?? field.section;
+                replace({ ...field, section }, true);
+              },
+            ),
+          ),
+          row(
+            '默认值',
+            defaultEditor(field, (value) => replace({ ...field, default: value } as Field)),
+          ),
+          ...kindSpecificRows(field, (next) => replace(next, true)),
+          row(
+            '仅当……时显示',
+            select(
+              [
+                { value: '', label: '始终显示' },
+                ...earlier.map((item) => ({ value: item.key, label: `「${item.label}」` })),
+              ],
+              dependency?.key ?? '',
+              (value) => {
+                const target = earlier.find((item) => item.key === value);
+                replace(
+                  target === undefined
+                    ? withoutWhen(field)
+                    : {
+                        ...field,
+                        visibleWhen: {
+                          key: target.key,
+                          equals: target.kind === 'boolean' ? true : (target.options?.[0] ?? ''),
+                        },
                       },
-                    },
-                true,
-              );
-            },
+                  true,
+                );
+              },
+            ),
           ),
-        ),
-        ...(dependency === undefined || field.visibleWhen === undefined
-          ? []
-          : [
-              row(
-                '等于',
-                dependency.kind === 'boolean'
-                  ? select(
-                      [
-                        { value: 'true', label: '打开' },
-                        { value: 'false', label: '关闭' },
-                      ],
-                      String(field.visibleWhen.equals),
-                      (value) =>
-                        replace({ ...field, visibleWhen: { key: dependency.key, equals: value === 'true' } }),
-                    )
-                  : select(
-                      (dependency.options ?? []).map((option) => ({ value: option, label: option })),
-                      String(field.visibleWhen.equals),
-                      (value) => replace({ ...field, visibleWhen: { key: dependency.key, equals: value } }),
-                    ),
-              ),
-            ]),
-        row(
-          '说明（悬停显示）',
-          textInput(field.help ?? '', (value) => {
-            const { help: _drop, ...rest } = field;
-            replace(value === '' ? (rest as Field) : { ...field, help: value });
-          }),
-        ),
-      ]);
+          ...(dependency === undefined || field.visibleWhen === undefined
+            ? []
+            : [
+                row(
+                  '等于',
+                  dependency.kind === 'boolean'
+                    ? select(
+                        [
+                          { value: 'true', label: '打开' },
+                          { value: 'false', label: '关闭' },
+                        ],
+                        String(field.visibleWhen.equals),
+                        (value) =>
+                          replace({
+                            ...field,
+                            visibleWhen: { key: dependency.key, equals: value === 'true' },
+                          }),
+                      )
+                    : select(
+                        (dependency.options ?? []).map((option) => ({
+                          value: option,
+                          label: option,
+                        })),
+                        String(field.visibleWhen.equals),
+                        (value) =>
+                          replace({
+                            ...field,
+                            visibleWhen: { key: dependency.key, equals: value },
+                          }),
+                      ),
+                ),
+              ]),
+          row(
+            '说明（悬停显示）',
+            textInput(field.help ?? '', (value) => {
+              const { help: _drop, ...rest } = field;
+              replace(value === '' ? (rest as Field) : { ...field, help: value });
+            }),
+          ),
+        ],
+      );
       return form;
     };
 
@@ -950,7 +1048,11 @@ export const componentAtomicEditView: ViewModule = {
             textInput(field[key] === undefined ? '' : String(field[key]), (value) => {
               const numeric = Number(value);
               replace(
-                setBound(field, key, value.trim() === '' || !Number.isFinite(numeric) ? undefined : numeric),
+                setBound(
+                  field,
+                  key,
+                  value.trim() === '' || !Number.isFinite(numeric) ? undefined : numeric,
+                ),
               );
             }),
           );
@@ -974,7 +1076,14 @@ export const componentAtomicEditView: ViewModule = {
         });
         area.value = (field.options ?? []).join('\n');
         area.addEventListener('change', () => {
-          const options = [...new Set(area.value.split('\n').map((line) => line.trim()).filter(Boolean))];
+          const options = [
+            ...new Set(
+              area.value
+                .split('\n')
+                .map((line) => line.trim())
+                .filter(Boolean),
+            ),
+          ];
           const fallback = options[0] ?? '';
           replace({
             ...field,
@@ -997,7 +1106,10 @@ export const componentAtomicEditView: ViewModule = {
 
     /** 检查器预览：按编译出的描述符分组呈现，作者在这里直接改默认值（所见即所用）。 */
     const renderInspector = (): HTMLElement => {
-      const panel = el('div', { class: 'component-inspector', attrs: { 'data-component-inspector': '' } });
+      const panel = el('div', {
+        class: 'component-inspector',
+        attrs: { 'data-component-inspector': '' },
+      });
       panel.append(
         el('div', { class: 'component-inspector__head' }, [
           el('strong', { text: '检查器' }),
@@ -1015,7 +1127,10 @@ export const componentAtomicEditView: ViewModule = {
           text: '公共区：位置、尺寸、旋转、不透明度、翻转（设计器统一提供）',
         }),
       );
-      const defaults = { props: compiled.manifest.defaultProps, style: compiled.manifest.defaultStyle };
+      const defaults = {
+        props: compiled.manifest.defaultProps,
+        style: compiled.manifest.defaultStyle,
+      };
       for (const section of compiled.manifest.editorDescriptor?.appearance ?? []) {
         const visibleFields = section.fields.filter((field) => conditionHolds(field, defaults));
         if (visibleFields.length === 0) continue;
@@ -1075,9 +1190,13 @@ export const componentAtomicEditView: ViewModule = {
         row(
           '默认尺寸',
           el('span', { class: 'component-inspector__size' }, [
-            numberInput(spec.defaultSize.width, { min: 8, max: 4096, step: 1 }, (value) => setDefaultSize({ ...spec.defaultSize, width: value })),
+            numberInput(spec.defaultSize.width, { min: 8, max: 4096, step: 1 }, (value) =>
+              setDefaultSize({ ...spec.defaultSize, width: value }),
+            ),
             el('span', { text: '×' }),
-            numberInput(spec.defaultSize.height, { min: 8, max: 4096, step: 1 }, (value) => setDefaultSize({ ...spec.defaultSize, height: value })),
+            numberInput(spec.defaultSize.height, { min: 8, max: 4096, step: 1 }, (value) =>
+              setDefaultSize({ ...spec.defaultSize, height: value }),
+            ),
           ]),
         ),
         checkbox('允许旋转', spec.rotate !== false, (checked) => {
@@ -1096,7 +1215,9 @@ export const componentAtomicEditView: ViewModule = {
         const editor = defaultEditor(own, (value) => {
           spec = {
             ...spec,
-            fields: spec.fields.map((item, at) => (at === index ? ({ ...item, default: value } as Field) : item)),
+            fields: spec.fields.map((item, at) =>
+              at === index ? ({ ...item, default: value } as Field) : item,
+            ),
           };
           changed({ left: true, right: false });
         });
@@ -1123,7 +1244,9 @@ export const componentAtomicEditView: ViewModule = {
       if (key === 'thousandsSeparator') {
         const box = el('input', { attrs: { type: 'checkbox', 'aria-label': field.label } });
         box.checked = format.thousandsSeparator === true;
-        box.addEventListener('change', () => writeFormat({ ...format, thousandsSeparator: box.checked }));
+        box.addEventListener('change', () =>
+          writeFormat({ ...format, thousandsSeparator: box.checked }),
+        );
         return box;
       }
       return el('span', { class: 'component-hint', text: field.control ?? field.label });
@@ -1199,7 +1322,8 @@ export const componentAtomicEditView: ViewModule = {
       stageFrame.dataset.backdrop = backdrop;
       sizeLabel.textContent = `${previewSize.width} × ${previewSize.height}`;
       const sameAsDefault =
-        previewSize.width === spec.defaultSize.width && previewSize.height === spec.defaultSize.height;
+        previewSize.width === spec.defaultSize.width &&
+        previewSize.height === spec.defaultSize.height;
       sizeLabel.dataset.custom = String(!sameAsDefault);
       stageBox.style.width = `${previewSize.width}px`;
       stageBox.style.height = `${previewSize.height}px`;
@@ -1253,7 +1377,11 @@ export const componentAtomicEditView: ViewModule = {
       const startY = event.clientY;
       const startHeight = codePanel.getBoundingClientRect().height;
       const move = (next: PointerEvent): void => {
-        const height = clamp(startHeight - (next.clientY - startY), 160, Math.max(200, center.clientHeight - 160));
+        const height = clamp(
+          startHeight - (next.clientY - startY),
+          160,
+          Math.max(200, center.clientHeight - 160),
+        );
         codePanel.style.height = `${height}px`;
       };
       const up = (): void => {
@@ -1326,7 +1454,8 @@ export const componentAtomicEditView: ViewModule = {
         published = source();
         window.clearTimeout(saveTimer);
         saveState = 'clean';
-        if (routeType === undefined) history.replaceState(null, '', `#/components/atomic/${encodeURIComponent(type)}`);
+        if (routeType === undefined)
+          history.replaceState(null, '', `#/components/atomic/${encodeURIComponent(type)}`);
         renderSaveBadge();
         renderMenu();
         showToast(`「${spec.name}」已发布，物料库已更新`, 'success');
@@ -1424,7 +1553,10 @@ export const componentAtomicEditView: ViewModule = {
             ],
             confirm: '知道了',
             cancel: false,
-            links: screens.map((screen) => ({ label: `打开「${screen.name}」`, run: () => goToEdit(screen.id) })),
+            links: screens.map((screen) => ({
+              label: `打开「${screen.name}」`,
+              run: () => goToEdit(screen.id),
+            })),
           });
           return;
         }
@@ -1439,7 +1571,9 @@ export const componentAtomicEditView: ViewModule = {
     const applySource = (next: AtomicComponentSource): void => {
       spec = next.spec;
       renderBody = next.renderBody;
-      previewSize = isSize(spec.defaultSize) ? { ...spec.defaultSize } : { width: 240, height: 120 };
+      previewSize = isSize(spec.defaultSize)
+        ? { ...spec.defaultSize }
+        : { width: 240, height: 120 };
       code?.setValue(renderBody);
       selected = undefined;
     };
@@ -1471,14 +1605,18 @@ export const componentAtomicEditView: ViewModule = {
       type = routeType;
       const library = await loadComponentLibrary(controller.signal);
       if (disposed) return;
-      const item = library.ok ? library.value.atomic.find((candidate) => candidate.type === type) : undefined;
+      const item = library.ok
+        ? library.value.atomic.find((candidate) => candidate.type === type)
+        : undefined;
       if (item === undefined || item.working === undefined) {
         page.replaceChildren(
           el('div', { class: 'page ds-page' }, [
             el('div', { class: 'error-banner', attrs: { role: 'alert' } }, [
               el('span', {
                 class: 'error-banner__message',
-                text: library.ok ? '组件不存在、已被删除或源码无法读取。' : (library.diagnostics[0]?.message ?? '读取失败。'),
+                text: library.ok
+                  ? '组件不存在、已被删除或源码无法读取。'
+                  : (library.diagnostics[0]?.message ?? '读取失败。'),
               }),
               el('button', { class: 'button', text: '返回组件库', on: { click: goToComponents } }),
             ]),
@@ -1516,7 +1654,10 @@ export const componentAtomicEditView: ViewModule = {
       }
     };
     const onDocumentClick = (event: MouseEvent): void => {
-      if (menuOpen && !(event.target instanceof Node && menu.parentElement?.contains(event.target))) {
+      if (
+        menuOpen &&
+        !(event.target instanceof Node && menu.parentElement?.contains(event.target))
+      ) {
         menuOpen = false;
         renderMenu();
       }
@@ -1549,7 +1690,8 @@ function sortBySection(fields: readonly Field[]): Field[] {
     .map((field, index) => ({ field, index }))
     .sort(
       (left, right) =>
-        (order.get(left.field.section) ?? 0) - (order.get(right.field.section) ?? 0) || left.index - right.index,
+        (order.get(left.field.section) ?? 0) - (order.get(right.field.section) ?? 0) ||
+        left.index - right.index,
     )
     .map((item) => item.field);
 }
@@ -1596,7 +1738,8 @@ function retype(field: Field, kind: Field['kind']): Field {
   const base = {
     key: field.key,
     label: field.label,
-    section: kind === 'color' && PROPS_SECTIONS.has(field.section) ? ('surface' as const) : field.section,
+    section:
+      kind === 'color' && PROPS_SECTIONS.has(field.section) ? ('surface' as const) : field.section,
     ...(field.help === undefined ? {} : { help: field.help }),
     ...(field.visibleWhen === undefined ? {} : { visibleWhen: field.visibleWhen }),
   };
@@ -1609,12 +1752,19 @@ function retype(field: Field, kind: Field['kind']): Field {
       return {
         ...base,
         kind,
-        default: typeof field.default === 'string' && field.default.startsWith('#') ? field.default : '#38bdf8',
+        default:
+          typeof field.default === 'string' && field.default.startsWith('#')
+            ? field.default
+            : '#38bdf8',
       };
     case 'choice':
       return { ...base, kind, options: ['选项一', '选项二'], default: '选项一' };
     default:
-      return { ...base, kind: 'text', default: typeof field.default === 'string' ? field.default : '' };
+      return {
+        ...base,
+        kind: 'text',
+        default: typeof field.default === 'string' ? field.default : '',
+      };
   }
 }
 
@@ -1729,7 +1879,10 @@ function numberInput(
   bounds: { readonly min?: number; readonly max?: number; readonly step?: number },
   onInput: (value: number) => void,
 ): HTMLInputElement {
-  const input = el('input', { class: 'field component-input component-input--number', attrs: { type: 'number' } });
+  const input = el('input', {
+    class: 'field component-input component-input--number',
+    attrs: { type: 'number' },
+  });
   if (bounds.min !== undefined) input.min = String(bounds.min);
   if (bounds.max !== undefined) input.max = String(bounds.max);
   if (bounds.step !== undefined) input.step = String(bounds.step);
@@ -1759,7 +1912,11 @@ function select(
   return control;
 }
 
-function checkbox(label: string, checked: boolean, onChange: (checked: boolean) => void): HTMLElement {
+function checkbox(
+  label: string,
+  checked: boolean,
+  onChange: (checked: boolean) => void,
+): HTMLElement {
   const box = el('input', { attrs: { type: 'checkbox' } });
   box.checked = checked;
   box.addEventListener('change', () => onChange(box.checked));
@@ -1796,7 +1953,10 @@ function iconButton(text: string, label: string, onClick: () => void): HTMLButto
 }
 
 /** 按控件类型编辑默认值（左栏定义表单与右栏检查器共用）。 */
-function defaultEditor(field: Field, onChange: (value: string | number | boolean) => void): HTMLElement {
+function defaultEditor(
+  field: Field,
+  onChange: (value: string | number | boolean) => void,
+): HTMLElement {
   switch (field.kind) {
     case 'number':
       return numberInput(
@@ -1825,8 +1985,13 @@ function defaultEditor(field: Field, onChange: (value: string | number | boolean
         if (/^#[0-9a-fA-F]{6}$/.test(value)) picker.value = value;
         onChange(value);
       });
-      const picker = el('input', { class: 'component-color', attrs: { type: 'color', 'aria-label': `${field.label}取色` } });
-      picker.value = /^#[0-9a-fA-F]{6}$/.test(String(field.default)) ? String(field.default) : '#000000';
+      const picker = el('input', {
+        class: 'component-color',
+        attrs: { type: 'color', 'aria-label': `${field.label}取色` },
+      });
+      picker.value = /^#[0-9a-fA-F]{6}$/.test(String(field.default))
+        ? String(field.default)
+        : '#000000';
       picker.addEventListener('input', () => {
         text.value = picker.value;
         onChange(picker.value);
@@ -1865,39 +2030,57 @@ function confirmDialog(options: {
       on: { click: () => done(true) },
     });
     overlay.append(
-      el('div', { class: 'ds-dialog', attrs: { role: 'alertdialog', 'aria-modal': 'true', 'aria-label': options.title } }, [
-        el('h2', { class: 'ds-dialog__title', text: options.title }),
-        el('div', { class: 'ds-dialog__body' }, options.lines.map((line) => el('p', { text: line }))),
-        ...(options.links === undefined || options.links.length === 0
-          ? []
-          : [
-              el(
-                'ul',
-                { class: 'ds-ref-list' },
-                options.links.map((link) =>
-                  el('li', { class: 'ds-ref-list__item' }, [
-                    el('button', {
-                      class: 'ds-ref-list__link',
-                      text: link.label,
-                      attrs: { type: 'button' },
-                      on: {
-                        click: () => {
-                          done(false);
-                          link.run();
-                        },
-                      },
-                    }),
-                  ]),
-                ),
-              ),
-            ]),
-        el('div', { class: 'ds-dialog__actions' }, [
-          ...(options.cancel === false
+      el(
+        'div',
+        {
+          class: 'ds-dialog',
+          attrs: { role: 'alertdialog', 'aria-modal': 'true', 'aria-label': options.title },
+        },
+        [
+          el('h2', { class: 'ds-dialog__title', text: options.title }),
+          el(
+            'div',
+            { class: 'ds-dialog__body' },
+            options.lines.map((line) => el('p', { text: line })),
+          ),
+          ...(options.links === undefined || options.links.length === 0
             ? []
-            : [el('button', { class: 'button', text: '取消', attrs: { type: 'button' }, on: { click: () => done(false) } })]),
-          confirmButton,
-        ]),
-      ]),
+            : [
+                el(
+                  'ul',
+                  { class: 'ds-ref-list' },
+                  options.links.map((link) =>
+                    el('li', { class: 'ds-ref-list__item' }, [
+                      el('button', {
+                        class: 'ds-ref-list__link',
+                        text: link.label,
+                        attrs: { type: 'button' },
+                        on: {
+                          click: () => {
+                            done(false);
+                            link.run();
+                          },
+                        },
+                      }),
+                    ]),
+                  ),
+                ),
+              ]),
+          el('div', { class: 'ds-dialog__actions' }, [
+            ...(options.cancel === false
+              ? []
+              : [
+                  el('button', {
+                    class: 'button',
+                    text: '取消',
+                    attrs: { type: 'button' },
+                    on: { click: () => done(false) },
+                  }),
+                ]),
+            confirmButton,
+          ]),
+        ],
+      ),
     );
     document.addEventListener('keydown', onKey);
     document.body.append(overlay);

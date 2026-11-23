@@ -131,7 +131,12 @@ export const PLUGIN_BOARD_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
           label: '动效',
           advanced: true,
           fields: [
-            { id: 'waveAnimation', target: 'props', path: ['waveAnimation'], label: '启用波纹动画' },
+            {
+              id: 'waveAnimation',
+              target: 'props',
+              path: ['waveAnimation'],
+              label: '启用波纹动画',
+            },
           ],
         },
       ],

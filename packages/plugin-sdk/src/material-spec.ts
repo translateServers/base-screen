@@ -193,15 +193,22 @@ export function parseBaseScreenMaterialSpec(
 ): ScreenParseResult<BaseScreenMaterialSpec> {
   const diagnostics: ScreenDiagnostic[] = [];
   const add = (path: readonly (string | number)[], message: string): void => {
-    diagnostics.push({ severity: 'error', code: 'PLUGIN_CORE_MANIFEST_FIELD_INVALID', path, message });
+    diagnostics.push({
+      severity: 'error',
+      code: 'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      path,
+      message,
+    });
   };
   if (!isRecord(input)) {
     add([], '组件规格必须是对象。');
     return { ok: false, diagnostics };
   }
   for (const key of Object.keys(input)) if (!SPEC_KEYS.has(key)) add([key], `未知字段 ${key}。`);
-  if (!isScreenMaterialType(input.type)) add(['type'], '物料类型不合法（形如 host.online.gauge-1a2b）。');
-  if (!isBaseScreenBoundedName(input.name, MAX_NAME)) add(['name'], `名称为 1–${MAX_NAME} 个字符。`);
+  if (!isScreenMaterialType(input.type))
+    add(['type'], '物料类型不合法（形如 host.online.gauge-1a2b）。');
+  if (!isBaseScreenBoundedName(input.name, MAX_NAME))
+    add(['name'], `名称为 1–${MAX_NAME} 个字符。`);
   if (!isBaseScreenBoundedName(input.category, MAX_NAME)) {
     add(['category'], `分类为 1–${MAX_NAME} 个字符。`);
   }
@@ -268,7 +275,10 @@ function parseNumberFormat(value: unknown, fields: readonly unknown[], add: AddD
   }
   for (const key of ['decimals', 'maxDecimals'] as const) {
     const item = value[key];
-    if (item !== undefined && (!Number.isInteger(item) || (item as number) < 0 || (item as number) > 6)) {
+    if (
+      item !== undefined &&
+      (!Number.isInteger(item) || (item as number) < 0 || (item as number) > 6)
+    ) {
       add(['numberFormat', key], `${key} 是 0–6 的整数。`);
     }
   }
@@ -305,13 +315,23 @@ function parseFields(fields: readonly unknown[], add: AddDiagnostic): void {
     } else if (seen.has(key)) {
       add([...path, 'key'], `键名 ${key} 重复。`);
     } else if (reserved.has(key)) {
-      add([...path, 'key'], `${key} 是引擎保留样式（公共区统一提供），物料不再声明（ADR-0099 R6）。`);
+      add(
+        [...path, 'key'],
+        `${key} 是引擎保留样式（公共区统一提供），物料不再声明（ADR-0099 R6）。`,
+      );
     } else if (NUMBER_FORMAT_PROP_KEYS.has(key)) {
-      add([...path, 'key'], `${key} 属于读数格式配置组：开启 numberFormat，不要手写同名字段（ADR-0102 R14）。`);
+      add(
+        [...path, 'key'],
+        `${key} 属于读数格式配置组：开启 numberFormat，不要手写同名字段（ADR-0102 R14）。`,
+      );
     }
-    if (!isBaseScreenBoundedName(field.label, MAX_LABEL)) add([...path, 'label'], '标签为 1–32 个字符。');
+    if (!isBaseScreenBoundedName(field.label, MAX_LABEL))
+      add([...path, 'label'], '标签为 1–32 个字符。');
     if (typeof field.section !== 'string' || !SECTION_IDS.has(field.section)) {
-      add([...path, 'section'], '分区只能是 format / structure / text / surface / semantic / motion。');
+      add(
+        [...path, 'section'],
+        '分区只能是 format / structure / text / surface / semantic / motion。',
+      );
     }
     const kind = field.kind;
     if (typeof kind !== 'string' || !FIELD_KINDS.has(kind)) {
@@ -325,7 +345,9 @@ function parseFields(fields: readonly unknown[], add: AddDiagnostic): void {
     if (field.visibleWhen !== undefined) {
       const condition = field.visibleWhen;
       const dependency =
-        isRecord(condition) && typeof condition.key === 'string' ? seen.get(condition.key) : undefined;
+        isRecord(condition) && typeof condition.key === 'string'
+          ? seen.get(condition.key)
+          : undefined;
       if (
         !isRecord(condition) ||
         Object.keys(condition).some((item) => item !== 'key' && item !== 'equals') ||
@@ -352,7 +374,8 @@ function parseFieldValue(
   const value = field.default;
   const onlyFor = (keys: readonly string[], allowed: string): void => {
     for (const key of keys) {
-      if (field[key] !== undefined && kind !== allowed) add([...path, key], `${key} 只用于 ${allowed} 字段。`);
+      if (field[key] !== undefined && kind !== allowed)
+        add([...path, key], `${key} 只用于 ${allowed} 字段。`);
     }
   };
   onlyFor(['min', 'max', 'step', 'unit'], 'number');
@@ -361,12 +384,15 @@ function parseFieldValue(
   switch (kind) {
     case 'number': {
       for (const key of ['min', 'max', 'step'] as const) {
-        if (field[key] !== undefined && !isFiniteNumber(field[key])) add([...path, key], `${key} 必须是数字。`);
+        if (field[key] !== undefined && !isFiniteNumber(field[key]))
+          add([...path, key], `${key} 必须是数字。`);
       }
       const min = field.min as number | undefined;
       const max = field.max as number | undefined;
-      if (min !== undefined && max !== undefined && min >= max) add([...path, 'max'], 'max 必须大于 min。');
-      if (field.step !== undefined && (field.step as number) <= 0) add([...path, 'step'], 'step 必须大于 0。');
+      if (min !== undefined && max !== undefined && min >= max)
+        add([...path, 'max'], 'max 必须大于 min。');
+      if (field.step !== undefined && (field.step as number) <= 0)
+        add([...path, 'step'], 'step 必须大于 0。');
       if (field.unit !== undefined && !isBaseScreenBoundedName(field.unit, MAX_UNIT)) {
         add([...path, 'unit'], `单位最多 ${MAX_UNIT} 个字符。`);
       }
@@ -414,7 +440,8 @@ function parseData(data: unknown, add: AddDiagnostic): void {
     return;
   }
   const allow = (keys: readonly string[]): void => {
-    for (const key of Object.keys(data)) if (!keys.includes(key)) add(['data', key], `未知字段 ${key}。`);
+    for (const key of Object.keys(data))
+      if (!keys.includes(key)) add(['data', key], `未知字段 ${key}。`);
   };
   switch (data.kind) {
     case 'none':
@@ -451,7 +478,8 @@ function parseData(data: unknown, add: AddDiagnostic): void {
           } else {
             ids.add(role.id);
           }
-          if (!isBaseScreenBoundedName(role.label, MAX_LABEL)) add([...path, 'label'], '角色名为 1–32 个字符。');
+          if (!isBaseScreenBoundedName(role.label, MAX_LABEL))
+            add([...path, 'label'], '角色名为 1–32 个字符。');
           if (role.valueType !== 'number' && role.valueType !== 'string') {
             add([...path, 'valueType'], '角色类型只能是 number 或 string。');
           }
@@ -464,12 +492,17 @@ function parseData(data: unknown, add: AddDiagnostic): void {
         }
       }
       const sample = data.sample;
-      if (!Array.isArray(sample) || sample.length > MAX_SAMPLE_ROWS || sample.some((row) => !isRecord(row))) {
+      if (
+        !Array.isArray(sample) ||
+        sample.length > MAX_SAMPLE_ROWS ||
+        sample.some((row) => !isRecord(row))
+      ) {
         add(['data', 'sample'], `示例行是最多 ${MAX_SAMPLE_ROWS} 个对象的数组。`);
       } else {
         sample.forEach((row, index) => {
           for (const [key, cell] of Object.entries(row as Record<string, unknown>)) {
-            if (!ids.has(key)) add(['data', 'sample', index, key], `示例行的键 ${key} 不是角色 id。`);
+            if (!ids.has(key))
+              add(['data', 'sample', index, key], `示例行的键 ${key} 不是角色 id。`);
             else if (cell !== null && typeof cell !== 'string' && !isFiniteNumber(cell)) {
               add(['data', 'sample', index, key], '示例单元格只能是字符串、数字或 null。');
             }
@@ -651,7 +684,8 @@ function dataContract(data: BaseScreenMaterialSpecData): Partial<BaseScreenMater
               id: SCALAR_ROLE,
               minFields: 1,
               maxFields: 1,
-              valueTypes: data.valueType === 'number' ? ['number', 'string'] : ['string', 'number', 'date'],
+              valueTypes:
+                data.valueType === 'number' ? ['number', 'string'] : ['string', 'number', 'date'],
             },
           ],
         },
@@ -732,7 +766,10 @@ export function createBaseScreenMaterialSpecDataAdapter(
         Object.fromEntries(
           data.roles.map((role) => {
             const field = fields[role.id]?.[0];
-            return [role.id, field === undefined ? null : coerceCell(row[field.id], role.valueType)];
+            return [
+              role.id,
+              field === undefined ? null : coerceCell(row[field.id], role.valueType),
+            ];
           }),
         ),
       );
@@ -748,16 +785,25 @@ export function normalizeBaseScreenMaterialSpecValue(
 ): { readonly value: number | string | null; readonly rows: readonly BaseScreenMaterialSpecRow[] } {
   if (data.kind === 'none') return { value: null, rows: [] };
   if (data.kind === 'scalar') return { value: coerceCell(value, data.valueType), rows: [] };
-  const source = isRecord(value) && Array.isArray(value.rows) ? value.rows : Array.isArray(value) ? value : [];
-  const rows = source.filter(isRecord).map((row) =>
-    Object.fromEntries(
-      data.roles.map((role) => [role.id, coerceCell(row[role.id] as ScreenJsonValue, role.valueType)]),
-    ),
-  );
+  const source =
+    isRecord(value) && Array.isArray(value.rows) ? value.rows : Array.isArray(value) ? value : [];
+  const rows = source
+    .filter(isRecord)
+    .map((row) =>
+      Object.fromEntries(
+        data.roles.map((role) => [
+          role.id,
+          coerceCell(row[role.id] as ScreenJsonValue, role.valueType),
+        ]),
+      ),
+    );
   return { value: null, rows };
 }
 
-function coerceCell(value: ScreenJsonValue | undefined, type: 'number' | 'string'): number | string | null {
+function coerceCell(
+  value: ScreenJsonValue | undefined,
+  type: 'number' | 'string',
+): number | string | null {
   if (value === null || value === undefined) return null;
   if (type === 'number') {
     const numeric =
