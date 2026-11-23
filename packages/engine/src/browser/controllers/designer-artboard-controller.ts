@@ -39,6 +39,8 @@ export interface DesignerArtboardContext {
   readonly fit: () => void;
   /** 参照底图开关变化（画布据此显示 / 隐藏参照层）。 */
   readonly onReferenceChange?: (visible: boolean) => void;
+  /** 状态栏「事件」开着：参照层是实况预览，不受参照底图开关影响。 */
+  readonly isLive?: () => boolean;
 }
 
 /** 新建弹框的默认外观：深色面板 + 半透明黑遮罩，点遮罩可关。 */
@@ -69,6 +71,10 @@ export class DesignerArtboardController {
   #host: HTMLElement | undefined;
   #context: DesignerArtboardContext | undefined;
   #open = false;
+  /** 右键标签打开的菜单：目标画布（'' = 主画布或标签条空白）与指针位置；`undefined` = 「+」新建菜单。 */
+  #tabMenu: { readonly id: string; readonly x: number; readonly y: number } | undefined;
+  /** 正在原地改名的从画布 id。 */
+  #renaming: string | undefined;
   #reference = true;
   /** 最近编辑的页面：编辑主画布时作参照底图。 */
   #lastPage: string | null = null;
@@ -85,6 +91,8 @@ export class DesignerArtboardController {
     this.#menu = undefined;
     this.#host = undefined;
     this.#open = false;
+    this.#tabMenu = undefined;
+    this.#renaming = undefined;
   }
 
   setContext(context: DesignerArtboardContext): void {
@@ -106,21 +114,111 @@ export class DesignerArtboardController {
    */
   referenceCanvas(): DesignerArtboardId | undefined {
     const document = this.#context?.getDocument();
-    if (document === undefined || !this.#reference) return undefined;
+    const live = this.#context?.isLive?.() === true;
+    if (document === undefined || (!this.#reference && !live)) return undefined;
     const artboard = this.#context?.getArtboard() ?? null;
-    if (artboard === null) {
-      const pages = (document.subCanvases ?? []).filter((canvas) => canvas.display === 'page');
-      return (pages.find((page) => page.id === this.#lastPage) ?? pages[0])?.id;
-    }
+    if (artboard === null) return this.referencePage() ?? undefined;
     const current = findSubCanvas(document, artboard);
     return current?.display === 'page' ? null : undefined;
   }
 
+  /**
+   * 编辑主画布时垫在下面的页面：最近编辑 / 预览的页面，没有就取起始页。「事件」开着时它就是
+   * 设计态里的「当前页」，蓝图切页在主画布上只换这一页（主画布组件保持原样、状态不丢）。
+   */
+  referencePage(): string | null {
+    const document = this.#context?.getDocument();
+    if (document === undefined) return null;
+    const pages = (document.subCanvases ?? []).filter((canvas) => canvas.display === 'page');
+    if (pages.some((page) => page.id === this.#lastPage)) return this.#lastPage;
+    return resolveScreenStartPageId(document) ?? pages[0]?.id ?? null;
+  }
+
+  setReferencePage(pageId: string): void {
+    if (this.#lastPage === pageId) return;
+    this.#lastPage = pageId;
+    this.#context?.onReferenceChange?.(this.#reference);
+  }
+
   closeMenu(focusTrigger = true): boolean {
     if (!this.#open) return false;
+    const tabMenu = this.#tabMenu;
     this.#open = false;
+    this.#tabMenu = undefined;
     this.render();
-    if (focusTrigger) this.#strip?.querySelector<HTMLElement>('[data-artboard-create]')?.focus();
+    if (focusTrigger) {
+      const trigger =
+        tabMenu === undefined
+          ? this.#strip?.querySelector<HTMLElement>('[data-artboard-create]')
+          : this.#tabButton(tabMenu.id);
+      trigger?.focus();
+    }
+    return true;
+  }
+
+  /**
+   * 右键画布标签：主画布与标签条空白处给「新建页面 / 新建弹框」；页面 / 弹框标签给重命名、
+   * 设为起始页、改显示方式、复制、左移 / 右移与删除。菜单作用于被右键的那块画布，不切换编辑画板。
+   */
+  openTabMenu(target: Element, event: MouseEvent): boolean {
+    if (target.closest('[data-canvas-tabs]') === null) return false;
+    if (target.closest('[data-artboard-rename]') !== null) return true;
+    const tab = target.closest<HTMLElement>('[data-artboard-select]');
+    const id = tab?.dataset.artboardSelect ?? '';
+    if (id !== '' && findSubCanvas(this.#context?.getDocument(), id) === undefined) return true;
+    this.#tabMenu = { id, x: event.clientX, y: event.clientY };
+    this.#open = true;
+    this.render();
+    this.#menu?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')?.focus();
+    return true;
+  }
+
+  /** 双击页面 / 弹框标签原地改名。 */
+  onDoubleClick(target: Element): boolean {
+    const tab = target.closest<HTMLElement>('[data-canvas-tabs] [data-artboard-select]');
+    const id = tab?.dataset.artboardSelect ?? '';
+    if (id === '') return tab !== null;
+    this.#startRename(id);
+    return true;
+  }
+
+  /** 改名输入框：Enter 提交、Esc 取消；聚焦页面 / 弹框标签时 F2 开始改名。 */
+  onKeyDown(event: KeyboardEvent): boolean {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target === null) return false;
+    const input = target.closest<HTMLInputElement>('[data-artboard-rename]');
+    if (input !== null) {
+      if (event.isComposing) return false;
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        this.#commitRename(input.value);
+        return true;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        this.#cancelRename();
+        return true;
+      }
+      return false;
+    }
+    if (event.key !== 'F2') return false;
+    const tab = target.closest<HTMLElement>('[data-canvas-tabs] [data-artboard-select]');
+    const id = tab?.dataset.artboardSelect ?? '';
+    if (id === '') return false;
+    event.preventDefault();
+    this.#startRename(id);
+    return true;
+  }
+
+  /** 改名输入框失焦即提交（与图层改名一致）。 */
+  onFocusOut(event: FocusEvent): boolean {
+    const input =
+      event.target instanceof Element
+        ? event.target.closest<HTMLInputElement>('[data-artboard-rename]')
+        : null;
+    if (input === null) return false;
+    this.#commitRename(input.value);
     return true;
   }
 
@@ -139,18 +237,33 @@ export class DesignerArtboardController {
       menu.replaceChildren();
       return;
     }
-    const item = (action: string, label: string, icon: DesignerIconName): string =>
-      `<button type="button" class="designer-control designer-button designer-menu-item" role="menuitem" data-artboard-create-kind="${action}"><span class="menu-item-icon" aria-hidden="true">${designerIcon(icon)}</span><span class="menu-item-label">${escapeHtml(label)}</span></button>`;
-    menu.innerHTML = `<div class="designer-context-menu-heading"><span class="designer-context-menu-heading-icon" aria-hidden="true">${designerIcon('layers')}</span><span class="designer-context-menu-heading-label">${TEXT.createMenu}</span></div>
-      ${item('page', TEXT.createPage, ICON.page)}
-      ${item('popup', TEXT.createPopup, ICON.popup)}`;
+    const tabMenu = this.#tabMenu;
+    const subCanvas =
+      tabMenu === undefined || tabMenu.id === '' ? undefined : findSubCanvas(document, tabMenu.id);
+    if (subCanvas !== undefined && document !== undefined) {
+      menu.setAttribute('aria-label', TEXT.tabMenuAria(subCanvas.name));
+      menu.innerHTML = subCanvasMenuMarkup(document, subCanvas);
+    } else {
+      menu.setAttribute('aria-label', TEXT.createMenu);
+      menu.innerHTML = createMenuMarkup();
+    }
     adoptDesignerFormControls(menu);
-    this.#position(menu);
+    if (tabMenu === undefined) this.#position(menu);
+    else this.#positionAt(menu, tabMenu.x, tabMenu.y);
   }
 
   onClick(target: Element): boolean {
+    const tabAction = target.closest<HTMLElement>('[data-artboard-tab-action]');
+    if (tabAction !== null) {
+      const id = this.#tabMenu?.id ?? '';
+      this.closeMenu(false);
+      this.#runTabAction(tabAction.dataset.artboardTabAction ?? '', id);
+      return true;
+    }
+    if (target.closest('[data-artboard-rename]') !== null) return true;
     if (target.closest('[data-artboard-create]') !== null) {
-      this.#open = !this.#open;
+      this.#open = !(this.#open && this.#tabMenu === undefined);
+      this.#tabMenu = undefined;
       this.render();
       if (this.#open) this.#menu?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
       return true;
@@ -204,6 +317,8 @@ export class DesignerArtboardController {
   }
 
   onChange(target: Element): boolean {
+    // 改名输入框由 Enter / 失焦提交，change 只认领、不重复提交。
+    if (target.closest('[data-artboard-rename]') !== null) return true;
     const field = target.closest<HTMLElement>('[data-sub-canvas-property], [data-popup-property]');
     if (field === null) return false;
     const current = this.#current();
@@ -260,11 +375,11 @@ export class DesignerArtboardController {
     return true;
   }
 
-  /** 复制当前从画布（连同其中的组件，新 id），插在它后面并切过去。 */
-  duplicateCurrentSubCanvas(): boolean {
+  /** 复制从画布（缺省当前画布；连同其中的组件，新 id），插在它后面并切过去。 */
+  duplicateCurrentSubCanvas(id?: string): boolean {
     const context = this.#context;
     const document = context?.getDocument();
-    const current = this.#current();
+    const current = this.#current(id);
     if (context === undefined || document === undefined || current === undefined) return false;
     const subCanvases = document.subCanvases ?? [];
     const ids = new Set(subCanvases.map((canvas) => canvas.id));
@@ -326,11 +441,11 @@ export class DesignerArtboardController {
     return true;
   }
 
-  /** 删除当前从画布：连同其中的组件、蓝图里引用它们的节点一起移除，一次可撤销事务。 */
-  deleteCurrentSubCanvas(): boolean {
+  /** 删除从画布（缺省当前画布）：连同其中的组件、蓝图里引用它们的节点一起移除，一次可撤销事务。 */
+  deleteCurrentSubCanvas(id?: string): boolean {
     const context = this.#context;
     const document = context?.getDocument();
-    const current = this.#current();
+    const current = this.#current(id);
     if (context === undefined || document === undefined || current === undefined) return false;
     const roots = document.components.filter(
       (component) => component.parentId === null && component.canvasId === current.id,
@@ -474,7 +589,11 @@ export class DesignerArtboardController {
         display === 'page' && id === start
           ? `<span class="designer-canvas-tab-start" aria-label="${TEXT.startPage}" data-tip="${TEXT.startPage}">${designerIcon('star')}</span>`
           : '';
-      return `<button type="button" class="designer-control designer-button designer-canvas-tab" data-variant="ghost" role="tab" aria-selected="${String(selected)}" data-artboard-select="${escapeHtml(id)}" data-canvas-display="${display}"><span class="designer-canvas-tab-icon" aria-hidden="true">${designerIcon(ICON[display])}</span><span class="designer-canvas-tab-name">${escapeHtml(name)}</span>${star}</button>`;
+      const icon = `<span class="designer-canvas-tab-icon" aria-hidden="true">${designerIcon(ICON[display])}</span>`;
+      if (id !== '' && id === this.#renaming) {
+        return `<span class="designer-canvas-tab designer-canvas-tab-renaming" aria-selected="${String(selected)}" data-canvas-display="${display}">${icon}<input type="text" class="designer-control designer-input designer-canvas-tab-rename" data-artboard-rename value="${escapeHtml(name)}" aria-label="${TEXT.renameAria}" spellcheck="false" autocomplete="off"></span>`;
+      }
+      return `<button type="button" class="designer-control designer-button designer-canvas-tab" data-variant="ghost" role="tab" aria-selected="${String(selected)}" data-artboard-select="${escapeHtml(id)}" data-canvas-display="${display}">${icon}<span class="designer-canvas-tab-name">${escapeHtml(name)}</span>${star}</button>`;
     };
     const referenceAvailable = subCanvases.some((canvas) => canvas.display === 'page');
     const referenceLabel = this.#reference ? TEXT.referenceOnAria : TEXT.referenceOffAria;
@@ -528,10 +647,10 @@ export class DesignerArtboardController {
    * 切换显示方式（D2：锚点与显示方式无关，蓝图连线不变）。页面 → 弹框按默认面板尺寸，
    * 并提示超出面板的组件数；弹框 → 页面去掉弹框专属字段与面板背景（透出主画布背景）。
    */
-  #changeDisplay(display: 'page' | 'popup'): void {
+  #changeDisplay(display: 'page' | 'popup', id?: string): void {
     const context = this.#context;
     const document = context?.getDocument();
-    const current = this.#current();
+    const current = this.#current(id);
     if (context === undefined || document === undefined || current === undefined) return;
     if (current.display === display) return;
     const next: ScreenSubCanvas =
@@ -556,10 +675,10 @@ export class DesignerArtboardController {
     );
   }
 
-  #setStartPage(): void {
+  #setStartPage(id?: string): void {
     const context = this.#context;
     const document = context?.getDocument();
-    const current = this.#current();
+    const current = this.#current(id);
     if (context === undefined || document === undefined || current?.display !== 'page') return;
     const result = context.execute({
       commands: [
@@ -589,8 +708,74 @@ export class DesignerArtboardController {
     context.fit();
   }
 
-  #current(): ScreenSubCanvas | undefined {
-    return findSubCanvas(this.#context?.getDocument(), this.#context?.getArtboard() ?? null);
+  #current(id?: string): ScreenSubCanvas | undefined {
+    return findSubCanvas(this.#context?.getDocument(), id ?? this.#context?.getArtboard() ?? null);
+  }
+
+  #runTabAction(action: string, id: string): void {
+    if (action === 'create-page') this.createSubCanvas('page');
+    else if (action === 'create-popup') this.createSubCanvas('popup');
+    else if (id === '') return;
+    else if (action === 'rename') this.#startRename(id);
+    else if (action === 'set-start') this.#setStartPage(id);
+    else if (action === 'to-page') this.#changeDisplay('page', id);
+    else if (action === 'to-popup') this.#changeDisplay('popup', id);
+    else if (action === 'duplicate') this.duplicateCurrentSubCanvas(id);
+    else if (action === 'move-left') this.#reorder(id, -1);
+    else if (action === 'move-right') this.#reorder(id, 1);
+    else if (action === 'delete') this.deleteCurrentSubCanvas(id);
+  }
+
+  /** 左移 / 右移标签：调整从画布顺序（也是「上一页 / 下一页」的顺序）。 */
+  #reorder(id: string, delta: -1 | 1): void {
+    const context = this.#context;
+    const subCanvases = [...(context?.getDocument()?.subCanvases ?? [])];
+    const index = subCanvases.findIndex((canvas) => canvas.id === id);
+    const next = index + delta;
+    if (context === undefined || index === -1 || next < 0 || next >= subCanvases.length) return;
+    [subCanvases[index], subCanvases[next]] = [subCanvases[next]!, subCanvases[index]!];
+    const result = context.execute({
+      commands: [{ type: 'replace-sub-canvases', subCanvases }],
+    });
+    if (!result.ok) context.reportDiagnostics(result.diagnostics);
+    else this.#tabButton(id)?.focus();
+  }
+
+  #startRename(id: string): void {
+    if (findSubCanvas(this.#context?.getDocument(), id) === undefined) return;
+    this.closeMenu(false);
+    this.#renaming = id;
+    this.render();
+    const input = this.#strip?.querySelector<HTMLInputElement>('[data-artboard-rename]');
+    input?.focus();
+    input?.select();
+  }
+
+  #cancelRename(): void {
+    const id = this.#renaming;
+    if (id === undefined) return;
+    this.#renaming = undefined;
+    this.render();
+    this.#tabButton(id)?.focus();
+  }
+
+  #commitRename(value: string): void {
+    const id = this.#renaming;
+    if (id === undefined) return;
+    // 先退出改名态：提交引起的重渲染不能再画出输入框。
+    this.#renaming = undefined;
+    const current = findSubCanvas(this.#context?.getDocument(), id);
+    const name = value.trim();
+    if (current === undefined || name.length === 0 || name === current.name) {
+      this.render();
+      return;
+    }
+    if (this.#replace({ ...current, name })) this.#context?.notify(TEXT.renamed(name));
+    else this.render();
+  }
+
+  #tabButton(id: string): HTMLElement | null | undefined {
+    return this.#strip?.querySelector<HTMLElement>(`[data-artboard-select="${CSS.escape(id)}"]`);
   }
 
   #currentPopup(): ScreenPopupCanvas | undefined {
@@ -619,6 +804,17 @@ export class DesignerArtboardController {
     return true;
   }
 
+  /** 右键菜单贴指针向上展开（标签条在画布底部），左右收进工作区。 */
+  #positionAt(menu: HTMLElement, x: number, y: number): void {
+    const host = this.#host;
+    if (host === undefined) return;
+    const hostRect = host.getBoundingClientRect();
+    const maxLeft = Math.max(8, hostRect.width - menu.offsetWidth - 8);
+    menu.style.left = `${Math.min(Math.max(8, x - hostRect.left), maxLeft)}px`;
+    menu.style.top = 'auto';
+    menu.style.bottom = `${Math.max(8, hostRect.bottom - y + 4)}px`;
+  }
+
   /** 菜单挂在工作区上：标签条在画布底部，所以贴「+」按钮向上展开。 */
   #position(menu: HTMLElement): void {
     const trigger = this.#strip?.querySelector<HTMLElement>('[data-artboard-create]');
@@ -630,6 +826,53 @@ export class DesignerArtboardController {
     menu.style.top = 'auto';
     menu.style.bottom = `${hostRect.bottom - triggerRect.top + 4}px`;
   }
+}
+
+function menuItem(
+  action: string,
+  label: string,
+  icon: DesignerIconName,
+  options: { readonly disabled?: boolean; readonly kbd?: string; readonly danger?: boolean } = {},
+): string {
+  return `<button type="button" class="designer-control designer-button designer-menu-item" role="menuitem" data-artboard-tab-action="${action}"${options.danger === true ? ' data-menu-tone="danger"' : ''}${options.disabled === true ? ' disabled' : ''}><span class="menu-item-icon" aria-hidden="true">${designerIcon(icon)}</span><span class="menu-item-label">${escapeHtml(label)}</span>${options.kbd === undefined ? '' : `<kbd>${options.kbd}</kbd>`}</button>`;
+}
+
+const MENU_SEPARATOR =
+  '<div class="designer-menu-separator" data-menu-separator role="separator"></div>';
+
+function menuHeading(icon: DesignerIconName, label: string): string {
+  return `<div class="designer-context-menu-heading"><span class="designer-context-menu-heading-icon" aria-hidden="true">${designerIcon(icon)}</span><span class="designer-context-menu-heading-label">${escapeHtml(label)}</span></div>`;
+}
+
+/** 「+」与主画布 / 空白处右键共用：新建页面、新建弹框。 */
+function createMenuMarkup(): string {
+  return `${menuHeading('layers', TEXT.createMenu)}
+      <button type="button" class="designer-control designer-button designer-menu-item" role="menuitem" data-artboard-create-kind="page"><span class="menu-item-icon" aria-hidden="true">${designerIcon(ICON.page)}</span><span class="menu-item-label">${TEXT.createPage}</span></button>
+      <button type="button" class="designer-control designer-button designer-menu-item" role="menuitem" data-artboard-create-kind="popup"><span class="menu-item-icon" aria-hidden="true">${designerIcon(ICON.popup)}</span><span class="menu-item-label">${TEXT.createPopup}</span></button>`;
+}
+
+function subCanvasMenuMarkup(document: ScreenDocument, subCanvas: ScreenSubCanvas): string {
+  const subCanvases = document.subCanvases ?? [];
+  const index = subCanvases.indexOf(subCanvas);
+  const isStart = resolveScreenStartPageId(document) === subCanvas.id;
+  return [
+    menuHeading(ICON[subCanvas.display], subCanvas.name),
+    menuItem('rename', TEXT.rename, 'pencil', { kbd: 'F2' }),
+    subCanvas.display === 'page'
+      ? menuItem('set-start', TEXT.setStartPage, 'star', { disabled: isStart })
+      : '',
+    subCanvas.display === 'page'
+      ? menuItem('to-popup', TEXT.changeToPopup, ICON.popup)
+      : menuItem('to-page', TEXT.changeToPage, ICON.page),
+    menuItem('duplicate', TEXT.duplicate, 'duplicate'),
+    MENU_SEPARATOR,
+    menuItem('move-left', TEXT.moveLeft, 'chevron-left', { disabled: index <= 0 }),
+    menuItem('move-right', TEXT.moveRight, 'chevron-right', {
+      disabled: index === -1 || index >= subCanvases.length - 1,
+    }),
+    MENU_SEPARATOR,
+    menuItem('delete', TEXT.deleteSubCanvas, 'trash', { danger: true }),
+  ].join('');
 }
 
 function defaultPopup(id: string, name: string, document: ScreenDocument): ScreenPopupCanvas {
