@@ -114,6 +114,8 @@ export interface BaseScreenBlueprintCanvasEdge {
   readonly value?: ScreenBlueprintValueExpression;
   readonly payload?: ScreenBlueprintValueExpression;
   readonly transition?: ScreenBlueprintVisibilityTransition;
+  /** 「设置状态」的目标状态（ADR-0110）。 */
+  readonly stateId?: string;
   /** 任一端点停用时为 false：连线淡显。 */
   readonly active: boolean;
 }

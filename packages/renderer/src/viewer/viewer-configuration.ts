@@ -10,12 +10,10 @@ import type {
 } from '@base-screen/contracts';
 import { isScreenHostDatasetPort } from '@base-screen/contracts';
 import type {
-  BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import {
-  isBaseScreenConditionalStylePort,
   isBaseScreenMaterialCatalog,
   isBaseScreenRuntimeContributionIndex,
   isScreenBlueprintHostActionPort,
@@ -31,8 +29,6 @@ export interface BaseScreenViewerConfiguration {
   readonly datasetPort?: ScreenHostDatasetPort;
   /** 来源目录端口：`host-catalog` 与 `url-query` 两种来源共用。 */
   readonly hostCatalogPort?: ScreenHostCatalogPort;
-  /** ADR-0059 宿主条件样式端口：configure-only（Renderer 创建时捕获，无独立 setter）。 */
-  readonly conditionalStylePort?: BaseScreenConditionalStylePort;
   readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
   readonly blueprintRuntimePort?: ScreenBlueprintRuntimePort;
   readonly blueprintHostActionPort?: ScreenBlueprintHostActionPort;
@@ -94,12 +90,6 @@ export function parseBaseScreenViewerConfiguration(
     !isScreenHostCatalogPort(configuration.hostCatalogPort)
   ) {
     return lifecycleFailure('Viewer host catalog port 必须同时提供 list、describe 与 resolve。');
-  }
-  if (
-    configuration.conditionalStylePort !== undefined &&
-    !isBaseScreenConditionalStylePort(configuration.conditionalStylePort)
-  ) {
-    return lifecycleFailure('Viewer conditional style port 必须是含 resolve 的对象。');
   }
   if (
     configuration.runtimeContributions !== undefined &&

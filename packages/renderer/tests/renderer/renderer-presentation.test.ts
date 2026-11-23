@@ -67,11 +67,35 @@ describe('BaseScreenRenderer material presentation styles', () => {
 
     expect(result.ok).toBe(true);
     const style = root.children[0]!.style;
-    expect(style.pointerEvents).toBe('none');
+    // 设计态（未开「事件」）不穿透：否则设计器点不中这个组件。
+    expect(style.pointerEvents).toBe('');
     expect(style.cursor).toBe('pointer');
     expect(style.clipPath).toBe('inset(0)');
     expect(style.mixBlendMode).toBe('screen');
     expect(style.filter).toBe('blur(2px) hue-rotate(90deg)');
+  });
+
+  it('applies pass-through only at runtime or with designer events enabled', () => {
+    const passThrough = { ...component('overlay', 0), style: { passThrough: true } };
+    const { root, renderer } = rendererWithRoot();
+    expect(renderer.render(document([passThrough])).ok).toBe(true);
+    expect(root.children[0]!.style.pointerEvents).toBe('');
+    expect(renderer.setInteractive(true).ok).toBe(true);
+    expect(root.children[0]!.style.pointerEvents).toBe('none');
+    expect(renderer.setInteractive(false).ok).toBe(true);
+    expect(root.children[0]!.style.pointerEvents).toBe('');
+
+    const viewerRoot = new FakeRoot();
+    const viewer = createBaseScreenRenderer({
+      root: viewerRoot as unknown as HTMLElement,
+      catalog: createCatalog(),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+    expect(viewer.render(document([passThrough])).ok).toBe(true);
+    expect(viewerRoot.children[0]!.style.pointerEvents).toBe('none');
   });
 
   it('leaves behavior and filter CSS untouched when the keys are absent', () => {

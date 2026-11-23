@@ -79,7 +79,7 @@ function diffComponent(
   diffObject('style', before.style, after.style, entries);
   compareValue('dataValue', before.dataValue ?? null, after.dataValue ?? null, entries);
   compareValue('dataSource', before.dataSource ?? null, after.dataSource ?? null, entries);
-  compareValue('styleRules', before.styleRules ?? [], after.styleRules ?? [], entries);
+  compareValue('states', before.states ?? null, after.states ?? null, entries);
   return entries;
 }
 

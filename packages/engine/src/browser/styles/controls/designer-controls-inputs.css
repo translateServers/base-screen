@@ -402,6 +402,13 @@
   box-shadow: 0 0 0 2px var(--designer-focus-ring);
 }
 
+/* 值位是外壳里的可编辑区，不是独立控件：`.designer-control:focus`（0,2,0）会压过
+   `.designer-stepper-value`（0,1,0），聚焦时外壳与值位各画一圈 2px 蓝环，看起来像
+   输入框套输入框。这里用外层类把环收回外壳一次，值位只留文本光标。 */
+.designer-stepper .designer-stepper-value:focus {
+  box-shadow: none;
+}
+
 .designer-stepper-button {
   display: grid;
   width: 34px;
@@ -425,9 +432,34 @@
   border-left: 1px solid var(--designer-border-subtle);
 }
 
+/* 两端按钮的悬停/按下底色贴住外壳圆角：按钮是矩形，方形底色会在 6px 圆角处露出直角。 */
+.designer-stepper-button:first-child {
+  border-radius: var(--designer-radius-3) 0 0 var(--designer-radius-3);
+}
+
+.designer-stepper-button:last-child {
+  border-radius: 0 var(--designer-radius-3) var(--designer-radius-3) 0;
+}
+
 .designer-stepper-button:hover:not(:disabled) {
   background-color: var(--designer-surface-control-hover);
   color: var(--designer-text-primary);
+}
+
+/* 按下比悬停再深一档：30px 高的图标按钮只靠光标位置说明「点到了」。 */
+.designer-stepper-button:active:not(:disabled) {
+  background-color: var(--designer-surface-control-active);
+}
+
+/* 键盘焦点落在 − / + 上时，环只画在按钮内侧，外壳退回静态描边：
+   两者同时画会并成一道 6px 的粗蓝边，看起来像按钮被粘在了边框上。 */
+.designer-stepper:has(> .designer-stepper-button:focus-visible) {
+  box-shadow: var(--designer-elev-ring);
+}
+
+.designer-stepper-button:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -2px;
 }
 
 .designer-stepper-button:disabled {

@@ -2,6 +2,8 @@ import type {
   ScreenDiagnostic,
   ScreenDocument,
   ScreenHostResourcePort,
+  ScreenJsonValue,
+  ScreenLevelScale,
   ScreenParseResult,
   ScreenSize,
   ScreenSubCanvas,
@@ -13,7 +15,6 @@ import type {
   ScreenInteractionState,
 } from '@base-screen/core';
 import type {
-  BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginInspectorControlCatalog,
   BaseScreenRuntimeContributionIndex,
@@ -23,6 +24,7 @@ import type { BaseScreenMaterialLibraryGrouping } from '../../../common/operatio
 import type { BaseScreenResolvedMaterialLibraryItem } from '../../../common/operations/material-library/material-library-items.js';
 import type { DesignerDescriptorDatasetFields } from '../../dom/descriptor/designer-descriptor-dom.js';
 import type { DesignerCanvasPresentationSettings } from '../../dom/panel/designer-panel-dom.js';
+import type { DesignerComponentStateEditing } from './designer-component-states-controller.js';
 
 export interface DesignerPanelControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
@@ -49,12 +51,16 @@ export interface DesignerPanelControllerCallbacks {
   readonly getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[];
   /** 授权目录：custom 控件只能从这里取构造函数。缺省即不渲染任何自定义控件。 */
   readonly getInspectorControls?: () => BaseScreenPluginInspectorControlCatalog | undefined;
-  /** 宿主条件样式作者口：缺省即不渲染宿主条件样式段。 */
-  readonly getHostConditionalStyleAuthoring?: () =>
-    | BaseScreenHostConditionalStyleAuthoringPort
-    | undefined;
-  /** 宿主绑定保存成功后重算指定组件的条件样式。 */
-  readonly refreshConditionalStyles?: (componentIds: readonly string[]) => void;
+  /** 检查器「正在编辑哪个状态」的会话记忆（ADR-0110）。 */
+  readonly componentStateEditing?: DesignerComponentStateEditing;
+  /** 画布按某状态预览组件；`default` 即恢复实时判定。 */
+  readonly previewComponentState?: (componentId: string, stateId: string) => void;
+  /** 画布上的实时判定（生效状态与取值）。 */
+  readonly readComponentStateRuntime?: (
+    componentId: string,
+  ) => { readonly stateId: string; readonly value?: ScreenJsonValue } | undefined;
+  /** 数据源实例对应的宿主分级表（资源类型 / 来源目录项声明，ADR-0110 §2.6.2）。 */
+  readonly readLevelScales?: (dataSourceId: string) => readonly ScreenLevelScale[] | undefined;
   readonly getGroupMaterialType: () => string | undefined;
   readonly getInteraction: () => ScreenInteractionState;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;

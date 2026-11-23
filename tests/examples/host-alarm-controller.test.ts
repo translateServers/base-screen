@@ -1,36 +1,16 @@
-import type { BaseScreenConditionalStyleRequest } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
   createHostAlarmController,
   type HostAlarmConnect,
   type HostAlarmEvent,
   type HostAlarmRecord,
-  type HostAlarmScheduler,
   type HostAlarmStatus,
 } from '../../examples/vanilla-host/src/screen/host-alarm-controller';
 
-const READY: BaseScreenConditionalStyleRequest['dataState'] = { status: 'ready', value: 1 };
-
-function request(componentId: string): BaseScreenConditionalStyleRequest {
-  return { componentId, dataState: READY };
-}
-
-const BINDINGS = {
-  'alarm.open': {
-    'kpi-alarm-value': {
-      warning: { color: '#fa8c16' },
-      critical: { color: '#f5222d' },
-    },
-    'top-notice': {
-      warning: { color: '#fa8c16', fontWeight: '700' },
-      critical: { color: '#f5222d', fontWeight: '700' },
-    },
-  },
-  'alarm.temperature': {
-    'kpi-alarm-value': { warning: { color: '#e6a23c' } },
-  },
-} as const;
-
+/**
+ * 宿主告警源（ADR-0110 §2.6）：只做「告警快照 → 按 key 汇总等级」，不带任何样式。
+ * 外观由组件状态决定，这里只验证分级与快照语义。
+ */
 function record(
   key: string,
   level: HostAlarmRecord['level'] = 'warning',
@@ -52,17 +32,8 @@ function snapshot(revision: number, alarms: readonly HostAlarmRecord[]): HostAla
   return { type: 'snapshot', revision, alarms };
 }
 
-function createHarness(): {
-  readonly controller: ReturnType<typeof createHostAlarmController>;
-  readonly invalidations: (readonly string[])[];
-  readonly urls: string[];
-  readonly closed: () => number;
-  readonly emit: (event: HostAlarmEvent) => void;
-  readonly emitStatus: (status: HostAlarmStatus) => void;
-  readonly flush: () => void;
-  readonly pending: () => number;
-} {
-  const invalidations: (readonly string[])[] = [];
+function createHarness() {
+  const changes: (readonly string[])[] = [];
   const urls: string[] = [];
   let closed = 0;
   let listener: ((event: HostAlarmEvent) => void) | undefined;
@@ -75,88 +46,58 @@ function createHarness(): {
       closed += 1;
     };
   };
-  const scheduled: (() => void)[] = [];
-  const schedule: HostAlarmScheduler = (callback) => {
-    scheduled.push(callback);
-    return () => {
-      const index = scheduled.indexOf(callback);
-      if (index >= 0) scheduled.splice(index, 1);
-    };
-  };
-  const controller = createHostAlarmController({
-    apiBase: '/api',
-    bindings: BINDINGS,
-    onInvalidate: (componentIds) => invalidations.push([...componentIds]),
-    connect,
-    schedule,
-  });
+  const controller = createHostAlarmController({ apiBase: '/api/', connect });
+  controller.onChange((keys) => changes.push([...keys].sort()));
   return {
     controller,
-    invalidations,
+    changes,
     urls,
     closed: () => closed,
-    emit: (event) => listener?.(event),
-    emitStatus: (status) => statusListener?.(status),
-    flush: () => {
-      for (const callback of scheduled.splice(0)) callback();
-    },
-    pending: () => scheduled.length,
+    emit: (event: HostAlarmEvent) => listener?.(event),
+    emitStatus: (status: HostAlarmStatus) => statusListener?.(status),
   };
 }
 
 describe('host alarm controller', () => {
-  it('CSR-H01 applies the initial snapshot and exposes the bound style through the port', async () => {
+  it('summarises the initial snapshot per key', async () => {
     const harness = createHarness();
-    harness.emit(snapshot(1, [record('alarm.open')]));
+    harness.emit(snapshot(1, [record('alarm.open'), record('alarm.temperature', 'critical')]));
     await harness.controller.ready(10);
-    harness.flush();
 
     expect(harness.urls).toEqual(['/api/demo/alarms/stream']);
-    expect(harness.controller.status()).toEqual({ status: 'live', revision: 1, activeCount: 1 });
-    expect(harness.controller.port.resolve(request('kpi-alarm-value'))).toEqual({
-      color: '#fa8c16',
+    expect(harness.controller.status()).toEqual({ status: 'live', revision: 1, activeCount: 2 });
+    expect(harness.controller.summary('alarm.open')).toEqual({ level: 'warning', count: 1 });
+    expect(harness.controller.summary('alarm.temperature')).toEqual({
+      level: 'critical',
+      count: 1,
     });
-    expect(harness.controller.port.resolve(request('top-notice'))).toEqual({
-      color: '#fa8c16',
-      fontWeight: '700',
-    });
-    expect(harness.controller.port.resolve(request('unbound'))).toBeUndefined();
-    expect(harness.invalidations).toEqual([['kpi-alarm-value', 'top-notice']]);
+    expect(harness.controller.summary('unknown')).toEqual({ level: null, count: 0 });
+    expect(harness.changes).toEqual([['alarm.open', 'alarm.temperature']]);
     harness.controller.stop();
   });
 
-  it('CSR-H02 applies raise and clear events and invalidates only the bound components', () => {
+  it('applies raise and clear events and reports only the affected key', () => {
     const harness = createHarness();
     harness.emit(snapshot(1, []));
-    harness.flush();
-    harness.invalidations.length = 0;
+    harness.changes.length = 0;
 
     harness.emit({ type: 'raise', revision: 2, alarm: record('alarm.open', 'critical') });
-    harness.flush();
-    expect(harness.controller.port.resolve(request('kpi-alarm-value'))).toEqual({
-      color: '#f5222d',
-    });
-    expect(harness.invalidations).toEqual([['kpi-alarm-value', 'top-notice']]);
-
-    harness.invalidations.length = 0;
+    expect(harness.controller.summary('alarm.open')).toEqual({ level: 'critical', count: 1 });
     harness.emit({ type: 'clear', revision: 3, alarmId: 'alarm-alarm.open' });
-    harness.flush();
-    expect(harness.controller.port.resolve(request('kpi-alarm-value'))).toBeUndefined();
-    expect(harness.invalidations).toEqual([['kpi-alarm-value', 'top-notice']]);
+    expect(harness.controller.summary('alarm.open')).toEqual({ level: null, count: 0 });
+    expect(harness.changes).toEqual([['alarm.open'], ['alarm.open']]);
     harness.controller.stop();
   });
 
-  it('CSR-H03 drops duplicate and out-of-order revisions and reconnects on a gap', async () => {
+  it('drops duplicate and out-of-order revisions and reconnects on a gap', async () => {
     const harness = createHarness();
     harness.emit(snapshot(4, []));
-    harness.flush();
-    harness.invalidations.length = 0;
+    harness.changes.length = 0;
 
     harness.emit({ type: 'raise', revision: 4, alarm: record('alarm.open') });
     harness.emit({ type: 'raise', revision: 2, alarm: record('alarm.open') });
-    harness.flush();
-    expect(harness.invalidations).toEqual([]);
-    expect(harness.controller.port.resolve(request('kpi-alarm-value'))).toBeUndefined();
+    expect(harness.changes).toEqual([]);
+    expect(harness.controller.summary('alarm.open').count).toBe(0);
 
     harness.emit({ type: 'raise', revision: 9, alarm: record('alarm.open') });
     expect(harness.closed()).toBe(1);
@@ -165,95 +106,45 @@ describe('host alarm controller', () => {
 
     harness.emit(snapshot(9, [record('alarm.open', 'critical')]));
     await harness.controller.ready(10);
-    harness.flush();
     expect(harness.controller.status()).toEqual({ status: 'live', revision: 9, activeCount: 1 });
-    expect(harness.controller.port.resolve(request('kpi-alarm-value'))).toEqual({
-      color: '#f5222d',
-    });
+    expect(harness.controller.summary('alarm.open').level).toBe('critical');
     harness.controller.stop();
   });
 
-  it('CSR-H04 coalesces multiple events into one invalidation per frame', () => {
-    const harness = createHarness();
-    harness.emit(snapshot(1, []));
-    harness.flush();
-    harness.invalidations.length = 0;
-
-    harness.emit({ type: 'raise', revision: 2, alarm: record('alarm.open') });
-    harness.emit({ type: 'raise', revision: 3, alarm: record('alarm.temperature') });
-    expect(harness.pending()).toBe(1);
-    harness.flush();
-
-    expect(harness.invalidations).toHaveLength(1);
-    expect([...harness.invalidations[0]!].sort()).toEqual(['kpi-alarm-value', 'top-notice']);
-    harness.controller.stop();
-  });
-
-  it('CSR-H05 picks the highest active alarm and ignores acknowledged or suppressed ones', () => {
+  it('takes the highest active level and ignores acknowledged or suppressed alarms', () => {
     const harness = createHarness();
     harness.emit(
-      snapshot(1, [record('alarm.open', 'warning'), record('alarm.temperature', 'warning')]),
+      snapshot(1, [
+        record('alarm.open', 'warning', { id: 'a' }),
+        record('alarm.open', 'info', { id: 'b' }),
+      ]),
     );
-    harness.flush();
-    expect(harness.controller.port.resolve(request('kpi-alarm-value'))).toEqual({
-      color: '#fa8c16',
-    });
-
-    harness.emit({ type: 'raise', revision: 2, alarm: record('alarm.open', 'critical') });
-    harness.flush();
-    expect(harness.controller.port.resolve(request('kpi-alarm-value'))).toEqual({
-      color: '#f5222d',
-    });
-
-    harness.emit({ type: 'ack', revision: 3, alarmId: 'alarm-alarm.open' });
-    harness.flush();
-    expect(harness.controller.port.resolve(request('kpi-alarm-value'))).toEqual({
-      color: '#e6a23c',
-    });
+    expect(harness.controller.summary('alarm.open')).toEqual({ level: 'warning', count: 2 });
 
     harness.emit({
-      type: 'suppress',
-      revision: 4,
-      alarmId: 'alarm-alarm.temperature',
-      suppressed: true,
+      type: 'raise',
+      revision: 2,
+      alarm: record('alarm.open', 'critical', { id: 'c' }),
     });
-    harness.flush();
-    expect(harness.controller.port.resolve(request('kpi-alarm-value'))).toBeUndefined();
-    expect(harness.controller.status().activeCount).toBe(0);
+    expect(harness.controller.summary('alarm.open')).toEqual({ level: 'critical', count: 3 });
+
+    harness.emit({ type: 'ack', revision: 3, alarmId: 'c' });
+    expect(harness.controller.summary('alarm.open')).toEqual({ level: 'warning', count: 2 });
+
+    harness.emit({ type: 'suppress', revision: 4, alarmId: 'a', suppressed: true });
+    expect(harness.controller.summary('alarm.open')).toEqual({ level: 'info', count: 1 });
     harness.controller.stop();
   });
 
-  it('CSR-H06 rebinds the live snapshot without reconnecting the stream', () => {
-    const harness = createHarness();
-    harness.emit(snapshot(1, [record('alarm.open', 'warning')]));
-    harness.flush();
-    harness.invalidations.length = 0;
-
-    harness.controller.setBindings({
-      'alarm.open': { 'top-notice': { warning: { color: '#123456' } } },
-    });
-    harness.flush();
-
-    // 旧目标必须一起失效，否则已着色的组件会停在旧颜色上。
-    expect([...harness.invalidations[0]!].sort()).toEqual(['kpi-alarm-value', 'top-notice']);
-    expect(harness.controller.port.resolve(request('kpi-alarm-value'))).toBeUndefined();
-    expect(harness.controller.port.resolve(request('top-notice'))).toEqual({ color: '#123456' });
-    expect(harness.closed()).toBe(0);
-    expect(harness.urls).toHaveLength(1);
-    harness.controller.stop();
-  });
-
-  it('CSR-H07 stops the stream and ignores later events', async () => {
+  it('stops the stream and ignores later events', async () => {
     const harness = createHarness();
     harness.emit(snapshot(1, [record('alarm.open')]));
-    harness.flush();
-    harness.invalidations.length = 0;
+    harness.changes.length = 0;
 
     harness.controller.stop();
     expect(harness.closed()).toBe(1);
     harness.emit({ type: 'raise', revision: 2, alarm: record('alarm.open', 'critical') });
-    harness.flush();
-    expect(harness.invalidations).toEqual([]);
+    expect(harness.changes).toEqual([]);
     await expect(harness.controller.ready(5)).resolves.toBeUndefined();
   });
 });

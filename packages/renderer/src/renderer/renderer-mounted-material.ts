@@ -3,10 +3,8 @@ import { parseBaseScreenMaterialEventDetail } from '@base-screen/plugin-core';
 import { resolveEffectiveModel } from './renderer-effective-style.js';
 import {
   applyMaterial,
-  applyMaterialDataMarker,
   applyMaterialDisplay,
   applyMaterialFrame,
-  applyMaterialHostStyle,
 } from './renderer-material-dom.js';
 import type { RendererState } from './renderer-state.js';
 import type { AppliedModelKey, MountedMaterial, RenderCandidate } from './renderer-types.js';
@@ -78,6 +76,7 @@ export function appliedModelKeyOf(
     hidden: state.visibility.isHidden(candidate.component.id),
     dataEpoch: candidate.dataEpoch,
     theme: document.theme,
+    stateId: state.componentStates.resolve(state, candidate, candidate.model.dataState),
   };
 }
 
@@ -89,32 +88,9 @@ function sameAppliedModelKey(left: AppliedModelKey, right: AppliedModelKey): boo
     left.stackOrder === right.stackOrder &&
     left.hidden === right.hidden &&
     left.dataEpoch === right.dataEpoch &&
-    left.theme === right.theme
+    left.theme === right.theme &&
+    left.stateId === right.stateId
   );
-}
-
-/**
- * 宿主告警状态变化后的样式-only 重算：只重写 effective model 与宿主级保留样式，
- * 不碰几何、transform、display 与 zIndex，因此不会打断画布手势或造成布局抖动。
- *
- * `passThrough`、`filter` 等保留键由引擎写到宿主元素 CSS，物料自身不消费；只写 model
- * 会让 `element.model` 与真实 `pointerEvents` / `filter` 脱节，直到下一次完整渲染才追平。
- *
- * 刻意不更新 `mounted.applied`：本次重写不改任何守卫输入，下一次渲染守卫命中时
- * 保留（而不是覆盖回）这次端口刷新的结果；但会同步 `appliedModel`，守卫命中时的
- * 几何/显示帧要读它的翻转与透明度。
- */
-export function applyMountedConditionalStyle(
-  state: RendererState,
-  candidate: RenderCandidate,
-  mounted: MountedMaterial,
-  document: ScreenDocument,
-): void {
-  const model = resolveEffectiveModel(state, candidate, candidate.model.dataState, document);
-  mounted.element.model = model;
-  mounted.appliedModel = model;
-  applyMaterialHostStyle(mounted.element, model);
-  applyMaterialDataMarker(mounted.element, model);
 }
 
 export function handleMaterialEvent(

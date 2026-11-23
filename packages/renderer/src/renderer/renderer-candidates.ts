@@ -86,12 +86,14 @@ export function prepareCandidates(
     const cached = validationCache.entries.get(component);
     let props: ScreenJsonObject;
     let style: ScreenJsonObject;
+    let stateStyleMap: ReadonlyMap<string, ScreenJsonObject>;
     if (cached !== undefined && cached.entry === entry && cached.theme === document.theme) {
-      // 同一组件引用 + 同一 catalog entry + 同一主题：props/style/styleRules 已在
+      // 同一组件引用 + 同一 catalog entry + 同一主题：props/style/states 已在
       // 先前渲染完整通过 schema 校验（缓存只写入全量成功项），直接复用结果。
       // 主题必须参与命中判定——缓存里的 style 已是 theme:<slot> 的解析结果。
       props = cached.props;
       style = cached.style;
+      stateStyleMap = cached.stateStyles;
       nextEntries.set(component, cached);
     } else {
       const validatedProps = validateBaseScreenMaterialProps(
@@ -128,49 +130,61 @@ export function prepareCandidates(
         );
         continue;
       }
-      // 条件样式规则（ADR-0058）：每条规则的 style 与基础样式合并后必须满足该物料
-      // styleSchema（静态、与数据无关），非法规则样式与非法 style 同路径失败关闭。
-      const styleRules = component.styleRules ?? [];
-      let styleRulesValid = true;
-      for (let ruleIndex = 0; ruleIndex < styleRules.length; ruleIndex++) {
-        const ruleThemed = resolveStyleThemeRefs(styleRules[ruleIndex]!.style, document.theme);
-        if (ruleThemed.unresolved.length > 0) {
+      // 组件状态（ADR-0110）：每个状态的覆盖与基础样式合并后必须满足该物料 styleSchema
+      // （静态、与数据无关）；非法状态样式与非法 style 同路径失败关闭。
+      const stateItems = component.states?.items ?? [];
+      const stateStyles = new Map<string, ScreenJsonObject>();
+      let statesValid = true;
+      for (let stateIndex = 0; stateIndex < stateItems.length; stateIndex++) {
+        const item = stateItems[stateIndex]!;
+        if (Object.keys(item.style).length === 0) continue;
+        const stateThemed = resolveStyleThemeRefs(item.style, document.theme);
+        if (stateThemed.unresolved.length > 0) {
           diagnostics.push(
-            ...ruleThemed.unresolved.map((key) =>
+            ...stateThemed.unresolved.map((key) =>
               diagnostic(
                 'DOCUMENT_FIELD_INVALID',
-                ['components', index, 'styleRules', ruleIndex, 'style', key],
+                ['components', index, 'states', 'items', stateIndex, 'style', key],
                 'Theme reference cannot be resolved against the document palette.',
               ),
             ),
           );
-          styleRulesValid = false;
+          statesValid = false;
           break;
         }
-        const ruleStyle = validateBaseScreenMaterialStyle(
-          { ...themed.style, ...ruleThemed.style },
+        const merged = validateBaseScreenMaterialStyle(
+          { ...themed.style, ...stateThemed.style },
           entry.manifest.styleSchema,
         );
-        if (!ruleStyle.ok) {
+        if (!merged.ok) {
           diagnostics.push(
-            ...prefixDiagnostics(ruleStyle.diagnostics, [
+            ...prefixDiagnostics(merged.diagnostics, [
               'components',
               index,
-              'styleRules',
-              ruleIndex,
+              'states',
+              'items',
+              stateIndex,
               'style',
             ]),
           );
-          styleRulesValid = false;
+          statesValid = false;
           break;
         }
+        stateStyles.set(item.id, merged.value);
       }
-      if (!styleRulesValid) {
+      if (!statesValid) {
         continue;
       }
       props = validatedProps.value;
       style = themed.style;
-      nextEntries.set(component, { entry, theme: document.theme, props, style });
+      stateStyleMap = stateStyles;
+      nextEntries.set(component, {
+        entry,
+        theme: document.theme,
+        props,
+        style,
+        stateStyles,
+      });
     }
     const resolved = readComponentData(dataSources, component, entry, contributionIndex, [
       'components',
@@ -194,6 +208,7 @@ export function prepareCandidates(
       },
       dataSource: resolved.dataSource,
       dataEpoch: resolved.epoch,
+      stateStyles: stateStyleMap,
     });
   }
   validationCache.entries = nextEntries;

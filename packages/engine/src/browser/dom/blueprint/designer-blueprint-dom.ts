@@ -290,6 +290,13 @@ function renderEffect(
     title.textContent =
       DESIGNER_UI_TEXT.blueprint.graph.mainCanvasPorts[action.operation] ?? action.operation;
     value.textContent = DESIGNER_UI_TEXT.blueprint.canvases;
+  } else if (action.type === 'component-state') {
+    title.textContent = `${
+      DESIGNER_UI_TEXT.blueprint.graph.ports[
+        action.operation === 'set' ? 'set-state' : 'reset-state'
+      ] ?? action.operation
+    } · ${action.componentId}`;
+    value.textContent = action.stateId ?? '';
   } else {
     // ADR-0076：宿主动作由插件声明。已声明显示其清单名，未声明明确标出——
     // 执行侧同样会失败关闭，作者面提前把同一事实讲清楚。

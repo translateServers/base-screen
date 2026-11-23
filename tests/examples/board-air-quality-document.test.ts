@@ -212,10 +212,10 @@ describe('air quality document', () => {
     expect(datasetComponentIds.has('trend-pm')).toBe(true);
   });
 
-  it('colours the selected city level and risk with canonical style rules', () => {
+  it('colours the selected city level and risk with component states', () => {
     const document = parsedDocument();
     const level = document.components.find((component) => component.id === 'hero-level');
-    expect(level?.styleRules?.map((rule) => rule.when.value)).toEqual([
+    expect(level?.states?.judge?.cases.map((entry) => entry.value)).toEqual([
       '优',
       '良',
       '轻度污染',
@@ -224,9 +224,9 @@ describe('air quality document', () => {
       '严重污染',
     ]);
     const ratio = document.components.find((component) => component.id === 'hero-ratio');
-    expect(ratio?.styleRules?.map((rule) => rule.when.operator)).toEqual(['gt', 'lte']);
+    expect(ratio?.states?.judge?.cases.map((entry) => entry.operator)).toEqual(['gt', 'lte']);
     const good = document.components.find((component) => component.id === 'hero-good');
-    expect(good?.styleRules?.map((rule) => rule.when.operator)).toEqual(['lt', 'gte']);
+    expect(good?.states?.judge?.cases.map((entry) => entry.operator)).toEqual(['lt', 'gte']);
   });
 
   it('keeps the three blueprint links on real components, variables and row fields', () => {

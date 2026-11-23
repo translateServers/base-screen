@@ -329,6 +329,23 @@ function edgeConfiguration(
         ),
       );
     }
+    // 「设置状态」的目标状态（ADR-0110 §2.4）：只能选目标组件已声明的状态。
+    if (target?.kind === 'component' && edge.targetPort === 'set-state') {
+      const items =
+        document.components.find((component) => component.id === target.componentId)?.states
+          ?.items ?? [];
+      parts.push(
+        field(
+          GRAPH.targetState,
+          `<select class="designer-control designer-select" data-blueprint-edge-field="state" data-edge-id="${id}">${items
+            .map(
+              (item) =>
+                `<option value="${escapeAttribute(item.id)}"${item.id === edge.stateId ? ' selected' : ''}>${escapeHtml(item.name)}</option>`,
+            )
+            .join('')}</select>`,
+        ),
+      );
+    }
     if (target?.kind === 'component' && ['show', 'hide', 'toggle'].includes(edge.targetPort)) {
       const transition = edge.transition;
       parts.push(

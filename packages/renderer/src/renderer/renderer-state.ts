@@ -23,6 +23,7 @@ import {
 } from '../resource/source-query-port.js';
 import { SubCanvasController } from '../sub-canvas-layer.js';
 import type { CreateBaseScreenRendererOptions } from './renderer.js';
+import { ComponentStateMemory } from './renderer-component-states.js';
 import type {
   ComponentValidationCache,
   MountedMaterial,
@@ -48,6 +49,8 @@ export interface RendererState {
   readonly visibility: BlueprintVisibilityController;
   /** 从画布运行时（ADR-0109）；设计态不建页面层与浮层。 */
   readonly subCanvases: SubCanvasController;
+  /** 组件状态（ADR-0110）的会话记忆：判定结果、蓝图设置与最近一次生效的状态。 */
+  readonly componentStates: ComponentStateMemory;
   /** 实例状态变化后由 Renderer 注入的重投影钩子（构造期先给空实现）。 */
   onDataSourceChanged: (dataSourceId: string) => void;
   /** 切页后按同一文档重新渲染；由 Renderer 注入。 */
@@ -116,6 +119,7 @@ export function createRendererState(options: CreateBaseScreenRendererOptions): R
       requestRender: () => state.requestRender(),
       ...(options.initialPageId === undefined ? {} : { initialPageId: options.initialPageId }),
     }),
+    componentStates: new ComponentStateMemory(),
     onDataSourceChanged: () => {},
     requestRender: () => {},
   };

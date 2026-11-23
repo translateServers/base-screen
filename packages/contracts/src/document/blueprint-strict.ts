@@ -36,6 +36,7 @@ const FLOW_EDGE_FIELDS = new Set([
   'value',
   'payload',
   'transition',
+  'stateId',
   'requiredCapabilities',
 ]);
 const SEMANTIC_EDGE_FIELDS = new Set(['kind', 'id', 'from', 'to', 'role']);

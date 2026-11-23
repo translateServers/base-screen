@@ -244,6 +244,8 @@ export interface DesignerBlueprintConnectionContext {
   readonly isEventAvailable: (componentId: string, eventName: string) => boolean;
   /** 宿主动作锚点是否已声明；宿主事件锚点总可连（事件名由作者决定）。 */
   readonly isHostActionAvailable: (actionId: string) => boolean;
+  /** 组件声明的状态 id（ADR-0110）：没有状态时不能连状态锚点；`set-state` 默认取第一个。 */
+  readonly componentStateIds?: (componentId: string) => readonly string[];
 }
 
 /**
@@ -303,11 +305,23 @@ export function connectDesignerBlueprintPorts(
   ) {
     return { ok: false, reason: 'invalid' };
   }
+  const sourceStates =
+    source.kind === 'component' ? (context.componentStateIds?.(source.componentId) ?? []) : [];
+  const targetStates =
+    target.kind === 'component' ? (context.componentStateIds?.(target.componentId) ?? []) : [];
   if (source.kind === 'component') {
-    const eventName = from.port.slice('event:'.length);
-    if (!context.isEventAvailable(source.componentId, eventName)) {
+    if (from.port === 'state-changed') {
+      if (sourceStates.length === 0) return { ok: false, reason: 'unavailable' };
+    } else if (!context.isEventAvailable(source.componentId, from.port.slice('event:'.length))) {
       return { ok: false, reason: 'unavailable' };
     }
+  }
+  if (
+    target.kind === 'component' &&
+    (to.port === 'set-state' || to.port === 'reset-state') &&
+    targetStates.length === 0
+  ) {
+    return { ok: false, reason: 'unavailable' };
   }
   const actionId = readScreenBlueprintActionPort(to.port);
   if (
@@ -346,6 +360,7 @@ export function connectDesignerBlueprintPorts(
     ...(rule.value === 'required' ? { value: { kind: 'event-payload', path: [] } } : {}),
     ...(rule.payload === 'required' ? { payload: { kind: 'event-payload', path: [] } } : {}),
     ...(rule.transition === 'optional' ? { transition: DEFAULT_BLUEPRINT_TRANSITION } : {}),
+    ...(rule.stateId === 'required' ? { stateId: targetStates[0]! } : {}),
   };
   return { ok: true, edgeId, blueprint: { ...blueprint, edges: [...blueprint.edges, edge] } };
 }
@@ -490,7 +505,9 @@ export type DesignerBlueprintEdgePatch =
   | { readonly type: 'transition'; readonly transition: ScreenBlueprintVisibilityTransition | null }
   | { readonly type: 'role'; readonly role: ScreenBlueprintSemanticRole }
   /** 改目标锚点（如显示 → 隐藏）；附加字段按新锚点的要求保留、补齐或去掉。 */
-  | { readonly type: 'target-port'; readonly port: string };
+  | { readonly type: 'target-port'; readonly port: string; readonly stateId?: string }
+  /** 「设置状态」的目标状态（ADR-0110 §2.4）。 */
+  | { readonly type: 'state'; readonly stateId: string };
 
 export function updateDesignerBlueprintEdge(
   blueprint: ScreenBlueprint,
@@ -527,6 +544,10 @@ export function updateDesignerBlueprintEdge(
         patch.transition === null ? rest : { ...rest, transition: patch.transition },
       );
     }
+    case 'state':
+      return rule.stateId === 'required'
+        ? replaceEdge(blueprint, { ...edge, stateId: patch.stateId })
+        : null;
     case 'target-port': {
       if (!isScreenBlueprintInputPort(target.kind, patch.port)) return null;
       if (
@@ -543,7 +564,9 @@ export function updateDesignerBlueprintEdge(
         return null;
       }
       const nextRule = screenBlueprintEdgeFieldRule(target.kind, patch.port);
-      const { value, payload, transition, ...rest } = edge;
+      const { value, payload, transition, stateId, ...rest } = edge;
+      const nextStateId = stateId ?? patch.stateId;
+      if (nextRule.stateId === 'required' && nextStateId === undefined) return null;
       return replaceEdge(blueprint, {
         ...rest,
         to: { node: edge.to.node, port: patch.port },
@@ -556,6 +579,7 @@ export function updateDesignerBlueprintEdge(
             ? { payload }
             : {}),
         ...(nextRule.transition === 'optional' && transition !== undefined ? { transition } : {}),
+        ...(nextRule.stateId === 'required' ? { stateId: nextStateId! } : {}),
       });
     }
   }

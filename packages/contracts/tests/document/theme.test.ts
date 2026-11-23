@@ -39,6 +39,8 @@ describe('document theme palette', () => {
     expect(resolveScreenThemeRef('#ffffff', theme)).toBeUndefined();
     expect(resolveScreenThemeRef(screenThemeRef('primary'), undefined)).toBeUndefined();
     expect(readScreenThemeRef('theme:nope')).toBeUndefined();
-    expect(SCREEN_THEME_SLOTS).toHaveLength(6);
+    expect(SCREEN_THEME_SLOTS).toHaveLength(10);
+    // 状态色位（ADR-0110 §2.6.4）在没有色板时也有内置默认色。
+    expect(resolveScreenThemeRef(screenThemeRef('danger'), undefined)).toBe('#f5222d');
   });
 });

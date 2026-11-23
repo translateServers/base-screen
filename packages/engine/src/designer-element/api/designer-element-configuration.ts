@@ -24,8 +24,6 @@ import {
   parseBaseScreenDesignerLeftPanelGroups,
 } from '../../common/operations/workbench/designer-left-panel-groups.js';
 import {
-  isBaseScreenConditionalStylePort,
-  isBaseScreenHostConditionalStyleAuthoringPort,
   isBaseScreenMaterialCatalog,
   isBaseScreenPluginCatalog,
   isBaseScreenPluginInspectorControlCatalog,
@@ -167,30 +165,6 @@ export function configure(
     };
   }
   if (
-    configuration.conditionalStylePort !== undefined &&
-    !isBaseScreenConditionalStylePort(configuration.conditionalStylePort)
-  ) {
-    return {
-      ok: false,
-      diagnostics: [
-        lifecycleDiagnostic('Designer conditional style port 必须是含 resolve 的对象。'),
-      ],
-    };
-  }
-  if (
-    configuration.hostConditionalStyleAuthoring !== undefined &&
-    !isBaseScreenHostConditionalStyleAuthoringPort(configuration.hostConditionalStyleAuthoring)
-  ) {
-    return {
-      ok: false,
-      diagnostics: [
-        lifecycleDiagnostic(
-          'Designer host conditional style authoring 必须提供 sources/bindings/save。',
-        ),
-      ],
-    };
-  }
-  if (
     configuration.runtimeContributions !== undefined &&
     !isBaseScreenRuntimeContributionIndex(configuration.runtimeContributions)
   ) {
@@ -274,8 +248,6 @@ export function configure(
     elementState.hostCatalogPort = configuration.hostCatalogPort;
     elementState.datasetPort = configuration.datasetPort;
   }
-  elementState.conditionalStylePort = configuration.conditionalStylePort;
-  elementState.hostConditionalStyleAuthoring = configuration.hostConditionalStyleAuthoring;
   elementState.catalog = configuration.catalog;
   elementState.leftPanelGroups = leftPanelGroups;
   elementState.materialLibraryState = materialLibraryState;

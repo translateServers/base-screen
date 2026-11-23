@@ -427,7 +427,7 @@ function migrateComponentDataSource(
     style: component.style,
     // 旧字段保留为 null：当前契约仍要求该键存在，它不再是写入口。
     dataSource: null,
-    ...(component.styleRules === undefined ? {} : { styleRules: component.styleRules }),
+    ...(component.states === undefined ? {} : { states: component.states }),
   } satisfies Omit<ScreenComponentNode, 'dataSource' | 'dataValue' | 'dataBinding'> & {
     dataSource: null;
   };

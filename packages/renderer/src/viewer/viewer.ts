@@ -22,11 +22,11 @@ import {
   type ScreenBlueprintPlan,
 } from '@base-screen/core';
 import type {
-  BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer, createBaseScreenRenderer } from '../renderer/renderer.js';
+import type { BaseScreenComponentStateChange } from '../renderer/renderer-component-states.js';
 import type { BaseScreenCanvasChange } from '../sub-canvas-layer.js';
 import { applyBlueprintDispatchToRenderer } from './viewer-blueprint-runtime.js';
 import { ViewerBlueprintTimerScheduler } from './viewer-blueprint-timer-scheduler.js';
@@ -62,7 +62,6 @@ export class BaseScreenViewerElement extends ElementBase {
   #resourcePort: ScreenHostResourcePort | undefined;
   #datasetPort: ScreenHostDatasetPort | undefined;
   #hostCatalogPort: ScreenHostCatalogPort | undefined;
-  #conditionalStylePort: BaseScreenConditionalStylePort | undefined;
   #contributionIndex: BaseScreenRuntimeContributionIndex | undefined;
   #blueprintRuntimePort: ScreenBlueprintRuntimePort | undefined;
   #blueprintHostActionPort: ScreenBlueprintHostActionPort | undefined;
@@ -85,6 +84,8 @@ export class BaseScreenViewerElement extends ElementBase {
   /** 正在分发的蓝图事件深度；分发期间产生的从画布事件排队，结束后按深度 +1 再分发。 */
   #dispatchDepth: number | undefined;
   #pendingCanvasEvents: BaseScreenCanvasChange[] = [];
+  /** 分发期间产生的组件状态改变（ADR-0110）同样排队，结束后按深度 +1 再分发。 */
+  #pendingStateEvents: ScreenBlueprintEvent[] = [];
   /** 宿主指定的起始页（ADR-0109 §2.3）。 */
   #initialPageId: string | undefined;
   #projectId: string | undefined;
@@ -133,7 +134,6 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#resourcePort = value.resourcePort;
     this.#datasetPort = value.datasetPort;
     this.#hostCatalogPort = value.hostCatalogPort;
-    this.#conditionalStylePort = value.conditionalStylePort;
     this.#contributionIndex = value.runtimeContributions;
     this.#blueprintRuntimePort = value.blueprintRuntimePort;
     this.#blueprintHostActionPort = value.blueprintHostActionPort;
@@ -239,21 +239,6 @@ export class BaseScreenViewerElement extends ElementBase {
     return this.#hostCatalogPort;
   }
 
-  /** ADR-0059：只读回读；配置入口是 configure 或初始化前的守卫 setter。 */
-  get conditionalStylePort(): BaseScreenConditionalStylePort | undefined {
-    return this.#conditionalStylePort;
-  }
-
-  set conditionalStylePort(value: BaseScreenConditionalStylePort | undefined) {
-    if (this.#renderer !== undefined && value !== this.#conditionalStylePort) {
-      this.emitLifecycleDiagnostic(
-        'Conditional style port cannot change after initialization. Call unload first.',
-      );
-      return;
-    }
-    this.#conditionalStylePort = value;
-  }
-
   get resourceTimeoutMs(): number {
     return this.#resourceTimeoutMs;
   }
@@ -326,6 +311,7 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#variableRuntime.cancel();
     this.#scheduler.suspend();
     this.#renderer?.resetBlueprintVisibility();
+    this.#renderer?.resetComponentStates();
     this.#document = value;
     // 装载/替换重新武装 ready：新文档首个成功渲染再发一次；同一文档的变量刷新不重置。
     this.#lifecycleReadyFired = false;
@@ -380,9 +366,9 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#variableRuntime.refreshVariables(options);
   }
 
-  /** 宿主告警/视觉状态变化后只重算条件样式，不重新取数、不改文档。 */
-  refreshConditionalStyles(componentIds?: readonly string[]): void {
-    this.#renderer?.refreshConditionalStyles(componentIds);
+  /** 组件当前生效的状态 id（ADR-0110，`default` 为默认）；未挂载返回 undefined。 */
+  readComponentState(componentId: string): string | undefined {
+    return this.#renderer?.readComponentState(componentId)?.stateId;
   }
 
   getVariable(id: string): ScreenVariableHandle | undefined {
@@ -437,9 +423,18 @@ export class BaseScreenViewerElement extends ElementBase {
           this.#pendingCanvasEvents.push(change);
         }
       },
-      ...(this.#conditionalStylePort === undefined
-        ? {}
-        : { conditionalStylePort: this.#conditionalStylePort }),
+      onComponentStateChange: (change) => {
+        this.dispatchEvent(
+          new CustomEvent('base-screen-component-state-change', {
+            bubbles: true,
+            composed: true,
+            detail: change,
+          }),
+        );
+        const event = componentStateBlueprintEvent(change);
+        if (this.#dispatchDepth === undefined) this.handleBlueprintEvent(event);
+        else this.#pendingStateEvents.push(event);
+      },
       resourceTimeoutMs: this.#resourceTimeoutMs,
       ...(this.#contributionIndex === undefined
         ? {}
@@ -616,6 +611,8 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#dispatchDepth = outerDepth;
     const canvasEvents = this.#pendingCanvasEvents;
     this.#pendingCanvasEvents = [];
+    const stateEvents = this.#pendingStateEvents;
+    this.#pendingStateEvents = [];
     for (const hostEvent of result.value.hostEvents) {
       if (this.#blueprintRuntimePort === undefined) {
         this.dispatchEvent(new CustomEvent('base-screen-blueprint-event', { detail: hostEvent }));
@@ -655,6 +652,9 @@ export class BaseScreenViewerElement extends ElementBase {
     }
     for (const change of canvasEvents) {
       this.handleBlueprintEvent(canvasBlueprintEvent(change), depth + 1);
+    }
+    for (const stateEvent of stateEvents) {
+      this.handleBlueprintEvent(stateEvent, depth + 1);
     }
   }
 
@@ -750,5 +750,17 @@ function canvasBlueprintEvent(change: BaseScreenCanvasChange): ScreenBlueprintEv
     canvasId: change.canvasId,
     name: change.open ? 'opened' : 'closed',
     payload: change.open ? (change.payload ?? null) : null,
+  };
+}
+
+/** 组件状态改变的蓝图事件（ADR-0110 §2.3）：负载 `{ from, to, cause }`。 */
+function componentStateBlueprintEvent(
+  change: BaseScreenComponentStateChange,
+): ScreenBlueprintEvent {
+  return {
+    type: 'component-state-changed',
+    componentId: change.componentId,
+    name: 'state-changed',
+    payload: { from: change.from, to: change.to, cause: change.cause },
   };
 }

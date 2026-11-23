@@ -31,6 +31,8 @@ export interface DesignerDescriptorContext {
   readonly manifest: NonNullable<ReturnType<BaseScreenMaterialCatalog['get']>>['manifest'];
   readonly datasetFields: readonly DesignerDescriptorDatasetFields[];
   readonly inspectorControls: BaseScreenPluginInspectorControlCatalog | undefined;
+  /** 文档主题（ADR-0098）：样式颜色字段的「主题色」色卡与 `theme:<slot>` 引用的显示都按它解析。 */
+  readonly theme?: ScreenDocument['theme'];
 }
 
 export function getDesignerDescriptorContext(
@@ -48,6 +50,7 @@ export function getDesignerDescriptorContext(
         manifest,
         datasetFields: input.getDatasetFields?.() ?? [],
         inspectorControls: input.inspectorControls,
+        theme: input.document?.theme,
       };
 }
 

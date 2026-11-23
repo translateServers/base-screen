@@ -9,10 +9,7 @@ import type {
   ScreenProjectSnapshotPort,
 } from '@base-screen/contracts';
 import { isScreenHostDatasetPort, validateScreenDesignerHostAdapter } from '@base-screen/contracts';
-import type {
-  BaseScreenConditionalStylePort,
-  BaseScreenHostConditionalStyleAuthoringPort,
-} from '@base-screen/plugin-core';
+import type {} from '@base-screen/plugin-core';
 import { lifecycleDiagnostic } from '../runtime/designer-element-guards.js';
 import {
   type DesignerElementHost,
@@ -124,56 +121,6 @@ export function writeHostCatalogPort(
   }
   elementState.hostCatalogPort = value;
   elementState.runtime.renderInteraction(element);
-}
-
-export function readConditionalStylePort(
-  element: DesignerElementHost,
-): BaseScreenConditionalStylePort | undefined {
-  const elementState = getDesignerElementState(element);
-
-  return elementState.conditionalStylePort;
-}
-
-export function readHostConditionalStyleAuthoring(
-  element: DesignerElementHost,
-): BaseScreenHostConditionalStyleAuthoringPort | undefined {
-  const elementState = getDesignerElementState(element);
-
-  return elementState.hostConditionalStyleAuthoring;
-}
-
-export function writeHostConditionalStyleAuthoring(
-  element: DesignerElementHost,
-  value: BaseScreenHostConditionalStyleAuthoringPort | undefined,
-) {
-  const elementState = getDesignerElementState(element);
-
-  if (elementState.renderer !== undefined && value !== elementState.hostConditionalStyleAuthoring) {
-    elementState.runtime.emitDiagnostics(element, [
-      lifecycleDiagnostic(
-        'Host conditional style authoring cannot change after initialization. Call unload first.',
-      ),
-    ]);
-    return;
-  }
-  elementState.hostConditionalStyleAuthoring = value;
-}
-
-export function writeConditionalStylePort(
-  element: DesignerElementHost,
-  value: BaseScreenConditionalStylePort | undefined,
-) {
-  const elementState = getDesignerElementState(element);
-
-  if (elementState.renderer !== undefined && value !== elementState.conditionalStylePort) {
-    elementState.runtime.emitDiagnostics(element, [
-      lifecycleDiagnostic(
-        'Conditional style port cannot change after initialization. Call unload first.',
-      ),
-    ]);
-    return;
-  }
-  elementState.conditionalStylePort = value;
 }
 
 export function readDatasetCatalogPort(

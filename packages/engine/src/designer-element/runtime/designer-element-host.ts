@@ -22,10 +22,8 @@ import type {
 import { type ScreenDocumentCommand, type ScreenDocumentTransaction } from '@base-screen/core';
 import type {
   BaseScreenComponentFragmentInsertionIntent,
-  BaseScreenConditionalStylePort,
   BaseScreenFragmentBody,
   BaseScreenFragmentDefinition,
-  BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
   BaseScreenRuntimeContributionIndex,
@@ -77,8 +75,6 @@ export interface DesignerElementHost extends HTMLElement {
   resourcePort: ScreenHostResourcePort | undefined;
   designerHostAdapter: ScreenDesignerHostAdapter | undefined;
   hostCatalogPort: ScreenHostCatalogPort | undefined;
-  conditionalStylePort: BaseScreenConditionalStylePort | undefined;
-  hostConditionalStyleAuthoring: BaseScreenHostConditionalStyleAuthoringPort | undefined;
   datasetPort: ScreenHostDatasetPort | undefined;
   projectCatalogPort: ScreenProjectCatalogPort | undefined;
   projectPreviewPort: ScreenProjectPreviewPort | undefined;
@@ -166,7 +162,6 @@ export interface DesignerElementHost extends HTMLElement {
   restoreSnapshot(snapshotId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   refreshData(componentId?: string): void;
   refreshVariables(options?: ScreenVariableRefreshOptions): void;
-  refreshConditionalStyles(componentIds?: readonly string[]): void;
   getVariable(id: string): import('@base-screen/contracts').ScreenVariableHandle | undefined;
   save(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   publish(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;

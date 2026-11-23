@@ -1,5 +1,6 @@
 import {
   isScreenThemeRefSyntax,
+  readScreenThemeColor,
   readScreenThemeRef,
   type ScreenDocument,
   type ScreenJsonObject,
@@ -19,7 +20,7 @@ export function resolveStyleThemeRefs(
   for (const [key, value] of Object.entries(style)) {
     if (typeof value !== 'string' || !isScreenThemeRefSyntax(value)) continue;
     const slot = readScreenThemeRef(value);
-    const color = slot === undefined ? undefined : theme?.palette[slot];
+    const color = slot === undefined ? undefined : readScreenThemeColor(theme, slot);
     if (color === undefined) {
       unresolved.push(key);
       continue;

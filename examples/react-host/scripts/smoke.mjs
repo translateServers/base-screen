@@ -355,8 +355,8 @@ async function main() {
 
     await first.close();
 
-    // A2. 实时告警演示大屏：告警流水 + KPI 读数 + 等级色块，以及 SSE 推送 → 条件样式。
-    //     这张屏是告警专用种子（组件 id 对齐宿主 `alarm.open` 绑定）：
+    // A2. 实时告警演示大屏：告警流水 + KPI 读数 + 等级色块，以及 SSE 推送 → 组件状态。
+    //     宿主只给等级（推送数据源 alarm_open），颜色来自组件状态引用的状态色位（ADR-0110）：
     //     流水 14 行（LINE-A 近 60 分钟定值，critical 2 条）、4 个读数走 demo_metric
     //     （alarm_open + 三个等级）、三块等级色块与流水的等级语义色同源。
     //     poll=0 关闭数据轮询，确保样式变化期间 datasetQueries 不增长。
@@ -508,7 +508,7 @@ async function main() {
       fail(`告警 critical 样式未命中：${JSON.stringify(alarmCritical)}`);
     }
     if (alarmCritical.documentStyle !== alarmWarning.documentStyle) {
-      fail('告警样式写入了 canonical 文档');
+      fail('告警状态切换写入了 canonical 文档');
     }
     if (datasetQueries.length !== queriesBeforeAlarmPush) {
       fail(`告警推送不应重新取数：${queriesBeforeAlarmPush} -> ${datasetQueries.length}`);

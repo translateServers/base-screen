@@ -19,6 +19,20 @@ export const DEMO_SERIES_RESOURCE = 'demo_series';
 export const DEMO_RANKING_RESOURCE = 'demo_ranking';
 /** 宿主素材库的图片身份（ADR-0089）：resourceId 是素材 id，解析结果是稳定内容 URL。 */
 export const HOST_IMAGE_RESOURCE = 'host_image';
+/** 告警汇总（ADR-0110 §2.6）：resourceId 是告警 key；宿主只给分级，外观由组件状态决定。 */
+export const HOST_ALARM_RESOURCE = 'alarm';
+
+/** 宿主分级表：只有等级，没有样式。设计器据此提供等级下拉与「按分级生成状态」。 */
+const ALARM_LEVEL_SCALES = [
+  {
+    path: ['level'],
+    levels: [
+      { value: 'critical', label: '严重', tone: 'danger' },
+      { value: 'warning', label: '一般', tone: 'warning' },
+      { value: 'info', label: '提示', tone: 'info' },
+    ],
+  },
+] as const;
 
 const POINTS_CONFIG_SCHEMA: BaseScreenMaterialObjectSchema = {
   kind: 'object',
@@ -70,6 +84,14 @@ export function createHostResourceRuntime(): BaseScreenPluginRuntime {
           id: DEMO_RANKING_RESOURCE,
           name: '演示排行',
           configSchema: RANKING_CONFIG_SCHEMA,
+        },
+        {
+          kind: 'dataResourceType',
+          id: HOST_ALARM_RESOURCE,
+          name: '告警汇总',
+          configSchema: { kind: 'object', properties: {}, required: [] },
+          delivery: { push: {} },
+          levelScales: ALARM_LEVEL_SCALES,
         },
         {
           kind: 'dataResourceType',

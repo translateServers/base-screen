@@ -29,6 +29,10 @@ export const SCREEN_BLUEPRINT_ACTION_PORT_PREFIX = 'action:';
 /** 组件显隐动作的三个输入锚点，锚点 id 即显隐操作。 */
 export const SCREEN_BLUEPRINT_VISIBILITY_PORTS = ['show', 'hide', 'toggle'] as const;
 
+/** 组件状态锚点（ADR-0110 §2.4）：只在组件声明了状态时可用（由 `references.ts` 判定）。 */
+export const SCREEN_BLUEPRINT_COMPONENT_STATE_INPUT_PORTS = ['set-state', 'reset-state'] as const;
+export const SCREEN_BLUEPRINT_COMPONENT_STATE_OUTPUT_PORT = 'state-changed';
+
 /**
  * 从画布节点的输入（打开 / 关闭 / 切换）与输出（已打开 / 已关闭）锚点（ADR-0109 §2.4）。
  * 与显示方式无关：页面上的文案是「进入 / 返回 / 已进入 / 已离开」，锚点 id 不变。
@@ -43,7 +47,13 @@ export const SCREEN_BLUEPRINT_MAIN_CANVAS_OUTPUT_PORTS = ['page-changed'] as con
 export const SCREEN_BLUEPRINT_FIXED_INPUT_PORTS: Readonly<
   Record<ScreenBlueprintNodeKind, readonly string[]>
 > = {
-  component: ['show', 'hide', 'toggle', 'request-data'],
+  component: [
+    'show',
+    'hide',
+    'toggle',
+    'request-data',
+    ...SCREEN_BLUEPRINT_COMPONENT_STATE_INPUT_PORTS,
+  ],
   variable: ['set', 'request'],
   host: [],
   lifecycle: [],
@@ -57,7 +67,7 @@ export const SCREEN_BLUEPRINT_FIXED_INPUT_PORTS: Readonly<
 export const SCREEN_BLUEPRINT_FIXED_OUTPUT_PORTS: Readonly<
   Record<ScreenBlueprintNodeKind, readonly string[]>
 > = {
-  component: [],
+  component: [SCREEN_BLUEPRINT_COMPONENT_STATE_OUTPUT_PORT],
   variable: ['data-updated'],
   host: [],
   lifecycle: ['ready'],
@@ -95,7 +105,9 @@ export function readScreenBlueprintActionPort(port: string): string | undefined 
 
 /** 输出锚点形态是否属于该节点种类（组件事件是否真在 manifest 中由编译期与作者面判定）。 */
 export function isScreenBlueprintOutputPort(kind: ScreenBlueprintNodeKind, port: string): boolean {
-  if (kind === 'component') return EVENT_PORT_PATTERN.test(port);
+  if (kind === 'component') {
+    return EVENT_PORT_PATTERN.test(port) || port === SCREEN_BLUEPRINT_COMPONENT_STATE_OUTPUT_PORT;
+  }
   return SCREEN_BLUEPRINT_FIXED_OUTPUT_PORTS[kind].includes(port);
 }
 
@@ -111,6 +123,8 @@ export interface ScreenBlueprintEdgeFieldRule {
   /** 宿主出口必带；弹框 `open` / `toggle` 可带（打开参数）；其余不得出现。 */
   readonly payload: 'required' | 'optional' | 'forbidden';
   readonly transition: 'optional' | 'forbidden';
+  /** 组件 `set-state` 必带；其余不得出现。 */
+  readonly stateId: 'required' | 'forbidden';
 }
 
 export function screenBlueprintEdgeFieldRule(
@@ -130,6 +144,7 @@ export function screenBlueprintEdgeFieldRule(
       (SCREEN_BLUEPRINT_VISIBILITY_PORTS as readonly string[]).includes(targetPort)
         ? 'optional'
         : 'forbidden',
+    stateId: targetKind === 'component' && targetPort === 'set-state' ? 'required' : 'forbidden',
   };
 }
 
@@ -173,6 +188,17 @@ export function screenBlueprintEdgeAction(
     }
     if (port === 'request-data') {
       return { type: 'request-component-data', componentId: target.componentId };
+    }
+    if (port === 'set-state' && edge.stateId !== undefined) {
+      return {
+        type: 'component-state',
+        componentId: target.componentId,
+        operation: 'set',
+        stateId: edge.stateId,
+      };
+    }
+    if (port === 'reset-state') {
+      return { type: 'component-state', componentId: target.componentId, operation: 'reset' };
     }
     return undefined;
   }
@@ -218,6 +244,13 @@ export function screenBlueprintPortTrigger(
 ): ScreenBlueprintTrigger | undefined {
   switch (node.kind) {
     case 'component': {
+      if (port === SCREEN_BLUEPRINT_COMPONENT_STATE_OUTPUT_PORT) {
+        return {
+          type: 'component-state-changed',
+          componentId: node.componentId,
+          eventName: 'state-changed',
+        };
+      }
       const eventName = readScreenBlueprintEventPort(port);
       return eventName === undefined
         ? undefined
@@ -396,6 +429,8 @@ function triggerCapability(trigger: ScreenBlueprintTrigger): string {
       return SCREEN_BLUEPRINT_CAPABILITIES.canvasEvent;
     case 'page-changed':
       return SCREEN_BLUEPRINT_CAPABILITIES.pageChanged;
+    case 'component-state-changed':
+      return SCREEN_BLUEPRINT_CAPABILITIES.componentStateChanged;
   }
 }
 
@@ -427,6 +462,9 @@ function collectActionCapabilities(action: ScreenBlueprintAction, capabilities: 
       return;
     case 'page-navigation':
       capabilities.add(SCREEN_BLUEPRINT_CAPABILITIES.pageNavigation);
+      return;
+    case 'component-state':
+      capabilities.add(SCREEN_BLUEPRINT_CAPABILITIES.componentState);
       return;
   }
 }

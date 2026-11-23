@@ -28,7 +28,7 @@ const COMPONENT_DIFF_FIELDS = [
   'status',
   'props',
   'style',
-  'styleRules',
+  'states',
   'dataSource',
   'dataValue',
   'dataBinding',
@@ -278,24 +278,24 @@ export async function createScreenProvider(screenFile) {
       const index = apis.buildComponentIndex(doc);
       let maxDepth = 0;
       let bindings = 0;
-      let styleRules = 0;
+      let componentStates = 0;
       for (const component of doc.components) {
         maxDepth = Math.max(maxDepth, apis.getAncestorIds(index, component.id).length);
         if (component.dataSource !== null && component.dataSource !== undefined) bindings += 1;
-        styleRules += (component.styleRules ?? []).length;
+        componentStates += component.states?.items.length ?? 0;
       }
       const limits = {
         maxComponents: 160,
         maxDepth: 6,
         maxBindings: 120,
-        maxStyleRules: 400,
+        maxComponentStates: 400,
         ...(budget ?? {}),
       };
       const metrics = {
         components: doc.components.length,
         maxDepth,
         dataBindings: bindings,
-        styleRules,
+        componentStates,
         blueprintNodes: doc.blueprint.nodes.length,
         blueprintEdges: doc.blueprint.edges.length,
       };
@@ -314,11 +314,11 @@ export async function createScreenProvider(screenFile) {
           actual: metrics.dataBindings,
           limit: limits.maxBindings,
         });
-      if (metrics.styleRules > limits.maxStyleRules)
+      if (metrics.componentStates > limits.maxComponentStates)
         violations.push({
-          code: 'PERF_STYLE_RULES',
-          actual: metrics.styleRules,
-          limit: limits.maxStyleRules,
+          code: 'PERF_COMPONENT_STATES',
+          actual: metrics.componentStates,
+          limit: limits.maxComponentStates,
         });
       return ok({ valid: violations.length === 0, metrics, budget: { limits, violations } });
     },
@@ -549,11 +549,11 @@ function auditComplexity(apis, document) {
   const index = apis.buildComponentIndex(document);
   const materialTypes = {};
   let maxDepth = 0;
-  let styleRules = 0;
+  let componentStates = 0;
   for (const component of document.components) {
     materialTypes[component.type] = (materialTypes[component.type] ?? 0) + 1;
     maxDepth = Math.max(maxDepth, apis.getAncestorIds(index, component.id).length);
-    styleRules += (component.styleRules ?? []).length;
+    componentStates += component.states?.items.length ?? 0;
   }
   const dataSources = document.dataSources ?? [];
   const variables = document.variables ?? [];
@@ -566,7 +566,7 @@ function auditComplexity(apis, document) {
     variables: variables.length,
     blueprintNodes: document.blueprint.nodes.length,
     blueprintEdges: document.blueprint.edges.length,
-    styleRules,
+    componentStates,
   };
 }
 
@@ -595,7 +595,7 @@ function summarizeScreenDocument(apis, document) {
       zIndex: component.zIndex,
       status: component.status,
       hasDataSource: component.dataSource !== null && component.dataSource !== undefined,
-      hasStyleRules: (component.styleRules ?? []).length > 0,
+      hasStates: component.states !== undefined,
       hasValue: component.dataValue !== null && component.dataValue !== undefined,
       hasBinding: component.dataBinding !== null && component.dataBinding !== undefined,
     })),

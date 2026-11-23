@@ -10,12 +10,6 @@ export {
   sameBaseScreenMaterialDefinition,
 } from './catalog-diff.js';
 export type {
-  BaseScreenConditionalStylePort,
-  BaseScreenConditionalStyleRequest,
-  BaseScreenHostConditionalStyleAuthoringPort,
-  BaseScreenHostConditionalStyleBinding,
-  BaseScreenHostConditionalStyleCondition,
-  BaseScreenHostConditionalStyleSource,
   BaseScreenMaterialArraySchema,
   BaseScreenMaterialBooleanSchema,
   BaseScreenMaterialCatalog,

@@ -99,6 +99,16 @@ function triggerEndpoint(trigger: ScreenBlueprintTrigger): {
   if (trigger.type === 'page-changed') {
     return { node: { kind: 'main-canvas', id: 'main-canvas' }, port: 'page-changed' };
   }
+  if (trigger.type === 'component-state-changed') {
+    return {
+      node: {
+        kind: 'component',
+        id: `component:${trigger.componentId}`,
+        componentId: trigger.componentId,
+      },
+      port: 'state-changed',
+    };
+  }
   return {
     node: {
       kind: 'variable',
@@ -113,7 +123,10 @@ function actionEndpoint(action: ScreenBlueprintAction): {
   readonly node: ScreenBlueprintNode;
   readonly port: string;
   readonly fields: Partial<
-    Pick<Extract<ScreenBlueprintEdge, { kind: 'flow' }>, 'value' | 'payload' | 'transition'>
+    Pick<
+      Extract<ScreenBlueprintEdge, { kind: 'flow' }>,
+      'value' | 'payload' | 'transition' | 'stateId'
+    >
   >;
 } {
   switch (action.type) {
@@ -180,6 +193,16 @@ function actionEndpoint(action: ScreenBlueprintAction): {
         node: { kind: 'main-canvas', id: 'main-canvas' },
         port: action.operation,
         fields: {},
+      };
+    case 'component-state':
+      return {
+        node: {
+          kind: 'component',
+          id: `component:${action.componentId}`,
+          componentId: action.componentId,
+        },
+        port: action.operation === 'set' ? 'set-state' : 'reset-state',
+        fields: action.stateId === undefined ? {} : { stateId: action.stateId },
       };
   }
 }

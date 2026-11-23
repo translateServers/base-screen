@@ -5,6 +5,10 @@ import type {
 import { designerIcon } from '../../dom/designer-icons.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
 import {
+  designerThemeColorSlots,
+  resolveDesignerThemeColorValue,
+} from '../color/designer-color-theme-slots.js';
+import {
   appendDesignerFieldReset,
   createDesignerFieldRow,
   createDesignerSwitchField,
@@ -96,7 +100,10 @@ function appendDescriptorFields(
         entries: segment.fields.map((field) => ({
           key: field.id,
           label: field.label,
-          value: readFieldTargetValue(field, field.path, context),
+          value: resolveDesignerThemeColorValue(
+            readFieldTargetValue(field, field.path, context),
+            context.theme,
+          ),
         })),
         renderField: (container, entry) => {
           const field = segment.fields.find((candidate) => candidate.id === entry.key);
@@ -143,7 +150,11 @@ function appendDescriptorField(
           ownerDocument,
           typeof value === 'string' ? value : undefined,
           `${context.component.id}:descriptor:${field.id}`,
-          { allowGradient: field.allowGradient === true },
+          {
+            allowGradient: field.allowGradient === true,
+            // 只有组件样式里的引用会被渲染器解析：props 颜色不提供主题色位。
+            ...(isStyleField(field) ? { themeSlots: designerThemeColorSlots(context.theme) } : {}),
+          },
         )
       : undefined;
   // color 控件用 span 容器：label 点击会激活 color input 弹出原生取色器。
@@ -310,4 +321,10 @@ function isPathPrefixed(
   prefix: readonly (string | number)[],
 ): boolean {
   return path.length > prefix.length && prefix.every((segment, index) => segment === path[index]);
+}
+
+function isStyleField(field: BaseScreenMaterialEditorField): boolean {
+  return (
+    field.target === 'style' || (field.target === 'interaction' && field.projection === 'style')
+  );
 }

@@ -846,6 +846,45 @@ describe('plugin manifests and catalogs', () => {
     }
   });
 
+  it('accepts host level scales on a resource type and rejects malformed ones (ADR-0110)', () => {
+    const manifestWith = (levelScales: unknown) =>
+      parseBaseScreenPluginManifest(
+        pluginManifest({
+          contributions: [
+            {
+              kind: 'dataResourceType',
+              id: 'acme_alarm',
+              name: '告警',
+              configSchema: { kind: 'object', properties: {}, required: [] },
+              delivery: { push: {} },
+              levelScales,
+            },
+          ],
+        }),
+      );
+    const scale = {
+      path: ['level'],
+      levels: [
+        { value: 'critical', label: '严重', tone: 'danger' },
+        { value: 'warning', label: '一般', tone: 'warning' },
+      ],
+    };
+    const valid = manifestWith([scale]);
+    expect(valid.ok).toBe(true);
+    if (valid.ok) expect(valid.value.contributions[0]).toMatchObject({ levelScales: [scale] });
+    for (const levelScales of [
+      [],
+      [{ ...scale, style: { color: '#f00' } }],
+      [{ ...scale, levels: [{ value: 'critical', label: '严重', tone: 'red' }] }],
+    ]) {
+      const invalid = manifestWith(levelScales);
+      expect(invalid.ok).toBe(false);
+      if (!invalid.ok) {
+        expect(invalid.diagnostics.some((item) => item.path.includes('levelScales'))).toBe(true);
+      }
+    }
+  });
+
   it('requires dataResourceType ids to satisfy the document resourceType name pattern', () => {
     const parse = (id: string) =>
       parseBaseScreenPluginManifest(

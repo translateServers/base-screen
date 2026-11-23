@@ -71,3 +71,25 @@ export interface ScreenSourceDelivery {
     readonly inactivityTimeoutSeconds?: number;
   };
 }
+
+/** 等级色调：映射到文档状态色位（ADR-0110 §2.6.4）。 */
+export type ScreenLevelTone = 'danger' | 'warning' | 'info' | 'success';
+
+export interface ScreenLevelScaleLevel {
+  /** 字段里出现的等级值，如 `'critical'`。 */
+  readonly value: string | number;
+  /** 作者面显示名，如「严重」。 */
+  readonly label: string;
+  readonly tone: ScreenLevelTone;
+}
+
+/**
+ * 宿主分级表（ADR-0110 §2.6.2）：只有等级，没有样式。只在作者面使用，文档不保存，运行时不读。
+ * 资源类型贡献（`dataResourceType.levelScales`）与来源目录项（`ScreenHostCatalogDescriptor.levelScales`）同形。
+ */
+export interface ScreenLevelScale {
+  /** 等级值所在的字段路径（相对来源结果；表格结果相对每一行）。 */
+  readonly path: readonly string[];
+  /** 1–8 个，按严重程度从高到低排列。 */
+  readonly levels: readonly ScreenLevelScaleLevel[];
+}

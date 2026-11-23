@@ -96,4 +96,38 @@ describe('material theme style', () => {
     ).toBe(defaultStyle);
     expect(resolveBaseScreenMaterialDefaultStyle({ defaultStyle }, { palette })).toBe(defaultStyle);
   });
+
+  it('accepts state preset keys on string and boolean style keys (ADR-0110)', () => {
+    const withGlow = (statePresetKeys: unknown) =>
+      parseBaseScreenMaterialManifest(
+        manifest({
+          styleSchema: {
+            kind: 'object',
+            properties: {
+              borderColor: { kind: 'string' },
+              accentColor: { kind: 'string' },
+              strokeWidth: { kind: 'number', minimum: 1, maximum: 8 },
+              glow: { kind: 'boolean' },
+            },
+            required: ['borderColor'],
+          },
+          statePresetKeys,
+        }),
+      );
+    expect(withGlow(['accentColor', 'glow']).ok).toBe(true);
+    for (const keys of [['strokeWidth'], ['missing'], ['glow', 'glow'], 'glow']) {
+      const parsed = withGlow(keys);
+      expect(parsed.ok, JSON.stringify(keys)).toBe(false);
+      expect(parsed.diagnostics[0]?.path[0]).toBe('statePresetKeys');
+    }
+  });
+
+  it('resolves omitted status slots to the built-in defaults', () => {
+    expect(
+      resolveBaseScreenMaterialDefaultStyle(
+        { defaultStyle: { accentColor: '#38bdf8' }, themeStyle: { accentColor: 'danger' } },
+        { palette },
+      ),
+    ).toEqual({ accentColor: '#f5222d' });
+  });
 });

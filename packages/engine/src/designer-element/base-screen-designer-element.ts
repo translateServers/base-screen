@@ -30,10 +30,8 @@ import {
 } from '@base-screen/core';
 import type {
   BaseScreenComponentFragmentInsertionIntent,
-  BaseScreenConditionalStylePort,
   BaseScreenFragmentBody,
   BaseScreenFragmentDefinition,
-  BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
   BaseScreenPluginInspectorControlCatalog,
@@ -97,9 +95,6 @@ export class BaseScreenDesignerElement extends ElementBase {
       // 浅色主题下会一直留着深色墨水（实测 rgb(141,141,141) 停在 #fcfcfc 上，
       // 直到下一次缩放才刷新）。这里主动重绘一次。
       this.#designerState.workbenchController.renderRulers();
-      // 主题切换只改 CSS 变量，画布颜色随之变化：重新测量守卫结果。
-      const document = this.#designerState.session.document;
-      if (document !== undefined) this.#designerState.guardController.schedule(document);
     }
   }
 
@@ -302,24 +297,6 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   set hostCatalogPort(value: ScreenHostCatalogPort | undefined) {
     this.#designerState.runtime.writeHostCatalogPort(this, value);
-  }
-
-  get conditionalStylePort(): BaseScreenConditionalStylePort | undefined {
-    return this.#designerState.runtime.readConditionalStylePort(this);
-  }
-
-  set conditionalStylePort(value: BaseScreenConditionalStylePort | undefined) {
-    this.#designerState.runtime.writeConditionalStylePort(this, value);
-  }
-
-  get hostConditionalStyleAuthoring(): BaseScreenHostConditionalStyleAuthoringPort | undefined {
-    return this.#designerState.runtime.readHostConditionalStyleAuthoring(this);
-  }
-
-  set hostConditionalStyleAuthoring(value:
-    | BaseScreenHostConditionalStyleAuthoringPort
-    | undefined) {
-    this.#designerState.runtime.writeHostConditionalStyleAuthoring(this, value);
   }
 
   get datasetPort(): ScreenHostDatasetPort | undefined {
@@ -736,11 +713,6 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   refreshVariables(options?: ScreenVariableRefreshOptions): void {
     return this.#designerState.runtime.refreshVariables(this, options);
-  }
-
-  /** 宿主告警/视觉状态变化后只重算条件样式（画布与预览），不重新取数、不改文档。 */
-  refreshConditionalStyles(componentIds?: readonly string[]): void {
-    return this.#designerState.runtime.refreshConditionalStyles(this, componentIds);
   }
 
   getVariable(id: string): ScreenVariableHandle | undefined {

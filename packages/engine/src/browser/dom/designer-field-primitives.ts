@@ -448,6 +448,9 @@ export function createDesignerStepper(
     const parsed = Number(input.value);
     commit(Number.isFinite(parsed) ? parsed : options.min, false);
   });
+  // 点进值位几乎总是换一个数，而不是在原值后面补一位：聚焦即全选，键入直接替换。
+  // 不这么做时，5 上补一个 1 会先变成 51、再在提交时被夹到上限。
+  input.addEventListener('focus', () => input.select());
   input.addEventListener('blur', () => commit(Number(input.value), false));
 
   element.append(decrement, input, increment);

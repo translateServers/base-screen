@@ -238,6 +238,11 @@ function validateBlueprintGraph(
         fail([...base, field], `Edge into "${truncate(edge.to.port)}" must not define ${field}.`);
       }
     }
+    if (rule.stateId === 'required' && edge.stateId === undefined) {
+      fail([...base, 'stateId'], `Edge into "${truncate(edge.to.port)}" requires stateId.`);
+    } else if (rule.stateId === 'forbidden' && edge.stateId !== undefined) {
+      fail([...base, 'stateId'], `Edge into "${truncate(edge.to.port)}" must not define stateId.`);
+    }
     if (rule.transition === 'forbidden' && edge.transition !== undefined) {
       fail(
         [...base, 'transition'],

@@ -17,6 +17,7 @@ import type {
   ScreenBlueprintEvent,
   ScreenBlueprintPlan,
   ScreenBlueprintRuleTrace,
+  ScreenBlueprintStateEffect,
   ScreenBlueprintTraceResult,
   ScreenBlueprintVisibilityEffect,
 } from './runtime-types.js';
@@ -49,6 +50,7 @@ interface RuleOutputs {
   readonly hostActions: ScreenBlueprintHostEvent[];
   readonly visibilityEffects: ScreenBlueprintVisibilityEffect[];
   readonly canvasEffects: ScreenBlueprintCanvasEffect[];
+  readonly stateEffects: ScreenBlueprintStateEffect[];
   readonly variableRequests: string[];
   readonly componentDataRequests: string[];
   readonly conditions: ScreenBlueprintConditionTrace[];
@@ -75,6 +77,7 @@ function evaluateScreenBlueprintEvent(
   const hostActions: ScreenBlueprintHostEvent[] = [];
   const visibilityEffects: ScreenBlueprintVisibilityEffect[] = [];
   const canvasEffects: ScreenBlueprintCanvasEffect[] = [];
+  const stateEffects: ScreenBlueprintStateEffect[] = [];
   const variableRequests: string[] = [];
   const componentDataRequests: string[] = [];
   const ruleTraces: ScreenBlueprintRuleTrace[] = [];
@@ -97,6 +100,7 @@ function evaluateScreenBlueprintEvent(
       hostActions: [],
       visibilityEffects: [],
       canvasEffects: [],
+      stateEffects: [],
       variableRequests: [],
       componentDataRequests: [],
       conditions: [],
@@ -109,6 +113,7 @@ function evaluateScreenBlueprintEvent(
     hostActions.push(...outputs.hostActions);
     visibilityEffects.push(...outputs.visibilityEffects);
     canvasEffects.push(...outputs.canvasEffects);
+    stateEffects.push(...outputs.stateEffects);
     variableRequests.push(...outputs.variableRequests);
     componentDataRequests.push(...outputs.componentDataRequests);
     if (withTrace) {
@@ -127,6 +132,7 @@ function evaluateScreenBlueprintEvent(
     hostActions,
     visibilityEffects,
     canvasEffects,
+    stateEffects,
     variableRequests,
     componentDataRequests,
   };
@@ -221,6 +227,25 @@ function runAction(
         operation: action.operation,
         output,
         detached: { type: 'canvas-visibility', actionIndex, ...output },
+      });
+    }
+    return undefined;
+  }
+  if (action.type === 'component-state') {
+    const effect = {
+      componentId: action.componentId,
+      operation: action.operation,
+      ...(action.stateId === undefined ? {} : { stateId: action.stateId }),
+    };
+    outputs.stateEffects.push(effect);
+    if (withTrace) {
+      outputs.actions.push({
+        type: 'component-state',
+        actionIndex,
+        edgeId,
+        ...effect,
+        output: { ...effect },
+        detached: { type: 'component-state', actionIndex, ...effect },
       });
     }
     return undefined;
@@ -345,7 +370,11 @@ function triggerMatches(
           ? trigger.intervalSeconds === event.intervalSeconds
           : trigger.type === 'canvas-event' && event.type === 'canvas-event'
             ? trigger.canvasId === event.canvasId
-            : trigger.type === 'page-changed' && event.type === 'page-changed';
+            : trigger.type === 'page-changed' && event.type === 'page-changed'
+              ? true
+              : trigger.type === 'component-state-changed' &&
+                event.type === 'component-state-changed' &&
+                trigger.componentId === event.componentId;
 }
 
 function indexedFailure<T>(

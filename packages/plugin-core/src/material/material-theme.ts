@@ -1,5 +1,6 @@
 import {
   isScreenThemeSlot,
+  readScreenThemeColor,
   type ScreenJsonObject,
   type ScreenJsonValue,
   type ScreenTheme,
@@ -59,6 +60,41 @@ export function validateMaterialThemeStyle(
   }
 }
 
+/** 一份清单最多声明多少个状态预置样式键。 */
+const MAX_STATE_PRESET_KEYS = 16;
+
+/**
+ * 校验 `statePresetKeys`（ADR-0110 §2.6.3）：不重复的样式键，必须是 `styleSchema` 里的
+ * 字符串键或布尔键。缺省即由设计器推断。
+ */
+export function validateMaterialStatePresetKeys(
+  value: ScreenJsonValue | undefined,
+  styleSchema: BaseScreenMaterialObjectSchema | undefined,
+  collector: PluginDiagnosticCollector,
+): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value) || value.length > MAX_STATE_PRESET_KEYS) {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['statePresetKeys'],
+      `State preset keys must be an array of at most ${MAX_STATE_PRESET_KEYS} style keys.`,
+    );
+    return;
+  }
+  const seen = new Set<string>();
+  value.forEach((key, index) => {
+    const kind = typeof key === 'string' ? styleSchema?.properties[key]?.kind : undefined;
+    if (typeof key !== 'string' || seen.has(key) || (kind !== 'string' && kind !== 'boolean')) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        ['statePresetKeys', index],
+        'State preset keys must be unique string or boolean style keys declared by the style schema.',
+      );
+    }
+    if (typeof key === 'string') seen.add(key);
+  });
+}
+
 /**
  * 新建组件时使用的默认样式：文档带主题色板时，`themeStyle` 声明的键取当前色板的颜色，
  * 其余键与没有色板时一律用 `defaultStyle`。
@@ -75,7 +111,7 @@ export function resolveBaseScreenMaterialDefaultStyle(
   if (slots === undefined || theme === undefined) return manifest.defaultStyle;
   let next: Record<string, ScreenJsonValue> | undefined;
   for (const [key, slot] of Object.entries(slots) as [string, ScreenThemeSlot][]) {
-    const color = theme.palette[slot];
+    const color = readScreenThemeColor(theme, slot);
     if (typeof color !== 'string') continue;
     next ??= { ...manifest.defaultStyle };
     next[key] = color;

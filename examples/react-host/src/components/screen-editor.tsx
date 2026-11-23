@@ -16,11 +16,6 @@ import { createLogger } from '../lib/logger';
 import { createHostAssetLibrary, HOST_ASSET_LIBRARY_GROUP_ID } from '../screen/asset-library';
 import { loadReactDesignerRuntime } from '../screen/composition-runtime';
 import { attachHostComponentWorkshop } from '../screen/fragment-shelf';
-import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
-import {
-  createHostAlarmStyleAuthoring,
-  parseHostAlarmBindings,
-} from '../screen/host-alarm-style-authoring';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -34,10 +29,8 @@ const logger = createLogger('screen-editor');
 
 interface EditorSetup {
   readonly runtime: BaseScreenRuntime;
-  readonly alarmStyleAuthoring: ReturnType<typeof createHostAlarmStyleAuthoring>;
   readonly datasetPort: ReturnType<typeof createHostDatasetPort>;
   readonly hostCatalogPort: ReturnType<typeof createHostCatalogPort>;
-  readonly conditionalStylePort: ReturnType<typeof createHostAlarmController>['port'];
   readonly resourcePort: ReturnType<typeof createHostResourcePort>;
 }
 
@@ -46,7 +39,7 @@ interface EditorSetup {
  * 业务端口、Blueprint light DOM 和宿主资源仍由这一页提供。底层 runtime 复用全站单例，
  * 因此查看页继续走原有的命令式装配时不会二次激活插件管理器。
  *
- * 装配（插件激活、告警首快照、端口）由 effect 异步备齐；未就绪期间把 `runtime` 与
+ * 装配（插件激活、端口）由 effect 异步备齐；未就绪期间把 `runtime` 与
  * `mountOptions` 都传 null，组件自己不挂载，宿主不需要再写条件渲染与占位节点。
  *
  * 保存仍是显式的：顶栏「保存」经宿主 project adapter 落盘；宿主不订阅文档变化、
@@ -70,22 +63,7 @@ export function ScreenEditorPage(): ReactElement {
     designerRef.current = null;
     lastErrorRef.current = undefined;
 
-    let alarms: ReturnType<typeof createHostAlarmController> | undefined;
     let disposed = false;
-
-    const loadAlarmBindings = async (): Promise<HostAlarmBindings> => {
-      const result = await api.getScreenAlarmBindings(screenId);
-      if (!result.ok) {
-        logger.warn('alarm bindings unavailable', result.error);
-        return {};
-      }
-      const parsed = parseHostAlarmBindings(result.data.bindings);
-      if (parsed === undefined) {
-        logger.warn('alarm bindings malformed', result.data.bindings);
-        return {};
-      }
-      return parsed;
-    };
 
     void (async () => {
       const runtime = await loadReactDesignerRuntime();
@@ -94,58 +72,25 @@ export function ScreenEditorPage(): ReactElement {
       // 尺寸交给 .stage / .stage > * 的 CSS（占满视口），宿主不再内联写百分比宽高。
       // 蓝图工作台用引擎自带的中央画布：主题、下拉与手势都跟随设计器同一套令牌与控件，
       // 宿主不再经 slot 覆盖一份等价实现（覆盖是可选能力，不是接入前提）。
-      // 告警端口必须在 configure 前注入；首快照最多等 800ms，超时先按基础样式渲染，
-      // 快照到达后由失效 API 补齐。画布与预览共用同一个端口。
-      // 绑定按 screenId 从宿主读取：页面里配过什么，打开就是什么。
-      const alarmBindings = await loadAlarmBindings();
-      if (disposed) return;
-      alarms = createHostAlarmController({
-        apiBase: resolveApiBase(),
-        bindings: alarmBindings,
-        onInvalidate: (componentIds) => {
-          designerRef.current?.refreshConditionalStyles(componentIds);
-        },
-      });
-      await alarms.ready(800);
-      if (disposed) return;
-
-      const alarmStyleAuthoring = createHostAlarmStyleAuthoring({
-        initialBindings: alarmBindings,
-        save: async (bindings) => {
-          const result = await api.updateScreenAlarmBindings(screenId, bindings);
-          if (!result.ok) return { ok: false, message: result.error.message };
-          const parsed = parseHostAlarmBindings(result.data.bindings);
-          if (parsed === undefined) {
-            return { ok: false, message: '业务系统返回的告警绑定格式无效。' };
-          }
-          return { ok: true, bindings: parsed };
-        },
-        onSaved: (bindings) => alarms?.setBindings(bindings),
-      });
-
       const datasetPort = createHostDatasetPort({ api, logger });
       setSetup({
         runtime,
-        alarmStyleAuthoring,
         datasetPort,
         hostCatalogPort: createHostCatalogPort({
           clock: () => new Date(),
           noticeSource: () => datasetPort.snapshot().alarms,
           logger,
         }),
-        conditionalStylePort: alarms.port,
         resourcePort: createHostResourcePort(),
       });
     })().catch((error: unknown) => {
       if (disposed) return;
-      alarms?.stop();
       logger.error('editor bootstrap failed', error);
       notifyError('设计器初始化失败，请返回列表重试。');
     });
 
     return () => {
       disposed = true;
-      alarms?.stop();
       setSetup(null);
       designerRef.current = null;
       logger.debug('edit view released');
@@ -163,8 +108,6 @@ export function ScreenEditorPage(): ReactElement {
           resourcePort: setup.resourcePort,
           datasetPort: setup.datasetPort,
           hostCatalogPort: setup.hostCatalogPort,
-          conditionalStylePort: setup.conditionalStylePort,
-          hostConditionalStyleAuthoring: setup.alarmStyleAuthoring,
           backButton: true,
           hostResourceSelectionButton: true,
           fragmentSaveAction: true,

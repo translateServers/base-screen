@@ -242,69 +242,218 @@
             },
             "additionalProperties": {}
           },
-          "styleRules": {
-            "maxItems": 8,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 64
-                },
-                "when": {
+          "states": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "minItems": 1,
+                "maxItems": 16,
+                "type": "array",
+                "items": {
                   "type": "object",
                   "properties": {
-                    "path": {
-                      "maxItems": 8,
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      }
-                    },
-                    "operator": {
+                    "id": {
                       "type": "string",
-                      "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "exists"]
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
                     },
-                    "value": {}
-                  },
-                  "required": ["path", "operator"],
-                  "additionalProperties": false,
-                  "allOf": [
-                    {
-                      "if": {
-                        "properties": {
-                          "operator": {
-                            "const": "exists"
-                          }
-                        },
-                        "required": ["operator"]
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "style": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
                       },
-                      "then": {
-                        "not": {
-                          "required": ["value"]
-                        }
-                      },
-                      "else": {
-                        "required": ["value"]
-                      }
+                      "additionalProperties": {}
                     }
-                  ]
-                },
-                "style": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
                   },
-                  "additionalProperties": {}
+                  "required": ["id", "name", "style"],
+                  "additionalProperties": false
                 }
               },
-              "required": ["id", "when", "style"],
-              "additionalProperties": false
-            }
+              "judge": {
+                "type": "object",
+                "properties": {
+                  "input": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "component-data"
+                          },
+                          "path": {
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            }
+                          }
+                        },
+                        "required": ["kind", "path"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "variable"
+                          },
+                          "variableId": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                          },
+                          "path": {
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            }
+                          }
+                        },
+                        "required": ["kind", "variableId", "path"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "data-source-field"
+                          },
+                          "dataSourceId": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                          },
+                          "where": {
+                            "type": "object",
+                            "properties": {
+                              "field": {
+                                "minItems": 1,
+                                "maxItems": 8,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                }
+                              },
+                              "equals": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "literal"
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["kind", "value"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "variable"
+                                      },
+                                      "variableId": {
+                                        "type": "string",
+                                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                                      }
+                                    },
+                                    "required": ["kind", "variableId"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            "required": ["field", "equals"],
+                            "additionalProperties": false
+                          },
+                          "path": {
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            }
+                          }
+                        },
+                        "required": ["kind", "dataSourceId", "path"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "cases": {
+                    "maxItems": 32,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "operator": {
+                          "type": "string",
+                          "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "exists"]
+                        },
+                        "value": {},
+                        "stateId": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                        }
+                      },
+                      "required": ["operator", "stateId"],
+                      "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "operator": {
+                                "const": "exists"
+                              }
+                            },
+                            "required": ["operator"]
+                          },
+                          "then": {
+                            "not": {
+                              "required": ["value"]
+                            }
+                          },
+                          "else": {
+                            "required": ["value"]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": ["input", "cases"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false
           },
           "dataSource": {
             "anyOf": [
@@ -1807,6 +1956,10 @@
                     "required": ["effect", "durationMs", "easing"],
                     "additionalProperties": false
                   },
+                  "stateId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                  },
                   "requiredCapabilities": {
                     "type": "array",
                     "items": {
@@ -1947,6 +2100,26 @@
               "maxLength": 64
             },
             "accentSecondary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "danger": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "warning": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "info": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "success": {
               "type": "string",
               "minLength": 1,
               "maxLength": 64

@@ -56,7 +56,16 @@ export interface ScreenBlueprintPageChangedEvent {
   readonly payload: ScreenJsonValue;
 }
 
+/** 组件生效状态改变（ADR-0110 §2.3），负载 `{ from, to, cause: 'judge' | 'blueprint' }`。 */
+export interface ScreenBlueprintComponentStateEvent {
+  readonly type: 'component-state-changed';
+  readonly componentId: string;
+  readonly name: 'state-changed';
+  readonly payload: ScreenJsonValue;
+}
+
 export type ScreenBlueprintEvent =
+  | ScreenBlueprintComponentStateEvent
   | ScreenBlueprintMaterialEvent
   | ScreenBlueprintVariableEvent
   | ScreenBlueprintLifecycleEvent
@@ -80,6 +89,8 @@ export interface ScreenBlueprintDispatchResult {
   readonly visibilityEffects: readonly ScreenBlueprintVisibilityEffect[];
   /** 从画布开合与页面导航（ADR-0109），按执行顺序。 */
   readonly canvasEffects: readonly ScreenBlueprintCanvasEffect[];
+  /** 组件状态设置 / 恢复（ADR-0110 §2.4），按执行顺序。 */
+  readonly stateEffects: readonly ScreenBlueprintStateEffect[];
   readonly variableRequests: readonly string[];
   readonly componentDataRequests: readonly string[];
 }
@@ -88,6 +99,13 @@ export interface ScreenBlueprintVisibilityEffect {
   readonly componentId: string;
   readonly operation: ScreenBlueprintComponentVisibilityAction['operation'];
   readonly transition?: ScreenBlueprintComponentVisibilityAction['transition'];
+}
+
+export interface ScreenBlueprintStateEffect {
+  readonly componentId: string;
+  readonly operation: 'set' | 'reset';
+  /** 只在 `set` 上出现。 */
+  readonly stateId?: string;
 }
 
 export type ScreenBlueprintCanvasEffect =
@@ -182,6 +200,18 @@ export interface ScreenBlueprintCanvasVisibilityActionTrace {
   readonly detached: ScreenJsonObject;
 }
 
+export interface ScreenBlueprintComponentStateActionTrace {
+  readonly type: 'component-state';
+  readonly actionIndex: number;
+  /** 执行该动作的连线。 */
+  readonly edgeId: string;
+  readonly componentId: string;
+  readonly operation: 'set' | 'reset';
+  readonly stateId?: string;
+  readonly output: ScreenJsonValue;
+  readonly detached: ScreenJsonObject;
+}
+
 export interface ScreenBlueprintPageNavigationActionTrace {
   readonly type: 'page-navigation';
   readonly actionIndex: number;
@@ -200,7 +230,8 @@ export type ScreenBlueprintActionTrace =
   | ScreenBlueprintHostActionTrace
   | ScreenBlueprintComponentVisibilityActionTrace
   | ScreenBlueprintCanvasVisibilityActionTrace
-  | ScreenBlueprintPageNavigationActionTrace;
+  | ScreenBlueprintPageNavigationActionTrace
+  | ScreenBlueprintComponentStateActionTrace;
 
 export interface ScreenBlueprintRuleTrace {
   readonly ruleId: string;

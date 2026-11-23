@@ -1,9 +1,3 @@
-import type { ScreenJsonObject } from 'base-screen/contracts';
-import type {
-  BaseScreenConditionalStylePort,
-  BaseScreenConditionalStyleRequest,
-} from 'base-screen/plugin-core';
-
 export type HostAlarmLevel = 'warning' | 'critical' | 'info';
 export type HostAlarmStatus = 'connecting' | 'live' | 'reconnecting' | 'offline';
 
@@ -34,8 +28,11 @@ export type HostAlarmEvent =
     }
   | { readonly type: 'heartbeat' };
 
-export type HostAlarmStyles = Readonly<Partial<Record<HostAlarmLevel, ScreenJsonObject>>>;
-export type HostAlarmBindings = Readonly<Record<string, Readonly<Record<string, HostAlarmStyles>>>>;
+/** 一个告警 key 的当前汇总：最高等级（没有告警为 null）与生效条数。 */
+export interface HostAlarmSummary {
+  readonly level: HostAlarmLevel | null;
+  readonly count: number;
+}
 
 export interface HostAlarmStatusSnapshot {
   readonly status: HostAlarmStatus;
@@ -49,28 +46,21 @@ export type HostAlarmConnect = (
   onStatus: (status: HostAlarmStatus) => void,
 ) => () => void;
 
-export type HostAlarmScheduler = (callback: () => void) => () => void;
-
 export interface HostAlarmControllerOptions {
   readonly apiBase: string;
-  readonly bindings: HostAlarmBindings;
-  readonly onInvalidate: (componentIds: readonly string[]) => void;
   readonly connect?: HostAlarmConnect;
-  readonly schedule?: HostAlarmScheduler;
   readonly readyTimeoutMs?: number;
 }
 
 export interface HostAlarmController {
-  /** 配置给 Designer/Viewer 的稳定端口；读取当前告警快照，无 I/O。 */
-  readonly port: BaseScreenConditionalStylePort;
+  /** 某个告警 key 的汇总（宿主分级规则的结果）；本地快照读取，无 I/O。 */
+  summary(key: string): HostAlarmSummary;
+  /** 快照变化后回调受影响的 key；返回取消订阅。 */
+  onChange(listener: (keys: readonly string[]) => void): () => void;
   readonly status: () => HostAlarmStatusSnapshot;
-  /** 首个 snapshot 已应用或超时；宿主在 configure 前等待，避免首屏闪烁。 */
+  /** 首个 snapshot 已应用或超时。 */
   readonly ready: (timeoutMs?: number) => Promise<void>;
-  /**
-   * 页面里改完绑定后热更新：不重建 SSE 连接，只换映射并失效新旧两侧命中的组件。
-   * 当前快照保持不变——绑定是展示映射，不是告警状态。
-   */
-  setBindings(bindings: HostAlarmBindings): void;
+  readonly revision: () => number;
   readonly stop: () => void;
 }
 
@@ -81,25 +71,22 @@ const LEVEL_PRIORITY: Readonly<Record<HostAlarmLevel, number>> = {
 };
 
 /**
- * 宿主告警适配层的最小参考实现。
+ * 宿主告警源的最小参考实现（ADR-0110 §2.6）。
  *
- * 告警系统 → SSE → 本地快照（revision 幂等、乱序丢弃、重连重同步）→
- * `conditionalStylePort` + 按帧合并的 `refreshConditionalStyles`。
- * 传输、凭证、阈值与告警生命周期都留在宿主；Base Screen 只消费样式覆盖。
+ * 告警系统 → SSE → 本地快照（revision 幂等、乱序丢弃、重连重同步）→ 按 key 汇总成「最高等级 + 条数」。
+ * 宿主只给分级，不给样式：资源端口把汇总作为推送数据源（`alarm` 资源类型）交给大屏，
+ * 组件用「组件状态」的判定把等级映射成外观。传输、阈值与告警生命周期都留在宿主。
  */
 export function createHostAlarmController(
   options: HostAlarmControllerOptions,
 ): HostAlarmController {
   const connect = options.connect ?? defaultConnect;
-  const schedule = options.schedule ?? defaultSchedule;
-  let bindings = options.bindings;
   const records = new Map<string, HostAlarmRecord>();
+  const listeners = new Set<(keys: readonly string[]) => void>();
   let revision = -1;
   let status: HostAlarmStatus = 'connecting';
   let stopped = false;
   let closeStream: (() => void) | undefined;
-  let pending = new Set<string>();
-  let cancelFlush: (() => void) | undefined;
   let snapshotApplied = false;
   let reconnecting = false;
 
@@ -109,91 +96,44 @@ export function createHostAlarmController(
   });
   let readyTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const port: BaseScreenConditionalStylePort = {
-    resolve: (request: BaseScreenConditionalStyleRequest) => resolveStyle(request.componentId),
-  };
-
-  function setStatus(next: HostAlarmStatus): void {
-    status = next;
-  }
-
-  function resolveStyle(componentId: string): ScreenJsonObject | undefined {
-    let best:
-      | { readonly level: HostAlarmLevel; readonly id: string; readonly style: ScreenJsonObject }
-      | undefined;
+  function summary(key: string): HostAlarmSummary {
+    let level: HostAlarmLevel | null = null;
+    let count = 0;
     for (const record of records.values()) {
-      if (record.acknowledged || record.suppressed) continue;
-      const style = bindings[record.key]?.[componentId]?.[record.level];
-      if (style === undefined) continue;
-      if (
-        best === undefined ||
-        LEVEL_PRIORITY[record.level] > LEVEL_PRIORITY[best.level] ||
-        (LEVEL_PRIORITY[record.level] === LEVEL_PRIORITY[best.level] && record.id < best.id)
-      ) {
-        best = { level: record.level, id: record.id, style };
+      if (record.key !== key || record.acknowledged || record.suppressed) continue;
+      count += 1;
+      if (level === null || LEVEL_PRIORITY[record.level] > LEVEL_PRIORITY[level]) {
+        level = record.level;
       }
     }
-    return best?.style;
+    return { level, count };
   }
 
-  function componentsForKey(key: string): readonly string[] {
-    return componentsFor(bindings, key);
-  }
-
-  function componentsFor(source: HostAlarmBindings, key: string): readonly string[] {
-    const components = source[key];
-    return components === undefined ? [] : Object.keys(components);
-  }
-
-  function setBindings(next: HostAlarmBindings): void {
-    const affected = new Set<string>();
-    for (const record of records.values()) {
-      for (const componentId of componentsFor(bindings, record.key)) affected.add(componentId);
-      for (const componentId of componentsFor(next, record.key)) affected.add(componentId);
-    }
-    bindings = next;
-    markComponents([...affected]);
-  }
-
-  function scheduleFlush(): void {
-    if (stopped || pending.size === 0 || cancelFlush !== undefined) return;
-    cancelFlush = schedule(() => {
-      cancelFlush = undefined;
-      if (stopped) return;
-      const ids = [...pending];
-      pending = new Set();
-      if (ids.length === 0) return;
+  function notify(keys: Iterable<string>): void {
+    const unique = [...new Set(keys)];
+    if (unique.length === 0) return;
+    for (const listener of listeners) {
       try {
-        options.onInvalidate(ids);
+        listener(unique);
       } catch {
-        // 宿主回调失败不能中断告警流；下一批事件会再次尝试。
+        // 单个读者失败不能中断告警流。
       }
-      if (pending.size > 0) scheduleFlush();
-    });
-  }
-
-  function markComponents(componentIds: readonly string[]): void {
-    if (componentIds.length === 0) return;
-    for (const componentId of componentIds) pending.add(componentId);
-    scheduleFlush();
+    }
   }
 
   function applySnapshot(event: Extract<HostAlarmEvent, { type: 'snapshot' }>): void {
-    const affected = new Set<string>();
-    for (const record of records.values()) {
-      for (const componentId of componentsForKey(record.key)) affected.add(componentId);
-    }
+    const keys = new Set<string>([...records.values()].map((record) => record.key));
     records.clear();
-    for (const alarm of event.alarms) records.set(alarm.id, alarm);
     for (const alarm of event.alarms) {
-      for (const componentId of componentsForKey(alarm.key)) affected.add(componentId);
+      records.set(alarm.id, alarm);
+      keys.add(alarm.key);
     }
     revision = event.revision;
     snapshotApplied = true;
     reconnecting = false;
-    setStatus('live');
+    status = 'live';
     resolveReadyNow();
-    if (affected.size > 0) markComponents([...affected]);
+    notify(keys);
   }
 
   function acceptRevision(next: number): boolean {
@@ -206,52 +146,51 @@ export function createHostAlarmController(
     return true;
   }
 
+  function update(
+    alarmId: string,
+    next: (current: HostAlarmRecord) => HostAlarmRecord | undefined,
+  ): void {
+    const current = records.get(alarmId);
+    if (current === undefined) return;
+    const updated = next(current);
+    if (updated === undefined) records.delete(alarmId);
+    else records.set(alarmId, updated);
+    notify([current.key]);
+  }
+
   function handleEvent(event: HostAlarmEvent): void {
     if (stopped) return;
     switch (event.type) {
       case 'heartbeat':
-        setStatus('live');
+        status = 'live';
         return;
       case 'snapshot':
         applySnapshot(event);
         return;
-      case 'raise': {
+      case 'raise':
         if (!acceptRevision(event.revision)) return;
         records.set(event.alarm.id, event.alarm);
-        markComponents(componentsForKey(event.alarm.key));
+        notify([event.alarm.key]);
         return;
-      }
-      case 'clear': {
-        const current = records.get(event.alarmId);
+      case 'clear':
         if (!acceptRevision(event.revision)) return;
-        if (current === undefined) return;
-        records.delete(event.alarmId);
-        markComponents(componentsForKey(current.key));
+        update(event.alarmId, () => undefined);
         return;
-      }
-      case 'ack': {
-        const current = records.get(event.alarmId);
+      case 'ack':
         if (!acceptRevision(event.revision)) return;
-        if (current === undefined) return;
-        records.set(event.alarmId, { ...current, acknowledged: true });
-        markComponents(componentsForKey(current.key));
+        update(event.alarmId, (current) => ({ ...current, acknowledged: true }));
         return;
-      }
-      case 'suppress': {
-        const current = records.get(event.alarmId);
+      case 'suppress':
         if (!acceptRevision(event.revision)) return;
-        if (current === undefined) return;
-        records.set(event.alarmId, { ...current, suppressed: event.suppressed });
-        markComponents(componentsForKey(current.key));
+        update(event.alarmId, (current) => ({ ...current, suppressed: event.suppressed }));
         return;
-      }
     }
   }
 
   function resync(): void {
     if (stopped || reconnecting) return;
     reconnecting = true;
-    setStatus('reconnecting');
+    status = 'reconnecting';
     closeStream?.();
     closeStream = undefined;
     openStream();
@@ -262,7 +201,7 @@ export function createHostAlarmController(
     const base = options.apiBase.replace(/\/+$/, '');
     closeStream = connect(`${base}/demo/alarms/stream`, handleEvent, (next) => {
       if (stopped) return;
-      setStatus(next);
+      status = next;
       if (next === 'live' && reconnecting) reconnecting = false;
     });
   }
@@ -289,16 +228,18 @@ export function createHostAlarmController(
     stopped = true;
     closeStream?.();
     closeStream = undefined;
-    cancelFlush?.();
-    cancelFlush = undefined;
-    pending.clear();
+    listeners.clear();
     resolveReadyNow();
   }
 
   openStream();
 
   return {
-    port,
+    summary,
+    onChange(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
     status: () => ({
       status,
       revision,
@@ -307,18 +248,9 @@ export function createHostAlarmController(
       ).length,
     }),
     ready,
-    setBindings,
+    revision: () => revision,
     stop,
   };
-}
-
-function defaultSchedule(callback: () => void): () => void {
-  if (typeof requestAnimationFrame === 'function') {
-    const id = requestAnimationFrame(callback);
-    return () => cancelAnimationFrame(id);
-  }
-  const id = setTimeout(callback, 0);
-  return () => clearTimeout(id);
 }
 
 function defaultConnect(

@@ -135,15 +135,6 @@ export function refreshVariables(
   elementState.previewController.refreshVariables(options);
 }
 
-export function refreshConditionalStyles(
-  element: DesignerElementHost,
-  componentIds?: readonly string[],
-): void {
-  const elementState = getDesignerElementState(element);
-  elementState.canvasRuntimeController.refreshConditionalStyles(componentIds);
-  elementState.previewController.refreshConditionalStyles(componentIds);
-}
-
 export function save(
   element: DesignerElementHost,
 ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {

@@ -4,8 +4,8 @@ import type {
   ScreenCanvasBackgroundImageFit,
   ScreenComponentDataSource,
   ScreenComponentNode,
+  ScreenComponentStates,
   ScreenComponentStatus,
-  ScreenComponentStyleRule,
   ScreenDataBinding,
   ScreenDataSource,
   ScreenDiagnostic,
@@ -89,8 +89,8 @@ export interface ScreenComponentPatch {
   readonly status?: ScreenComponentStatus;
   readonly props?: ScreenJsonObject;
   readonly style?: ScreenJsonObject;
-  /** 条件样式规则整体替换（ADR-0058）：传完整新数组，空数组清除全部规则。 */
-  readonly styleRules?: readonly ScreenComponentStyleRule[];
+  /** 组件状态整体替换（ADR-0110）；`null` = 去掉全部状态。 */
+  readonly states?: ScreenComponentStates | null;
   readonly dataSource?: ScreenComponentDataSource | null;
   /** 取值引用；`null` = 不取值。 */
   readonly dataValue?: ScreenValueRef | null;

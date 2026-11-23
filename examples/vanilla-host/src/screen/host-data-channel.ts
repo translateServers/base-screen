@@ -16,6 +16,7 @@ import { api } from '../lib/api';
 import { resolveApiBase } from '../lib/api-base';
 import { createLogger } from '../lib/logger';
 import type { MetricPoint } from '../types';
+import { createHostAlarmController, type HostAlarmController } from './host-alarm-controller';
 
 const logger = createLogger('host-data-channel');
 
@@ -32,7 +33,17 @@ const DEMO_METRIC = 'demo_metric';
 const DEMO_SERIES = 'demo_series';
 const DEMO_RANKING = 'demo_ranking';
 const HOST_IMAGE = 'host_image';
-const AUTHORIZED_RESOURCE_TYPES = new Set([DEMO_METRIC, DEMO_SERIES, DEMO_RANKING, HOST_IMAGE]);
+/** 告警汇总（ADR-0110 §2.6）：resourceId 是告警 key，值为 `{ level, count }`，只推送不轮询。 */
+const ALARM = 'alarm';
+const AUTHORIZED_RESOURCE_TYPES = new Set([
+  DEMO_METRIC,
+  DEMO_SERIES,
+  DEMO_RANKING,
+  HOST_IMAGE,
+  ALARM,
+]);
+/** 最后一个告警读者离开后保留告警连接的时长。 */
+const ALARM_LINGER_MS = 2_000;
 /** 可订阅推送的类型（ADR-0104），须与 `host-resource-plugin` 的 `delivery.push` 声明一致。 */
 const PUSH_RESOURCE_TYPES = new Set([DEMO_METRIC, DEMO_SERIES]);
 const DEFAULT_POINTS = 24;
@@ -67,8 +78,56 @@ export function createHostResourcePort(): ScreenHostResourcePort {
     lingerMs: STREAM_LINGER_MS,
   });
 
+  // 告警源按需建立：第一个读者到来时连上，最后一个离开后稍候断开（同一条 SSE 由多个组件共用）。
+  let alarms: HostAlarmController | undefined;
+  let alarmReaders = 0;
+  let alarmLinger: ReturnType<typeof setTimeout> | undefined;
+  const acquireAlarms = (): HostAlarmController => {
+    if (alarmLinger !== undefined) {
+      clearTimeout(alarmLinger);
+      alarmLinger = undefined;
+    }
+    alarms ??= createHostAlarmController({ apiBase: resolveApiBase() });
+    return alarms;
+  };
+  const releaseAlarms = (): void => {
+    if (alarmReaders > 0 || alarms === undefined) return;
+    alarmLinger = setTimeout(() => {
+      alarmLinger = undefined;
+      if (alarmReaders > 0) return;
+      alarms?.stop();
+      alarms = undefined;
+    }, ALARM_LINGER_MS);
+  };
+
   return {
-    subscribe: streams.subscribe,
+    subscribe(request, sink, options) {
+      if (request.resourceType !== ALARM) return streams.subscribe(request, sink, options);
+      const feed = acquireAlarms();
+      alarmReaders += 1;
+      const push = (): void =>
+        sink.push({
+          type: 'snapshot',
+          value: { ...feed.summary(request.resourceId) },
+          cursor: { epoch: 'alarm', revision: Math.max(0, feed.revision()) },
+        });
+      void feed.ready().then(() => {
+        if (!options.signal.aborted) push();
+      });
+      const stop = feed.onChange((keys) => {
+        if (keys.includes(request.resourceId)) push();
+      });
+      options.signal.addEventListener(
+        'abort',
+        () => {
+          stop();
+          alarmReaders -= 1;
+          releaseAlarms();
+        },
+        { once: true },
+      );
+      return { ok: true, value: null, diagnostics: [] };
+    },
     async resolve({
       resourceType,
       resourceId,
@@ -76,6 +135,14 @@ export function createHostResourcePort(): ScreenHostResourcePort {
     }): Promise<ScreenParseResult<ScreenJsonValue>> {
       if (!AUTHORIZED_RESOURCE_TYPES.has(resourceType)) {
         return failure('HOST_RESOURCE_ACCESS_DENIED', `未授权的资源类型：${resourceType}`);
+      }
+
+      if (resourceType === ALARM) {
+        const feed = acquireAlarms();
+        await feed.ready();
+        const value = { ...feed.summary(resourceId) };
+        releaseAlarms();
+        return { ok: true, value, diagnostics: [] };
       }
 
       if (resourceType === HOST_IMAGE) {

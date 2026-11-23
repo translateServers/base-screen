@@ -584,12 +584,19 @@
   background: var(--designer-surface-panel);
 }
 
+/* 样式 tab 的字段行距：30px 控件 + 8px 间距。数据/交互 tab 保持 4px 的紧凑档；
+   样式 tab 一段里常有 8 个字段，4px 会让标签贴住上一行的控件。
+   几何网格自己管行距（10px），它的 margin: 0 在下面覆盖，不吃这个变量。 */
+.properties .inspector-pane[data-inspector-pane="appearance"] {
+  --inspector-field-gap: var(--designer-space-4);
+}
+
 /* 字段行骨架（标签列 + 控件列）在控件层 designer-controls-fields.css；
    右栏只保留面板密度与换行策略。 */
 .properties .inspector-pane .designer-field {
   display: grid;
   gap: var(--designer-space-2);
-  margin-bottom: var(--designer-space-2);
+  margin-bottom: var(--inspector-field-gap, var(--designer-space-2));
   white-space: normal;
 }
 
@@ -880,6 +887,15 @@
   cursor: pointer;
 }
 
+/* 样式 tab：标题与首行也用 8px。6px 时「文字」读起来像贴在颜色行上，
+   和下方 8px 的行距不成比例。内建分段（几何/状态/通用/行为）与描述符分段
+   （结构/文字）同属一栏，标题节奏必须一档。 */
+.properties .inspector-pane[data-inspector-pane="appearance"] .designer-descriptor-group-summary,
+.properties .inspector-pane[data-inspector-pane="appearance"] .designer-panel-section-title,
+.properties .inspector-pane[data-inspector-pane="appearance"] .designer-inspector-section-title {
+  margin-bottom: var(--designer-space-4);
+}
+
 .properties .designer-descriptor-group-summary::-webkit-details-marker,
 .properties .designer-descriptor-group-summary::before,
 .properties .designer-descriptor-group-summary::after {
@@ -915,79 +931,126 @@
   box-shadow: inset 0 0 0 1px var(--designer-accent);
 }
 
-/* 条件样式：规则卡片列表。间距只在容器内增长，避免规则增删时整块面板跳动。 */
-.properties .designer-style-rule-hint {
-  margin: 0 0 var(--designer-space-4);
+/* 主题色板里的分组小标题（状态色位，ADR-0110 §2.6.4）。 */
+.properties .designer-inspector-subheading {
+  margin: var(--designer-space-4) 0 var(--designer-space-2);
   color: var(--designer-text-muted);
   font-size: 11px;
-  line-height: 1.5;
 }
 
-.properties .designer-style-rules {
-  display: grid;
-  gap: var(--designer-space-4);
-  margin-bottom: var(--designer-space-4);
+/* 组件状态（ADR-0110）：状态标签、编辑条、判定条件。行高固定，切换编辑对象不让面板跳动。 */
+.properties .designer-state-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--designer-space-2);
 }
 
-.properties .designer-style-rule {
+.properties .designer-state-chip[data-state-live]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-right: var(--designer-space-2);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-success);
+}
+
+.properties .designer-state-chip[aria-pressed="true"] {
+  border-color: var(--designer-accent);
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent-text);
+}
+
+.properties .designer-state-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  margin-top: var(--designer-space-4);
+}
+
+.properties .designer-state-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.properties .designer-state-summary,
+.properties .designer-state-now {
+  color: var(--designer-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.properties .designer-state-now {
+  margin: var(--designer-space-3) 0;
+}
+
+.properties .designer-state-generate {
   display: grid;
   gap: var(--designer-space-3);
+  margin-bottom: var(--designer-space-4);
   padding: var(--designer-space-4);
   border: 1px solid var(--designer-border-subtle);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-control);
 }
 
-.properties .designer-style-rule-header {
+.properties .designer-state-levels {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--designer-space-4);
-  color: var(--designer-text-primary);
+  gap: var(--designer-space-2);
+  color: var(--designer-text-secondary);
   font-size: 11px;
 }
 
-.properties .designer-style-rule-actions {
-  display: flex;
-  gap: var(--designer-space-1);
+.properties .designer-state-level-swatch {
+  width: 8px;
+  height: 8px;
+  margin-left: var(--designer-space-2);
+  border-radius: var(--designer-radius-1);
+  background: var(--designer-state-tone, var(--designer-text-muted));
 }
 
-.properties .designer-style-rule-action {
-  min-width: 22px;
-  height: 22px;
-  padding: 0;
-  font-size: 12px;
-  line-height: 1;
-}
-
-.properties .designer-style-rule-fields {
+.properties .designer-state-cases {
   display: grid;
-  gap: var(--designer-space-3);
+  gap: var(--designer-space-2);
+  margin-bottom: var(--designer-space-4);
 }
 
-.properties .designer-style-rule-fields .designer-field {
-  margin: 0;
+.properties .designer-state-case {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) auto minmax(0, 0.9fr) auto;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-1);
+  border-radius: var(--designer-radius-2);
 }
 
-.properties .designer-style-rule-empty {
-  margin: 0;
+.properties .designer-state-case[data-state-case-hit] {
+  background: var(--designer-accent-surface);
+}
+
+.properties .designer-state-case-other {
+  display: block;
+  padding-left: var(--designer-space-3);
   color: var(--designer-text-muted);
   font-size: 11px;
 }
 
-.properties .designer-style-rule-add {
+.properties .designer-state-case-arrow {
+  color: var(--designer-text-muted);
+  font-size: 11px;
+}
+
+.properties .designer-state-case-add {
   width: 100%;
 }
 
-/* 宿主条件样式：条件源表单与保存状态。状态行固定最小高度，切换文案不让面板跳动。 */
-.properties .designer-host-style-form {
-  margin-top: var(--designer-space-4);
+/* 被当前状态覆盖的字段：行尾「恢复默认」按钮用强调色标出（字段行本身沿用控件原语的外观）。 */
+.properties .designer-state-reset-key {
+  flex: 0 0 auto;
+  color: var(--designer-accent-text);
 }
 
-.properties .designer-host-style-status {
-  min-height: 16px;
-  margin: var(--designer-space-3) 0 0;
-  color: var(--designer-text-muted);
-  font-size: 11px;
-  line-height: 1.4;
+.properties [data-state-frozen] {
+  opacity: 0.5;
 }

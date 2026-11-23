@@ -51,7 +51,7 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
 ```text
 lib/api-base.ts  lib/api.ts  lib/asset-model.ts  lib/datasource-model.ts  lib/format.ts  lib/logger.ts
 lib/render-diagnostics.ts
-screen/host-alarm-controller.ts  screen/host-alarm-style-authoring.ts
+screen/host-alarm-controller.ts
 screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
 screen/asset-library.ts  screen/asset-return.ts
 screen/datasource-return.ts
@@ -288,10 +288,10 @@ M 段是**宿主资源作者面**闭环：编辑页右下角打开作者面，�
 | KPI 读数 | `kpi-alarm-value` 翻牌 ← `alarm_open` | `demo_metric`（`/api/metrics`） |
 | 等级色块 | 3 组「矩形色块 + 色条 + 翻牌」 | `alarm_critical` / `alarm_warning` / `alarm_info` |
 
-这张屏的存在理由是**把演示 key 落到具体组件上**：告警绑定按大屏持久化在宿主后端
-（`ScreenAlarmBinding`），种子把 `alarm.open` 映射到组件 id（`kpi-alarm-value`、`top-notice`），
-作为开箱模板；组件检查器的「业务条件样式」段可以改条件源、等级与样式并保存。
-组件沿用与生产监控屏相同的两个 id 与基础色，文档本身仍然没有告警 key、阈值或样式规则。
+这张屏演示**宿主只给分级、大屏决定样式**（ADR-0110 §2.6）：数据源 `alarm_open` 是宿主的
+推送资源（`alarm` / `alarm.open`，值 `{ level, count }`），`kpi-alarm-value` 与 `top-notice` 带
+严重 / 一般 / 提示三个组件状态，按 `alarm_open.level` 判定，颜色引用文档状态色位。
+阈值与告警生命周期留在宿主，文档里只有告警资源身份与「等级 → 状态」。
 等级色块的三条实色条与流水的等级语义色（`criticalColor` / `warningColor` / `infoColor`）同源
 （`#f5222d` / `#fa8c16` / `#1677ff`），
 根测试按 `BOARD_ALARM_LEVEL_COLORS` 逐色比对，避免"同一等级两种红"。
@@ -325,7 +325,7 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 交互只有两条：点城市榜任意行 → 蓝图 `rowClick` 关系写 `city`；点 24/48 小时按钮 →
 `valueClick` 写 `hours`，两张趋势图同步切换。城市榜同时承担排名与城市选择，时间窗显式
 可见；默认城市为上海（AQI 36，优），北京仍固定排在榜单第 1 行，风险不被隐藏。
-等级/超标着色走 canonical `styleRules`（ADR-0058），不注入宿主 CSS。
+等级/超标着色走组件状态（ADR-0110），不注入宿主 CSS。
 
 **案例复盘：真实数据链路暴露的边界（本轮已修诊断可见性与共享实例，其余记录如下）**
 
@@ -341,7 +341,7 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
   但不能直接做表格列。本案例用 ASCII 排名列 + 文档层表头解释列义。
 - **scroll-board 不能逐行着色，也没有选中行样式**：等级语义色只认 critical / warning / info，
   中文等级值只能落到未知等级色（`unknownColor`）；榜单的行内等级色因此是统一的青色。当前城市由主视觉
-  与榜单标题表达；主视觉的等级/标准比/达标状态/优良率用 `styleRules` 条件着色。
+  与榜单标题表达；主视觉的等级/标准比/达标状态/优良率用组件状态着色。
 - **ECharts 物料不暴露轴范围**：评审稿的固定量程（AQI 0–160 / 颗粒物 0–120）无法在
   文档层设置，双趋势图使用自适应量程；固定刻度需要给图表物料增加轴 props。
 - **时间窗按钮没有选中态**：`base.text` 没有 selected/active 样式；文档层用「当前
@@ -431,27 +431,21 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 
 ### 实时告警（宿主推送）
 
-外部告警系统拥有条件样式的判定与视觉映射，并通过 SSE 推送当前告警。Base Screen **不连接**
-告警系统，也不保存告警状态：
+外部告警系统拥有告警判定与分级，并通过 SSE 推送当前告警。宿主把它整理成一个推送数据源，
+大屏按等级切换组件状态（ADR-0110 §2.6）：
 
 ```text
-告警系统 --SSE--> 宿主 host-alarm-controller
-                     ├─ 维护当前快照（revision、Map、重连重同步、乱序丢弃）
-                     ├─ conditionalStylePort.resolve(componentId) → 样式覆盖
-                     └─ element.refreshConditionalStyles(componentIds)
+告警系统 --SSE--> 宿主 host-alarm-controller（快照、revision、重连重同步、乱序丢弃）
+                     └─ 按告警 key 汇总 { level, count }
+                          └─ resourcePort.subscribe（资源类型 alarm）→ 推送数据源 → 组件状态
 ```
 
-- **端口必须在 `configure` 前提交**；三端在配置前 `await alarms.ready(800)`，首快照未到时
-  先按基础样式渲染，到达后由失效 API 补齐。
-- **绑定在宿主侧，按屏持久化**：`GET/PUT /api/screens/:id/alarm-bindings` 保存
-  `alarm key → 组件 id → 等级 → 样式`。种子屏的开箱映射（`alarm.open` → `kpi-alarm-value`
-  与 `top-notice`）只在缺少记录时补种；组件检查器的「业务条件样式」段按当前物料
-  Manifest 过滤样式字段，保存后经 `controller.setBindings()` 热更新并重算样式，不重建 SSE。
-  文档里没有告警 key、阈值或样式规则。
-- **合并与优先级**：同一组件命中多条告警时取 `critical > warning > info`，同级按 alarm id
-  字典序；`acknowledged` / `suppressed` 不参与样式。
-- **一帧一次**：控制器按 `requestAnimationFrame` 合并事件，只失效受影响的组件；`stop()` 后
-  不再回调。事件 revision 重复/倒序丢弃，缺口触发重连并以 snapshot 全量替换。
+- **宿主只给分级**：资源类型 `alarm` 在 `host-resource-plugin.ts` 声明 `delivery.push` 与
+  `levelScales`（critical / warning / info → 危险 / 警告 / 提示色调）；设计器据此给出等级下拉与
+  「按分级生成状态」。样式不由宿主保存，也不注入大屏。
+- **合并与优先级**：同一 key 有多条告警时取 `critical > warning > info`，`acknowledged` /
+  `suppressed` 不计入。多个组件共用一条 SSE，最后一个读者离开 2 秒后断开。
+- **快照语义**：事件 revision 重复/倒序丢弃，缺口触发重连并以 snapshot 全量替换。
 - **验证**：查看页顶栏有 `[data-alarm-status]` chip 与「模拟告警 / 解除告警」按钮。冒烟以
   `poll=0` 打开**「实时告警演示大屏」**，先 `POST reset` 等待 warning，再 `POST raise` 断言
   critical，`POST clear` 断言恢复；同时断言 dataset query 数与 canonical 文档未变化。
@@ -503,14 +497,13 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
   拖到另一组件表达详情/分组/下钻。检查器可改效果类型、条件与变量；事件字段可直接填写
   `row.city`：声明过的 payload 字段只是建议，物料没声明 `payloadSchema` 也能用。
 
-### 条件样式
+### 组件状态
 
-- 「样式」页签底部的「条件样式」按组件数据值判定：路径留空表示数据值本身；操作符支持
-  `eq / neq / gt / gte / lt / lte / contains / exists`；命中后覆盖物料 stylePanel 里的颜色键。
-- 规则可新增、删除、上下移动，最多 8 条；提交走 `update-components` 的 `styleRules` 整体替换，
-  合并后的完整 style 会过一次物料 `styleSchema`，不认识的颜色键不会写进文档。
-- 空气质量种子里的 `hero-level`（6 条等级色）、`hero-ratio` / `hero-good`（阈值色）都能在
-  这个面板里直接改；查看页切城市时颜色随数据值变化。
+- 检查器顶部「外观状态」：默认 + 自建状态；选中某个状态后，外观区的改动只写进该状态的覆盖。
+- 「判定」：取值可选组件数据 / 变量 / 数据源（可按行查找，匹配值可引用变量）；条件按顺序判定，
+  第一条命中即生效，都不命中为默认。蓝图「设置状态 / 恢复自动」优先于判定。
+- 空气质量种子里的 `hero-level`（6 个等级状态）、`hero-ratio` / `hero-good`（阈值状态）都能在
+  这里直接改；查看页切城市时状态随数据值变化。
 
 ## 数据绑定演示
 

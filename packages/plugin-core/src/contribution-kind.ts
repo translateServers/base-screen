@@ -1,6 +1,7 @@
 import {
   isScreenComponentId,
   isScreenVariableName,
+  listScreenLevelScaleIssues,
   listScreenSourceDeliveryIssues,
   type ScreenDiagnostic,
   type ScreenJsonObject,
@@ -124,7 +125,7 @@ export const CONTRIBUTION_KIND_DESCRIPTORS: readonly ContributionKindDescriptor[
   {
     kind: 'dataResourceType',
     requiredFields: ['kind', 'id', 'name', 'configSchema'],
-    optionalFields: ['queryScope', 'delivery'],
+    optionalFields: ['queryScope', 'delivery', 'levelScales'],
     identifierFields: ['id'],
     hasDisplayName: true,
     identityField: 'id',
@@ -151,6 +152,15 @@ export const CONTRIBUTION_KIND_DESCRIPTORS: readonly ContributionKindDescriptor[
           [...path, 'queryScope'],
           'Resource queryScope must be the literal "resource" when declared.',
         );
+      }
+      if (contribution.levelScales !== undefined) {
+        for (const issue of listScreenLevelScaleIssues(contribution.levelScales)) {
+          collector.add(
+            'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+            [...path, 'levelScales', ...issue.path],
+            issue.message,
+          );
+        }
       }
       if (contribution.delivery !== undefined) {
         for (const issue of listScreenSourceDeliveryIssues(contribution.delivery)) {

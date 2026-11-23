@@ -20,7 +20,7 @@ class FakeRenderer implements BaseScreenRenderer {
   readonly contexts: Array<{ readonly trigger?: string; readonly traceId?: string } | undefined> =
     [];
   readonly refreshes: (string | undefined)[] = [];
-  readonly conditionalStyleRefreshes: (readonly string[] | undefined)[] = [];
+  readonly stateEffects: unknown[] = [];
   readonly visibilityEffects: (readonly ScreenBlueprintVisibilityEffect[])[] = [];
 
   render(
@@ -47,9 +47,17 @@ class FakeRenderer implements BaseScreenRenderer {
     this.refreshes.push(componentId);
   }
 
-  refreshConditionalStyles(componentIds?: readonly string[]): void {
-    this.calls.push('conditional-style');
-    this.conditionalStyleRefreshes.push(componentIds);
+  applyBlueprintStateEffects(effects: readonly unknown[]): void {
+    this.calls.push('state');
+    this.stateEffects.push(...effects);
+  }
+
+  readComponentState(): undefined {
+    return undefined;
+  }
+
+  resetComponentStates(): void {
+    this.calls.push('reset-states');
   }
 
   // 数据源实例接口（T02c-2）：设计器画布运行时不走这条路径，桩实现即可。
@@ -161,12 +169,16 @@ function catalogPort(resolve: ScreenHostCatalogPort['resolve']): ScreenHostCatal
 }
 
 describe('DesignerCanvasRuntimeController', () => {
-  it('CSR-D05 forwards conditional style refreshes with the requested component scope', () => {
+  it('previews a component state on the canvas and resets back to the judge', () => {
     const { controller, renderer } = createHarness();
 
-    controller.refreshConditionalStyles(['a', 'b']);
+    controller.previewComponentState('a', 'warn');
+    controller.previewComponentState('a', 'default');
 
-    expect(renderer.conditionalStyleRefreshes).toEqual([['a', 'b']]);
+    expect(renderer.stateEffects).toEqual([
+      { componentId: 'a', operation: 'set', stateId: 'warn' },
+      { componentId: 'a', operation: 'reset' },
+    ]);
   });
 
   it('applies static document variables before the canvas render', () => {

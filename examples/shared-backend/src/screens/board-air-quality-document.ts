@@ -46,16 +46,17 @@ interface DemoComponent {
   readonly dataSource: unknown;
   readonly dataValue?: unknown;
   readonly dataBinding?: unknown;
-  readonly styleRules?: readonly StyleRule[];
+  readonly states?: unknown;
 }
 
-type StyleRuleOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists';
+type StateOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists';
 
-interface StyleRule {
+/** 一个状态与命中它的条件（按出现顺序判定，第一条命中即生效）。 */
+interface StateRule {
   readonly id: string;
   readonly when: {
     readonly path: readonly string[];
-    readonly operator: StyleRuleOperator;
+    readonly operator: StateOperator;
     readonly value?: unknown;
   };
   readonly style: Readonly<Record<string, unknown>>;
@@ -69,11 +70,47 @@ function push(component: Omit<DemoComponent, 'zIndex'>): void {
   components.push({ ...component, zIndex });
 }
 
-/** 条件样式规则以组件自身 dataState.value 为条件源（ADR-0058），这里用于等级/超标着色。 */
-function addStyleRules(id: string, rules: readonly StyleRule[]): void {
+/** 状态显示名（作者面状态标签用）。 */
+const STATE_NAMES: Readonly<Record<string, string>> = {
+  'level-excellent': '优',
+  'level-good': '良',
+  'level-light': '轻度污染',
+  'level-moderate': '中度污染',
+  'level-heavy': '重度污染',
+  'level-severe': '严重污染',
+  'ratio-exceed': '超标',
+  'ratio-ok': '达标',
+  'ratio-status-exceed': '超标',
+  'ratio-status-ok': '达标',
+  'good-low': '偏少',
+  'good-ok': '正常',
+};
+
+/**
+ * 组件状态（ADR-0110）以组件自身数据为判定取值，这里用于等级 / 超标着色。AQI 等级由示例后端按
+ * HJ 633-2012 计算并随数据返回（宿主给分级），外观由本屏的状态决定。
+ */
+function addStates(id: string, rules: readonly StateRule[]): void {
   const index = components.findIndex((component) => component.id === id);
-  if (index < 0) throw new Error(`style rule target not found: ${id}`);
-  components[index] = { ...components[index]!, styleRules: rules };
+  if (index < 0) throw new Error(`state target not found: ${id}`);
+  components[index] = {
+    ...components[index]!,
+    states: {
+      items: rules.map((rule) => ({
+        id: rule.id,
+        name: STATE_NAMES[rule.id] ?? rule.id,
+        style: rule.style,
+      })),
+      judge: {
+        input: { kind: 'component-data', path: [] },
+        cases: rules.map((rule) => ({
+          operator: rule.when.operator,
+          ...(rule.when.operator === 'exists' ? {} : { value: rule.when.value }),
+          stateId: rule.id,
+        })),
+      },
+    },
+  };
 }
 
 type Box = readonly [number, number, number, number];
@@ -664,7 +701,7 @@ text(
 );
 
 // 等级/超标着色：状态色只落在等级文字、PM2.5 标准比、达标状态与优良率上。
-addStyleRules('hero-level', [
+addStates('hero-level', [
   {
     id: 'level-excellent',
     when: { path: [], operator: 'eq', value: '优' },
@@ -696,7 +733,7 @@ addStyleRules('hero-level', [
     style: { color: '#E47161' },
   },
 ]);
-addStyleRules('hero-ratio', [
+addStates('hero-ratio', [
   {
     id: 'ratio-exceed',
     when: { path: [], operator: 'gt', value: 100 },
@@ -704,7 +741,7 @@ addStyleRules('hero-ratio', [
   },
   { id: 'ratio-ok', when: { path: [], operator: 'lte', value: 100 }, style: { color: '#E8F3F5' } },
 ]);
-addStyleRules('hero-ratio-status', [
+addStates('hero-ratio-status', [
   {
     id: 'ratio-status-exceed',
     when: { path: [], operator: 'contains', value: '超标准' },
@@ -716,7 +753,7 @@ addStyleRules('hero-ratio-status', [
     style: { color: '#72D6C2' },
   },
 ]);
-addStyleRules('hero-good', [
+addStates('hero-good', [
   { id: 'good-low', when: { path: [], operator: 'lt', value: 50 }, style: { color: '#E4B25E' } },
   { id: 'good-ok', when: { path: [], operator: 'gte', value: 50 }, style: { color: '#E8F3F5' } },
 ]);

@@ -82,7 +82,6 @@ export function releaseSurfaces(element: DesignerElementHost): void {
   elementState.layers = undefined;
   elementState.notificationController.release();
   elementState.errorConsoleController.release();
-  elementState.guardController.release();
   elementState.changeController.release();
   elementState.presentationLockController.release();
   elementState.intentController.release();
@@ -135,12 +134,6 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
   const consoleTrigger = shadow.querySelector<HTMLButtonElement>('[data-error-console-toggle]');
   if (consoleDialog !== null && consoleTrigger !== null) {
     elementState.errorConsoleController.connect(consoleDialog, consoleTrigger);
-  }
-  const guardStrip = shadow.querySelector<HTMLButtonElement>('[data-guard-toggle]');
-  const guardPopover = shadow.querySelector<HTMLElement>('[data-guard-popover]');
-  const guardContent = shadow.querySelector<HTMLElement>('[data-canvas-content]');
-  if (guardStrip !== null && guardPopover !== null && canvas !== null && guardContent !== null) {
-    elementState.guardController.connect(guardStrip, guardPopover, canvas, guardContent);
   }
   const draftBar = shadow.querySelector<HTMLElement>('[data-draft-bar]');
   const changePane = shadow.querySelector<HTMLElement>('[data-change-pane]');

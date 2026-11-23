@@ -10,9 +10,7 @@ import type {
   ScreenProjectSnapshotPort,
 } from '@base-screen/contracts';
 import type {
-  BaseScreenConditionalStylePort,
   BaseScreenFragmentDefinition,
-  BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
   BaseScreenPluginInspectorControlCatalog,
@@ -29,7 +27,6 @@ import { DesignerCanvasRuntimeController } from '../../browser/controllers/desig
 import { DesignerChangeController } from '../../browser/controllers/designer-change-controller.js';
 import { DesignerCommandPaletteController } from '../../browser/controllers/designer-command-palette-controller.js';
 import { DesignerErrorConsoleController } from '../../browser/controllers/designer-error-console-controller.js';
-import { DesignerGuardController } from '../../browser/controllers/designer-guard-controller.js';
 import { DesignerImportController } from '../../browser/controllers/designer-import-controller.js';
 import { DesignerIntegrationController } from '../../browser/controllers/designer-integration-controller.js';
 import { DesignerIntentChoiceController } from '../../browser/controllers/designer-intent-choice-controller.js';
@@ -52,6 +49,7 @@ import { DesignerCoordinateEntryController } from '../../browser/controllers/ent
 import { DesignerSizeEntryController } from '../../browser/controllers/entry/designer-size-entry-controller.js';
 import { DesignerGestureController } from '../../browser/controllers/gesture/designer-gesture-controller.js';
 import { DesignerLayersController } from '../../browser/controllers/layers/designer-layers-controller.js';
+import { DesignerComponentStateEditing } from '../../browser/controllers/panel/designer-component-states-controller.js';
 import { DesignerPanelController } from '../../browser/controllers/panel/designer-panel-controller.js';
 import { DesignerProjectFeedbackController } from '../../browser/controllers/project/designer-project-feedback-controller.js';
 import { DesignerProjectWorkspaceController } from '../../browser/controllers/project/designer-project-workspace-controller.js';
@@ -107,8 +105,8 @@ export interface DesignerElementState {
   pluginCommandPort: PluginCommandPort | undefined;
   resourcePort: ScreenHostResourcePort | undefined;
   hostCatalogPort: ScreenHostCatalogPort | undefined;
-  conditionalStylePort: BaseScreenConditionalStylePort | undefined;
-  hostConditionalStyleAuthoring: BaseScreenHostConditionalStyleAuthoringPort | undefined;
+  /** 检查器「正在编辑哪个状态」的会话记忆（ADR-0110）。 */
+  componentStateEditing: DesignerComponentStateEditing;
   datasetPort: ScreenHostDatasetPort | undefined;
   designerHostAdapter: ScreenDesignerHostAdapter | undefined;
   projectCatalogPort: ScreenProjectCatalogPort | undefined;
@@ -171,7 +169,6 @@ export interface DesignerElementState {
   notificationController: DesignerNotificationController;
   topbarController: DesignerTopbarController;
   errorConsoleController: DesignerErrorConsoleController;
-  guardController: DesignerGuardController;
   changeController: DesignerChangeController;
   intentController: DesignerIntentController;
   /** 指代歧义的点选会话：候选进画布多选，用户点选后把选择交回平台。 */
@@ -255,11 +252,11 @@ export function createDesignerElementState(
   state.tooltipController = new DesignerTooltipController();
   state.notificationController = new DesignerNotificationController();
   state.errorConsoleController = new DesignerErrorConsoleController();
-  state.guardController = new DesignerGuardController();
   state.changeController = new DesignerChangeController();
   state.intentController = new DesignerIntentController();
   state.targetDisplayController = new DesignerTargetDisplayController();
   state.artboardController = new DesignerArtboardController();
+  state.componentStateEditing = new DesignerComponentStateEditing();
   state.presentationLockController = new DesignerPresentationLockController();
   state.scrollContinuityController = new DesignerScrollContinuityController();
   state.sizeTierController = new DesignerSizeTierController();

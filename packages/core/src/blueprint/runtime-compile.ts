@@ -87,6 +87,7 @@ function cloneAction(action: ScreenBlueprintAction): ScreenBlueprintAction {
     case 'request-variable':
     case 'request-component-data':
     case 'page-navigation':
+    case 'component-state':
       return { ...action };
     case 'canvas-visibility':
       return action.payload === undefined

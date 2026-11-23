@@ -409,22 +409,6 @@ export const api = {
       body: input,
       ...(signal === undefined ? {} : { signal }),
     }),
-  getScreenAlarmBindings: (
-    id: string,
-    signal?: AbortSignal,
-  ): Promise<ApiResult<{ bindings: Record<string, unknown> }>> =>
-    request(
-      `/screens/${encodeURIComponent(id)}/alarm-bindings`,
-      signal === undefined ? {} : { signal },
-    ),
-  updateScreenAlarmBindings: (
-    id: string,
-    bindings: unknown,
-  ): Promise<ApiResult<{ bindings: Record<string, unknown> }>> =>
-    request(`/screens/${encodeURIComponent(id)}/alarm-bindings`, {
-      method: 'PUT',
-      body: { bindings },
-    }),
   metricSeries: (metric: string, points: number): Promise<ApiResult<MetricSeries>> =>
     request(`/metrics/series?metric=${encodeURIComponent(metric)}&points=${points}`),
   metricRanking: (dimension: string, limit: number): Promise<ApiResult<MetricRanking>> =>

@@ -31,7 +31,7 @@ const COMPONENT_PATCH_FIELDS = new Set([
   'status',
   'props',
   'style',
-  'styleRules',
+  'states',
   'dataSource',
   'dataValue',
   'dataBinding',
@@ -145,6 +145,9 @@ export function applyUpdateComponentsCommand(
     }
     if ('belowSubCanvas' in patch && patch.belowSubCanvas === null) {
       delete (next as { belowSubCanvas?: unknown }).belowSubCanvas;
+    }
+    if ('states' in patch && patch.states === null) {
+      delete (next as { states?: unknown }).states;
     }
     return next;
   });

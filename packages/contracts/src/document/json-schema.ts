@@ -21,10 +21,10 @@ export function generateScreenDocumentJsonSchema(): ScreenJsonObject {
   const component = getObject(components.items);
   const componentProperties = getObject(component.properties);
   getObject(componentProperties.name).maxLength = MAX_NAME_CODE_POINTS;
-  const styleRuleWhen = getObject(
-    getObject(getObject(getObject(componentProperties.styleRules).items).properties).when,
-  );
-  styleRuleWhen.allOf = [
+  const states = getObject(getObject(componentProperties.states).properties);
+  const judge = getObject(getObject(states.judge).properties);
+  const stateCase = getObject(getObject(judge.cases).items);
+  stateCase.allOf = [
     {
       if: { properties: { operator: { const: 'exists' } }, required: ['operator'] },
       then: { not: { required: ['value'] } },

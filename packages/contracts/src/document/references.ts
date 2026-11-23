@@ -223,6 +223,41 @@ export function validateReferences(
       clean = false;
     }
   });
+  // 组件状态的判定取值（ADR-0110 §2.2）：变量 / 数据源 / 按行查找的变量必须已声明。
+  document.components.forEach((component, componentIndex) => {
+    const input = component.states?.judge?.input;
+    if (input === undefined) return;
+    const base: DiagnosticSegment[] = ['components', componentIndex, 'states', 'judge', 'input'];
+    if (input.kind === 'variable' && !variableIds.has(input.variableId)) {
+      collector.add(
+        'VARIABLE_NAME_INVALID',
+        at([...base, 'variableId']),
+        phase,
+        `State judge references unknown variable id "${truncateKey(input.variableId)}".`,
+      );
+      clean = false;
+    }
+    if (input.kind !== 'data-source-field') return;
+    if (!dataSourceIds.has(input.dataSourceId)) {
+      collector.add(
+        'VALUE_REF_TARGET_MISSING',
+        at([...base, 'dataSourceId']),
+        phase,
+        `State judge references unknown data source id "${truncateKey(input.dataSourceId)}".`,
+      );
+      clean = false;
+    }
+    const equals = input.where?.equals;
+    if (equals?.kind === 'variable' && !variableIds.has(equals.variableId)) {
+      collector.add(
+        'VARIABLE_NAME_INVALID',
+        at([...base, 'where', 'equals', 'variableId']),
+        phase,
+        `State row match references unknown variable id "${truncateKey(equals.variableId)}".`,
+      );
+      clean = false;
+    }
+  });
   document.blueprint.nodes.forEach((node, index) => {
     const base: DiagnosticSegment[] = ['blueprint', 'nodes', index];
     if (node.kind === 'component' && !idToIndex.has(node.componentId)) {
@@ -269,6 +304,48 @@ export function validateReferences(
             collector,
             phase,
           ) && clean;
+      }
+    }
+  });
+  // 组件状态锚点（ADR-0110 §2.4）：只在组件声明了状态时可用；`set-state` 的目标状态必须存在。
+  const blueprintNodes = new Map(document.blueprint.nodes.map((node) => [node.id, node]));
+  document.blueprint.edges.forEach((edge, index) => {
+    if (edge.kind !== 'flow') return;
+    const ends = [
+      { end: 'from' as const, ref: edge.from, statePort: edge.from.port === 'state-changed' },
+      {
+        end: 'to' as const,
+        ref: edge.to,
+        statePort: edge.to.port === 'set-state' || edge.to.port === 'reset-state',
+      },
+    ];
+    for (const { end, ref, statePort } of ends) {
+      if (!statePort) continue;
+      const node = blueprintNodes.get(ref.node);
+      if (node?.kind !== 'component') continue;
+      const componentIndex = idToIndex.get(node.componentId);
+      const states =
+        componentIndex === undefined ? undefined : document.components[componentIndex]!.states;
+      if (states === undefined) {
+        collector.add(
+          'DOCUMENT_FIELD_INVALID',
+          at(['blueprint', 'edges', index, end, 'port']),
+          phase,
+          `Component "${truncateKey(node.componentId)}" has no states for port "${ref.port}".`,
+        );
+        clean = false;
+      } else if (
+        end === 'to' &&
+        edge.stateId !== undefined &&
+        !states.items.some((state) => state.id === edge.stateId)
+      ) {
+        collector.add(
+          'DOCUMENT_FIELD_INVALID',
+          at(['blueprint', 'edges', index, 'stateId']),
+          phase,
+          `Component "${truncateKey(node.componentId)}" has no state "${truncateKey(edge.stateId)}".`,
+        );
+        clean = false;
       }
     }
   });

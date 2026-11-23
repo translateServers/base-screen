@@ -1,7 +1,7 @@
 import {
   isScreenThemeSlot,
   SCREEN_CANVAS_FIELDS,
-  SCREEN_THEME_SLOTS,
+  SCREEN_THEME_BASE_SLOTS,
   type ScreenDocument,
   screenJsonEquals,
 } from '@base-screen/contracts';
@@ -195,8 +195,9 @@ function applyTheme(document: ScreenDocument, patch: unknown): ScreenCommandResu
     }
   }
   const palette = { ...document.theme?.palette, ...patch } as Record<string, string>;
-  // 色板要么不存在、要么六槽齐全：半套色板会让 theme: 引用解析到空洞。
-  if (SCREEN_THEME_SLOTS.some((slot) => typeof palette[slot] !== 'string')) {
+  // 色板要么不存在、要么六个基础色位齐全：半套色板会让 theme: 引用解析到空洞。
+  // 状态色位（ADR-0110 §2.6.4）可省略，省略时取内置默认色。
+  if (SCREEN_THEME_BASE_SLOTS.some((slot) => typeof palette[slot] !== 'string')) {
     return screenCommandFailure(
       document,
       invalidScreenCommand('Theme patch must complete all palette slots.', ['patch']),

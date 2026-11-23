@@ -122,6 +122,10 @@ export function buildDesignerBlueprintConnectionContext(
       ),
     isHostActionAvailable: (actionId) =>
       isDesignerBlueprintHostActionDeclared(runtimeContributions, actionId),
+    componentStateIds: (componentId) =>
+      document.components
+        .find((component) => component.id === componentId)
+        ?.states?.items.map((item) => item.id) ?? [],
   };
 }
 
@@ -257,6 +261,13 @@ export function buildDesignerBlueprintGraph(
           const outputs = declared.map((event) =>
             port(node, 'out', `event:${event.name}`, event.label, event.available),
           );
+          // 状态锚点（ADR-0110 §2.4）只在组件声明了状态时出现。
+          const stateful = component?.states !== undefined;
+          if (stateful) {
+            outputs.push(
+              port(node, 'out', 'state-changed', TEXT.ports['state-changed'] ?? 'state'),
+            );
+          }
           for (const used of usedPorts(node, 'out')) {
             if (outputs.some((candidate) => candidate.id === used)) continue;
             const name = readScreenBlueprintEventPort(used) ?? used;
@@ -267,7 +278,11 @@ export function buildDesignerBlueprintGraph(
             title: component?.name ?? node.componentId,
             subtitle: component === undefined ? TEXT.missingEntity : component.type,
             outputs,
-            inputs: fixedInputs,
+            inputs: stateful
+              ? fixedInputs
+              : fixedInputs.filter(
+                  (candidate) => candidate.id !== 'set-state' && candidate.id !== 'reset-state',
+                ),
             semantic: true,
             componentId: node.componentId,
             ...(component === undefined
@@ -420,6 +435,7 @@ export function buildDesignerBlueprintGraph(
       ...(edge.value === undefined ? {} : { value: edge.value }),
       ...(edge.payload === undefined ? {} : { payload: edge.payload }),
       ...(edge.transition === undefined ? {} : { transition: edge.transition }),
+      ...(edge.stateId === undefined ? {} : { stateId: edge.stateId }),
       active,
     };
   });

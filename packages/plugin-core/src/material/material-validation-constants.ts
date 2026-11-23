@@ -39,4 +39,5 @@ export const MANIFEST_FIELDS = new Set([
   'cover',
   'editorDescriptor',
   'themeStyle',
+  'statePresetKeys',
 ]);

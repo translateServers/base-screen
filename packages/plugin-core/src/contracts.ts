@@ -4,6 +4,7 @@ import type {
   ScreenDocument,
   ScreenJsonObject,
   ScreenJsonValue,
+  ScreenLevelScale,
   ScreenMaterialErrorCode,
   ScreenParseResult,
   ScreenSize,
@@ -45,62 +46,6 @@ export interface BaseScreenMaterialModel {
   readonly style: ScreenJsonObject;
   readonly size: ScreenSize;
   readonly dataState: BaseScreenMaterialDataState;
-}
-
-/** ADR-0059 宿主条件样式端口请求：组件身份与其当前完整数据状态（含 idle/loading/error）。 */
-export interface BaseScreenConditionalStyleRequest {
-  readonly componentId: string;
-  readonly dataState: BaseScreenMaterialDataState;
-}
-
-/**
- * ADR-0059 宿主条件样式端口：同步、无副作用、不发起 I/O。宿主当前已发布的告警/视觉快照
- * 不变时，相同 (componentId, dataState) 必须返回等价覆盖；快照变化后结果可变，但宿主必须
- * 先提交快照，再调用 refreshConditionalStyles() 让已挂载视觉与快照对齐。
- * 返回样式覆盖键值（merge 语义，同 styleRules 的 style），undefined 表示无覆盖；
- * 非法覆盖与抛异常由 Renderer 同路径 fail-closed 隔离。
- */
-export interface BaseScreenConditionalStylePort {
-  resolve(request: BaseScreenConditionalStyleRequest): ScreenJsonObject | undefined;
-}
-
-/**
- * 宿主条件样式的条件源（如告警 key）与条件（如等级）。
- *
- * 只用于作者面展示：Engine 渲染通用表单，不解释 sourceId/conditionId 的语义，
- * 也不持有外部系统的传输、凭证或阈值配置。
- */
-export interface BaseScreenHostConditionalStyleCondition {
-  readonly id: string;
-  readonly label: string;
-}
-
-export interface BaseScreenHostConditionalStyleSource {
-  readonly id: string;
-  readonly label: string;
-  readonly conditions: readonly BaseScreenHostConditionalStyleCondition[];
-}
-
-/** 某组件在一个条件源 + 条件命中的样式覆盖；同源同条件可携带多个样式键。 */
-export interface BaseScreenHostConditionalStyleBinding {
-  readonly sourceId: string;
-  readonly conditionId: string;
-  readonly style: ScreenJsonObject;
-}
-
-/**
- * 宿主条件样式作者口：Engine 只负责原生表单与调用时序，条件源、持久化与语义归宿主。
- *
- * `bindings` 返回该组件当前完整绑定；`save` 接收替换后的完整列表，宿主必须在 resolve 前
- * 让新绑定对 `conditionalStylePort` 生效。保存成功后 Engine 会重算该组件样式。
- */
-export interface BaseScreenHostConditionalStyleAuthoringPort {
-  readonly sources: readonly BaseScreenHostConditionalStyleSource[];
-  bindings(componentId: string): readonly BaseScreenHostConditionalStyleBinding[];
-  save(
-    componentId: string,
-    bindings: readonly BaseScreenHostConditionalStyleBinding[],
-  ): Promise<ScreenParseResult<void>>;
 }
 
 export type BaseScreenMaterialPropSchema =
@@ -240,6 +185,11 @@ export interface BaseScreenMaterialManifest {
    * 只影响插入那一刻（见 `resolveBaseScreenMaterialDefaultStyle`），不改变已有组件。
    */
   readonly themeStyle?: Readonly<Record<string, ScreenThemeSlot>>;
+  /**
+   * 可选：「按分级生成状态」时预置覆盖的样式键（ADR-0110 §2.6.3）。指定后优先于设计器的推断
+   * （主色、描边色、发光）；颜色键写状态色位引用，开关键（boolean）在危险等级打开。
+   */
+  readonly statePresetKeys?: readonly string[];
 }
 
 export interface BaseScreenMaterialElement extends HTMLElement {
@@ -304,6 +254,8 @@ export interface BaseScreenPluginDataResourceTypeContribution {
    * 声明即表示宿主的资源端口为该类型实现了 `subscribe`。
    */
   readonly delivery?: ScreenSourceDelivery;
+  /** 宿主分级表（ADR-0110 §2.6.2）：只在作者面使用，文档不保存，运行时不读。 */
+  readonly levelScales?: readonly ScreenLevelScale[];
 }
 
 /**

@@ -599,6 +599,14 @@ function simulationEvent(
   payload: ScreenJsonValue,
 ): ScreenBlueprintEvent | undefined {
   if (node.kind === 'component') {
+    if (port === 'state-changed') {
+      return {
+        type: 'component-state-changed',
+        componentId: node.componentId,
+        name: 'state-changed',
+        payload,
+      };
+    }
     const name = readScreenBlueprintEventPort(port);
     return name === undefined ? undefined : { componentId: node.componentId, name, payload };
   }
@@ -645,5 +653,13 @@ function describeAction(action: ScreenBlueprintAction, document: ScreenDocument)
     }
     case 'page-navigation':
       return TEXT.mainCanvasPorts[action.operation] ?? action.operation;
+    case 'component-state': {
+      const component = document.components.find((item) => item.id === action.componentId);
+      const state = component?.states?.items.find((item) => item.id === action.stateId);
+      const port = TEXT.ports[action.operation === 'set' ? 'set-state' : 'reset-state'];
+      return `${port ?? action.operation} · ${componentName(action.componentId)}${
+        state === undefined ? '' : ` · ${state.name}`
+      }`;
+    }
   }
 }

@@ -3,7 +3,6 @@ import type {
   ScreenDocument,
   ScreenHostResourcePort,
 } from '@base-screen/contracts';
-import type { BaseScreenConditionalStylePort } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import { createBaseScreenRenderer } from '../../src/renderer/renderer.js';
 import {
@@ -151,45 +150,42 @@ describe('material model reassignment guard', () => {
     expect(elementOf(root, 'resource').model).toBe(reapplied);
   });
 
-  it('keeps refreshConditionalStyles effective while the render guard holds', () => {
+  it('keeps blueprint state effects effective while the render guard holds', () => {
     const root = new FakeRoot();
-    let opacity = 0.5;
-    let portCalls = 0;
-    const port: BaseScreenConditionalStylePort = {
-      resolve: () => {
-        portCalls++;
-        return { opacity };
-      },
-    };
     const renderer = createBaseScreenRenderer({
       root: root as unknown as HTMLElement,
       catalog: createCatalog(),
-      mode: 'design',
+      mode: 'viewer',
       interactive: false,
       onMaterialEvent: undefined,
       resourcePort: undefined,
-      conditionalStylePort: port,
     });
-    const first = document([component('styled', 0)]);
+    const styled: ScreenComponentNode = {
+      ...component('styled', 0),
+      style: { opacity: 0.5 },
+      states: { items: [{ id: 'dim', name: '暗', style: { opacity: 0.9 } }] },
+    };
+    const first = document([styled]);
     expect(renderer.render(first).ok).toBe(true);
-    expect(elementOf(root, 'styled').model?.style.opacity).toBe(0.5);
-
     const second = derive(first, [...first.components]);
     expect(renderer.render(second).ok).toBe(true);
     const applied = elementOf(root, 'styled').model;
-    const appliedCalls = portCalls;
 
-    // 守卫命中：输入未变的提交不再调端口、不重赋 model。
+    // 守卫命中：输入未变的提交不重赋 model。
     const third = derive(second, [...second.components]);
     expect(renderer.render(third).ok).toBe(true);
     expect(elementOf(root, 'styled').model).toBe(applied);
-    expect(portCalls).toBe(appliedCalls);
 
-    // 宿主快照变化仍经 refreshConditionalStyles 生效（协议入口不受守卫影响）。
-    opacity = 0.9;
-    renderer.refreshConditionalStyles();
-    expect(elementOf(root, 'styled').model).not.toBe(applied);
+    // 蓝图设置状态改变守卫签名：只重写这一个组件，下一次同输入渲染保持设置后的结果。
+    renderer.applyBlueprintStateEffects([
+      { componentId: 'styled', operation: 'set', stateId: 'dim' },
+    ]);
     expect(elementOf(root, 'styled').model?.style.opacity).toBe(0.9);
-    expect(portCalls).toBe(appliedCalls + 1);
+    const dimmed = elementOf(root, 'styled').model;
+    expect(renderer.render(derive(third, [...third.components])).ok).toBe(true);
+    expect(elementOf(root, 'styled').model).toBe(dimmed);
+
+    renderer.applyBlueprintStateEffects([{ componentId: 'styled', operation: 'reset' }]);
+    expect(elementOf(root, 'styled').model?.style.opacity).toBe(0.5);
   });
 });

@@ -118,8 +118,15 @@ export class DesignerCanvasRuntimeController {
     return document === undefined ? {} : this.collectRuntimeVariables(document);
   }
 
-  refreshConditionalStyles(componentIds?: readonly string[]): void {
-    this.callbacks.getRenderer()?.refreshConditionalStyles(componentIds);
+  /** 画布按某状态预览组件（ADR-0110）：`default` 即恢复实时判定。设计态不发状态改变事件。 */
+  previewComponentState(componentId: string, stateId: string): void {
+    this.callbacks
+      .getRenderer()
+      ?.applyBlueprintStateEffects([
+        stateId === 'default'
+          ? { componentId, operation: 'reset' }
+          : { componentId, operation: 'set', stateId },
+      ]);
   }
 
   getVariable(id: string): ScreenVariableHandle | undefined {
@@ -261,6 +268,7 @@ export class DesignerCanvasRuntimeController {
     this.#variableListeners.clear();
     this.#variables.clear();
     this.callbacks.getRenderer()?.resetBlueprintVisibility();
+    this.callbacks.getRenderer()?.resetComponentStates();
     this.callbacks.resetPopups?.();
     this.#pendingCanvasEvents = [];
   }

@@ -21,16 +21,6 @@ model Screen {
   revision     Int                 @default(1)
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
-  alarmBinding ScreenAlarmBinding?
-}
-
-/// 宿主侧告警绑定：key → 组件 id → 等级 → 样式覆盖。屏幕文档不保存告警知识，
-/// 这张表就是宿主按屏持久化的那一份；值为 JSON，结构由 alarm-binding-guard 校验。
-model ScreenAlarmBinding {
-  screenId  String   @id
-  screen    Screen   @relation(fields: [screenId], references: [id], onDelete: Cascade)
-  config    String
-  updatedAt DateTime @updatedAt
 }
 
 /// 宿主素材库（ADR-0089）：文件落在 data/assets/，这张表只存元数据与稳定 id。

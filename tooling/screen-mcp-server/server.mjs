@@ -113,7 +113,7 @@ export function createScreenMcpServer(provider) {
           maxComponents: z.number().int().positive().optional(),
           maxDepth: z.number().int().positive().optional(),
           maxBindings: z.number().int().positive().optional(),
-          maxStyleRules: z.number().int().positive().optional(),
+          maxComponentStates: z.number().int().positive().optional(),
         })
         .optional(),
     },

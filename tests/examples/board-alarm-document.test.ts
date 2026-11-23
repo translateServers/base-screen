@@ -23,7 +23,7 @@ import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-materia
  * 2) manifest schema 才知道 required 与"未声明键一律拒绝"；
  * 3) 数据集/宿主资源绑定必须回到后端定义与演示通道的字段上核对。
  *
- * 额外一层是这张屏的存在理由：组件 id 必须与宿主 `alarm.open` 演示绑定的两个 id 对齐，
+ * 额外一层是这张屏的存在理由：两个组件按宿主告警等级切换状态（ADR-0110），
  * 且等级色块与流水的等级语义色必须同源——两处任一漂移，屏幕就不再是"告警演示屏"。
  */
 const MANIFESTS = [
@@ -177,11 +177,27 @@ describe('alarm demo document', () => {
     }
   });
 
-  it('reuses the component ids the host alarm binding targets', () => {
+  it('switches the alarm reading and notice by the host alarm level', () => {
     if (!parsed.ok) throw new Error('document did not parse');
     const byId = new Map(parsed.value.components.map((component) => [component.id, component]));
+    const source = parsed.value.dataSources?.find((item) => item.id === 'alarm_open');
+    expect(source?.source).toEqual({
+      kind: 'host-resource',
+      resourceType: 'alarm',
+      resourceId: 'alarm.open',
+    });
+    expect(source?.updatePolicy).toEqual({ mode: 'push' });
+    for (const id of ['kpi-alarm-value', 'top-notice']) {
+      const states = byId.get(id)?.states;
+      expect(states?.items.map((item) => item.id)).toEqual(['critical', 'warning', 'info']);
+      expect(states?.items[0]?.style.color).toBe('theme:danger');
+      expect(states?.judge?.input).toEqual({
+        kind: 'data-source-field',
+        dataSourceId: 'alarm_open',
+        path: ['level'],
+      });
+    }
 
-    // 宿主后端种子 `ALARM_DEMO_BINDINGS['alarm.open']` 只认这两个 id；改名等于让告警推送失去落点。
     const alarmValue = byId.get('kpi-alarm-value');
     expect(alarmValue?.type).toBe('board.digital-flop');
     expect(alarmValue?.style.color).toBe('#7ff0ff');

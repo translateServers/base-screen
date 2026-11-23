@@ -31,7 +31,7 @@
 - 「数据源」页只有一条渲染路径：`datasetPort` 是否提供只决定 `dataset` 选项可用性，不得再用它决定渲染哪套面板；面板按 `data-ds-section` 分段，状态变化只换受影响段。
 - 图片资产（上传、存储、转码、CDN、目录、权限与删除保护）归宿主，Base Screen 只提供统一资源选择桥与有界校验，不建立资产目录或网络客户端。文档只存 `host-resource` 身份，`static` URL 仅用于历史/外部图片。组件提交只写 legacy `dataSource`，且只接受没有 `dataValue` 键的组件——命令不能删键，契约禁止两种取值写法并存。
 - 在线物料包由宿主生成 ESM 并负责审核与 `import()`；Base Screen 不 fetch，只接收重建后的 catalog。物料 `type` 跨构建稳定，代码更新用同 type 配新 tagName/constructor，文档与 Manifest 不存版本字段。
-- 宿主实时告警与条件样式只经 `conditionalStylePort` 与 `refreshConditionalStyles()` 适配：快照变化只重算样式，不取数、不写文档、不进历史，屏幕文档保持零告警知识。
+- 宿主告警以数据接入（普通或推送数据源，ADR-0110 §2.6）：宿主给出等级，等级对应的外观由组件状态与文档状态色位决定；宿主不向大屏注入样式。
 - 事件 Blueprint：`blueprint.relations` 是唯一持久化模型，运行时规则由 `deriveScreenBlueprintRules` 派生且**不得写回文档**；`blueprint.layout` 只存节点位置与视口，其余选择/拖动/高亮属 session。宿主启用工作台必须经 `blueprintCapability` 声明能力，未授权能力失败关闭。
 - 宿主作者扩展只用公开 Custom Element method/event 与 JSON-safe authoring bridge；不得依赖 Engine 私有 Shadow DOM、内部 Store、`src` 路径或未声明的 UI 注入逃生口。
 

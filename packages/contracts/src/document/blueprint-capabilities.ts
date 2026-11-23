@@ -23,6 +23,8 @@ export const SCREEN_BLUEPRINT_CAPABILITY_IDS = [
   'blueprint.trigger.page-changed',
   'blueprint.action.canvas-visibility',
   'blueprint.action.page-navigation',
+  'blueprint.trigger.component-state-changed',
+  'blueprint.action.component-state',
 ] as const;
 
 export type ScreenBlueprintCapabilityId = (typeof SCREEN_BLUEPRINT_CAPABILITY_IDS)[number];
@@ -45,6 +47,8 @@ export const SCREEN_BLUEPRINT_CAPABILITIES = {
   pageChanged: 'blueprint.trigger.page-changed',
   canvasVisibility: 'blueprint.action.canvas-visibility',
   pageNavigation: 'blueprint.action.page-navigation',
+  componentStateChanged: 'blueprint.trigger.component-state-changed',
+  componentState: 'blueprint.action.component-state',
 } as const satisfies Record<string, ScreenBlueprintCapabilityId>;
 
 export const SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY = 'blueprint.trigger.material-event';

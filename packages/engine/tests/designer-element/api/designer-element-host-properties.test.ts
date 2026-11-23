@@ -5,7 +5,6 @@ import type {
 } from '@base-screen/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  readConditionalStylePort,
   readDatasetCatalogPort,
   readDesignerHostAdapter,
   readHostCatalogPort,
@@ -88,7 +87,6 @@ describe('designer-element host properties api', () => {
     expect(readResourcePort(designer)).toBeUndefined();
     expect(readDatasetCatalogPort(designer)).toBeUndefined();
     expect(readHostCatalogPort(designer)).toBeUndefined();
-    expect(readConditionalStylePort(designer)).toBeUndefined();
     expect(readProjectCatalogPort(designer)).toBeUndefined();
   });
 
@@ -168,6 +166,7 @@ describe('designer-element host properties api', () => {
     writeDatasetCatalogPort(designer, datasetPort);
     state.renderer = {
       resetBlueprintVisibility: () => undefined,
+      resetComponentStates: () => undefined,
       dispose: () => undefined,
     } as never;
     const diagnostics = vi.spyOn(state.runtime, 'emitDiagnostics').mockImplementation(() => {});

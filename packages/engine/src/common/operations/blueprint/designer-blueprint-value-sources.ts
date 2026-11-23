@@ -72,6 +72,15 @@ export function designerBlueprintEventFieldPaths(
   const seen = new Set<string>();
   for (const trigger of designerBlueprintEdgeTriggers(document.blueprint, edgeId)) {
     if (trigger.node.kind !== 'component') continue;
+    if (trigger.port === 'state-changed') {
+      // 组件状态改变（ADR-0110 §2.3）的负载固定为 `{ from, to, cause }`。
+      for (const key of ['from', 'to', 'cause']) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+        paths.push([key]);
+      }
+      continue;
+    }
     const componentId = trigger.node.componentId;
     const eventName = readScreenBlueprintEventPort(trigger.port);
     const component = document.components.find((candidate) => candidate.id === componentId);

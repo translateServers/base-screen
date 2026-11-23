@@ -32,7 +32,7 @@ export interface ScreenCanvas {
 }
 
 /** 文档级主题色位（ADR-0098）：固定语义槽，色板具体颜色由文档携带。 */
-export type ScreenThemeSlot =
+export type ScreenThemeBaseSlot =
   | 'primary'
   | 'text'
   | 'textSecondary'
@@ -40,8 +40,14 @@ export type ScreenThemeSlot =
   | 'accent'
   | 'accentSecondary';
 
+/** 状态色位（ADR-0110 §2.6.4）：组件状态与等级着色共用；色板里可省略，省略时取内置默认色。 */
+export type ScreenThemeStatusSlot = 'danger' | 'warning' | 'info' | 'success';
+
+export type ScreenThemeSlot = ScreenThemeBaseSlot | ScreenThemeStatusSlot;
+
 export interface ScreenTheme {
-  readonly palette: Readonly<Record<ScreenThemeSlot, string>>;
+  readonly palette: Readonly<Record<ScreenThemeBaseSlot, string>> &
+    Readonly<Partial<Record<ScreenThemeStatusSlot, string>>>;
 }
 
 export interface ScreenPosition {
@@ -176,7 +182,16 @@ export interface ScreenDataSource {
   readonly readOnly?: boolean;
 }
 
-export type ScreenComponentStyleRuleOperator =
+/** 组件状态（ADR-0110）：对组件外观的一组覆盖；「默认」就是组件本身，不写进这里。 */
+export interface ScreenComponentState {
+  /** COMPONENT_ID 词法，组件内唯一，不得为 `default`。 */
+  readonly id: string;
+  readonly name: string;
+  /** 对 `component.style` 的部分覆盖，可为空对象。 */
+  readonly style: ScreenJsonObject;
+}
+
+export type ScreenComponentStateOperator =
   | 'eq'
   | 'neq'
   | 'gt'
@@ -186,16 +201,42 @@ export type ScreenComponentStyleRuleOperator =
   | 'contains'
   | 'exists';
 
-export interface ScreenComponentStyleRuleCondition {
-  readonly path: readonly string[];
-  readonly operator: ScreenComponentStyleRuleOperator;
-  readonly value?: ScreenJsonValue;
+/** 按行查找（ADR-0110 §2.6.1 情况 C）：取第一条 `field` 等于 `equals` 的行。 */
+export interface ScreenComponentStateRowMatch {
+  readonly field: readonly string[];
+  readonly equals:
+    | { readonly kind: 'literal'; readonly value: string | number | boolean }
+    | { readonly kind: 'variable'; readonly variableId: string };
 }
 
-export interface ScreenComponentStyleRule {
-  readonly id: string;
-  readonly when: ScreenComponentStyleRuleCondition;
-  readonly style: ScreenJsonObject;
+export type ScreenComponentStateInput =
+  | { readonly kind: 'component-data'; readonly path: readonly string[] }
+  | { readonly kind: 'variable'; readonly variableId: string; readonly path: readonly string[] }
+  | {
+      readonly kind: 'data-source-field';
+      readonly dataSourceId: string;
+      readonly where?: ScreenComponentStateRowMatch;
+      /** 有 `where` 时相对匹配行，否则相对整个结果。 */
+      readonly path: readonly string[];
+    };
+
+export interface ScreenComponentStateCase {
+  readonly operator: ScreenComponentStateOperator;
+  /** `exists` 禁止，其余必填。 */
+  readonly value?: ScreenJsonValue;
+  readonly stateId: string;
+}
+
+export interface ScreenComponentStateJudge {
+  readonly input: ScreenComponentStateInput;
+  /** 按顺序判定，第一条命中即停；都不命中为默认。 */
+  readonly cases: readonly ScreenComponentStateCase[];
+}
+
+export interface ScreenComponentStates {
+  readonly items: readonly ScreenComponentState[];
+  /** 缺省 = 只能由蓝图切换。 */
+  readonly judge?: ScreenComponentStateJudge;
 }
 
 export interface ScreenComponentNode {
@@ -210,7 +251,8 @@ export interface ScreenComponentNode {
   readonly status: ScreenComponentStatus;
   readonly props: ScreenJsonObject;
   readonly style: ScreenJsonObject;
-  readonly styleRules?: readonly ScreenComponentStyleRule[];
+  /** 组件状态（ADR-0110）。 */
+  readonly states?: ScreenComponentStates;
   /** 旧形态：组件自带的数据源配置。与 `dataValue` 互斥，解析期 fail-closed。 */
   readonly dataSource: ScreenComponentDataSource | null;
   /** 取值引用；`null` = 不取值。与 `dataSource` 同一位置只能有一个写入口。 */
@@ -323,7 +365,15 @@ export interface ScreenBlueprintPageChangedTrigger {
   readonly eventName: 'page-changed';
 }
 
+/** 组件生效状态改变后发射一次（组件节点的 `state-changed`），负载 `{ from, to, cause }`。 */
+export interface ScreenBlueprintComponentStateTrigger {
+  readonly type: 'component-state-changed';
+  readonly componentId: string;
+  readonly eventName: 'state-changed';
+}
+
 export type ScreenBlueprintTrigger =
+  | ScreenBlueprintComponentStateTrigger
   | ScreenBlueprintMaterialEventTrigger
   | ScreenBlueprintVariableEventTrigger
   | ScreenBlueprintLifecycleTrigger
@@ -418,7 +468,17 @@ export interface ScreenBlueprintPageNavigationAction {
   readonly operation: ScreenBlueprintPageNavigationOperation;
 }
 
+/** 设置 / 恢复组件状态（ADR-0110 §2.4）：`set` 保持到 `reset` 或页面重载。 */
+export interface ScreenBlueprintComponentStateAction {
+  readonly type: 'component-state';
+  readonly componentId: string;
+  readonly operation: 'set' | 'reset';
+  /** 只在 `set` 上出现。 */
+  readonly stateId?: string;
+}
+
 export type ScreenBlueprintAction =
+  | ScreenBlueprintComponentStateAction
   | ScreenBlueprintSetVariableAction
   | ScreenBlueprintRequestVariableAction
   | ScreenBlueprintRequestComponentDataAction
@@ -508,7 +568,8 @@ export interface ScreenBlueprintPortRef {
 
 /**
  * 执行流连线：从输出锚点到输入锚点。附加字段只在目标锚点需要时出现：
- * 变量 `set` 必带 `value`，宿主 `event:*` / `action:*` 必带 `payload`，组件显隐可带 `transition`。
+ * 变量 `set` 必带 `value`，宿主 `event:*` / `action:*` 必带 `payload`，组件显隐可带 `transition`，
+ * 组件 `set-state` 必带 `stateId`。
  */
 export interface ScreenBlueprintFlowEdge {
   readonly kind: 'flow';
@@ -518,6 +579,8 @@ export interface ScreenBlueprintFlowEdge {
   readonly value?: ScreenBlueprintValueExpression;
   readonly payload?: ScreenBlueprintValueExpression;
   readonly transition?: ScreenBlueprintVisibilityTransition;
+  /** 组件 `set-state` 的目标状态。 */
+  readonly stateId?: string;
   readonly requiredCapabilities?: readonly string[];
 }
 

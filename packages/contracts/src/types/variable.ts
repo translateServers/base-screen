@@ -1,5 +1,5 @@
 import type { ScreenDatasetParameterDefinition } from './dataset-port.js';
-import type { ScreenSourceDelivery } from './push.js';
+import type { ScreenLevelScale, ScreenSourceDelivery } from './push.js';
 
 /**
  * 来源目录项：宿主命名空间内的一个可取值的来源（host-catalog / url-query 共用）。
@@ -22,6 +22,8 @@ export interface ScreenHostCatalogDescriptor extends ScreenHostCatalogSummary {
   readonly previewable: boolean;
   /** 宿主声明该来源支持推送（ADR-0104 §2.3）；缺省视为只支持拉取。 */
   readonly delivery?: ScreenSourceDelivery;
+  /** 宿主分级表（ADR-0110 §2.6.2）；只在作者面使用。 */
+  readonly levelScales?: readonly ScreenLevelScale[];
 }
 
 export interface ScreenHostCatalogPage {

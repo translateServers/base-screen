@@ -472,9 +472,21 @@ export class DesignerBlueprintPanelsController {
     ) {
       next = updateDesignerBlueprintEdge(document.blueprint, edgeId, { type: 'role', role: value });
     } else if (field === 'target-port') {
+      const target = document.blueprint.nodes.find((node) => node.id === edge.to.node);
+      const firstState =
+        target?.kind === 'component'
+          ? document.components.find((component) => component.id === target.componentId)?.states
+              ?.items[0]?.id
+          : undefined;
       next = updateDesignerBlueprintEdge(document.blueprint, edgeId, {
         type: 'target-port',
         port: value,
+        ...(firstState === undefined ? {} : { stateId: firstState }),
+      });
+    } else if (field === 'state' && edge.kind === 'flow') {
+      next = updateDesignerBlueprintEdge(document.blueprint, edgeId, {
+        type: 'state',
+        stateId: value,
       });
     } else if (field === 'host-event' && EVENT_NAME.test(value.trim())) {
       next = updateDesignerBlueprintEdge(document.blueprint, edgeId, {

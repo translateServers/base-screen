@@ -9,6 +9,10 @@ import {
   MAX_BLUEPRINT_LAYOUT_NODES,
   MAX_BLUEPRINT_NODE_NAME_CODE_POINTS,
   MAX_BLUEPRINT_NODES,
+  MAX_COMPONENT_STATE_CASES,
+  MAX_COMPONENT_STATE_PATH_SEGMENT_CODE_POINTS,
+  MAX_COMPONENT_STATE_PATH_SEGMENTS,
+  MAX_COMPONENT_STATES,
   MAX_COMPONENTS,
   MAX_DATA_SOURCE_NAME_CODE_POINTS,
   MAX_DATA_SOURCE_PARAMS,
@@ -20,10 +24,6 @@ import {
   MAX_PUSH_RETAIN_ROWS,
   MAX_PUSH_RETAIN_SECONDS,
   MAX_PUSH_RETAIN_TIME_FIELD_CODE_UNITS,
-  MAX_STYLE_RULE_ID_CODE_POINTS,
-  MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
-  MAX_STYLE_RULE_PATH_SEGMENTS,
-  MAX_STYLE_RULES_PER_COMPONENT,
   MAX_SUB_CANVAS_NAME_CODE_POINTS,
   MAX_SUB_CANVASES,
   MAX_VALUE_REF_PATH_SEGMENTS,
@@ -129,35 +129,76 @@ export const componentStatusSchema = z.strictObject({
   hidden: z.boolean(),
 });
 
-const styleRuleConditionSchema = z
+const componentStatePathSchema = z
+  .array(z.string().min(1).max(MAX_COMPONENT_STATE_PATH_SEGMENT_CODE_POINTS))
+  .max(MAX_COMPONENT_STATE_PATH_SEGMENTS);
+
+const componentStateRowMatchSchema = z.strictObject({
+  field: componentStatePathSchema.min(1),
+  equals: z.discriminatedUnion('kind', [
+    z.strictObject({
+      kind: z.literal('literal'),
+      value: z.union([z.string(), z.number().finite(), z.boolean()]),
+    }),
+    z.strictObject({
+      kind: z.literal('variable'),
+      variableId: z.string().regex(COMPONENT_ID_REGEXP),
+    }),
+  ]),
+});
+
+const componentStateInputSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('component-data'), path: componentStatePathSchema }),
+  z.strictObject({
+    kind: z.literal('variable'),
+    variableId: z.string().regex(COMPONENT_ID_REGEXP),
+    path: componentStatePathSchema,
+  }),
+  z.strictObject({
+    kind: z.literal('data-source-field'),
+    dataSourceId: z.string().regex(COMPONENT_ID_REGEXP),
+    where: componentStateRowMatchSchema.optional(),
+    path: componentStatePathSchema,
+  }),
+]);
+
+const componentStateCaseSchema = z
   .strictObject({
-    path: z
-      .array(z.string().min(1).max(MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS))
-      .max(MAX_STYLE_RULE_PATH_SEGMENTS),
     operator: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'exists']),
     value: z.any().optional(),
+    stateId: z.string().regex(COMPONENT_ID_REGEXP),
   })
-  .superRefine((condition, context) => {
-    if (condition.operator === 'exists' && condition.value !== undefined) {
+  .superRefine((entry, context) => {
+    if (entry.operator === 'exists' && entry.value !== undefined) {
       context.addIssue({
         code: 'custom',
-        message: 'exists style rule condition must not define value.',
+        message: 'exists state case must not define value.',
         path: ['value'],
       });
     }
-    if (condition.operator !== 'exists' && condition.value === undefined) {
+    if (entry.operator !== 'exists' && entry.value === undefined) {
       context.addIssue({
         code: 'custom',
-        message: 'style rule condition requires value.',
+        message: 'State case must define value unless operator is exists.',
         path: ['value'],
       });
     }
   });
 
-const styleRuleSchema = z.strictObject({
-  id: z.string().min(1).max(MAX_STYLE_RULE_ID_CODE_POINTS),
-  when: styleRuleConditionSchema,
+const componentStateSchema = z.strictObject({
+  id: z.string().regex(COMPONENT_ID_REGEXP),
+  name: z.string().min(1),
   style: z.record(z.string(), z.any()),
+});
+
+const componentStatesSchema = z.strictObject({
+  items: z.array(componentStateSchema).min(1).max(MAX_COMPONENT_STATES),
+  judge: z
+    .strictObject({
+      input: componentStateInputSchema,
+      cases: z.array(componentStateCaseSchema).max(MAX_COMPONENT_STATE_CASES),
+    })
+    .optional(),
 });
 
 export const dataBindingSchema = z.strictObject({
@@ -355,7 +396,7 @@ export const componentSchema = z.strictObject({
   status: componentStatusSchema,
   props: z.record(z.string(), z.any()),
   style: z.record(z.string(), z.any()),
-  styleRules: z.array(styleRuleSchema).max(MAX_STYLE_RULES_PER_COMPONENT).optional(),
+  states: componentStatesSchema.optional(),
   dataSource: z.union([
     staticDataSourceSchema,
     datasetDataSourceSchema,
@@ -568,6 +609,7 @@ const blueprintEdgeSchema = z.discriminatedUnion('kind', [
     value: blueprintValueExpressionSchema.optional(),
     payload: blueprintValueExpressionSchema.optional(),
     transition: blueprintVisibilityTransitionSchema.optional(),
+    stateId: blueprintIdSchema.optional(),
     requiredCapabilities: z.array(blueprintIdSchema).optional(),
   }),
   z.strictObject({
@@ -615,6 +657,10 @@ export const themeSchema = z.strictObject({
     background: themeColorSchema,
     accent: themeColorSchema,
     accentSecondary: themeColorSchema,
+    danger: themeColorSchema.optional(),
+    warning: themeColorSchema.optional(),
+    info: themeColorSchema.optional(),
+    success: themeColorSchema.optional(),
   }),
 });
 

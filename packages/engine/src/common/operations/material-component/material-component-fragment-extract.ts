@@ -108,8 +108,8 @@ export function extractBaseScreenComponentFragment(input: {
   if (!collected.ok) return collected;
 
   const entryOf = (component: ScreenComponentNode): ScreenParseResult<BaseScreenFragmentNode> => {
-    if ((component.styleRules?.length ?? 0) > 0) {
-      warnings.push(warning(component.id, 'Conditional style rules are not saved in fragments.'));
+    if (component.states !== undefined) {
+      warnings.push(warning(component.id, 'Component states are not saved in fragments.'));
     }
     if (component.status.locked || component.status.hidden) {
       warnings.push(warning(component.id, 'Locked and hidden states are not saved in fragments.'));

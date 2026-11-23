@@ -1,6 +1,7 @@
 import { isScreenVariableName } from '../document/schema.js';
 import { parseScreenJsonValue } from '../json/parse.js';
 import { listScreenSourceDeliveryIssues, normalizeScreenSourceDelivery } from '../push/delivery.js';
+import { listScreenLevelScaleIssues } from '../push/level-scale.js';
 import type {
   ScreenDatasetParameterDefinition,
   ScreenDatasetParameterValue,
@@ -44,6 +45,7 @@ export function parseScreenHostCatalogDescriptor(
       'readOnly',
       'previewable',
       'delivery',
+      'levelScales',
     ]),
     [],
     diagnostics,
@@ -61,6 +63,12 @@ export function parseScreenHostCatalogDescriptor(
       diagnostics.push(diagnostic(['delivery', ...issue.path], issue.message));
     }
   }
+  const levelScales = parsed.value.levelScales;
+  if (levelScales !== undefined) {
+    for (const issue of listScreenLevelScaleIssues(levelScales)) {
+      diagnostics.push(diagnostic(['levelScales', ...issue.path], issue.message));
+    }
+  }
   const parameters = parseParameters(parsed.value.parameters, diagnostics);
   if (diagnostics.length > 0) return invalidWith(diagnostics);
   const readOnly = parsed.value.readOnly;
@@ -75,6 +83,9 @@ export function parseScreenHostCatalogDescriptor(
       previewable: parsed.value.previewable as boolean,
       ...(delivery !== undefined
         ? { delivery: normalizeScreenSourceDelivery(delivery as ScreenSourceDelivery) }
+        : {}),
+      ...(levelScales !== undefined
+        ? { levelScales: levelScales as ScreenHostCatalogDescriptor['levelScales'] & object }
         : {}),
     },
     diagnostics: [],

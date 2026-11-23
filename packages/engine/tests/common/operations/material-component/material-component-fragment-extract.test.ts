@@ -201,19 +201,13 @@ describe('extractBaseScreenComponentFragment', () => {
     expect(extracted.ok).toBe(false);
   });
 
-  it('warns that conditional style rules and locked state are not saved', () => {
+  it('warns that component states and locked state are not saved', () => {
     const document = documentWith({
       components: [
         node({
           id: 'value',
           status: { locked: true, hidden: false },
-          styleRules: [
-            {
-              id: 'warn',
-              when: { path: ['level'], operator: 'eq', value: 1 },
-              style: { color: '#f00' },
-            },
-          ],
+          states: { items: [{ id: 'warn', name: '警告', style: { color: '#f00' } }] },
         }),
       ],
     });

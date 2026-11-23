@@ -4,10 +4,7 @@ import type {
   ScreenHostDatasetPort,
   ScreenHostResourcePort,
 } from '@base-screen/contracts';
-import type {
-  BaseScreenConditionalStylePort,
-  BaseScreenMaterialCatalog,
-} from '@base-screen/plugin-core';
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import { DesignerPreviewController } from '../../../src/browser/controllers/designer-preview-controller.js';
 
@@ -24,7 +21,6 @@ class FakeElement {
   readonly configureCalls: unknown[][] = [];
   unloadCalls = 0;
   readonly refreshDataCalls: (string | undefined)[] = [];
-  readonly refreshConditionalStyleCalls: (readonly string[] | undefined)[] = [];
   documentValue: unknown = undefined;
 
   constructor(readonly tagName: string) {}
@@ -56,10 +52,6 @@ class FakeElement {
 
   refreshData(componentId?: string): void {
     this.refreshDataCalls.push(componentId);
-  }
-
-  refreshConditionalStyles(componentIds?: readonly string[]): void {
-    this.refreshConditionalStyleCalls.push(componentIds);
   }
 
   set document(value: unknown) {
@@ -121,7 +113,6 @@ function createHarness(options: {
   getResourcePort?: () => ScreenHostResourcePort | undefined;
   getHostCatalogPort?: () => ScreenHostCatalogPort | undefined;
   getDatasetPort?: () => ScreenHostDatasetPort | undefined;
-  getConditionalStylePort?: () => BaseScreenConditionalStylePort | undefined;
 }): {
   controller: DesignerPreviewController;
   viewer: FakeElement;
@@ -138,7 +129,6 @@ function createHarness(options: {
     getResourcePort: options.getResourcePort ?? (() => stableResourcePort),
     getHostCatalogPort: options.getHostCatalogPort ?? (() => stableVariablePort),
     getDatasetPort: options.getDatasetPort ?? (() => undefined),
-    getConditionalStylePort: options.getConditionalStylePort ?? (() => undefined),
     getRuntimeContributions: () => undefined,
     isViewerRegistered: () => true,
   });
@@ -294,44 +284,5 @@ describe('DesignerPreviewController nested viewer configure (RB3)', () => {
 
     controller.refreshData('component-a');
     expect(viewer.refreshDataCalls).toEqual(['component-a']);
-  });
-
-  it('CSR-D03 passes the conditional style port and forwards style refresh', () => {
-    const conditionalStylePort: BaseScreenConditionalStylePort = {
-      resolve: () => ({ color: '#ff4d4f' }),
-    };
-    const { controller, viewer } = createHarness({
-      getCatalog: () => stableCatalog,
-      getConditionalStylePort: () => conditionalStylePort,
-    });
-    expect(controller.toggle()).toBe(true);
-
-    const configuration = viewer.configureCalls[0]![0] as {
-      conditionalStylePort?: unknown;
-    };
-    expect(configuration.conditionalStylePort).toBe(conditionalStylePort);
-
-    controller.refreshConditionalStyles(['component-a']);
-    expect(viewer.refreshConditionalStyleCalls).toEqual([['component-a']]);
-  });
-
-  it('CSR-D04 reconfigures the preview when the conditional style port changes', () => {
-    const first: BaseScreenConditionalStylePort = { resolve: () => undefined };
-    const second: BaseScreenConditionalStylePort = { resolve: () => ({ color: '#fa8c16' }) };
-    let current = first;
-    const { controller, viewer } = createHarness({
-      getCatalog: () => stableCatalog,
-      getConditionalStylePort: () => current,
-    });
-    expect(controller.toggle()).toBe(true);
-    expect(viewer.configureCalls).toHaveLength(1);
-
-    current = second;
-    controller.sync(documentValue());
-    expect(viewer.unloadCalls).toBe(1);
-    expect(viewer.configureCalls).toHaveLength(2);
-    expect(
-      (viewer.configureCalls[1]![0] as { conditionalStylePort?: unknown }).conditionalStylePort,
-    ).toBe(second);
   });
 });
