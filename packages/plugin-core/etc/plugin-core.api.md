@@ -16,6 +16,7 @@ import { ScreenDiagnostic } from '@base-screen/contracts';
 import type { ScreenDocument } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
 import { ScreenJsonValue } from '@base-screen/contracts';
+import type { ScreenLevelScale } from '@base-screen/contracts';
 import type { ScreenMaterialErrorCode } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
 import { ScreenPosition } from '@base-screen/contracts';
@@ -71,20 +72,6 @@ export interface BaseScreenComponentFragmentInsertionIntent {
     readonly dataSources?: readonly BaseScreenFragmentDataSource[];
     readonly nodes: readonly BaseScreenFragmentNode[];
     readonly shell?: BaseScreenFragmentShell;
-}
-
-// @public
-export interface BaseScreenConditionalStylePort {
-    // (undocumented)
-    resolve(request: BaseScreenConditionalStyleRequest): ScreenJsonObject | undefined;
-}
-
-// @public
-export interface BaseScreenConditionalStyleRequest {
-    // (undocumented)
-    readonly componentId: string;
-    // (undocumented)
-    readonly dataState: BaseScreenMaterialDataState;
 }
 
 // @public
@@ -178,44 +165,6 @@ export interface BaseScreenFragmentNode extends BaseScreenFragmentEntry {
 
 // @public
 export type BaseScreenFragmentShell = BaseScreenFragmentEntry;
-
-// @public
-export interface BaseScreenHostConditionalStyleAuthoringPort {
-    // (undocumented)
-    bindings(componentId: string): readonly BaseScreenHostConditionalStyleBinding[];
-    // (undocumented)
-    save(componentId: string, bindings: readonly BaseScreenHostConditionalStyleBinding[]): Promise<ScreenParseResult<void>>;
-    // (undocumented)
-    readonly sources: readonly BaseScreenHostConditionalStyleSource[];
-}
-
-// @public
-export interface BaseScreenHostConditionalStyleBinding {
-    // (undocumented)
-    readonly conditionId: string;
-    // (undocumented)
-    readonly sourceId: string;
-    // (undocumented)
-    readonly style: ScreenJsonObject;
-}
-
-// @public
-export interface BaseScreenHostConditionalStyleCondition {
-    // (undocumented)
-    readonly id: string;
-    // (undocumented)
-    readonly label: string;
-}
-
-// @public (undocumented)
-export interface BaseScreenHostConditionalStyleSource {
-    // (undocumented)
-    readonly conditions: readonly BaseScreenHostConditionalStyleCondition[];
-    // (undocumented)
-    readonly id: string;
-    // (undocumented)
-    readonly label: string;
-}
 
 // @public (undocumented)
 export interface BaseScreenMaterialArraySchema {
@@ -524,6 +473,7 @@ export interface BaseScreenMaterialManifest {
     readonly propertyPanel: readonly BaseScreenMaterialPropertyPanelField[];
     // (undocumented)
     readonly propsSchema: BaseScreenMaterialObjectSchema;
+    readonly statePresetKeys?: readonly string[];
     // (undocumented)
     readonly staticData?: BaseScreenMaterialStaticDataDescriptor;
     // (undocumented)
@@ -755,6 +705,7 @@ export interface BaseScreenPluginDataResourceTypeContribution {
     readonly id: string;
     // (undocumented)
     readonly kind: 'dataResourceType';
+    readonly levelScales?: readonly ScreenLevelScale[];
     // (undocumented)
     readonly name: string;
     readonly queryScope?: 'resource';

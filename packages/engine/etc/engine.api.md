@@ -5,14 +5,12 @@
 ```ts
 
 import { BaseScreenComponentFragmentInsertionIntent } from '@base-screen/plugin-core';
-import type { BaseScreenConditionalStylePort } from '@base-screen/plugin-core';
 import { BaseScreenFragmentBlueprint } from '@base-screen/plugin-core';
 import { BaseScreenFragmentBody } from '@base-screen/plugin-core';
 import { BaseScreenFragmentDataSource } from '@base-screen/plugin-core';
 import { BaseScreenFragmentDefinition } from '@base-screen/plugin-core';
 import { BaseScreenFragmentNode } from '@base-screen/plugin-core';
 import { BaseScreenFragmentShell } from '@base-screen/plugin-core';
-import type { BaseScreenHostConditionalStyleAuthoringPort } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginInspectorControlCatalog } from '@base-screen/plugin-core';
@@ -99,9 +97,6 @@ export const BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT: 'base-screen-desi
 
 // @public
 export const BASE_SCREEN_FRAGMENT_SAVE_REQUEST_EVENT: 'base-screen-fragment-save-request';
-
-// @public
-export const BASE_SCREEN_GUARD_CHANGE_EVENT = "base-screen-guard-change";
 
 // @public (undocumented)
 export const BASE_SCREEN_HOST_RESOURCE_DRAG_MIME: 'application/x-base-screen-host-resource';
@@ -220,6 +215,7 @@ export interface BaseScreenBlueprintCanvasEdge {
     readonly source: string;
     // (undocumented)
     readonly sourcePort: string;
+    readonly stateId?: string;
     // (undocumented)
     readonly target: string;
     // (undocumented)
@@ -537,7 +533,6 @@ export interface BaseScreenDesignerConfiguration {
     readonly backButton?: boolean;
     // (undocumented)
     readonly catalog: BaseScreenMaterialCatalog;
-    readonly conditionalStylePort?: BaseScreenConditionalStylePort;
     // (undocumented)
     readonly datasetPort?: ScreenHostDatasetPort;
     // (undocumented)
@@ -547,7 +542,6 @@ export interface BaseScreenDesignerConfiguration {
     readonly groupMaterialType?: string;
     // (undocumented)
     readonly hostCatalogPort?: ScreenHostCatalogPort;
-    readonly hostConditionalStyleAuthoring?: BaseScreenHostConditionalStyleAuthoringPort;
     readonly hostResourceSelectionButton?: boolean;
     // (undocumented)
     readonly initialWorkbenchMode?: BaseScreenDesignerWorkbenchMode;
@@ -607,9 +601,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     commitComponentTextEdit(request: ScreenComponentTextCommitRequest): ScreenParseResult<ScreenDocument>;
     commitHostResourceSelection(commit: BaseScreenHostResourceSelectionCommit): ScreenParseResult<ScreenDocument>;
-    // (undocumented)
-    get conditionalStylePort(): BaseScreenConditionalStylePort | undefined;
-    set conditionalStylePort(value: BaseScreenConditionalStylePort | undefined);
     configure(configuration: BaseScreenDesignerConfiguration): ScreenParseResult<null>;
     // (undocumented)
     connectedCallback(): void;
@@ -667,9 +658,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     get hostCatalogPort(): ScreenHostCatalogPort | undefined;
     set hostCatalogPort(value: ScreenHostCatalogPort | undefined);
-    // (undocumented)
-    get hostConditionalStyleAuthoring(): BaseScreenHostConditionalStyleAuthoringPort | undefined;
-    set hostConditionalStyleAuthoring(value: BaseScreenHostConditionalStyleAuthoringPort | undefined);
     // (undocumented)
     get hostResourceSelectionButton(): boolean;
     // (undocumented)
@@ -748,7 +736,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     redo(): ScreenParseResult<ScreenDocument>;
     refreshCatalog(catalog: BaseScreenMaterialCatalog, options?: BaseScreenMaterialCatalogRefreshOptions): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult>;
-    refreshConditionalStyles(componentIds?: readonly string[]): void;
     // (undocumented)
     refreshData(componentId?: string): void;
     // (undocumented)
@@ -1166,24 +1153,6 @@ export interface DesignerChangeUnitPresentation {
 }
 
 // @public (undocumented)
-export interface DesignerContrastIssue {
-    // (undocumented)
-    readonly backgroundColor: string;
-    // (undocumented)
-    readonly componentId: string;
-    // (undocumented)
-    readonly componentName: string;
-    // (undocumented)
-    readonly ratio: number;
-    // (undocumented)
-    readonly requiredRatio: number;
-    readonly suggestedColor: string | null;
-    readonly suggestedRatio: number | null;
-    // (undocumented)
-    readonly textColor: string;
-}
-
-// @public (undocumented)
 export interface DesignerDisplayAngularSize {
     // (undocumented)
     readonly horizontalDeg: number;
@@ -1227,18 +1196,6 @@ export interface DesignerDisplayReadability {
 }
 
 // @public
-export interface DesignerGuardSnapshot {
-    // (undocumented)
-    readonly checked: number;
-    // (undocumented)
-    readonly enabled: boolean;
-    // (undocumented)
-    readonly issues: readonly DesignerContrastIssue[];
-    // (undocumented)
-    readonly truncated: boolean;
-}
-
-// @public
 export type DesignerIntentHandler = (request: ScreenIntentRequest, signal?: AbortSignal) => Promise<DesignerIntentOutcome>;
 
 // @public
@@ -1251,7 +1208,7 @@ export type DesignerIntentOutcome = IntentSuccess | (IntentFailure & {
 export type DesignerIntentRemedy = 'whole-screen';
 
 // @public (undocumented)
-export type DesignerMetricName = 'intent_submit' | 'clarify_open' | 'parameter_route' | 'direct_edit' | 'draft_created' | 'draft_discarded' | 'change_adopt' | 'change_reject' | 'guard_fail' | 'fix_preview' | 'fix_apply' | 'revert' | 'patch_record';
+export type DesignerMetricName = 'intent_submit' | 'clarify_open' | 'parameter_route' | 'direct_edit' | 'draft_created' | 'draft_discarded' | 'change_adopt' | 'change_reject' | 'revert' | 'patch_record';
 
 // @public (undocumented)
 export interface DesignerMetricPayload {

@@ -4,13 +4,13 @@
 
 ```ts
 
-import type { BaseScreenConditionalStylePort } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialMode } from '@base-screen/plugin-core';
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import { ScreenBlueprintCanvasEffect } from '@base-screen/core';
 import type { ScreenBlueprintHostActionPort } from '@base-screen/contracts';
 import type { ScreenBlueprintRuntimePort } from '@base-screen/contracts';
+import { ScreenBlueprintStateEffect } from '@base-screen/core';
 import { ScreenBlueprintVisibilityEffect } from '@base-screen/core';
 import { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
@@ -47,6 +47,18 @@ export type BaseScreenCanvasChange = {
 // @public
 export type BaseScreenCanvasChangeReason = 'blueprint' | 'host' | 'mask' | 'escape' | 'start';
 
+// @public
+export interface BaseScreenComponentStateChange {
+    // (undocumented)
+    readonly cause: 'judge' | 'blueprint';
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly from: string;
+    // (undocumented)
+    readonly to: string;
+}
+
 // @public (undocumented)
 export interface BaseScreenMaterialEvent {
     // (undocumented)
@@ -63,6 +75,7 @@ export interface BaseScreenMaterialEvent {
 export interface BaseScreenRenderer {
     announceStartPage(): void;
     applyBlueprintCanvasEffects(effects: readonly ScreenBlueprintCanvasEffect[]): void;
+    applyBlueprintStateEffects(effects: readonly ScreenBlueprintStateEffect[]): void;
     // (undocumented)
     applyBlueprintVisibilityEffects(effects: readonly ScreenBlueprintVisibilityEffect[]): ScreenParseResult<null>;
     // (undocumented)
@@ -81,8 +94,11 @@ export interface BaseScreenRenderer {
         readonly trigger?: ScreenResourceExecutionTrigger;
         readonly traceId?: string;
     }, startOnly?: ReadonlySet<string>): void;
+    readComponentState(componentId: string): {
+        readonly stateId: string;
+        readonly value?: ScreenJsonValue;
+    } | undefined;
     readDataSourceValue(dataSourceId: string): ScreenJsonValue | undefined;
-    refreshConditionalStyles(componentIds?: readonly string[]): void;
     // (undocumented)
     refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void;
     refreshDataSource(dataSourceId: string, options?: {
@@ -96,6 +112,7 @@ export interface BaseScreenRenderer {
     }): ScreenParseResult<null>;
     // (undocumented)
     resetBlueprintVisibility(): void;
+    resetComponentStates(): void;
     setCatalog(catalog: BaseScreenMaterialCatalog): ScreenParseResult<null>;
     setInteractive(enabled: boolean): ScreenParseResult<null>;
     // (undocumented)
@@ -113,7 +130,6 @@ export interface BaseScreenViewerConfiguration {
     readonly blueprintRuntimePort?: ScreenBlueprintRuntimePort;
     // (undocumented)
     readonly catalog: BaseScreenMaterialCatalog;
-    readonly conditionalStylePort?: BaseScreenConditionalStylePort;
     // (undocumented)
     readonly datasetPort?: ScreenHostDatasetPort;
     // (undocumented)
@@ -147,8 +163,6 @@ export class BaseScreenViewerElement extends ElementBase {
     get catalog(): BaseScreenMaterialCatalog | undefined;
     set catalog(value: BaseScreenMaterialCatalog | undefined);
     closeCanvas(canvasId: string): boolean;
-    get conditionalStylePort(): BaseScreenConditionalStylePort | undefined;
-    set conditionalStylePort(value: BaseScreenConditionalStylePort | undefined);
     configure(configuration: BaseScreenViewerConfiguration): ScreenParseResult<null>;
     // (undocumented)
     connectedCallback(): void;
@@ -166,8 +180,8 @@ export class BaseScreenViewerElement extends ElementBase {
     get hostCatalogPort(): ScreenHostCatalogPort | undefined;
     set hostCatalogPort(value: ScreenHostCatalogPort | undefined);
     openCanvas(canvasId: string, payload?: ScreenJsonValue): boolean;
+    readComponentState(componentId: string): string | undefined;
     refreshCatalog(catalog: BaseScreenMaterialCatalog): ScreenParseResult<null>;
-    refreshConditionalStyles(componentIds?: readonly string[]): void;
     // (undocumented)
     refreshData(componentId?: string): void;
     // (undocumented)
@@ -204,7 +218,6 @@ export interface CreateBaseScreenRendererOptions {
     // (undocumented)
     readonly catalog: BaseScreenMaterialCatalog;
     readonly componentFailurePolicy?: ComponentFailurePolicy;
-    readonly conditionalStylePort?: BaseScreenConditionalStylePort;
     // (undocumented)
     readonly contributionIndex?: BaseScreenRuntimeContributionIndex;
     // (undocumented)
@@ -224,6 +237,7 @@ export interface CreateBaseScreenRendererOptions {
     // (undocumented)
     readonly observer?: ScreenResourceObserver;
     readonly onCanvasChange?: (change: BaseScreenCanvasChange) => void;
+    readonly onComponentStateChange?: (change: BaseScreenComponentStateChange) => void;
     readonly onDataSourceSettled?: (dataSourceId: string) => void;
     // (undocumented)
     readonly onDiagnostic?: (diagnostic: ScreenDiagnostic) => void;

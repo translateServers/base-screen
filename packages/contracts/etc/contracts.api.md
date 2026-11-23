@@ -14,6 +14,9 @@ export const COMPONENT_ID_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$";
 export const DEFAULT_PUSH_RETAIN_ROWS = 1000;
 
 // @public
+export const DEFAULT_SCREEN_COMPONENT_STATE_ID = "default";
+
+// @public
 export function derivedDataSourceId(ownerId: string): string;
 
 // @public
@@ -61,11 +64,20 @@ export function isScreenThemeRefSyntax(value: string): boolean;
 // @public (undocumented)
 export function isScreenThemeSlot(value: string): value is ScreenThemeSlot;
 
+// @public (undocumented)
+export function isScreenThemeStatusSlot(value: string): value is ScreenThemeStatusSlot;
+
 // @public
 export function isScreenVariableName(value: unknown): value is string;
 
 // @public (undocumented)
 export function jsonDepth(value: ScreenJsonValue | undefined): number;
+
+// @public
+export function listScreenComponentStateDependencies(states: ScreenComponentStates | undefined): ScreenComponentStateDependencies;
+
+// @public
+export function listScreenLevelScaleIssues(value: unknown): readonly ScreenSourceDeliveryIssue[];
 
 // @public
 export function listScreenSourceDeliveryIssues(value: unknown): readonly ScreenSourceDeliveryIssue[];
@@ -102,6 +114,24 @@ export const MAX_BLUEPRINT_RULE_STEPS = 1024;
 
 // @public
 export const MAX_BLUEPRINT_RULES = 1000;
+
+// @public (undocumented)
+export const MAX_COMPONENT_STATE_CASES = 32;
+
+// @public (undocumented)
+export const MAX_COMPONENT_STATE_NAME_CODE_POINTS = 32;
+
+// @public (undocumented)
+export const MAX_COMPONENT_STATE_PATH_SEGMENT_CODE_POINTS = 64;
+
+// @public (undocumented)
+export const MAX_COMPONENT_STATE_PATH_SEGMENTS = 8;
+
+// @public (undocumented)
+export const MAX_COMPONENT_STATE_VALUE_BYTES: number;
+
+// @public
+export const MAX_COMPONENT_STATES = 16;
 
 // @public (undocumented)
 export const MAX_DATA_SOURCE_NAME_CODE_POINTS = 256;
@@ -142,6 +172,15 @@ export const MAX_HOST_CATALOG_BYTES: number;
 // @public (undocumented)
 export const MAX_HOST_CATALOG_PAGE_ITEMS = 50;
 
+// @public (undocumented)
+export const MAX_LEVEL_LABEL_CODE_POINTS = 32;
+
+// @public (undocumented)
+export const MAX_LEVEL_SCALE_LEVELS = 8;
+
+// @public
+export const MAX_LEVEL_SCALES = 16;
+
 // @public
 export const MAX_POPUP_BORDER_RADIUS = 200;
 
@@ -164,21 +203,6 @@ export const MAX_PUSH_RETAIN_TIME_FIELD_CODE_UNITS = 128;
 export const MAX_SCREEN_MATERIAL_ERROR_MESSAGE_LENGTH = 256;
 
 // @public (undocumented)
-export const MAX_STYLE_RULE_ID_CODE_POINTS = 64;
-
-// @public (undocumented)
-export const MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS = 64;
-
-// @public (undocumented)
-export const MAX_STYLE_RULE_PATH_SEGMENTS = 8;
-
-// @public (undocumented)
-export const MAX_STYLE_RULE_VALUE_BYTES: number;
-
-// @public (undocumented)
-export const MAX_STYLE_RULES_PER_COMPONENT = 8;
-
-// @public (undocumented)
 export const MAX_SUB_CANVAS_NAME_CODE_POINTS = 64;
 
 // @public
@@ -186,6 +210,9 @@ export const MAX_SUB_CANVASES = 64;
 
 // @public (undocumented)
 export const MAX_VALUE_REF_PATH_SEGMENTS = 8;
+
+// @public
+export function mergeScreenComponentStateStyle(style: ScreenJsonObject, states: ScreenComponentStates | undefined, stateId: string): ScreenJsonObject;
 
 // @public
 export function migrateScreenDocument(input: unknown): ScreenMigrationResult;
@@ -277,16 +304,30 @@ export function readScreenBlueprintEventPort(port: string): string | undefined;
 export function readScreenComponentDataBinding(component: ScreenComponentNode): ScreenDataBinding | null;
 
 // @public
+export function readScreenComponentStatePath(value: ScreenJsonValue, path: readonly string[]): {
+    readonly ok: true;
+    readonly value: ScreenJsonValue;
+} | {
+    readonly ok: false;
+};
+
+// @public
 export function readScreenComponentValueRef(component: ScreenComponentNode): ScreenValueRef | null;
 
 // @public
 export function readScreenDocumentDataSources(document: ScreenDocument): readonly ScreenDataSource[];
 
 // @public
+export function readScreenThemeColor(theme: ScreenTheme | undefined, slot: ScreenThemeSlot): string | undefined;
+
+// @public
 export function readScreenThemeRef(value: string): ScreenThemeSlot | undefined;
 
 // @public
 export function readScreenVariableRecord(entry: ScreenVariableEntry): ScreenVariableRecord;
+
+// @public (undocumented)
+export function resolveScreenComponentState(states: ScreenComponentStates | undefined, readers: ScreenComponentStateReaders): ScreenComponentStateResolution;
 
 // @public
 export function resolveScreenPopupPosition(canvas: {
@@ -334,10 +375,18 @@ export const SCREEN_BLUEPRINT_CAPABILITIES: {
     readonly pageChanged: 'blueprint.trigger.page-changed';
     readonly canvasVisibility: 'blueprint.action.canvas-visibility';
     readonly pageNavigation: 'blueprint.action.page-navigation';
+    readonly componentStateChanged: 'blueprint.trigger.component-state-changed';
+    readonly componentState: 'blueprint.action.component-state';
 };
 
 // @public
-export const SCREEN_BLUEPRINT_CAPABILITY_IDS: readonly ['blueprint.trigger.material-event', 'blueprint.trigger.variable-event', 'blueprint.trigger.lifecycle', 'blueprint.trigger.timer', 'blueprint.value.event-payload', 'blueprint.value.variable', 'blueprint.condition.compare', 'blueprint.action.set-variable', 'blueprint.action.emit-host-event', 'blueprint.action.component-visibility', 'blueprint.action.request-variable', 'blueprint.action.request-component-data', 'blueprint.trigger.canvas-event', 'blueprint.trigger.page-changed', 'blueprint.action.canvas-visibility', 'blueprint.action.page-navigation'];
+export const SCREEN_BLUEPRINT_CAPABILITY_IDS: readonly ['blueprint.trigger.material-event', 'blueprint.trigger.variable-event', 'blueprint.trigger.lifecycle', 'blueprint.trigger.timer', 'blueprint.value.event-payload', 'blueprint.value.variable', 'blueprint.condition.compare', 'blueprint.action.set-variable', 'blueprint.action.emit-host-event', 'blueprint.action.component-visibility', 'blueprint.action.request-variable', 'blueprint.action.request-component-data', 'blueprint.trigger.canvas-event', 'blueprint.trigger.page-changed', 'blueprint.action.canvas-visibility', 'blueprint.action.page-navigation', 'blueprint.trigger.component-state-changed', 'blueprint.action.component-state'];
+
+// @public
+export const SCREEN_BLUEPRINT_COMPONENT_STATE_INPUT_PORTS: readonly ['set-state', 'reset-state'];
+
+// @public (undocumented)
+export const SCREEN_BLUEPRINT_COMPONENT_STATE_OUTPUT_PORT = "state-changed";
 
 // @public (undocumented)
 export const SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY = "blueprint.action.component-visibility";
@@ -388,7 +437,16 @@ export const SCREEN_MATERIAL_ERROR_CODES: readonly ['HOST_RESOURCE_ACCESS_DENIED
 export const SCREEN_POPUP_ANCHORS: readonly ["top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"];
 
 // @public
+export const SCREEN_THEME_BASE_SLOTS: readonly ScreenThemeBaseSlot[];
+
+// @public (undocumented)
 export const SCREEN_THEME_SLOTS: readonly ScreenThemeSlot[];
+
+// @public (undocumented)
+export const SCREEN_THEME_STATUS_DEFAULTS: Readonly<Record<ScreenThemeStatusSlot, string>>;
+
+// @public
+export const SCREEN_THEME_STATUS_SLOTS: readonly ScreenThemeStatusSlot[];
 
 // @public (undocumented)
 export interface ScreenAbortSignal {
@@ -467,7 +525,7 @@ export interface ScreenBlueprint {
 }
 
 // @public (undocumented)
-export type ScreenBlueprintAction = ScreenBlueprintSetVariableAction | ScreenBlueprintRequestVariableAction | ScreenBlueprintRequestComponentDataAction | ScreenBlueprintEmitHostEventAction | ScreenBlueprintHostAction | ScreenBlueprintComponentVisibilityAction | ScreenBlueprintCanvasVisibilityAction | ScreenBlueprintPageNavigationAction;
+export type ScreenBlueprintAction = ScreenBlueprintComponentStateAction | ScreenBlueprintSetVariableAction | ScreenBlueprintRequestVariableAction | ScreenBlueprintRequestComponentDataAction | ScreenBlueprintEmitHostEventAction | ScreenBlueprintHostAction | ScreenBlueprintComponentVisibilityAction | ScreenBlueprintCanvasVisibilityAction | ScreenBlueprintPageNavigationAction;
 
 // @public (undocumented)
 export function screenBlueprintActionPort(actionId: string): string;
@@ -508,6 +566,27 @@ export interface ScreenBlueprintComponentNode extends ScreenBlueprintNodeBase {
     readonly componentId: string;
     // (undocumented)
     readonly kind: 'component';
+}
+
+// @public
+export interface ScreenBlueprintComponentStateAction {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly operation: 'set' | 'reset';
+    readonly stateId?: string;
+    // (undocumented)
+    readonly type: 'component-state';
+}
+
+// @public
+export interface ScreenBlueprintComponentStateTrigger {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly eventName: 'state-changed';
+    // (undocumented)
+    readonly type: 'component-state-changed';
 }
 
 // @public (undocumented)
@@ -554,6 +633,7 @@ export type ScreenBlueprintEdgeCategory = 'interaction' | 'data' | 'flow' | 'exi
 // @public
 export interface ScreenBlueprintEdgeFieldRule {
     readonly payload: 'required' | 'optional' | 'forbidden';
+    readonly stateId: 'required' | 'forbidden';
     // (undocumented)
     readonly transition: 'optional' | 'forbidden';
     // (undocumented)
@@ -588,6 +668,7 @@ export interface ScreenBlueprintFlowEdge {
     readonly payload?: ScreenBlueprintValueExpression;
     // (undocumented)
     readonly requiredCapabilities?: readonly string[];
+    readonly stateId?: string;
     // (undocumented)
     readonly to: ScreenBlueprintPortRef;
     // (undocumented)
@@ -848,7 +929,7 @@ export interface ScreenBlueprintTimerTrigger {
 }
 
 // @public (undocumented)
-export type ScreenBlueprintTrigger = ScreenBlueprintMaterialEventTrigger | ScreenBlueprintVariableEventTrigger | ScreenBlueprintLifecycleTrigger | ScreenBlueprintTimerTrigger | ScreenBlueprintCanvasTrigger | ScreenBlueprintPageChangedTrigger;
+export type ScreenBlueprintTrigger = ScreenBlueprintComponentStateTrigger | ScreenBlueprintMaterialEventTrigger | ScreenBlueprintVariableEventTrigger | ScreenBlueprintLifecycleTrigger | ScreenBlueprintTimerTrigger | ScreenBlueprintCanvasTrigger | ScreenBlueprintPageChangedTrigger;
 
 // @public (undocumented)
 export type ScreenBlueprintValueExpression = {
@@ -976,16 +1057,104 @@ export interface ScreenComponentNode {
     readonly rotation: number;
     // (undocumented)
     readonly size: ScreenSize;
+    readonly states?: ScreenComponentStates;
     // (undocumented)
     readonly status: ScreenComponentStatus;
     // (undocumented)
     readonly style: ScreenJsonObject;
     // (undocumented)
-    readonly styleRules?: readonly ScreenComponentStyleRule[];
-    // (undocumented)
     readonly type: string;
     // (undocumented)
     readonly zIndex: number;
+}
+
+// @public
+export interface ScreenComponentState {
+    readonly id: string;
+    // (undocumented)
+    readonly name: string;
+    readonly style: ScreenJsonObject;
+}
+
+// @public (undocumented)
+export interface ScreenComponentStateCase {
+    // (undocumented)
+    readonly operator: ScreenComponentStateOperator;
+    // (undocumented)
+    readonly stateId: string;
+    readonly value?: ScreenJsonValue;
+}
+
+// @public (undocumented)
+export interface ScreenComponentStateDependencies {
+    // (undocumented)
+    readonly componentData: boolean;
+    // (undocumented)
+    readonly dataSourceIds: readonly string[];
+    // (undocumented)
+    readonly variableIds: readonly string[];
+}
+
+// @public (undocumented)
+export type ScreenComponentStateInput = {
+    readonly kind: 'component-data';
+    readonly path: readonly string[];
+} | {
+    readonly kind: 'variable';
+    readonly variableId: string;
+    readonly path: readonly string[];
+} | {
+    readonly kind: 'data-source-field';
+    readonly dataSourceId: string;
+    readonly where?: ScreenComponentStateRowMatch;
+    readonly path: readonly string[];
+};
+
+// @public (undocumented)
+export interface ScreenComponentStateJudge {
+    readonly cases: readonly ScreenComponentStateCase[];
+    // (undocumented)
+    readonly input: ScreenComponentStateInput;
+}
+
+// @public (undocumented)
+export type ScreenComponentStateOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists';
+
+// @public (undocumented)
+export interface ScreenComponentStateReaders {
+    readonly componentData: () => ScreenJsonValue | undefined;
+    readonly dataSource: (dataSourceId: string) => ScreenJsonValue | undefined;
+    readonly variable: (variableId: string) => ScreenJsonValue | undefined;
+}
+
+// @public (undocumented)
+export type ScreenComponentStateResolution = {
+    readonly status: 'resolved';
+    readonly stateId: string;
+    readonly value?: ScreenJsonValue;
+} | {
+    readonly status: 'unavailable';
+};
+
+// @public
+export interface ScreenComponentStateRowMatch {
+    // (undocumented)
+    readonly equals: {
+        readonly kind: 'literal';
+        readonly value: string | number | boolean;
+    } | {
+        readonly kind: 'variable';
+        readonly variableId: string;
+    };
+    // (undocumented)
+    readonly field: readonly string[];
+}
+
+// @public (undocumented)
+export interface ScreenComponentStates {
+    // (undocumented)
+    readonly items: readonly ScreenComponentState[];
+    readonly judge?: ScreenComponentStateJudge;
 }
 
 // @public (undocumented)
@@ -995,29 +1164,6 @@ export interface ScreenComponentStatus {
     // (undocumented)
     readonly locked: boolean;
 }
-
-// @public (undocumented)
-export interface ScreenComponentStyleRule {
-    // (undocumented)
-    readonly id: string;
-    // (undocumented)
-    readonly style: ScreenJsonObject;
-    // (undocumented)
-    readonly when: ScreenComponentStyleRuleCondition;
-}
-
-// @public (undocumented)
-export interface ScreenComponentStyleRuleCondition {
-    // (undocumented)
-    readonly operator: ScreenComponentStyleRuleOperator;
-    // (undocumented)
-    readonly path: readonly string[];
-    // (undocumented)
-    readonly value?: ScreenJsonValue;
-}
-
-// @public (undocumented)
-export type ScreenComponentStyleRuleOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists';
 
 // @public (undocumented)
 export interface ScreenComponentTextCommitRequest {
@@ -1311,6 +1457,7 @@ export interface ScreenHostCatalogDescribeRequest {
 // @public
 export interface ScreenHostCatalogDescriptor extends ScreenHostCatalogSummary {
     readonly delivery?: ScreenSourceDelivery;
+    readonly levelScales?: readonly ScreenLevelScale[];
     readonly parameters: readonly ScreenDatasetParameterDefinition[];
     // (undocumented)
     readonly previewable: boolean;
@@ -1552,6 +1699,23 @@ export interface ScreenJsonParseOptions {
 export type ScreenJsonValue = null | boolean | number | string | readonly ScreenJsonValue[] | {
     readonly [key: string]: ScreenJsonValue;
 };
+
+// @public
+export interface ScreenLevelScale {
+    readonly levels: readonly ScreenLevelScaleLevel[];
+    readonly path: readonly string[];
+}
+
+// @public (undocumented)
+export interface ScreenLevelScaleLevel {
+    readonly label: string;
+    // (undocumented)
+    readonly tone: ScreenLevelTone;
+    readonly value: string | number;
+}
+
+// @public
+export type ScreenLevelTone = 'danger' | 'warning' | 'info' | 'success';
 
 // @public (undocumented)
 export type ScreenMaterialErrorCode = (typeof SCREEN_MATERIAL_ERROR_CODES)[number];
@@ -2057,14 +2221,20 @@ export interface ScreenTargetDisplayProfile {
 // @public (undocumented)
 export interface ScreenTheme {
     // (undocumented)
-    readonly palette: Readonly<Record<ScreenThemeSlot, string>>;
+    readonly palette: Readonly<Record<ScreenThemeBaseSlot, string>> & Readonly<Partial<Record<ScreenThemeStatusSlot, string>>>;
 }
+
+// @public
+export type ScreenThemeBaseSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
 
 // @public (undocumented)
 export function screenThemeRef(slot: ScreenThemeSlot): string;
 
+// @public (undocumented)
+export type ScreenThemeSlot = ScreenThemeBaseSlot | ScreenThemeStatusSlot;
+
 // @public
-export type ScreenThemeSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
+export type ScreenThemeStatusSlot = 'danger' | 'warning' | 'info' | 'success';
 
 // @public
 export interface ScreenUpdatePolicy {
@@ -2177,6 +2347,9 @@ export interface ScreenVariableRefreshOptions {
     readonly variableIds?: readonly string[];
 }
 
+// @public
+export function selectScreenComponentStateRow(source: ScreenJsonValue, where: Pick<ScreenComponentStateRowMatch, 'field'>, equals: ScreenJsonValue): ScreenJsonValue | undefined;
+
 // @public (undocumented)
 export function serializeScreenDocument(document: ScreenDocument): string;
 
@@ -2185,6 +2358,9 @@ export function sortScreenDiagnostics(diagnostics: readonly ScreenDiagnostic[]):
 
 // @public
 export function supportsScreenSourcePush(delivery: ScreenSourceDelivery | undefined): boolean;
+
+// @public
+export function testScreenComponentStateCase(entry: Pick<ScreenComponentStateCase, 'operator' | 'value'>, value: ScreenJsonValue | undefined): boolean;
 
 // @public (undocumented)
 export function validateScreenDesignerHostAdapter(input: unknown): ScreenParseResult<ScreenDesignerHostAdapter>;

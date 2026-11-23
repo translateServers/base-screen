@@ -43,9 +43,6 @@ export const BASE_SCREEN_DESIGNER_TAG_NAME: 'base-screen-designer';
 // @public (undocumented)
 export const BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT: 'base-screen-designer-workbench-mode-change';
 
-// @public
-export const BASE_SCREEN_GUARD_CHANGE_EVENT = "base-screen-guard-change";
-
 // @public (undocumented)
 export const BASE_SCREEN_HOST_RESOURCE_DRAG_MIME: 'application/x-base-screen-host-resource';
 
@@ -180,6 +177,7 @@ export interface BaseScreenBlueprintCanvasEdge {
     readonly source: string;
     // (undocumented)
     readonly sourcePort: string;
+    readonly stateId?: string;
     // (undocumented)
     readonly target: string;
     // (undocumented)
@@ -459,20 +457,6 @@ interface BaseScreenComponentInsertionIntent {
     readonly position?: ScreenPosition;
 }
 
-// @public
-interface BaseScreenConditionalStylePort {
-    // (undocumented)
-    resolve(request: BaseScreenConditionalStyleRequest): ScreenJsonObject | undefined;
-}
-
-// @public
-interface BaseScreenConditionalStyleRequest {
-    // (undocumented)
-    readonly componentId: string;
-    // (undocumented)
-    readonly dataState: BaseScreenMaterialDataState;
-}
-
 // @public (undocumented)
 interface BaseScreenCustomElementRegistryPort {
     // (undocumented)
@@ -534,7 +518,6 @@ export interface BaseScreenDesignerConfiguration {
     readonly backButton?: boolean;
     // (undocumented)
     readonly catalog: BaseScreenMaterialCatalog;
-    readonly conditionalStylePort?: BaseScreenConditionalStylePort;
     // (undocumented)
     readonly datasetPort?: ScreenHostDatasetPort;
     // (undocumented)
@@ -544,7 +527,6 @@ export interface BaseScreenDesignerConfiguration {
     readonly groupMaterialType?: string;
     // (undocumented)
     readonly hostCatalogPort?: ScreenHostCatalogPort;
-    readonly hostConditionalStyleAuthoring?: BaseScreenHostConditionalStyleAuthoringPort;
     readonly hostResourceSelectionButton?: boolean;
     // (undocumented)
     readonly initialWorkbenchMode?: BaseScreenDesignerWorkbenchMode;
@@ -604,9 +586,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     commitComponentTextEdit(request: ScreenComponentTextCommitRequest): ScreenParseResult<ScreenDocument>;
     commitHostResourceSelection(commit: BaseScreenHostResourceSelectionCommit): ScreenParseResult<ScreenDocument>;
-    // (undocumented)
-    get conditionalStylePort(): BaseScreenConditionalStylePort | undefined;
-    set conditionalStylePort(value: BaseScreenConditionalStylePort | undefined);
     configure(configuration: BaseScreenDesignerConfiguration): ScreenParseResult<null>;
     // (undocumented)
     connectedCallback(): void;
@@ -664,9 +643,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     get hostCatalogPort(): ScreenHostCatalogPort | undefined;
     set hostCatalogPort(value: ScreenHostCatalogPort | undefined);
-    // (undocumented)
-    get hostConditionalStyleAuthoring(): BaseScreenHostConditionalStyleAuthoringPort | undefined;
-    set hostConditionalStyleAuthoring(value: BaseScreenHostConditionalStyleAuthoringPort | undefined);
     // (undocumented)
     get hostResourceSelectionButton(): boolean;
     // (undocumented)
@@ -745,7 +721,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     redo(): ScreenParseResult<ScreenDocument>;
     refreshCatalog(catalog: BaseScreenMaterialCatalog, options?: BaseScreenMaterialCatalogRefreshOptions): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult>;
-    refreshConditionalStyles(componentIds?: readonly string[]): void;
     // (undocumented)
     refreshData(componentId?: string): void;
     // (undocumented)
@@ -951,44 +926,6 @@ interface BaseScreenFragmentNode extends BaseScreenFragmentEntry {
 // @public
 type BaseScreenFragmentShell = BaseScreenFragmentEntry;
 
-// @public
-interface BaseScreenHostConditionalStyleAuthoringPort {
-    // (undocumented)
-    bindings(componentId: string): readonly BaseScreenHostConditionalStyleBinding[];
-    // (undocumented)
-    save(componentId: string, bindings: readonly BaseScreenHostConditionalStyleBinding[]): Promise<ScreenParseResult<void>>;
-    // (undocumented)
-    readonly sources: readonly BaseScreenHostConditionalStyleSource[];
-}
-
-// @public
-interface BaseScreenHostConditionalStyleBinding {
-    // (undocumented)
-    readonly conditionId: string;
-    // (undocumented)
-    readonly sourceId: string;
-    // (undocumented)
-    readonly style: ScreenJsonObject;
-}
-
-// @public
-interface BaseScreenHostConditionalStyleCondition {
-    // (undocumented)
-    readonly id: string;
-    // (undocumented)
-    readonly label: string;
-}
-
-// @public (undocumented)
-interface BaseScreenHostConditionalStyleSource {
-    // (undocumented)
-    readonly conditions: readonly BaseScreenHostConditionalStyleCondition[];
-    // (undocumented)
-    readonly id: string;
-    // (undocumented)
-    readonly label: string;
-}
-
 // @public (undocumented)
 export interface BaseScreenHostResourceAuthoringIntent {
     // (undocumented)
@@ -1144,21 +1081,6 @@ interface BaseScreenMaterialDataBindingRole {
     // (undocumented)
     readonly valueTypes: readonly ScreenDatasetValueType[];
 }
-
-// @public (undocumented)
-type BaseScreenMaterialDataState = {
-    readonly status: 'idle';
-} | {
-    readonly status: 'loading';
-} | {
-    readonly status: 'ready';
-    readonly value: ScreenJsonValue;
-    readonly stale?: true;
-} | {
-    readonly status: 'error';
-    readonly code: ScreenMaterialErrorCode;
-    readonly message: string;
-};
 
 // @public (undocumented)
 interface BaseScreenMaterialDefinition {
@@ -1396,6 +1318,7 @@ interface BaseScreenMaterialManifest {
     readonly propertyPanel: readonly BaseScreenMaterialPropertyPanelField[];
     // (undocumented)
     readonly propsSchema: BaseScreenMaterialObjectSchema;
+    readonly statePresetKeys?: readonly string[];
     // (undocumented)
     readonly staticData?: BaseScreenMaterialStaticDataDescriptor;
     // (undocumented)
@@ -1681,6 +1604,7 @@ interface BaseScreenPluginDataResourceTypeContribution {
     readonly id: string;
     // (undocumented)
     readonly kind: 'dataResourceType';
+    readonly levelScales?: readonly ScreenLevelScale[];
     // (undocumented)
     readonly name: string;
     readonly queryScope?: 'resource';
@@ -1993,7 +1917,6 @@ export interface BaseScreenViewerConfiguration {
     readonly blueprintRuntimePort?: ScreenBlueprintRuntimePort;
     // (undocumented)
     readonly catalog: BaseScreenMaterialCatalog;
-    readonly conditionalStylePort?: BaseScreenConditionalStylePort;
     // (undocumented)
     readonly datasetPort?: ScreenHostDatasetPort;
     // (undocumented)
@@ -2027,8 +1950,6 @@ export class BaseScreenViewerElement extends ElementBase_2 {
     get catalog(): BaseScreenMaterialCatalog | undefined;
     set catalog(value: BaseScreenMaterialCatalog | undefined);
     closeCanvas(canvasId: string): boolean;
-    get conditionalStylePort(): BaseScreenConditionalStylePort | undefined;
-    set conditionalStylePort(value: BaseScreenConditionalStylePort | undefined);
     configure(configuration: BaseScreenViewerConfiguration): ScreenParseResult<null>;
     // (undocumented)
     connectedCallback(): void;
@@ -2046,8 +1967,8 @@ export class BaseScreenViewerElement extends ElementBase_2 {
     get hostCatalogPort(): ScreenHostCatalogPort | undefined;
     set hostCatalogPort(value: ScreenHostCatalogPort | undefined);
     openCanvas(canvasId: string, payload?: ScreenJsonValue): boolean;
+    readComponentState(componentId: string): string | undefined;
     refreshCatalog(catalog: BaseScreenMaterialCatalog): ScreenParseResult<null>;
-    refreshConditionalStyles(componentIds?: readonly string[]): void;
     // (undocumented)
     refreshData(componentId?: string): void;
     // (undocumented)
@@ -2290,24 +2211,6 @@ interface DesignerChangeUnitPresentation {
 }
 
 // @public (undocumented)
-interface DesignerContrastIssue {
-    // (undocumented)
-    readonly backgroundColor: string;
-    // (undocumented)
-    readonly componentId: string;
-    // (undocumented)
-    readonly componentName: string;
-    // (undocumented)
-    readonly ratio: number;
-    // (undocumented)
-    readonly requiredRatio: number;
-    readonly suggestedColor: string | null;
-    readonly suggestedRatio: number | null;
-    // (undocumented)
-    readonly textColor: string;
-}
-
-// @public (undocumented)
 interface DesignerDisplayAngularSize {
     // (undocumented)
     readonly horizontalDeg: number;
@@ -2343,18 +2246,6 @@ interface DesignerDisplayPhysicalSize {
 }
 
 // @public
-export interface DesignerGuardSnapshot {
-    // (undocumented)
-    readonly checked: number;
-    // (undocumented)
-    readonly enabled: boolean;
-    // (undocumented)
-    readonly issues: readonly DesignerContrastIssue[];
-    // (undocumented)
-    readonly truncated: boolean;
-}
-
-// @public
 type DesignerIntentHandler = (request: ScreenIntentRequest, signal?: AbortSignal) => Promise<DesignerIntentOutcome>;
 
 // @public
@@ -2367,7 +2258,7 @@ type DesignerIntentOutcome = IntentSuccess | (IntentFailure & {
 type DesignerIntentRemedy = 'whole-screen';
 
 // @public (undocumented)
-type DesignerMetricName = 'intent_submit' | 'clarify_open' | 'parameter_route' | 'direct_edit' | 'draft_created' | 'draft_discarded' | 'change_adopt' | 'change_reject' | 'guard_fail' | 'fix_preview' | 'fix_apply' | 'revert' | 'patch_record';
+type DesignerMetricName = 'intent_submit' | 'clarify_open' | 'parameter_route' | 'direct_edit' | 'draft_created' | 'draft_discarded' | 'change_adopt' | 'change_reject' | 'revert' | 'patch_record';
 
 // @public (undocumented)
 interface DesignerMetricPayload {
@@ -2487,10 +2378,7 @@ type RuntimeMaterial = NonNullable<CreatePluginRegistrationOptions['materials']>
 export const SCREEN_AUTHORING_REQUEST_EVENT: 'base-screen-authoring-request';
 
 // @public
-const SCREEN_BLUEPRINT_CAPABILITY_IDS: readonly ['blueprint.trigger.material-event', 'blueprint.trigger.variable-event', 'blueprint.trigger.lifecycle', 'blueprint.trigger.timer', 'blueprint.value.event-payload', 'blueprint.value.variable', 'blueprint.condition.compare', 'blueprint.action.set-variable', 'blueprint.action.emit-host-event', 'blueprint.action.component-visibility', 'blueprint.action.request-variable', 'blueprint.action.request-component-data', 'blueprint.trigger.canvas-event', 'blueprint.trigger.page-changed', 'blueprint.action.canvas-visibility', 'blueprint.action.page-navigation'];
-
-// @public
-const SCREEN_MATERIAL_ERROR_CODES: readonly ['HOST_RESOURCE_ACCESS_DENIED', 'HOST_RESOURCE_UNAVAILABLE', 'HOST_RESOURCE_TIMEOUT', 'HOST_RESOURCE_FAILED', 'HOST_RESOURCE_INVALID', 'HOST_DATASET_INVALID', 'HOST_DATASET_BINDING_INVALID', 'HOST_DATASET_ADAPTER_FAILED'];
+const SCREEN_BLUEPRINT_CAPABILITY_IDS: readonly ['blueprint.trigger.material-event', 'blueprint.trigger.variable-event', 'blueprint.trigger.lifecycle', 'blueprint.trigger.timer', 'blueprint.value.event-payload', 'blueprint.value.variable', 'blueprint.condition.compare', 'blueprint.action.set-variable', 'blueprint.action.emit-host-event', 'blueprint.action.component-visibility', 'blueprint.action.request-variable', 'blueprint.action.request-component-data', 'blueprint.trigger.canvas-event', 'blueprint.trigger.page-changed', 'blueprint.action.canvas-visibility', 'blueprint.action.page-navigation', 'blueprint.trigger.component-state-changed', 'blueprint.action.component-state'];
 
 // @public (undocumented)
 interface ScreenAbortSignal {
@@ -2614,6 +2502,7 @@ interface ScreenBlueprintFlowEdge {
     readonly payload?: ScreenBlueprintValueExpression;
     // (undocumented)
     readonly requiredCapabilities?: readonly string[];
+    readonly stateId?: string;
     // (undocumented)
     readonly to: ScreenBlueprintPortRef;
     // (undocumented)
@@ -2867,12 +2756,11 @@ interface ScreenComponentNode {
     readonly rotation: number;
     // (undocumented)
     readonly size: ScreenSize;
+    readonly states?: ScreenComponentStates;
     // (undocumented)
     readonly status: ScreenComponentStatus;
     // (undocumented)
     readonly style: ScreenJsonObject;
-    // (undocumented)
-    readonly styleRules?: readonly ScreenComponentStyleRule[];
     // (undocumented)
     readonly type: string;
     // (undocumented)
@@ -2896,13 +2784,76 @@ interface ScreenComponentPatch {
     readonly rotation?: number;
     // (undocumented)
     readonly size?: ScreenSize;
+    readonly states?: ScreenComponentStates | null;
     // (undocumented)
     readonly status?: ScreenComponentStatus;
     // (undocumented)
     readonly style?: ScreenJsonObject;
-    readonly styleRules?: readonly ScreenComponentStyleRule[];
     // (undocumented)
     readonly zIndex?: number;
+}
+
+// @public
+interface ScreenComponentState {
+    readonly id: string;
+    // (undocumented)
+    readonly name: string;
+    readonly style: ScreenJsonObject;
+}
+
+// @public (undocumented)
+interface ScreenComponentStateCase {
+    // (undocumented)
+    readonly operator: ScreenComponentStateOperator;
+    // (undocumented)
+    readonly stateId: string;
+    readonly value?: ScreenJsonValue;
+}
+
+// @public (undocumented)
+type ScreenComponentStateInput = {
+    readonly kind: 'component-data';
+    readonly path: readonly string[];
+} | {
+    readonly kind: 'variable';
+    readonly variableId: string;
+    readonly path: readonly string[];
+} | {
+    readonly kind: 'data-source-field';
+    readonly dataSourceId: string;
+    readonly where?: ScreenComponentStateRowMatch;
+    readonly path: readonly string[];
+};
+
+// @public (undocumented)
+interface ScreenComponentStateJudge {
+    readonly cases: readonly ScreenComponentStateCase[];
+    // (undocumented)
+    readonly input: ScreenComponentStateInput;
+}
+
+// @public (undocumented)
+type ScreenComponentStateOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists';
+
+// @public
+interface ScreenComponentStateRowMatch {
+    // (undocumented)
+    readonly equals: {
+        readonly kind: 'literal';
+        readonly value: string | number | boolean;
+    } | {
+        readonly kind: 'variable';
+        readonly variableId: string;
+    };
+    // (undocumented)
+    readonly field: readonly string[];
+}
+
+// @public (undocumented)
+interface ScreenComponentStates {
+    // (undocumented)
+    readonly items: readonly ScreenComponentState[];
+    readonly judge?: ScreenComponentStateJudge;
 }
 
 // @public (undocumented)
@@ -2912,29 +2863,6 @@ interface ScreenComponentStatus {
     // (undocumented)
     readonly locked: boolean;
 }
-
-// @public (undocumented)
-interface ScreenComponentStyleRule {
-    // (undocumented)
-    readonly id: string;
-    // (undocumented)
-    readonly style: ScreenJsonObject;
-    // (undocumented)
-    readonly when: ScreenComponentStyleRuleCondition;
-}
-
-// @public (undocumented)
-interface ScreenComponentStyleRuleCondition {
-    // (undocumented)
-    readonly operator: ScreenComponentStyleRuleOperator;
-    // (undocumented)
-    readonly path: readonly string[];
-    // (undocumented)
-    readonly value?: ScreenJsonValue;
-}
-
-// @public (undocumented)
-type ScreenComponentStyleRuleOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists';
 
 // @public (undocumented)
 export interface ScreenComponentTextCommitRequest {
@@ -3312,6 +3240,7 @@ interface ScreenHostCatalogDescribeRequest {
 // @public
 interface ScreenHostCatalogDescriptor extends ScreenHostCatalogSummary {
     readonly delivery?: ScreenSourceDelivery;
+    readonly levelScales?: readonly ScreenLevelScale[];
     readonly parameters: readonly ScreenDatasetParameterDefinition[];
     // (undocumented)
     readonly previewable: boolean;
@@ -3542,8 +3471,22 @@ type ScreenJsonValue = null | boolean | number | string | readonly ScreenJsonVal
     readonly [key: string]: ScreenJsonValue;
 };
 
+// @public
+interface ScreenLevelScale {
+    readonly levels: readonly ScreenLevelScaleLevel[];
+    readonly path: readonly string[];
+}
+
 // @public (undocumented)
-type ScreenMaterialErrorCode = (typeof SCREEN_MATERIAL_ERROR_CODES)[number];
+interface ScreenLevelScaleLevel {
+    readonly label: string;
+    // (undocumented)
+    readonly tone: ScreenLevelTone;
+    readonly value: string | number;
+}
+
+// @public
+type ScreenLevelTone = 'danger' | 'warning' | 'info' | 'success';
 
 // @public
 interface ScreenPageCanvas extends ScreenSubCanvasBase {
@@ -4011,14 +3954,20 @@ interface ScreenTargetDisplayProfile {
 // @public (undocumented)
 interface ScreenTheme {
     // (undocumented)
-    readonly palette: Readonly<Record<ScreenThemeSlot, string>>;
+    readonly palette: Readonly<Record<ScreenThemeBaseSlot, string>> & Readonly<Partial<Record<ScreenThemeStatusSlot, string>>>;
 }
+
+// @public
+type ScreenThemeBaseSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
 
 // @public
 type ScreenThemePatch = Readonly<Partial<Record<ScreenThemeSlot, string>>>;
 
+// @public (undocumented)
+type ScreenThemeSlot = ScreenThemeBaseSlot | ScreenThemeStatusSlot;
+
 // @public
-type ScreenThemeSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
+type ScreenThemeStatusSlot = 'danger' | 'warning' | 'info' | 'success';
 
 // @public (undocumented)
 interface ScreenTransactionProvenance {

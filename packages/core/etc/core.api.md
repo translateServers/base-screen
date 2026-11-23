@@ -17,8 +17,8 @@ import type { ScreenCanvasBackground } from '@base-screen/contracts';
 import type { ScreenCanvasBackgroundImageFit } from '@base-screen/contracts';
 import type { ScreenComponentDataSource } from '@base-screen/contracts';
 import { ScreenComponentNode } from '@base-screen/contracts';
+import type { ScreenComponentStates } from '@base-screen/contracts';
 import { ScreenComponentStatus } from '@base-screen/contracts';
-import type { ScreenComponentStyleRule } from '@base-screen/contracts';
 import { ScreenDataBinding } from '@base-screen/contracts';
 import { ScreenDatasetField } from '@base-screen/contracts';
 import { ScreenDatasetValueType } from '@base-screen/contracts';
@@ -221,7 +221,7 @@ export interface ScreenAlignmentDelta {
 export type ScreenAxis = 'x' | 'y';
 
 // @public (undocumented)
-export type ScreenBlueprintActionTrace = ScreenBlueprintSetVariableActionTrace | ScreenBlueprintRequestVariableActionTrace | ScreenBlueprintRequestComponentDataActionTrace | ScreenBlueprintEmitHostEventActionTrace | ScreenBlueprintHostActionTrace | ScreenBlueprintComponentVisibilityActionTrace | ScreenBlueprintCanvasVisibilityActionTrace | ScreenBlueprintPageNavigationActionTrace;
+export type ScreenBlueprintActionTrace = ScreenBlueprintSetVariableActionTrace | ScreenBlueprintRequestVariableActionTrace | ScreenBlueprintRequestComponentDataActionTrace | ScreenBlueprintEmitHostEventActionTrace | ScreenBlueprintHostActionTrace | ScreenBlueprintComponentVisibilityActionTrace | ScreenBlueprintCanvasVisibilityActionTrace | ScreenBlueprintPageNavigationActionTrace | ScreenBlueprintComponentStateActionTrace;
 
 // @public (undocumented)
 export type ScreenBlueprintCanvasEffect = {
@@ -270,6 +270,37 @@ interface ScreenBlueprintCapabilityIndex {
 }
 
 // @public (undocumented)
+export interface ScreenBlueprintComponentStateActionTrace {
+    // (undocumented)
+    readonly actionIndex: number;
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
+    // (undocumented)
+    readonly operation: 'set' | 'reset';
+    // (undocumented)
+    readonly output: ScreenJsonValue;
+    // (undocumented)
+    readonly stateId?: string;
+    // (undocumented)
+    readonly type: 'component-state';
+}
+
+// @public
+export interface ScreenBlueprintComponentStateEvent {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly name: 'state-changed';
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'component-state-changed';
+}
+
+// @public (undocumented)
 export interface ScreenBlueprintComponentVisibilityActionTrace {
     // (undocumented)
     readonly actionIndex: number;
@@ -305,6 +336,7 @@ export interface ScreenBlueprintDispatchResult {
     readonly hostActions: readonly ScreenBlueprintHostEvent[];
     // (undocumented)
     readonly hostEvents: readonly ScreenBlueprintHostEvent[];
+    readonly stateEffects: readonly ScreenBlueprintStateEffect[];
     // (undocumented)
     readonly variableRequests: readonly string[];
     // (undocumented)
@@ -329,7 +361,7 @@ export interface ScreenBlueprintEmitHostEventActionTrace {
 }
 
 // @public (undocumented)
-export type ScreenBlueprintEvent = ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent | ScreenBlueprintLifecycleEvent | ScreenBlueprintTimerEvent | ScreenBlueprintCanvasEvent | ScreenBlueprintPageChangedEvent;
+export type ScreenBlueprintEvent = ScreenBlueprintComponentStateEvent | ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent | ScreenBlueprintLifecycleEvent | ScreenBlueprintTimerEvent | ScreenBlueprintCanvasEvent | ScreenBlueprintPageChangedEvent;
 
 // @public (undocumented)
 export interface ScreenBlueprintHostActionTrace {
@@ -458,6 +490,15 @@ export interface ScreenBlueprintSetVariableActionTrace {
     readonly variableId: string;
 }
 
+// @public (undocumented)
+export interface ScreenBlueprintStateEffect {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly operation: 'set' | 'reset';
+    readonly stateId?: string;
+}
+
 // @public
 interface ScreenBlueprintTimerEvent {
     // (undocumented)
@@ -553,11 +594,11 @@ export interface ScreenComponentPatch {
     readonly rotation?: number;
     // (undocumented)
     readonly size?: ScreenSize;
+    readonly states?: ScreenComponentStates | null;
     // (undocumented)
     readonly status?: ScreenComponentStatus;
     // (undocumented)
     readonly style?: ScreenJsonObject;
-    readonly styleRules?: readonly ScreenComponentStyleRule[];
     // (undocumented)
     readonly zIndex?: number;
 }

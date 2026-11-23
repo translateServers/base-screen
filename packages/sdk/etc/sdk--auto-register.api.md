@@ -15,7 +15,6 @@ import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT } from '@base-screen
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT } from '@base-screen/engine';
-import { BASE_SCREEN_GUARD_CHANGE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_HOST_RESOURCE_DRAG_MIME } from '@base-screen/engine';
 import { BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT } from '@base-screen/engine';
@@ -87,7 +86,6 @@ import { createBaseScreenCorePluginDesignReadPort } from '@base-screen/engine';
 import { CreateBaseScreenCorePluginDesignReadPortOptions } from '@base-screen/engine';
 import type { createBaseScreenPluginContributionCommandPort } from '@base-screen/plugin-manager';
 import { CreatePluginRegistrationOptions } from '@base-screen/plugin-sdk';
-import { DesignerGuardSnapshot } from '@base-screen/engine';
 import { parseBaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
 import { parseBaseScreenDesignerLeftPanelGroups } from '@base-screen/engine';
 import { parseBaseScreenHostResourceAuthoringIntent } from '@base-screen/engine';
@@ -136,8 +134,6 @@ export { BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX }
 export const BASE_SCREEN_DESIGNER_TAG_NAME: 'base-screen-designer';
 
 export { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT }
-
-export { BASE_SCREEN_GUARD_CHANGE_EVENT }
 
 export { BASE_SCREEN_HOST_RESOURCE_DRAG_MIME }
 
@@ -516,8 +512,6 @@ export function defineBaseScreenElements(): ScreenParseResult<null>;
 
 // @public (undocumented)
 export function defineBaseScreenViewer(): ScreenParseResult<CustomElementConstructor>;
-
-export { DesignerGuardSnapshot }
 
 // @public
 export function mountBaseScreenDesignerSkeleton(container: Element): ScreenParseResult<BaseScreenDesignerElement>;
