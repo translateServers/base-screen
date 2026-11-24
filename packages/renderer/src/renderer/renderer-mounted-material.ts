@@ -22,6 +22,7 @@ export function reconcileMountedMaterial(
   mounted: MountedMaterial,
   stackOrder: number,
   document: ScreenDocument,
+  opacity: number,
 ): void {
   mounted.stackOrder = stackOrder;
   mounted.projection.projectionKey = candidate.dataSource?.projectionKey;
@@ -32,11 +33,17 @@ export function reconcileMountedMaterial(
     mounted.appliedModel !== undefined &&
     sameAppliedModelKey(mounted.applied, applied)
   ) {
-    applyMaterialFrame(mounted.element, candidate.component, mounted.appliedModel, stackOrder);
+    applyMaterialFrame(
+      mounted.element,
+      candidate.component,
+      mounted.appliedModel,
+      stackOrder,
+      opacity,
+    );
     applyMaterialDisplay(mounted.element, state.visibility.isHidden(candidate.component.id));
     return;
   }
-  applyMountedModel(state, candidate, mounted, stackOrder, document);
+  applyMountedModel(state, candidate, mounted, stackOrder, document, opacity);
 }
 
 /**
@@ -49,6 +56,7 @@ export function applyMountedModel(
   mounted: MountedMaterial,
   stackOrder: number,
   document: ScreenDocument,
+  opacity: number,
 ): void {
   const model = resolveEffectiveModel(state, candidate, candidate.model.dataState, document);
   applyMaterial(
@@ -57,6 +65,7 @@ export function applyMountedModel(
     model,
     state.visibility.isHidden(candidate.component.id),
     stackOrder,
+    opacity,
   );
   mounted.applied = appliedModelKeyOf(state, candidate, stackOrder, document);
   mounted.appliedModel = model;

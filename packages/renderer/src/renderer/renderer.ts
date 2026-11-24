@@ -42,8 +42,12 @@ import {
 } from './renderer-candidates.js';
 import type { BaseScreenComponentStateChange } from './renderer-component-states.js';
 import { diagnostic, failure, renderFailure } from './renderer-diagnostics.js';
-import { resolveEffectiveModel } from './renderer-effective-style.js';
-import { applyMaterial, applyMaterialDataMarker } from './renderer-material-dom.js';
+import { resolveComponentOpacities, resolveEffectiveModel } from './renderer-effective-style.js';
+import {
+  applyMaterial,
+  applyMaterialDataMarker,
+  applyMaterialOpacity,
+} from './renderer-material-dom.js';
 import {
   appliedModelKeyOf,
   applyMountedModel,
@@ -262,6 +266,11 @@ class Renderer implements BaseScreenRenderer {
     const candidates = [...prepared.value].sort(
       (left, right) => painterIndex.get(left.component.id)! - painterIndex.get(right.component.id)!,
     );
+    this.#state.opacities = resolveComponentOpacities(
+      this.#state,
+      new Map(candidates.map((candidate) => [candidate.component.id, candidate])),
+      parsedDocument.value,
+    );
     const next = new Map<string, MountedMaterial>();
     const runtimeDiagnostics: ScreenDiagnostic[] = [];
     for (const candidate of candidates) {
@@ -275,6 +284,7 @@ class Renderer implements BaseScreenRenderer {
             existing,
             stackOrder,
             parsedDocument.value,
+            this.#state.opacities.get(candidate.component.id) ?? 1,
           );
         } catch {
           runtimeDiagnostics.push(
@@ -322,6 +332,7 @@ class Renderer implements BaseScreenRenderer {
           mountedModel,
           this.#state.visibility.isHidden(candidate.component.id),
           stackOrder,
+          this.#state.opacities.get(candidate.component.id) ?? 1,
         );
       } catch {
         runtimeDiagnostics.push(renderFailure(candidate, 'Material render raised an exception.'));
@@ -642,6 +653,21 @@ class Renderer implements BaseScreenRenderer {
 
   #refreshStates(componentIds: readonly string[]): void {
     if (componentIds.length > 0) refreshComponentStates(this.#state, componentIds);
+    this.#refreshOpacities();
+  }
+
+  /** 组件状态变化会改祖先容器的 opacity，Document 后代是 DOM 兄弟，需整体重算。 */
+  #refreshOpacities(): void {
+    const document = this.#state.document;
+    if (document === undefined) return;
+    this.#state.opacities = resolveComponentOpacities(
+      this.#state,
+      this.#state.candidates,
+      document,
+    );
+    for (const [componentId, mounted] of this.#state.mounted) {
+      applyMaterialOpacity(mounted.element, this.#state.opacities.get(componentId) ?? 1);
+    }
   }
 
   /**
@@ -694,7 +720,14 @@ class Renderer implements BaseScreenRenderer {
       }
       mounted.projection.dataState = resolved.dataState;
       mounted.projection.projectionKey = resolved.dataSource?.projectionKey;
-      applyMountedModel(this.#state, nextCandidate, mounted, mounted.stackOrder, document);
+      applyMountedModel(
+        this.#state,
+        nextCandidate,
+        mounted,
+        mounted.stackOrder,
+        document,
+        this.#state.opacities.get(componentId) ?? 1,
+      );
     }
   }
 }
@@ -713,7 +746,14 @@ function refreshComponentStates(state: RendererState, componentIds: readonly str
     try {
       const key = appliedModelKeyOf(state, candidate, mounted.stackOrder, document);
       if (mounted.applied !== undefined && mounted.applied.stateId === key.stateId) continue;
-      applyMountedModel(state, candidate, mounted, mounted.stackOrder, document);
+      applyMountedModel(
+        state,
+        candidate,
+        mounted,
+        mounted.stackOrder,
+        document,
+        state.opacities.get(componentId) ?? 1,
+      );
     } catch {
       state.options.onDiagnostic?.(
         diagnostic(

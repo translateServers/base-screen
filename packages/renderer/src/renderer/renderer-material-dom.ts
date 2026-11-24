@@ -7,14 +7,15 @@ export function applyMaterial(
   model: BaseScreenMaterialModel,
   effectivelyHidden: boolean,
   stackOrder: number,
+  opacity: number,
 ): void {
-  applyMaterialFrame(element, component, model, stackOrder);
+  applyMaterialFrame(element, component, model, stackOrder, opacity);
   element.model = model;
   applyMaterialDisplay(element, effectivelyHidden);
 }
 
 /**
- * 几何帧：position、size、zIndex、transform、opacity 的写入。每次 reconcile 都要
+ * 几何帧：position、size、zIndex、transform、opacity（含祖先容器合成）的写入。每次 reconcile 都要
  * 跑，但全部走同值守卫——先读后写，未变更属性的写次数为 0，不触发 CSSOM 写入。
  * 不含 display：display 必须在 model 赋值之后收尾（见 `applyMaterialDisplay`）。
  */
@@ -23,6 +24,7 @@ export function applyMaterialFrame(
   component: ScreenComponentNode,
   model: BaseScreenMaterialModel,
   stackOrder: number,
+  opacity: number,
 ): void {
   const position = component.position;
   const style = element.style;
@@ -50,13 +52,15 @@ export function applyMaterialFrame(
   const scaleY = model.style.flipY === true ? -1 : 1;
   const transform = scaleX === 1 && scaleY === 1 ? rotate : `${rotate} scale(${scaleX}, ${scaleY})`;
   if (style.transform !== transform) style.transform = transform;
-  const opacity =
-    typeof model.style.opacity === 'number' && Number.isFinite(model.style.opacity)
-      ? String(Math.min(1, Math.max(0, model.style.opacity)))
-      : '';
-  if (style.opacity !== opacity) style.opacity = opacity;
+  applyMaterialOpacity(element, opacity);
   applyMaterialHostStyle(element, model);
   applyMaterialDataMarker(element, model);
+}
+
+/** 只写最终透明度，同值守卫；祖先容器状态变化时用，不重跑几何与 model。 */
+export function applyMaterialOpacity(element: BaseScreenMaterialElement, opacity: number): void {
+  const nextOpacity = Number.isFinite(opacity) ? String(Math.min(1, Math.max(0, opacity))) : '1';
+  if (element.style.opacity !== nextOpacity) element.style.opacity = nextOpacity;
 }
 
 /**

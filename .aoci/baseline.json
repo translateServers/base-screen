@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-21T03:27:31Z",
-  "updated_at": "2026-11-24T15:23:42Z",
+  "updated_at": "2026-11-24T15:45:05Z",
   "files": {
     ".changeset/blueprint-node-graph.md": {
       "role": "index",
@@ -329,9 +329,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "61a07d2a810bdff422a3a3abe5b14832a6f519ec9c0505e67a07f89c14d0058f",
-      "size": 367527,
-      "normalized_sha256": "61a07d2a810bdff422a3a3abe5b14832a6f519ec9c0505e67a07f89c14d0058f"
+      "sha256": "ffb57f310ed71c3054865ff7552149ab4b641aaa3e71a4787687122e5967a3cd",
+      "size": 367945,
+      "normalized_sha256": "ffb57f310ed71c3054865ff7552149ab4b641aaa3e71a4787687122e5967a3cd"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -8297,27 +8297,27 @@
     },
     "packages/renderer/src/renderer/renderer-effective-style.ts": {
       "role": "index",
-      "sha256": "f34d0f4c12422cfab328823d47e20bab92f5afbd216a67e65d00a5430150acca",
-      "size": 993,
-      "normalized_sha256": "f34d0f4c12422cfab328823d47e20bab92f5afbd216a67e65d00a5430150acca"
+      "sha256": "1a425e1f2a81f89f504cee502cee720cb6200de85789de7b2951f39537f11ad1",
+      "size": 3106,
+      "normalized_sha256": "1a425e1f2a81f89f504cee502cee720cb6200de85789de7b2951f39537f11ad1"
     },
     "packages/renderer/src/renderer/renderer-material-dom.ts": {
       "role": "index",
-      "sha256": "155f5054c9132b5ad007636f3025ce0ede1447152b56b3df6dd710f7960ade85",
-      "size": 6606,
-      "normalized_sha256": "155f5054c9132b5ad007636f3025ce0ede1447152b56b3df6dd710f7960ade85"
+      "sha256": "9cf1864fb4979c694434c108aa000e9612f2d70c8dbf0c4360b73ad1d7ccbeb4",
+      "size": 6875,
+      "normalized_sha256": "9cf1864fb4979c694434c108aa000e9612f2d70c8dbf0c4360b73ad1d7ccbeb4"
     },
     "packages/renderer/src/renderer/renderer-mounted-material.ts": {
       "role": "index",
-      "sha256": "526596f63129e84994a845d6541b7335dea27a1626897d42aa25b46c051436ca",
-      "size": 4783,
-      "normalized_sha256": "526596f63129e84994a845d6541b7335dea27a1626897d42aa25b46c051436ca"
+      "sha256": "51ea85ec5b356fb02dfd51a13164cbbe352c5242636c8836b3ece92bbd7dc545",
+      "size": 4889,
+      "normalized_sha256": "51ea85ec5b356fb02dfd51a13164cbbe352c5242636c8836b3ece92bbd7dc545"
     },
     "packages/renderer/src/renderer/renderer-state.ts": {
       "role": "index",
-      "sha256": "5263666f1b5a4d0eb252208d7fd9782276fe21a65dd58ee4760ec455686eb7e2",
-      "size": 9719,
-      "normalized_sha256": "5263666f1b5a4d0eb252208d7fd9782276fe21a65dd58ee4760ec455686eb7e2"
+      "sha256": "03b1ac7c3cc357585e4efd3c01960a500e4dc33257af65724ba770efd8cac537",
+      "size": 9879,
+      "normalized_sha256": "03b1ac7c3cc357585e4efd3c01960a500e4dc33257af65724ba770efd8cac537"
     },
     "packages/renderer/src/renderer/renderer-theme.ts": {
       "role": "index",
@@ -8333,9 +8333,9 @@
     },
     "packages/renderer/src/renderer/renderer.ts": {
       "role": "index",
-      "sha256": "ed66c174072c3a3b5e002c86c939467fea60eb7fd206194687a6f7e26b94b7c9",
-      "size": 31314,
-      "normalized_sha256": "ed66c174072c3a3b5e002c86c939467fea60eb7fd206194687a6f7e26b94b7c9"
+      "sha256": "3ac5562594d124898593a9fad2676ed1a91ed43478cec21087efdb47c7f42b4c",
+      "size": 32439,
+      "normalized_sha256": "3ac5562594d124898593a9fad2676ed1a91ed43478cec21087efdb47c7f42b4c"
     },
     "packages/renderer/src/resource/data-source-runtime.ts": {
       "role": "index",
@@ -8519,9 +8519,9 @@
     },
     "packages/renderer/tests/renderer/renderer-presentation.test.ts": {
       "role": "observe",
-      "sha256": "fcb96c173001316af2988320e9d6068b3c4e78b1e21fc3f5276cde0021a61ef2",
-      "size": 8144,
-      "normalized_sha256": "fcb96c173001316af2988320e9d6068b3c4e78b1e21fc3f5276cde0021a61ef2"
+      "sha256": "b6d79fb9cf085e372ec44f4b5004431ada9fe863f4f03b90e7e56c9dd6cbd2b4",
+      "size": 10180,
+      "normalized_sha256": "b6d79fb9cf085e372ec44f4b5004431ada9fe863f4f03b90e7e56c9dd6cbd2b4"
     },
     "packages/renderer/tests/renderer/renderer-resilience-events.test.ts": {
       "role": "observe",

@@ -35,6 +35,8 @@ export interface RendererState {
   catalog: BaseScreenMaterialCatalog;
   mounted: Map<string, MountedMaterial>;
   candidates: Map<string, RenderCandidate>;
+  /** 当前文档每个组件含祖先容器合成的透明度，由 render() 重算。 */
+  opacities: ReadonlyMap<string, number>;
   document: import('@base-screen/contracts').ScreenDocument | undefined;
   lastValidatedInput: import('@base-screen/contracts').ScreenDocument | undefined;
   validationCache: ComponentValidationCache;
@@ -101,6 +103,7 @@ export function createRendererState(options: CreateBaseScreenRendererOptions): R
     catalog: options.catalog,
     mounted: new Map(),
     candidates: new Map(),
+    opacities: new Map(),
     document: undefined,
     lastValidatedInput: undefined,
     validationCache: { entries: new Map() },

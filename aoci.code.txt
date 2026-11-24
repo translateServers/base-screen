@@ -1411,13 +1411,13 @@ renderer-candidates.ts[RG8L]: F:渲染候选的准备校验与数据投影 | R:c
 renderer-component-states.ts[RG7S]: F:渲染器组件状态记忆与改变事件（ADR-0110 §2.3） | R:code:packages/contracts/src/document/component-states.ts | A:- | S:cause 区分自动判定与蓝图设置；只保留仍挂载组件；改变事件排到本次渲染之后再交宿主，避免物料写入途中重入蓝图
 renderer-data-source.ts[DB7S]: F:实例结果到物料 dataState 的逐组件投影 | R:code:packages/renderer/src/renderer/renderer-candidates.ts | A:- | S:本模块不发请求，请求身份是数据源实例；同一实例被多组件以不同映射引用时只发一次请求各自投影；binding 为空直接 ready
 renderer-diagnostics.ts[DB5T]: F:渲染器诊断的构造前缀与排序 | R:- | A:- | S:统一诊断构造按路径加前缀并排序，渲染失败时给出稳定输出
-renderer-effective-style.ts[RG7T]: F:物料有效模型求值 | R:code:packages/renderer/src/renderer/renderer-component-states.ts | A:- | S:model.style 恒为主题已解析的基础样式；生效状态的预校验样式覆盖它，默认状态即基础；不回写文档
-renderer-material-dom.ts[EA7S]: F:物料几何帧、宿主样式、数据标记与显示的 DOM 应用 | R:code:packages/renderer/src/renderer/renderer-types.ts | A:- | S:物料声明的 max-content 宽度在 model 未重赋值时保留；display 须在 model 赋值之后收尾；ready+stale 打 data-base-screen-data-stale；事件穿透只在运行时或开启事件时写
-renderer-mounted-material.ts[EA7S]: F:已挂载物料的复用、模型键比对与事件处理 | R:code:packages/renderer/src/renderer/renderer-material-dom.ts | A:- | S:输入签名全等则只重跑几何帧与 display 不重赋 model；复用路径须用本次文档而非 state.document；事件门控须读最近一次 render 的候选
-renderer-state.ts[RG8M]: F:渲染器运行状态容器 | R:code:packages/renderer/src/renderer/renderer.ts | A:- | S:数据源实例运行时是请求身份缓存与代际唯一所有者；设计态不订阅推送且不建页面层与浮层；dataset 只在端口声明 queryScope 时共享；持有组件状态会话记忆
+renderer-effective-style.ts[RG7T]: F:物料有效模型求值与组件透明度合成 | R:code:packages/renderer/src/renderer/renderer-component-states.ts | A:状态样式覆盖 / 祖先 opacity 连乘 / 环防护 | S:model.style 恒为主题已解析基础样式；生效状态覆盖它但不回写文档；文档后代是 DOM 兄弟，容器 opacity 必须沿 parentId 链连乘给每个组件
+renderer-material-dom.ts[EA7S]: F:物料几何帧、宿主样式、数据标记、透明度与显示的 DOM 应用 | R:code:packages/renderer/src/renderer/renderer-types.ts | A:几何与 opacity 写入 / 宿主保留样式 / stale 标记 / display 收尾 | S:max-content 宽度在 model 未重赋值时保留；display 须在 model 赋值后收尾；opacity 用合成值同值守卫写入；ready+stale 打 data-base-screen-data-stale；事件穿透只在运行时或开启事件时写
+renderer-mounted-material.ts[EA7S]: F:已挂载物料的复用、模型键比对、透明度应用与事件处理 | R:code:packages/renderer/src/renderer/renderer-material-dom.ts | A:复用帧刷新 / 状态与数据重投影 / 事件门控 | S:输入签名全等只重跑几何帧、opacity 与 display 不重赋 model；复用路径用本次文档；事件门控读最近一次 render 的候选
+renderer-state.ts[RG8M]: F:渲染器运行状态容器 | R:code:packages/renderer/src/renderer/renderer.ts | A:挂载与候选 / 数据源实例 / 组件状态 / 合成透明度 / 子画布 | S:数据源实例是请求身份缓存与代际唯一所有者；设计态不订阅推送且不建页面层；dataset 仅 queryScope 声明时共享；opacities 由每次 render 重算供 DOM 兄弟后代继承
 renderer-theme.ts[RG5T]: F:style 中主题色引用的解析 | R:code:packages/contracts/src/document/theme.ts | A:- | S:解析不到的引用进 unresolved 由调用方失败关闭，不能渲染成字面字符串
 renderer-types.ts[FC5T]: F:渲染候选、已挂载物料与校验缓存类型 | R:code:packages/renderer/src/renderer/renderer.ts | A:- | S:候选带各非默认状态预校验样式；缓存 style 已是主题解析结果，主题变化视为未命中
-renderer.ts[EA9L]: F:核心渲染器的实现 | R:code:packages/renderer/src/renderer/renderer-candidates.ts,code:packages/renderer/src/renderer/renderer-mounted-material.ts,code:packages/renderer/src/sub-canvas-layer.ts | A:- | S:候选失败策略缺省 fail，Viewer 传 skip；目录变更先校验再交换；组件状态按判定与蓝图设置切换，只重算依赖来源变化的组件；画布与状态变化回调排在本次渲染之后
+renderer.ts[EA9L]: F:核心渲染器的实现 | R:code:packages/renderer/src/renderer/renderer-candidates.ts,code:packages/renderer/src/renderer/renderer-mounted-material.ts,code:packages/renderer/src/sub-canvas-layer.ts | A:候选校验与挂载 / 透明度合成 / 状态与数据刷新 / 目录交换 / 回调排队 | S:候选失败缺省 fail、Viewer skip；目录先校验再交换；状态变化只重算依赖来源组件并重算祖先透明度；画布与状态回调排在本次渲染之后
 
 ===/<repository>/packages/renderer/src/resource/===
 data-source-runtime.ts[RG9L]: F:数据源实例的运行期状态、请求与推送订阅管理 | R:code:packages/renderer/src/resource/request-coordinator.ts,code:packages/renderer/src/resource/push-window.ts | A:- | S:一实例一条状态；请求键由来源与规范参数组成，path 与 dataBinding 不进键；文档中消失的实例取消在途并丢弃；设计态 push 只拉一次；订阅身份即请求键，退订后旧 sink 事件丢弃
