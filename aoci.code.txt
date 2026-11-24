@@ -125,7 +125,7 @@ host-alarm-controller.ts[IM7M]: F:宿主告警源参考实现，把 SSE 告警�
 host-catalog-port.ts[IM6M]: F:宿主变量来源目录端口 | R:code:examples/react-host/src/screen/host-dataset-port.ts | A:list/describe 供变量面板 / resolve 供渲染器求值 clock-notice-status | S:production.clock/notice/status 三个来源；取数抛错时返回失败诊断而非 reject，实例沿用 initialValue 避免整屏不渲染
 host-data-channel.ts[IN7M]: F:宿主数据通道 resourcePort | R:code:examples/react-host/src/lib/api.ts,code:examples/react-host/src/screen/host-alarm-controller.ts | A:resolve 投影表格 / push 实例经 SSE 订阅 / 告警汇总推送 | S:resourceType 白名单失败关闭；复用键只由资源身份与参数派生不混入会话凭证；可推送类型须与 host-resource-plugin 的 delivery.push 一致；告警 SSE 多组件共用，最后读者离开 2 秒后断开
 host-dataset-port.ts[IS6S]: F:宿主数据集端口 | R:code:examples/react-host/src/lib/api.ts | A:groups/list/describe/query 适配 / 告警行与失败快照 | S:复用官方 host-kit 辅助层处理协议校验取消与错误归一化；monitor.alarms 查询结果缓存为告警行供目录端口播报
-host-intent-reference.ts[IG4S]: F:智能体意图引用目录端口 | R:code:examples/react-host/src/lib/api.ts | A:把素材与数据集拍平成分页清单 | S:引擎带 query/limit/offset 按页回答；素材与数据集各自独立失败不连带；缺省页大小 20
+host-intent-reference.ts[IG4T]: F:智能体意图引用目录端口 | R:code:examples/react-host/src/lib/api.ts | A:把素材与数据集拍平成分页清单 | S:引擎带 query/limit/offset 按页回答；素材与数据集各自独立失败不连带；缺省页大小 20
 host-intent.ts[IA7L]: F:宿主智能体意图处理器 | R:code:examples/react-host/src/screen/agent-catalog.ts | A:接收提案命令 / 画布与组件补丁 / 文档诊断与目录读取 | S:目录用函数而非快照读取，在线物料发布下架后整体替换 catalog 也能取到最新；提案本身不落库，screenId 仅用于日志与素材范围
 host-refresh-controller.ts[IR7L]: F:宿主轮询刷新控制器 | R:code:examples/react-host/src/components/screen-viewer.tsx | A:按数据源实例分组重建到期表 / 250ms 心跳刷新 / tickNow | S:只要求元素提供 document/refreshData/getVariable 便于假元素测试；hidden 期间不累积欠账恢复时只补一次全量；推送实例一律跳过轮询
 host-resource-authoring.ts[IU7L]: F:宿主资源作者面页面入口 | R:code:examples/react-host/src/screen/asset-library.ts | A:枚举资源类型与物料 / 插入替换宿主资源 / 参数配置 | S:设计器数据面板对 host-resource 只读，授权与目录归宿主；无此模块则宿主资源只能靠种子 JSON 出现，与页面内可配置目标冲突；三端逐字共享
@@ -387,7 +387,7 @@ host-alarm-controller.ts[IM7M]: F:宿主告警源参考实现（Vanilla），把
 host-catalog-port.ts[IM6M]: F:宿主变量来源目录端口（Vanilla） | R:code:examples/vanilla-host/src/screen/host-dataset-port.ts | A:list/describe 供变量面板 / resolve 供渲染器求值 | S:production.clock/notice/status 三来源；取数抛错返回失败诊断而非 reject，实例沿用 initialValue 避免整屏不渲染
 host-data-channel.ts[IN7M]: F:宿主数据通道 resourcePort（Vanilla） | R:code:examples/vanilla-host/src/lib/api.ts,code:examples/vanilla-host/src/screen/host-alarm-controller.ts | A:resolve 投影表格 / push 实例经 SSE 订阅 / 告警汇总推送 | S:resourceType 白名单失败关闭；复用键只由资源身份与参数派生不混入会话凭证；可推送类型须与 host-resource-plugin 的 delivery.push 一致；告警 SSE 多组件共用，最后读者离开 2 秒后断开
 host-dataset-port.ts[IS6S]: F:宿主数据集端口（Vanilla） | R:code:examples/vanilla-host/src/lib/api.ts | A:groups/list/describe/query 适配 / 告警快照 | S:复用官方 host-kit 辅助层处理校验取消与错误归一；monitor.alarms 结果缓存为告警行供播报
-host-intent-reference.ts[IG4S]: F:智能体意图引用目录（Vanilla） | R:code:examples/vanilla-host/src/lib/api.ts | A:把素材与数据集拍平成分页清单 | S:引擎带 query/limit/offset 按页回答；素材与数据集各自独立失败不连带；缺省页大小20
+host-intent-reference.ts[IG4T]: F:智能体意图引用目录（Vanilla） | R:code:examples/vanilla-host/src/lib/api.ts | A:把素材与数据集拍平成分页清单 | S:引擎带 query/limit/offset 按页回答；素材与数据集各自独立失败不连带；缺省页大小20
 host-intent.ts[IA7L]: F:宿主智能体意图处理器（Vanilla） | R:code:examples/vanilla-host/src/screen/agent-catalog.ts | A:接收提案命令 / 画布组件补丁 / 文档诊断 | S:目录用函数而非快照读取，在线物料发布下架后能取到最新；提案不落库 screenId 仅用于日志与素材范围
 host-refresh-controller.ts[IR7L]: F:宿主轮询刷新控制器（Vanilla） | R:code:examples/vanilla-host/src/views/screen-view.ts | A:按数据源实例分组重建到期表 / 250ms 心跳刷新 / tickNow | S:只要求元素提供 document/refreshData/getVariable 便于假元素测试；hidden 期间不累积欠账恢复时只补一次全量；推送实例一律跳过轮询
 host-resource-authoring.ts[IU7L]: F:宿主资源作者面页面入口（Vanilla） | R:code:examples/vanilla-host/src/screen/asset-library.ts | A:枚举资源类型与物料 / 插入替换宿主资源 / 参数配置 | S:设计器数据面板对 host-resource 只读，授权与目录归宿主；三端逐字共享且 vanilla 为基准
@@ -479,13 +479,13 @@ host-alarm-controller.ts[IM7M]: F:宿主告警源参考实现（Vue），把 SSE
 host-catalog-port.ts[IM6M]: F:宿主变量来源目录端口（Vue） | R:code:examples/vue-host/src/screen/host-dataset-port.ts | A:list/describe 供变量面板 / resolve 供渲染器求值 | S:production.clock/notice/status 三来源；取数抛错返回失败诊断而非 reject，实例沿用 initialValue 避免整屏不渲染
 host-data-channel.ts[IN7M]: F:宿主数据通道 resourcePort（Vue） | R:code:examples/vue-host/src/lib/api.ts,code:examples/vue-host/src/screen/host-alarm-controller.ts | A:resolve 投影表格 / push 实例经 SSE 订阅 / 告警汇总推送 | S:resourceType 白名单失败关闭；复用键只由资源身份与参数派生不混入会话凭证；可推送类型须与 host-resource-plugin 的 delivery.push 一致；告警 SSE 多组件共用，最后读者离开 2 秒后断开
 host-dataset-port.ts[IS6S]: F:宿主数据集端口（Vue） | R:code:examples/vue-host/src/lib/api.ts | A:groups/list/describe/query 适配 / 告警快照 | S:复用官方 host-kit 辅助层处理校验取消与错误归一；monitor.alarms 结果缓存为告警行供播报
-host-intent-reference.ts[IG4S]: F:智能体意图引用目录（Vue） | R:code:examples/vue-host/src/lib/api.ts | A:把素材与数据集拍平成分页清单 | S:引擎带 query/limit/offset 按页回答；素材与数据集各自独立失败不连带；缺省页大小20
+host-intent-reference.ts[IG4T]: F:智能体意图引用目录（Vue） | R:code:examples/vue-host/src/lib/api.ts | A:把素材与数据集拍平成分页清单 | S:引擎带 query/limit/offset 按页回答；素材与数据集各自独立失败不连带；缺省页大小20
 host-intent.ts[IA7L]: F:宿主智能体意图处理器（Vue） | R:code:examples/vue-host/src/screen/agent-catalog.ts | A:接收提案命令 / 画布组件补丁 / 文档诊断 | S:目录用函数而非快照读取，在线物料发布下架后能取到最新；提案不落库 screenId 仅用于日志与素材范围
 host-refresh-controller.ts[IR7L]: F:宿主轮询刷新控制器（Vue） | R:code:examples/vue-host/src/components/ScreenViewer.vue | A:按数据源实例分组重建到期表 / 250ms 心跳刷新 / tickNow | S:只要求元素提供 document/refreshData/getVariable 便于假元素测试；hidden 期间不累积欠账恢复时只补一次全量；推送实例一律跳过轮询
 host-resource-authoring.ts[IU7L]: F:宿主资源作者面页面入口（Vue） | R:code:examples/vue-host/src/screen/asset-library.ts | A:枚举资源类型与物料 / 插入替换宿主资源 / 参数配置 | S:设计器数据面板对 host-resource 只读，授权与目录归宿主；三端逐字共享且 vanilla 为基准
 host-resource-plugin.ts[IE5S]: F:宿主资源类型插件声明（Vue） | R:code:examples/vue-host/src/screen/host-data-channel.ts | A:声明 demo_metric/series/ranking、alarm 与 host_image 五种资源类型 | S:未声明类型渲染器直接丢弃，须与 host-data-channel 白名单一致；alarm 只带 levelScales 分级不带样式；指标类 push 静默 20 秒判过期
 host-runtime.ts[IR8M]: F:宿主标准 runtime 与在线物料装配（Vue） | R:code:examples/vue-host/src/screen/host-resource-plugin.ts | A:单例创建 / 插件能力授权 / 在线物料加载增删 | S:request-component-data 能力须让出避免撞身份；初始化失败清 Promise 允许重试；在线物料类型与内置冲突则跳过
-metric-value-material.ts[IS5S]: F:Vue 指标读数物料桥与表格适配 | R:code:examples/vue-host/src/screen/metric-value.ts | A:SFC 经桥接为物料 / tabularDataAdapter 取第一行数值 | S:角色 value 绑定字段取第一行数值三端同一语义；返回普通对象满足 ScreenJsonValue 索引签名
+metric-value-material.ts[IS5T]: F:Vue 指标读数物料桥与表格适配 | R:code:examples/vue-host/src/screen/metric-value.ts | A:SFC 经桥接为物料 / tabularDataAdapter 取第一行数值 | S:角色 value 绑定字段取第一行数值三端同一语义；返回普通对象满足 ScreenJsonValue 索引签名
 metric-value.ts[IE5T]: F:三端共有指标读数物料 manifest 与指标卡分片 | R:code:examples/vue-host/src/screen/metric-value-material.ts | A:type/tagName/schema 声明 / 数据能力与绑定角色 / METRIC_CARD_FRAGMENT | S:三端 type/tagName/schema 完全一致使种子文档可跨前端渲染；读数物料保持原子，标题与底座由分片的 base.text 与 base.container 承担
 online-materials.ts[IA7L]: F:在线物料宿主侧实现（ADR-0090） | R:code:examples/vue-host/src/screen/host-runtime.ts,code:examples/vue-host/src/screen/component-workshop.ts | A:草稿生成 ESM 与 Manifest / 审核持久化 / import 定义 / 重建目录 | S:三端逐字共享；Base Screen 不 fetch 不 import 只接收重建后的 catalog；工坊规格模块走 loadSpecMaterialEntry；生成元素不得把 display 覆盖成 block
 project-adapter.ts[IP6T]: F:宿主项目适配器（Vue） | R:code:examples/vue-host/src/lib/api.ts | A:load/save 映射业务 API 与信封 | S:业务 API 与信封映射归宿主，迁移校验取消与冲突归官方 host-kit 辅助层
@@ -503,7 +503,7 @@ layout.css[FC6M]: F:应用外壳与舞台布局样式（Vue） | R:code:examples
 online-materials.css[OC6M]: F:在线物料面板与编辑对话框样式（Vue） | R:code:examples/vue-host/src/styles/base.css | A:- | S:三端共用；对话框尺寸用 min 与 vw/vh 自适应，::backdrop 模糊背景
 
 ===/<repository>/packages/base-screen/===
-CHANGELOG.md[SG7L]: F:base-screen 包变更日志 | R:code:packages/base-screen/README.md | A:0.2.0 变更 / 迁移说明 | S:移除 react/vue 子路径消除包图环，改直接依赖独立桥接包；设计器改首帧骨架加分帧水合；入口按作者面拆异步 chunk
+CHANGELOG.md[SG7T]: F:base-screen 包变更日志 | R:code:packages/base-screen/README.md | A:0.2.0 变更 / 迁移说明 | S:移除 react/vue 子路径消除包图环，改直接依赖独立桥接包；设计器改首帧骨架加分帧水合；入口按作者面拆异步 chunk
 README.md[SG8S]: F:base-screen 单包分发说明 | R:code:packages/base-screen/CHANGELOG.md | A:安装 / 子路径表 / 框架组件 | S:Viewer/Designer/物料/插件装进一个包按子路径引入；内部实现全内联宿主无需装 @base-screen/* 内部包；浏览器以 Web Components 对外
 package.json[FV5S]: F:base-screen 包清单 | R:code:packages/base-screen/README.md | A:子路径导出 / 构建脚本 / 依赖 | S:单包分发导出各子路径；内部实现全内联不依赖 @base-screen/* 内部包；build 生成 API 报告
 tsconfig.api.json[FC2T]: F:API 报告生成 tsconfig | R:code:packages/base-screen/tsconfig.json | A:- | S:供 API Extractor 生成各子路径报告使用
@@ -656,7 +656,7 @@ apply-component-commands.ts[IA8M]: F:组件命令应用实现 | R:code:packages/
 apply-data-source-command.ts[IA6T]: F:数据源替换命令 | R:code:packages/core/src/data/data-source-dependents.ts | A:applyReplaceDataSourcesCommand | S:整组替换文档级数据源；同 id 且内容相等的实例按引用复用旧对象；报告受影响的引用组件
 apply-variable-command.ts[IA5T]: F:变量重命名命令 | R:code:packages/core/src/commands/command-result.ts | A:renameVariable | S:只改作者可见标签不改不可变变量 id，故重命名原子无需重写组件数据与蓝图表达式
 apply.ts[IA9M]: F:文档命令总应用入口 | R:code:packages/core/src/commands/apply-component-commands.ts | A:分派十二类命令并汇总诊断 / 事务回滚 / 净变化 | S:事务首个失败即整体回滚；画布字段集取自 contracts 不自抄；主题补丁合并后须凑齐基础槽，状态色位可省略；数据源结果变化时读它的组件也计入重投影
-command-input.ts[IG6S]: F:命令输入校验原语 | R:code:packages/core/src/commands/parse-command.ts | A:patchDocument/严格 patch 判定 | S:canonicalTargetIds 与 isExactPatch/isStatusOnlyPatch 区分合法补丁；拒绝危险键与非法形状
+command-input.ts[IG6T]: F:命令输入校验原语 | R:code:packages/core/src/commands/parse-command.ts | A:patchDocument/严格 patch 判定 | S:canonicalTargetIds 与 isExactPatch/isStatusOnlyPatch 区分合法补丁；拒绝危险键与非法形状
 command-result.ts[IG5T]: F:命令结果构造 | R:code:packages/core/src/commands/types.ts | A:success/failure/invalid/finalize 构造 | S:统一命令结果形状与诊断；finalize 附加前后文档与 provenance
 parse-command.ts[IG6T]: F:文档命令严格解析 | R:code:packages/core/src/commands/types.ts | A:parseScreenDocumentCommand | S:十二类命令白名单与逐类字段白名单，除 startCanvasId 外字段必填；命令上限 256KiB；失败关闭
 types.ts[FG7S]: F:文档命令与事务类型定义 | R:code:packages/contracts/src/types/document.ts | A:各命令形状 / 组件与画布补丁 / 事务来源与结果 | S:补丁 null 表示删除字段；replace-sub-canvases 空数组删除字段；move-components 子组件随根组件不能单独移动
@@ -1331,7 +1331,7 @@ diagnostics.ts[DB5T]: F:插件管理器诊断收集与失败构造 | R:code:pack
 index.ts[FC4T]: F:plugin-manager 包的公共入口再导出 | R:code:packages/plugin-manager/src/manager.ts | A:- | S:导出插件管理器工厂与相关公共类型，作为包唯一入口
 input.ts[IB7M]: F:插件管理器输入选项的快照与校验 | R:code:packages/plugin-manager/src/preflight-types.ts | A:- | S:插件上限 128 独立物料上限 512；校验 instanceId 端口工厂与激活模式，activation 限 eager 或 lazy，任一步失败关闭
 manager.ts[AB9L]: F:插件生命周期管理器的实现 | R:code:packages/plugin-manager/src/preflight.ts | A:- | S:所有操作经串行队列执行避免并发竞态；dispose 幂等；懒激活把插件钩子推迟到首次使用；单插件失败不扩散其余贡献照常发布
-preflight-types.ts[FC6S]: F:插件预检的类型定义 | R:code:packages/plugin-manager/src/manager.ts | A:- | S:定义 ManagerInput Candidate 与 ActivationSession 的形状，供预检与管理器共享
+preflight-types.ts[FC6T]: F:插件预检的类型定义 | R:code:packages/plugin-manager/src/manager.ts | A:- | S:定义 ManagerInput Candidate 与 ActivationSession 的形状，供预检与管理器共享
 preflight.ts[AB8M]: F:插件激活计划的收敛构建 | R:code:packages/plugin-manager/src/resolver.ts | A:- | S:全局门失败关闭，单插件失败只排除该插件；幂等收敛直到幸存集合稳定；跨插件冲突按稳定顺序 first-wins，依赖失败级联排除
 registry.ts[IB7M]: F:物料面板检查器控件的注册表检查 | R:code:packages/plugin-manager/src/preflight-types.ts | A:- | S:按 tagName 查询构造器，同一标签解析到不同构造器报身份冲突；manifest 的 type 与 tagName 须与贡献声明一致，否则排除
 remote-sandbox.ts[IB7M]: F:远程插件 iframe 沙箱的构造 | R:- | A:- | S:默认超时 5 秒限定 100 到 60000 毫秒，消息上限 64KB；沙箱仅开 allow-scripts 与 allow-same-origin，referrerPolicy 为 no-referrer；预检失败返回失败沙箱
@@ -1357,7 +1357,7 @@ index.ts[FC4T]: F:plugin-sdk 包公共入口再导出 | R:code:packages/plugin-s
 material-config-groups.ts[FE6S]: F:物料通用配置组（ADR-0102 §11） | R:code:packages/plugin-sdk/src/material-editor-audit.ts | A:读数格式 / 图表标题 / 图例 / 合并 | S:同类配置在所有物料同字段同顺序同文档键；前缀单位给字符串即同时作默认值；同键被多组声明时拒绝
 material-definition.ts[IB7S]: F:物料定义的纯数据 builder 与编辑器描述符辅助 | R:code:packages/plugin-sdk/src/diagnostics.ts | A:- | S:解析 manifest 与元素静态清单，二者须结构相等否则报身份冲突；元素静态 tabular adapter 一并校验；不渲染 UI
 material-editor-audit.ts[DQ7M]: F:检查器配置表单范式审计（ADR-0102 §13） | R:code:packages/plugin-core/src/editor/editor-descriptor-inference.ts | A:auditBaseScreenMaterialEditorForm | S:R9 默认可见字段≤12；R11 控件须等于推导；R12 不得写扁平面板；R14 配置组键须走配置组；R15 字段不能单独标 advanced
-material-loading-container.ts[EB6M]: F:物料加载态容器的 opt-in 呈现 | R:code:packages/plugin-sdk/src/material-loading.ts | A:- | S:不注册自定义元素不用全局 DOM 状态；loading 用 inert 与隐藏遮罩使内容不可交互但不移除重挂；空错误文案仍归物料自理
+material-loading-container.ts[EB6T]: F:物料加载态容器的 opt-in 呈现 | R:code:packages/plugin-sdk/src/material-loading.ts | A:- | S:不注册自定义元素不用全局 DOM 状态；loading 用 inert 与隐藏遮罩使内容不可交互但不移除重挂；空错误文案仍归物料自理
 material-loading.ts[EB5T]: F:物料共享加载指示视图的构造 | R:code:packages/plugin-sdk/src/material-loading-container.ts | A:- | S:框架无关 opt-in 视图，文案按文本渲染绝不按 HTML 解析；不发请求不访问全局 document 不使用定时器
 material-package.ts[IB7S]: F:宿主托管物料包的构造与定义 | R:code:packages/plugin-sdk/src/material-definition.ts | A:- | S:创建期完成全部 manifest 静态清单适配器校验与包内身份冲突检查，不触碰浏览器全局；materials 上限 512 且至少一个；define 显式注册全部自定义元素并返回目录条目
 material-rendered-element.ts[EB7M]: F:渲染函数物料的呈现器与元素定义（ADR-0105 §2.3） | R:code:packages/plugin-sdk/src/material-spec.ts | A:- | S:作者只写数据就绪时的绘制；宿主元素尺寸透明度变换归渲染器不碰；加载与 idle 保留原画面，出错换错误视图；多行数据为空即空态
@@ -1474,7 +1474,7 @@ plugin-core.ts[FC4T]: F:sdk plugin-core 子路径的再导出 | R:code:packages/
 plugins.ts[IB6T]: F:蓝图能力内置插件的构造 | R:code:packages/sdk/src/runtime.ts | A:- | S:构造声明蓝图能力的内置插件贡献，供运行时默认接入
 renderer.ts[FC4T]: F:sdk renderer 子路径的再导出 | R:code:packages/sdk/src/index.ts | A:- | S:单一再导出，不承载实现
 runtime-adapter.ts[IA7S]: F:既有宿主 runtime 的适配 | R:code:packages/sdk/src/runtime-mounts.ts | A:- | S:不创建 plugin manager 不重复注册元素，只补挂载句柄目录替换与销毁编排；一个 runtime 仅支持一个 Designer 会话，换绑定前须释放当前句柄；dispose 先释放组合层再委托宿主
-runtime-diagnostics.ts[DB6S]: F:运行时挂载诊断与结果构造 | R:- | A:- | S:统一成功失败空结果诊断收集与挂载阶段标注，供组合层各模块复用
+runtime-diagnostics.ts[DB6T]: F:运行时挂载诊断与结果构造 | R:- | A:- | S:统一成功失败空结果诊断收集与挂载阶段标注，供组合层各模块复用
 runtime-lifecycle.ts[IA7S]: F:运行时的目录事务挂载跟踪与销毁编排 | R:code:packages/sdk/src/runtime-mounts.ts | A:- | S:注册后的 Viewer 与完整运行时共用；目录事务区分已挂载与后续挂载目标；销毁幂等
 runtime-mounts.ts[IA8L]: F:运行时挂载上下文与目录归属管理 | R:code:packages/sdk/src/mount-handle.ts | A:- | S:用 WeakMap 按句柄记录目录归属；挂载失败时先释放句柄再返回失败结果；配置与初始化分阶段并上报诊断
 runtime-registration.ts[IA7S]: F:运行时插件物料的注册与目录校验 | R:code:packages/sdk/src/runtime-diagnostics.ts | A:- | S:Viewer 与完整运行时共用注册激活和目录校验，不承载 Designer 实现；无 customElements 时失败关闭；正则化宿主物料为定义清单
@@ -1496,7 +1496,7 @@ vue.api.md[SZ4T]: F:vue 适配包的 API 报告快照 | R:- | A:- | S:反映对�
 
 ===/<repository>/packages/vue/src/===
 components.ts[IA7M]: F:Vue 设计器与查看器挂载组件 | R:code:packages/vue/src/index.ts | A:- | S:runtime 与 mountOptions 为 null 时未就绪不挂载且诊断清空；文档项目身份变化重挂载，catalog 新引用热刷新；用 generation 计数防止过期回调
-global-styles.ts[IB6S]: F:全局样式的收集与传播辅助 | R:code:packages/vue/src/index.ts | A:- | S:收集文档样式源中全部可读规则文本供桥接层注入宿主 shadow root，使组件库样式穿透 shadow DOM；用 visited 集避免样式表重复遍历
+global-styles.ts[IB6T]: F:全局样式的收集与传播辅助 | R:code:packages/vue/src/index.ts | A:- | S:收集文档样式源中全部可读规则文本供桥接层注入宿主 shadow root，使组件库样式穿透 shadow DOM；用 visited 集避免样式表重复遍历
 index.ts[IB7M]: F:Vue 物料定义与组件入口汇总 | R:code:packages/vue/src/components.ts,code:packages/vue/src/global-styles.ts | A:- | S:导出挂载组件与 Vue 物料定义构造器；挂载前把全局样式传播进 shadow root 使组件库首次初始化拿到正确尺寸；非交互控件用 CSS 门控指针事件
 
 ===/<repository>/plugins/plugin-materials/===
@@ -1577,7 +1577,7 @@ designer-ui.mjs[FO7M]: F:设计器 UI 文案与表单控件来源的门禁 | R:c
 engine-import.mjs[FO9L]: F:引擎模块分层与 DOM 耦合的门禁 | R:code:tooling/checks/boundaries.mjs | A:- | S:common 与 vendor 不得引用 DOM 全局；低层依赖闭包不得触及高层根；发布入口无注册与存储副作用；browser 与 common 子层方向与 designer-element 结构须显式登记，含反向回归用例
 host-tokens.mjs[FO7S]: F:宿主公共令牌名的门禁 | R:code:tooling/build/host-tokens.mjs | A:- | S:守公共名集合与双主题配对，名字快照必需：只做重新生成无 diff 时删令牌会静默通过，快照让任何删改名都须显式修改并出现在 PR diff
 material-atomicity.mjs[FO7L]: F:物料原子化与表单范式的源码门禁 | R:code:packages/plugin-sdk/src/material-style-keys.ts | A:- | S:R4–R9 落实 ADR-0099，R10 落实 ADR-0100 分片规则；样式键词典与 plugin-sdk 副本须同步；宿主侧额外禁 label；图表家具按名单豁免；PARADIGM_DEBT 棘轮只减不增
-packages.mjs[FO7T]: F:工作区包定义的唯一清单 | R:- | A:- | S:集中声明各包的构建方式包名是否私有与副作用入口，供边界依赖 API 报告等检查共用
+packages.mjs[FO7M]: F:工作区包定义的唯一清单 | R:- | A:- | S:集中声明各包的构建方式包名是否私有与副作用入口，供边界依赖 API 报告等检查共用
 
 ===/<repository>/tooling/===
 clean.mjs[FO4T]: F:构建产物清理脚本 | R:- | A:- | S:清理 dist 等构建输出，体量极小
