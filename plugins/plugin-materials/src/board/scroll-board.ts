@@ -327,8 +327,14 @@ export class PluginBoardScrollBoardElement extends BoardMaterialElement {
   #timer: ReturnType<typeof setInterval> | undefined;
   #offset = 0;
   #rows: readonly Record<string, unknown>[] = [];
+  /** roving tabindex 的当前行：整块看板只占一个 Tab 停靠点。 */
+  #activeRow = 0;
+  /** 重渲染前焦点在看板内：数据刷新会整块重建，重建后要把焦点放回当前行。 */
+  #restoreFocus = false;
 
   protected renderMaterial(): void {
+    // :focus-within 能穿过 shadow 边界判断（物料挂在查看器的 shadow root 里）。
+    this.#restoreFocus = typeof this.matches === 'function' && this.matches(':focus-within');
     this.#stopTimer();
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
@@ -383,10 +389,13 @@ export class PluginBoardScrollBoardElement extends BoardMaterialElement {
     if (headerVisible) {
       const header = doc.createElement('div');
       header.dataset.boardHeader = '';
+      header.setAttribute('role', 'row');
       header.style.cssText = `flex:0 0 auto;display:flex;height:${rowHeight}px;align-items:center;border-bottom:1px solid ${borderColor};color:${styleColor(model.style.headerColor, '#8aa4c0')};font:600 ${fontSize}px/1 sans-serif;`;
       // 启用等级色条时表头补一个等宽占位，否则表头与数据列会错开 4 px + 间距。
       if (statusColumnIndex >= 0) header.appendChild(this.#statusBar('transparent'));
-      for (const column of data.columns) header.appendChild(this.#cell(column.label, 1, fontSize));
+      for (const column of data.columns) {
+        header.appendChild(this.#cell(column.label, 1, fontSize, false, undefined, 'columnheader'));
+      }
       root.appendChild(header);
     }
 
@@ -398,9 +407,31 @@ export class PluginBoardScrollBoardElement extends BoardMaterialElement {
     const track = doc.createElement('div');
     track.dataset.boardTrack = '';
     track.style.cssText = `position:absolute;left:0;right:0;top:0;will-change:transform;`;
+    // 键盘：只有一个 Tab 停靠点，上下方向键 / Home / End 在行间移动，Enter / 空格触发 rowClick。
+    // 设计态（不可交互）不设 tabindex、不监听按键：方向键要留给设计器微调组件位置。
+    const interactive = model.interactive;
+    const lines: HTMLElement[] = [];
+    this.#activeRow = Math.min(this.#activeRow, Math.max(0, data.rows.length - 1));
+    const moveTo = (index: number): void => {
+      const next = lines[index];
+      if (next === undefined) return;
+      lines[this.#activeRow]?.setAttribute('tabindex', '-1');
+      next.setAttribute('tabindex', '0');
+      this.#activeRow = index;
+      // 视口 overflow:hidden 且由 transform 轮播：不让浏览器滚动视口，由 focusin 负责把行移进视口。
+      next.focus({ preventScroll: true });
+    };
     data.rows.forEach((row, rowIndex) => {
       const line = doc.createElement('div');
       line.dataset.boardRow = String(rowIndex);
+      line.setAttribute('role', 'row');
+      if (interactive) line.setAttribute('tabindex', rowIndex === this.#activeRow ? '0' : '-1');
+      line.setAttribute(
+        'aria-label',
+        `第 ${rowIndex + 1} 行：${data.columns
+          .map((column) => `${column.label} ${String(row[column.id] ?? '')}`)
+          .join('，')}`,
+      );
       line.style.cssText = `display:flex;height:${rowHeight}px;align-items:center;border-bottom:1px solid ${borderColor};font:${fontSize}px/1 sans-serif;`;
       let statusColor: string | undefined;
       if (statusColumnIndex >= 0) {
@@ -425,6 +456,39 @@ export class PluginBoardScrollBoardElement extends BoardMaterialElement {
         );
       });
       line.addEventListener('click', () => this.#emitRowClick(rowIndex, row));
+      if (interactive) {
+        // 浏览器默认焦点框在深色看板上几乎看不见（WCAG 2.4.7）：聚焦时用文字色画 2px 内描边。
+        line.addEventListener('focus', () => {
+          line.style.outline = `2px solid ${styleColor(model.style.color, '#e6f1ff')}`;
+          line.style.outlineOffset = '-2px';
+        });
+        line.addEventListener('blur', () => {
+          line.style.outline = '';
+          line.style.outlineOffset = '';
+        });
+        line.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            this.#emitRowClick(rowIndex, row);
+            return;
+          }
+          const last = data.rows.length - 1;
+          const target =
+            event.key === 'ArrowDown'
+              ? Math.min(rowIndex + 1, last)
+              : event.key === 'ArrowUp'
+                ? Math.max(rowIndex - 1, 0)
+                : event.key === 'Home'
+                  ? 0
+                  : event.key === 'End'
+                    ? last
+                    : undefined;
+          if (target === undefined) return;
+          event.preventDefault();
+          moveTo(target);
+        });
+      }
+      lines.push(line);
       track.appendChild(line);
     });
     viewport.appendChild(track);
@@ -432,9 +496,33 @@ export class PluginBoardScrollBoardElement extends BoardMaterialElement {
     this.commit(root);
 
     // 只有真正容纳不下的数据才轮播；一屏能放下时保持静止（也就不会无谓地消耗定时器）。
-    if (readBoolean(model.props.autoScroll, true) && data.rows.length > visibleCount) {
+    const scrolls = readBoolean(model.props.autoScroll, true) && data.rows.length > visibleCount;
+    if (scrolls) {
       this.#startTimer(viewport, track, rowHeight, visibleCount, model);
     }
+    if (interactive) {
+      // 键盘焦点进入看板时暂停轮播并把焦点行移进视口（否则焦点可能落在视口外、或被轮播滚走）；
+      // 焦点离开看板后恢复轮播。
+      viewport.addEventListener('focusin', (event) => {
+        const index = Number((event.target as HTMLElement).dataset.boardRow);
+        if (!Number.isInteger(index)) return;
+        this.#stopTimer();
+        this.#offset = Math.max(0, Math.min(index, data.rows.length - visibleCount));
+        track.style.transition = 'none';
+        track.style.transform = `translateY(${-this.#offset * rowHeight}px)`;
+      });
+      viewport.addEventListener('focusout', (event) => {
+        // 数据刷新整块重建时，被移除的旧视口也会派发 focusout：它已不在文档里，不能再起定时器。
+        if (!viewport.isConnected) return;
+        if (event.relatedTarget instanceof Node && viewport.contains(event.relatedTarget)) return;
+        if (scrolls && this.#timer === undefined) {
+          this.#startTimer(viewport, track, rowHeight, visibleCount, model);
+        }
+      });
+      // 放回焦点会触发上面的 focusin：轮播随之暂停，焦点行移进视口。
+      if (this.#restoreFocus) lines[this.#activeRow]?.focus({ preventScroll: true });
+    }
+    this.#restoreFocus = false;
   }
 
   /** 行左 4 px 状态色条：与文字并存，因此色盲也能读出行等级。 */
@@ -451,9 +539,11 @@ export class PluginBoardScrollBoardElement extends BoardMaterialElement {
     fontSize: number,
     alignEnd = false,
     color?: string,
+    role: 'cell' | 'columnheader' = 'cell',
   ): HTMLElement {
     const cell = this.ownerDocument.createElement('span');
     cell.dataset.boardCell = String(columnIndex);
+    cell.setAttribute('role', role);
     cell.textContent = text;
     const colorStyle = color === undefined ? '' : `color:${color};`;
     cell.style.cssText = `flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:${fontSize}px;${colorStyle}${alignEnd ? 'text-align:right;font-variant-numeric:tabular-nums;' : ''}`;
@@ -467,13 +557,26 @@ export class PluginBoardScrollBoardElement extends BoardMaterialElement {
     visibleCount: number,
     model: BoardMaterialModel,
   ): void {
+    // 减少动效不能等于停播：视口 overflow:hidden，停播后超出一屏的行永远看不到。
+    // 改为整页、无过渡地翻页，信息照样轮到，只是没有滑动。
+    const reduceMotion =
+      this.ownerDocument.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches ??
+      false;
+    // 同一时刻只允许一个轮播定时器：重复启动会让多个定时器同时推进 #offset。
+    this.#stopTimer();
     const interval = Math.max(200, Math.round(readNumber(model.props.intervalMs, 3000)));
     // 视口高度 = 可见行数 × 行高；读取一次，之后只做 transform，不触碰布局属性。
     viewport.dataset.boardVisibleRows = String(visibleCount);
     this.#offset = 0;
     this.#timer = setInterval(() => {
-      this.#offset += 1;
       const rows = this.#rows.length;
+      if (reduceMotion) {
+        this.#offset = this.#offset + visibleCount >= rows ? 0 : this.#offset + visibleCount;
+        track.style.transition = 'none';
+        track.style.transform = `translateY(${-this.#offset * rowHeight}px)`;
+        return;
+      }
+      this.#offset += 1;
       // 滚过末尾后从顶部无缝接回：位移取模，避免累积成越来越大的 translate 值。
       const shift = this.#offset % rows;
       track.style.transition = 'transform 420ms cubic-bezier(.33,1,.68,1)';

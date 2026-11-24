@@ -2502,8 +2502,8 @@ select.ws-input { padding: 0 4px; }
 .ws-button:disabled { border-color: var(--bs-host-border-subtle); background: var(--bs-host-surface-control); color: var(--bs-host-text-disabled); cursor: not-allowed; }
 .ws-icon:disabled { color: var(--bs-host-text-disabled); cursor: not-allowed; }
 .ws-primary { border-color: transparent; background: var(--bs-host-action-primary, #5297fc); color: var(--bs-host-text-on-accent, #1c2b40); font-weight: 600; }
-.ws-primary:hover:not(:disabled) { background: var(--bs-host-action-primary-hover, #6aa6fc); }
-.ws-primary[data-blocked="true"] { border-color: var(--bs-host-border-subtle); background: var(--bs-host-surface-control); color: var(--bs-host-text-disabled); }
+.ws-primary:hover:not(:disabled):not([data-blocked="true"]) { background: var(--bs-host-action-primary-hover, #6aa6fc); }
+.ws-primary[data-blocked="true"] { border-color: var(--bs-host-border-subtle); background: var(--bs-host-surface-control); color: var(--bs-host-text-disabled); cursor: not-allowed; }
 .ws-danger { color: var(--bs-host-danger-text, #fd7469); }
 .ws-ghost { background: none; }
 .ws-wide { width: 100%; }

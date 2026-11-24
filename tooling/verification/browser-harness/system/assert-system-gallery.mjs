@@ -193,11 +193,16 @@ export async function assertSystemGallery(browser, baseUrl) {
       const style = getComputedStyle(primary);
       return { background: style.backgroundColor, color: style.color };
     });
-    expect(lightPrimary?.background, 'light primary background missing').toBeTruthy();
-    expect(lightPrimary?.background, 'light primary background did not change').not.toBe(
-      chrome.primaryBackground,
+    // 本文件的 expect 是 (condition, message) 收集器，不是 Jest 断言：不能链式调用。
+    expect(Boolean(lightPrimary?.background), 'light primary background missing');
+    expect(
+      lightPrimary?.background !== chrome.primaryBackground,
+      `light primary background did not change: ${lightPrimary?.background}`,
     );
-    expect(lightPrimary?.color, 'light primary text did not change').not.toBe(chrome.primaryColor);
+    expect(
+      lightPrimary?.color !== chrome.primaryColor,
+      `light primary text did not change: ${lightPrimary?.color}`,
+    );
 
     if (failures.length > 0) {
       throw new Error(`SYSTEM_GALLERY_FORM_CONTROLS_FAILED:${failures.join(' | ')}`);

@@ -129,11 +129,16 @@ export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
 
 export class BaseScreenTableMaterialElement extends BaseScreenOfficialMaterialElement {
   static readonly manifest = BASE_SCREEN_TABLE_MATERIAL_MANIFEST;
+  /** roving tabindex 的当前格：重渲染（数据刷新）后留在原位，越界时收进表内。 */
+  private activeCell = { row: 0, column: 0 };
+  /** 重渲染前焦点在表内：数据刷新会整表重建，重建后要把焦点放回当前格，否则键盘焦点掉到 body。 */
+  private restoreFocus = false;
 
   protected renderMaterial(): void {
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
-    this.replaceChildren();
+    // :focus-within 能穿过 shadow 边界判断（物料挂在查看器的 shadow root 里）。
+    this.restoreFocus = hasFocusWithin(this);
     this.replaceChildren();
     // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
     if (this.style.display !== 'none') this.style.display = 'block';
@@ -180,23 +185,88 @@ export class BaseScreenTableMaterialElement extends BaseScreenOfficialMaterialEl
     head.appendChild(headerRow);
     table.appendChild(head);
     const body = this.ownerDocument.createElement('tbody');
+    // 键盘：整张表只占一个 Tab 停靠点（roving tabindex），方向键在格间移动，Enter / 空格触发
+    // cellClick。设计态（不可交互）不设 tabindex、不监听按键：方向键要留给设计器微调组件位置。
+    const interactive = model.interactive;
+    const grid: HTMLTableCellElement[][] = [];
+    const active = {
+      row: Math.min(this.activeCell.row, data.rows.length - 1),
+      column: Math.min(this.activeCell.column, data.columns.length - 1),
+    };
+    const moveTo = (rowIndex: number, columnIndex: number): void => {
+      const next = grid[rowIndex]?.[columnIndex];
+      if (next === undefined) return;
+      grid[active.row]?.[active.column]?.setAttribute('tabindex', '-1');
+      next.setAttribute('tabindex', '0');
+      active.row = rowIndex;
+      active.column = columnIndex;
+      this.activeCell = { row: rowIndex, column: columnIndex };
+      next.focus();
+    };
     data.rows.forEach((row, rowIndex) => {
       const tableRow = this.ownerDocument.createElement('tr');
       tableRow.addEventListener('click', () => this.emitRowClick(rowIndex, row));
-      data.columns.forEach((column) => {
+      const cells: HTMLTableCellElement[] = [];
+      data.columns.forEach((column, columnIndex) => {
         const cell = this.ownerDocument.createElement('td');
+        if (interactive) {
+          const isActive = rowIndex === active.row && columnIndex === active.column;
+          cell.setAttribute('tabindex', isActive ? '0' : '-1');
+        }
         cell.textContent = formatCellValue(row[column.id], column.valueType);
         cell.style.cssText = `height: ${numberValue(model.style.rowHeight, 32)}px; padding: 0 10px; border: 1px solid ${stringValue(model.style.borderColor)}; font-size: ${numberValue(model.style.fontSize, 13)}px; white-space: nowrap;`;
-        cell.addEventListener('click', (event) => {
-          event.stopPropagation();
+        // 激活单元格（点击 / Enter / 空格）先发 cellClick、再发所在行的 rowClick，顺序同 DOM 冒泡。
+        // 单元格铺满整行，若只发 cellClick，rowClick 就永远没有入口（蓝图里连了 rowClick 也不会触发）。
+        const activate = (): void => {
           this.emitCellClick(rowIndex, column.id, row[column.id] ?? null);
+          this.emitRowClick(rowIndex, row);
+        };
+        cell.addEventListener('click', (event) => {
+          // rowClick 已在 activate 里发过：拦下冒泡，行上的监听不再重复发一次。
+          event.stopPropagation();
+          activate();
         });
+        if (interactive) {
+          // 浏览器默认焦点框在深色表格上几乎看不见（WCAG 2.4.7）：聚焦时用文字色画 2px 内描边。
+          cell.addEventListener('focus', () => {
+            cell.style.outline = `2px solid ${stringValue(model.style.color) || 'currentColor'}`;
+            cell.style.outlineOffset = '-2px';
+          });
+          cell.addEventListener('blur', () => {
+            cell.style.outline = '';
+            cell.style.outlineOffset = '';
+          });
+          cell.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              activate();
+              return;
+            }
+            const target = nextGridCell(
+              event.key,
+              event.ctrlKey,
+              rowIndex,
+              columnIndex,
+              data.rows.length,
+              data.columns.length,
+            );
+            if (target === undefined) return;
+            event.preventDefault();
+            moveTo(target.row, target.column);
+          });
+        }
+        cells.push(cell);
         tableRow.appendChild(cell);
       });
+      grid.push(cells);
       body.appendChild(tableRow);
     });
     table.appendChild(body);
     this.appendChild(table);
+    if (interactive && this.restoreFocus) {
+      grid[active.row]?.[active.column]?.focus({ preventScroll: true });
+    }
+    this.restoreFocus = false;
   }
 
   private emitRowClick(rowIndex: number, row: Readonly<Record<string, unknown>>): void {
@@ -224,10 +294,45 @@ export class BaseScreenTableMaterialElement extends BaseScreenOfficialMaterialEl
   }
 }
 
+/**
+ * 网格方向键（WAI-ARIA grid 模式）：左右在行内、上下跨行，Home / End 到行首尾，
+ * Ctrl+Home / Ctrl+End 到表首尾；到边不回绕。返回 undefined 表示不处理这个键。
+ */
+function nextGridCell(
+  key: string,
+  ctrlKey: boolean,
+  row: number,
+  column: number,
+  rowCount: number,
+  columnCount: number,
+): { readonly row: number; readonly column: number } | undefined {
+  const lastRow = rowCount - 1;
+  const lastColumn = columnCount - 1;
+  // 到边时返回原格：调用方照样 preventDefault，方向键不会滚动外层页面。
+  return key === 'ArrowRight'
+    ? { row, column: Math.min(column + 1, lastColumn) }
+    : key === 'ArrowLeft'
+      ? { row, column: Math.max(column - 1, 0) }
+      : key === 'ArrowDown'
+        ? { row: Math.min(row + 1, lastRow), column }
+        : key === 'ArrowUp'
+          ? { row: Math.max(row - 1, 0), column }
+          : key === 'Home'
+            ? { row: ctrlKey ? 0 : row, column: 0 }
+            : key === 'End'
+              ? { row: ctrlKey ? lastRow : row, column: lastColumn }
+              : undefined;
+}
+
 function formatCellValue(value: unknown, valueType: string): string {
   if (value === null || value === undefined) return '';
   if (valueType === 'boolean') return value === true ? '是' : '否';
   return String(value);
+}
+
+/** 元素自身或后代持有焦点（可穿过 shadow 边界）；无 DOM 的测试替身没有 matches，按未聚焦处理。 */
+function hasFocusWithin(element: Element): boolean {
+  return typeof element.matches === 'function' && element.matches(':focus-within');
 }
 
 function stringValue(value: unknown): string {

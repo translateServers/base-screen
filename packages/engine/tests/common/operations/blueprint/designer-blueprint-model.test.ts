@@ -9,6 +9,13 @@ import type {
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
+  DESIGNER_BLUEPRINT_NODE_BORDER,
+  DESIGNER_BLUEPRINT_NODE_HEADER_HEIGHT,
+  DESIGNER_BLUEPRINT_NODE_MIN_HEIGHT,
+  DESIGNER_BLUEPRINT_NODE_PADDING,
+  DESIGNER_BLUEPRINT_NODE_ROW_HEIGHT,
+} from '../../../../src/common/operations/blueprint/designer-blueprint-geometry.js';
+import {
   buildDesignerBlueprintConnectionContext,
   buildDesignerBlueprintGraph,
   buildDesignerBlueprintSimulationTriggers,
@@ -367,6 +374,30 @@ describe('Blueprint canvas projection', () => {
         );
       }
     }
+  });
+
+  it('estimates card height with the same formula as the canvas, borders included', () => {
+    type CanvasNode = Parameters<typeof estimateDesignerBlueprintNodeHeight>[0];
+    const node = (rows: number): CanvasNode =>
+      ({
+        inputs: Array.from({ length: rows }, () => ({})),
+        outputs: [],
+        semantic: false,
+      }) as unknown as CanvasNode;
+    // 画布 height()：HEADER + BODY_TOP + rows × ROW + BODY_BOTTOM + BORDER，再与最小高度取大。
+    const canvasHeight = (rows: number): number =>
+      Math.max(
+        DESIGNER_BLUEPRINT_NODE_MIN_HEIGHT,
+        DESIGNER_BLUEPRINT_NODE_HEADER_HEIGHT +
+          DESIGNER_BLUEPRINT_NODE_PADDING +
+          DESIGNER_BLUEPRINT_NODE_BORDER +
+          rows * DESIGNER_BLUEPRINT_NODE_ROW_HEIGHT,
+      );
+    for (const rows of [0, 1, 2, 4, 9]) {
+      const estimated = estimateDesignerBlueprintNodeHeight(node(rows));
+      expect(estimated, `${rows} rows`).toBe(canvasHeight(rows));
+    }
+    expect(estimateDesignerBlueprintNodeHeight(node(4))).toBe(179);
   });
 
   it('marks undeclared component events and host actions as unavailable ports', () => {

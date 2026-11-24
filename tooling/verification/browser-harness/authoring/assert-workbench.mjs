@@ -682,13 +682,18 @@ async function assertNativeEventsToggle(designer, page) {
       );
       return true;
     };
-    const matches = (expected) => {
-      const actual = probeEvents.at(-1);
+    const sameEvent = (actual, expected) =>
+      actual !== undefined &&
+      actual.componentId === expected.componentId &&
+      actual.type === expected.type &&
+      actual.name === expected.name;
+    const matches = (expected) => sameEvent(probeEvents.at(-1), expected);
+    // 最近 N 条事件依次与期望一致：一次交互可能按顺序派发多个事件（单元格 → 所在行）。
+    const matchesTail = (expected) => {
+      const tail = probeEvents.slice(-expected.length);
       return (
-        actual !== undefined &&
-        actual.componentId === expected.componentId &&
-        actual.type === expected.type &&
-        actual.name === expected.name
+        tail.length === expected.length &&
+        tail.every((actual, index) => sameEvent(actual, expected[index]))
       );
     };
     // 原生 CSS 交互探针：语义图表圆点的 pointer 光标与 mouseenter 放大同样受开关门控。
@@ -755,9 +760,15 @@ async function assertNativeEventsToggle(designer, page) {
       row:
         dispatch('probe-table', 'tbody tr') &&
         matches({ componentId: 'probe-table', type: 'base.table', name: 'rowClick' }),
+      // 真实点击总是命中单元格（单元格铺满整行）：一次点击先发 cellClick、再发所在行的 rowClick，
+      // 且是同一行；只断言最后一条 cellClick 测不出「rowClick 永远没有入口」。
       cell:
         dispatch('probe-table', 'td') &&
-        matches({ componentId: 'probe-table', type: 'base.table', name: 'cellClick' }),
+        matchesTail([
+          { componentId: 'probe-table', type: 'base.table', name: 'cellClick' },
+          { componentId: 'probe-table', type: 'base.table', name: 'rowClick' },
+        ]) &&
+        probeEvents.at(-2)?.payload?.rowIndex === probeEvents.at(-1)?.payload?.rowIndex,
       bridgeReact:
         dispatch('probe-react', 'button') &&
         matches({
@@ -838,7 +849,8 @@ async function assertNativeEventsToggle(designer, page) {
     probe.hoverOn.cursor !== 'pointer' ||
     probe.bridgeOn.react !== 'auto' ||
     probe.bridgeOn.vue !== 'auto' ||
-    probe.onCount !== 7 ||
+    // text / chart / semanticChart / row 各 1，单元格点击 2（cellClick + rowClick），桥接 2。
+    probe.onCount !== 8 ||
     probe.offCount !== probe.onCount ||
     probe.bridgeAfterOff.react !== 'none' ||
     probe.bridgeAfterOff.vue !== 'none' ||

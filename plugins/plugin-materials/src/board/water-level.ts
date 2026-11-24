@@ -167,6 +167,7 @@ export class PluginBoardWaterLevelElement extends BoardMaterialElement {
   constructor() {
     super();
     this.addEventListener('click', this.#handleClick);
+    this.addEventListener('keydown', this.#handleKeyDown);
   }
 
   protected renderMaterial(): void {
@@ -183,6 +184,10 @@ export class PluginBoardWaterLevelElement extends BoardMaterialElement {
     this.setAttribute('role', 'meter');
     // a11y 名称取物料清单名，不来自文档：物料不再有标题字段。
     this.setAttribute('aria-label', PluginBoardWaterLevelElement.manifest.name);
+    // 设计态不可聚焦：tabIndex=-1 仍会被鼠标点中获得焦点，必须移除属性。
+    // 不写 aria-keyshortcuts：Enter / 空格是激活键，不是快捷键。
+    if (model.interactive) this.tabIndex = 0;
+    else this.removeAttribute('tabindex');
 
     if (model.dataState.status !== 'ready') {
       this.#wave = undefined;
@@ -249,9 +254,12 @@ export class PluginBoardWaterLevelElement extends BoardMaterialElement {
     this.setAttribute('aria-valuenow', String(percent));
 
     // 设计态不播放：无限动画只应在用户真正观看的预览/发布态里跑。
+    const reduceMotion =
+      doc.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches ?? false;
     if (
       readBoolean(model.props.waveAnimation, true) &&
       model.interactive &&
+      !reduceMotion &&
       this.#wave !== undefined
     ) {
       this.#wave.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-50%)' }], {
@@ -265,7 +273,15 @@ export class PluginBoardWaterLevelElement extends BoardMaterialElement {
   disconnectedCallback(): void {
     this.#wave = undefined;
     this.removeEventListener('click', this.#handleClick);
+    this.removeEventListener('keydown', this.#handleKeyDown);
   }
+
+  readonly #handleKeyDown = (event: KeyboardEvent): void => {
+    if (this.materialModel?.interactive !== true) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    this.#handleClick();
+  };
 
   readonly #handleClick = (): void => {
     const model = this.materialModel;

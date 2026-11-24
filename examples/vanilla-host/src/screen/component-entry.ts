@@ -6,6 +6,7 @@ import {
 } from 'base-screen/designer';
 import { auditBaseScreenFragment, hasBaseScreenAuthoringErrors } from 'base-screen/plugins';
 import { showToast } from '../components/toast';
+import { trapModalFocus } from '../lib/modal-focus';
 import { goToComponents, goToFragmentComponent } from '../lib/navigation';
 import {
   createFragmentId,
@@ -116,12 +117,10 @@ export function attachHostComponentEntry(
     dialog.append(title, nameInput.row, categoryInput.row, note, status, actions);
     overlay.append(dialog);
 
+    let releaseFocus: (() => void) | undefined;
     const close = (): void => {
       overlay.remove();
-      document.removeEventListener('keydown', onKey);
-    };
-    const onKey = (keyEvent: KeyboardEvent): void => {
-      if (keyEvent.key === 'Escape') close();
+      releaseFocus?.();
     };
     cancel.addEventListener('click', close);
     dialog.addEventListener('submit', (submitEvent) => {
@@ -161,11 +160,8 @@ export function attachHostComponentEntry(
         showEditLink(id);
       })();
     });
-    document.addEventListener('keydown', onKey);
-    // 设计器的轻 DOM 子节点只有带 slot 才会显示：对话框挂到 body，覆盖在嵌入面之上。
     document.body.append(overlay);
-    nameInput.control.select();
-    nameInput.control.focus();
+    releaseFocus = trapModalFocus(dialog, { initialFocus: 'input', onEscape: close });
   };
 
   /** toast 只是文字；这里补一条可点击的「在组件库中编辑」，几秒后自动消失。 */

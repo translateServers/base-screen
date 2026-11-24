@@ -10,6 +10,7 @@ import {
   type DatasourceDraft,
   type DatasourcePreviewResponse,
   type DatasourceTestResponse,
+  type DraftField,
   draftFromDetail,
   draftSignature,
   draftToConfig,
@@ -31,6 +32,7 @@ import {
 } from '../lib/datasource-model';
 import { el } from '../lib/dom';
 import { formatDateTime } from '../lib/format';
+import { captureModalFocus, restoreModalFocus, trapModalFocus } from '../lib/modal-focus';
 import { openDiscard, openFieldChange } from './datasource-dialogs';
 
 /**
@@ -52,6 +54,8 @@ interface DrawerState {
   test: DatasourceTestResponse | null;
   preview: DatasourcePreviewResponse | null;
   formError: string | null;
+  /** 本地校验失败时指向的控件；服务端错误不指向具体控件。 */
+  formErrorField: DraftField | null;
   conflict: string | null;
 }
 
@@ -74,6 +78,7 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
     test: null,
     preview: null,
     formError: null,
+    formErrorField: null,
     conflict: null,
   };
 
@@ -94,7 +99,12 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
     [head, body, foot],
   );
   const overlay = el('div', { class: 'ds-overlay ds-overlay--right' }, [drawer]);
+  let releaseFocus: (() => void) | undefined;
   document.body.append(overlay);
+  releaseFocus = trapModalFocus(drawer, {
+    initialFocus: '[data-ds-field="name"]',
+    onEscape: () => requestClose(),
+  });
 
   const readOnly = (): boolean => state.detail?.type === 'builtin';
   const dirty = (): boolean =>
@@ -116,18 +126,35 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
 
   const close = (): void => {
     overlay.remove();
+    releaseFocus?.();
     options.onClose();
   };
 
   // ---- 渲染 ---------------------------------------------------------------
 
   const render = (): void => {
+    // 整块重建会移走焦点所在的控件：先记下焦点，重建后放回同一控件，
+    // 否则焦点陷阱会把焦点拉回名称框（例如点「添加过滤条件」后）。
+    const focus = captureModalFocus(drawer);
     head.replaceChildren(
       el('h2', { text: editing ? `编辑「${state.detail?.name ?? ''}」` : '新建数据源' }),
       el('button', { class: 'button', text: DATASOURCE_TEXT.close, on: { click: requestClose } }),
     );
     body.replaceChildren(...renderBody());
     foot.replaceChildren(...renderFoot());
+    if (state.formError === null) drawer.removeAttribute('aria-describedby');
+    else drawer.setAttribute('aria-describedby', 'ds-form-error');
+    markInvalidField();
+    restoreModalFocus(drawer, focus);
+  };
+
+  /** 校验错误指向的控件标 aria-invalid 并关联错误文案；没有单一控件的错误只出文案。 */
+  const markInvalidField = (): void => {
+    const field = state.formErrorField;
+    if (field === null) return;
+    const control = body.querySelector<HTMLElement>(`[data-ds-field="${field}"]`);
+    control?.setAttribute('aria-invalid', 'true');
+    control?.setAttribute('aria-describedby', 'ds-form-error');
   };
 
   const renderBody = (): readonly Node[] => {
@@ -146,7 +173,12 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
             el('p', {
               class: 'ds-error',
               text: state.formError,
-              attrs: { role: 'alert', 'data-ds-form-error': '' },
+              attrs: {
+                role: 'alert',
+                id: 'ds-form-error',
+                tabindex: '-1',
+                'data-ds-form-error': '',
+              },
             }),
           ]),
       ...(state.conflict === null ? [] : [renderConflict()]),
@@ -313,15 +345,22 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
   }
 
   function renderSqlite(): HTMLElement {
-    const fileSelect = el('select', { class: 'field', attrs: { 'data-ds-field': 'file' } }, [
-      el('option', { text: '请选择…', attrs: { value: '' } }),
-      ...state.files.map((file) =>
-        el('option', {
-          text: `${file.name} · ${formatBytes(file.sizeBytes)} · ${formatDateTime(file.modifiedAt)}`,
-          attrs: { value: file.name },
-        }),
-      ),
-    ]);
+    const fileSelect = el(
+      'select',
+      {
+        class: 'field',
+        attrs: { 'data-ds-field': 'file', 'aria-label': '数据库文件' },
+      },
+      [
+        el('option', { text: '请选择…', attrs: { value: '' } }),
+        ...state.files.map((file) =>
+          el('option', {
+            text: `${file.name} · ${formatBytes(file.sizeBytes)} · ${formatDateTime(file.modifiedAt)}`,
+            attrs: { value: file.name },
+          }),
+        ),
+      ],
+    );
     fileSelect.value = state.draft.file;
     fileSelect.addEventListener('change', () => {
       state.draft.file = fileSelect.value;
@@ -335,20 +374,61 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
 
     const tabs = el(
       'div',
-      { class: 'ds-tabs', attrs: { role: 'tablist' } },
-      (['table', 'sql'] as const).map((mode) => {
+      { class: 'ds-tabs', attrs: { role: 'tablist', 'aria-label': 'SQLite 查询方式' } },
+      (['table', 'sql'] as const).map((mode, index) => {
         const button = el('button', {
           class: `button ds-tab${state.draft.sqliteMode === mode ? ' ds-tab--active' : ''}`,
           text: mode === 'table' ? '表模式' : 'SQL 模式',
-          attrs: { type: 'button', role: 'tab', 'data-ds-mode': mode },
+          attrs: {
+            type: 'button',
+            role: 'tab',
+            id: `ds-sqlite-${mode}-tab`,
+            'data-ds-mode': mode,
+          },
         });
+        // 只有选中的标签页对应已渲染的面板：未选中的不写 aria-controls，避免指向不存在的 id。
+        if (state.draft.sqliteMode === mode) {
+          button.setAttribute('aria-controls', `ds-sqlite-${mode}-panel`);
+        }
         button.setAttribute('aria-selected', String(state.draft.sqliteMode === mode));
+        button.tabIndex = state.draft.sqliteMode === mode ? 0 : -1;
         button.addEventListener('click', () => {
           state.draft.sqliteMode = mode;
           render();
         });
+        button.addEventListener('keydown', (event) => {
+          const keyboardEvent = event as KeyboardEvent;
+          const next =
+            keyboardEvent.key === 'ArrowRight'
+              ? (index + 1) % 2
+              : keyboardEvent.key === 'ArrowLeft'
+                ? (index + 1) % 2
+                : keyboardEvent.key === 'Home'
+                  ? 0
+                  : keyboardEvent.key === 'End'
+                    ? 1
+                    : undefined;
+          if (next === undefined) return;
+          keyboardEvent.preventDefault();
+          const nextMode = next === 0 ? 'table' : 'sql';
+          state.draft.sqliteMode = nextMode;
+          render();
+          // render() 重建了整个 body，闭包里的 tabs 已脱离文档：必须从抽屉里重新查新按钮。
+          drawer.querySelector<HTMLButtonElement>(`[data-ds-mode="${nextMode}"]`)?.focus();
+        });
         return button;
       }),
+    );
+    const panel = el(
+      'div',
+      {
+        attrs: {
+          id: `ds-sqlite-${state.draft.sqliteMode}-panel`,
+          role: 'tabpanel',
+          'aria-labelledby': `ds-sqlite-${state.draft.sqliteMode}-tab`,
+        },
+      },
+      state.draft.sqliteMode === 'table' ? renderTableMode() : renderSqlMode(),
     );
 
     return el('section', { class: 'ds-section' }, [
@@ -371,20 +451,27 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
           : []),
       ]),
       tabs,
-      ...(state.draft.sqliteMode === 'table' ? renderTableMode() : renderSqlMode()),
+      panel,
     ]);
   }
 
   function renderTableMode(): readonly Node[] {
-    const tableSelect = el('select', { class: 'field', attrs: { 'data-ds-field': 'table' } }, [
-      el('option', { text: '请选择…', attrs: { value: '' } }),
-      ...(state.schema?.tables ?? []).map((table) =>
-        el('option', {
-          text: `${table.name}${table.kind === 'view' ? '（视图）' : ''}`,
-          attrs: { value: table.name },
-        }),
-      ),
-    ]);
+    const tableSelect = el(
+      'select',
+      {
+        class: 'field',
+        attrs: { 'data-ds-field': 'table', 'aria-label': '表或视图' },
+      },
+      [
+        el('option', { text: '请选择…', attrs: { value: '' } }),
+        ...(state.schema?.tables ?? []).map((table) =>
+          el('option', {
+            text: `${table.name}${table.kind === 'view' ? '（视图）' : ''}`,
+            attrs: { value: table.name },
+          }),
+        ),
+      ],
+    );
     tableSelect.value = state.draft.table;
     tableSelect.addEventListener('change', () => {
       state.draft.table = tableSelect.value;
@@ -424,12 +511,19 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
     }
 
     const filterRows = state.draft.filters.map((filter, index) => {
-      const columnSelect = el('select', { class: 'field' }, [
-        el('option', { text: '请选择…', attrs: { value: '' } }),
-        ...columnsOfTable()
-          .filter((column) => column.supported)
-          .map((column) => el('option', { text: column.name, attrs: { value: column.name } })),
-      ]);
+      const columnSelect = el(
+        'select',
+        {
+          class: 'field',
+          attrs: { 'aria-label': `过滤条件 ${index + 1} 的列` },
+        },
+        [
+          el('option', { text: '请选择…', attrs: { value: '' } }),
+          ...columnsOfTable()
+            .filter((column) => column.supported)
+            .map((column) => el('option', { text: column.name, attrs: { value: column.name } })),
+        ],
+      );
       columnSelect.value = filter.column;
       columnSelect.addEventListener('change', () => {
         state.draft.filters[index] = {
@@ -437,7 +531,10 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
           column: columnSelect.value,
         };
       });
-      const paramInput = el('input', { class: 'field', attrs: { value: filter.param } });
+      const paramInput = el('input', {
+        class: 'field',
+        attrs: { value: filter.param, 'aria-label': `过滤条件 ${index + 1} 的参数名` },
+      });
       paramInput.addEventListener('input', () => {
         state.draft.filters[index] = {
           ...(state.draft.filters[index] ?? filter),
@@ -496,7 +593,7 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
   function renderSqlMode(): readonly Node[] {
     const textarea = el('textarea', {
       class: 'field ds-field__sql',
-      attrs: { 'data-ds-field': 'sql', placeholder: SQL_TEMPLATE },
+      attrs: { 'data-ds-field': 'sql', 'aria-label': 'SQL 语句', placeholder: SQL_TEMPLATE },
       on: {
         input: (event: Event) => {
           state.draft.sql = (event.target as HTMLTextAreaElement).value;
@@ -529,6 +626,7 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
       class: 'field',
       attrs: {
         'data-ds-field': 'url',
+        'aria-label': '请求地址',
         placeholder: 'http://127.0.0.1:3000/api/demo/press',
         value: state.draft.url,
       },
@@ -540,7 +638,10 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
     });
 
     const rows = state.draft.headers.map((header, index) => {
-      const nameInput = el('input', { class: 'field', attrs: { value: header.name } });
+      const nameInput = el('input', {
+        class: 'field',
+        attrs: { value: header.name, 'aria-label': `header ${index + 1} 名称` },
+      });
       nameInput.addEventListener('input', () => {
         state.draft.headers[index] = {
           ...(state.draft.headers[index] ?? header),
@@ -551,6 +652,7 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
         class: 'field',
         attrs: {
           type: 'password',
+          'aria-label': `header ${index + 1} 的值`,
           // 掩码占位：值永远留空，服务端把空串当作「保留原值」
           placeholder: header.hasValue ? MASKED_SECRET : '',
           value: header.value,
@@ -616,7 +718,10 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
 
   function renderStatic(): HTMLElement {
     const columnInputs = state.draft.staticColumns.map((column, index) => {
-      const input = el('input', { class: 'field', attrs: { value: column } });
+      const input = el('input', {
+        class: 'field',
+        attrs: { value: column, 'aria-label': `第 ${index + 1} 列的名称` },
+      });
       input.addEventListener('input', () => {
         state.draft.staticColumns[index] = input.value;
       });
@@ -648,7 +753,10 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
         ...state.draft.staticColumns.map((_column, columnIndex) => {
           const input = el('input', {
             class: 'field',
-            attrs: { value: row[columnIndex] ?? '' },
+            attrs: {
+              value: row[columnIndex] ?? '',
+              'aria-label': `第 ${rowIndex + 1} 行第 ${columnIndex + 1} 列的值`,
+            },
           });
           input.addEventListener('input', () => {
             const nextRow = state.draft.staticRows[rowIndex] ?? [];
@@ -721,24 +829,37 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
 
   function renderParams(): HTMLElement {
     const rows = state.draft.params.map((parameter, index) => {
-      const nameInput = el('input', { class: 'field', attrs: { value: parameter.name } });
+      const nameInput = el('input', {
+        class: 'field',
+        attrs: { value: parameter.name, 'aria-label': `参数 ${index + 1} 的名称` },
+      });
       nameInput.addEventListener('input', () => {
         state.draft.params[index] = {
           ...(state.draft.params[index] ?? parameter),
           name: nameInput.value,
         };
       });
-      const labelInput = el('input', { class: 'field', attrs: { value: parameter.label } });
+      const labelInput = el('input', {
+        class: 'field',
+        attrs: { value: parameter.label, 'aria-label': `参数 ${index + 1} 的标签` },
+      });
       labelInput.addEventListener('input', () => {
         state.draft.params[index] = {
           ...(state.draft.params[index] ?? parameter),
           label: labelInput.value,
         };
       });
-      const typeSelect = el('select', { class: 'field' }, [
-        el('option', { text: 'string', attrs: { value: 'string' } }),
-        el('option', { text: 'number', attrs: { value: 'number' } }),
-      ]);
+      const typeSelect = el(
+        'select',
+        {
+          class: 'field',
+          attrs: { 'aria-label': `参数 ${index + 1} 的类型` },
+        },
+        [
+          el('option', { text: 'string', attrs: { value: 'string' } }),
+          el('option', { text: 'number', attrs: { value: 'number' } }),
+        ],
+      );
       typeSelect.value = parameter.valueType;
       typeSelect.addEventListener('change', () => {
         state.draft.params[index] = {
@@ -746,7 +867,9 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
           valueType: typeSelect.value === 'number' ? 'number' : 'string',
         };
       });
-      const requiredInput = el('input', { attrs: { type: 'checkbox' } });
+      const requiredInput = el('input', {
+        attrs: { type: 'checkbox', 'aria-label': `参数 ${index + 1} 是否必填` },
+      });
       requiredInput.checked = parameter.required;
       requiredInput.addEventListener('change', () => {
         state.draft.params[index] = {
@@ -756,7 +879,7 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
       });
       const defaultInput = el('input', {
         class: 'field',
-        attrs: { value: parameter.defaultValue },
+        attrs: { value: parameter.defaultValue, 'aria-label': `参数 ${index + 1} 的默认值` },
       });
       defaultInput.addEventListener('input', () => {
         state.draft.params[index] = {
@@ -904,10 +1027,13 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
     const check = validateDraft(state.draft);
     if (check.ok === false) {
       state.formError = check.message;
+      state.formErrorField = check.field ?? null;
       render();
+      overlay.querySelector<HTMLElement>('[data-ds-form-error]')?.focus({ preventScroll: true });
       return false;
     }
     state.formError = null;
+    state.formErrorField = null;
     return true;
   }
 

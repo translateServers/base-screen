@@ -49,6 +49,7 @@ function elementWith(
       style: {},
       textContent: '',
       setAttribute: () => {},
+      appendChild: () => {},
       attachShadow: () => ({ append: () => {} }),
     }),
     createElementNS: () => ({

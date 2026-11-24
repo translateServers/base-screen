@@ -6,7 +6,7 @@ import type {
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { BaseScreenOfficialMaterialElement } from './base-material.js';
-import { styleField, withOfficialEditorDescriptor } from './editor-descriptor.js';
+import { propField, styleField, withOfficialEditorDescriptor } from './editor-descriptor.js';
 
 export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
   withOfficialEditorDescriptor(
@@ -17,7 +17,7 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
       category: '基础',
       keywords: ['图片', '图像'],
       defaultSize: { width: 240, height: 160 },
-      defaultProps: {},
+      defaultProps: { alt: '' },
       defaultData: '',
       staticData: { kind: 'scalar', valueType: 'string' },
       defaultStyle: { objectFit: 'contain', opacity: 1, flipX: false, flipY: false },
@@ -32,7 +32,11 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
         required: ['objectFit', 'opacity'],
       },
       stylePanel: [],
-      propsSchema: { kind: 'object', properties: {}, required: [] },
+      propsSchema: {
+        kind: 'object',
+        properties: { alt: { kind: 'string' } },
+        required: [],
+      },
       propertyPanel: [],
       events: [],
       dataCapabilities: ['static', 'host-resource', 'variable'],
@@ -44,7 +48,12 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
         {
           id: 'structure',
           label: '结构',
-          fields: [styleField('objectFit', '适应方式', 'select')],
+          fields: [
+            styleField('objectFit', '适应方式', 'select'),
+            propField('alt', '替代文本', 'text', {
+              help: '描述图片传达的信息；留空按装饰图片处理。',
+            }),
+          ],
         },
       ],
     },
@@ -81,7 +90,7 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
       return;
     }
     const image = this.ownerDocument.createElement('img');
-    image.alt = '';
+    image.alt = typeof model.props.alt === 'string' ? model.props.alt : '';
     image.style.width = '100%';
     image.style.height = '100%';
     image.style.objectFit =

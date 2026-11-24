@@ -94,8 +94,8 @@ vite-env.d.ts[FG1T]: F:Vite 客户端类型引用声明 | R:- | A:- | S:单行�
 ===/<repository>/examples/react-host/src/components/===
 app-shell.tsx[EU5T]: F:React 应用外壳顶栏与主区域 | R:code:examples/react-host/src/App.tsx | A:品牌 / 三项主导航 / 环境标记 | S:导航用原生 href=#/... 而非 Link，使新标签打开与冒烟 page.goto 行为一致；用 aria-current 标识当前页
 asset-list.tsx[ED6M]: F:宿主素材后台页 | R:code:examples/react-host/src/components/datasource-list.tsx | A:公共/临时素材筛选 / 搜索 / 删除保护 / 上传 | S:设计器左栏只做消费与临时上传，此处上传只产生公共素材；删除引用数由后端计算
-datasource-dialogs.tsx[EU5S]: F:数据源页的确认删除/删除受阻/字段变更/放弃四类弹层 | R:code:examples/react-host/src/components/datasource-drawer.tsx | A:- | S:一律用页面内弹层而非 window.confirm，嵌入式浏览器对 confirm 静默返回 null 会表现为点了没反应；弹层带 data-ds-dialog、主按钮带 data-ds-confirm 供冒烟定位
-datasource-drawer.tsx[ED7L]: F:数据源新建/编辑抽屉 | R:code:examples/react-host/src/components/datasource-dialogs.tsx | A:配置表单 / 连接测试 / 数据预览 / 保存 | S:掩码 header 回填必须用 value:''，否则 token 被写坏；测试与预览看 body.ok 而非 HTTP 状态；未改过时测试用已存配置才能带真实 header 原值
+datasource-dialogs.tsx[EU5S]: F:数据源页的确认删除/删除受阻/字段变更/放弃四类弹层 | R:code:examples/react-host/src/components/datasource-drawer.tsx | A:四类确认弹层 / 列表与动作 / Overlay 统一焦点陷阱 | S:Overlay 挂 trapModalFocus：Escape 经 onEscapeRef 调最新回调且 effect 空依赖；弹层卸载即释放陷阱，调用方勿再绑 document keydown 或手动 focus。
+datasource-drawer.tsx[ED7L]: F:数据源新建/编辑抽屉与配置表单 | R:code:examples/react-host/src/components/datasource-dialogs.tsx | A:配置表单 / 连接测试 / 数据预览 / 保存 / 焦点与错误通告 / SQLite 标签页键盘模型 | S:初始焦点落 name；Escape 经 requestCloseRef 取最新回调，effect 空依赖。formError 出现后聚焦 ds-form-error alert；SQLite 标签页用 roving tabindex，方向键切页并移动焦点。
 datasource-list.tsx[ED7L]: F:数据源管理列表页 | R:code:examples/react-host/src/components/datasource-drawer.tsx | A:筛选分页 / 新建编辑 / 删除保护 / 结果提示 | S:result.ok 才是业务成败（/test 与 /preview 失败也返回 200）；删除保护引用清单来自 409 响应而非列表快照；筛选与分页都在服务端，前端不二次过滤
 error-banner.tsx[EU3T]: F:React 统一错误横幅组件 | R:- | A:- | S:固定内边距，几何稳定不引入布局抖动；onRetry 缺省时不渲染重试按钮
 screen-editor.tsx[EA8S]: F:React 大屏编辑页 | R:code:examples/react-host/src/screen/composition-runtime.ts,code:examples/react-host/src/screen/fragment-shelf.ts | A:异步装配 runtime 与宿主端口 / 挂载设计器 / 意图、素材库与组件工坊接线 / 冲突提示 | S:用 SDK 组合层 BaseScreenDesigner，装配未就绪时 runtime 与 mountOptions 传 null 不挂载；开启 fragmentSaveAction 由工坊接管存为组合；保存显式触发不隐式保存
@@ -111,6 +111,7 @@ asset-model.ts[LD6T]: F:宿主素材库共享纯逻辑 | R:code:examples/react-h
 datasource-model.ts[LD8L]: F:数据源类型与纯函数模型（三端逐字一致） | R:- | A:类型映射 / datasetId 生成 / 掩码占位 / 草稿状态与校验 / 中文文案 | S:根测试断言三端 sha256 一致且与后端 slugify 一致；SQL 边界为只读单语句≤500行3秒超时；掩码固定 8 点不泄露长度
 format.ts[CG2T]: F:日期与数字格式化 | R:- | A:- | S:无效日期返回 --；数字按 zh-CN 千分位且最多 2 位小数
 logger.ts[CO3T]: F:轻量前端日志工厂 | R:- | A:- | S:debug 仅开发模式输出；不记录凭证或完整文档内容
+modal-focus.ts[LU6S]: F:三端共享的模态焦点管理与焦点陷阱 | R:code:examples/react-host/src/components/datasource-dialogs.tsx,code:examples/react-host/src/components/datasource-drawer.tsx | A:初始焦点 / Tab 循环 / Escape / 关闭恢复 / 异步重绘补偿 | S:三端逐字一致并由根测试锁定。Escape/Tab 在容器持焦或容器为最上层可见 aria-modal 时接管，焦点落 body 也生效；关闭仅在原焦点仍连接时恢复；调用方勿再手写 Escape 或初始 focus。
 render-diagnostics.ts[EO5S]: F:查看器渲染诊断宿主浮层 | R:code:examples/react-host/src/lib/logger.ts | A:消费 base-screen-diagnostic 事件 / 左上角浮层 / 收起与释放 | S:浮层挂在未缩放的 viewer-stage 上避免跟随画布缩放；不消费时组件校验失败会出现画布空白但状态在线的排障黑洞
 
 ===/<repository>/examples/react-host/src/screen/===
@@ -304,7 +305,7 @@ screen-document-guard.ts[IS7T]: F:大屏文档有界结构校验 | R:code:exampl
 screen.types.ts[FG3T]: F:大屏对外投影类型 | R:code:examples/shared-backend/src/screens/screen-document-guard.ts | A:- | S:ScreenShape 含 document，SummaryShape 不含以减小列表响应
 screens.controller.ts[IE5T]: F:大屏 REST 控制器 | R:code:examples/shared-backend/src/screens/screens.service.ts | A:列表/新建/读取/更新/删除 | S:列表用 summary 投影不含 document；更新 revision 不匹配返回 409
 screens.module.ts[IE3T]: F:大屏 NestJS 模块 | R:code:examples/shared-backend/src/screens/screens.service.ts | A:- | S:导入 AssetsModule，提供并导出 ScreensService
-screens.service.ts[IP7S]: F:大屏存取与播种服务 | R:code:examples/shared-backend/src/screens/screen-document-guard.ts,code:examples/shared-backend/src/screens/starter-document.ts | A:CRUD / revision 乐观锁 / 启动补种 / 临时素材续期与清理 | S:按名字补种五张屏已有行不覆盖；PrismaService 须值导入以保留 DI 元数据；素材续期或清理失败不让保存删除报错
+screens.service.ts[IP7S]: F:大屏存取与播种服务 | R:code:examples/shared-backend/src/screens/screen-document-guard.ts,code:examples/shared-backend/src/screens/starter-document.ts | A:CRUD / revision 乐观锁 / 启动补种 / 临时素材续期与清理 | S:按名字补种五张屏：缺的插入；同名 revision=1 且内容不同的未保存种子原地刷新（id 不变），revision>1 与自建行不动；PrismaService 须值导入保留 DI 元数据；素材续期或清理失败不阻断保存删除
 starter-document.ts[IG6S]: F:新建大屏起始文档与种子清单 | R:code:examples/shared-backend/src/screens/board-demo-document.ts | A:起始卡片文档 / 五张种子屏序列化 | S:起始卡片由四个原子物料按 zIndex 叠出且皆根节点；create 只发轻量卡片；起始文档写错在启动期即抛错
 
 ===/<repository>/examples/shared-backend/src/screens/dto/===
@@ -349,8 +350,8 @@ smoke.mjs[TQ8L]: F:Vanilla 前端真实浏览器冒烟脚本 | R:code:examples/R
 
 ===/<repository>/examples/vanilla-host/src/components/===
 app-shell.ts[EU5T]: F:Vanilla 应用外壳顶栏与主区域 | R:code:examples/vanilla-host/src/lib/dom.ts | A:品牌 / 四项主导航（大屏、数据源、素材、组件库）/ 环境标记 | S:aria-current 标识当前页供读屏与冒烟判断；设计器嵌入时高度链由 CSS 保证不额外推断尺寸
-datasource-dialogs.ts[EU5S]: F:Vanilla 数据源四类弹层 | R:code:examples/vanilla-host/src/lib/dom.ts | A:确认删除/删除受阻/字段变更/放弃弹层 | S:一律用页面内弹层而非 window.confirm（嵌入式浏览器静默返回 null）；带 data-ds-dialog 与 data-ds-confirm 供冒烟定位
-datasource-drawer.ts[ED7L]: F:Vanilla 数据源新建/编辑抽屉 | R:code:examples/vanilla-host/src/components/datasource-dialogs.ts | A:配置表单 / 连接测试 / 数据预览 / 保存 | S:掩码 header 回填用空值否则写坏 token；测试预览看 body.ok 非 HTTP 状态；未改过时用已存配置才能带真实 header
+datasource-dialogs.ts[EU5S]: F:Vanilla 数据源四类弹层 | R:code:examples/vanilla-host/src/lib/dom.ts | A:确认删除 / 删除受阻 / 字段变更 / 放弃 / 统一焦点陷阱 | S:弹层挂到 body 后才建立 trap；Escape 与关闭走同一 close，先卸载再释放陷阱并恢复原焦点。三个确认弹层共用 mountDialog，勿再单独绑 document keydown。
+datasource-drawer.ts[ED7L]: F:Vanilla 数据源新建/编辑抽屉与配置表单 | R:code:examples/vanilla-host/src/components/datasource-dialogs.ts | A:配置表单 / 连接测试 / 数据预览 / 保存 / 焦点与错误通告 / SQLite 标签页键盘模型 | S:初始焦点落 name，Escape 关闭。每次 render 同步 drawer 的 aria-describedby；校验失败后聚焦 ds-form-error。SQLite 标签页用 roving tabindex，方向键切页后焦点随新页。
 error-banner.ts[EU3T]: F:Vanilla 统一错误横幅 | R:code:examples/vanilla-host/src/lib/dom.ts | A:- | S:message 加可选重试按钮；用 el 构建且几何稳定不引入布局抖动
 spinner.ts[EU2T]: F:Vanilla 骨架屏占位 | R:code:examples/vanilla-host/src/lib/dom.ts | A:- | S:尺寸固定避免加载态与就绪态之间的布局跳动
 toast.ts[EU3T]: F:Vanilla 全局单例 Toast | R:code:examples/vanilla-host/src/lib/dom.ts | A:- | S:三视图共用一个容器避免多实例；4 秒自动移除点击可提前关闭
@@ -363,6 +364,7 @@ datasource-model.ts[LD8L]: F:数据源类型与纯函数模型（Vanilla） | R:
 dom.ts[FG4T]: F:最小 DOM 构建助手 | R:- | A:el 创建元素 / clear 清空 | S:无框架环境下保持视图声明式可读；支持 class/text/attrs/on 与子节点
 format.ts[CG2T]: F:日期与数字格式化（Vanilla） | R:- | A:- | S:无效日期返回 --；数字按 zh-CN 千分位且最多 2 位小数
 logger.ts[CO3T]: F:轻量前端日志（Vanilla） | R:- | A:- | S:debug 仅开发模式输出；不记录凭证或完整文档内容
+modal-focus.ts[LU6S]: F:三端共享的模态焦点管理与焦点陷阱 | R:code:examples/vanilla-host/src/components/datasource-dialogs.ts,code:examples/vanilla-host/src/components/datasource-drawer.ts,code:examples/vanilla-host/src/screen/component-entry.ts | A:初始焦点 / Tab 循环 / Escape / 关闭恢复 / 异步重绘补偿 | S:三端逐字一致并由根测试锁定。Escape/Tab 在容器持焦或容器为最上层可见 aria-modal 时接管，焦点落 body 也生效；关闭仅在原焦点仍连接时恢复；调用方勿再手写 Escape 或初始 focus。
 navigation.ts[FG3T]: F:hash 路由跳转助手 | R:code:examples/vanilla-host/src/router.ts | A:列表 / 数据源 / 素材 / 组件库与两个组件编辑器 / 编辑 / 查看 | S:统一 hash 目标格式防拼接漂移；id 与 type 均 URI 编码
 render-diagnostics.ts[EO5S]: F:查看器渲染诊断宿主浮层（Vanilla） | R:code:examples/vanilla-host/src/lib/logger.ts | A:消费 base-screen-diagnostic 事件 / 浮层 / 释放 | S:浮层挂在未缩放的 viewer-stage 上避免跟随画布缩放；不消费时组件校验失败会出现画布空白但状态在线的排障黑洞
 
@@ -377,7 +379,7 @@ agent-catalog.ts[IA6S]: F:智能体物料目录摘要（Vanilla） | R:code:exam
 asset-library.ts[IU7L]: F:宿主素材库左栏与统一选择器（ADR-0089） | R:code:examples/vanilla-host/src/lib/asset-model.ts | A:消费公开 slot / 插入替换背景 / 选图请求桥 / 临时上传 | S:三端逐字共享且 vanilla 为基准；文档只存 host_image 身份不存 URL；设计器只允许临时上传
 asset-return.ts[FG3T]: F:素材页返回线索（Vanilla） | R:- | A:- | S:sessionStorage 记住来源屏；只接受编辑路由，存储不可用静默降级
 code-editor.ts[IU5S]: F:组件编辑器代码面板（ADR-0106 D2） | R:code:examples/vanilla-host/src/views/component-atomic-edit.ts | A:CodeMirror 编辑器 / 上下文补全 / 语法诊断 / 保存与运行快捷键 | S:CodeMirror 只是示例依赖；语法错误读 Lezer 语法树错误节点不执行代码；setValue 不触发 onChange
-component-entry.ts[IE6M]: F:大屏编辑页内的组件库入口（ADR-0106） | R:code:examples/vanilla-host/src/screen/component-library.ts,code:examples/vanilla-host/src/views/screen-edit.ts | A:物料库组合注入 / 存为组合命名对话框 / 左栏管理组件分组 | S:取代 ADR-0105 悬浮工坊，编辑页只消费，制作管理在组件库页面；设计器轻 DOM 子节点无 slot 不显示，对话框挂 body
+component-entry.ts[IE6M]: F:大屏编辑页内的组件库入口（ADR-0106） | R:code:examples/vanilla-host/src/screen/component-library.ts,code:examples/vanilla-host/src/views/screen-edit.ts | A:物料库组合注入 / 存为组合命名与焦点 / 左栏管理组件分组 | S:存为组合对话框挂 body 后交给 trapModalFocus，初始焦点为首个输入框；关闭统一走 close 释放陷阱。勿再手动 select/focus 名称框或另绑 Escape。
 component-library.ts[IA7L]: F:组件库宿主侧模型（ADR-0106） | R:code:examples/vanilla-host/src/screen/component-workshop.ts,code:examples/vanilla-host/src/lib/api.ts | A:模板与选项 / 汇总在线物料包草稿组合 / 体检 / 草稿保存与发布 / 组合存取 / 返回线索 | S:规格骨架体检全来自 SDK，页面只经此调用不直接拼接口；保存草稿不影响已发布版本；发布即体检→新 tagName 编译→写包→热刷新→删草稿；旧模板在线物料只能在物料库用不可编辑
 component-preview.ts[IU5M]: F:组件预览与封面渲染（ADR-0106 §2.3） | R:code:examples/vanilla-host/src/screen/component-library.ts | A:编译预览 / 四态数据 / 封面与组合线框封面 | S:用 SDK 渲染骨架与画布一致，不注册 Custom Element；渲染模块按源码缓存只 import 一次
 component-workshop.ts[AE7L]: F:组件工坊宿主侧实现，在线制作原子组件与组合组件（ADR-0105） | R:code:examples/vanilla-host/src/screen/fragment-shelf.ts,code:examples/vanilla-host/src/screen/online-materials.ts | A:规格模块打包与受控加载 / 物料与组合存储端口 / 物料库分组注入 / 工坊界面 | S:三端逐字共享且 browser-harness 挂同一份；禁用态用公共令牌颜色而非 opacity；预览棋盘格是功能例外；Manifest 重编译须一致，同标签只 define 一次
@@ -444,8 +446,8 @@ vite-env.d.ts[FG2T]: F:Vite 与 Vue SFC 类型声明 | R:- | A:- | S:引用 vite
 ===/<repository>/examples/vue-host/src/components/===
 AppShell.vue[EU5T]: F:Vue 应用外壳顶栏与主区域 | R:code:examples/vue-host/src/App.vue | A:品牌 / 三主导航 / 运行环境标记 | S:用 RouterLink 与 computed 判断当前页；aria-current 标识当前页；设计器嵌入时不叠第二层布局
 AssetList.vue[EU6M]: F:Vue 素材后台组件 | R:code:examples/vue-host/src/lib/asset-model.ts | A:公共/临时素材筛选 / 搜索 / 上传 / 删除保护 | S:设计器左栏只做消费与临时上传，此处上传只产生公共素材；删除引用数由后端计算
-DatasourceDialogs.vue[EU5S]: F:Vue 数据源四类弹层 | R:code:examples/vue-host/src/lib/datasource-model.ts | A:确认删除/删除受阻/字段变更/放弃弹层 | S:一律用页面内弹层而非 window.confirm；带 data-ds-dialog 与 data-ds-confirm 供冒烟定位
-DatasourceDrawer.vue[ED7L]: F:Vue 数据源新建/编辑抽屉 | R:code:examples/vue-host/src/components/DatasourceDialogs.vue | A:配置表单 / 连接测试 / 数据预览 / 保存 | S:掩码 header 回填用空值否则写坏 token；测试预览看 body.ok 非 HTTP 状态；未改过时用已存配置
+DatasourceDialogs.vue[EU5S]: F:Vue 数据源四类弹层 | R:code:examples/vue-host/src/lib/datasource-model.ts | A:四类弹层 / 列表与动作 / 焦点陷阱生命周期 | S:setupFocus 在 kind 变化后 nextTick 重建陷阱，先释放旧陷阱；卸载时释放以恢复触发焦点。Escape 统一 emit cancel，不再单独监听 document。
+DatasourceDrawer.vue[ED7L]: F:Vue 数据源新建/编辑抽屉与配置表单 | R:code:examples/vue-host/src/components/DatasourceDialogs.vue,code:examples/vue-host/src/lib/datasource-model.ts,code:examples/vue-host/src/lib/modal-focus.ts | A:三种类型配置表单 / 连接测试与预览 / 保存与字段变更二次确认 / 草稿脏判定与冲突建议名 / 焦点陷阱与错误通告 / SQLite 标签页键盘模型 | S:掩码 header 回填 value 必须留空，把占位符当值提交会写坏 token；测试/预览看响应体 ok 而非 HTTP 状态；表单报错后聚焦 ds-form-error，脏表单关闭先确认放弃。
 DatasourceList.vue[EU7M]: F:Vue 数据源管理列表组件 | R:code:examples/vue-host/src/components/DatasourceDrawer.vue | A:筛选分页 / 新建编辑 / 删除保护 / 结果提示 | S:result.ok 才是业务成败；删除保护引用清单来自 409 响应；筛选分页都在服务端
 ErrorBanner.vue[EU3T]: F:Vue 统一错误横幅 | R:- | A:- | S:message 加可选重试按钮；固定内边距几何稳定不引入布局抖动
 MetricValue.vue[IS4T]: F:Vue 指标读数物料 SFC | R:code:examples/vue-host/src/screen/metric-value.ts | A:unit 与 value props / 共享容器和数值样式内联绑定 / 数值单位与空值呈现 | S:原子物料不含标题或底座；渲染盒由引擎写入，组件不写宽高；内联样式不依赖全局规则传入 shadow root
@@ -461,9 +463,10 @@ use-stores.ts[IG5T]: F:zustand 到 Vue 响应式的桥接 composable | R:code:ex
 api-base.ts[FG5T]: F:API Base 运行时解析（Vue） | R:- | A:- | S:优先级为运行时注入 __HOST_APP_CONFIG__ > 构建期 VITE_API_URL > 同源相对 /api；同源相对覆盖 dev 代理与同源托管
 api.ts[IN8L]: F:Vue 后端 REST 客户端（三端逐字一致） | R:code:examples/vue-host/src/lib/api-base.ts,code:examples/vue-host/src/types.ts | A:Result 风格 fetch 封装 / 大屏与数据源 CRUD / 素材与在线物料 / 组件库草稿与组合 / 智能体接口 | S:错误体 payload 平铺字段须透传供 UI 显示；数据源测试与预览成功响应是 200+body.ok，须看 body.ok 判业务成败；multipart 上传不设 Content-Type
 asset-model.ts[LD6T]: F:宿主素材库共享纯逻辑（Vue） | R:code:examples/vue-host/src/types.ts | A:身份路径 / 上传校验 / 文案 / 引用错误解析 | S:三端逐字一致且不含 DOM/fetch/框架状态；客户端上传白名单与后端一致
-datasource-model.ts[LD8L]: F:数据源类型与纯函数模型（Vue） | R:- | A:类型映射 / datasetId 生成 / 掩码 / 草稿校验 / 文案 | S:三端逐字节相同由根测试断言 sha256；SQL 边界只读单语句≤500行3秒超时；掩码固定8点不泄露长度
+datasource-model.ts[LD8L]: F:数据源类型与纯函数模型（Vue） | R:- | A:类型与状态标签 / slug 与 datasetId 预览 / 掩码占位 / 声明类型映射 / 草稿状态与校验 / 中文文案与提交 config | S:三端同构文件逐字节相同由根测试锁定 sha256；只放纯类型与纯函数，不 fetch、不引框架、不读存储；掩码固定 8 点不泄露长度，header 回填值留空否则 token 变 8 点；SQL 边界只读单语句≤500 行 3 秒超时；服务端校验权威，本地只拦可本地改的错误；静态单元格只接受标量，文本不会解析成对象。
 format.ts[CG2T]: F:日期与数字格式化（Vue） | R:- | A:- | S:无效日期返回 --；数字按 zh-CN 千分位且最多 2 位小数
 logger.ts[CO3T]: F:轻量前端日志（Vue） | R:- | A:- | S:debug 仅开发模式输出；不记录凭证或完整文档内容
+modal-focus.ts[LU6S]: F:三端共享的模态焦点管理与焦点陷阱 | R:code:examples/vue-host/src/components/DatasourceDrawer.vue,code:examples/vue-host/src/components/DatasourceDialogs.vue | A:初始焦点 / Tab 循环 / Escape / 焦点快照与整块重建恢复 / 关闭恢复原焦点 / 异步重绘补偿 | S:仅 DOM 最后的最上层可见 aria-modal 接管焦点；Escape 在容器持焦或本层最上层时生效，下层不抢焦点；关闭仅在原焦点仍连接时恢复；调用方勿再写 Escape 与初始 focus。
 render-diagnostics.ts[EO5S]: F:查看器渲染诊断宿主浮层（Vue） | R:code:examples/vue-host/src/lib/logger.ts | A:消费 base-screen-diagnostic 事件 / 浮层 / 释放 | S:浮层挂在未缩放的 viewer-stage 上避免跟随画布缩放；不消费时组件校验失败会出现画布空白但状态在线的排障黑洞
 toast.ts[EU3T]: F:Vue 全局单例 Toast | R:- | A:- | S:容器不属于视图树，命令式挂 body 避免为小状态面引入依赖；4 秒自动移除点击可提前关闭
 
@@ -471,7 +474,7 @@ toast.ts[EU3T]: F:Vue 全局单例 Toast | R:- | A:- | S:容器不属于视图�
 agent-catalog.ts[IA6S]: F:智能体物料目录摘要（Vue） | R:code:examples/vue-host/src/lib/api.ts | A:从 runtime.catalog 压成生成用摘要 / 样式签名 | S:权威来源是合并后的 runtime.catalog 上线组件下一句即进提示词；不搬 tagName/DOM/事件/完整 schema 守住边界
 asset-library.ts[IU7L]: F:宿主素材库左栏与统一选择器（ADR-0089） | R:code:examples/vue-host/src/lib/asset-model.ts | A:消费公开 slot / 插入替换背景 / 选图请求桥 / 临时上传 | S:三端逐字共享且 vanilla 为基准；文档只存 host_image 身份不存 URL；设计器只允许临时上传
 asset-return.ts[FG3T]: F:素材页返回线索（Vue） | R:- | A:- | S:sessionStorage 记住来源屏；只接受编辑路由，存储不可用静默降级
-component-workshop.ts[AE7L]: F:三端共享的组件工坊宿主实现（ADR-0105） | R:code:examples/vue-host/src/screen/fragment-shelf.ts,code:examples/vue-host/src/screen/online-materials.ts | A:规格模块生成回读与受控 import / 物料与分片存储端口及运行时装载 / 物料库分组 / 原子与组合编辑、预览、体检、发布 | S:三端与 harness 逐字共享；持久化 Manifest 须等于同标签重编译结果，否则失败关闭；同标签只 define 一次，仅清单变化时回挂构造器；代码加载与存储归宿主端口
+component-workshop.ts[AE7L]: F:三端共享的组件工坊宿主实现（ADR-0105） | R:code:examples/vue-host/src/screen/fragment-shelf.ts,code:examples/vue-host/src/screen/online-materials.ts | A:规格模块生成回读与受控 import / 物料与分片存储端口 / 物料库分组 / 原子组件编辑与预览 / 组合从选区提取 / 体检与发布上下架删除 | S:持久化 Manifest 须等于同标签重编译结果否则失败关闭；同标签只 define 一次，仅清单变化时更新构造器不重挂载；代码经 blob import() 受控加载，三端逐字共享。
 composition-runtime.ts[FG2T]: F:编辑查看页共享 runtime 加载入口（Vue） | R:code:examples/vue-host/src/screen/host-runtime.ts | A:- | S:仅转调 loadHostRuntime 保证编辑查看共用同一标准 runtime 与在线物料状态
 datasource-return.ts[FG3T]: F:数据源页返回线索（Vue） | R:- | A:- | S:同 asset-return，sessionStorage 记住来源屏；只接受编辑路由静默降级
 fragment-shelf.ts[IE5S]: F:宿主组件工坊接线 | R:code:examples/vue-host/src/screen/component-workshop.ts,code:examples/vue-host/src/lib/api.ts | A:原子组件存后端 MaterialPackage / 组合存 localStorage / 预置指标卡 / 接管存为组合 | S:三端逐字共享；组合存储仅示例级，真实宿主应落自己的后端；发布后经 host-runtime 的 applyOnlineMaterialPackage 热刷新
@@ -826,7 +829,7 @@ designer-workbench-controller.ts[IE7M]: F:工作台控制器组合参考线、�
 designer-workbench-tabs-controller.ts[IE7M]: F:工作台页签控制器 | R:code:packages/engine/src/browser/controllers/workbench/designer-workbench-controller.ts | A:- | S:工作台页签的切换与状态管理
 
 ===/<repository>/packages/engine/src/browser/dom/blueprint/===
-designer-blueprint-default-canvas.ts[AU9L]: F:引擎默认蓝图中央画布与本地交互编排 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-geometry.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts | A:节点卡片与锚点 / 贝塞尔连线与标签 / 拖拽连线框选平移缩放 / 右键菜单与快捷键 / 模拟触发与轨迹 / 自动布局和视口适配 | S:只收发画布协议，文档、历史与校验不在此；拖动、框选、平移、缩放及语义显隐均为会话态，松手只提交一次 commit-layout；结构与选中态分离缓存，按下元素不得重建，否则丢 click 或双击；几何只读共享常量，卡片宽 164、锚点命中 28、缩放 0.3–2
+designer-blueprint-default-canvas.ts[AU9L]: F:引擎默认蓝图中央画布与本地交互编排 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-geometry.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts | A:节点卡片与锚点 / 贝塞尔连线与标签 / 拖拽连线框选平移缩放 / 右键菜单与快捷键 / 模拟触发与轨迹 / 自动布局和视口适配 | S:只收发画布协议，文档、历史与校验不在画布；拖动/框选/平移/缩放与语义连线显隐均为会话态，松手只提交一次 commit-layout；结构标记与选中态分离缓存，标记不变不重建 DOM，否则按下元素被换掉会丢 click 与双击；几何只读共享常量：卡片宽 164、锚点命中 28、缩放 0.3–2，上下描边 2 计入高度；节点拖动按 8px 网格对齐。
 designer-blueprint-dom-helpers.ts[FG1T]: F:蓝图画布 DOM 辅助 | R:code:packages/engine/src/browser/dom/blueprint/designer-blueprint-dom.ts | A:- | S:蓝图 DOM 构建的小辅助函数
 designer-blueprint-dom.ts[FG7L]: F:设计视图事件面板摘要与能力态 DOM | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts | A:事件摘要 / 交互卡片 / 效果描述 | S:目标是条件节点时展开其 yes/no 连出的动作；未声明的宿主动作明确标出，与执行侧失败关闭同一事实
 designer-blueprint-host-left-panel-dom.ts[FG4T]: F:蓝图宿主左栏 DOM | R:code:packages/engine/src/browser/dom/blueprint/designer-blueprint-dom.ts | A:- | S:蓝图工作台宿主左栏 DOM 结构
@@ -1022,9 +1025,9 @@ designer-workbench-inspector-data.css[FG7L]: F:数据源检查器面板、提示
 designer-workbench-inspector.css[FG7L]: F:检查器右栏五行栅格与属性区外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:五行顺序在所有状态固定；列须显式声明为单列，子项漏写 grid-column 会另开列挤成竖条；页签用 hidden 摘除时须就地压回 display；智能体页签规则须排在画布与多选行模板之后
 designer-workbench-layers.css[FG6M]: F:图层面板列头搜索与图层树行的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-selection.css | A:- | S:行缩进折叠箭头与引导线共用 18px 加 depth 乘 16px 基准，三处必须同步；能力标记 data 是实心点、event 是空心环，先靠形状区分再靠颜色，纯色差对色觉差异用户等于无区分
 designer-workbench-materials.css[FG5S]: F:物料卡片、缩略图、封面与分片线框外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:交互只改绘制属性几何恒定；缩略图比例必须保留，否则封面适配误判退成 contain；卡片只留图加名
-designer-workbench-panels.css[FU6M]: F:设计器左右面板、检查器与物料库的布局样式 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css,code:packages/engine/src/browser/styles/designer-tokens.css | A:物料工具栏与网格 / 检查器上下文几何摘要 / 搜索与密度过滤 / rail 与 inspector 可见性 | S:面板层只管几何与排版，徽标和空态外观归 chrome；basic 密度隐藏 advanced，但搜索时展示；搜索过滤用 inspector-pane 高优先级选择器而非 important；滚动容器预留稳定轨道
+designer-workbench-panels.css[FU6M]: F:设计器左右面板、检查器与物料库的布局样式 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css,code:packages/engine/src/browser/styles/designer-tokens.css | A:物料工具栏与网格 / 检查器上下文与几何摘要 / 搜索结果列表与右键菜单 / 筛选字段与分组隐藏 / 密度 basic 过滤 / rail 与 inspector 显隐 | S:徽标与空态外观归 chrome，面板层只管几何排版；筛选标记由 chrome-dom 打在 root，数据工作台也要隐藏被筛掉的字段与分组；basic 密度隐藏 advanced、搜索时恢复；滚动容器预留稳定轨道。
 designer-workbench-selection.css[FG5T]: F:图层树与蓝图库列表选中态的共用画法 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:选中态共用一份中性绘制，强调色只留给可执行操作与画布选框
-designer-workbench-shell.css[FG7L]: F:设计器舞台、状态栏与面板把手的整体布局外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:状态栏左工具读数与项目状态、右组件数尺寸开关缩放；右栏行顺序归 inspector 层；把手悬停只加深收边不用强调色；折叠胶囊钮始终可命中
+designer-workbench-shell.css[FG7L]: F:设计器舞台、状态栏与面板把手的整体布局外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:状态栏左读数与项目状态、右组件数尺寸开关缩放；右栏行顺序归 inspector；把手悬停只加深收边；折叠胶囊钮始终可命中；状态开关最小高度 24px 是触控目标契约。
 designer-workbench-style.ts[FG4T]: F:工作台 CSS 分片的按序拼接常量 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:选择层排在全部面板之后赢同特异性，可访问性始终最后
 designer-workbench-topbar.css[FG6L]: F:顶栏的栅格列宽与响应式收缩外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-shell.css | A:- | S:顶栏高度含 border 与栅格行等高避免 1px 溢出；首列与左栏同宽并保底 200px
 designer-workbench-variable-editor.css[FG5L]: F:变量编辑器表单的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-variables.css | A:- | S:字段分组与错误汇总的视觉层级统一由本文件承担
@@ -1058,10 +1061,10 @@ designer-metrics.ts[FG6T]: F:度量基础事件名枚举与构造 | R:- | A:- | 
 
 ===/<repository>/packages/engine/src/common/operations/blueprint/===
 designer-blueprint-capabilities.ts[FG7T]: F:蓝图宿主动作能力词表的可用性投影 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts | A:- | S:索引抛错或缺失一律降级为空表或不可用，不让插件索引异常击穿作者面；未声明动作据此显示降级提示
-designer-blueprint-geometry.ts[KU6T]: F:蓝图节点卡片与锚点交互的共享几何常量 | R:code:packages/engine/src/browser/dom/blueprint/designer-blueprint-default-canvas.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts,code:packages/engine/src/browser/styles/designer-tokens.css | A:卡片宽高与内距 / 锚点行高 / 节点间距 / 吸附距离 | S:卡片宽、标题高、行高与最小高必须与 CSS 令牌及节点高度计算同步；上下内距之和作为统一几何量供高度估算复用
+designer-blueprint-geometry.ts[KU6T]: F:蓝图节点卡片与锚点交互的共享几何常量 | R:code:packages/engine/src/browser/dom/blueprint/designer-blueprint-default-canvas.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts,code:packages/engine/src/browser/styles/designer-tokens.css | A:卡片宽高与上下内距 / 标题高 / 锚点行高 / 节点间距与最小高 / 吸附距离 / 描边常量 | S:NODE_BORDER=2 为卡片上下 1px 描边之和，画布 height() 与模型估算高度须同公式计入，否则自动堆叠间距差 2px；内距和 PADDING 供高度估算复用；宽/标题高/行高/最小高须与 CSS 令牌同步。
 designer-blueprint-graph.ts[DB8L]: F:蓝图节点图作者期操作（ADR-0107） | R:code:packages/contracts/src/document/blueprint-graph.ts | A:节点 id 与查找 / 插入 / 连线校验 / 删除剪枝 / 节点连线更新与排序 / 复制 / 布局视口 / 分片合并提取 | S:组件变量宿主就绪节点各自唯一，定时器与条件每次新建；连线拒绝重复与条件成环；无状态组件不能连状态锚点；参数只对弹框打开与切换可选
 designer-blueprint-model-types.ts[FG3T]: F:蓝图事件选项类型 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts | A:- | S:可用性由 manifest 声明与能力门禁共同决定
-designer-blueprint-model.ts[AU8L]: F:蓝图文档到画布图、节点库与模拟触点的投影 | R:code:packages/contracts/src/document/blueprint-graph.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-graph.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-geometry.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts | A:事件能力与连线上下文 / 组件变量节点库 / 节点锚点可用性 / 画布图与语义边 / 模拟触发 / 自动布局与高度估算 | S:节点与边同文档一一对应，不派生结构依赖边；未保存节点按流边分层再按实际卡高重排，已存布局不动；状态锚点仅声明状态的组件出现；缺失物料事件与未声明宿主动作保留为不可用锚点；文案由浏览器注入，common 不引 ui-text
+designer-blueprint-model.ts[AU8L]: F:蓝图文档到画布图、节点库与模拟触点的投影 | R:code:packages/contracts/src/document/blueprint-graph.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-graph.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-geometry.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts | A:事件能力与连线上下文 / 组件变量节点库 / 节点锚点可用性 / 画布图与语义边 / 模拟触发 / 自动布局与高度估算 | S:节点与边同文档一一对应，不派生结构或依赖边；未保存节点按连线最长上游路径分层、再按实际卡高重排，已保存布局不动；状态锚点仅声明状态的组件出现；缺失物料事件与未声明宿主动作保留为不可用锚点；文案由浏览器注入、common 不引 ui-text；高度估算与画布同公式计入描边。
 designer-blueprint-protocol-guards.ts[FG6T]: F:蓝图画布协议的校验守卫与结果构造 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts | A:- | S:标识最长 256、坐标绝对值上限 100 万；失败区分authoring无效与超限两类诊断码
 designer-blueprint-protocol-types.ts[FG6M]: F:蓝图画布协议类型与事件常量 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts | A:- | S:定义 slot 名、state/command 事件、节点拖拽 MIME 与工作台模式事件；画布节点带锚点，从画布节点带显示方式
 designer-blueprint-protocol.ts[FG8M]: F:蓝图画布命令解析与类型守卫 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol-types.ts | A:- | S:命令 id 最长 128、布局节点≤4096、模拟载荷≤256KiB；锚点须符合契约锚点词法；未知字段一律拒绝严格按 type 分派
@@ -1260,14 +1263,14 @@ material.api.md[SZ5S]: F:material 主入口的 API 报告快照 | R:- | A:- | S:
 ===/<repository>/packages/material/src/===
 auto-register.ts[FO5T]: F:八种官方物料的批量自注册 | R:code:packages/material/src/index.ts | A:- | S:逐个执行物料定义并冻结校验，任一失败即抛错终止注册；同时再导出全部定义函数
 base-material.ts[EA7S]: F:官方物料元素基类与盒面绘制 | R:code:packages/material/src/container.ts | A:- | S:模型未设置时读取抛错；边框画在 canonical 盒内用 border-box；渐变边框用叠加层加 mask，只动自身 display；不透明度由 Renderer 统一写
-chart.ts[EA7M]: F:图表官方物料的定义与 manifest | R:code:packages/material/src/editor-descriptor.ts | A:- | S:tabular 静态数据带默认维度度量绑定；检查器只走 editorDescriptor；宿主 display 为 none 时不得覆盖成 block
+chart.ts[EA7L]: F:图表官方物料的定义、manifest 与可访问数据呈现 | R:code:packages/material/src/editor-descriptor.ts | A:静态/数据集/变量绑定 / ready 摘要与 aria-label / 整图 roving tabindex 点选 / 方向键与 Home/End / 视觉隐藏读屏数据表 / 数据适配器与空态 | S:整图只占一个 Tab 停靠点：interactive 时数据点 role=button 走 roving tabindex，方向键/Home/End 移动、Enter/Space 发 pointClick；设计态不设 tabindex；读屏隐藏数据表最多 200 行。
 container.ts[EA6T]: F:容器官方物料的定义与 manifest | R:code:packages/material/src/base-material.ts | A:- | S:children 为真但 libraryVisible 为假，仅用于编组与组壳
 editor-descriptor.ts[FC5T]: F:为官方物料挂检查器描述符的辅助 | R:code:packages/plugin-core/src/editor/editor-descriptor.ts | A:- | S:描述符是官方物料唯一表单来源；按 manifest 自身 schema 校验，失败属开发期错误直接抛出
-image.ts[EA6S]: F:图片官方物料的定义与 manifest | R:code:packages/material/src/base-material.ts | A:- | S:唯一开启宿主资源选择入口的官方物料；URL 有界校验失败关闭；加载失败移除图片显示占位
+image.ts[EA6S]: F:图片官方物料的定义、manifest 与替代文本 | R:code:packages/material/src/base-material.ts | A:结构分区含替代文本 / 加载与失败占位 / 自然尺寸投影 | S:alt 是唯一无障碍 prop，默认空串表示装饰图；只从 props.alt 读取并写 img.alt，不写进 data 或 style。URL 有界校验失败关闭；仍是唯一开放宿主资源选择的官方物料。
 index.ts[FC5T]: F:material 包的物料定义入口导出 | R:code:packages/material/src/base-material.ts | A:- | S:导出八种官方物料的 define 函数供自注册与按需引入
 rule.ts[EA5S]: F:分割线官方物料的定义与 manifest | R:code:packages/material/src/base-material.ts | A:- | S:只画一条线；只写内部样式绝不写宿主 width/height
 shapes.ts[EA6S]: F:矩形与椭圆官方物料的定义与 manifest | R:code:packages/material/src/base-material.ts | A:- | S:椭圆圆角固定 50% 不暴露 borderRadius 且无结构分区，边框不开放渐变
-table.ts[EA7M]: F:表格官方物料的定义与 manifest | R:code:packages/material/src/base-material.ts | A:- | S:tabular 静态数据带默认列绑定；预留滚动条轨道避免数据变化抖动；display 为 none 时不得覆盖
+table.ts[EA7L]: F:表格官方物料的定义、manifest 与键盘可访问渲染 | R:code:packages/material/src/base-material.ts | A:静态/数据集/变量绑定 / 整表 roving tabindex / 网格方向键与 Home/End / 单元格 Enter/Space 激活 / cellClick 与 rowClick / 滚动与焦点恢复 | S:整表 roving tabindex：td 可聚焦、tr 无按键；单元格 Enter/Space 经 activate 先 cellClick 后 rowClick；方向键左右行内、上下跨行、Home/End 与 Ctrl 版到表首尾不回绕；设计态不设 tabindex；display:none 勿覆盖。
 text.ts[EA7M]: F:文本官方物料的定义与 manifest | R:code:packages/material/src/base-material.ts | A:- | S:数据能力含 host-resource 可直接读推送指标，但不开放宿主资源选择入口；垂直居中与底对齐用内层 flex 包装，元素本身保持 block
 
 ===/<repository>/packages/plugin-core/===
@@ -1513,23 +1516,23 @@ border-box.ts[EA7M]: F:装饰边框物料的 manifest 与元素 | R:code:plugins
 border-picker.ts[EB6S]: F:装饰边框样式选择器的检查器控件 | R:code:plugins/plugin-materials/src/board/identity.ts | A:- | S:契约与内建控件一致，宿主写 model 用户改值派发 change 宿主读 value 走 props 事务；拿不到 Store 故撤销 dirty 批量语义自动一致；每项画真实缩略图因为选边框是视觉决策
 capsule-progress.ts[EA7M]: F:胶囊进度物料的 manifest 与元素 | R:code:plugins/plugin-materials/src/board/board-element.ts | A:- | S:只画读数不内建标题；发光属 style 的 fillGlow；读数格式走通用配置组；display 为 none 时不得覆盖
 device-sample.ts[FG4T]: F:设备五态物料共用的示例数据 | R:code:plugins/plugin-materials/src/board/status-grid.ts | A:- | S:状态分布与灯阵必须共用同一份 12 台样例，否则插入的卡片自相矛盾；含不在五态内的值演示归未知
-digital-flop.ts[EA7M]: F:数字翻牌器物料的 manifest 与元素 | R:code:plugins/plugin-materials/src/board/board-element.ts | A:- | S:只依赖原生 DOM 与 Web Animations 不打包动画库；读数格式走通用配置组；只有一排数字格无标题行；翻牌不触发相邻格重排
+digital-flop.ts[EA7M]: F:数字翻牌器物料的 manifest 与元素，含读数格式、键盘激活与减少动效 | R:code:plugins/plugin-materials/src/board/board-element.ts | A:按位翻牌与读数格式配置组 / 数字色与格外文字色分离 / 键盘激活与减少动效 | S:数字色 #04182a 对格底 #38bdf8 勿改浅；格外文字用 labelColor(#e6f1ff) 压深背景、缺省回落浅色；设计态移除 tabindex，interactive 才 role=button 支持 Enter/Space；reduced-motion 跳过翻牌仍显数字
 element-base.ts[FC4T]: F:无 DOM 环境的元素基类替身 | R:code:plugins/plugin-materials/src/board/board-element.ts | A:- | S:插件模块须能被 Node 导入，故不能直接 extends HTMLElement；真正注册在 customElements 缺失时由 SDK 失败关闭
 fragments.ts[FE6M]: F:大屏插件的组合分片贡献（ADR-0100/0101） | R:code:plugins/plugin-materials/src/board/status-legend.ts,code:plugins/plugin-materials/src/board/title-decor.ts | A:设备状态卡 / 设备状态概览 / 标题栏 / 设备状态面板 | S:只组合本插件与官方物料不新增渲染逻辑；标题必须是 base.text；分片无法预置文档级数据源，插入后灯阵与图例应改读同一实例
-identity.ts[FC6M]: F:大屏物料的类型标签名与共享样式词汇 | R:code:plugins/plugin-materials/src/board/board-degradation.ts | A:- | S:五态色唯一来源，物料内不得再写十六进制字面量；颜色不是唯一编码须配文字；正常低饱和只有故障高饱和；标题装饰只画图元文字由 base.text 承担
-index.ts[FC6S]: F:大屏物料定义的聚合导出 | R:code:plugins/plugin-materials/src/board/board-element.ts | A:- | S:汇总各 board 物料、检查器控件、样例数据、分片与布局纯函数导出，供插件注册接入
+identity.ts[FC6M]: F:大屏物料的类型标签名、五态色与共享样式词汇 | R:code:plugins/plugin-materials/src/board/board-degradation.ts | A:- | S:五态色唯一来源，物料不得复写字面量；颜色须配文字；正常低饱和、故障高饱和；文字色另用 BOARD_STATUS_TEXT_COLORS，不得用指示色；标题装饰只画图元。
+index.ts[FC6S]: F:大屏物料定义的聚合导出 | R:code:plugins/plugin-materials/src/board/board-element.ts | A:- | S:汇总各 board 物料、检查器控件、样例数据、分片与布局纯函数导出；状态指示色与文字色同源导出，供插件注册接入。
 json-values.ts[DB6T]: F:物料读取 props style dataState 的安全取值器 | R:code:plugins/plugin-materials/src/board/tabular-columns-adapter.ts | A:- | S:把缺失与类型不符统一收敛为兜底值，避免各元素重复类型判断；readPath 任一段非对象返回 undefined 不抛异常
 marquee.ts[EA7M]: F:滚动字幕物料的 manifest 与元素 | R:code:plugins/plugin-materials/src/board/board-element.ts | A:- | S:无缝循环靠同段文本复制两份加轨道 -50% 位移，两份 padding 须一致；设计态不播只显第一份；周期 periodMs 用毫秒
-pipeline.ts[EA7L]: F:产线工序链物料的 manifest 与元素 | R:code:plugins/plugin-materials/src/board/tabular-columns-adapter.ts | A:- | S:行序即工序顺序不得重排；可见数按 model.size 算不测 DOM；空态文案由物料固定不开放 prop；五态色只取 identity
+pipeline.ts[EA7L]: F:产线工序链物料的 manifest 与元素 | R:code:plugins/plugin-materials/src/board/tabular-columns-adapter.ts | A:工序节点 / 状态条与状态文字 / 越界读数提示 / 五态色回退 | S:行序即工序；可见数按 model.size 算不测 DOM；空态文案固定；五态色只取 identity。状态文字默认走 BOARD_STATUS_TEXT_COLORS，作者显式改色保持原值。
 scalar-adapter.ts[IB6T]: F:标量与文本物料的表格投影适配器 | R:code:plugins/plugin-materials/src/board/json-values.ts | A:- | S:标量投影结果必须是数字本身而非对象，只取第一行；文本适配器把绑定列所有行拼成一行，分隔符固定全角间隔号
-scroll-board.ts[EA7L]: F:轮播列表物料的 manifest 与元素 | R:code:plugins/plugin-materials/src/board/tabular-columns-adapter.ts | A:- | S:视口高度固定为行数乘行高，滚动只改 track transform；等级色是 style 四个语义色键，缺省回落共用等级色板；暴露 rowClick 事件
+scroll-board.ts[EA7L]: F:轮播列表物料的 manifest 与元素，含表头、等级色列、键盘行导航与自动轮播 | R:code:plugins/plugin-materials/src/board/tabular-columns-adapter.ts | A:表头与固定视口 / 等级色列与共用色板 / 表格角色与键盘导航 / 减少动效整页翻页 | S:视口=行数×行高、只改 transform；等级色 style 四键回落共用板；reduced-motion 不停定时器而整页无过渡翻页，否则越界行看不到；表头/行/格补 table 角色，interactive 行可聚焦并 Enter/Space
 status-grid.ts[EA7L]: F:状态灯阵物料的 manifest、元素与布局纯函数 | R:code:plugins/plugin-materials/src/board/status-legend.ts,code:plugins/plugin-materials/src/board/device-sample.ts | A:- | S:格子恒为正方形，容量按 model.size 算不测 DOM，设计态与预览一致；文字按边长降级；图例拆到 status-legend，底栏只留溢出 +N
 status-legend.ts[EA7L]: F:状态分布物料：按设备五态计数的图例 | R:code:plugins/plugin-materials/src/board/status-grid.ts | A:- | S:只消费 status 角色绑定的一列，可与灯阵绑定同一数据；角色未绑定时失败关闭；总数说明由物料固定给出
 tabs.ts[EA7M]: F:标签页物料的 manifest 与元素 | R:code:plugins/plugin-materials/src/board/identity.ts | A:- | S:只做选中哪一项，切换后显示什么由蓝图按值分支决定；标签取第 1 列值取第 2 列，最多 12 项；设计态未开事件不响应点击；抛 tabChange
 tabular-columns-adapter.ts[IB6S]: F:tabular 角色到表格数据的通用投影工厂 | R:code:plugins/plugin-materials/src/board/json-values.ts | A:- | S:列顺序等于绑定字段数组顺序而非 dataset 字段顺序，位置语义依赖它；rows 键集合同样按绑定字段投影，多余字段不漏进视图模型；绑定角色无字段时失败关闭
 title-decor-picker.ts[EB5S]: F:标题装饰形态选择器的检查器控件 | R:code:plugins/plugin-materials/src/board/title-decor.ts | A:- | S:每项画缩略图并给中文名；骨架是编译期字面量，文档值只参与 aria-pressed 比较不拼进 markup
 title-decor.ts[EA6M]: F:标题装饰物料：卡片标题栏的图元部分（ADR-0101） | R:code:plugins/plugin-materials/src/board/identity.ts | A:- | S:只画竖条、下划线、括号、双箭头图元，文字由放在里面的 base.text 承担；形态是 props，颜色线宽背景是 style
-water-level.ts[EA7M]: F:水位图物料的 manifest 与元素 | R:code:plugins/plugin-materials/src/board/board-element.ts | A:- | S:波纹只改 transform 横移宽 200% 的波浪；几何用钳制值文本用原值；形状圆或矩形；读数格式走配置组；display 为 none 时不得覆盖
+water-level.ts[EA7M]: F:水位图物料的 manifest 与元素，含读数、圆矩罐体、波纹与键盘激活 | R:code:plugins/plugin-materials/src/board/board-element.ts | A:读数与量程钳制 / 圆矩罐体与容器查询 / 波纹动效与减少动效 / 键盘激活 | S:波纹只 transform 横移 200%；几何用钳制值、文本用原值；interactive 才可聚焦并 Enter/Space；reduced-motion 不播波纹但内容仍可读；display:none 不得覆盖
 
 ===/<repository>/plugins/plugin-materials/src/echarts/===
 chart-adapter.ts[IB5T]: F:ECharts 图表的适配接口与动态加载 | R:code:plugins/plugin-materials/src/echarts/echarts-runtime.ts | A:- | S:对外只暴露 handle 接口与 JSON-safe 载荷，第三方类型只在 runtime 文件内部；通过动态 import 加载 runtime 避免 echarts 进入首屏闭包
@@ -1537,7 +1540,7 @@ chart-data-adapter.ts[IB5T]: F:图表数据的表格投影适配器 | R:code:plu
 chart-option.ts[DB7M]: F:图表 canonical 数据到 ECharts option 的纯映射 | R:code:plugins/plugin-materials/src/echarts/chart-data-adapter.ts | A:- | S:不含第三方类型；line 与 area 同族面积是折线加渐变填充，bar 用纵向渐变，pie 走环形布局不生成直角坐标系；多系列备用色板首系列用作者选色
 chart-render-scheduler.ts[RG5T]: F:图表渲染的调度与取消 | R:code:plugins/plugin-materials/src/echarts/element.ts | A:- | S:把高频数据更新合并为延迟渲染，卸载时取消排队避免对已断开元素绘制
 echarts-runtime.ts[IB7T]: F:ECharts 运行期的唯一静态依赖入口 | R:code:plugins/plugin-materials/src/echarts/chart-adapter.ts | A:- | S:只由 chart-adapter 动态 import，其他模块静态引用会把整包拉回首屏闭包；按需注册图型与组件而非整包导入以利 tree-shaking；模块只求值一次故并发加载 use 只执行一次
-element.ts[EA7M]: F:ECharts 图表物料元素 | R:code:plugins/plugin-materials/src/echarts/manifest.ts | A:- | S:宽高由渲染器写死只设 display 且不得覆盖 none；运行期动态加载中不重复发起；首帧只出轻量内容图表随后补齐；加载或实例化失败走降级不抛出
+element.ts[EA7M]: F:ECharts 图表物料元素与读屏细节表，含按需加载、交互点与失败降级 | R:code:plugins/plugin-materials/src/echarts/manifest.ts | A:按帧加载与实例化 / 可聚焦细节表与键盘操作 / seriesClick 交互点 / 失败降级 | S:宽高由渲染器写死、此处只设 display 不得覆盖 none；动态加载不重复发起；ready 挂可聚焦细节表、focus-within 才展开；换数或释放即移除；失败走状态视图降级
 index.ts[FC4T]: F:ECharts 物料的聚合导出 | R:code:plugins/plugin-materials/src/echarts/element.ts | A:- | S:汇总图表物料定义与适配器导出，供插件注册统一接入
 manifest.ts[FC6M]: F:ECharts 图表物料家族的 manifest 定义 | R:code:plugins/plugin-materials/src/echarts/element.ts | A:- | S:标题、图例与仪表盘数值格式走通用配置组；检查器只走描述符；每个图表家族一个稳定 type
 series-picker.ts[EB5T]: F:图表系列选择器的检查器控件 | R:code:plugins/plugin-materials/src/echarts/element.ts | A:- | S:插件为图表物料贡献的系列选择控件，遵循宿主写 model 用户改值派发 change 的内建控件契约
@@ -1622,7 +1625,7 @@ assert-inspector-data-tab.mjs[FB5T]: F:检查器数据源页签显隐的浏览�
 assert-inspector-form-consistency.mjs[FB7M]: F:检查器表单控件视觉一致性的浏览器断言（ADR-0102） | R:code:tooling/verification/browser-harness/main.ts | A:- | S:逐个插入每种物料展开全部分区，按控件类型比对高度、圆角、底色、字体、内距与起止位置而非截图；须量到大部分物料；验证基础与全量切换
 assert-inspector.mjs[FB9L]: F:检查器与调色板的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖表单滚动连续性、坐标与尺寸输入、描述符步进器、导入探测、可编辑快捷键与调色板布局交互；断言后还原原值避免污染后续步骤
 assert-interactions.mjs[FB9L]: F:设计器交互的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖选区与框选、多选批量编辑、画布内文本编辑、吸附与覆盖层复用、变换预览、图层、事件守卫、主题隔离、控件样式与提示
-assert-workbench.mjs[FB9L]: F:工作台外壳与作者流的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖顶栏项目名、命令面板、嵌套菜单、项目与物料作者流、原生事件开关、桌面基线几何、文本数据状态、直接预览往返与宿主集成
+assert-workbench.mjs[FB9L]: F:工作台外壳与作者流的浏览器断言集合 | R:code:tooling/verification/browser-harness/run-browser-harness.mjs | A:顶栏与命令面板 / 嵌套菜单与桌面基线几何 / 项目与物料作者流 / 原生事件开关探针 / 文本数据态与预览及宿主集成 | S:覆盖顶栏项目名、命令面板、嵌套菜单可命中性、项目冲突继续/重载/重试、物料数据态、桌面几何与实例隔离、直接预览往返、宿主集成；单元格点击须依次发 cellClick 与同行 rowClick，共 8 条事件；canvas 缩放六档下拉不回退分段
 
 ===/<repository>/tooling/verification/browser-harness/blueprint/===
 assert-blueprint.mjs[FB9L]: F:蓝图工作台与相关作者流的浏览器断言 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖蓝图工作台、组件文本提交与语义图表作者流；陈旧 revision 失败关闭并重发权威状态；内部事件面板只读
@@ -1679,9 +1682,9 @@ layout-assertions.mjs[FB5T]: F:布局断言的共享助手 | R:code:tooling/veri
 open-viewport.mjs[FB6S]: F:打开视口的共享助手 | R:code:tooling/verification/browser-harness/shared/harness-utils.mjs | A:- | S:封装进入画布视口与就绪等待的通用流程
 
 ===/<repository>/tooling/verification/browser-harness/system/===
-assert-system-gallery.mjs[FB6M]: F:设计系统清单的浏览器断言 | R:code:tooling/verification/browser-harness/system/system-gallery.ts | A:控件几何与禁用态断言 / 下拉弹层几何断言 / 浅深主题主按钮断言 | S:默认深色下验证尺寸与禁用几何；切换浅色后主按钮背景与文字必须变化，防止主操作令牌只在单主题生效
+assert-system-gallery.mjs[FB6M]: F:设计系统清单的浏览器断言 | R:code:tooling/verification/browser-harness/system/system-gallery.ts | A:控件尺寸与禁用态 / 分段轨道几何 / 自绘下拉弹层对齐 / 浅深主题主按钮 | S:深色下校验 input/分段/按钮尺寸与圆角 6px、最小字号≥11；切换浅色后主按钮背景与文字必须变化；expect 是 (condition,message) 收集器，不能链式 toBeTruthy/not.toBe
 run-system-assert.mjs[FB4T]: F:设计系统断言的运行入口 | R:code:tooling/verification/browser-harness/system/assert-system-gallery.mjs | A:- | S:启动设计系统清单的断言，体量极小
-system-gallery.ts[FB9L]: F:设计系统清单页的构建 | R:code:tooling/verification/browser-harness/system.html,code:packages/engine/src/browser/styles/designer-tokens.css | A:令牌与状态矩阵 / 组件原语 / 字阶间距圆角 / 主题切换 | S:数值展示由 design-system-contract.test.ts 与令牌文件锁定；主操作统一 button-primary-*；浅深两套主题可切换且缺省深色
+system-gallery.ts[FB9L]: F:设计系统清单页的构建 | R:code:tooling/verification/browser-harness/system.html,code:packages/engine/src/browser/styles/designer-tokens.css | A:令牌与状态矩阵 / 组件原语 / 字阶间距圆角 / 主题切换 / 图标按钮名称与触控目标 | S:数值展示由 design-system-contract.test.ts 与令牌文件锁定；主操作统一 button-primary-*；浅深两套主题可切换且缺省深色。图标按钮必须显式 ariaLabel，目录链接与状态开关保持 24px 触控目标。
 
 ===/<repository>/tooling/verification/browser-harness/text/===
 assert-text-auto-width.mjs[FB9L]: F:文本自适应宽度与运行时几何的浏览器断言 | R:code:tooling/verification/browser-harness/run-browser-harness.mjs | A:- | S:手势进行中异步数据不得改几何基线；本地测量与旋转、镜像、缩放无关；画布命中与包含用测量边而非保存回退值

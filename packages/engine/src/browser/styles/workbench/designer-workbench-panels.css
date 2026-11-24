@@ -257,10 +257,11 @@
   justify-content: flex-start;
 }
 
-.properties .inspector-pane [data-inspector-search-kind="field"][data-inspector-filtered],
-.properties .inspector-pane [data-inspector-search-kind="section"][data-inspector-filtered],
-.properties [data-inspector-search-kind="field"][data-inspector-filtered],
-.properties [data-inspector-search-kind="section"][data-inspector-filtered] {
+/* 筛选标记由 designer-inspector-chrome-dom 在整个 root 上打：右侧属性面板与数据工作台
+   （位于 main.workspace，不在 .properties 内）都要隐藏被筛掉的字段与分组。 */
+.properties .inspector-pane [data-inspector-search-kind][data-inspector-filtered],
+.properties [data-inspector-search-kind][data-inspector-filtered],
+[data-data-workbench] [data-inspector-search-kind][data-inspector-filtered] {
   display: none;
 }
 

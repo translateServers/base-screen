@@ -133,6 +133,14 @@ export const BOARD_STATUS_COLORS = {
   unknown: '#4f5d6b',
 } as const;
 
+export const BOARD_STATUS_TEXT_COLORS = {
+  running: '#70b88f',
+  standby: '#c2b273',
+  fault: '#ff6b6b',
+  offline: '#b7c3cf',
+  unknown: '#94a3b8',
+} as const;
+
 export type BoardStatusKey = keyof typeof BOARD_STATUS_COLORS;
 
 /**

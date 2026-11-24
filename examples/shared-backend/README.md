@@ -94,12 +94,17 @@ screenName, expiresAt, createdAt }`。`temporary=true` 是设计器临时上传�
 告警状态在内存中，进程重启即回到初始 warning；`reset` 恢复初始快照。真实告警平台的持久化、
 确认/屏蔽生命周期与传输凭证由宿主接入，本示例只演示宿主适配层与 SSE 推送。
 
-启动期补种五条记录（按名字补齐：缺哪张插哪张，已有行不覆盖）：「默认销售大屏」是 50+ 组件的成品风格文档，「系统监控大屏」保留
+启动期补种五条记录（按名字补齐：缺哪张插哪张；已有行只在从未保存过时刷新，见下）：「默认销售大屏」是 50+ 组件的成品风格文档，「系统监控大屏」保留
 原来的最小卡片文档（覆盖宿主自有物料路径），「生产监控大屏」是覆盖四种 dataSource 的数据层
 成品文档，「实时告警演示大屏」是告警链路专用屏（流水 + KPI + 等级色块，组件 id 对齐宿主
 `alarm.open` 绑定），「空气质量监测大屏」是三个自建 SQLite 数据源 + 真实快照（Open-Meteo CAMS）
-的城市空气质量案例。新增种子在旧库重启后自动补上；想彻底重置成出厂状态才需要删
-`data/screens.db`，或直接跑冒烟脚本（它使用独立库并自动迁移）。
+的城市空气质量案例。新增种子在旧库重启后自动补上。
+
+物料与文档契约的 B 类改名（ADR-0099 / ADR-0102 / ADR-0110）不写迁移，只改写种子源码，所以已有的
+种子行也要跟上：同名且 `revision` 仍为 1（从未在设计器里保存过）的行，内容与当前种子不同时会在启动时
+原地改写为当前种子，id 不变。保存过的种子（`revision` > 1）和自建大屏一律不碰；它们若带着旧键，
+查看页会报「Material props do not satisfy the declared schema」或「大屏文档迁移失败」，需要在设计器里
+重做或删掉后重启补种。想彻底重置成出厂状态才需要删 `data/screens.db`，或直接跑冒烟脚本（它使用独立库并自动迁移）。
 
 在线物料包（`MaterialPackage`）只存 `type`（稳定文档身份）、`name`、ESM `code`、Manifest JSON
 与 revision；同一 `type` 至多一条。后端不执行代码、不解析 Component 实现，发布前校验
@@ -142,7 +147,7 @@ pnpm --filter @base-screen-example/shared-backend dev # 开发：migrate deploy 
 - schema 变更：`pnpm --filter @base-screen-example/shared-backend exec prisma migrate dev --name <描述>`，
   产物（`prisma/migrations/`）随提交进仓库。
 - `dev` / `start` 前自动 `prisma migrate deploy`，无需手动同步 schema。
-- 启动时由 `ScreensService.onModuleInit` 按名字幂等补种五条演示大屏（只插缺失的，不覆盖已有行）
+- 启动时由 `ScreensService.onModuleInit` 按名字幂等补种五条演示大屏（插缺失的；只刷新从未保存过的种子行）
   （`默认销售大屏`、`系统监控大屏`、`生产监控大屏`、`实时告警演示大屏`、`空气质量监测大屏`），
   dev / start / e2e 行为一致；数据源播种由 `DatasourceSeedService` 负责（含 `city-air.db`
   的幂等生成），素材播种由 `AssetSeedService` 负责（仅空表时生成）。

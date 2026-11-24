@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { api } from '../lib/api';
 import {
   cellText,
@@ -11,6 +11,7 @@ import {
   type DatasourceDraft,
   type DatasourcePreviewResponse,
   type DatasourceTestResponse,
+  type DraftField,
   draftFromDetail,
   draftSignature,
   draftToConfig,
@@ -31,6 +32,7 @@ import {
   validateDraft,
 } from '../lib/datasource-model';
 import { formatDateTime } from '../lib/format';
+import { trapModalFocus } from '../lib/modal-focus';
 import { showToast } from '../lib/toast';
 import DatasourceDialogs from './DatasourceDialogs.vue';
 
@@ -66,10 +68,15 @@ const busy = ref<'load' | 'schema' | 'test' | 'preview' | 'save' | null>(
 const test = ref<DatasourceTestResponse | null>(null);
 const preview = ref<DatasourcePreviewResponse | null>(null);
 const formError = ref<string | null>(null);
+/** 本地校验失败时指向的控件；服务端错误不指向具体控件。 */
+const formErrorField = ref<DraftField | null>(null);
 const conflict = ref<string | null>(null);
 const askDiscard = ref(false);
 const askFieldChange = ref(false);
 let autoPreviewDone = false;
+const dialogRef = ref<HTMLElement | null>(null);
+const formErrorRef = ref<HTMLElement | null>(null);
+let releaseFocus: (() => void) | undefined;
 
 const readOnly = computed((): boolean => detail.value?.type === 'builtin');
 const dirty = computed(
@@ -94,6 +101,12 @@ function patch(partial: Partial<DatasourceDraft>): void {
   draft.value = { ...draft.value, ...partial };
 }
 
+watch(formError, async (message) => {
+  if (message === null) return;
+  await nextTick();
+  formErrorRef.value?.focus({ preventScroll: true });
+});
+
 function buildConfig(): Record<string, unknown> {
   return draftToConfig(draft.value, declaredTypes.value);
 }
@@ -102,9 +115,11 @@ function guard(): boolean {
   const check = validateDraft(draft.value);
   if (check.ok === false) {
     formError.value = check.message;
+    formErrorField.value = check.field ?? null;
     return false;
   }
   formError.value = null;
+  formErrorField.value = null;
   return true;
 }
 
@@ -236,6 +251,36 @@ function requestClose(): void {
   emit('close');
 }
 
+function onSqliteModeKeyDown(event: KeyboardEvent, mode: 'table' | 'sql'): void {
+  const index = mode === 'table' ? 0 : 1;
+  const next =
+    event.key === 'ArrowRight'
+      ? (index + 1) % 2
+      : event.key === 'ArrowLeft'
+        ? (index + 1) % 2
+        : event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? 1
+            : undefined;
+  if (next === undefined) return;
+  event.preventDefault();
+  const nextMode = next === 0 ? 'table' : 'sql';
+  patch({ sqliteMode: nextMode });
+  const target = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  target?.parentElement?.querySelector<HTMLButtonElement>(`[data-ds-mode="${nextMode}"]`)?.focus();
+}
+
+onMounted(() => {
+  if (dialogRef.value !== null) {
+    releaseFocus = trapModalFocus(dialogRef.value, {
+      initialFocus: '[data-ds-field="name"]',
+      onEscape: () => requestClose(),
+    });
+  }
+});
+onBeforeUnmount(() => releaseFocus?.());
+
 function adoptSuggestion(): void {
   // 服务端不会自动加后缀：把名称改成「… 2」让 slug 自然落到建议名
   patch({ name: `${draft.value.name} 2` });
@@ -271,10 +316,12 @@ watch(
 <template>
   <div class="ds-overlay ds-overlay--right">
     <section
+      ref="dialogRef"
       class="ds-drawer"
       role="dialog"
       aria-modal="true"
       :aria-label="editing ? '编辑数据源' : '新建数据源'"
+      :aria-describedby="formError === null ? undefined : 'ds-form-error'"
       data-ds-form=""
     >
       <header class="ds-drawer__head">
@@ -326,6 +373,8 @@ watch(
               <input
                 class="field"
                 data-ds-field="name"
+                :aria-invalid="formErrorField === 'name'"
+                :aria-describedby="formErrorField === 'name' ? 'ds-form-error' : undefined"
                 :value="draft.name"
                 maxlength="64"
                 @input="patch({ name: ($event.target as HTMLInputElement).value })"
@@ -372,6 +421,9 @@ watch(
                 <select
                   class="field"
                   data-ds-field="file"
+                  aria-label="数据库文件"
+                  :aria-invalid="formErrorField === 'file'"
+                  :aria-describedby="formErrorField === 'file' ? 'ds-form-error' : undefined"
                   :value="draft.file"
                   @change="
                     patch({
@@ -395,28 +447,36 @@ watch(
               <span v-if="files.length === 0" class="ds-muted">{{ DATASOURCE_TEXT.noDatabaseFiles }}</span>
             </div>
 
-            <div class="ds-tabs" role="tablist">
+            <div class="ds-tabs" role="tablist" aria-label="SQLite 查询方式">
               <button
                 v-for="mode in ['table', 'sql'] as const"
                 :key="mode"
                 type="button"
                 role="tab"
+                :id="`ds-sqlite-${mode}-tab`"
+                :aria-controls="draft.sqliteMode === mode ? `ds-sqlite-${mode}-panel` : undefined"
                 class="button ds-tab"
                 :class="{ 'ds-tab--active': draft.sqliteMode === mode }"
                 :aria-selected="draft.sqliteMode === mode"
+                :tabindex="draft.sqliteMode === mode ? 0 : -1"
                 :data-ds-mode="mode"
                 @click="patch({ sqliteMode: mode })"
+                @keydown="onSqliteModeKeyDown($event, mode)"
               >
                 {{ mode === 'table' ? '表模式' : 'SQL 模式' }}
               </button>
             </div>
 
             <template v-if="draft.sqliteMode === 'table'">
+              <div id="ds-sqlite-table-panel" role="tabpanel" aria-labelledby="ds-sqlite-table-tab">
               <div class="ds-field">
                 <span>表 / 视图</span>
                 <select
                   class="field"
                   data-ds-field="table"
+                  aria-label="表或视图"
+                  :aria-invalid="formErrorField === 'table'"
+                  :aria-describedby="formErrorField === 'table' ? 'ds-form-error' : undefined"
                   :value="draft.table"
                   @change="
                     patch({
@@ -479,6 +539,7 @@ watch(
                       <td>
                         <select
                           class="field"
+                          :aria-label="`过滤条件 ${index + 1} 的列`"
                           :value="filter.column"
                           @change="
                             patch({
@@ -503,6 +564,7 @@ watch(
                       <td>
                         <input
                           class="field"
+                          :aria-label="`过滤条件 ${index + 1} 的参数名`"
                           :value="filter.param"
                           @input="
                             patch({
@@ -536,13 +598,18 @@ watch(
                   {{ DATASOURCE_TEXT.addFilter }}
                 </button>
               </div>
+              </div>
             </template>
 
-            <div v-else class="ds-field">
-              <span>SQL（单条 SELECT / WITH）</span>
+            <div v-else id="ds-sqlite-sql-panel" role="tabpanel" aria-labelledby="ds-sqlite-sql-tab">
+              <div class="ds-field">
+                <span>SQL（单条 SELECT / WITH）</span>
               <textarea
                 class="field ds-field__sql"
                 data-ds-field="sql"
+                aria-label="SQL 语句"
+                :aria-invalid="formErrorField === 'sql'"
+                :aria-describedby="formErrorField === 'sql' ? 'ds-form-error' : undefined"
                 :value="draft.sql"
                 :placeholder="SQL_TEMPLATE"
                 @input="patch({ sql: ($event.target as HTMLTextAreaElement).value })"
@@ -552,6 +619,7 @@ watch(
                 <button type="button" class="button" @click="patch({ sql: SQL_TEMPLATE })">
                   插入模板
                 </button>
+              </div>
               </div>
             </div>
           </section>
@@ -563,6 +631,9 @@ watch(
               <input
                 class="field"
                 data-ds-field="url"
+                aria-label="请求地址"
+                :aria-invalid="formErrorField === 'url'"
+                :aria-describedby="formErrorField === 'url' ? 'ds-form-error' : undefined"
                 placeholder="http://127.0.0.1:3000/api/demo/press"
                 :value="draft.url"
                 @input="patch({ url: ($event.target as HTMLInputElement).value })"
@@ -583,6 +654,7 @@ watch(
                     <td>
                       <input
                         class="field"
+                        :aria-label="`header ${index + 1} 名称`"
                         :value="header.name"
                         @input="
                           patch({
@@ -600,6 +672,7 @@ watch(
                       <input
                         class="field"
                         type="password"
+                        :aria-label="`header ${index + 1} 的值`"
                         :placeholder="header.hasValue ? MASKED_SECRET : ''"
                         :value="header.value"
                         @input="
@@ -647,6 +720,7 @@ watch(
                 <span v-for="(column, index) in draft.staticColumns" :key="`column-${index}`" class="ds-col-input">
                   <input
                     class="field"
+                    :aria-label="`第 ${index + 1} 列的名称`"
                     :value="column"
                     @input="
                       patch({
@@ -704,6 +778,7 @@ watch(
                     <td v-for="(_, columnIndex) in draft.staticColumns" :key="`cell-${rowIndex}-${columnIndex}`">
                       <input
                         class="field"
+                        :aria-label="`第 ${rowIndex + 1} 行第 ${columnIndex + 1} 列的值`"
                         :value="row[columnIndex] ?? ''"
                         @input="
                           patch({
@@ -761,6 +836,7 @@ watch(
                   <td>
                     <input
                       class="field"
+                      :aria-label="`参数 ${index + 1} 的名称`"
                       :value="parameter.name"
                       @input="
                         patch({
@@ -776,6 +852,7 @@ watch(
                   <td>
                     <input
                       class="field"
+                      :aria-label="`参数 ${index + 1} 的标签`"
                       :value="parameter.label"
                       @input="
                         patch({
@@ -791,6 +868,7 @@ watch(
                   <td>
                     <select
                       class="field"
+                      :aria-label="`参数 ${index + 1} 的类型`"
                       :value="parameter.valueType"
                       @change="
                         patch({
@@ -815,6 +893,7 @@ watch(
                   <td>
                     <input
                       type="checkbox"
+                      :aria-label="`参数 ${index + 1} 是否必填`"
                       :checked="parameter.required"
                       @change="
                         patch({
@@ -830,6 +909,7 @@ watch(
                   <td>
                     <input
                       class="field"
+                      :aria-label="`参数 ${index + 1} 的默认值`"
                       :value="parameter.defaultValue"
                       @input="
                         patch({
@@ -864,7 +944,15 @@ watch(
             </button>
           </section>
 
-          <p v-if="formError !== null" class="ds-error" role="alert" data-ds-form-error="">
+          <p
+            v-if="formError !== null"
+            ref="formErrorRef"
+            id="ds-form-error"
+            class="ds-error"
+            role="alert"
+            tabindex="-1"
+            data-ds-form-error=""
+          >
             {{ formError }}
           </p>
           <p v-if="conflict !== null" class="ds-conflict" data-ds-conflict="">

@@ -2,6 +2,7 @@ import type { DatasourceRefScreen } from '../lib/datasource-model';
 import { DATASOURCE_TEXT, screenEditHref } from '../lib/datasource-model';
 import { el } from '../lib/dom';
 import { formatDateTime } from '../lib/format';
+import { trapModalFocus } from '../lib/modal-focus';
 
 /**
  * 数据源页的弹层（删除保护 / 轻确认 / 放弃修改）。
@@ -27,13 +28,14 @@ function mountDialog(
     children,
   );
   const root = el('div', { class: 'ds-overlay' }, [dialog]);
-  document.body.append(root);
-  return {
-    root,
-    close: () => {
-      root.remove();
-    },
+  let releaseFocus: (() => void) | undefined;
+  const close = (): void => {
+    root.remove();
+    releaseFocus?.();
   };
+  document.body.append(root);
+  releaseFocus = trapModalFocus(dialog, { onEscape: close });
+  return { root, close };
 }
 
 /** 未引用数据源的删除轻确认。 */

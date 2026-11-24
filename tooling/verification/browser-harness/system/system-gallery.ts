@@ -63,7 +63,7 @@ const GALLERY_CSS = `
 .sg-lede { margin: 0; color: var(--designer-text-secondary); }
 .sg-lede code { padding: 0 var(--designer-space-1); border-radius: var(--designer-radius-1); background: var(--designer-surface-control); font: var(--designer-font-numeric); font-size: var(--designer-font-size-xs); }
 .sg-toc { display: flex; flex-wrap: wrap; gap: var(--designer-space-2); margin-top: var(--designer-space-2); }
-.sg-toc a { padding: 2px var(--designer-space-3); border-radius: var(--designer-radius-pill); background: var(--designer-surface-control); color: var(--designer-text-secondary); font: var(--designer-font-small); text-decoration: none; }
+.sg-toc a { display: inline-flex; min-height: 24px; align-items: center; padding: 2px var(--designer-space-3); border-radius: var(--designer-radius-pill); background: var(--designer-surface-control); color: var(--designer-text-secondary); font: var(--designer-font-small); text-decoration: none; }
 .sg-toc a:hover { background: var(--designer-surface-control-hover); color: var(--designer-text-primary); }
 .sg-section { display: grid; gap: var(--designer-space-5); margin-top: var(--designer-space-7); padding-top: var(--designer-space-6); border-top: 1px solid var(--designer-border-subtle); }
 .sg-h2 { margin: 0; font-size: var(--designer-font-size-lg); font-weight: 600; letter-spacing: var(--designer-tracking-heading); }
@@ -414,6 +414,7 @@ function layerRow(
     toggle.type = 'button';
     toggle.className = `designer-control designer-button layer-${property === 'hidden' ? 'eye' : 'lock'}`;
     toggle.dataset.layerToggle = property;
+    toggle.ariaLabel = `${property === 'hidden' ? (state.hidden === true ? '显示' : '隐藏') : state.locked === true ? '解锁' : '锁定'} ${state.name}`;
     toggle.ariaPressed = String(
       property === 'hidden' ? state.hidden === true : state.locked === true,
     );
@@ -453,6 +454,7 @@ function blueprintRow(
   const action = ownerDocument.createElement('button');
   action.type = 'button';
   action.className = 'blueprint-palette-action';
+  action.ariaLabel = state.placed === true ? `定位 ${state.name}` : `添加 ${state.name}`;
   action.innerHTML = designerIcon(state.placed === true ? 'locate' : 'plus');
   row.append(primary, action);
   return row;

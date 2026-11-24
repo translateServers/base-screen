@@ -17,6 +17,7 @@ import {
   BOARD_SECONDARY_COLOR,
   BOARD_STATUS_COLORS,
   BOARD_STATUS_LABELS,
+  BOARD_STATUS_TEXT_COLORS,
   type BoardStatusKey,
   normalizeBoardStatus,
   PLUGIN_BOARD_PIPELINE_TAG_NAME,
@@ -581,7 +582,9 @@ export class PluginBoardPipelineElement extends BoardMaterialElement {
       const statusText = doc.createElement('span');
       statusText.dataset.boardPipelineStatus = '';
       statusText.textContent = BOARD_STATUS_LABELS[status];
-      statusText.style.cssText = `max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${color};font-size:${Math.max(10, Math.round(options.fontSize * 0.85))}px;`;
+      const statusTextColor =
+        color === BOARD_STATUS_COLORS[status] ? BOARD_STATUS_TEXT_COLORS[status] : color;
+      statusText.style.cssText = `max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${statusTextColor};font-size:${Math.max(10, Math.round(options.fontSize * 0.85))}px;`;
       node.appendChild(statusText);
     }
 

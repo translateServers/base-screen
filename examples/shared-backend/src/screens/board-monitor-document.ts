@@ -312,12 +312,12 @@ function staticTable(
 }
 
 /**
- * 选择器：**用 `board.scroll-board` 而不是 `base.table`**。
+ * 选择器：用 `board.scroll-board`。
  *
- * 原因：蓝图联动走物料的 `rowClick` 事件，而 `base.table` 的 `td` 上挂了
- * `stopPropagation` 的 `cellClick`，真实点击永远先命中单元格、`rowClick` 不会触发；
- * `scroll-board` 的行是 div，点击即 `rowClick`，payload 里带整行 `{ row }`，正是
- * 「点一行 → 取该行的 line/window/level 写进变量」需要的形状。
+ * 蓝图联动走物料的 `rowClick` 事件，payload 里带整行 `{ row }`，正是
+ * 「点一行 → 取该行的 line/window/level 写进变量」需要的形状；看板风格也与本屏一致。
+ * （早期 `base.table` 的单元格点击会拦下冒泡、`rowClick` 永远不触发，这是当时选它的原因；
+ * 现在单元格激活会先发 `cellClick` 再发 `rowClick`，两者都可以做选择器。）
  */
 function selectorBoard(
   id: string,

@@ -230,6 +230,7 @@ describe('official material native events (interactive gating)', () => {
     const cell = clickableNode(harness.created, 'td');
 
     fireClick(row);
+    fireClick(cell, { stopPropagation: () => {} });
     expect(harness.events).toHaveLength(0);
 
     harness.setModel(readyModel(tableData(), true));
@@ -240,14 +241,34 @@ describe('official material native events (interactive gating)', () => {
       payload: { rowIndex: 0, row: { amount: 42 } },
     });
 
+    // 真实点击总是先命中单元格（单元格铺满整行）：一次点击先发 cellClick、再发所在行的 rowClick；
+    // 单元格拦下冒泡，行上的监听不会再重复发一次 rowClick。
     const stopped: unknown[] = [];
     fireClick(cell, { stopPropagation: () => stopped.push(true) });
     expect(stopped).toHaveLength(1);
-    expect(harness.events).toHaveLength(2);
-    expect(harness.events[1]?.detail).toEqual({
-      name: 'cellClick',
-      payload: { rowIndex: 0, columnId: 'amount', value: 42 },
-    });
+    expect(harness.events.slice(1).map((event) => event.detail)).toEqual([
+      { name: 'cellClick', payload: { rowIndex: 0, columnId: 'amount', value: 42 } },
+      { name: 'rowClick', payload: { rowIndex: 0, row: { amount: 42 } } },
+    ]);
+  });
+
+  it('table activates a cell from the keyboard with the same cellClick then rowClick pair', () => {
+    const harness = mountElement(BaseScreenTableMaterialElement, readyModel(tableData(), true));
+    const cell = harness.created.find(
+      (node) => node.tagName === 'td' && node.listeners.has('keydown'),
+    );
+    if (cell === undefined) throw new Error('No keyboard-reachable td rendered.');
+    for (const key of ['Enter', ' ']) {
+      for (const listener of cell.listeners.get('keydown') ?? []) {
+        listener({ key, ctrlKey: false, preventDefault: () => {} });
+      }
+    }
+    expect(harness.events.map((event) => (event.detail as { name: string }).name)).toEqual([
+      'cellClick',
+      'rowClick',
+      'cellClick',
+      'rowClick',
+    ]);
   });
 
   it('keeps non-event elements silent even when interactive', () => {

@@ -242,6 +242,51 @@ describe('ScreensService', () => {
     expect(prisma.screen.createMany).not.toHaveBeenCalled();
   });
 
+  // B 类改名（ADR-0099 / ADR-0102 / ADR-0110）只改写种子源码；老库里从未保存过的种子要跟上，
+  // 否则查看页会因未知 props / styleRules 整块渲染失败。
+  it('refreshes seed rows that were never saved when the seed document changed', async () => {
+    const prisma = createPrismaMock();
+    const current = SEED_SCREENS.map((screen) => ({
+      id: `id-${screen.name}`,
+      name: screen.name,
+      revision: 1,
+      document: screen.serialize(),
+    }));
+    current[2] = { ...current[2]!, document: '{"stale":true}' };
+    prisma.screen.findMany.mockResolvedValue(current);
+    const { service } = await createService(prisma);
+
+    await service.ensureSeed();
+
+    expect(prisma.screen.createMany).not.toHaveBeenCalled();
+    expect(prisma.screen.update).toHaveBeenCalledTimes(1);
+    const call = prisma.screen.update.mock.calls[0]?.[0] as {
+      where: { id: string };
+      data: Record<string, unknown>;
+    };
+    expect(call.where).toEqual({ id: `id-${SEED_SCREENS[2]!.name}` });
+    // 只换文档：id 原样保留，revision 不 +1（它仍是「从未保存过」的种子）。
+    expect(call.data).toEqual({ document: SEED_SCREENS[2]!.serialize() });
+  });
+
+  it('never rewrites seeds a user has saved or screens that are not seeds', async () => {
+    const prisma = createPrismaMock();
+    prisma.screen.findMany.mockResolvedValue([
+      ...SEED_SCREENS.map((screen) => ({
+        id: `id-${screen.name}`,
+        name: screen.name,
+        revision: 2,
+        document: '{"edited":true}',
+      })),
+      { id: 'mine', name: '测试', revision: 1, document: '{"mine":true}' },
+    ]);
+    const { service } = await createService(prisma);
+
+    await service.ensureSeed();
+
+    expect(prisma.screen.update).not.toHaveBeenCalled();
+  });
+
   it('lists summaries without documents', async () => {
     const prisma = createPrismaMock();
     prisma.screen.findMany.mockResolvedValue([row()]);

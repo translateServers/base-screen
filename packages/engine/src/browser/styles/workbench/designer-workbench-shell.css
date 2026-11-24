@@ -70,6 +70,7 @@
 
 .status-toggle {
   display: inline-flex;
+  min-height: 24px;
   cursor: pointer;
   align-items: center;
   gap: var(--designer-space-2);

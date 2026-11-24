@@ -52,4 +52,19 @@ describe('design system inventory stays bound to token values', () => {
     expect(actions).toContain('background: var(--designer-button-primary-background);');
     expect(actions).toContain('color: var(--designer-text-on-accent);');
   });
+
+  it('keeps the system gallery harness on its own (condition, message) collector', () => {
+    const harness = read('tooling/verification/browser-harness/system/assert-system-gallery.mjs');
+    // 该脚本的 expect 不是 Jest：链式 matcher 会在运行时抛 TypeError。
+    expect(harness).not.toMatch(/\)\.(?:not\.)?to[A-Z]\w*\(/);
+  });
+
+  it('hides filtered inspector entries in the data workbench too', () => {
+    const panels = read(
+      'packages/engine/src/browser/styles/workbench/designer-workbench-panels.css',
+    );
+    expect(panels).toContain(
+      '[data-data-workbench] [data-inspector-search-kind][data-inspector-filtered]',
+    );
+  });
 });
