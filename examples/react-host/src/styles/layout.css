@@ -16,7 +16,11 @@
   flex: 0 0 auto;
   padding: var(--spacing-3) var(--spacing-5);
   border-bottom: 1px solid var(--color-border);
-  background: linear-gradient(180deg, rgba(11, 42, 70, 0.72) 0%, rgba(5, 13, 26, 0.9) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bs-host-surface-panel) 72%, var(--bs-host-accent)) 0%,
+    color-mix(in srgb, var(--bs-host-surface-workspace) 90%, transparent) 100%
+  );
 }
 
 .shell__brand {
@@ -35,7 +39,7 @@
 
 .shell__meta {
   color: var(--color-text-muted);
-  font-size: 10px;
+  font-size: var(--bs-host-font-size-xs);
   letter-spacing: 0.18em;
 }
 
@@ -102,7 +106,12 @@
   inset: 0;
   overflow: hidden;
   background:
-    radial-gradient(90% 70% at 50% 0%, rgba(12, 74, 110, 0.35) 0%, transparent 70%), #02070f;
+    radial-gradient(
+      90% 70% at 50% 0%,
+      color-mix(in srgb, var(--bs-host-accent) 35%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--bs-host-surface-workspace);
 }
 
 .viewer-stage__frame {
@@ -135,7 +144,7 @@
   padding: 6px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: rgba(5, 17, 31, 0.88);
+  background: color-mix(in srgb, var(--bs-host-surface-panel) 88%, transparent);
   backdrop-filter: blur(10px);
 }
 
@@ -176,7 +185,7 @@
 }
 
 .editor-resource-authoring .button {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--bs-host-shadow-float);
 }
 
 .editor-resource-panel[hidden] {
@@ -194,7 +203,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface-solid);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--bs-host-shadow-overlay);
 }
 
 .editor-resource-hint {

@@ -257,15 +257,18 @@
   justify-content: flex-start;
 }
 
-[data-inspector-filtered] {
-  display: none !important;
+.properties .inspector-pane [data-inspector-search-kind="field"][data-inspector-filtered],
+.properties .inspector-pane [data-inspector-search-kind="section"][data-inspector-filtered],
+.properties [data-inspector-search-kind="field"][data-inspector-filtered],
+.properties [data-inspector-search-kind="section"][data-inspector-filtered] {
+  display: none;
 }
 
 .properties[data-inspector-density="basic"]:not([data-inspector-searching])
   [data-inspector-advanced],
 [data-data-workbench][data-inspector-density="basic"]:not([data-inspector-searching])
   [data-inspector-advanced] {
-  display: none !important;
+  display: none;
 }
 
 .inspector-search-highlight {

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-21T03:27:31Z",
-  "updated_at": "2026-11-24T09:01:13Z",
+  "updated_at": "2026-11-24T11:58:23Z",
   "files": {
     ".changeset/blueprint-node-graph.md": {
       "role": "index",
@@ -311,9 +311,9 @@
     },
     "CONTEXT.md": {
       "role": "index",
-      "sha256": "7ca1c713a0df5131041ec5cbb5557ab4a4591f4109f3c0f6fcc4b68c27f9c7f0",
-      "size": 15561,
-      "normalized_sha256": "7ca1c713a0df5131041ec5cbb5557ab4a4591f4109f3c0f6fcc4b68c27f9c7f0"
+      "sha256": "a92d143fdc425dd310a81cbfb12b69955d9302ed51534b8edc00fe18ec67a78f",
+      "size": 15698,
+      "normalized_sha256": "a92d143fdc425dd310a81cbfb12b69955d9302ed51534b8edc00fe18ec67a78f"
     },
     "LICENSE": {
       "role": "index",
@@ -329,9 +329,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "2fc2c597f86884891fafd67b178d61b9f4c398bfa3a16c2e8e11a59a45f2ab18",
-      "size": 355901,
-      "normalized_sha256": "2fc2c597f86884891fafd67b178d61b9f4c398bfa3a16c2e8e11a59a45f2ab18"
+      "sha256": "14a5f34b23fa5455e0dc6bccdf8e516045cd842b519c23bcd9727399e77095cb",
+      "size": 361963,
+      "normalized_sha256": "14a5f34b23fa5455e0dc6bccdf8e516045cd842b519c23bcd9727399e77095cb"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -371,9 +371,9 @@
     },
     "examples/react-host/index.html": {
       "role": "index",
-      "sha256": "1a611f190347bd845a9f60d186c7a1c949ebb30d1faa856af39cd765a2465963",
-      "size": 322,
-      "normalized_sha256": "1a611f190347bd845a9f60d186c7a1c949ebb30d1faa856af39cd765a2465963"
+      "sha256": "ed872b5dd6d2aa77f0335d493a50a5b47580e32f43d67223115de1d05e95c964",
+      "size": 338,
+      "normalized_sha256": "ed872b5dd6d2aa77f0335d493a50a5b47580e32f43d67223115de1d05e95c964"
     },
     "examples/react-host/package.json": {
       "role": "index",
@@ -503,9 +503,9 @@
     },
     "examples/react-host/src/main.tsx": {
       "role": "index",
-      "sha256": "5d79043244d7a732cb996eda4133fa32760234526408634f652bc883f9c05e6c",
+      "sha256": "cbf4d25ce0e859ea28cea33e880818ba97dbc9e4bf2196faaddbe92b05a954c6",
       "size": 956,
-      "normalized_sha256": "5d79043244d7a732cb996eda4133fa32760234526408634f652bc883f9c05e6c"
+      "normalized_sha256": "cbf4d25ce0e859ea28cea33e880818ba97dbc9e4bf2196faaddbe92b05a954c6"
     },
     "examples/react-host/src/routes.tsx": {
       "role": "index",
@@ -533,9 +533,9 @@
     },
     "examples/react-host/src/screen/component-workshop.ts": {
       "role": "index",
-      "sha256": "36681296a3d9507e443ff211a44aa33a55f391e73e51b9137d76422fb0abaea9",
-      "size": 97088,
-      "normalized_sha256": "36681296a3d9507e443ff211a44aa33a55f391e73e51b9137d76422fb0abaea9"
+      "sha256": "8077b3d156d39ccb6eae65e6e824a4684da4ee2272a2950cc07f0d367d08b83d",
+      "size": 97376,
+      "normalized_sha256": "8077b3d156d39ccb6eae65e6e824a4684da4ee2272a2950cc07f0d367d08b83d"
     },
     "examples/react-host/src/screen/composition-runtime.ts": {
       "role": "index",
@@ -623,15 +623,15 @@
     },
     "examples/react-host/src/screen/metric-value-material.tsx": {
       "role": "index",
-      "sha256": "ee57c827bbe84c5192104555525e607fd405cd4a3e182deb75d08fe4ea973cd6",
-      "size": 4063,
-      "normalized_sha256": "ee57c827bbe84c5192104555525e607fd405cd4a3e182deb75d08fe4ea973cd6"
+      "sha256": "48ba5c903c6d0447863c6dbc3be4b4b244f8482107c4d2bbaf54ca02d1289196",
+      "size": 3714,
+      "normalized_sha256": "48ba5c903c6d0447863c6dbc3be4b4b244f8482107c4d2bbaf54ca02d1289196"
     },
     "examples/react-host/src/screen/metric-value.ts": {
       "role": "index",
-      "sha256": "a05c2f0c29da49cfcd18dbc3849885801c4d9f10fa4e07271a359e1d0626a49a",
-      "size": 3598,
-      "normalized_sha256": "a05c2f0c29da49cfcd18dbc3849885801c4d9f10fa4e07271a359e1d0626a49a"
+      "sha256": "cb8eb544581e88faf2382c6cc923d5189e97a0c6e467412013a4f44344a1e27d",
+      "size": 4137,
+      "normalized_sha256": "cb8eb544581e88faf2382c6cc923d5189e97a0c6e467412013a4f44344a1e27d"
     },
     "examples/react-host/src/screen/online-materials.ts": {
       "role": "index",
@@ -665,33 +665,33 @@
     },
     "examples/react-host/src/styles/asset-library.css": {
       "role": "index",
-      "sha256": "a0e9fa149a8a7e2fb17611aeadf8ef1c965cb98305e1b6221832213f1e33beb6",
-      "size": 14298,
-      "normalized_sha256": "a0e9fa149a8a7e2fb17611aeadf8ef1c965cb98305e1b6221832213f1e33beb6"
+      "sha256": "c91a9b0239535ee49d60fd96a865616573e9f7ba6b3478b56197d7273e39b89d",
+      "size": 14321,
+      "normalized_sha256": "c91a9b0239535ee49d60fd96a865616573e9f7ba6b3478b56197d7273e39b89d"
     },
     "examples/react-host/src/styles/base.css": {
       "role": "index",
-      "sha256": "ef682631cd497097066dfdd798e4c4d08843d2ad27a178b86761c236a52c9ec2",
-      "size": 1284,
-      "normalized_sha256": "ef682631cd497097066dfdd798e4c4d08843d2ad27a178b86761c236a52c9ec2"
+      "sha256": "e2c8bb043d6df70f4503448d2c37c9bc3e8a1fdf3f6cb0d9709a35980edec559",
+      "size": 1539,
+      "normalized_sha256": "e2c8bb043d6df70f4503448d2c37c9bc3e8a1fdf3f6cb0d9709a35980edec559"
     },
     "examples/react-host/src/styles/components.css": {
       "role": "index",
-      "sha256": "610ba77cff1cb2bde549145245c67346538e49edff1f1ab84042c68a19753850",
-      "size": 18060,
-      "normalized_sha256": "610ba77cff1cb2bde549145245c67346538e49edff1f1ab84042c68a19753850"
+      "sha256": "9d095403eadeaa6f61f91bc16767d27fcfa0480b79e09d102d01249ef2aa906d",
+      "size": 19671,
+      "normalized_sha256": "9d095403eadeaa6f61f91bc16767d27fcfa0480b79e09d102d01249ef2aa906d"
     },
     "examples/react-host/src/styles/layout.css": {
       "role": "index",
-      "sha256": "51ebd20e5661df5ec2aae0634bb336d6ed42ee3821a0ba95edf63fc6f617c790",
-      "size": 4968,
-      "normalized_sha256": "51ebd20e5661df5ec2aae0634bb336d6ed42ee3821a0ba95edf63fc6f617c790"
+      "sha256": "27c2d03e5d13c65ff7da449251b3b2ae6295cff22903664c829fb54e4782caea",
+      "size": 5237,
+      "normalized_sha256": "27c2d03e5d13c65ff7da449251b3b2ae6295cff22903664c829fb54e4782caea"
     },
     "examples/react-host/src/styles/online-materials.css": {
       "role": "index",
-      "sha256": "62a356b4cc8816d7364b70ac7414a56f5665487ea2531c6db5fa8098aca8fb4e",
-      "size": 6204,
-      "normalized_sha256": "62a356b4cc8816d7364b70ac7414a56f5665487ea2531c6db5fa8098aca8fb4e"
+      "sha256": "1dd1b39a2c400167b001c95986909b72dcc6ebffe610e31a764eff8e4366f4a3",
+      "size": 7222,
+      "normalized_sha256": "1dd1b39a2c400167b001c95986909b72dcc6ebffe610e31a764eff8e4366f4a3"
     },
     "examples/react-host/src/types.ts": {
       "role": "index",
@@ -1589,9 +1589,9 @@
     },
     "examples/vanilla-host/index.html": {
       "role": "index",
-      "sha256": "7a4b119a8d8cd01b341ce4d9ea6becde634f8e0346c24a5af43ab6780fc8b572",
-      "size": 323,
-      "normalized_sha256": "7a4b119a8d8cd01b341ce4d9ea6becde634f8e0346c24a5af43ab6780fc8b572"
+      "sha256": "59ebffdfc0abd6f30ffcb7ad4296bc50ed2e887a3cb8eba880a148d285ec4ea9",
+      "size": 339,
+      "normalized_sha256": "59ebffdfc0abd6f30ffcb7ad4296bc50ed2e887a3cb8eba880a148d285ec4ea9"
     },
     "examples/vanilla-host/package.json": {
       "role": "index",
@@ -1697,9 +1697,9 @@
     },
     "examples/vanilla-host/src/main.ts": {
       "role": "index",
-      "sha256": "8b673cdc8056f9c7a9e57eef5096901edf3bff479dc593475e4f33ce21d07784",
+      "sha256": "b5568c513e9a1710819749616d4e19da211b55ff33e31473e380977728b353b9",
       "size": 1022,
-      "normalized_sha256": "8b673cdc8056f9c7a9e57eef5096901edf3bff479dc593475e4f33ce21d07784"
+      "normalized_sha256": "b5568c513e9a1710819749616d4e19da211b55ff33e31473e380977728b353b9"
     },
     "examples/vanilla-host/src/router.ts": {
       "role": "index",
@@ -1751,9 +1751,9 @@
     },
     "examples/vanilla-host/src/screen/component-workshop.ts": {
       "role": "index",
-      "sha256": "36681296a3d9507e443ff211a44aa33a55f391e73e51b9137d76422fb0abaea9",
-      "size": 97088,
-      "normalized_sha256": "36681296a3d9507e443ff211a44aa33a55f391e73e51b9137d76422fb0abaea9"
+      "sha256": "8077b3d156d39ccb6eae65e6e824a4684da4ee2272a2950cc07f0d367d08b83d",
+      "size": 97376,
+      "normalized_sha256": "8077b3d156d39ccb6eae65e6e824a4684da4ee2272a2950cc07f0d367d08b83d"
     },
     "examples/vanilla-host/src/screen/datasource-return.ts": {
       "role": "index",
@@ -1835,15 +1835,15 @@
     },
     "examples/vanilla-host/src/screen/metric-value-element.ts": {
       "role": "index",
-      "sha256": "74badb3c43583c912e444c3e19c527b1b09db678cdf5ec32ae85abed98cb42a0",
-      "size": 3835,
-      "normalized_sha256": "74badb3c43583c912e444c3e19c527b1b09db678cdf5ec32ae85abed98cb42a0"
+      "sha256": "125d9192bcb8613932e85dff7d2cc9a02914ad7d869a56a10b0bee22955a831d",
+      "size": 3749,
+      "normalized_sha256": "125d9192bcb8613932e85dff7d2cc9a02914ad7d869a56a10b0bee22955a831d"
     },
     "examples/vanilla-host/src/screen/metric-value.ts": {
       "role": "index",
-      "sha256": "a05c2f0c29da49cfcd18dbc3849885801c4d9f10fa4e07271a359e1d0626a49a",
-      "size": 3598,
-      "normalized_sha256": "a05c2f0c29da49cfcd18dbc3849885801c4d9f10fa4e07271a359e1d0626a49a"
+      "sha256": "cb8eb544581e88faf2382c6cc923d5189e97a0c6e467412013a4f44344a1e27d",
+      "size": 4137,
+      "normalized_sha256": "cb8eb544581e88faf2382c6cc923d5189e97a0c6e467412013a4f44344a1e27d"
     },
     "examples/vanilla-host/src/screen/online-materials.ts": {
       "role": "index",
@@ -1877,39 +1877,39 @@
     },
     "examples/vanilla-host/src/styles/asset-library.css": {
       "role": "index",
-      "sha256": "a0e9fa149a8a7e2fb17611aeadf8ef1c965cb98305e1b6221832213f1e33beb6",
-      "size": 14298,
-      "normalized_sha256": "a0e9fa149a8a7e2fb17611aeadf8ef1c965cb98305e1b6221832213f1e33beb6"
+      "sha256": "c91a9b0239535ee49d60fd96a865616573e9f7ba6b3478b56197d7273e39b89d",
+      "size": 14321,
+      "normalized_sha256": "c91a9b0239535ee49d60fd96a865616573e9f7ba6b3478b56197d7273e39b89d"
     },
     "examples/vanilla-host/src/styles/base.css": {
       "role": "index",
-      "sha256": "ef682631cd497097066dfdd798e4c4d08843d2ad27a178b86761c236a52c9ec2",
-      "size": 1284,
-      "normalized_sha256": "ef682631cd497097066dfdd798e4c4d08843d2ad27a178b86761c236a52c9ec2"
+      "sha256": "e2c8bb043d6df70f4503448d2c37c9bc3e8a1fdf3f6cb0d9709a35980edec559",
+      "size": 1539,
+      "normalized_sha256": "e2c8bb043d6df70f4503448d2c37c9bc3e8a1fdf3f6cb0d9709a35980edec559"
     },
     "examples/vanilla-host/src/styles/component-library.css": {
       "role": "index",
-      "sha256": "d277b55d195c1908832f325b98ca650028834b5dbdf03e082bae4a94a8f4b663",
-      "size": 21869,
-      "normalized_sha256": "d277b55d195c1908832f325b98ca650028834b5dbdf03e082bae4a94a8f4b663"
+      "sha256": "212d0df0da331357df8e13c1a0cde09d134386a4d0b053be8a00b606c6d005e8",
+      "size": 23996,
+      "normalized_sha256": "212d0df0da331357df8e13c1a0cde09d134386a4d0b053be8a00b606c6d005e8"
     },
     "examples/vanilla-host/src/styles/components.css": {
       "role": "index",
-      "sha256": "62dc49f88e478fa0adbae2a75c41c5585ea466796b225b92e52fb7228a60dbcf",
-      "size": 18341,
-      "normalized_sha256": "62dc49f88e478fa0adbae2a75c41c5585ea466796b225b92e52fb7228a60dbcf"
+      "sha256": "e6ee7858779c5a1ddb6d8913aec60fecb55a94db7229d3991559935089901277",
+      "size": 19952,
+      "normalized_sha256": "e6ee7858779c5a1ddb6d8913aec60fecb55a94db7229d3991559935089901277"
     },
     "examples/vanilla-host/src/styles/layout.css": {
       "role": "index",
-      "sha256": "51ebd20e5661df5ec2aae0634bb336d6ed42ee3821a0ba95edf63fc6f617c790",
-      "size": 4968,
-      "normalized_sha256": "51ebd20e5661df5ec2aae0634bb336d6ed42ee3821a0ba95edf63fc6f617c790"
+      "sha256": "27c2d03e5d13c65ff7da449251b3b2ae6295cff22903664c829fb54e4782caea",
+      "size": 5237,
+      "normalized_sha256": "27c2d03e5d13c65ff7da449251b3b2ae6295cff22903664c829fb54e4782caea"
     },
     "examples/vanilla-host/src/styles/online-materials.css": {
       "role": "index",
-      "sha256": "62a356b4cc8816d7364b70ac7414a56f5665487ea2531c6db5fa8098aca8fb4e",
-      "size": 6204,
-      "normalized_sha256": "62a356b4cc8816d7364b70ac7414a56f5665487ea2531c6db5fa8098aca8fb4e"
+      "sha256": "1dd1b39a2c400167b001c95986909b72dcc6ebffe610e31a764eff8e4366f4a3",
+      "size": 7222,
+      "normalized_sha256": "1dd1b39a2c400167b001c95986909b72dcc6ebffe610e31a764eff8e4366f4a3"
     },
     "examples/vanilla-host/src/types.ts": {
       "role": "index",
@@ -2003,9 +2003,9 @@
     },
     "examples/vue-host/index.html": {
       "role": "index",
-      "sha256": "19df35425a9f30e62103fe95a8ad1844f6c6e297de6e728446018cdf635f00b5",
-      "size": 319,
-      "normalized_sha256": "19df35425a9f30e62103fe95a8ad1844f6c6e297de6e728446018cdf635f00b5"
+      "sha256": "a7196810db2bd0094caeee15e54c232dab8e369b2bf572f182966d38e1a042af",
+      "size": 335,
+      "normalized_sha256": "a7196810db2bd0094caeee15e54c232dab8e369b2bf572f182966d38e1a042af"
     },
     "examples/vue-host/package.json": {
       "role": "index",
@@ -2063,9 +2063,9 @@
     },
     "examples/vue-host/src/components/MetricValue.vue": {
       "role": "index",
-      "sha256": "e46d9f0f1b7f01da2d4ad536ab50caaacc0f753761afe488d00067ea9622aaaa",
-      "size": 853,
-      "normalized_sha256": "e46d9f0f1b7f01da2d4ad536ab50caaacc0f753761afe488d00067ea9622aaaa"
+      "sha256": "931c87ead645ddb8895931ebe3f2a3709a20b7e82555390e59e48564c89e9ed1",
+      "size": 1063,
+      "normalized_sha256": "931c87ead645ddb8895931ebe3f2a3709a20b7e82555390e59e48564c89e9ed1"
     },
     "examples/vue-host/src/components/ScreenEditor.vue": {
       "role": "index",
@@ -2147,9 +2147,9 @@
     },
     "examples/vue-host/src/main.ts": {
       "role": "index",
-      "sha256": "a57c92cd085bd76413bbd32b8206f3d174a4c16192c34b2e9dec264dcef001d2",
+      "sha256": "cd3aa102f86932d92336da16f248ec6bf4fd0763a991e2564cc42ca2ea7a577a",
       "size": 843,
-      "normalized_sha256": "a57c92cd085bd76413bbd32b8206f3d174a4c16192c34b2e9dec264dcef001d2"
+      "normalized_sha256": "cd3aa102f86932d92336da16f248ec6bf4fd0763a991e2564cc42ca2ea7a577a"
     },
     "examples/vue-host/src/router-meta.d.ts": {
       "role": "index",
@@ -2183,9 +2183,9 @@
     },
     "examples/vue-host/src/screen/component-workshop.ts": {
       "role": "index",
-      "sha256": "36681296a3d9507e443ff211a44aa33a55f391e73e51b9137d76422fb0abaea9",
-      "size": 97088,
-      "normalized_sha256": "36681296a3d9507e443ff211a44aa33a55f391e73e51b9137d76422fb0abaea9"
+      "sha256": "8077b3d156d39ccb6eae65e6e824a4684da4ee2272a2950cc07f0d367d08b83d",
+      "size": 97376,
+      "normalized_sha256": "8077b3d156d39ccb6eae65e6e824a4684da4ee2272a2950cc07f0d367d08b83d"
     },
     "examples/vue-host/src/screen/composition-runtime.ts": {
       "role": "index",
@@ -2273,15 +2273,15 @@
     },
     "examples/vue-host/src/screen/metric-value-material.ts": {
       "role": "index",
-      "sha256": "c29c09c121078b28fafeaad0bd7eb3df03424b333fe94989d71792d7d14a40a5",
-      "size": 2947,
-      "normalized_sha256": "c29c09c121078b28fafeaad0bd7eb3df03424b333fe94989d71792d7d14a40a5"
+      "sha256": "f57dd2db8356ff9d1eca11eb5b4f640d1b613f8f3255954b78c1ffa3dadac0ea",
+      "size": 2926,
+      "normalized_sha256": "f57dd2db8356ff9d1eca11eb5b4f640d1b613f8f3255954b78c1ffa3dadac0ea"
     },
     "examples/vue-host/src/screen/metric-value.ts": {
       "role": "index",
-      "sha256": "a05c2f0c29da49cfcd18dbc3849885801c4d9f10fa4e07271a359e1d0626a49a",
-      "size": 3598,
-      "normalized_sha256": "a05c2f0c29da49cfcd18dbc3849885801c4d9f10fa4e07271a359e1d0626a49a"
+      "sha256": "cb8eb544581e88faf2382c6cc923d5189e97a0c6e467412013a4f44344a1e27d",
+      "size": 4137,
+      "normalized_sha256": "cb8eb544581e88faf2382c6cc923d5189e97a0c6e467412013a4f44344a1e27d"
     },
     "examples/vue-host/src/screen/online-materials.ts": {
       "role": "index",
@@ -2315,33 +2315,33 @@
     },
     "examples/vue-host/src/styles/asset-library.css": {
       "role": "index",
-      "sha256": "a0e9fa149a8a7e2fb17611aeadf8ef1c965cb98305e1b6221832213f1e33beb6",
-      "size": 14298,
-      "normalized_sha256": "a0e9fa149a8a7e2fb17611aeadf8ef1c965cb98305e1b6221832213f1e33beb6"
+      "sha256": "c91a9b0239535ee49d60fd96a865616573e9f7ba6b3478b56197d7273e39b89d",
+      "size": 14321,
+      "normalized_sha256": "c91a9b0239535ee49d60fd96a865616573e9f7ba6b3478b56197d7273e39b89d"
     },
     "examples/vue-host/src/styles/base.css": {
       "role": "index",
-      "sha256": "ef682631cd497097066dfdd798e4c4d08843d2ad27a178b86761c236a52c9ec2",
-      "size": 1284,
-      "normalized_sha256": "ef682631cd497097066dfdd798e4c4d08843d2ad27a178b86761c236a52c9ec2"
+      "sha256": "e2c8bb043d6df70f4503448d2c37c9bc3e8a1fdf3f6cb0d9709a35980edec559",
+      "size": 1539,
+      "normalized_sha256": "e2c8bb043d6df70f4503448d2c37c9bc3e8a1fdf3f6cb0d9709a35980edec559"
     },
     "examples/vue-host/src/styles/components.css": {
       "role": "index",
-      "sha256": "a68a95727a604d1256a2748448706f7e11a7927aff03b3716558d2d1b0c1ed4b",
-      "size": 18610,
-      "normalized_sha256": "a68a95727a604d1256a2748448706f7e11a7927aff03b3716558d2d1b0c1ed4b"
+      "sha256": "5fd448731f86c16181d7d1a3b48a38008e49348e1b57684aa8a978c4ff9987b8",
+      "size": 19468,
+      "normalized_sha256": "5fd448731f86c16181d7d1a3b48a38008e49348e1b57684aa8a978c4ff9987b8"
     },
     "examples/vue-host/src/styles/layout.css": {
       "role": "index",
-      "sha256": "51ebd20e5661df5ec2aae0634bb336d6ed42ee3821a0ba95edf63fc6f617c790",
-      "size": 4968,
-      "normalized_sha256": "51ebd20e5661df5ec2aae0634bb336d6ed42ee3821a0ba95edf63fc6f617c790"
+      "sha256": "27c2d03e5d13c65ff7da449251b3b2ae6295cff22903664c829fb54e4782caea",
+      "size": 5237,
+      "normalized_sha256": "27c2d03e5d13c65ff7da449251b3b2ae6295cff22903664c829fb54e4782caea"
     },
     "examples/vue-host/src/styles/online-materials.css": {
       "role": "index",
-      "sha256": "62a356b4cc8816d7364b70ac7414a56f5665487ea2531c6db5fa8098aca8fb4e",
-      "size": 6204,
-      "normalized_sha256": "62a356b4cc8816d7364b70ac7414a56f5665487ea2531c6db5fa8098aca8fb4e"
+      "sha256": "1dd1b39a2c400167b001c95986909b72dcc6ebffe610e31a764eff8e4366f4a3",
+      "size": 7222,
+      "normalized_sha256": "1dd1b39a2c400167b001c95986909b72dcc6ebffe610e31a764eff8e4366f4a3"
     },
     "examples/vue-host/src/types.ts": {
       "role": "index",
@@ -2369,9 +2369,9 @@
     },
     "package.json": {
       "role": "index",
-      "sha256": "7c0e9250b95c5881cdd063dc206d832491e26e49ba2b5822a36ff2c80f6309b4",
-      "size": 4372,
-      "normalized_sha256": "7c0e9250b95c5881cdd063dc206d832491e26e49ba2b5822a36ff2c80f6309b4"
+      "sha256": "1759a212b258cb1add9011240bd45820e5988d143ea665f2fbf1c8f176b808b7",
+      "size": 4462,
+      "normalized_sha256": "1759a212b258cb1add9011240bd45820e5988d143ea665f2fbf1c8f176b808b7"
     },
     "packages/base-screen/CHANGELOG.md": {
       "role": "index",
@@ -4211,9 +4211,9 @@
     },
     "packages/engine/src/browser/dom/blueprint/designer-blueprint-default-canvas.ts": {
       "role": "index",
-      "sha256": "ea5265b4febf66abda73d76f27f1d2c7e0f776fcf32b10527009d0c1c4330641",
-      "size": 61107,
-      "normalized_sha256": "ea5265b4febf66abda73d76f27f1d2c7e0f776fcf32b10527009d0c1c4330641"
+      "sha256": "a78d518c09d223e1664dbe16b010cc8726534f18543ac71a99dd1f1726bf9b5b",
+      "size": 61293,
+      "normalized_sha256": "a78d518c09d223e1664dbe16b010cc8726534f18543ac71a99dd1f1726bf9b5b"
     },
     "packages/engine/src/browser/dom/blueprint/designer-blueprint-dom-helpers.ts": {
       "role": "index",
@@ -4949,9 +4949,9 @@
     },
     "packages/engine/src/browser/styles/controls/designer-controls-actions.css": {
       "role": "index",
-      "sha256": "33200b3fc89a02b82d096c9fdd3dbf3c43c7c73fc50a1190087a006a81c2dedc",
-      "size": 16817,
-      "normalized_sha256": "33200b3fc89a02b82d096c9fdd3dbf3c43c7c73fc50a1190087a006a81c2dedc"
+      "sha256": "415fc3ff24ca8b3c62c0b8f36bf15e7e50a818cd626159f00bfe977988eaf67c",
+      "size": 16752,
+      "normalized_sha256": "415fc3ff24ca8b3c62c0b8f36bf15e7e50a818cd626159f00bfe977988eaf67c"
     },
     "packages/engine/src/browser/styles/controls/designer-controls-adaptivity.css": {
       "role": "index",
@@ -5027,9 +5027,9 @@
     },
     "packages/engine/src/browser/styles/designer-tokens.css": {
       "role": "index",
-      "sha256": "29e8c36dcf54a4046b670253f2aaf2d8bb92bd390c1690308d81aefada3f14b3",
-      "size": 23370,
-      "normalized_sha256": "29e8c36dcf54a4046b670253f2aaf2d8bb92bd390c1690308d81aefada3f14b3"
+      "sha256": "52a63cffd80085d24e4309c69ad83e244283dcaea3bbe4a58ecc236e5d36ee31",
+      "size": 23505,
+      "normalized_sha256": "52a63cffd80085d24e4309c69ad83e244283dcaea3bbe4a58ecc236e5d36ee31"
     },
     "packages/engine/src/browser/styles/host/host-tokens.css": {
       "role": "index",
@@ -5051,9 +5051,9 @@
     },
     "packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-canvas-nodes.css": {
       "role": "index",
-      "sha256": "ecaedf5b2e8196d0e5a919aa0c79e1e103941c7299b9a11d89311151754cec9d",
-      "size": 9058,
-      "normalized_sha256": "ecaedf5b2e8196d0e5a919aa0c79e1e103941c7299b9a11d89311151754cec9d"
+      "sha256": "dbb380948700ae904cade0de7ccfd4f71452eecfc2bd3c7659a0e1a0ba2ab57f",
+      "size": 9183,
+      "normalized_sha256": "dbb380948700ae904cade0de7ccfd4f71452eecfc2bd3c7659a0e1a0ba2ab57f"
     },
     "packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-canvas-overlays.css": {
       "role": "index",
@@ -5159,9 +5159,9 @@
     },
     "packages/engine/src/browser/styles/workbench/designer-workbench-panels.css": {
       "role": "index",
-      "sha256": "77f3ed48e88ba851f90baae05244e43f5de8156f5f3851f60d6797f90a893484",
-      "size": 8243,
-      "normalized_sha256": "77f3ed48e88ba851f90baae05244e43f5de8156f5f3851f60d6797f90a893484"
+      "sha256": "ed7e94b83916ba18049d184342d564b5ff5cbad3d1aab5bf97d730d6eeb9dbc5",
+      "size": 8530,
+      "normalized_sha256": "ed7e94b83916ba18049d184342d564b5ff5cbad3d1aab5bf97d730d6eeb9dbc5"
     },
     "packages/engine/src/browser/styles/workbench/designer-workbench-selection.css": {
       "role": "index",
@@ -5337,6 +5337,12 @@
       "size": 9283,
       "normalized_sha256": "c81fc10f06d5aaab465e0cac588ee46db55fb88647ea66763fe133d9d0343ecc"
     },
+    "packages/engine/src/common/operations/blueprint/designer-blueprint-geometry.ts": {
+      "role": "index",
+      "sha256": "faad73919859a13309c29be7abf57bde861ece00e0d1d991f2fe44b7a9bfb81e",
+      "size": 548,
+      "normalized_sha256": "faad73919859a13309c29be7abf57bde861ece00e0d1d991f2fe44b7a9bfb81e"
+    },
     "packages/engine/src/common/operations/blueprint/designer-blueprint-graph.ts": {
       "role": "index",
       "sha256": "cc804ac0e8f7ddae54f94dd462f0041c0e6a0db1da61079e3ebf6cb9d29b6649",
@@ -5351,9 +5357,9 @@
     },
     "packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts": {
       "role": "index",
-      "sha256": "f919dbc17b1e48acc22b99d712dcaee89840d49996270ae76883a30ff8cbb67b",
-      "size": 23461,
-      "normalized_sha256": "f919dbc17b1e48acc22b99d712dcaee89840d49996270ae76883a30ff8cbb67b"
+      "sha256": "35c0f8feb51fbd7e07fb6898c60765b82863ac37750aea48d11bcbf09f20af14",
+      "size": 23668,
+      "normalized_sha256": "35c0f8feb51fbd7e07fb6898c60765b82863ac37750aea48d11bcbf09f20af14"
     },
     "packages/engine/src/common/operations/blueprint/designer-blueprint-mutation-helpers.ts": {
       "role": "index",
@@ -6473,9 +6479,9 @@
     },
     "packages/engine/tests/browser/dom/blueprint/designer-blueprint-default-canvas.test.ts": {
       "role": "observe",
-      "sha256": "c5ebf5c7482dc0b67955100e1fa30e123c204d87d76d49c90e8363b623097a29",
-      "size": 4464,
-      "normalized_sha256": "c5ebf5c7482dc0b67955100e1fa30e123c204d87d76d49c90e8363b623097a29"
+      "sha256": "e4a04a6f1319de1402966110d262550d604296e239adff6d13d12aac47ec2ae7",
+      "size": 4692,
+      "normalized_sha256": "e4a04a6f1319de1402966110d262550d604296e239adff6d13d12aac47ec2ae7"
     },
     "packages/engine/tests/browser/dom/blueprint/designer-blueprint-dom.test.ts": {
       "role": "observe",
@@ -6749,9 +6755,9 @@
     },
     "packages/engine/tests/browser/styles/designer-workbench-interaction.test.ts": {
       "role": "observe",
-      "sha256": "25f1caa643f74bd882f484d7d88d303bd022359dae1bf29a6f880620db41dad5",
-      "size": 22866,
-      "normalized_sha256": "25f1caa643f74bd882f484d7d88d303bd022359dae1bf29a6f880620db41dad5"
+      "sha256": "583c840f8cb357815311222e9a77762a360339fe6df6eeabab8873712caae9df",
+      "size": 23023,
+      "normalized_sha256": "583c840f8cb357815311222e9a77762a360339fe6df6eeabab8873712caae9df"
     },
     "packages/engine/tests/browser/styles/designer-workbench-structure.test.ts": {
       "role": "observe",
@@ -9471,6 +9477,12 @@
       "size": 7765,
       "normalized_sha256": "047a8dd5f0a84a53b633d3525aa53ee8df26d2762a0164990d602e5655fc7292"
     },
+    "tests/examples/host-style-contract.test.ts": {
+      "role": "observe",
+      "sha256": "610727311fb7c8798d3965ec5ce1c18e734759a41aaff5338b3bc652def47a09",
+      "size": 3363,
+      "normalized_sha256": "610727311fb7c8798d3965ec5ce1c18e734759a41aaff5338b3bc652def47a09"
+    },
     "tests/examples/vanilla-component-route.test.ts": {
       "role": "observe",
       "sha256": "023b929cf612af970b0265cbcd73f766b166558540b79669fb896cc8245649f0",
@@ -9518,6 +9530,12 @@
       "sha256": "9d1e1c4d082a381ebde842cd8b5f154a9af9e9bd0026c20605a16ae14ac9d2b4",
       "size": 2718,
       "normalized_sha256": "9d1e1c4d082a381ebde842cd8b5f154a9af9e9bd0026c20605a16ae14ac9d2b4"
+    },
+    "tests/tooling/design-system-contract.test.ts": {
+      "role": "observe",
+      "sha256": "e2fee4fca60a8686720007aade89347b4b394df4f40b3db2e0d09175026a5cae",
+      "size": 2346,
+      "normalized_sha256": "e2fee4fca60a8686720007aade89347b4b394df4f40b3db2e0d09175026a5cae"
     },
     "tests/tooling/material-atomicity.test.ts": {
       "role": "observe",
@@ -9617,9 +9635,9 @@
     },
     "tooling/checks/designer-styles.mjs": {
       "role": "index",
-      "sha256": "6b6a6f9cea9d8facca5c021042a94001d0c4d82c1b749ad7c51ca97cb408f936",
-      "size": 33388,
-      "normalized_sha256": "6b6a6f9cea9d8facca5c021042a94001d0c4d82c1b749ad7c51ca97cb408f936"
+      "sha256": "f24f5dbb8de23036a371e1e67a13b152f8b10af5e72e6e14e871e77c12a6b39c",
+      "size": 34609,
+      "normalized_sha256": "f24f5dbb8de23036a371e1e67a13b152f8b10af5e72e6e14e871e77c12a6b39c"
     },
     "tooling/checks/designer-ui.mjs": {
       "role": "index",
@@ -9632,6 +9650,12 @@
       "sha256": "511e4b6cc491de1ce07096aeb3ac977e457f15c10b1b1d6eb168f850718732b1",
       "size": 14549,
       "normalized_sha256": "511e4b6cc491de1ce07096aeb3ac977e457f15c10b1b1d6eb168f850718732b1"
+    },
+    "tooling/checks/host-styles.mjs": {
+      "role": "index",
+      "sha256": "a92fa3389a0512b469750505dd116d7187c4222a205c1c0825daae8d5351fb69",
+      "size": 2922,
+      "normalized_sha256": "a92fa3389a0512b469750505dd116d7187c4222a205c1c0825daae8d5351fb69"
     },
     "tooling/checks/host-tokens.mjs": {
       "role": "index",
@@ -10043,9 +10067,9 @@
     },
     "tooling/verification/browser-harness/system/assert-system-gallery.mjs": {
       "role": "index",
-      "sha256": "c6f3716aefdef7778f3bd31b9cb45089ebdfe5b980d69768c2350ffec84b198b",
-      "size": 9558,
-      "normalized_sha256": "c6f3716aefdef7778f3bd31b9cb45089ebdfe5b980d69768c2350ffec84b198b"
+      "sha256": "e068a7b36154dd8bd463d5aa263a7aa822eed670c9901c26e8c28cf1e49b7679",
+      "size": 10778,
+      "normalized_sha256": "e068a7b36154dd8bd463d5aa263a7aa822eed670c9901c26e8c28cf1e49b7679"
     },
     "tooling/verification/browser-harness/system/run-system-assert.mjs": {
       "role": "index",
@@ -10055,9 +10079,9 @@
     },
     "tooling/verification/browser-harness/system/system-gallery.ts": {
       "role": "index",
-      "sha256": "ec8e3dfb1d0d9280c4a73bb9148a0eac3943c0ff8e7d2504ee92cb60064270f9",
-      "size": 37162,
-      "normalized_sha256": "ec8e3dfb1d0d9280c4a73bb9148a0eac3943c0ff8e7d2504ee92cb60064270f9"
+      "sha256": "27d3b7893c4f65dd5575021d39a7660d3adf462292b540c6e1e3aa0f1e40d846",
+      "size": 37243,
+      "normalized_sha256": "27d3b7893c4f65dd5575021d39a7660d3adf462292b540c6e1e3aa0f1e40d846"
     },
     "tooling/verification/browser-harness/text/assert-text-auto-width.mjs": {
       "role": "index",

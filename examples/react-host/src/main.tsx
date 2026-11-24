@@ -2,11 +2,11 @@ import { createRoot } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import { App } from './App';
 import { registerHostMaterials } from './screen/register';
+// 公共令牌层（--bs-host-*）：必须先于宿主样式加载，asset-library.css 只做别名。
+import 'base-screen/host-tokens.css';
 import './styles/base.css';
 import './styles/layout.css';
 import './styles/components.css';
-// 公共令牌层（--bs-host-*）：必须先于宿主样式加载，asset-library.css 只做别名。
-import 'base-screen/host-tokens.css';
 import './styles/asset-library.css';
 import './styles/online-materials.css';
 

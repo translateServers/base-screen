@@ -191,6 +191,9 @@
      标题栏高与锚点行高不能只改这里——连线端点由画布按 HEADER_HEIGHT / ROW_HEIGHT 计算，
      节点高度估算在 designer-blueprint-model.ts 的 CARD_HEADER，三处同步。 */
   --designer-blueprint-node-radius: var(--designer-radius-4);
+  --designer-blueprint-node-width: 164px;
+  --designer-blueprint-node-row-height: 27px;
+  --designer-blueprint-node-min-height: 108px;
   --designer-blueprint-node-icon: 24px;
   --designer-blueprint-node-header-height: 44px;
   --designer-blueprint-node-header-gap: 10px;

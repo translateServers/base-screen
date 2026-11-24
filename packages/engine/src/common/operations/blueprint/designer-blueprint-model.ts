@@ -22,6 +22,13 @@ import {
   listDesignerBlueprintHostActions,
 } from './designer-blueprint-capabilities.js';
 import {
+  DESIGNER_BLUEPRINT_NODE_GAP as CARD_GAP,
+  DESIGNER_BLUEPRINT_NODE_HEADER_HEIGHT as CARD_HEADER,
+  DESIGNER_BLUEPRINT_NODE_MIN_HEIGHT as CARD_MIN_HEIGHT,
+  DESIGNER_BLUEPRINT_NODE_PADDING as CARD_PADDING,
+  DESIGNER_BLUEPRINT_NODE_ROW_HEIGHT as CARD_ROW,
+} from './designer-blueprint-geometry.js';
+import {
   blueprintNodeKindOf,
   type DesignerBlueprintConnectionContext,
   findComponentBlueprintNode,
@@ -506,14 +513,9 @@ function describeCondition(
 }
 
 /**
- * 卡片几何与默认画布一致（标题 44 + 上下内边距 25 + 每行锚点 27，最小 108）。
+ * 卡片几何来自 `designer-blueprint-geometry.ts`（标题 44 + 上下内边距 25 + 每行锚点 27，最小 108）。
  * 自动摆放的节点按实际卡片高度在列内重新堆叠，避免高卡片互相压住；已保存位置的节点不动。
  */
-const CARD_HEADER = 44;
-const CARD_PADDING = 27;
-const CARD_ROW = 27;
-const CARD_MIN_HEIGHT = 108;
-const CARD_GAP = 28;
 
 export function estimateDesignerBlueprintNodeHeight(node: BaseScreenBlueprintCanvasNode): number {
   const rows = node.inputs.length + node.outputs.length + (node.semantic ? 1 : 0);

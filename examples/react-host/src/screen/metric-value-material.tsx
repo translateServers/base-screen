@@ -6,7 +6,11 @@ import type {
   BaseScreenMaterialModel,
   BaseScreenMaterialTabularDataAdapter,
 } from 'base-screen/plugin-core';
-import { METRIC_VALUE_MANIFEST } from './metric-value';
+import {
+  METRIC_VALUE_CONTAINER_STYLE,
+  METRIC_VALUE_MANIFEST,
+  METRIC_VALUE_NUMBER_STYLE,
+} from './metric-value';
 
 export interface MetricValueProps {
   readonly unit: string;
@@ -26,29 +30,8 @@ export interface MetricValueProps {
  */
 export function MetricValue({ unit, value }: MetricValueProps): React.ReactElement {
   return (
-    <div
-      data-metric-value
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        height: '100%',
-        padding: '14px 16px',
-        color: '#e8eefb',
-        font: '12px/1.4 system-ui, sans-serif',
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        data-metric-value-number
-        style={{
-          fontSize: 30,
-          fontWeight: 700,
-          color: '#39c5bb',
-          fontVariantNumeric: 'tabular-nums',
-        }}
-      >
+    <div data-metric-value style={METRIC_VALUE_CONTAINER_STYLE}>
+      <div data-metric-value-number style={METRIC_VALUE_NUMBER_STYLE}>
         {value === null ? '--' : `${value}${unit}`}
       </div>
     </div>

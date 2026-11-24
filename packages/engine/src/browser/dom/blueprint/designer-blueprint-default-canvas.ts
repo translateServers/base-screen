@@ -1,5 +1,15 @@
 import type { ScreenBlueprintLayoutNode, ScreenJsonValue } from '@base-screen/contracts';
 import {
+  DESIGNER_BLUEPRINT_NODE_BODY_BOTTOM as BODY_BOTTOM,
+  DESIGNER_BLUEPRINT_NODE_BODY_TOP as BODY_TOP,
+  DESIGNER_BLUEPRINT_NODE_HEADER_HEIGHT as HEADER_HEIGHT,
+  DESIGNER_BLUEPRINT_NODE_MIN_HEIGHT as MIN_NODE_HEIGHT,
+  DESIGNER_BLUEPRINT_NODE_GAP as NODE_GAP,
+  DESIGNER_BLUEPRINT_NODE_WIDTH as NODE_WIDTH,
+  DESIGNER_BLUEPRINT_NODE_ROW_HEIGHT as ROW_HEIGHT,
+  DESIGNER_BLUEPRINT_NODE_SNAP_DISTANCE as SNAP_DISTANCE,
+} from '../../../common/operations/blueprint/designer-blueprint-geometry.js';
+import {
   BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
   BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT,
   BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME,
@@ -26,20 +36,12 @@ import { escapeAttribute, escapeHtml } from './designer-blueprint-dom-helpers.js
  * 只经画布协议与工作台通信：收 `state` 事件渲染，发 `command` 事件请求修改；文档、历史与校验都不在这里。
  * 拖动、框选、平移、缩放是本地交互态，松手后一次性以 `commit-layout` 提交位置。
  *
- * 几何：卡片宽 164、标题栏 36、内边距 12/13/13、锚点行 27（先输出后输入，语义锚点单列一行）、
- * 圆点 12（命中 28）。连线是三次贝塞尔，控制点水平偏移 |Δx|×0.5（反向连线 ×0.8）。
+ * 几何来自 `designer-blueprint-geometry.ts`：卡片宽 164、标题栏 44、内边距 12/13/13、
+ * 锚点行 27（先输出后输入，语义锚点单列一行）、圆点 12（命中 28）。
  */
 
-const NODE_WIDTH = 164;
-/** 标题栏高（与 .bp-node-header 一致；两行标题 18 + 16，上下各留 5px 以上）。 */
-const HEADER_HEIGHT = 44;
-const BODY_TOP = 12;
-const BODY_BOTTOM = 13;
-const ROW_HEIGHT = 27;
 /** 锚点圆心压在卡片外缘上（连线直接接到卡片边，见 bp-port 样式的 --designer-blueprint-port-offset）。 */
 const PORT_EDGE_OFFSET = 0;
-const MIN_NODE_HEIGHT = 108;
-const SNAP_DISTANCE = 28;
 const GRID = 8;
 const MENU_CLICK_TOLERANCE = 4;
 const MIN_ZOOM = 0.3;
@@ -753,7 +755,7 @@ class DefaultBlueprintCanvas {
       list.sort((left, right) => this.position(left).y - this.position(right).y);
       for (const node of list) {
         this.#positions.set(node.id, { x: 40 + column * 248, y });
-        y += this.height(node) + 28;
+        y += this.height(node) + NODE_GAP;
       }
     }
     this.render();

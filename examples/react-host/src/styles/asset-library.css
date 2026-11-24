@@ -309,7 +309,7 @@
   background: var(--asset-surface-panel);
   box-shadow: var(--asset-elev-ring);
   color: var(--asset-text-secondary);
-  font-size: 10px;
+  font-size: var(--bs-host-font-size-xs);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;

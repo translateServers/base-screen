@@ -105,6 +105,7 @@ export async function assertSystemGallery(browser, baseUrl) {
       const input = root.querySelector('.designer-input');
       const layer = root.querySelector('.layer-row');
       const palette = root.querySelector('.blueprint-palette-item');
+      const primary = root.querySelector('.designer-button[data-variant="primary"]');
       return {
         layerSelected: background('.layer-row[aria-selected="true"]'),
         paletteSelected: background('.blueprint-palette-item[data-selected="true"]'),
@@ -114,6 +115,8 @@ export async function assertSystemGallery(browser, baseUrl) {
         minFontSize: fontSizes.length === 0 ? undefined : Math.min(...fontSizes),
         emptyClass: root.querySelector('.designer-empty')?.className,
         badgeClass: root.querySelector('.designer-badge')?.className,
+        primaryBackground: primary === null ? undefined : getComputedStyle(primary).backgroundColor,
+        primaryColor: primary === null ? undefined : getComputedStyle(primary).color,
       };
     });
     if (chrome === undefined) throw new Error('SYSTEM_GALLERY_CHROME_MISSING');
@@ -178,6 +181,24 @@ export async function assertSystemGallery(browser, baseUrl) {
       Math.abs((measurements.menuRight ?? 0) - (measurements.triggerRight ?? 0)) <= 1,
       `select menu right ${measurements.menuRight} vs trigger ${measurements.triggerRight}`,
     );
+    await page.locator('.sg-theme').click();
+    await page.waitForFunction(() => {
+      return document.querySelector('base-screen-designer')?.getAttribute('theme') === 'light';
+    });
+    const lightPrimary = await page.evaluate(() => {
+      const host = document.querySelector('base-screen-designer');
+      const root = host?.shadowRoot;
+      const primary = root?.querySelector('.designer-button[data-variant="primary"]');
+      if (primary === null || primary === undefined) return undefined;
+      const style = getComputedStyle(primary);
+      return { background: style.backgroundColor, color: style.color };
+    });
+    expect(lightPrimary?.background, 'light primary background missing').toBeTruthy();
+    expect(lightPrimary?.background, 'light primary background did not change').not.toBe(
+      chrome.primaryBackground,
+    );
+    expect(lightPrimary?.color, 'light primary text did not change').not.toBe(chrome.primaryColor);
+
     if (failures.length > 0) {
       throw new Error(`SYSTEM_GALLERY_FORM_CONTROLS_FAILED:${failures.join(' | ')}`);
     }

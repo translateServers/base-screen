@@ -19,8 +19,8 @@
 }
 
 .button:hover {
-  border-color: var(--color-accent);
-  background: rgba(56, 189, 248, 0.12);
+  border-color: var(--bs-host-accent);
+  background: color-mix(in srgb, var(--bs-host-accent) 12%, transparent);
 }
 
 .button:focus-visible {
@@ -30,23 +30,23 @@
 
 .button--primary {
   border-color: transparent;
-  background: var(--color-accent);
-  color: #04182a;
+  background: var(--bs-host-action-primary);
+  color: var(--bs-host-text-on-accent);
   font-weight: 600;
 }
 
 .button--primary:hover {
-  background: #7dd3fc;
+  background: var(--bs-host-action-primary-hover);
 }
 
 .button--danger {
-  border-color: rgba(248, 113, 113, 0.5);
-  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--bs-host-danger) 50%, transparent);
+  color: var(--bs-host-danger);
 }
 
 .button--danger:hover {
-  border-color: var(--color-danger);
-  background: rgba(248, 113, 113, 0.12);
+  border-color: var(--bs-host-danger);
+  background: color-mix(in srgb, var(--bs-host-danger) 12%, transparent);
 }
 
 .list-header {
@@ -95,18 +95,21 @@
 }
 
 .screen-card:hover {
-  border-color: rgba(56, 189, 248, 0.45);
-  box-shadow:
-    0 0 0 1px rgba(56, 189, 248, 0.12),
-    0 12px 32px rgba(2, 12, 24, 0.55);
+  border-color: color-mix(in srgb, var(--bs-host-accent) 45%, transparent);
+  box-shadow: var(--bs-host-elev-ring), var(--bs-host-shadow-overlay);
 }
 
-/* 封面：网格 + 径向光晕，模拟成品大屏缩略图的科技底。纯 CSS，不额外拉预览实例。 */
+/* 封面：网格 + 径向光晕，模拟成品大屏缩略图的科技底。纯 CSS，不额外拉预览实例。
+   封面渐变是产品装饰例外，不参与宿主主题语义。 */
 .screen-cover {
   position: relative;
   aspect-ratio: 16 / 9;
   background:
-    radial-gradient(120% 100% at 18% 0%, rgba(14, 116, 144, 0.55) 0%, transparent 58%),
+    radial-gradient(
+      120% 100% at 18% 0%,
+      color-mix(in srgb, var(--bs-host-accent) 55%, transparent) 0%,
+      transparent 58%
+    ),
     linear-gradient(160deg, #0a2a47 0%, #061426 55%, #040b16 100%);
   border-bottom: 1px solid var(--color-border);
 }
@@ -115,11 +118,19 @@
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(56, 189, 248, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.12) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--bs-host-accent) 12%, transparent) 1px, transparent 1px),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--bs-host-accent) 12%, transparent) 1px,
+      transparent 1px
+    );
   background-size: 28px 28px;
   content: "";
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 85%);
+  mask-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bs-host-surface-workspace) 85%, transparent),
+    transparent 85%
+  );
 }
 
 .screen-cover::after {
@@ -128,7 +139,7 @@
   bottom: -40%;
   width: 70%;
   height: 90%;
-  border: 1px solid rgba(56, 189, 248, 0.22);
+  border: 1px solid color-mix(in srgb, var(--bs-host-accent) 22%, transparent);
   border-radius: 50%;
   content: "";
 }
@@ -138,8 +149,8 @@
   top: 12px;
   left: 14px;
   z-index: 1;
-  color: #4c8bb5;
-  font-size: 10px;
+  color: var(--bs-host-text-muted);
+  font-size: var(--bs-host-font-size-xs);
   letter-spacing: 0.24em;
 }
 
@@ -149,10 +160,10 @@
   right: 12px;
   z-index: 1;
   padding: 2px 7px;
-  border: 1px solid rgba(56, 189, 248, 0.28);
-  border-radius: 999px;
-  color: #7fc4e8;
-  font-size: 10px;
+  border: 1px solid color-mix(in srgb, var(--bs-host-accent) 28%, transparent);
+  border-radius: var(--bs-host-radius-pill);
+  color: var(--bs-host-accent-text);
+  font-size: var(--bs-host-font-size-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -163,10 +174,10 @@
   left: 14px;
   z-index: 1;
   overflow: hidden;
-  color: #eaf6ff;
-  font-size: 17px;
+  color: var(--bs-host-text-primary);
+  font-size: var(--bs-host-font-size-xl);
   font-weight: 600;
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
+  text-shadow: 0 1px 12px color-mix(in srgb, var(--bs-host-surface-workspace) 65%, transparent);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -270,7 +281,7 @@
   background: linear-gradient(
     100deg,
     var(--color-surface) 30%,
-    rgba(148, 163, 184, 0.08) 50%,
+    color-mix(in srgb, var(--bs-host-text-muted) 8%, transparent) 50%,
     var(--color-surface) 70%
   );
   background-size: 200% 100%;
@@ -306,11 +317,11 @@
   min-height: 44px;
   margin-bottom: var(--spacing-3);
   padding: var(--spacing-2) var(--spacing-3);
-  border: 1px solid rgba(248, 113, 113, 0.45);
+  border: 1px solid color-mix(in srgb, var(--bs-host-danger) 45%, transparent);
   border-radius: var(--radius-sm);
-  background: rgba(248, 113, 113, 0.1);
-  color: var(--color-danger);
-  font-size: 13px;
+  background: color-mix(in srgb, var(--bs-host-danger) 10%, transparent);
+  color: var(--bs-host-danger);
+  font-size: var(--bs-host-font-size-base);
 }
 
 .error-banner__message {
@@ -339,12 +350,12 @@
 }
 
 .toast--success {
-  border-color: rgba(56, 189, 248, 0.5);
+  border-color: color-mix(in srgb, var(--bs-host-accent) 50%, transparent);
 }
 
 .toast--error {
-  border-color: rgba(248, 113, 113, 0.5);
-  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--bs-host-danger) 50%, transparent);
+  color: var(--bs-host-danger);
 }
 
 /* 查看页顶栏的数据状态 chip：在线=绿、离线=橙。颜色只是辅助，文字本身已带「在线/离线」，
@@ -359,13 +370,13 @@
 }
 
 .viewer-bar__status[data-state="online"] {
-  border-color: rgba(82, 196, 26, 0.45);
-  color: #52c41a;
+  border-color: color-mix(in srgb, var(--bs-host-success) 45%, transparent);
+  color: var(--bs-host-success);
 }
 
 .viewer-bar__status[data-state="offline"] {
-  border-color: rgba(250, 140, 22, 0.5);
-  color: #fa8c16;
+  border-color: color-mix(in srgb, var(--bs-host-warning) 50%, transparent);
+  color: var(--bs-host-warning);
 }
 
 /* ---------------------------------------------------------------------------
@@ -400,7 +411,7 @@
 .shell__tab--active {
   color: var(--color-text);
   border-color: var(--color-accent);
-  background: rgba(56, 189, 248, 0.12);
+  background: color-mix(in srgb, var(--bs-host-accent) 12%, transparent);
 }
 
 .ds-page {
@@ -435,7 +446,7 @@
 .ds-filter--active {
   border-color: var(--color-accent);
   color: var(--color-text);
-  background: rgba(56, 189, 248, 0.14);
+  background: color-mix(in srgb, var(--bs-host-accent) 14%, transparent);
 }
 
 .ds-meta {
@@ -459,12 +470,12 @@
 }
 
 .ds-result--ok {
-  border-color: rgba(52, 211, 153, 0.45);
+  border-color: color-mix(in srgb, var(--bs-host-success) 45%, transparent);
   color: var(--color-success);
 }
 
 .ds-result--error {
-  border-color: rgba(248, 113, 113, 0.45);
+  border-color: color-mix(in srgb, var(--bs-host-danger) 45%, transparent);
   color: var(--color-danger);
 }
 
@@ -492,7 +503,7 @@
 .ds-table th,
 .ds-table td {
   padding: 10px var(--spacing-3);
-  border-bottom: 1px solid rgba(56, 189, 248, 0.1);
+  border-bottom: 1px solid color-mix(in srgb, var(--bs-host-accent) 10%, transparent);
   text-align: left;
   vertical-align: middle;
 }
@@ -570,15 +581,15 @@
 }
 
 .ds-badge--ready {
-  border-color: rgba(52, 211, 153, 0.5);
+  border-color: color-mix(in srgb, var(--bs-host-success) 50%, transparent);
   color: var(--color-success);
-  background: rgba(52, 211, 153, 0.1);
+  background: color-mix(in srgb, var(--bs-host-success) 10%, transparent);
 }
 
 .ds-badge--error {
-  border-color: rgba(248, 113, 113, 0.5);
+  border-color: color-mix(in srgb, var(--bs-host-danger) 50%, transparent);
   color: var(--color-danger);
-  background: rgba(248, 113, 113, 0.1);
+  background: color-mix(in srgb, var(--bs-host-danger) 10%, transparent);
 }
 
 .ds-badge--draft {
@@ -586,9 +597,9 @@
 }
 
 .ds-badge--builtin {
-  border-color: rgba(56, 189, 248, 0.45);
+  border-color: color-mix(in srgb, var(--bs-host-accent) 45%, transparent);
   color: var(--color-accent);
-  background: rgba(56, 189, 248, 0.08);
+  background: color-mix(in srgb, var(--bs-host-accent) 8%, transparent);
 }
 
 .ds-empty__reset {
@@ -602,7 +613,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--spacing-5);
-  background: rgba(2, 8, 18, 0.72);
+  background: var(--bs-host-surface-scrim);
   backdrop-filter: blur(2px);
   z-index: 40;
 }
@@ -619,7 +630,7 @@
   height: 100%;
   border-left: 1px solid var(--color-border);
   background: var(--color-surface-solid);
-  box-shadow: -24px 0 48px rgba(2, 8, 18, 0.6);
+  box-shadow: var(--bs-host-shadow-overlay);
 }
 
 .ds-drawer__head,
@@ -732,7 +743,7 @@
 .ds-tab--active {
   border-color: var(--color-accent);
   color: var(--color-text);
-  background: rgba(56, 189, 248, 0.14);
+  background: color-mix(in srgb, var(--bs-host-accent) 14%, transparent);
 }
 
 .ds-columns {
@@ -757,7 +768,7 @@
   border: 1px solid var(--color-border);
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 10px;
+  font-size: var(--bs-host-font-size-xs);
 }
 
 .ds-param-list {
@@ -793,7 +804,7 @@
 
 .ds-error {
   padding: var(--spacing-2) var(--spacing-3);
-  border: 1px solid rgba(248, 113, 113, 0.45);
+  border: 1px solid color-mix(in srgb, var(--bs-host-danger) 45%, transparent);
   border-radius: var(--radius-sm);
   color: var(--color-danger);
   font-size: 12px;
@@ -804,7 +815,7 @@
   align-items: center;
   gap: var(--spacing-2);
   padding: var(--spacing-2) var(--spacing-3);
-  border: 1px solid rgba(56, 189, 248, 0.4);
+  border: 1px solid color-mix(in srgb, var(--bs-host-accent) 40%, transparent);
   border-radius: var(--radius-sm);
   color: var(--color-text);
   font-size: 12px;
@@ -834,7 +845,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface-solid);
-  box-shadow: 0 24px 48px rgba(2, 8, 18, 0.6);
+  box-shadow: var(--bs-host-shadow-overlay);
 }
 
 .ds-dialog__title {
@@ -914,7 +925,7 @@
   height: 30px;
   flex: none;
   border-radius: 4px;
-  background: rgba(5, 13, 26, 0.6);
+  background: color-mix(in srgb, var(--bs-host-surface-workspace) 60%, transparent);
   object-fit: cover;
 }
 
@@ -927,7 +938,7 @@
 .asset-admin-scope-detail {
   color: var(--color-text-muted);
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
-  font-size: 10px;
+  font-size: var(--bs-host-font-size-xs);
 }
 
 .asset-admin-upload-input {

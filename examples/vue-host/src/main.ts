@@ -2,11 +2,11 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import { router } from './router';
 import { registerHostMaterials } from './screen/register';
+// 公共令牌层（--bs-host-*）：必须先于宿主样式加载，asset-library.css 只做别名。
+import 'base-screen/host-tokens.css';
 import './styles/base.css';
 import './styles/layout.css';
 import './styles/components.css';
-// 公共令牌层（--bs-host-*）：必须先于宿主样式加载，asset-library.css 只做别名。
-import 'base-screen/host-tokens.css';
 import './styles/asset-library.css';
 import './styles/online-materials.css';
 

@@ -449,7 +449,6 @@ const importantBaseline = {
   'workbench/designer-workbench-accessibility.css': 1,
   'workbench/designer-workbench-blueprint-surface.css': 1,
   'workbench/designer-workbench-inspector.css': 7,
-  'workbench/designer-workbench-panels.css': 2,
   'workbench/designer-workbench-shell.css': 1,
   'workbench/designer-workbench-variables.css': 1,
 };
@@ -471,11 +470,16 @@ function countRawColors(content) {
   return total;
 }
 
+const importantCounts = {};
+const rawColorCounts = {};
 for (const file of nonTokenLayers) {
   const key = file.slice(stylesPrefix.length);
   const content = source(file);
 
   const important = (content.match(/!important/g) ?? []).length;
+  const rawColors = countRawColors(content);
+  importantCounts[key] = important;
+  rawColorCounts[key] = rawColors;
   const allowedImportant = importantBaseline[key] ?? 0;
   if (important > allowedImportant) {
     throw new Error(
@@ -483,7 +487,6 @@ for (const file of nonTokenLayers) {
     );
   }
 
-  const rawColors = countRawColors(content);
   const allowedColors = colorBaseline[key] ?? 0;
   if (rawColors > allowedColors) {
     throw new Error(
@@ -647,10 +650,6 @@ if (
 }
 
 const styleMetrics = computeStyleMetrics();
-if (process.argv.includes('--report')) {
-  console.log(JSON.stringify(styleMetrics, null, 2));
-  process.exit(0);
-}
 for (const [key, counts] of Object.entries(styleMetrics)) {
   const allowed = styleDebtBaseline[key] ?? {};
   for (const [metric, code] of Object.entries(styleMetricCodes)) {
@@ -842,3 +841,41 @@ if (inspectorMinConstant !== compactRight) {
 }
 if (warningWidth !== compactContainerWidth) sizeTierDrift(`warning-width=${warningWidth}`);
 if (warningHeight !== tierHeight + 1) sizeTierDrift(`warning-height=${warningHeight}`);
+
+const blueprintGeometrySource = source(
+  'packages/engine/src/common/operations/blueprint/designer-blueprint-geometry.ts',
+);
+const blueprintGeometryTokens = [
+  ['DESIGNER_BLUEPRINT_NODE_WIDTH', '--designer-blueprint-node-width'],
+  ['DESIGNER_BLUEPRINT_NODE_HEADER_HEIGHT', '--designer-blueprint-node-header-height'],
+  ['DESIGNER_BLUEPRINT_NODE_ROW_HEIGHT', '--designer-blueprint-node-row-height'],
+  ['DESIGNER_BLUEPRINT_NODE_MIN_HEIGHT', '--designer-blueprint-node-min-height'],
+];
+for (const [constant, token] of blueprintGeometryTokens) {
+  const constantMatch = new RegExp(`export const ${constant} = (\\d+);`).exec(
+    blueprintGeometrySource,
+  );
+  const tokenMatch = new RegExp(`${token}:\\s*(\\d+)px;`).exec(tokensCss);
+  if (constantMatch === null || tokenMatch === null) {
+    throw new Error(`DESIGNER_STYLE_BLUEPRINT_GEOMETRY_MISSING:${constant}:${token}`);
+  }
+  if (constantMatch[1] !== tokenMatch[1]) {
+    throw new Error(
+      `DESIGNER_STYLE_BLUEPRINT_GEOMETRY_DRIFT:${constant}:${constantMatch[1]}!=${tokenMatch[1]}`,
+    );
+  }
+}
+
+if (process.argv.includes('--report')) {
+  console.log(
+    JSON.stringify(
+      {
+        styleMetrics,
+        importantCounts,
+        rawColorCounts,
+      },
+      null,
+      2,
+    ),
+  );
+}

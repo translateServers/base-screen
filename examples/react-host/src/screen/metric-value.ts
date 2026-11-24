@@ -19,6 +19,25 @@ import type {
 export const METRIC_VALUE_TYPE = 'host-app.metric-value';
 export const METRIC_VALUE_TAG = 'host-app-metric-value';
 
+export const METRIC_VALUE_CONTAINER_STYLE = {
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  height: '100%',
+  padding: 'var(--bs-host-space-5) var(--bs-host-space-6)',
+  color: 'var(--bs-host-text-primary)',
+  font: 'var(--bs-host-font-size-sm) / 1.4 var(--bs-host-font-family)',
+  boxSizing: 'border-box',
+  overflow: 'hidden',
+} as const;
+
+export const METRIC_VALUE_NUMBER_STYLE = {
+  fontSize: '30px',
+  fontWeight: 600,
+  color: 'var(--bs-host-accent)',
+  fontVariantNumeric: 'tabular-nums',
+} as const;
+
 export const METRIC_VALUE_MANIFEST: BaseScreenMaterialManifest = {
   type: METRIC_VALUE_TYPE,
   tagName: METRIC_VALUE_TAG,

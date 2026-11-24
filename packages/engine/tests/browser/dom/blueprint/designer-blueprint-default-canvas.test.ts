@@ -18,6 +18,9 @@ function readSource(file: string): string {
 const canvas = readSource(
   '../../../../src/browser/dom/blueprint/designer-blueprint-default-canvas.ts',
 );
+const geometry = readSource(
+  '../../../../src/common/operations/blueprint/designer-blueprint-geometry.ts',
+);
 const panel = readSource(
   '../../../../src/browser/controllers/blueprint/designer-blueprint-workbench-panel.ts',
 );
@@ -73,9 +76,10 @@ describe('engine default blueprint canvas', () => {
   });
 
   it('keeps the LIGHT CHASER card geometry, 28px port hit area and shared grid tokens', () => {
-    expect(canvas).toContain('const NODE_WIDTH = 164;');
-    expect(canvas).toContain('const ROW_HEIGHT = 27;');
-    expect(canvas).toContain('const SNAP_DISTANCE = 28;');
+    expect(canvas).toContain('designer-blueprint-geometry.js');
+    expect(geometry).toContain('DESIGNER_BLUEPRINT_NODE_WIDTH = 164');
+    expect(geometry).toContain('DESIGNER_BLUEPRINT_NODE_ROW_HEIGHT = 27');
+    expect(geometry).toContain('DESIGNER_BLUEPRINT_NODE_SNAP_DISTANCE = 28');
     expect(nodesCss).toMatch(/\.bp-port::before\s*\{[^}]*width: 28px;[^}]*height: 28px;/s);
     expect(css).toContain('background-image: var(--designer-canvas-surface-image);');
     // 点阵随平移缩放，光晕层固定不平铺：平移只写 --bp-pan-*，不写整个 background-position。

@@ -4,7 +4,11 @@ import type {
   BaseScreenMaterialModel,
   BaseScreenMaterialTabularDataAdapter,
 } from 'base-screen/plugin-core';
-import { METRIC_VALUE_MANIFEST } from './metric-value';
+import {
+  METRIC_VALUE_CONTAINER_STYLE,
+  METRIC_VALUE_MANIFEST,
+  METRIC_VALUE_NUMBER_STYLE,
+} from './metric-value';
 
 /**
  * Vanilla 自有物料：自定义元素 + manifest（与 React / Vue 版同一 type/tagName）。
@@ -36,20 +40,16 @@ class MetricValueElement extends HTMLElement {
     this.replaceChildren();
     this.setAttribute('data-metric-value', '');
     // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
-    if (this.style.display !== 'none') this.style.display = 'block';
-    this.style.overflow = 'hidden';
-    this.style.boxSizing = 'border-box';
-    this.style.padding = '14px 16px';
-    this.style.color = '#e8eefb';
-    this.style.font = '12px/1.4 system-ui, sans-serif';
+    const rendererDisplay = this.style.display;
+    Object.assign(this.style, METRIC_VALUE_CONTAINER_STYLE);
+    this.style.display = rendererDisplay === 'none' ? 'none' : 'flex';
 
     // 原子物料：只画数值 + 单位。标题交给文档层的 `base.text`，底座与边框交给容器/边框物料。
     const value = this.ownerDocument.createElement('div');
     value.setAttribute('data-metric-value-number', '');
     const projected = readProjectedValue(model);
     value.textContent = projected === null ? '--' : `${projected}${String(model.props.unit ?? '')}`;
-    value.style.cssText =
-      'font-size:30px;font-weight:700;color:#39c5bb;font-variant-numeric:tabular-nums;';
+    Object.assign(value.style, METRIC_VALUE_NUMBER_STYLE);
     this.append(value);
   }
 }

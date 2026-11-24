@@ -7,7 +7,8 @@
   --bp-accent: var(--designer-blueprint-accent-component);
   position: absolute;
   box-sizing: border-box;
-  width: 164px;
+  width: var(--designer-blueprint-node-width);
+  min-height: var(--designer-blueprint-node-min-height);
   border: 1px solid var(--designer-blueprint-node-border);
   border-radius: var(--designer-blueprint-node-radius);
   background: var(--designer-blueprint-node-surface);
@@ -158,7 +159,7 @@
 .designer-blueprint-canvas .bp-anchor {
   display: flex;
   align-items: center;
-  min-height: 27px;
+  min-height: var(--designer-blueprint-node-row-height);
   border-radius: var(--designer-radius-2);
   transition: background-color 0.16s;
 }
