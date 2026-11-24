@@ -52,11 +52,11 @@ push-data-source-runtime.md[SD5T]: F:推送式数据源运行时的 renderer min
 refresh-catalog-grouping.md[SU3T]: F:refreshCatalog 携带物料库分组一并交换的变更说明 | R:- | A:- | S:分组按新 catalog 校验，与 catalog 同次全有或全无
 remove-contrast-guard.md[SU4T]: F:移除设计器对比度守卫的 minor 变更说明 | R:- | A:- | S:core 的对比度计算函数保留，截图探针与示例后端仍在使用
 remove-scene-switching.md[SU4T]: F:移除场景切换的破坏性 minor 变更说明（ADR-0092 §4） | R:- | A:- | S:删除 setSceneCatalog 等元素 API 与 base-screen-scene-change 事件；同屏内容切换改用从画布或蓝图显隐
-segmented-reserved-style-ai-description.md[SG5T]: F:检查器分段控件与保留样式键、AI 样式签名的 minor 变更说明 | R:code:packages/engine/src/browser | A:- | S:styleSchema 校验接受引擎级保留键 opacity/flipX/flipY，物料自行申报时仍以申报 schema 为准
+segmented-reserved-style-ai-description.md[SG5T]: F:检查器分段控件与保留样式键、AI 样式签名的 minor 变更说明 | R:code:packages/engine/src/browser/dom/descriptor/designer-descriptor-control-dom.ts | A:- | S:styleSchema 校验接受引擎级保留键 opacity/flipX/flipY，物料自行申报时仍以申报 schema 为准
 select-all-current-level.md[SU3T]: F:修复全选后删不掉组件的 patch 变更说明 | R:- | A:- | S:全选只选当前编辑层级直接成员；父子混选删除只删最上层，含锁定组件整体不删
 spacing-descriptor-control.md[SE3T]: F:描述符新增四边距 spacing 控件的 minor 变更说明 | R:- | A:- | S:四边用一个对象值承载，缺任一边或非数字校验失败关闭
 text-material-host-resource.md[SE3T]: F:官方文本物料支持读宿主资源的 minor 变更说明 | R:code:packages/material/src/text.ts | A:- | S:宿主资源选择入口仍只对图片物料开放
-theme-behavior-lifecycle.md[SG5T]: F:批2 通用视觉层、文档级主题与生命周期/定时器触发器的 minor 变更说明 | R:code:packages/contracts/src | A:- | S:主题引用 theme:<slot> 悬空时失败关闭；lifecycle.ready 只发一次，timer 间隔限 1–86400 秒且按间隔去重
+theme-behavior-lifecycle.md[SG5T]: F:批2 通用视觉层、文档级主题与生命周期/定时器触发器的 minor 变更说明 | R:code:packages/contracts/src/document/theme.ts | A:- | S:主题引用 theme:<slot> 悬空时失败关闭；lifecycle.ready 只发一次，timer 间隔限 1–86400 秒且按间隔去重
 
 ===/<repository>/.github/===
 CODEOWNERS[FC2T]: F:全仓库代码所有者 | R:- | A:- | S:所有文件的 owner 为 @zhouan190
@@ -278,7 +278,7 @@ health.module.ts[IE2T]: F:存活探针 NestJS 模块 | R:code:examples/shared-ba
 material-package.dto.ts[IG5T]: F:在线物料包请求 DTO | R:code:examples/shared-backend/src/material-packages/material-package.types.ts | A:保存/更新/可见性入参 | S:type 须匹配 host.online.* 命名空间防覆盖内置物料；code 长 1..200KiB；更新带 revision 乐观锁
 
 ===/<repository>/examples/shared-backend/src/material-packages/===
-material-package.types.ts[FG4T]: F:在线物料包领域类型与常量 | R:code:examples/shared-backend/src/prisma/schema.prisma | A:- | S:代码与 Manifest 由宿主生成审核后端只持久化；type 前缀 host.online.，代码上限 200KiB Manifest 64KiB
+material-package.types.ts[FG4T]: F:在线物料包领域类型与常量 | R:code:examples/shared-backend/prisma/schema.prisma | A:- | S:代码与 Manifest 由宿主生成审核后端只持久化；type 前缀 host.online.，代码上限 200KiB Manifest 64KiB
 material-packages.controller.ts[IE5T]: F:在线物料包 REST 控制器 | R:code:examples/shared-backend/src/material-packages/material-packages.service.ts | A:列表/新建/更新/可见性/删除 | S:type 须 host.online.*；更新 type 不可改且用 revision 乐观锁；被引用删除返回 409
 material-packages.module.ts[IE2T]: F:在线物料包 NestJS 模块 | R:code:examples/shared-backend/src/app.module.ts | A:- | S:导入 PrismaModule，提供并导出 MaterialPackagesService
 material-packages.service.ts[IA6M]: F:在线物料包存取服务 | R:code:examples/shared-backend/src/material-packages/dto/material-package.dto.ts | A:CRUD / Manifest 规范化 / 引用检查 | S:只存储不执行代码；tagName 须含连字符；type 创建后不可变；删除前扫文档 component.type 被引用则 409
@@ -569,7 +569,7 @@ validation.ts[FG6S]: F:数据集值与字段校验原语 | R:code:packages/contr
 
 ===/<repository>/packages/contracts/src/diagnostics/===
 collector.ts[FG6S]: F:诊断收集器 | R:code:packages/contracts/src/document/validate.ts | A:分段追加/计数/上限截断诊断 | S:最多 100 条诊断，达上限后以哨兵路径标记继续计数；区分 root 与 document 阶段
-material-error.ts[FG6T]: F:物料可见终止错误码 | R:code:packages/contracts/README.md | A:SCREEN_MATERIAL_ERROR_CODES 冻结集合 | S:物料只收到这八个码，其余归并为 HOST_RESOURCE_FAILED；错误消息有长度上限与安全默认值
+material-error.ts[FG6T]: F:物料可见终止错误码 | R:code:plugins/plugin-materials/src/board/board-degradation.ts | A:SCREEN_MATERIAL_ERROR_CODES 冻结集合 | S:物料只收到这八个码，其余归并为 HOST_RESOURCE_FAILED；错误消息有长度上限与安全默认值
 
 ===/<repository>/packages/contracts/src/document/===
 blueprint-capabilities.ts[FG7T]: F:蓝图能力词汇唯一来源 | R:code:packages/contracts/src/document/blueprint-graph.ts | A:SCREEN_BLUEPRINT_CAPABILITY_IDS / 语义键映射 | S:能力 id 写入文档 requiredCapabilities 并被授权判定与规则归一化消费，单点声明防漂移；JSON Schema 中仍是自由字符串
@@ -579,7 +579,7 @@ canvas-background.ts[FG8T]: F:画布背景能力唯一权威 | R:code:packages/c
 component-states.ts[DB8M]: F:组件状态纯求值（ADR-0110），renderer 与设计器预览共用 | R:code:packages/contracts/src/json/equality.ts | A:resolve 状态 / 条件判定 / 按行查找 / 路径读取 / 样式合并 / 依赖列举 | S:来源未就绪或路径不存在返回 unavailable，调用方保持上一结果；找不到匹配行取值为空照常判定；条件按序第一条命中生效；路径只认自有属性与非负整数下标
 data-source-order.ts[IG7S]: F:数据源参数依赖排序 | R:code:packages/contracts/src/document/validate.ts | A:构建参数图 / 拓扑排序 / 成环诊断 | S:边 X→Y 表示 X 参数取自 Y 输出即 Y 先求值；自引用与悬空边不建图由专门诊断处理
 envelope.ts[FG8M]: F:项目信封严格校验 | R:code:packages/contracts/src/document/validate.ts | A:projectId/revision/name/description 校验与文档验证 | S:检查码点长度与字节上限、无控制字符；校验通过后调用 validateDocument 验证内部文档
-identity.ts[FG4T]: F:物料类型身份模式 | R:code:packages/contracts/README.md | A:SCREEN_MATERIAL_TYPE_PATTERN / isScreenMaterialType | S:物料类型须两段点分命名；提供正则判定谓词
+identity.ts[FG4T]: F:物料类型身份模式 | R:code:packages/contracts/src/document/schema.ts | A:SCREEN_MATERIAL_TYPE_PATTERN / isScreenMaterialType | S:物料类型须两段点分命名；提供正则判定谓词
 image-url.ts[FG5T]: F:有界图片 URL 判定 | R:code:packages/contracts/src/json/canonical.ts | A:isBoundedScreenImageUrl | S:允许 http(s)/协议相对/根相对/点相对前缀，拒绝 data/javascript/blob/file；无控制字符与空白；失败关闭不解析不修复
 json-schema.ts[FG6S]: F:Screen Document JSON Schema 生成 | R:code:packages/contracts/src/document/schema.ts | A:generateScreenDocumentJsonSchema | S:从 zod documentSchema 生成并注入 $id 与长度上限；以 allOf 补丁表达刷新策略交叉约束：auto 必带间隔、push 专属字段、url-query 禁 push
 limits.ts[FG6T]: F:文档有界常量集中定义 | R:code:packages/contracts/src/document/schema.ts | A:- | S:文档≤10MiB、组件≤10000、从画布≤64、蓝图节点≤2000 连线≤10000、单规则步骤≤1024；push 保留行缺省 1000 上限 10000；组件状态≤16
@@ -647,7 +647,7 @@ core.api.md[FS9L]: F:core 包公共 API 报告 | R:code:packages/core/src/index.
 ===/<repository>/packages/core/src/blueprint/===
 runtime-compile.ts[IA6S]: F:蓝图节点图编译为运行时计划 | R:code:packages/contracts/src/document/blueprint-graph.ts | A:compileScreenBlueprint | S:规则由 contracts 的 deriveScreenBlueprintRules 派生，这里只做能力门禁与深拷贝，未授权能力失败关闭；能力 id 再导出仅维持公共 API
 runtime-dispatch.ts[IA8M]: F:蓝图事件分派与追踪 | R:code:packages/core/src/blueprint/runtime-json.ts | A:dispatchScreenBlueprintEvent / traceScreenBlueprintEvent | S:按规则顺序匹配触发器，逐条深度优先执行步骤树，条件按 yes/no 分支；事件负载上限 256KiB；输出显隐、状态、画布效果、变量与宿主事件
-runtime-json.ts[IA7S]: F:蓝图表达式求值 | R:code:packages/contracts/src/document/blueprint-relations.ts | A:evaluateExpression/evaluateCondition/clone 系列 | S:按 literal/event-payload/variable 等 kind 求值；用 screenJsonEquals 判等；返回值安全克隆
+runtime-json.ts[IA7S]: F:蓝图表达式求值 | R:code:packages/contracts/src/document/blueprint-graph.ts | A:evaluateExpression/evaluateCondition/clone 系列 | S:按 literal/event-payload/variable 等 kind 求值；用 screenJsonEquals 判等；返回值安全克隆
 runtime-types.ts[FG6M]: F:蓝图运行时类型定义 | R:code:packages/core/src/blueprint/runtime-json.ts | A:事件 / 计划 / 分派结果与效果 / 动作与规则 trace 类型 | S:含从画布开合与页面导航效果、组件状态设置恢复效果；state-changed 负载含 from/to/cause
 runtime.ts[FG4T]: F:蓝图运行时公共入口再导出 | R:code:packages/core/src/blueprint/runtime-compile.ts | A:- | S:汇总 compile/dispatch/trace 与各事件、效果、轨迹类型
 
@@ -749,7 +749,7 @@ designer-update-policy-authoring.ts[IE6M]: F:工作台更新方式写回文档�
 
 ===/<repository>/packages/engine/src/browser/controllers/===
 designer-artboard-controller.ts[IE8L]: F:画布标签条与从画布作者面控制器（ADR-0109） | R:code:packages/engine/src/common/session/designer-artboard.ts,code:packages/contracts/src/document/sub-canvas.ts | A:主画布页面弹框切换 / 新建复制删除改名 / 从画布设置 / 移到与置于下方 | S:移画布只作用于选区根组件，子组件随根；改名由 Enter 或失焦提交 change 不重复提交；设计态当前页随蓝图切页只换页不动主画布组件
-designer-auto-width-controller.ts[IE6S]: F:自动宽度控制器 | R:code:packages/engine/src/geometry/component-bounds.ts | A:- | S:文本自动宽度测量后同步几何；实测宽度变化不产生事务
+designer-auto-width-controller.ts[IE6S]: F:自动宽度控制器 | R:code:packages/core/src/geometry/component-bounds.ts | A:- | S:文本自动宽度测量后同步几何；实测宽度变化不产生事务
 designer-canvas-runtime-controller.ts[IE7L]: F:设计态画布运行时控制器 | R:code:packages/core/src/blueprint/runtime-dispatch.ts | A:渲染与变量快照 / 宿主变量解析 / 蓝图分派到渲染器 / 从画布预览与状态预览 / ready 生命周期 | S:宿主变量解析前挂起资源；替换失败回滚 ready 标志；设计态预览组件状态不发状态改变事件；能力编译失败时画布可渲染但禁用蓝图分派
 designer-change-controller.ts[IE8L]: F:智能体变更提案控制器 | R:code:packages/engine/src/common/operations/change/designer-change-proposal.ts | A:提案准备 / 幽灵预览 / 采纳忽略撤回 / 评审态 / 历史回退 | S:提案到达只加计数与草案条不切走检查器；评审态只读画布；草案层只挂受影响组件及其祖先；回退只移动历史指针
 designer-command-palette-controller.ts[IE8L]: F:命令面板控制器 | R:code:packages/engine/src/common/operations/designer-operation-registry.ts | A:前缀查询解析 / 排序过滤 / 物料图层命令蓝图条目 / 组合分片条目 | S:只在 Ctrl/Cmd+K 打开；结果最多 18 条；组合分片条目携带分片 id 交物料库面板整片插入
@@ -791,7 +791,7 @@ designer-marquee-gesture.ts[IE6S]: F:框选手势 | R:code:packages/engine/src/b
 designer-transform-gesture.ts[IE6M]: F:缩放旋转手柄变换手势 | R:code:packages/engine/src/common/operations/element/designer-transform.ts | A:- | S:拖动期间实时改 DOM 预览，结束时按 canonical 事务提交并恢复预览样式；缩放按缩放后包围盒预览吸附参考线
 
 ===/<repository>/packages/engine/src/browser/controllers/layers/===
-designer-layer-drag-controller.ts[IE8L]: F:图层拖拽控制器 | R:code:packages/engine/src/common/operations/hierarchy.ts | A:- | S:图层树中拖拽重排父子与顺序
+designer-layer-drag-controller.ts[IE8L]: F:图层拖拽控制器 | R:code:packages/core/src/hierarchy/hierarchy.ts | A:- | S:图层树中拖拽重排父子与顺序
 designer-layer-rename-controller.ts[IE6S]: F:图层重命名控制器 | R:code:packages/engine/src/browser/dom/layers/designer-layers-dom.ts | A:- | S:图层名称内联编辑与提交
 designer-layers-controller.ts[IE8L]: F:图层面板控制器：渲染协调、选择与多选、折叠、搜索、拖拽重排与重命名 | R:code:packages/engine/src/browser/dom/layers/designer-layers-model.ts,code:packages/engine/src/browser/dom/layers/designer-layers-dom.ts,code:packages/core/src/hierarchy/hierarchy.ts | A:- | S:图层树渲染选择与可见锁定状态管理；左右键做层级导航（展开/折叠/进子行/回父行），搜索态只移动不折叠；折叠会重建子节点但 tree 容器复用，渲染后须按 id 找回焦点
 
@@ -819,7 +819,7 @@ designer-variable-editor-mutations.ts[IE7M]: F:变量编辑变更操作 | R:code
 designer-variables-controller.ts[IE8L]: F:变量面板主控制器 | R:code:packages/engine/src/browser/controllers/variables/designer-variable-editor-controller.ts | A:- | S:组合目录编辑器与画布变量的统一交互
 
 ===/<repository>/packages/engine/src/browser/controllers/workbench/===
-designer-guide-controller.ts[IE7M]: F:引导控制器 | R:code:packages/engine/src/common/operations/workbench/designer-guide-controller.ts | A:- | S:工作台引导步骤的展示与推进
+designer-guide-controller.ts[IE7M]: F:引导控制器 | R:- | A:- | S:工作台引导步骤的展示与推进
 designer-panel-layout-controller.ts[IE8L]: F:面板布局控制器 | R:code:packages/engine/src/common/operations/workbench/designer-navigation.ts | A:- | S:工作台面板尺寸与布局的拖拽调整与持久化
 designer-snap-controller.ts[IE6M]: F:吸附控制器管理手势内吸附几何、对齐与等间距索引 | R:code:packages/engine/src/browser/viewport/designer-canvas-snap-geometry.ts,code:packages/engine/src/browser/viewport/designer-canvas-aids.ts | A:- | S:一次手势只投影一次组件边界供吸附与标注共用；只吸附可见区域内且在屏幕 reach 内的兄弟与父容器；缓存实例本地，排除集按集合比较
 designer-workbench-controller.ts[IE7M]: F:工作台控制器组合参考线、面板布局、吸附与右栏页签并对外转发 | R:code:packages/engine/src/browser/controllers/workbench/designer-snap-controller.ts,code:packages/engine/src/browser/controllers/workbench/designer-workbench-tabs-controller.ts | A:- | S:标尺 canvas 手绘颜料取自 CSS 令牌，主题切换须显式重绘；预览只画按最终几何重收集的 guides；状态栏事件开关是设计态 interactive 唯一来源；折叠胶囊钮按下不得启动拖拽改宽
@@ -1136,7 +1136,7 @@ designer-selection.ts[DB6S]: F:选中集合的子树展开与上下文解析 | R
 designer-component-states.ts[DB8L]: F:组件状态作者面纯逻辑（ADR-0110） | R:code:packages/contracts/src/document/component-states.ts | A:状态增删改 / 判定与条件编辑 / 样式重定向 / 整体替换事务 / 按分级生成 | S:只产事务不碰 DOM；编辑非默认状态时样式改写进该状态覆盖；覆盖与基础合并须过 styleSchema；删状态连带删指向它的蓝图连线
 designer-inspector.ts[EA7S]: F:检查器上下文判定与分组摘要计算 | R:code:packages/engine/src/common/operations/selection/designer-selection.ts | A:- | S:按画布单件编组多选四态分派；无后代或禁用 children 的物料不算编组；可编组需同父至少两件且无锁定
 designer-material-appearance.ts[DB7S]: F:物料外观区的唯一来源（ADR-0102 D1） | R:code:packages/plugin-core/src/editor/editor-descriptor.ts | A:- | S:有描述符外观区用描述符，否则扁平面板转成内容与样式两分区；检查器、提交门禁与多选批量共用这一份字段表；缺 schema 视为不可编辑不抛错
-designer-quick-style.ts[DB7M]: F:图表快捷样式的预设色板与事务构造 | R:code:packages/engine/src/common/operations/style/designer-style-rules.ts | A:- | S:九套预设色板；动作支持性由 manifest 的 styleSchema 与 propsSchema 声明判定，未声明样式键的物料不生成无效补丁
+designer-quick-style.ts[DB7M]: F:图表快捷样式的预设色板与事务构造 | R:code:packages/engine/src/common/operations/style/designer-style-field.ts | A:- | S:九套预设色板；动作支持性由 manifest 的 styleSchema 与 propsSchema 声明判定，未声明样式键的物料不生成无效补丁
 designer-style-field.ts[DB5T]: F:检查器样式补丁与耦合字段联动 | R:code:packages/engine/src/common/operations/style/designer-material-appearance.ts | A:- | S:改边框色视作显示边框，零宽在同一事务启用到至少 1px；颜色未变或未开放宽度不动
 
 ===/<repository>/packages/engine/src/common/operations/workbench/===
@@ -1505,7 +1505,7 @@ tsconfig.build.json[FO4T]: F:plugin-materials 构建期声明输出的编译配�
 tsconfig.json[FO4T]: F:plugin-materials 的类型检查编译配置 | R:code:plugins/plugin-materials/tsconfig.build.json | A:- | S:包级编译选项基线
 
 ===/<repository>/plugins/plugin-materials/src/board/===
-board-degradation.ts[EB6S]: F:大屏物料的降级文案与保留画面判定 | R:code:packages/engine/src/common/validation/designer-guard.ts | A:- | S:错误码短文案集中在一份避免八物料漂移；HOST_RESOURCE_FAILED 涵盖参数错数据集404请求失败故写数据更新失败；只用短文案不显示英文 message；已画过画面时非 error 态永不清屏
+board-degradation.ts[EB6S]: F:大屏物料的降级文案与保留画面判定 | R:code:packages/contracts/src/diagnostics/material-error.ts | A:- | S:错误码短文案集中在一份避免八物料漂移；HOST_RESOURCE_FAILED 涵盖参数错数据集404请求失败故写数据更新失败；只用短文案不显示英文 message；已画过画面时非 error 态永不清屏
 board-editor.ts[FC4T]: F:大屏物料检查器描述符的解析辅助 | R:code:packages/plugin-core/src/editor/editor-descriptor.ts | A:- | S:按物料 schema 校验，失败属开发期错误直接抛出
 board-element.ts[EA7T]: F:大屏物料自有基类与降级呈现 | R:code:plugins/plugin-materials/src/board/board-degradation.ts | A:- | S:不能依赖官方物料包故按同一 ABI 自实现最小骨架；尺寸由渲染器拥有物料不得改写宿主 width height；commit 是成功渲染唯一入口兼恢复语义，比 cloneNode 缓存安全不丢监听
 border-box.ts[EA7M]: F:装饰边框物料的 manifest 与元素 | R:code:plugins/plugin-materials/src/board/identity.ts | A:- | S:不承载数据不声明 static；可容纳子组件当卡片外壳；形态与角标尺寸是 props，线宽颜色是 style；缺 accentColor 时渲染与改动前一致；只画边框角标无标题栏
@@ -1607,7 +1607,7 @@ smoke.mjs[FB6S]: F:屏幕 MCP 的冒烟测试 | R:code:tooling/screen-mcp-server
 ===/<repository>/tooling/testing/===
 tag-tests.mjs[FB6S]: F:测试标签分类的脚本 | R:code:tooling/lib/audit-rules.mjs | A:- | S:按规则权重对测试文件做标签建议与分类，输出 suggestions 供人工确认
 test-audit.mjs[FB6S]: F:测试审计的脚本 | R:code:tooling/lib/audit-rules.mjs | A:- | S:按审计规则扫描测试文件的问题并产出审计报告，落盘到 audit 临时区
-test-baseline.mjs[FB7M]: F:静态测试基线的采集 | R:code:tooling/testing/test-baseline.mjs | A:- | S:不执行测试秒级采集各包与根级测试文件计数与环境信息；Windows 下 pnpm 需带 cmd 扩展名因 spawnSync 无法执行裸垫片
+test-baseline.mjs[FB7M]: F:静态测试基线的采集 | R:code:tooling/lib/scope-graph.mjs | A:- | S:不执行测试秒级采集各包与根级测试文件计数与环境信息；Windows 下 pnpm 需带 cmd 扩展名因 spawnSync 无法执行裸垫片
 test-scope.config.json[FB4T]: F:测试范围的配置数据 | R:- | A:- | S:声明测试范围选择的治理配置与阈值参数
 test-scope.mjs[FB9L]: F:测试范围选择的编排脚本 | R:code:tooling/lib/scope-graph.mjs | A:- | S:依据 diff 与依赖闭包映射包，按治理规则筛选引擎测试并生成范围计划与执行报告，维护选择历史
 
@@ -1719,4 +1719,4 @@ level-scale.ts[FG6S]: F:宿主分级表校验（ADR-0110 §2.6.2） | R:code:pac
 fragment.ts[DB8L]: F:组合分片的唯一形状解析器（ADR-0087/0100） | R:code:packages/plugin-core/src/contribution-kind.ts | A:插入意图 / 分片定义 / 分片体与节点 / 数据源与蓝图 / 有界名称 | S:插入即展开文档不记来源；用相对 anchor 偏移；1–64 节点且父节点先声明；数据源≤16、蓝图节点连线各≤32；不携带变量；JSON≤64K 字符
 
 ===/<repository>/sites/base-screen-landing/===
-index.html[EU5L]: F:Base Screen 对外落地页，单文件承载首屏主张、能力与接入步骤、在线示例入口、职责边界与分层架构 | R:code:README.md,code:tooling/verification/browser-harness/index.html | A:首屏与导航 / 关键数据带 / 能力与接入步骤 / 在线示例入口 / 职责边界 / 分层架构与页面交互 | S:单文件内联样式与脚本、无构建步骤，改样式直接改此处；三处 ./demo/?designer 指向同目录 demo（browser-harness 产物），只部署本文件会得到死链
+index.html[EU5L]: F:Base Screen 对外落地页，单文件承载首屏主张、能力与接入步骤、在线示例入口、职责边界与分层架构 | R:code:README.md,code:tooling/verification/browser-harness/index.html | A:首屏与导航 / 关键数据带 / 能力与接入步骤 / 在线示例入口 / 职责边界 / 分层架构与页面交互 | S:单文件内联样式与脚本、无构建步骤，改样式直接改此处；五处 ./demo/?designer 指向同目录 demo（browser-harness 产物），只部署本文件会得到死链
