@@ -517,16 +517,28 @@
   margin-bottom: var(--designer-space-2);
 }
 
-/* 画布尺寸：W / H 一对输入等分控件列。 */
+/* 画布尺寸：常态只有一行下拉（读数即尺寸），W / H 只在「自定义」时作为展开面出现。 */
 .properties .designer-canvas-size-controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--designer-space-3);
 }
 
-/* 常用尺寸下拉占满一行，W / H 在下一行。 */
 .properties .designer-canvas-size-preset {
   grid-column: 1 / -1;
+}
+
+/* 展开面与下拉同列、等分两栏；与下拉之间的 6px 来自上面字段行的 gap，
+   读起来是同一个控件的第二行，而不是另起一组字段。 */
+.properties .designer-canvas-size-custom {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--designer-space-3);
+}
+
+.properties .designer-canvas-size-custom[hidden] {
+  display: none;
 }
 
 /* 不透明度：几何沿用滑杆字段的公共规则（`.designer-field-control:has(> .designer-range)`），

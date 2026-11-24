@@ -272,6 +272,45 @@ function createSelect(viewport: FakeWindow, optionCount = 20, selectedIndex = 0)
   return { handle, trigger, menu, optionButtons };
 }
 
+describe('enhanceDesignerSelect detail readings', () => {
+  const byClass = (root: FakeElement | undefined, className: string): FakeElement | undefined =>
+    root?.children.find((child) => child.className === className);
+
+  it('renders the option detail as a secondary reading in the trigger and the menu', () => {
+    const ownerDocument = new FakeDocument(new FakeWindow(1440, 900));
+    const select = ownerDocument.createElement('select');
+    const option = ownerDocument.createElement('option');
+    option.value = '1920x1080';
+    option.textContent = '1080P';
+    option.dataset.detail = '1920 × 1080';
+    option.selected = true;
+    select.appendChild(option);
+    select.value = '1920x1080';
+
+    const handle = enhanceDesignerSelect(select as unknown as HTMLSelectElement);
+    const trigger = handle.trigger as unknown as FakeElement;
+    const element = handle.element as unknown as FakeElement;
+    const value = byClass(trigger, 'designer-select-value');
+    expect(byClass(value, 'designer-select-value-text')?.textContent).toBe('1080P');
+    expect(byClass(value, 'designer-select-value-detail')?.textContent).toBe('1920 × 1080');
+    // 次级读数的显隐由属性控制，空值不会在触发器里留一段空白。
+    expect(value?.dataset.detail).toBe('true');
+
+    const menu = element.children.find((child) => child.className === 'designer-select-menu');
+    const menuOption = menu?.children.find((child) => child.dataset.value === '1920x1080');
+    expect(byClass(menuOption, 'designer-select-option-detail')?.textContent).toBe('1920 × 1080');
+    // 原生选项文本保持纯标签：取值、读屏与既有断言都不受影响。
+    expect(option.textContent).toBe('1080P');
+  });
+
+  it('keeps the trigger single-level when options carry no detail', () => {
+    const fixture = createSelect(new FakeWindow(1440, 900), 3, 1);
+    const value = byClass(fixture.trigger, 'designer-select-value');
+    expect(value?.dataset.detail).toBe('false');
+    expect(byClass(value, 'designer-select-value-detail')?.textContent).toBe('');
+  });
+});
+
 describe('enhanceDesignerSelect placement', () => {
   it('floats the menu above in a bottom panel and clamps its scrolling height', () => {
     const viewport = new FakeWindow(1440, 900);

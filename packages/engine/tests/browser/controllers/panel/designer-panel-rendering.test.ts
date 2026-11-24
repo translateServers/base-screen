@@ -97,6 +97,45 @@ describe('designer panel rendering', () => {
     ).toHaveLength(2);
   });
 
+  it('keeps one preset reading on the size row and expands W / H only for custom canvases', () => {
+    const renderSizeRow = (canvas: ScreenDocument['canvas']) => {
+      const ownerDocument = new FakeDocument();
+      const properties = ownerDocument.createElement('div');
+      renderDesignerProperties(
+        properties as unknown as HTMLElement,
+        { ...document(), canvas },
+        { selectedComponentIds: [], focusedComponentId: null },
+        catalog(),
+      );
+      const all = descendants(properties);
+      const custom = all.find((element) =>
+        element.className.split(/\s+/).includes('designer-canvas-size-custom'),
+      );
+      return {
+        select: all.find((element) => element.dataset.canvasProperty === 'size'),
+        custom,
+        options: all.filter((element) => element.tagName === 'option'),
+      };
+    };
+
+    const preset = renderSizeRow({ ...document().canvas, width: 1920, height: 1080 });
+    expect(preset.select?.value).toBe('1920x1080');
+    expect(preset.custom?.hidden).toBe(true);
+    // 分辨率是预设选项的次级读数：下拉本身就读得全，不必再复制一组 W / H。
+    expect(preset.options.find((option) => option.value === '1920x1080')?.dataset.detail).toBe(
+      '1920 × 1080',
+    );
+
+    const custom = renderSizeRow({ ...document().canvas, width: 1600, height: 900 });
+    expect(custom.select?.value).toBe('custom');
+    expect(custom.custom?.hidden).toBe(false);
+    // 自定义态下 W / H 就在同一字段行里，落地即改。
+    const inputs = (custom.custom === undefined ? [] : descendants(custom.custom)).filter(
+      (element) => element.tagName === 'input',
+    );
+    expect(inputs.map((element) => element.dataset.canvasProperty)).toEqual(['width', 'height']);
+  });
+
   it('renders the active canvas background through the shared color palette control', () => {
     const ownerDocument = new FakeDocument();
     const properties = ownerDocument.createElement('div');

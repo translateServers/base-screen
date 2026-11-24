@@ -409,8 +409,10 @@ function createCanvasFieldRow(
 }
 
 /**
- * 常用画布尺寸。键对应文案表 `canvasSizePresetNames`；宽高与预设都不一致时下拉显示「自定义」，
- * 下面的 W / H 始终可直接改，改完自动回落到对应预设或「自定义」。
+ * 常用画布尺寸。键对应文案表 `canvasSizePresetNames`。
+ *
+ * 常态只有一个下拉：命中预设时它就是整行读数（名称 + 分辨率），宽高不再重复占一行；
+ * 只有落到「自定义」时才在原地展开 W / H。改完任一边即离开预设，尺寸再次命中预设时收回。
  */
 export const DESIGNER_CANVAS_SIZE_PRESETS = [
   ['fhd', 1920, 1080],
@@ -443,11 +445,8 @@ function appendCanvasSizeField(parent: HTMLElement, document: ScreenDocument): v
     options: [
       ...DESIGNER_CANVAS_SIZE_PRESETS.map(([key, presetWidth, presetHeight]) => ({
         value: `${presetWidth}x${presetHeight}`,
-        label: DESIGNER_UI_TEXT.propertiesPanel.canvasSizePresetLabel(
-          names[key],
-          presetWidth,
-          presetHeight,
-        ),
+        label: names[key],
+        detail: DESIGNER_UI_TEXT.propertiesPanel.canvasSizeReading(presetWidth, presetHeight),
       })),
       {
         value: DESIGNER_CANVAS_SIZE_CUSTOM,
@@ -461,8 +460,15 @@ function appendCanvasSizeField(parent: HTMLElement, document: ScreenDocument): v
   const preset = enhanceDesignerSelect(select).element;
   preset.classList.add('designer-canvas-size-preset');
   control.appendChild(preset);
+
+  // W / H 是「自定义」的展开面，不是常驻第二行：命中预设时整行只有一个下拉，
+  // 省掉一组与下拉读数重复的数字，面板首屏也少一行。
+  const custom = ownerDocument.createElement('div');
+  custom.className = 'designer-canvas-size-custom';
+  custom.hidden = matched !== undefined;
+  control.appendChild(custom);
   createCanvasGeoInput(
-    control,
+    custom,
     'W',
     'width',
     document.canvas.width,
@@ -470,7 +476,7 @@ function appendCanvasSizeField(parent: HTMLElement, document: ScreenDocument): v
     { min: 1, step: 1 },
   );
   const height = createCanvasGeoInput(
-    control,
+    custom,
     'H',
     'height',
     document.canvas.height,
@@ -478,6 +484,16 @@ function appendCanvasSizeField(parent: HTMLElement, document: ScreenDocument): v
     { min: 1, step: 1 },
   );
   appendDesignerFieldMessage(field, height, 'canvas-height');
+  // 选「自定义」时事务层不提交（宽高由输入框各自提交），这里只负责把展开面放出来；
+  // 选回预设先收起，等提交后整栏重渲染，再以预设读数落定。焦点留在触发器上——
+  // 与原生 select 一致，键盘用户下一跳（Tab）自然落进 W。
+  select.addEventListener('change', (event) => {
+    const customMode = select.value === DESIGNER_CANVAS_SIZE_CUSTOM;
+    custom.hidden = !customMode;
+    // 「自定义」只是展开输入面，不是一次文档提交：拦住冒泡，否则事务层会把它当成
+    // 无效草稿并弹出「操作未完成」。
+    if (customMode) event.stopPropagation();
+  });
   parent.appendChild(field);
 }
 

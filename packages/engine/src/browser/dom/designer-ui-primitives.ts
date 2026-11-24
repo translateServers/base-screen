@@ -69,6 +69,11 @@ export interface CreateDesignerSwitchOptions {
 
 export interface DesignerSelectOption {
   readonly disabled?: boolean;
+  /**
+   * 次级读数（如尺寸预设的 `1920 × 1080`）：与标签分成主次两级排版，只在触发器与弹层里
+   * 以弱化数字字形显示，不进入原生选项文本——原生 select 的取值与读屏文本仍是标签本身。
+   */
+  readonly detail?: string;
   readonly label: string;
   readonly selected?: boolean;
   readonly value: string;
@@ -439,6 +444,7 @@ export function createDesignerSelect(
     const option = ownerDocument.createElement('option');
     option.value = optionDefinition.value;
     option.textContent = optionDefinition.label;
+    if (optionDefinition.detail !== undefined) option.dataset.detail = optionDefinition.detail;
     if (optionDefinition.selected !== undefined) option.selected = optionDefinition.selected;
     if (optionDefinition.disabled !== undefined) option.disabled = optionDefinition.disabled;
     select.appendChild(option);

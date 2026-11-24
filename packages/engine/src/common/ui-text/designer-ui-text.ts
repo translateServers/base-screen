@@ -1076,8 +1076,8 @@ export const DESIGNER_UI_TEXT = {
     canvasDimensions: '尺寸',
     canvasSizePreset: '常用尺寸',
     canvasSizeCustom: '自定义',
-    canvasSizePresetLabel: (name: string, width: number, height: number) =>
-      `${name} ${width} × ${height}`,
+    /** 预设的次级读数：名称是主标签，`1920 × 1080` 只回答“具体多少”。 */
+    canvasSizeReading: (width: number, height: number) => `${width} × ${height}`,
     canvasSizePresetNames: {
       fhd: '1080P',
       qhd: '2K',

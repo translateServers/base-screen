@@ -608,11 +608,35 @@
   box-shadow: 0 0 0 2px var(--designer-focus-ring);
 }
 
+/* 触发器读数分两级：名称占剩余宽度并可截断，次级读数（尺寸）靠右、用弱化数字字形，
+   读作「名称 …… 具体尺寸」。原生选项文本仍只有名称，读屏语义不跟着排版走。 */
 .designer-select-value {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--designer-space-4);
+  overflow: hidden;
+}
+
+.designer-select-value-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.designer-select-value-detail {
+  display: none;
+  flex: none;
+  margin-left: auto;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+}
+
+.designer-select-value[data-detail="true"] .designer-select-value-detail {
+  display: block;
 }
 
 .designer-select-value[data-placeholder="true"] {
@@ -700,6 +724,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 选项的次级读数与触发器同源：名称在左，尺寸靠右，勾选仍占最后一列。 */
+.designer-select-option-detail {
+  flex: none;
+  margin-left: auto;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
 }
 
 .designer-select-option:not(:disabled):hover,
