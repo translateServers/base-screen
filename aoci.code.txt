@@ -5,7 +5,7 @@
 .gitattributes[FC3T]: F:Git 行尾与二进制资产声明 | R:- | A:- | S:文本强制 LF 关闭 autocrlf；图片/字体/压缩包标 binary 防 eol 破坏
 .gitignore[FC4T]: F:版本库忽略规则 | R:- | A:- | S:忽略 node_modules/.turbo/dist 与 .workbuddy/.qoder/.base-screen 等本地工作区；新增 *.backup.* 覆盖 aoci init 改写受跟踪文件前的备份；AOCI 认知资产的提交面由 .aoci/.gitignore 白名单独占，此处不重复声明以免两份副本漂移
 .node-version[FV2T]: F:声明项目 Node 版本 | R:- | A:- | S:版本为 22
-AGENTS.md[SG8S]: F:仓库开发指南，只写 Agent 该怎么做的规范与不可推导决策，系统结构交给 aoci.txt | R:code:README.md,code:CONTEXT.md | A:环境搭建与验证 / 包边界 / 产品定位与宿主边界 / 目录结构与命名 / 分层与边界 / 契约与产物 / 代码与测试 / AOCI 与仓库门禁的交互 | S:托管区块由 aoci init 重写，人工只维护其前散文；engine/src 三层 designer-element→browser→common 单向；宿主告警以数据接入、外观由组件状态决定；样式键词典两份须同步；认知进版本库但无门禁守护新鲜度
+AGENTS.md[SG8S]: F:仓库开发指南，只写 Agent 该怎么做的规范与不可推导决策，系统结构交给 aoci.txt | R:code:README.md,code:CONTEXT.md | A:环境搭建与验证 / 包边界 / 产品定位与宿主边界 / 目录结构与命名 / 分层与边界 / 契约与产物 / 代码与测试 / AOCI 与仓库门禁的交互 | S:托管区块由 aoci init 重写；engine/src 三层 designer-element→browser→common 单向；智能体产物一律写 dataValue+dataBinding、dataSource=null；认知进版本库但无门禁守护新鲜度
 CONTEXT.md[SG6S]: F:Base Screen 领域词汇表，记录跨包须统一理解的概念及其唯一实现落点 | R:code:AGENTS.md,code:packages/engine/src/browser/styles/designer-tokens.css,code:tooling/verification/browser-harness/system/system-gallery.ts | A:契约与诊断 / 插件贡献词汇 / Designer 组合根 / 数据面板 / 物料 / 设计系统 | S:设计数值以 designer-tokens.css 为准，清单由 tests/tooling/design-system-contract.test.ts 锁定；主操作统一 button-primary-*，文档不得复制过期数值
 LICENSE[SZ3T]: F:MIT 开源许可证 | R:- | A:- | S:Copyright 2026 zhouan190
 README.md[SG9M]: F:Base Screen 项目总览与接入指南 | R:code:CONTEXT.md,code:AGENTS.md | A:适用场景 / 核心能力 / 快速体验 / 在你的应用中使用 / 核心模型 / 与宿主的职责划分 / 示例 / 包结构 | S:以 Screen Document 为统一文档、Web Components 为浏览器集成边界；发布面只有单包 base-screen，packages 下 12 个包均 private 构建期内联；项目、数据、资产、发布与长任务由宿主负责
@@ -17,46 +17,8 @@ turbo.json[FO5T]: F:monorepo 任务编排的配置 | R:- | A:- | S:build lint ty
 vitest.config.ts[FO4T]: F:单元测试的运行配置 | R:code:packages/engine/vite.config.ts | A:- | S:配置 vitest 的测试范围与环境，体量极小
 
 ===/<repository>/.changeset/===
-blueprint-node-graph.md[SB6T]: F:蓝图改为节点图模型并重做蓝图工作台的跨包 minor 变更说明（ADR-0107） | R:code:packages/contracts/src/document/blueprint-graph.ts | A:文档契约破坏性变更 / 运行时 / 作者面 / 组合分片 | S:ScreenBlueprint 由 relations 改为 nodes+edges；迁移一次迁完 rules→relations→节点图；变量事件 request-state 移除
-board-decor-system.md[SE5T]: F:大屏容器与装饰体系的 plugin-materials minor 变更说明（ADR-0101） | R:code:plugins/plugin-materials/src/board/border-box.ts | A:- | S:装饰边框可容纳子组件并新增可选 accentColor，缺省时渲染与改动前一致；新增标题装饰物料与标题栏、设备状态面板组合
-board-device-status-fragment.md[SE4T]: F:首份插件组合分片设备状态卡与命令面板列出分片的变更说明 | R:- | A:- | S:分片 id 为 base-screen.board.device-status-card，插入即展开为四个普通组件
-board-device-status-redesign.md[SE5T]: F:按大屏组件调研重做设备状态类物料与分片的 minor 变更说明 | R:code:plugins/plugin-materials/src/board/status-grid.ts | A:- | S:五态色默认改为仅故障高饱和，键名不变，显式写色值的存量组件不受影响；灯阵格子恒为正方形
-board-materials-atomic-props.md[SE6T]: F:大屏插件物料按 ADR-0099 收敛作者面的不兼容变更说明 | R:code:plugins/plugin-materials/src/board/marquee.ts | A:- | S:旧文档残留 speedSeconds、emptyText、statusPalette、lineWidth、glow 等键会校验失败关闭，须改写为新形态
-board-tabs.md[SE4T]: F:新增大屏标签页物料 board.tabs 的 minor 变更说明 | R:code:plugins/plugin-materials/src/board/tabs.ts | A:- | S:标签取数据第1列、值取第2列，切换抛 tabChange 供蓝图按值打开页面
-canvas-size-presets.md[SU3T]: F:页面配置尺寸新增常用尺寸预设下拉的变更说明 | R:- | A:- | S:选中预设一次提交宽高；与预设都不一致时显示自定义
-color-picker-theme-slots.md[SU5T]: F:取色器支持主题色位与状态色位的 engine minor 变更说明 | R:- | A:- | S:选中写入 theme:<slot> 引用随色板变化，改选具体颜色即变回色值；弹层层级改用 --designer-z-popover
-common-opacity-control.md[SU4T]: F:不透明度与翻转控件对所有物料显示的 patch 变更说明 | R:- | A:- | S:二者是引擎级保留样式，物料申报的 schema 仅用于收窄取值
-component-states.md[SB6T]: F:组件状态取代条件样式与宿主条件样式的跨包 minor 变更说明（ADR-0110） | R:code:packages/contracts/src/document/component-states.ts | A:contracts / core / renderer / plugin-core / engine | S:styleRules 直接删除不写迁移，带 styleRules 的文档按未知字段失败关闭；conditionalStylePort 与 refreshConditionalStyles 已删除
-component-workshop-sdk.md[SE5T]: F:plugin-sdk 在线作者面物料规格、渲染函数物料与体检的 minor 变更说明（ADR-0105） | R:- | A:- | S:作者只写数据就绪时的绘制，骨架四态与失败隔离由 SDK 统一；样式键词典新增 positiveColor/negativeColor
+agent-proposal-review.md[SB6T]: F:智能体提案安全评审的跨包 minor 变更说明 | R:- | A:CHANGE_* 诊断契约 / 整屏原子采纳 / 草案展示与旧版切换 | S:对应 ADR-0111 阶段0；不包含生成修复回环、流式或中间表示扩展
 config.json[FC3T]: F:Changesets 版本发布配置 | R:- | A:- | S:baseBranch=master；access=public；内部依赖升级用 patch
-designer-page-preview-live.md[SU4T]: F:设计器事件开启时页面预览与查看器一致的 patch 变更说明 | R:- | A:- | S:物料不再把宿主元素 display 无条件写成 block，避免覆盖隐藏与蓝图显隐
-document-missing-root-fields.md[SB3T]: F:文档缺少 canvas 或 blueprint 时失败关闭的 contracts patch 说明 | R:- | A:- | S:此前缺失会跳过结构校验并在引用校验中抛 TypeError
-double-click-through-selection-grab.md[SU4T]: F:修复真实鼠标双击无法进组的 patch 变更说明 | R:code:packages/engine/src/browser/dom/designer-selection-dom.ts | A:- | S:拖拽层只挖显式选中组件；挖整棵子树时嵌套矩形被 evenodd 挖两次又成填充
-editor-condition-target.md[SE3T]: F:描述符条件新增可选 target 的变更说明 | R:- | A:- | S:省略时与字段同侧，存量描述符不变
-fragment-contribution.md[SE5T]: F:组合分片正式化第一阶段的跨包 minor 变更说明（ADR-0100） | R:code:packages/plugin-core/src/contribution-kind.ts | A:- | S:plugin-core 独占分片形状契约；新增 fragment 贡献类型无需能力授权，engine 继续转发原名称
-fragment-insert-selection-and-drop.md[SU4T]: F:修复组合分片插入后选区与拖放落点的 patch 变更说明 | R:- | A:- | S:插入后只选根节点，有外壳只选外壳；拖放落点可越出画布
-fragment-material-library.md[SU5T]: F:物料库展示组合分片的 minor 变更说明（ADR-0100 1b） | R:code:packages/engine/src/common/operations/material-library/material-library-grouping.ts | A:- | S:每份分片先在空文档按当前 catalog 试运行，失败则隐藏并报 warning；同 id 宿主分片优先
-fragment-phase-two.md[SE5T]: F:组合分片第二阶段共享数据、分片内联动与存为组合的 minor 变更说明 | R:code:packages/engine/src/common/operations/material-component/material-component-fragment.ts | A:- | S:分片不携带变量，引用变量即拒绝；插入事务顺序为数据源→组件→蓝图关系，一次可撤销
-group-shell-keeps-padding.md[SU5T]: F:组壳不再压平带内边距容器的 minor 变更说明 | R:code:packages/engine/src/common/operations/selection/designer-group.ts | A:- | S:逐边判断：贴着子项的边跟随，留内边距的边只在子项越出时外扩；最宽子项开自适应宽度会吃掉右侧内边距
-inspector-density-tiers.md[SU4T]: F:检查器基础与全量分层规则的变更说明（ADR-0102 §7.1） | R:- | A:- | S:字段不能单独标 advanced；物料分区只有 motion 仅全量可见且须标 advanced
-inspector-field-reset.md[SU3T]: F:检查器数值字段复位按钮的 patch 变更说明 | R:- | A:- | S:输入控件须先设 min/max/step 再赋值，否则大于 100 的值被钳
-inspector-form-paradigm.md[SE6T]: F:检查器配置表单范式（控件推导、描述符唯一来源、配置组、范式审计）的 minor 说明 | R:code:packages/plugin-core/src/editor/editor-descriptor.ts | A:- | S:扁平面板由引擎转成描述符分区渲染；文档键 board.digital-flop 的 props.suffix 改名为 unit
-inspector-form-visual-spec.md[SU3T]: F:检查器表单控件统一视觉规格的 patch 变更说明 | R:- | A:- | S:控件只有一档 30px 高度；多选值不同统一显示混合
-main-and-sub-canvases.md[SB6T]: F:主画布与从画布的跨包 minor 变更说明（ADR-0109） | R:code:packages/contracts/src/document/sub-canvas.ts | A:contracts / core / renderer / engine | S:取代未发布的 ADR-0108 popups 不写迁移；只挂载当前页，按页面背景→下方组件→当前页→主画布→弹框分层
-material-theme-style.md[SE5T]: F:新建组件颜色跟随文档主题的 minor 变更说明（ADR-0101） | R:- | A:- | S:写入解析后的颜色而非 theme 引用，换色板不连带改已有组件；themeStyle 最多 32 项
-official-material-descriptors.md[SE5T]: F:官方物料检查器迁移到 editorDescriptor 的 minor 变更说明 | R:code:packages/material/src/text.ts | A:- | S:分区按结构→文字→填充与描边→阴影；描述符写顶层键沿用扁平面板提交语义
-push-data-source-contracts.md[SD6T]: F:长连接数据源契约切片 1 的跨包 minor 变更说明（ADR-0104） | R:- | A:- | S:只有契约与校验，运行时订阅后续实现；fallbackIntervalSeconds 与 retain 只属 push，url-query 来源禁 push
-push-data-source-designer.md[SD5T]: F:设计器与查看器推送数据源作者面的 minor 变更说明（ADR-0104 切片 5） | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-authoring-dom.ts | A:- | S:实时推送只在来源能推送时出现；更新方式经 replace-data-sources 单条事务写回引用实例，手动写成省略字段；物料 ready+stale 时打 data-base-screen-data-stale
-push-data-source-host-kit.md[SN5T]: F:host-kit 推送订阅 helper 的 minor 变更说明（ADR-0104 切片 3） | R:- | A:createSseSubscribe / createSubscriptionHub | S:基于原生 EventSource 不自写重试；游标从 Last-Event-ID 的 epoch:revision 补齐；订阅中心最后一个订阅者离开后延迟 2000ms 关闭
-push-data-source-runtime.md[SD5T]: F:推送式数据源运行时的 renderer minor 变更说明（ADR-0104 切片 2） | R:code:packages/renderer/src/resource/data-source-runtime.ts | A:- | S:设计态不订阅只拉一次；跳号或换 epoch 进入重同步直到新快照；failed 进 error 不保留旧值；retain.rows 缺省 1000 再按 1MiB 裁剪
-refresh-catalog-grouping.md[SU3T]: F:refreshCatalog 携带物料库分组一并交换的变更说明 | R:- | A:- | S:分组按新 catalog 校验，与 catalog 同次全有或全无
-remove-contrast-guard.md[SU4T]: F:移除设计器对比度守卫的 minor 变更说明 | R:- | A:- | S:core 的对比度计算函数保留，截图探针与示例后端仍在使用
-remove-scene-switching.md[SU4T]: F:移除场景切换的破坏性 minor 变更说明（ADR-0092 §4） | R:- | A:- | S:删除 setSceneCatalog 等元素 API 与 base-screen-scene-change 事件；同屏内容切换改用从画布或蓝图显隐
-segmented-reserved-style-ai-description.md[SG5T]: F:检查器分段控件与保留样式键、AI 样式签名的 minor 变更说明 | R:code:packages/engine/src/browser/dom/descriptor/designer-descriptor-control-dom.ts | A:- | S:styleSchema 校验接受引擎级保留键 opacity/flipX/flipY，物料自行申报时仍以申报 schema 为准
-select-all-current-level.md[SU3T]: F:修复全选后删不掉组件的 patch 变更说明 | R:- | A:- | S:全选只选当前编辑层级直接成员；父子混选删除只删最上层，含锁定组件整体不删
-spacing-descriptor-control.md[SE3T]: F:描述符新增四边距 spacing 控件的 minor 变更说明 | R:- | A:- | S:四边用一个对象值承载，缺任一边或非数字校验失败关闭
-text-material-host-resource.md[SE3T]: F:官方文本物料支持读宿主资源的 minor 变更说明 | R:code:packages/material/src/text.ts | A:- | S:宿主资源选择入口仍只对图片物料开放
-theme-behavior-lifecycle.md[SG5T]: F:批2 通用视觉层、文档级主题与生命周期/定时器触发器的 minor 变更说明 | R:code:packages/contracts/src/document/theme.ts | A:- | S:主题引用 theme:<slot> 悬空时失败关闭；lifecycle.ready 只发一次，timer 间隔限 1–86400 秒且按间隔去重
 
 ===/<repository>/.github/===
 CODEOWNERS[FC2T]: F:全仓库代码所有者 | R:- | A:- | S:所有文件的 owner 为 @zhouan190
@@ -74,10 +36,10 @@ ci.yml[OV8S]: F:主干与 PR 的 CI 校验流水线 | R:- | A:verify-m0 / covera
 README.md[SG9L]: F:三端示例总览与数据接入验收说明 | R:code:examples/react-host/README.md | A:三端技术对照 / 页面流程 / REST 契约 / 数据层接入 / 在页面上配置数据大屏 / 数据绑定演示与组件工坊 / 数据源后台管理 / 验收项追溯 | S:三端功能对等，共享层清单须逐字一致并同批落地；datasetPort 有四条硬规矩；宿主告警只给分级、经推送数据源驱动组件状态，不向大屏注入样式；SQLite 数据源有安全边界
 
 ===/<repository>/examples/react-host/===
-CHANGELOG.md[SV2T]: F:React 示例前端变更日志 | R:- | A:- | S:依赖升级为主；版本跟随 base-screen 与 @base-screen/react
+CHANGELOG.md[SV2T]: F:React 示例前端变更日志 | R:- | A:- | S:版本以依赖升级为主；0.0.3 跟随 base-screen@0.3.0 与桥接包
 README.md[SG5T]: F:React 示例前端架构与运行说明 | R:code:examples/README.md | A:目录结构 / 技术选型 / 运行 / 页面路由 | S:物料样式内联，因 React 桥不传播文档全局样式进 shadow root；HashRouter 免 SPA fallback，三端路由行为对等
 index.html[EU2T]: F:React 示例 HTML 入口 | R:- | A:- | S:body 启用 bs-host；#app 以 module 加载 /src/main.tsx
-package.json[FV4T]: F:React 示例前端包清单 | R:- | A:dev/build/preview/typecheck/verify 脚本 | S:私有包，依赖 workspace 协议的 base-screen、@base-screen/react 与 plugin-materials；verify 执行 smoke.mjs
+package.json[FV4T]: F:React 示例前端包清单 | R:- | A:dev/build/preview/typecheck/verify 脚本 | S:私有包；workspace 依赖 base-screen、@base-screen/react 与 plugin-materials；verify 执行 smoke.mjs
 tsconfig.json[FC3T]: F:React 示例 TypeScript 编译配置 | R:- | A:- | S:ES2022+Bundler+react-jsx，strict 全开；noEmit 不产出
 vite.config.ts[FV4T]: F:React 示例 Vite 构建与开发配置 | R:code:examples/react-host/src/lib/api-base.ts | A:- | S:dev 把 /api 代理到 127.0.0.1:3000，生产靠运行时解析 API Base 不依赖代理；dedupe react/react-dom 避免双 dispatcher；dev 端口 5174
 
@@ -127,7 +89,7 @@ host-catalog-port.ts[IM6M]: F:宿主变量来源目录端口 | R:code:examples/r
 host-data-channel.ts[IN7M]: F:宿主数据通道 resourcePort | R:code:examples/react-host/src/lib/api.ts,code:examples/react-host/src/screen/host-alarm-controller.ts | A:resolve 投影表格 / push 实例经 SSE 订阅 / 告警汇总推送 | S:resourceType 白名单失败关闭；复用键只由资源身份与参数派生不混入会话凭证；可推送类型须与 host-resource-plugin 的 delivery.push 一致；告警 SSE 多组件共用，最后读者离开 2 秒后断开
 host-dataset-port.ts[IS6S]: F:宿主数据集端口 | R:code:examples/react-host/src/lib/api.ts | A:groups/list/describe/query 适配 / 告警行与失败快照 | S:复用官方 host-kit 辅助层处理协议校验取消与错误归一化；monitor.alarms 查询结果缓存为告警行供目录端口播报
 host-intent-reference.ts[IG4T]: F:智能体意图引用目录端口 | R:code:examples/react-host/src/lib/api.ts | A:把素材与数据集拍平成分页清单 | S:引擎带 query/limit/offset 按页回答；素材与数据集各自独立失败不连带；缺省页大小 20
-host-intent.ts[IA7L]: F:宿主智能体意图处理器 | R:code:examples/react-host/src/screen/agent-catalog.ts | A:接收提案命令 / 画布与组件补丁 / 文档诊断与目录读取 | S:目录用函数而非快照读取，在线物料发布下架后整体替换 catalog 也能取到最新；提案本身不落库，screenId 仅用于日志与素材范围
+host-intent.ts[IA7L]: F:宿主智能体意图处理器 | R:code:examples/react-host/src/screen/agent-catalog.ts | A:接收提案命令 / 画布与组件补丁 / 文档诊断与目录读取 | S:目录用函数而非快照读取；提案不落库；文本改写将 legacy static 转为 dataValue inline+dataSource=null，数据绑定组件不得改成内联值
 host-refresh-controller.ts[IR7L]: F:宿主轮询刷新控制器 | R:code:examples/react-host/src/components/screen-viewer.tsx | A:按数据源实例分组重建到期表 / 250ms 心跳刷新 / tickNow | S:只要求元素提供 document/refreshData/getVariable 便于假元素测试；hidden 期间不累积欠账恢复时只补一次全量；推送实例一律跳过轮询
 host-resource-authoring.ts[IU7L]: F:宿主资源作者面页面入口 | R:code:examples/react-host/src/screen/asset-library.ts | A:枚举资源类型与物料 / 插入替换宿主资源 / 参数配置 | S:设计器数据面板对 host-resource 只读，授权与目录归宿主；无此模块则宿主资源只能靠种子 JSON 出现，与页面内可配置目标冲突；三端逐字共享
 host-resource-plugin.ts[IE5S]: F:宿主资源类型插件声明 | R:code:examples/react-host/src/screen/host-data-channel.ts | A:声明 demo_metric/series/ranking、alarm 与 host_image 五种资源类型 | S:未声明类型渲染器直接丢弃，须与 host-data-channel 白名单一致；alarm 只带 levelScales 分级不带样式；指标类 push 静默 20 秒判过期
@@ -191,11 +153,11 @@ agent-client.ts[II7M]: F:模型调用统一入口 | R:code:examples/shared-backe
 agent-component-edit.ts[IA7M]: F:选中组件修改的编译逻辑 | R:code:examples/shared-backend/src/agent/agent.service.ts | A:组件快照与补丁 / 字段校验 | S:最多 12 组件与 48 上下文键；模型产出可编译补丁，非法结构进不来
 agent-compose.ts[IA8L]: F:智能体中间表示到 Screen Document 的目录驱动确定性编译器 | R:code:examples/shared-backend/src/agent/agent-spec.ts,code:examples/shared-backend/src/agent/agent-catalog.ts | A:按目录选物料 / 套风格预设 / 四列栅格编排 1920x1080 组件树 / 数据与素材落 dataSources | S:type 只来自目录，目录外 type 判整份 spec 失败；样式以 defaultStyle 为起点且只写物料声明过的键；颜色只取预设；表格写 dataValue inline+dataBinding 不产出 legacy dataSource
 agent-route.ts[IA8L]: F:一句话动作路由 | R:code:examples/shared-backend/src/agent/agent-client.ts | A:识别画布/组件等指令 / 匹配与解析 / 工具调用或文本兜底 | S:画布指令先确定性匹配，认不出才交模型短超时路由；action 统一经 agent.service 的 act 入口
-agent-spec.ts[IA6S]: F:智能体输出中间表示的类型定义 | R:code:examples/shared-backend/src/agent/agent-compose.ts | A:KPI / 图表 / 区块 / 整屏 Spec | S:模型只描述讲什么有哪些模块及数据形态，不直接写 Screen Document，组件树由编译器后端生成
+agent-spec.ts[IA6S]: F:智能体输出中间表示的类型定义 | R:code:examples/shared-backend/src/agent/agent-compose.ts | A:KPI / 图表 / 区块 / 整屏 Spec | S:只保留目录驱动的 blocks 形态；panels 无兼容分支；模型不直接写 Screen Document，组件树由后端编译器生成
 agent-style.ts[IA5T]: F:智能体风格预设与色板 | R:code:examples/shared-backend/src/agent/agent-compose.ts | A:四套预设 id / 色板定义 | S:模型只挑预设名，颜色全由后端决定；每套须满足 WCAG AA 正文≥4.5:1，改色板须重算对比度；视觉由宿主统一决定
 agent.controller.ts[IE5T]: F:智能体 REST 控制器 | R:code:examples/shared-backend/src/agent/agent.service.ts | A:generate/candidate/component-edit/act 四个 POST 端点 | S:挂 agent 前缀与 Swagger 标签；入参经 DTO 校验后委托 AgentService
 agent.module.ts[IE3T]: F:智能体 NestJS 模块 | R:code:examples/shared-backend/src/app.module.ts | A:- | S:导入 Assets/Screens/Datasets，提供控制器与服务
-agent.service.ts[IA9L]: F:智能体业务编排服务 | R:code:examples/shared-backend/src/agent/agent-catalog.ts | A:generate/candidate/component-edit/act 实现 / 目录与模型调用 / 落库与降级 | S:无模型或失败时返回 deterministic 模式兜底；图片素材权限按当前 screenId 在后端重新读取；模型产物经编译器后再落库
+agent.service.ts[IA9L]: F:智能体业务编排服务 | R:code:examples/shared-backend/src/agent/agent-catalog.ts | A:generate/candidate/component-edit/act 实现 / 目录与模型调用 / 落库与降级 | S:无模型或失败时返回 deterministic 模式兜底；图片素材权限按 screenId 后端重读；parseCatalogSpec 拒绝自有 panels 键（包括与 blocks 混合）；模型产物经编译器后再落库
 
 ===/<repository>/examples/shared-backend/src/agent/dto/===
 agent-act.dto.ts[IG4T]: F:统一动作入口 DTO | R:code:examples/shared-backend/src/agent/agent.controller.ts | A:- | S:字段刻意扁平不用嵌套对象，避免 forbidNonWhitelisted 下嵌套校验报错难排查；含作用域与上下文校验
@@ -338,10 +300,10 @@ llm-stub.ts[TQ6S]: F:本地 OpenAI 兼容模型桩 | R:code:examples/shared-back
 temp-dir.ts[TQ5T]: F:e2e 临时受管目录助手 | R:code:examples/shared-backend/test/datasources.e2e-spec.ts | A:建临时目录 / 带重试删除 / 等子进程退出 | S:rmSync 会撞 EBUSY 因 SQLite 子进程 SIGKILL 句柄释放异步；删除重试10次最终失败只吞不抛；目录只放受管 db 不指向 data
 
 ===/<repository>/examples/vanilla-host/===
-CHANGELOG.md[SG2T]: F:Vanilla 示例前端变更日志 | R:- | A:- | S:版本变更以依赖升级为主，0.0.2 跟随 base-screen 0.2.0
+CHANGELOG.md[SG2T]: F:Vanilla 示例前端变更日志 | R:- | A:- | S:版本以依赖升级为主；0.0.3 跟随 base-screen@0.3.0
 README.md[SG5T]: F:Vanilla 示例前端架构与运行说明 | R:code:examples/README.md | A:目录结构 / 零框架实现 / 路由与视图 | S:三端功能对等，本工程是零框架参考实现；router 用动态 import 做路由级代码分割；物料自定义元素与 manifest 跟 React/Vue 同 type/tagName
 index.html[FG2T]: F:Vanilla 示例 HTML 入口 | R:- | A:- | S:body 启用 bs-host；#app 以 module 加载 /src/main.ts
-package.json[FV4T]: F:Vanilla 示例前端包清单 | R:- | A:dev/build/preview/typecheck/verify 脚本 | S:私有包，依赖 base-screen、plugin-materials、codemirror 系列、echarts 与 zustand；verify 执行 smoke.mjs
+package.json[FV4T]: F:Vanilla 示例前端包清单 | R:- | A:dev/build/preview/typecheck/verify 脚本 | S:私有包；依赖 workspace 协议的 base-screen、plugin-materials、codemirror 系列、echarts 与 zustand；verify 执行 smoke.mjs
 tsconfig.json[FC3T]: F:Vanilla 前端 TypeScript 编译配置 | R:- | A:- | S:ES2022+Bundler 解析；strict 全开；noEmit
 vite.config.ts[FV4T]: F:Vanilla 前端 Vite 构建与开发配置 | R:code:examples/vanilla-host/src/lib/api-base.ts | A:- | S:dev 把 /api 代理到 127.0.0.1:3000，生产靠运行时解析 API Base；dev 端口 5175
 
@@ -390,7 +352,7 @@ host-catalog-port.ts[IM6M]: F:宿主变量来源目录端口（Vanilla） | R:co
 host-data-channel.ts[IN7M]: F:宿主数据通道 resourcePort（Vanilla） | R:code:examples/vanilla-host/src/lib/api.ts,code:examples/vanilla-host/src/screen/host-alarm-controller.ts | A:resolve 投影表格 / push 实例经 SSE 订阅 / 告警汇总推送 | S:resourceType 白名单失败关闭；复用键只由资源身份与参数派生不混入会话凭证；可推送类型须与 host-resource-plugin 的 delivery.push 一致；告警 SSE 多组件共用，最后读者离开 2 秒后断开
 host-dataset-port.ts[IS6S]: F:宿主数据集端口（Vanilla） | R:code:examples/vanilla-host/src/lib/api.ts | A:groups/list/describe/query 适配 / 告警快照 | S:复用官方 host-kit 辅助层处理校验取消与错误归一；monitor.alarms 结果缓存为告警行供播报
 host-intent-reference.ts[IG4T]: F:智能体意图引用目录（Vanilla） | R:code:examples/vanilla-host/src/lib/api.ts | A:把素材与数据集拍平成分页清单 | S:引擎带 query/limit/offset 按页回答；素材与数据集各自独立失败不连带；缺省页大小20
-host-intent.ts[IA7L]: F:宿主智能体意图处理器（Vanilla） | R:code:examples/vanilla-host/src/screen/agent-catalog.ts | A:接收提案命令 / 画布组件补丁 / 文档诊断 | S:目录用函数而非快照读取，在线物料发布下架后能取到最新；提案不落库 screenId 仅用于日志与素材范围
+host-intent.ts[IA7L]: F:宿主智能体意图处理器（Vanilla） | R:code:examples/vanilla-host/src/screen/agent-catalog.ts | A:接收提案命令 / 画布组件补丁 / 文档诊断 | S:目录用函数而非快照读取；提案不落库；文本改写将 legacy static 转为 dataValue inline+dataSource=null，数据绑定组件不得改成内联值
 host-refresh-controller.ts[IR7L]: F:宿主轮询刷新控制器（Vanilla） | R:code:examples/vanilla-host/src/views/screen-view.ts | A:按数据源实例分组重建到期表 / 250ms 心跳刷新 / tickNow | S:只要求元素提供 document/refreshData/getVariable 便于假元素测试；hidden 期间不累积欠账恢复时只补一次全量；推送实例一律跳过轮询
 host-resource-authoring.ts[IU7L]: F:宿主资源作者面页面入口（Vanilla） | R:code:examples/vanilla-host/src/screen/asset-library.ts | A:枚举资源类型与物料 / 插入替换宿主资源 / 参数配置 | S:设计器数据面板对 host-resource 只读，授权与目录归宿主；三端逐字共享且 vanilla 为基准
 host-resource-plugin.ts[IE5S]: F:宿主资源类型插件声明（Vanilla） | R:code:examples/vanilla-host/src/screen/host-data-channel.ts | A:声明 demo_metric/series/ranking、alarm 与 host_image 五种资源类型 | S:未声明类型渲染器直接丢弃，须与 host-data-channel 白名单一致；alarm 只带 levelScales 分级不带样式；指标类 push 静默 20 秒判过期
@@ -425,10 +387,10 @@ screen-list.ts[EU7M]: F:大屏列表视图（Vanilla） | R:code:examples/vanill
 screen-view.ts[EU7L]: F:Vanilla 大屏只读查看视图 | R:code:examples/vanilla-host/src/screen/host-runtime.ts,code:examples/vanilla-host/src/screen/host-refresh-controller.ts | A:等比缩放播放 / 端口装配与轮询 / 数据状态与告警浮条 / URL 变量播种 | S:frame 保持 canonical 像素用 transform 适配；datasetPort、hostCatalogPort 与 observer 须在 configure 内提交；在线离线按组件判定，任一组件失败即离线
 
 ===/<repository>/examples/vue-host/===
-CHANGELOG.md[SG2T]: F:Vue 示例前端变更日志 | R:- | A:- | S:版本变更以依赖升级为主，0.0.2 跟随 base-screen 0.2.0
+CHANGELOG.md[SG2T]: F:Vue 示例前端变更日志 | R:- | A:- | S:版本以依赖升级为主；0.0.3 跟随 base-screen@0.3.0 与 Vue 桥
 README.md[SG6T]: F:Vue 示例前端架构与运行说明 | R:code:examples/README.md | A:目录结构 / tarball 外部消费者 / 三端对等 | S:同时是 verify:tarball 载体，CI 复制到仓库外换真实 tarball 验证从发布物消费 ABI
 index.html[FG2T]: F:Vue 示例 HTML 入口 | R:code:examples/vue-host/src/main.ts | A:zh-CN 页面元数据 / #app 挂载点 / module 脚本入口 | S:body.bs-host 启用宿主别名；#app 由 /src/main.ts 挂载
-package.json[FV4T]: F:Vue 示例前端包清单 | R:- | A:dev/build/preview/typecheck/verify 脚本 | S:私有包依赖 Vue3 与 @base-screen/vue；typecheck 用 vue-tsc；verify 执行 smoke.mjs
+package.json[FV4T]: F:Vue 示例前端包清单 | R:- | A:dev/build/preview/typecheck/verify 脚本 | S:私有包；workspace 依赖 Vue3、base-screen、@base-screen/vue 与 plugin-materials；typecheck 用 vue-tsc；verify 执行 smoke.mjs
 tsconfig.json[FC3T]: F:Vue 前端 TypeScript 编译配置 | R:- | A:- | S:ES2022+Bundler+noEmit，strict 全开；include 含 vue 文件
 vite.config.ts[FV4T]: F:Vue 前端 Vite 构建与开发配置 | R:code:examples/vue-host/src/lib/api-base.ts | A:- | S:vue 插件把 base-screen-/host-app- 前缀当自定义元素不走组件编译；dev 代理 /api 到 3000
 
@@ -483,7 +445,7 @@ host-catalog-port.ts[IM6M]: F:宿主变量来源目录端口（Vue） | R:code:e
 host-data-channel.ts[IN7M]: F:宿主数据通道 resourcePort（Vue） | R:code:examples/vue-host/src/lib/api.ts,code:examples/vue-host/src/screen/host-alarm-controller.ts | A:resolve 投影表格 / push 实例经 SSE 订阅 / 告警汇总推送 | S:resourceType 白名单失败关闭；复用键只由资源身份与参数派生不混入会话凭证；可推送类型须与 host-resource-plugin 的 delivery.push 一致；告警 SSE 多组件共用，最后读者离开 2 秒后断开
 host-dataset-port.ts[IS6S]: F:宿主数据集端口（Vue） | R:code:examples/vue-host/src/lib/api.ts | A:groups/list/describe/query 适配 / 告警快照 | S:复用官方 host-kit 辅助层处理校验取消与错误归一；monitor.alarms 结果缓存为告警行供播报
 host-intent-reference.ts[IG4T]: F:智能体意图引用目录（Vue） | R:code:examples/vue-host/src/lib/api.ts | A:把素材与数据集拍平成分页清单 | S:引擎带 query/limit/offset 按页回答；素材与数据集各自独立失败不连带；缺省页大小20
-host-intent.ts[IA7L]: F:宿主智能体意图处理器（Vue） | R:code:examples/vue-host/src/screen/agent-catalog.ts | A:接收提案命令 / 画布组件补丁 / 文档诊断 | S:目录用函数而非快照读取，在线物料发布下架后能取到最新；提案不落库 screenId 仅用于日志与素材范围
+host-intent.ts[IA7L]: F:宿主智能体意图处理器（Vue） | R:code:examples/vue-host/src/screen/agent-catalog.ts | A:接收提案命令 / 画布组件补丁 / 文档诊断 | S:目录用函数而非快照读取；提案不落库；文本改写将 legacy static 转为 dataValue inline+dataSource=null，数据绑定组件不得改成内联值
 host-refresh-controller.ts[IR7L]: F:宿主轮询刷新控制器（Vue） | R:code:examples/vue-host/src/components/ScreenViewer.vue | A:按数据源实例分组重建到期表 / 250ms 心跳刷新 / tickNow | S:只要求元素提供 document/refreshData/getVariable 便于假元素测试；hidden 期间不累积欠账恢复时只补一次全量；推送实例一律跳过轮询
 host-resource-authoring.ts[IU7L]: F:宿主资源作者面页面入口（Vue） | R:code:examples/vue-host/src/screen/asset-library.ts | A:枚举资源类型与物料 / 插入替换宿主资源 / 参数配置 | S:设计器数据面板对 host-resource 只读，授权与目录归宿主；三端逐字共享且 vanilla 为基准
 host-resource-plugin.ts[IE5S]: F:宿主资源类型插件声明（Vue） | R:code:examples/vue-host/src/screen/host-data-channel.ts | A:声明 demo_metric/series/ranking、alarm 与 host_image 五种资源类型 | S:未声明类型渲染器直接丢弃，须与 host-data-channel 白名单一致；alarm 只带 levelScales 分级不带样式；指标类 push 静默 20 秒判过期
@@ -506,32 +468,32 @@ layout.css[FU6M]: F:Vue 宿主外壳、嵌入舞台与查看器布局 | R:code:e
 online-materials.css[FU6M]: F:Vue 在线物料浮层与编辑对话框样式 | R:code:examples/vue-host/src/styles/base.css,code:examples/vue-host/src/screen/component-workshop.ts | A:双栏物料列表与编辑区 / 表单与预览 / 状态错误提示 / 窄屏单栏 | S:对话框以 auto/minmax(0,1fr) 网格约束滚动区；列表与编辑区预留 scrollbar-gutter；窄屏列表限高 180px，表单降两列
 
 ===/<repository>/packages/base-screen/===
-CHANGELOG.md[SG7T]: F:base-screen 包变更日志 | R:code:packages/base-screen/README.md | A:0.2.0 变更 / 迁移说明 | S:移除 react/vue 子路径消除包图环，改直接依赖独立桥接包；设计器改首帧骨架加分帧水合；入口按作者面拆异步 chunk
+CHANGELOG.md[SG7T]: F:base-screen 包变更日志 | R:code:packages/base-screen/README.md | A:0.2.0 与 0.3.0 变更 / 迁移说明 | S:0.3.0 记录蓝图节点图、组件状态与组合分片等破坏性及增量变更；发布说明不替代对应 ADR
 README.md[SG8S]: F:base-screen 单包分发说明 | R:code:packages/base-screen/CHANGELOG.md | A:安装 / 子路径表 / 框架组件 | S:Viewer/Designer/物料/插件装进一个包按子路径引入；内部实现全内联宿主无需装 @base-screen/* 内部包；浏览器以 Web Components 对外
-package.json[FV5S]: F:base-screen 包清单 | R:code:packages/base-screen/README.md | A:子路径导出 / 构建脚本 / 依赖 | S:单包分发导出各子路径；内部实现全内联不依赖 @base-screen/* 内部包；build 生成 API 报告
+package.json[FV5S]: F:base-screen 单包发布清单 | R:code:packages/base-screen/README.md,code:packages/base-screen/src/index.ts | A:子路径导出 / 构建与检查脚本 / 运行时与可选 peer 依赖 | S:仅发布 dist；运行时只依赖 zod，内部包仅列为 devDependencies 并在构建期内联；自动注册入口与 host-tokens.css 声明 sideEffects，不可误 Tree-shake
 tsconfig.api.json[FC2T]: F:API 报告生成 tsconfig | R:code:packages/base-screen/tsconfig.json | A:- | S:供 API Extractor 生成各子路径报告使用
 tsconfig.build.json[FC2T]: F:base-screen 构建 tsconfig | R:code:packages/base-screen/tsconfig.json | A:- | S:继承基础配置并排除测试与 API 报告
 tsconfig.json[FC3T]: F:base-screen TypeScript 编译配置 | R:- | A:- | S:ES 模块与严格检查配置，供源码与 API 生成共用
 vite.config.ts[FV4T]: F:base-screen Vite 构建配置 | R:code:packages/base-screen/package.json | A:- | S:库模式构建各子路径入口，内联内部实现产出单包
 
 ===/<repository>/packages/base-screen/etc/===
-base-screen--auto-register.api.md[FS9L]: F:auto-register 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:运行时采纳 / 蓝图画布协议与事件常量 / 设计器与查看器标签名 / 组合层运行时类型 | S:API Extractor 自动生成勿手改；与主入口 base-screen.api.md 同内容；用于 API 变更门禁
-base-screen--contracts.api.md[FS9L]: F:contracts 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:文档解析与诊断 / 蓝图节点图与从画布类型 / 组件状态求值 / 主题色位 / 推送 delivery 校验 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
-base-screen--core.api.md[FS9L]: F:core 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:文档命令与事务 / 历史 / 几何 / 蓝图运行时与组件状态、画布显隐轨迹 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
-base-screen--designer-auto-register.api.md[FS9L]: F:designer-auto-register 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:设计器元素注册与挂载 / 存为组合事件详情 / 物料库分片解析 | S:API Extractor 自动生成勿手改；与 designer 报告同内容；用于 API 变更门禁
-base-screen--designer.api.md[FS9L]: F:designer 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:设计器组件与挂载控制器 / 存为组合事件详情 / 物料库分片解析 | S:API Extractor 自动生成勿手改；与 designer-auto-register 报告同内容；用于 API 变更门禁
-base-screen--engine.api.md[FS9L]: F:engine 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:设计器会话与画布交互 / 检查器编排 / 组合分片插入与存为组合契约 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
-base-screen--host-kit.api.md[FS9L]: F:host-kit 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:REST 项目适配器 / 数据集端口 / SSE 订阅与订阅中心 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
-base-screen--material-auto-register.api.md[FS9L]: F:material-auto-register 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:八种官方物料 define 函数 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
-base-screen--material.api.md[FS9L]: F:material 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:官方物料 manifest 与元素类 / 表格适配器 / 加载容器 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
-base-screen--plugin-core.api.md[FS9L]: F:plugin-core 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:插件与物料核心契约 / 组合分片定义与插入意图 / fragment 贡献 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
-base-screen--plugin-manager.api.md[FS9L]: F:plugin-manager 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:插件管理器工厂与快照 / 贡献命令端口 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
-base-screen--plugin-sdk.api.md[FS9L]: F:plugin-sdk 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:物料与插件定义 / 物料规格编译与体检 / 分片定义 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
-base-screen--plugins.api.md[FS9L]: F:plugins 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:插件相关导出合集 / 物料规格与体检 / 分片定义 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
-base-screen--renderer.api.md[FS9L]: F:renderer 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:渲染器工厂 / 查看器元素与配置 / 画布切换与组件状态变化事件类型 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
-base-screen--viewer-auto-register.api.md[FS9L]: F:viewer-auto-register 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:只读查看器注册 / 查看器运行时与挂载选项 | S:API Extractor 自动生成勿手改；与 viewer 报告同内容；用于 API 变更门禁
-base-screen--viewer.api.md[FS9L]: F:viewer 子路径公共 API 报告 | R:code:packages/base-screen/README.md | A:只读查看器组合层 / 查看器运行时与挂载选项 | S:API Extractor 自动生成勿手改；与 viewer-auto-register 报告同内容；用于 API 变更门禁
-base-screen.api.md[FS9L]: F:base-screen 主入口公共 API 报告 | R:code:packages/base-screen/README.md | A:组合层运行时 / 蓝图画布协议与事件常量 / 标签名 | S:API Extractor 自动生成勿手改；与 auto-register 报告同内容；用于 API 变更门禁
+base-screen--auto-register.api.md[SV9L]: F:auto-register 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/auto-register.ts,code:tooling/build/api-reports.mjs | A:组合运行时与 Designer/Viewer 元素注册 / 挂载控制器与运行时配置 / 蓝图画布协议、能力插件与事件常量 / 左侧面板、物料库与宿主资源选择桥 / 作者请求与项目状态类型 | S:API Extractor 从内联后的 dist 声明生成，勿手改；与主入口 base-screen.api.md 字节相同；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--contracts.api.md[SV9L]: F:contracts 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/contracts.ts,code:tooling/build/api-reports.mjs | A:Screen Document 严格解析、诊断、迁移与序列化 / JSON Schema 与有界 JSON、作者请求校验 / 数据源、变量、数据集与宿主资源契约 / Blueprint 节点图、规则派生与运行时端口 / 组件状态、画布、主题色位与推送 delivery | S:API Extractor 从内联后的 dist 声明生成并收录 forgotten exports，勿手改；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--core.api.md[SV9L]: F:core 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/core.ts,code:tooling/build/api-reports.mjs | A:文档命令、事务与差异 / 历史撤销重做与回滚 / 几何、命中测试、视口和交互归约 / Blueprint 编译、事件分发与追踪 / 值引用求值、数据依赖与颜色可读性 | S:API Extractor 从内联后的 dist 声明生成，勿手改；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--designer-auto-register.api.md[SV9L]: F:designer-auto-register 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/designer-auto-register.ts,code:tooling/build/api-reports.mjs | A:设计器元素定义与骨架挂载 / 画布和 Blueprint 工作台配置、事件与命令 / 项目生命周期与变更提案 / 物料库分片、状态和刷新契约 / 组合分片插入与存为组合事件 / 左侧面板和宿主资源选择桥 | S:API Extractor 从内联后的 dist 声明生成，勿手改；与 designer.api.md 字节相同；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--designer.api.md[SV9L]: F:designer 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/designer.ts,code:tooling/build/api-reports.mjs | A:设计器元素定义与骨架挂载 / 画布和 Blueprint 工作台配置、事件与命令 / 项目生命周期与变更提案 / 物料库分片、状态和刷新契约 / 组合分片插入与存为组合事件 / 左侧面板和宿主资源选择桥 | S:API Extractor 从内联后的 dist 声明生成，勿手改；与 designer-auto-register.api.md 字节相同；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--engine.api.md[SV9L]: F:engine 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/engine.ts,code:tooling/build/api-reports.mjs | A:设计器会话、选择与画布交互 / 检查器编排与物料库状态、分片 / 项目加载、保存、发布、快照与冲突恢复 / 组合分片插入和存为组合契约 / 智能体意图、变更提案与显示指标 / 蓝图画布协议和宿主资源桥 | S:API Extractor 从内联后的 dist 声明生成，勿手改；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--host-kit.api.md[SV9L]: F:host-kit 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/host-kit.ts,code:tooling/build/api-reports.mjs | A:HTTP 项目适配器与可配置请求映射 / REST 数据集端口及操作观察 / SSE 订阅、游标快照与共享订阅中心 / 中止信号和宿主资源执行上下文适配 / 项目迁移回调与错误结果类型 | S:API Extractor 从内联后的 dist 声明生成，勿手改；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--material-auto-register.api.md[SV9L]: F:material-auto-register 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/material-auto-register.ts,code:tooling/build/api-reports.mjs | A:图表、容器、椭圆、图片、矩形、分隔线、表格和文本物料的 define 工厂 / 以 ScreenParseResult 返回物料目录项 | S:API Extractor 从内联后的 dist 声明生成，勿手改；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--material.api.md[SV9L]: F:material 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/material.ts,code:tooling/build/api-reports.mjs | A:八种官方物料 manifest 与 Custom Element 类 / define 工厂和官方类型常量 / 图表、表格、文本的表格数据适配器 / 加载与错误状态视图 / 物料模型、编辑器描述符和主题状态类型 | S:API Extractor 从内联后的 dist 声明生成，勿手改；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--plugin-core.api.md[SV9L]: F:plugin-core 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/plugin-core.ts,code:tooling/build/api-reports.mjs | A:物料 manifest、模型、目录与 schema / JSON-safe 检查器描述符及控件推导 / 插件清单、生命周期、面板与贡献目录 / 命令、Blueprint 动作和数据处理端口 / 组合分片定义与插入意图 / 图表、表格数据契约与主题默认样式 | S:API Extractor 从内联后的 dist 声明生成，勿手改；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--plugin-manager.api.md[SV9L]: F:plugin-manager 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/plugin-manager.ts,code:tooling/build/api-reports.mjs | A:插件管理器工厂与选项 / 生命周期状态与快照 / 自定义元素注册端口 / 管理器贡献命令端口 | S:API Extractor 从内联后的 dist 声明生成并收录 forgotten exports，勿手改；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--plugin-sdk.api.md[SV9L]: F:plugin-sdk 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/plugin-sdk.ts,code:tooling/build/api-reports.mjs | A:物料规格解析、编译与审计 / 规格渲染函数、元素骨架与 presenter / 物料和插件包、注册与组合分片定义 / 检查器描述符、配置组与数字格式 / 加载、空态和错误视图 / 样式键词典与表格数据适配 | S:API Extractor 从内联后的 dist 声明生成，勿手改；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--plugins.api.md[SV9L]: F:plugins 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/plugins.ts,code:tooling/build/api-reports.mjs | A:plugin-core、plugin-manager 与 plugin-sdk 导出合集 / 物料规格编译、渲染和审计 / 插件包、注册与贡献命令端口 / Blueprint 能力插件 / 检查器描述符、配置组与组合分片 | S:API Extractor 从内联后的 dist 声明生成，勿手改；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--renderer.api.md[SV9L]: F:renderer 子路径公共 API 黄金报告 | R:code:packages/base-screen/src/renderer.ts,code:tooling/build/api-reports.mjs | A:渲染器工厂和运行时配置 / Viewer 元素、文档和目录刷新 / 数据源准备、变量和值引用读取 / Blueprint 状态与画布可见性效果 / 画布切换、页面变化和组件状态事件 / 交互、失败策略与资源执行上下文 | S:API Extractor 从内联后的 dist 声明生成，勿手改；check:api 拒绝报告漂移，CI 要求报告变更有 Changesets
+base-screen--viewer-auto-register.api.md[FS9L]: F:viewer 自动注册子路径公共 API 报告 | R:code:packages/base-screen/src/viewer-auto-register.ts,code:packages/base-screen/README.md | A:查看器元素与轻量运行时 / 物料目录与宿主端口 / 页面导航与组件状态 / 诊断错误码 | S:API Extractor 按 exports 生成勿手改；与 viewer 报告同内容；check:api 校验，api:report 统一重生成
+base-screen--viewer.api.md[FS9L]: F:viewer 子路径公共 API 报告 | R:code:packages/base-screen/src/viewer.ts,code:packages/base-screen/README.md | A:查看器元素与轻量运行时 / 物料目录与宿主端口 / 页面导航与组件状态 / 诊断错误码 | S:API Extractor 按 exports 生成勿手改；与 viewer-auto-register 报告同内容；check:api 校验，api:report 统一重生成
+base-screen.api.md[FS9L]: F:base-screen 主入口公共 API 报告 | R:code:packages/base-screen/src/index.ts,code:packages/base-screen/README.md | A:完整运行时与 Designer/Viewer / 物料插件与宿主套件 / 蓝图画布协议与事件 / 变更提案与诊断错误码 | S:API Extractor 从内联后的声明生成勿手改；主入口面宽于 viewer；check:api 校验，api:report 统一重生成
 
 ===/<repository>/packages/base-screen/src/===
 auto-register.ts[FG1T]: F:auto-register 子路径再导出 | R:code:packages/base-screen/src/index.ts | A:- | S:单行 re-export @base-screen/sdk/auto-register
@@ -553,14 +515,14 @@ viewer-auto-register.ts[FG1T]: F:viewer-auto-register 子路径再导出 | R:cod
 viewer.ts[FG1T]: F:viewer 子路径再导出 | R:code:packages/base-screen/src/index.ts | A:- | S:单行 re-export @base-screen/sdk/viewer
 
 ===/<repository>/packages/contracts/===
-CHANGELOG.md[SG6M]: F:contracts 包变更日志 | R:code:packages/contracts/package.json | A:各版本 API 变更与迁移说明 | S:记录 dataset/document 契约与诊断的破坏性与新增变更
-package.json[FV5T]: F:contracts 包清单 | R:code:packages/contracts/CHANGELOG.md | A:导出 / 构建脚本 / 依赖 | S:提供 zod 严格解析的文档与宿主契约；仅 ESM 单包分发
+CHANGELOG.md[SG6M]: F:contracts 包变更日志 | R:code:packages/contracts/package.json,code:packages/contracts/etc/contracts.api.md | A:文档与数据契约 / 蓝图与组件状态 / 宿主端口 / 诊断及迁移变更 | S:日志含已被后续版本取代或删除的设计，不能当作当前 API 清单；当前行为以源码、解析器与 API 报告为准
+package.json[FV5T]: F:contracts 内部包清单 | R:code:packages/contracts/CHANGELOG.md,code:packages/contracts/src/index.ts | A:主入口与 JSON Schema 导出 / 构建测试脚本 / zod 依赖 | S:private 包不单独发布，产物仅 dist 且无副作用；build 同时写出黄金 screen-document.schema.json，不得只改类型或运行时
 tsconfig.build.json[FC2T]: F:contracts 构建 tsconfig | R:code:packages/contracts/tsconfig.json | A:- | S:继承基础配置排除测试
 tsconfig.json[FC3T]: F:contracts TypeScript 编译配置 | R:- | A:- | S:ESM 模块与严格检查配置
 vitest.config.ts[FG3T]: F:contracts 测试配置 | R:code:packages/contracts/tsconfig.json | A:- | S:配置契约包单元测试运行环境
 
 ===/<repository>/packages/contracts/etc/===
-contracts.api.md[FS9L]: F:contracts 包公共 API 报告 | R:code:packages/contracts/src/index.ts | A:文档解析诊断与序列化 / 蓝图节点图与派生规则 / 从画布 / 组件状态 / 主题色位 / 推送契约与宿主端口 | S:API Extractor 自动生成勿手改；用于 API 变更门禁
+contracts.api.md[FS9L]: F:contracts 包公共 API 报告 | R:code:packages/contracts/src/index.ts,code:packages/contracts/src/types/diagnostics.ts | A:严格文档解析诊断与序列化 / 数据源实例与取值引用 / 蓝图节点图 / 组件状态与主题 / 宿主端口及上限 | S:API Extractor 生成勿手改；check:api 校验；报告不替代黄金 JSON Schema，契约变更须同步解析、schema、测试与迁移
 
 ===/<repository>/packages/contracts/src/dataset/===
 constants.ts[FG3T]: F:数据集有界常量 | R:code:packages/contracts/src/dataset/parse.ts | A:- | S:字段≤256、行≤10000、字节≤1MiB、分页≤50 与单位格式长度上限
@@ -626,7 +588,7 @@ migrate-document.ts[IG9L]: F:文档迁移引擎 | R:code:packages/contracts/src/
 authoring.ts[FG7M]: F:作者面请求类型与常量 | R:code:packages/contracts/src/types/json.ts | A:ScreenAuthoringRequest / 事件与体积上限 | S:定义 component-text 作者请求形状与请求源字节深度上限；供智能体作者协议
 dataset-port.ts[FG6T]: F:宿主数据集端口类型 | R:code:packages/contracts/src/types/dataset.ts | A:ScreenHostDatasetPort 及描述查询类型 | S:定义宿主数据集 list/describe/query 端口契约与不透明发布身份
 dataset.ts[FG4T]: F:数据集领域类型 | R:code:packages/contracts/src/types/dataset-port.ts | A:字段/行/表格数据集类型 | S:值类型为 string/number/boolean/date；表格数据集含字段行与总数
-diagnostics.ts[FG7S]: F:诊断与解析结果类型 | R:code:packages/contracts/src/types/json.ts | A:ScreenDiagnostic / ScreenParseResult / 错误码联合 | S:诊断含 severity/code/path/message；解析结果为 ok 数据或诊断集合
+diagnostics.ts[FG7S]: F:文档诊断与解析结果类型 | R:code:packages/contracts/src/types/document.ts,code:packages/contracts/src/types/json.ts | A:严重级别与路径 / 封闭错误码联合 / 诊断结构 / 成功值或失败诊断集合 | S:新增 CHANGE_* 五项专供变更提案流程；扩大错误码联合须同步产生与消费分支及 API 报告；成功解析也保留 diagnostics 数组
 document.ts[FG9L]: F:canonical 文档类型定义 | R:code:packages/contracts/src/document/schema.ts | A:画布/组件与组件状态/数据源与刷新策略/变量/蓝图节点图与派生规则/从画布/主题全类型 | S:取值引用是全文档唯一接值表述，变量值不得为 variable 别名链；auto 必带 intervalSeconds，push 专属 fallback 与 retain，retain 的 seconds 与 timeField 成对
 envelope.ts[FG5T]: F:项目信封类型 | R:code:packages/contracts/src/types/document.ts | A:ScreenProjectEnvelope | S:信封含 projectId/revision/name/description 与内部文档
 execution.ts[FG5T]: F:资源执行上下文与观察事件类型 | R:code:packages/contracts/src/types/push.ts | A:执行模式与触发 / 观察事件 | S:上下文绝不写入文档；观察事件不携带参数值载荷或敏感消息；观察者异常须被隔离；push 触发表示 invalidate 引发的重解析
@@ -639,8 +601,8 @@ variable.ts[FG5T]: F:宿主来源目录类型 | R:code:packages/contracts/src/ty
 parse.ts[FG7M]: F:宿主来源目录解析 | R:code:packages/contracts/src/json/parse.ts,code:packages/contracts/src/push/delivery.ts | A:解析目录项详情与分页 / 参数定义 | S:目录条目与参数值有界拒控制字符；页项≤50、总字节≤256KiB；delivery 与 levelScales 复用 push 下的共享校验
 
 ===/<repository>/packages/core/===
-CHANGELOG.md[SG6M]: F:core 包变更日志 | R:code:packages/core/package.json | A:数据边界与全局变量变更记录 | S:记录数据集端口与参数权威、全局变量作者化、宿主资源作者 intent 三项整合变更
-package.json[FV5T]: F:core 包清单 | R:code:packages/core/CHANGELOG.md | A:导出 / 构建脚本 / 依赖 | S:提供文档命令事务历史与蓝图运行时；供 sdk 聚合
+CHANGELOG.md[SG6M]: F:core 包变更日志 | R:code:packages/core/package.json,code:packages/core/etc/core.api.md | A:文档命令事务与历史 / 数据源实例 / 蓝图运行时 / 差异计算变更 | S:日志保留已被节点图等新形态取代的历史设计，不能当作当前契约；当前行为以源码与 API 报告为准
+package.json[FV5T]: F:core 内部包清单 | R:code:packages/core/CHANGELOG.md,code:packages/core/src/index.ts | A:公共入口 / 构建测试脚本 / contracts 工作区依赖 | S:private 无副作用包，仅发布 dist；运行时只依赖 contracts，发布时随 base-screen 内联，不进入宿主运行时依赖
 tsconfig.build.json[FC2T]: F:core 构建 tsconfig | R:code:packages/core/tsconfig.json | A:- | S:继承基础配置排除测试
 tsconfig.json[FC3T]: F:core TypeScript 编译配置 | R:- | A:- | S:ESM 模块与严格检查配置
 
@@ -670,7 +632,7 @@ host-dataset.ts[FG2T]: F:宿主取值旧入口再导出 | R:code:packages/core/s
 value-ref.ts[IA8M]: F:取值求值与字段映射校验 | R:code:packages/core/src/json/path-update.ts | A:宿主资源参数求值/绑定校验/变量依赖提取 | S:字段映射角色有 min/max 约束；参数值有界；变量依赖供失效刷新
 
 ===/<repository>/packages/core/src/diff/===
-screen-diff.ts[IG6S]: F:文档差异计算 | R:code:packages/contracts/src/types/document.ts | A:diffScreenDocuments 逐组件属性差异 | S:工具面与设计器共用一份实现；值稳定 JSON 后超 80 字截断；新增删除组件无属性行
+screen-diff.ts[IG6S]: F:文档组件差异计算 | R:code:packages/contracts/src/types/document.ts,code:packages/engine/src/common/operations/change/designer-change-proposal.ts | A:按组件 id 对齐增删改 / 几何、状态、数据绑定与画布归属差异 / 稳定 JSON 前后值 | S:只比较 components，不覆盖画布、蓝图或数据源；props/style 仅顶层键，嵌套对象整体比较；undefined 归为 null，值超 80 字截断，新增删除组件无属性行
 
 ===/<repository>/packages/core/src/geometry/===
 alignment.ts[IG6S]: F:组件对齐计算 | R:code:packages/core/src/geometry/component-bounds.ts | A:calculateScreenAlignment | S:按轴与 start/center/end 模式算位移；跳过隐藏与锁定组件
@@ -711,9 +673,9 @@ invariant-error.ts[FG3T]: F:不变量错误类型 | R:code:packages/core/src/int
 validate-semantics.ts[FG8T]: F:Core 语义不变量校验 | R:code:packages/core/src/geometry/bounds.ts | A:validateCoreSemantics | S:契约负责结构与资源上限，Core 校验祖先深度≤256 等额外领域不变量
 
 ===/<repository>/packages/engine/===
-CHANGELOG.md[SG7L]: F:engine 包变更日志 | R:code:packages/engine/package.json | A:设计器会话与画布交互变更 | S:记录引擎会话画布交互检查器编排相关的破坏性与新增变更
+CHANGELOG.md[SG7L]: F:engine 包变更日志 | R:code:packages/engine/package.json,code:packages/engine/etc/engine.api.md | A:设计器会话与画布 / 数据源作者面 / 检查器与工作台 / 蓝图及插件编排变更 | S:日志含已删除的场景、对比度守卫与旧条件样式等历史能力，不能当作当前 API 或行为清单；以源码、测试与 API 报告为准
 README.md[SG4T]: F:engine 包说明 | R:code:packages/engine/package.json | A:- | S:说明引擎包职责与设计器会话编排定位
-package.json[FV5T]: F:engine 包清单 | R:code:packages/engine/CHANGELOG.md | A:导出 / 构建脚本 / 依赖 | S:提供设计器会话画布交互与检查器编排；供 sdk 聚合
+package.json[FV5T]: F:engine 内部包清单 | R:code:packages/engine/CHANGELOG.md,code:packages/engine/src/index.ts | A:主入口与宿主令牌导出 / 构建检查脚本 / contracts、core、plugin-core、renderer 依赖 | S:private 包；host-tokens.css 是唯一 sideEffects；build 清理 vendor JS 并生成宿主令牌，发布时内联进 base-screen
 tsconfig.build.json[FO4T]: F:引擎构建期声明输出的编译配置 | R:code:packages/engine/tsconfig.json | A:- | S:继承基础配置，仅输出声明与 sourceMap，排除测试夹具与 vendor 目录
 tsconfig.json[FO4T]: F:引擎的类型检查编译配置 | R:code:packages/engine/tsconfig.build.json | A:- | S:包级编译选项基线，构建配置在其上追加声明输出
 tsconfig.vendor.json[FO4T]: F:引擎 vendor 代码的独立编译配置 | R:code:packages/engine/tsconfig.json | A:- | S:为内置 moveable 裁剪代码提供与主源码隔离的类型检查范围
@@ -734,27 +696,27 @@ designer-blueprint-workbench-panel.ts[IE7L]: F:蓝图工作台面板编排 | R:c
 
 ===/<repository>/packages/engine/src/browser/controllers/dataset/===
 designer-data-flow-scroll-sync.ts[IG5S]: F:数据流面板滚动同步 | R:code:packages/engine/src/browser/controllers/dataset/designer-dataset-controller.ts | A:- | S:同步数据面板多区域滚动位置
-designer-data-source-authoring.ts[IE8L]: F:数据源作者化纯逻辑 | R:code:packages/contracts/src/document/read-data-value.ts | A:读取作者化来源 / 草稿创建与参数映射 / 字段自动匹配 / 各模式数据源事务 | S:新形态只在此翻译成旧形状供草稿用，写回须走 createDatasetBindingTransaction；取值引用⇄旧参数唯一映射点，表达不了的引用返回 undefined 须报 HOST_DATASET_PARAMETER_INVALID
+designer-data-source-authoring.ts[IE8L]: F:数据源作者化投影与事务构建 | R:code:packages/contracts/src/document/read-data-value.ts,code:packages/engine/src/browser/controllers/dataset/designer-dataset-draft-controller.ts,code:packages/engine/src/browser/controllers/dataset/designer-update-policy-authoring.ts | A:dataset 与 host-resource 实例读取 / 草稿与字段匹配 / 参数引用转换 / 共享实例绑定清理 / 静态与变量事务 | S:新形态只投影为 legacy 草稿，写回走 createDatasetBindingTransaction；引用与旧参数仅 inline/variable 互转，其余须报 HOST_DATASET_PARAMETER_INVALID；复用实例不覆盖更新策略，旧实例仅在被组件与变量弃用时删除
 designer-dataset-catalog-controller.ts[IE7M]: F:数据集目录控制器 | R:code:packages/engine/src/browser/controllers/dataset/designer-dataset-controller.ts | A:- | S:加载与筛选数据集目录并驱动选择
 designer-dataset-controller-context.ts[FG6M]: F:数据集控制器状态与上下文 | R:code:packages/engine/src/browser/controllers/dataset/designer-dataset-controller.ts | A:回调契约 / 控制器状态 / 作者化视图初值 | S:防抖自动应用在结构重绘时须清掉；展开组只在结构重绘时重置；更新方式初值按实例 updatePolicy 如实回显含 push
 designer-dataset-controller.ts[IE7S]: F:数据集面板主控制器 | R:code:packages/engine/src/browser/controllers/dataset/designer-dataset-draft-controller.ts | A:目录/草稿/事件/点击分派 | S:组合目录草稿事件与滚动同步各子控制器统一数据面板交互
-designer-dataset-draft-controller.ts[IE8L]: F:数据集草稿控制器 | R:code:packages/engine/src/browser/controllers/dataset/designer-data-source-authoring.ts,code:packages/engine/src/browser/controllers/dataset/designer-update-policy-authoring.ts | A:模式切换与描述 / 实例选择 / 草稿应用与焦点同步 / 绑定与参数编辑 / 更新方式写回 | S:300ms 防抖且有必填参数未填不提交；只在用户主动选数据集时自动落库，首屏描述不得偷改文档；无目录端口也不得把 dataset 谎报成 host-resource
+designer-dataset-draft-controller.ts[IE8L]: F:数据集草稿与作者面控制器 | R:code:packages/engine/src/browser/controllers/dataset/designer-data-source-authoring.ts,code:packages/engine/src/browser/controllers/dataset/designer-dataset-surface-controller.ts,code:packages/engine/src/browser/controllers/dataset/designer-update-policy-authoring.ts | A:模式与实例选择 / 描述和自动应用 / 参数映射编辑 / 焦点与草稿同步 / 更新方式写回 | S:300ms 防抖且必填参数未填不提交；仅主动选数据集时自动落库；无目录端口只禁 dataset 选项，已有 dataset 仍如实显示；会话提交保留草稿，文档策略变化才回灌；inline 与 readOnly 实例不写文档
 designer-dataset-effective-value.ts[IG4T]: F:数据集有效值计算 | R:code:packages/engine/src/browser/controllers/dataset/designer-dataset-controller.ts | A:- | S:按参数与变量求组件当前有效数据值
 designer-dataset-events.ts[IE8L]: F:数据集面板事件处理 | R:code:packages/engine/src/browser/controllers/dataset/designer-dataset-draft-controller.ts | A:输入 / 点击 / 变更 / 键盘 / 来源浮层 / 工作台 | S:固定值编辑与变量搜索就地更新不整块重绘以保焦点与 IME；打开取值或绑定浮层时取消待触发的自动应用；芯片删除须先于触发器分支裁决
 designer-dataset-instance-view.ts[IG4T]: F:组件引用实例的只读视图 | R:code:packages/contracts/src/document/read-data-value.ts | A:readDesignerDataSourceInstanceView / 同数据集实例 | S:实例级字段只读的唯一判据；pending 与 missing 必须分开；存在性只读文档，禁止用 describe 判断
 designer-dataset-panel-controller.ts[IE7M]: F:数据集面板控制器 | R:code:packages/engine/src/browser/controllers/dataset/designer-dataset-controller.ts | A:- | S:数据面板 DOM 渲染与交互绑定
 designer-dataset-preview-controller.ts[IE7M]: F:数据集预览控制器 | R:code:packages/engine/src/browser/controllers/dataset/designer-dataset-controller.ts | A:- | S:预览数据集查询结果与字段映射
-designer-dataset-surface-controller.ts[IE8L]: F:数据面板表面渲染与段协调 | R:code:packages/engine/src/browser/controllers/dataset/designer-dataset-controller-context.ts | A:表面与工作台渲染 / 主操作条 / 目录结果 / 推送能力读取 / 焦点恢复 | S:固定值与变量编辑只改状态不整块重绘；首次渲染须补内容键否则首次 patch 全段重建；检查器与工作台不能共用内容键
+designer-dataset-surface-controller.ts[IE8L]: F:数据面板表面渲染、段级协调与宿主资源作者面 | R:code:packages/engine/src/browser/controllers/dataset/designer-dataset-controller-context.ts,code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts,code:packages/engine/src/browser/dom/dataset/designer-data-section-diff.ts | A:检查器与工作台渲染 / 段级 diff 与焦点恢复 / 目录结果就地刷新 / 七态与推送能力派生 | S:两个挂载点各算 options；host-resource 无描述符也可进工作台编辑实例策略；资源摘要须回读 dataValue 的文档实例，不能只看 legacy dataSource；首次渲染先盖内容键
 designer-static-cell.ts[IG3T]: F:静态数据单元格 | R:code:packages/engine/src/browser/controllers/dataset/designer-static-table-controller.ts | A:- | S:静态表格单元格渲染与编辑
 designer-static-data-events.ts[IE7M]: F:静态数据事件处理 | R:code:packages/engine/src/browser/controllers/dataset/designer-static-table-controller.ts | A:- | S:静态数据表格的编辑事件与行增删
 designer-static-table-controller.ts[IE6S]: F:静态数据表格控制器 | R:code:packages/engine/src/browser/controllers/dataset/designer-static-cell.ts | A:- | S:静态数据表格的渲染分页与编辑
 designer-update-policy-authoring.ts[IE6M]: F:工作台更新方式写回文档（ADR-0104 切片 5） | R:code:packages/engine/src/browser/controllers/dataset/designer-data-source-authoring.ts | A:策略映射 / 等价判断 / 写入目标 / 单条事务 / 新实例初值与回显对齐 | S:只写组件经 dataValue 引用且真实存在于 dataSources 的实例，派生实例不可写；保留面板无控件的 retain 字段；来源不能推送时拒绝切到 push
 
 ===/<repository>/packages/engine/src/browser/controllers/===
-designer-artboard-controller.ts[IE8L]: F:画布标签条与从画布作者面控制器（ADR-0109） | R:code:packages/engine/src/common/session/designer-artboard.ts,code:packages/contracts/src/document/sub-canvas.ts | A:主画布页面弹框切换 / 新建复制删除改名 / 从画布设置 / 移到与置于下方 | S:移画布只作用于选区根组件，子组件随根；改名由 Enter 或失焦提交 change 不重复提交；设计态当前页随蓝图切页只换页不动主画布组件
+designer-artboard-controller.ts[IE8L]: F:画布标签条、从画布作者面与参照页协调（ADR-0109） | R:code:packages/engine/src/common/session/designer-artboard.ts,code:packages/contracts/src/document/sub-canvas.ts | A:主画布与从画布切换 / 新建复制删除改名与排序 / 页面和弹框设置 / 组件移到与置于下方 / 参照页选择 | S:移动只作用于选区根组件，子组件随根；改名由 Enter 或失焦提交，change 不重复提交；事件态蓝图切页只换参照页，不动主画布组件；换弹框锚点时偏移归零
 designer-auto-width-controller.ts[IE6S]: F:自动宽度控制器 | R:code:packages/core/src/geometry/component-bounds.ts | A:- | S:文本自动宽度测量后同步几何；实测宽度变化不产生事务
 designer-canvas-runtime-controller.ts[IE7L]: F:设计态画布运行时控制器 | R:code:packages/core/src/blueprint/runtime-dispatch.ts | A:渲染与变量快照 / 宿主变量解析 / 蓝图分派到渲染器 / 从画布预览与状态预览 / ready 生命周期 | S:宿主变量解析前挂起资源；替换失败回滚 ready 标志；设计态预览组件状态不发状态改变事件；能力编译失败时画布可渲染但禁用蓝图分派
-designer-change-controller.ts[IE8L]: F:智能体变更提案控制器 | R:code:packages/engine/src/common/operations/change/designer-change-proposal.ts | A:提案准备 / 幽灵预览 / 采纳忽略撤回 / 评审态 / 历史回退 | S:提案到达只加计数与草案条不切走检查器；评审态只读画布；草案层只挂受影响组件及其祖先；回退只移动历史指针
+designer-change-controller.ts[IE8L]: F:智能体变更提案、不透明草案与采纳回退控制器 | R:code:packages/engine/src/common/operations/change/designer-change-proposal.ts,code:packages/engine/src/browser/dom/change/designer-change-dom.ts | A:提案准备 / 子集或整份幽灵预览 / 会话标记 / 采纳忽略撤回 / 评审态 / 历史回退 | S:画布背景或尺寸变化必须整份预览；子集只挂受影响组件及祖先并清背景，失败回退整份；查看旧版同时撤草案与标记；标记只改显示，不写文档与历史
 designer-command-palette-controller.ts[IE8L]: F:命令面板控制器 | R:code:packages/engine/src/common/operations/designer-operation-registry.ts | A:前缀查询解析 / 排序过滤 / 物料图层命令蓝图条目 / 组合分片条目 | S:只在 Ctrl/Cmd+K 打开；结果最多 18 条；组合分片条目携带分片 id 交物料库面板整片插入
 designer-error-console-controller.ts[IE7M]: F:错误控制台控制器 | R:code:packages/engine/src/browser/dom/change/designer-change-dom.ts | A:- | S:收集并展示诊断与错误消息面板
 designer-import-controller.ts[IE6S]: F:文档导入控制器 | R:code:packages/contracts/src/document/parse.ts | A:- | S:导入 screen 文档并做解析诊断
@@ -768,7 +730,7 @@ designer-page-preview-controller.ts[IE6S]: F:设计态页面切换预览（ADR-0
 designer-popup-preview-controller.ts[IE6S]: F:设计态弹框预览（ADR-0108/0109） | R:code:packages/engine/src/browser/controllers/designer-canvas-runtime-controller.ts | A:独立预览渲染器 / 开合与延迟隐藏 | S:另起预览模式可交互渲染器，只挂弹框组件且画布背景透明；主画布与页面由设计器自己的渲染器画
 designer-presentation-lock-controller.ts[IE6S]: F:演示锁定控制器 | R:code:packages/engine/src/common/operations/display/designer-target-display.ts | A:- | S:演示模式下的交互锁定与解锁管理
 designer-preview-controller.ts[IE6S]: F:嵌套 Viewer 预览控制器 | R:code:packages/renderer/src/viewer/viewer.ts | A:首次原子 configure / 依赖变化重配 / 文档同步 / refreshData 转发 | S:只有 catalog 必填，资源与目录端口可选，静态预览也须能 configure；依赖变化先 unload 再重配
-designer-reference-layer-controller.ts[IE6S]: F:参照底图控制器（ADR-0109 §2.5） | R:code:packages/engine/src/common/session/designer-artboard.ts | A:只读参照渲染器 / 参照文档构造 | S:以 32% 不透明度垫参照画布内容，不拦截指针不进图层不可选；参照组件 id 加 ref: 前缀去掉从画布与蓝图，避免与真实组件同名
+designer-reference-layer-controller.ts[IE6S]: F:只读参照底图与事件态实况参照层（ADR-0109） | R:code:packages/engine/src/common/session/designer-artboard.ts | A:独立只读渲染器 / 参照文档投影 / 目录变更重建 / 实况交互与事件转发 | S:默认 32% 不透明且不可交互；事件态不透明可交互，编辑页面时主画布内容在上；参照副本按原组件 WeakMap 缓存，id 加 ref: 并去掉从画布与蓝图
 designer-scroll-continuity-controller.ts[IE6S]: F:滚动连续性控制器 | R:code:packages/engine/src/browser/dom/designer-interaction-dom.ts | A:- | S:编辑前后保持画布滚动位置不跳变
 designer-size-tier-controller.ts[IE6S]: F:尺寸档位控制器 | R:code:packages/engine/src/browser/dom/designer-interaction-dom.ts | A:- | S:按视口尺寸切换响应式档位与布局
 designer-target-display-controller.ts[IE7M]: F:目标显示器控制器 | R:code:packages/engine/src/common/operations/display/designer-target-display.ts | A:- | S:目标显示器选择与显示状态管理
@@ -829,17 +791,17 @@ designer-workbench-controller.ts[IE7M]: F:工作台控制器组合参考线、�
 designer-workbench-tabs-controller.ts[IE7M]: F:工作台页签控制器 | R:code:packages/engine/src/browser/controllers/workbench/designer-workbench-controller.ts | A:- | S:工作台页签的切换与状态管理
 
 ===/<repository>/packages/engine/src/browser/dom/blueprint/===
-designer-blueprint-default-canvas.ts[AU9L]: F:引擎默认蓝图中央画布与本地交互编排 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-geometry.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts | A:节点卡片与锚点 / 贝塞尔连线与标签 / 拖拽连线框选平移缩放 / 右键菜单与快捷键 / 模拟触发与轨迹 / 自动布局和视口适配 | S:只收发画布协议，文档、历史与校验不在画布；拖动/框选/平移/缩放与语义连线显隐均为会话态，松手只提交一次 commit-layout；结构标记与选中态分离缓存，标记不变不重建 DOM，否则按下元素被换掉会丢 click 与双击；几何只读共享常量：卡片宽 164、锚点命中 28、缩放 0.3–2，上下描边 2 计入高度；节点拖动按 8px 网格对齐。
+designer-blueprint-default-canvas.ts[AU9L]: F:引擎默认蓝图中央画布与本地交互编排 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-geometry.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts | A:节点与锚点 / 贝塞尔连线标签 / 拖拽连线框选平移缩放 / 菜单快捷键 / 模拟触发轨迹 / 自动布局与视口适配 | S:只收发画布协议；拖动、框选、平移、缩放与语义显隐均为会话态，松手一次 commit-layout；结构标记不变不重建 DOM，避免丢 click；几何读共享常量，拖动按 8px 网格对齐
 designer-blueprint-dom-helpers.ts[FG1T]: F:蓝图画布 DOM 辅助 | R:code:packages/engine/src/browser/dom/blueprint/designer-blueprint-dom.ts | A:- | S:蓝图 DOM 构建的小辅助函数
 designer-blueprint-dom.ts[FG7L]: F:设计视图事件面板摘要与能力态 DOM | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts | A:事件摘要 / 交互卡片 / 效果描述 | S:目标是条件节点时展开其 yes/no 连出的动作；未声明的宿主动作明确标出，与执行侧失败关闭同一事实
 designer-blueprint-host-left-panel-dom.ts[FG4T]: F:蓝图宿主左栏 DOM | R:code:packages/engine/src/browser/dom/blueprint/designer-blueprint-dom.ts | A:- | S:蓝图工作台宿主左栏 DOM 结构
-designer-blueprint-inspector-configuration.ts[FG8L]: F:蓝图检查器配置页 | R:code:packages/engine/src/browser/dom/blueprint/designer-blueprint-inspector-dom.ts | A:节点配置 / 连线配置 / 表达式编辑 / 多选批量 | S:从画布打开与切换的参数先给开关再出编辑器；设置状态只能选目标组件已声明状态；字段行占位须在 innerHTML 之后 hydrate
+designer-blueprint-inspector-configuration.ts[FG8L]: F:蓝图检查器节点、连线与表达式配置页 | R:code:packages/engine/src/browser/dom/blueprint/designer-blueprint-inspector-dom.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-value-sources.ts | A:节点锚点与基础配置 / 条件表达式 / 连线端口与载荷 / 状态和过渡 / 同源执行顺序 / 多选批量 | S:弹框参数先给开关再出编辑器；set-state 仅列目标组件已声明状态；字段行占位必须在 innerHTML 后、表单控件接管前 hydrate
 designer-blueprint-inspector-dom.ts[FG6S]: F:蓝图检查器面板 DOM | R:code:packages/engine/src/browser/dom/blueprint/designer-blueprint-inspector-configuration.ts | A:配置 / 问题 / 模拟轨迹三页签 | S:问题页列诊断，轨迹页展示深度优先模拟步骤
-designer-blueprint-library-dom.ts[FG8M]: F:蓝图节点库 DOM | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts | A:组件 / 逻辑 / 变量页签 / 画布节点组 / 宿主页签 | S:主画布条目只在文档有页面时出现；未加入单击加入已加入则定位
+designer-blueprint-library-dom.ts[FG8M]: F:蓝图节点库、关系列表与宿主页签 DOM | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts,code:packages/engine/src/common/operations/workbench/designer-left-panel-groups.ts | A:组件变量与功能节点 / 画布节点组 / 关系搜索定位 / 宿主左栏分组 / 添加拖入与已放置定位 | S:主画布条目只在文档有页面时出现；host 与 lifecycle 是单例，已存在转为定位；组件和变量未加入时单击加入、已加入则选中定位
 designer-blueprint-workbench-dom.ts[FG6S]: F:蓝图工作台 DOM | R:code:packages/engine/src/browser/dom/blueprint/designer-blueprint-default-canvas.ts | A:- | S:蓝图工作台整体布局 DOM 骨架
 
 ===/<repository>/packages/engine/src/browser/dom/change/===
-designer-change-dom.ts[FG8L]: F:变更面板 DOM | R:code:packages/engine/src/browser/controllers/designer-change-controller.ts | A:草案栏 / 变更单元 / 反馈 / 历史 / 评审入口 | S:标题单行截断补原生 title；待决计数只改文本不重建页签；前进栈只能重做恢复不得传给回退
+designer-change-dom.ts[FG8L]: F:变更提案、草案条、旧版标记与历史 DOM | R:code:packages/engine/src/browser/controllers/designer-change-controller.ts,code:packages/engine/src/common/operations/change/designer-change-proposal.ts | A:草案条 / 字段差异 / 整屏只读分组 / 评审与反馈 / 移除轮廓 / 历史回退入口 | S:整屏替换无逐项按钮，只能整体放弃或二次确认全部采纳；旧组件 visibility:hidden 保几何，移除轮廓复制旧帧；查看旧版清空标记；未来历史节点禁用
 
 ===/<repository>/packages/engine/src/browser/dom/color/===
 designer-color-palette-body-dom.ts[FG7M]: F:调色板主体 DOM | R:code:packages/engine/src/browser/dom/color/designer-color-palette-dom.ts | A:- | S:调色板主体色块与选择的 DOM 渲染
@@ -870,8 +832,8 @@ designer-dataset-binding.ts[FG3T]: F:数据集绑定 DOM | R:code:packages/engin
 designer-dataset-catalog-dom.ts[FG7M]: F:数据集目录 DOM | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据集目录列表的 DOM 渲染
 designer-dataset-config-controls.ts[FG6S]: F:数据集配置控件 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-config-dom.ts | A:- | S:数据源类型选择与参数配置控件
 designer-dataset-config-dom.ts[FG8L]: F:数据集配置 DOM：来源摘要卡片、字段映射、请求参数与绑定角色 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-config-controls.ts | A:- | S:各数据源类型配置表单的完整 DOM 渲染；数据集描述只挂摘要卡片的 data-tip 与 aria-description；参数行形态只由固定值/变量分段表达，inline 模式不再渲染「固定值2」这类与输入框重复的摘要触发器，只留改绑变量图标；绑定角色一行一个角色，全选/清空只留在弹层里
-designer-dataset-dom.ts[FG7M]: F:数据集面板 DOM 汇总 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-authoring-dom.ts | A:- | S:数据面板整体 DOM 结构与子模块汇总导出
-designer-dataset-flow-dom.ts[FG8L]: F:数据流 DOM | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据源到组件绑定关系的数据流可视化 DOM
+designer-dataset-dom.ts[FG7M]: F:数据源检查器面板与全屏工作台 DOM | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-flow-dom.ts,code:packages/engine/src/browser/dom/dataset/designer-dataset-authoring-dom.ts,code:packages/engine/src/browser/dom/dataset/designer-dataset-sections.ts | A:数据流与反馈 / 来源浮层 / 工作台头部步骤与关闭确认 / 同源 section 装配 | S:内联与工作台共用 section 工厂；host-resource 无描述符仍渲染 authoring；来源浮层挂 properties 兄弟，整块重绘前先销毁选择器并清旧浮层
+designer-dataset-flow-dom.ts[FG8L]: F:取值方式、连续数据流与主操作条视图 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts,code:packages/engine/src/browser/dom/dataset/designer-dataset-sections.ts,code:packages/engine/src/browser/dom/dataset/designer-dataset-primitives.ts | A:空态与来源切换 / host-resource 摘要 / 静态变量数据流 / 请求状态与动作 / 底部让位 | S:host-resource 与其他模式共用 requiredDataSections，首帧不能缺 source、preview、authoring；只有空态 value 段带 source 滚动锚；状态条用实测高度占位，首帧零高不写
 designer-dataset-preview-dom.ts[FG7M]: F:数据响应预览：空态、结果表格与参数摘要 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:查询结果表格预览的 DOM 渲染；空态不重复组头已写的「尚未请求」，只留行动说明与「当前参数 · …」摘要，参数顺序跟随 descriptor
 designer-dataset-primitives.ts[FG6S]: F:数据集 DOM 原语 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据面板共用的 DOM 构建原语
 designer-dataset-sections.ts[FG5T]: F:数据集分区定义 | R:code:packages/engine/src/browser/dom/dataset/designer-dataset-dom.ts | A:- | S:数据面板各分区键与结构定义
@@ -894,19 +856,19 @@ designer-event-system.ts[FG6S]: F:设计器 DOM 事件系统 | R:code:packages/e
 designer-field-primitives.ts[FG7L]: F:检查器字段行原语 | R:code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:字段行 / 开关行 / 勾选行 / 提示 / 复位 / 滑杆读数 / 步进器 | S:字段行是标签列 74px 加控件列网格，标签须为 span 控件落在控件列；开关行是右栏布尔字段唯一写法；取色器与文本域用 span 标签
 designer-form-controls-dom.ts[FG6S]: F:表单控件 DOM | R:code:packages/engine/src/browser/dom/designer-field-primitives.ts | A:- | S:表单控件的采纳与统一管理
 designer-html-escape.ts[FG3T]: F:HTML 转义 | R:- | A:- | S:转义文本防止注入到设计器 DOM
-designer-icons.ts[FG5S]: F:设计器统一线性图标族 | R:- | A:- | S:24 网格 1.7 描边；工具 id 只是注册表名别名
+designer-icons.ts[FG5T]: F:设计器统一线性 SVG 图标族与工具字形映射 | R:- | A:- | S:24 网格、1.7 描边、圆角端点；工具 id 只是注册表别名；A 段取自原型，B 段自绘，C 段工具图标重绘而非 16 网格放大
 designer-image-metadata-dom.ts[FG3T]: F:图片元数据 DOM | R:code:packages/engine/src/browser/dom/designer-field-primitives.ts | A:- | S:图片尺寸等元数据的展示 DOM
 designer-inspector-chrome-dom.ts[FG6S]: F:检查器框架 DOM：身份卡、密度过滤与隐藏提示 | R:code:packages/engine/src/browser/dom/designer-inspector-search-dom.ts | A:- | S:组件名与物料名相同时副标题只报类型；基础模式底部提示已隐藏 N 项并可切全量
 designer-inspector-search-dom.ts[FG7M]: F:检查器搜索 DOM | R:code:packages/engine/src/browser/dom/designer-inspector-chrome-dom.ts | A:可搜索项标注 / 结果渲染 / 克隆编辑器 / 右键菜单 | S:搜索结果按外观、数据、交互页签标注
 designer-interaction-dom.ts[FG6S]: F:交互 DOM：能力摘要、交互设置与事件段 | R:code:packages/engine/src/browser/dom/designer-event-system.ts | A:- | S:画布交互相关的 DOM 结构与状态；设计与预览能力合并为一个默认收起的「组件能力」折叠段，摘要直接列出能力名；事件段仍常驻；能力列表复用两列 chip
 designer-left-panel-groups-dom.ts[FG5S]: F:渲染设计器左栏宿主分组标签与面板 | R:code:packages/engine/src/common/operations/workbench/designer-left-panel-groups.ts,code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:- | S:重渲染先移除已渲染宿主节点再恢复焦点，宿主插槽事件由表面路由隔离
 designer-quick-style-dom.ts[FG6M]: F:图表类物料的快捷样式面板含配色预设字号与信息密度 | R:code:packages/engine/src/common/operations/style/designer-quick-style.ts,code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:- | S:仅对图表或表格类物料追加，按钮可用性由 manifest 能力判定；九宫格预设与三行配置默认收起（常驻约占 200px，且属一次性选择）；自带 details 必须带 designer-inspector-disclosure 类，否则收起态没有 chevron，看起来像一条孤立分隔线
-designer-select-dom.ts[FG7M]: F:自绘下拉控件以触发器加浮层包装原生 select | R:code:packages/engine/src/browser/dom/designer-icons.ts | A:- | S:原生 select 保留取值与 change；弹层 fixed 视口定位逐帧跟随、翻转夹紧；键盘与滚轮止住冒泡避免被画布手势抢走
+designer-select-dom.ts[FG7M]: F:以触发器与浮层增强原生 select 的自绘下拉 | R:code:packages/engine/src/browser/dom/designer-icons.ts,code:packages/engine/src/browser/styles/controls/designer-controls-inputs.css | A:选项镜像与次级读数 / 键盘选择 / 视口定位跟随 / 禁用同步与事件派发 | S:原生 select 保留 value 与 change；弹层 fixed 逐帧跟随、翻转夹紧并按整行裁切；滚轮与展开键盘止冒泡；ShadowRoot 活动元素从所在根读取
 designer-selection-dom.ts[FG5S]: F:画布选中框的名称标签、拖拽层与变换手柄 | R:code:packages/engine/src/common/operations/selection/designer-selection.ts | A:- | S:拖拽层 evenodd 裁剪只挖显式选中根组件，传整棵子树会让嵌套子组件区重新变成填充；手柄仅当全部选中项可变换且未锁定时出现
 designer-surface-router.ts[FG8S]: F:设计器 shadow 表面事件集中挂载与处理器链分发 | R:code:packages/engine/src/browser/dom/designer-editable-target.ts | A:- | S:宿主插槽的 light DOM 事件被守卫跳过，不被内部 data-* 路由或快捷键误识别；capture 通道抢先认领指针会话
 designer-text-edit-dom.ts[FG6S]: F:画布内文本编辑 overlay 复刻物料排版的 contenteditable 层 | R:- | A:- | S:视口几何须除以 zoom 还原本地坐标；只止冒泡不 preventDefault 否则文本选不中；层级取选择层加一
 designer-text-selection.ts[FG4T]: F:判定设计器内是否存在非折叠的手动文本选区 | R:code:packages/engine/src/browser/dom/designer-surface-router.ts | A:- | S:有选区时复制归浏览器，避免应用剪贴板吞掉文本
-designer-ui-primitives.ts[FG8L]: F:设计器私有 DOM 原语含按钮输入开关分段与标签页工厂 | R:code:packages/engine/src/browser/dom/designer-icons.ts | A:- | S:从包根永不导出；只投影结构状态到 ARIA 不接管点击；segmented 与 tabs 语义分开；tooltip 用 data-tip 与原生 title 分开
+designer-ui-primitives.ts[FG8L]: F:设计器私有 DOM 控件原语与组合外壳 | R:code:packages/engine/src/browser/dom/designer-icons.ts,code:packages/engine/src/browser/dom/designer-field-primitives.ts | A:按钮与输入 / 开关复选 / 下拉 / 分段与页签 / 组合控件外壳 / 字段消息 | S:不从包根导出；只投影结构与 ARIA，不接管点击；segmented 与 tabs 语义分开；range 先设范围再赋值；switch 以 native checkedness 为唯一状态
 designer-variable-inspector-dom.ts[FG7L]: F:变量检查器浮层与行更多菜单承载新建编辑删除确认 | R:code:packages/engine/src/browser/dom/designer-variables-editor-dom.ts,code:packages/engine/src/common/operations/designer-variable-view.ts | A:- | S:浮层挂在面板 scope 而非滚动区以免被裁切，复用已存在层节点不重复创建
 designer-variable-references-dom.ts[FG5S]: F:变量引用计数与引用列表含组件参数和蓝图规则跳转 | R:code:packages/engine/src/common/operations/designer-variable-operations.ts,code:packages/engine/src/common/operations/designer-variable-view.ts | A:- | S:引用链接携带 layerSelect 或 blueprintSearchId 供跳转，表达式路径按标识符规则格式化
 designer-variables-dom.ts[FG8L]: F:变量面板渲染按来源分组的变量列表与行摘要 | R:code:packages/engine/src/common/operations/designer-variable-view.ts,code:packages/engine/src/browser/dom/designer-variables-editor-dom.ts | A:- | S:分组只影响呈现，行编辑索引仍取文档下标，命令寻址不变；搜索在常驻外壳中过滤不丢焦点
@@ -938,7 +900,7 @@ designer-menu.ts[FG7L]: F:设计器菜单控制器 | R:code:packages/engine/src/
 designer-plugin-command-menu.ts[FG4T]: F:插件命令注入工具菜单的按钮模板与渲染 | R:code:packages/engine/src/common/operations/plugin/designer-plugin-commands.ts | A:- | S:插件命令与内建动作同网格，图标槽固定用 sparkle；无命令时不产出分隔
 
 ===/<repository>/packages/engine/src/browser/dom/panel/===
-designer-canvas-properties-dom.ts[FG6L]: F:页面配置面板：画布、从画布、背景与主题色板控件 | R:code:packages/engine/src/browser/dom/panel/designer-canvas-transactions.ts | A:- | S:编辑从画布时先给从画布专属设置，页面不给尺寸行，背景图与主题只属主画布；尺寸含常用预设与自定义；首屏只展开画布段
+designer-canvas-properties-dom.ts[FG6L]: F:主画布与从画布配置面板控件 | R:code:packages/engine/src/browser/dom/panel/designer-canvas-transactions.ts,code:packages/engine/src/browser/controllers/designer-artboard-controller.ts | A:尺寸预设与自定义 / 不透明度缩放 / 渲染开关 / 背景与图片 / 页面弹框设置 / 主题色板 | S:从画布先给专属设置，页面无尺寸行，背景图与主题仅主画布；custom 只展开不提交并止冒泡；空背景图提交为 null；主题按整副色板更新
 designer-canvas-transactions.ts[FG7M]: F:画布展示设置、背景与主题色板的事务构造 | R:code:packages/engine/src/browser/dom/color/designer-color-palette-model.ts | A:- | S:无色板时只落六个基础色位，状态色位省略取默认；单色背景同时写 background 与 backgroundColor；背景图 URL 失败关闭在 canonical 解析处
 designer-chrome-primitives.ts[FG6S]: F:面板件原语含分区空态与徽标的唯一结构 | R:code:packages/engine/src/browser/dom/designer-ui-primitives.ts | A:- | S:长期存在的分区应显式给 key 否则顺序键随插删平移导致折叠态串位；外观只在 workbench-chrome.css 一处；summary 选项渲染为标题行内 .designer-inspector-section-meta，只在收起时显示
 designer-color-group-dom.ts[FG6S]: F:检查器色板组：连续颜色字段合成色卡带加单编辑器 | R:code:packages/engine/src/browser/dom/descriptor/designer-descriptor-fields-dom.ts | A:- | S:连续 color 字段 ≥3 才成组；组内只留一个编辑器，选中项须存在 DOM 之外，否则改色跳回首个
@@ -968,7 +930,7 @@ designer-value-ref-summary-dom.ts[FG4T]: F:取值引用的徽标加名称摘要�
 designer-value-ref-types.ts[FG5M]: F:取值选择器的文案类型与候选构造 | R:- | A:- | S:文案包必须整包传入防止加键后静默失效；删除目标的引用用稳定兜底标签不暴露内部 id
 
 ===/<repository>/packages/engine/src/browser/dom/workspace/===
-designer-workspace-markup.ts[FG7L]: F:设计器工作区完整 HTML 标记模板 | R:code:packages/engine/src/browser/dom/workspace/designer-workspace-template.ts | A:- | S:物料骨架占位上限六张；含蓝图画布 slot 与命令面板帮助对话框错误控制台等 ARIA 结构；面板把手是 role=separator
+designer-workspace-markup.ts[FG7M]: F:设计器工作区完整 HTML 标记与物料骨架 | R:code:packages/engine/src/browser/dom/workspace/designer-workspace-template.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts | A:左右栏与顶栏 / 画布层 / 蓝图与数据工作台 / 检查器和智能体 / 命令面板与错误控制台 | S:物料骨架最多六张；面板把手是 role=separator；上下文菜单挂 designer 根以防 workspace 裁切；蓝图能力未授权时工作台页签禁用失败关闭
 designer-workspace-skeleton.ts[FG4T]: F:设计器首帧加载骨架标记与构造 | R:code:packages/engine/src/browser/dom/workspace/designer-workspace-markup.ts | A:- | S:复用栅格与面板宽度使替换不产生尺寸位移；占位块 aria-hidden
 designer-workspace-template.ts[FG6M]: F:工作区按钮坐标缩放与菜单行模板集 | R:code:packages/engine/src/browser/dom/menu/designer-menu-icons.ts | A:- | S:顶栏下拉与右键共用菜单行模板；带文案按钮用独立布局避免图标文字堆叠
 designer-workspace.ts[FG7S]: F:设计器根工作区创建与各区块组装 | R:code:packages/engine/src/browser/dom/workspace/designer-workspace-markup.ts,code:packages/engine/src/browser/dom/material-library/designer-material-library-dom.ts | A:- | S:下拉菜单移到布局根避开顶栏 overflow 裁剪；工具图标经此转出供 controllers 层消费
@@ -989,7 +951,7 @@ designer-controls-color-palette.css[FG6L]: F:颜色调色板控件的触发器�
 designer-controls-date-field.css[FG5M]: F:日期字段输入框触发器与自绘日历弹层外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-inputs.css | A:- | S:输入框保留 designer-input 形态，触发器绝对定位压在右缘
 designer-controls-descriptor.css[FG4T]: F:描述符分组与摘要的外观 | R:- | A:- | S:分组用 details 语义，summary 隐藏原生 marker 自绘箭头
 designer-controls-fields.css[FG6L]: F:检查器字段行与数值读数排版 | R:code:packages/engine/src/browser/styles/controls/designer-controls-inputs.css | A:- | S:字段行只有 30px 一档；字段间距 6px，再收到 4px 标签粘连；行骨架标签列 74px 加控件列；附加行横跨两列
-designer-controls-inputs.css[FG6L]: F:开关、步进器、滑杆与输入基座等控件外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-fields.css | A:- | S:控件描边即阴影无真实 border，状态只换环不位移；禁用换底色与弱文本不用透明度；混合值用虚线段不改几何
+designer-controls-inputs.css[FG6L]: F:输入、开关、步进器、滑杆与下拉等控件外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-fields.css,code:packages/engine/src/browser/dom/designer-select-dom.ts | A:- | S:描边即阴影、无真实 border，状态只换环不位移；禁用用底色与弱文本；混合值用虚线；复合控件焦点只留外壳，浮动下拉按整行夹紧
 designer-controls-quick-style.css[FG5M]: F:图表快捷样式按钮网格与配色预览的外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-actions.css | A:- | S:预设按钮禁用态与选中态共用统一 token 表达
 designer-controls-segmented.css[FG6S]: F:分段控件的轨道选中态与上下文变体外观 | R:code:packages/engine/src/browser/styles/controls/designer-controls-tabs.css | A:- | S:选中态字重最后加到 600 作当前值提示；禁用态换色不换透明度满足对比度契约；分段默认单行等高；画布缩放 6 档的 3×2 特例已删——缩放改成下拉后不再产生 segmented 节点，留着重叠规则只会误导下一个改布局的人
 designer-controls-style.ts[FG4T]: F:控件 CSS 分片的按序拼接常量 | R:code:packages/engine/src/browser/styles/controls/designer-controls-inputs.css | A:- | S:按字段色板输入日期分段快捷动作标签顺序拼接
@@ -1008,25 +970,25 @@ designer-workbench-accessibility.css[FG5T]: F:强制颜色模式下的选中态�
 designer-workbench-blueprint-canvas-edges.css[FG5S]: F:蓝图画布连线外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-canvas.css | A:- | S:中性细线贝塞尔加线中箭头；选中链路强调色加粗其余退后；语义连线淡虚线无箭头；全程不加光晕
 designer-workbench-blueprint-canvas-nodes.css[FU6M]: F:蓝图画布节点卡片、锚点与交互态样式 | R:code:packages/engine/src/browser/styles/designer-tokens.css,code:packages/engine/src/browser/dom/blueprint/designer-blueprint-default-canvas.ts | A:类型图标与标题 / 选中聚焦轨迹停用态 / 重命名 / 锚点行与语义接口 / 连线吸附反馈 | S:27px 行高、12px 圆点与 -20px 外缘偏移必须与画布端点计算一致，13px 内距与偏移联动；停用节点仍可选可连；类型色只落图标
 designer-workbench-blueprint-canvas-overlays.css[FG4T]: F:蓝图画布浮层外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-canvas.css | A:- | S:右键菜单完全复用共享菜单外壳
-designer-workbench-blueprint-canvas.css[FG6M]: F:蓝图中央画布骨架、点阵舞台与模拟条 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-canvas-nodes.css | A:- | S:颜色全取 --designer-blueprint-* 令牌；点阵随平移缩放走、光晕固定，平移写进整体背景会出硬接缝；窄画布收起按钮文字
-designer-workbench-blueprint-details.css[FG6L]: F:蓝图库与蓝图检查器配置页布局外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-surface.css | A:- | S:复用画布面板 rail 与行几何不引入第二套外壳；已放置不铺底，选中统一由 selection 层；配置页沿用检查器分区与字段行
+designer-workbench-blueprint-canvas.css[FG6S]: F:蓝图中央画布骨架、点阵舞台与模拟条 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-canvas-nodes.css | A:- | S:颜色取 --designer-blueprint-* 等设计令牌；点阵随平移缩放、光晕固定，分两层背景避免接缝；hidden 用两级选择器覆盖自带 display；窄画布收起文字
+designer-workbench-blueprint-details.css[FG6L]: F:蓝图节点库与检查器配置页布局外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-surface.css,code:packages/engine/src/browser/styles/workbench/designer-workbench-selection.css | A:- | S:复用 rail 与检查器字段行，不另造外壳；已放置不铺底，选中归 selection 层；配置页只补蓝图内容块；关系色条与画布同色，窄栏双列改单列
 designer-workbench-blueprint-panels.css[FG5S]: F:蓝图面板的布局外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-surface.css | A:- | S:面板沿用同套 token 与标题行几何
 designer-workbench-blueprint-surface.css[FG5S]: F:蓝图工作区表面栅格与模式投影 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-shell.css | A:- | S:列须显式写 1，否则被甩进隐式第二列塌成竖条；蓝图检查器与智能体页签互斥
 designer-workbench-blueprint-toolbar.css[FG3T]: F:蓝图工具栏的外观 | R:- | A:- | S:蓝图工具栏样式，体量极小
-designer-workbench-canvas.css[FG7L]: F:画布视口、舞台、选中框与参考线外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-selection.css | A:- | S:viewport 键盘聚焦用内描边；Renderer 内容裁剪到画布边界而选区手柄参考线在外层；选区标签贴下沿以免压住旋转手柄
+designer-workbench-canvas.css[FG7L]: F:画布视口、舞台、选区、参考线、画布标签与预览覆盖层外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-selection.css,code:packages/engine/src/browser/styles/workbench/designer-workbench-shell.css | A:视口与舞台 / 选区变换 / 参考线测量 / 画布标签与参照 / 幽灵草案 / 目标屏与弹框预览 | S:Renderer 内容裁剪到画布边界而选区手柄参考线在外层；选区标签贴下沿免压旋转手柄；持久参考线 1px 视觉配 9px 命中条；画布标签全态固定字重防重排；参照底图只读 32%，事件模式才转实况可交互
 designer-workbench-change.css[FG5S]: F:变更审查面板的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector.css | A:- | S:审查面板复用右栏五行结构与统一 token
 designer-workbench-chrome.css[FG7L]: F:面板件分区、空态、徽标与列表行的唯一外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-selection.css | A:- | S:其余 workbench 文件只管布局不得重设面板件外观；列表行三档、控件两档；检查器与数据面板分区变体也只在此
 designer-workbench-data-binding.css[FG6L]: F:数据绑定步骤与数据集作者化段的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector-data.css | A:- | S:绑定角色字段列表与兼容字段选项共用统一 token；高级设置段内四块（编辑方式/过滤器/只读事实/工具）的间距由 .designer-data-group[data-details-group=refresh] 控制，容器 .designer-dataset-authoring 不承担该段布局，改它不会生效；复制/全屏图标排在只读卡片之后
 designer-workbench-data-catalog.css[FG6L]: F:数据源目录面板与只读实例事实的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-data-editor.css | A:- | S:目录列表与搜索过滤态共用统一 token；只读事实区必须 grid-column:1/-1 跨满父级两列网格，否则只占左半列；行距 space-3，跳转按钮 justify-self:end 对齐读数列；designer-dataset-description 规则已删（描述改走 data-tip，DOM 不再产生该节点）
 designer-workbench-data-editor.css[FG6L]: F:数据工作台容器与步骤布局的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector-data.css | A:- | S:数据工作台为绝对定位覆盖层并声明 data-workbench 容器名
 designer-workbench-feedback.css[FG5M]: F:帮助对话框反馈提示与遮罩的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:帮助对话框用 z-modal 层级与 scrim 底并带入场动效
-designer-workbench-inspector-data.css[FG7L]: F:数据源检查器面板、提示条与数据流外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector.css | A:- | S:数据流只有一行，内容区独占剩余高度并滚动；sticky 操作条限制在内容盒；提示条只读或不可用 32px、失败 44px，含内边距须自行声明 border-box；不做常驻状态徽标
+designer-workbench-inspector-data.css[FG7L]: F:数据源检查器、页面配置与数据工作台的表单和状态外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector.css,code:packages/engine/src/browser/styles/workbench/designer-workbench-canvas.css | A:数据来源与提示 / 参数映射 / 响应预览 / 页面配置 / 静态表格 / 来源浮层与全屏工作台 | S:数据流仅一行，内容区独占剩余高度并滚动，sticky 操作条限于内容盒；提示条 32/44px 含 padding 且无常驻徽标；映射行固定角色列与最小行高；加载占位与失败区同尺寸防抖；声明 display 的元素显式处理 hidden
 designer-workbench-inspector.css[FG7L]: F:检查器右栏五行栅格与属性区外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:五行顺序在所有状态固定；列须显式声明为单列，子项漏写 grid-column 会另开列挤成竖条；页签用 hidden 摘除时须就地压回 display；智能体页签规则须排在画布与多选行模板之后
 designer-workbench-layers.css[FG6M]: F:图层面板列头搜索与图层树行的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-selection.css | A:- | S:行缩进折叠箭头与引导线共用 18px 加 depth 乘 16px 基准，三处必须同步；能力标记 data 是实心点、event 是空心环，先靠形状区分再靠颜色，纯色差对色觉差异用户等于无区分
 designer-workbench-materials.css[FG5S]: F:物料卡片、缩略图、封面与分片线框外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:交互只改绘制属性几何恒定；缩略图比例必须保留，否则封面适配误判退成 contain；卡片只留图加名
 designer-workbench-panels.css[FU6M]: F:设计器左右面板、检查器与物料库的布局样式 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css,code:packages/engine/src/browser/styles/designer-tokens.css | A:物料工具栏与网格 / 检查器上下文与几何摘要 / 搜索结果列表与右键菜单 / 筛选字段与分组隐藏 / 密度 basic 过滤 / rail 与 inspector 显隐 | S:徽标与空态外观归 chrome，面板层只管几何排版；筛选标记由 chrome-dom 打在 root，数据工作台也要隐藏被筛掉的字段与分组；basic 密度隐藏 advanced、搜索时恢复；滚动容器预留稳定轨道。
 designer-workbench-selection.css[FG5T]: F:图层树与蓝图库列表选中态的共用画法 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:选中态共用一份中性绘制，强调色只留给可执行操作与画布选框
-designer-workbench-shell.css[FG7L]: F:设计器舞台、状态栏与面板把手的整体布局外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:状态栏左读数与项目状态、右组件数尺寸开关缩放；右栏行顺序归 inspector；把手悬停只加深收边；折叠胶囊钮始终可命中；状态开关最小高度 24px 是触控目标契约。
+designer-workbench-shell.css[FG7L]: F:设计器舞台、状态栏、侧栏把手、检查器与智能体右栏及演示锁布局外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css,code:packages/engine/src/browser/styles/workbench/designer-workbench-inspector-data.css | A:舞台与状态栏 / 左右面板折叠 / 检查器与智能体切换 / 变更评审 / 演示锁 | S:状态栏左侧为工具选区与项目状态，右侧为组件数尺寸开关缩放；右栏行序归 inspector；把手悬停只加深收边，折叠胶囊钮始终可命中；状态开关最小高度 24px；声明 display 的元素显式让 hidden 生效
 designer-workbench-style.ts[FG4T]: F:工作台 CSS 分片的按序拼接常量 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-chrome.css | A:- | S:选择层排在全部面板之后赢同特异性，可访问性始终最后
 designer-workbench-topbar.css[FG6L]: F:顶栏的栅格列宽与响应式收缩外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-shell.css | A:- | S:顶栏高度含 border 与栅格行等高避免 1px 溢出；首列与左栏同宽并保底 200px
 designer-workbench-variable-editor.css[FG5L]: F:变量编辑器表单的外观 | R:code:packages/engine/src/browser/styles/workbench/designer-workbench-variables.css | A:- | S:字段分组与错误汇总的视觉层级统一由本文件承担
@@ -1065,7 +1027,7 @@ designer-blueprint-graph.ts[DB8L]: F:蓝图节点图作者期操作（ADR-0107�
 designer-blueprint-model-types.ts[FG3T]: F:蓝图事件选项类型 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts | A:- | S:可用性由 manifest 声明与能力门禁共同决定
 designer-blueprint-model.ts[AU8L]: F:蓝图文档到画布图、节点库与模拟触点的投影 | R:code:packages/contracts/src/document/blueprint-graph.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-graph.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-geometry.ts,code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts | A:事件能力与连线上下文 / 组件变量节点库 / 节点锚点可用性 / 画布图与语义边 / 模拟触发 / 自动布局与高度估算 | S:节点与边同文档一一对应，不派生结构或依赖边；未保存节点按连线最长上游路径分层、再按实际卡高重排，已保存布局不动；状态锚点仅声明状态的组件出现；缺失物料事件与未声明宿主动作保留为不可用锚点；文案由浏览器注入、common 不引 ui-text；高度估算与画布同公式计入描边。
 designer-blueprint-protocol-guards.ts[FG6T]: F:蓝图画布协议的校验守卫与结果构造 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts | A:- | S:标识最长 256、坐标绝对值上限 100 万；失败区分authoring无效与超限两类诊断码
-designer-blueprint-protocol-types.ts[FG6M]: F:蓝图画布协议类型与事件常量 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts | A:- | S:定义 slot 名、state/command 事件、节点拖拽 MIME 与工作台模式事件；画布节点带锚点，从画布节点带显示方式
+designer-blueprint-protocol-types.ts[FG6M]: F:蓝图画布与设计器工作台的协议类型、事件和命令常量 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol.ts | A:工作台模式与聚焦 / 节点边与锚点 / 状态选择追踪 / 插入更新布局命令 / 模拟触发与结果 | S:定义画布 slot、state/command、节点拖拽 MIME 与模式事件；语义锚点固定 semantic 且不进入 flow；端口能力缺失仍可见但不可连并给原因；仅定时器与条件可改名复制；从画布节点带 id 与 page/popup 显示方式
 designer-blueprint-protocol.ts[FG8M]: F:蓝图画布命令解析与类型守卫 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-protocol-types.ts | A:- | S:命令 id 最长 128、布局节点≤4096、模拟载荷≤256KiB；锚点须符合契约锚点词法；未知字段一律拒绝严格按 type 分派
 designer-blueprint-value-sources.ts[FG7S]: F:蓝图设值来源判定与事件字段路径 | R:code:packages/engine/src/common/operations/blueprint/designer-blueprint-model.ts | A:- | S:声明字段只是建议，物料未写 payloadSchema 也可手填；state-changed 负载固定 from/to/cause
 
@@ -1078,7 +1040,7 @@ designer-catalog-refresh.ts[DB5T]: F:物料目录交换的纯文档兼容性检�
 
 ===/<repository>/packages/engine/src/common/operations/change/===
 designer-change-events.ts[FC4T]: F:变更状态事件与提案摘要的投影 | R:- | A:- | S:摘要只暴露展示与定位字段不含候选文档；状态事件供宿主更新未读角标免轮询
-designer-change-proposal.ts[AB8M]: F:变更提案编译成候选文档与可独立采纳单元 | R:code:packages/engine/src/common/operations/change/designer-change-events.ts | A:- | S:整批命令在副本试算全成功才产草案，失败关闭无半成品；画布变量蓝图变更单独补差异判定避免纯背景改动被判空
+designer-change-proposal.ts[AB8M]: F:变更提案编译成候选文档、差异与可独立采纳单元 | R:code:packages/engine/src/common/operations/change/designer-change-events.ts | A:副本试算与差异 / 组件并集分组 / 文档级单元 / 整屏替换识别 / 单元命令提取 | S:整批命令在副本试算全成功才产草案，无差异亦拒绝；共享同一条命令的组件并为一组，文档级命令另成组；任一单元不能独立成立或识别为整屏替换时退回整批；整屏替换只能整体采纳或放弃
 designer-review.ts[FC3T]: F:评审态人员元信息的类型定义 | R:- | A:- | S:仅展示用，引擎不建模角色或权限
 
 ===/<repository>/packages/engine/src/common/operations/===
@@ -1157,7 +1119,7 @@ project-controller-support.ts[DB6S]: F:项目控制器的失败构造与待决�
 project-controller.ts[AB8S]: F:项目生命周期控制器的协调核心 | R:code:packages/engine/src/common/project/project-controller-state.ts | A:- | S:统一编排文档替换加载保存发布与脏冲突回调；适配器绑定变更与仪表盘状态集中于此
 
 ===/<repository>/packages/engine/src/common/session/===
-designer-artboard.ts[DB8M]: F:设计器画板视图投影与写回（ADR-0109 §2.5） | R:code:packages/engine/src/common/session/designer-session.ts | A:画板画布读取 / 组件归属 / 投影 / 合并写回 | S:一次只编辑一个画板，画板外组件隐藏锁定且其改动全部丢弃；页面尺寸恒随主画布，背景作者改过才写；背景图只属主画布
+designer-artboard.ts[DB8M]: F:设计器单画板视图投影与完整文档写回（ADR-0109 §2.5） | R:code:packages/engine/src/common/session/designer-session.ts | A:画板画布读取 / 组件归属 / 视图投影 / 合并写回 | S:一次只编辑一个画板；画板外组件隐藏锁定，写回丢弃其改动；页面尺寸恒随主画布，背景仅作者改过才写，背景图只属主画布；隐藏副本按原组件引用 WeakMap 缓存，避免整套重校验重绘；仅根组件携带 canvasId
 designer-session.ts[AB8L]: F:设计器会话的文档历史选区、画板与项目协调 | R:code:packages/engine/src/common/project/project-controller.ts,code:packages/engine/src/common/session/designer-artboard.ts | A:- | S:统一持有文档历史与交互并委派项目控制器；整个指向别的画板的宿主事务直接作用完整文档，混合当前与画板外组件的事务只作用当前画板；当前从画布消失退回主画布
 
 ===/<repository>/packages/engine/src/common/tools/===
@@ -1166,7 +1128,7 @@ designer-tools.ts[FC5T]: F:设计器绘制工具的登记与快捷键解析 | R:
 
 ===/<repository>/packages/engine/src/common/ui-text/===
 designer-blueprint-ui-text.ts[SL6L]: F:蓝图工作台用户可见文案目录 | R:code:packages/engine/src/common/ui-text/designer-ui-text.ts | A:- | S:纯数据目录含节点图节点、锚点、连线、右键菜单与模拟文案；动作名取插件声明，未声明时明确标出
-designer-ui-text.ts[SL7L]: F:设计器用户可见文案的唯一权威目录 | R:code:packages/engine/src/common/ui-text/designer-blueprint-ui-text.ts | A:- | S:浏览器层内联文案由 check-designer-ui 禁止；短名与无障碍名须同处定义；需要数量用参数函数而非拼接；含画板、组件状态、推送更新方式等文案；段名与字段名不得重复
+designer-ui-text.ts[SL7L]: F:设计器用户可见文案与诊断摘要的唯一权威目录 | R:code:packages/engine/src/common/ui-text/designer-blueprint-ui-text.ts | A:画布与数据 / 检查器与变量 / 素材图层 / 变更与智能体 / 项目诊断 / 描述符控件 | S:浏览器内联文案由 check-designer-ui 禁止；短名与无障碍名同处定义，数量用参数函数；data.title 仅搜索面包屑，页签另取 inspectorUi.dataSource；取值选择器整包传 text 不得挑键；段名与字段名避免重复
 
 ===/<repository>/packages/engine/src/common/vendor/moveable/===
 LICENSE-MIT.md[SZ3T]: F:内置 Moveable 依赖的 MIT 许可证文本 | R:- | A:- | S:随 vendored snap 与 types 一同保留的授权声明
@@ -1178,7 +1140,7 @@ snap.ts[KG7S]: F:画布吸附锚点竞争与最近参考线选择 | R:code:packa
 ===/<repository>/packages/engine/src/designer-element/api/===
 designer-element-authoring.ts[IA8M]: F:元素作者编辑的请求取消提交与上下文 API | R:code:packages/engine/src/common/operations/designer-authoring-bridge.ts | A:- | S:请求登记到 pending 表并带代际，提交时校验守卫；实例数据源只接受内联参数，含引用者返回 null 不发起编辑
 designer-element-catalog.ts[IA8S]: F:物料目录热刷新的元素 API | R:code:packages/engine/src/common/operations/catalog/designer-catalog-refresh.ts | A:- | S:初始化后刷新目录的唯一入口，全有或全无：先校验目录、分组、条目、分片、文档与蓝图，任一步失败保持全部状态；分组随 catalog 同次交换
-designer-element-change.ts[IA7T]: F:变更提案的提交读取采纳与撤回 API | R:code:packages/engine/src/common/operations/change/designer-change-proposal.ts | A:- | S:提交只挂幽灵草案不写文档，采纳才是独立事务；只给摘要不给候选文档；撤回无文档与历史副作用
+designer-element-change.ts[IA7S]: F:变更提案的提交、待决读取、采纳、忽略与撤回 API | R:code:packages/engine/src/common/operations/change/designer-change-proposal.ts | A:提交幽灵草案 / 读取待决摘要 / 单元采纳与忽略 / 全部采纳 / 撤回 | S:提交只挂幽灵草案不写文档，已有待决时拒绝覆盖；宿主不调用模型且只收摘要；采纳单元作为一次事务并重算其余；撤回仅清草案，无文档与历史副作用
 designer-element-configuration-types.ts[FC7T]: F:设计器元素配置的类型契约 | R:code:packages/engine/src/designer-element/api/designer-element-configuration.ts | A:- | S:汇总目录、左栏分组、物料库状态条目与分片、插件、项目端口；素材选择按钮默认隐藏；fragmentSaveAction 开启存为组合
 designer-element-configuration.ts[IA8M]: F:设计器元素的配置与目录初始化 | R:code:packages/engine/src/designer-element/api/designer-element-configuration-types.ts | A:- | S:已初始化时拒绝重复 configure；逐项先校验后提交，失败保持原字段与会话不变；catalog 是骨架闭合唯一条件，只经 setter 注入也须换掉骨架
 designer-element-display.ts[IA5T]: F:目标屏参数与叠加开关的元素 API | R:code:packages/engine/src/common/operations/display/designer-target-display.ts | A:- | S:只驱动画布叠加不写入 Screen Document；验收读数缺参数的项为 null
@@ -1211,7 +1173,7 @@ designer-element-host.ts[FC8S]: F:设计器元素宿主的能力契约接口 | R
 designer-element-lifecycle.ts[EA7M]: F:元素连接断开时的表面拆卸、释放与重连 | R:code:packages/engine/src/designer-element/runtime/designer-element-state.ts | A:- | S:断连取消延迟水合并逐项 disconnect 控制器，结束文本编辑以免 visibility 残留；重连恢复水合
 designer-element-operation-state.ts[EA7S]: F:元素操作宿主回调的组装与操作注册表、表面路由初始化 | R:code:packages/engine/src/common/operations/element/designer-element-operations.ts | A:- | S:把会话、面板控制器与视口等状态包装成操作宿主回调；启用态实时取自各控制器与项目适配器能力
 designer-element-plugin-commands.ts[EA7S]: F:插件命令与面板动作的元素运行时执行 | R:code:packages/engine/src/common/operations/plugin/designer-plugin-commands.ts | A:- | S:chrome 触发保持 args 为 null，面板触发才带 args；命令端口缺失时禁用；校验失败也发诊断避免面板点了没反应
-designer-element-rendering.ts[EA8L]: F:设计器运行时初始化与文档界面渲染 | R:code:packages/engine/src/designer-element/runtime/designer-element-state.ts | A:初始化 / 分帧水合 / 文档与交互渲染 / 主画布、参照层、弹框预览与幽灵渲染器 / 原生事件 | S:运行时就绪即撤销骨架兜底计时；骨架先画过时物料库与画布拆到后续帧；首屏缩放只在首个文档首次落定时决定一次，之后不再自动改缩放
+designer-element-rendering.ts[EA8L]: F:设计器运行时初始化、分帧水合、文档界面与覆盖层渲染 | R:code:packages/engine/src/designer-element/runtime/designer-element-state.ts | A:Shadow DOM 与控制器装配 / 分帧水合 / 文档交互渲染 / 主参照弹框幽灵渲染器 / 原生事件 | S:运行时就绪即撤销骨架计时；骨架先画过时物料库与画布拆后续帧；首屏缩放仅首个文档首次落定尝试，视窗无布局最多重试 10 帧；Renderer 挂内容层裁剪而选区手柄参考线留外层；数据面板单一渲染路径，datasetPort 只决定 mode；幽灵草案渲染器隔离且不交互
 designer-element-runtime.ts[EA8L]: F:设计器元素运行时接口的聚合装配 | R:code:packages/engine/src/designer-element/runtime/designer-element-rendering.ts | A:- | S:汇总各 API 与生命周期模块实现为统一 runtime 对象供元素门面消费，不承载新逻辑
 designer-element-skeleton.ts[EA5T]: F:目录到达前首帧骨架与超时兜底 | R:code:packages/engine/src/designer-element/runtime/designer-element-rendering.ts | A:- | S:骨架与最终栅格同尺寸，宿主可立即放元素；catalog 迟到 15 秒切错误态避免永久加载动画；迟到仍可正常初始化
 designer-element-state.ts[EA8M]: F:设计器元素运行时状态与全部控制器的容器 | R:code:packages/engine/src/designer-element/runtime/designer-element-controller-state.ts | A:- | S:WeakMap 按元素持有状态；含分片、存为组合开关、编辑状态会话与骨架计时；用户手动缩放后归用户所有不再自动改
@@ -1222,9 +1184,9 @@ designer-element-surface-bindings.ts[EA8M]: F:设计器表面事件到各控制�
 index.ts[FC4T]: F:引擎包的公共入口再导出 | R:code:packages/engine/src/designer-element/base-screen-designer-element.ts | A:- | S:导出插件端口项目控制器设计器元素类与全部公共 API，作为包唯一入口
 
 ===/<repository>/packages/host-kit/===
-CHANGELOG.md[SZ4T]: F:host-kit 包的变更记录 | R:- | A:- | S:按版本记录宿主工具包的变更与修复
+CHANGELOG.md[SZ4T]: F:host-kit 包 0.1.0 与 0.2.0 变更记录 | R:code:packages/host-kit/package.json | A:宿主接入辅助 / 推送订阅与共享连接 / 发布与依赖更新 | S:记录 REST 项目与数据集适配、SSE 推送 helper 及订阅复用变更
 README.md[SG4T]: F:host-kit 包说明 | R:code:packages/host-kit/src/index.ts | A:提供 / 推送订阅 | S:只依赖 contracts，不引入存储、网络重试或业务降级；SSE 重连交给浏览器原生 EventSource
-package.json[FO4T]: F:host-kit 包的元数据与脚本定义 | R:- | A:- | S:声明包名版本入口与构建脚本
+package.json[FO4T]: F:host-kit 包元数据、ESM 导出与构建检查脚本 | R:code:packages/host-kit/CHANGELOG.md | A:包身份与仓库元数据 / ESM 导出 / contracts 依赖 / 构建检查测试脚本 | S:private，仅 dist 入包；ESM 无副作用；build 先清 dist 再 tsc
 tsconfig.build.json[FO4T]: F:host-kit 构建期声明输出的编译配置 | R:code:packages/host-kit/tsconfig.json | A:- | S:继承包基础配置追加声明输出
 tsconfig.json[FO4T]: F:host-kit 的类型检查编译配置 | R:code:packages/host-kit/tsconfig.build.json | A:- | S:包级编译选项基线
 
@@ -1242,8 +1204,8 @@ sse-subscribe.ts[IN7M]: F:基于原生 EventSource 的推送订阅 helper（ADR-
 subscription-hub.ts[IN7M]: F:推送订阅中心：同键逻辑订阅复用一条上游连接 | R:code:packages/host-kit/src/sse-subscribe.ts | A:createSubscriptionHub | S:复用键只由资源身份与参数派生不混入会话凭证；迟到者先收连接状态再收合成快照；最后订阅者离开 linger 2000ms 后关闭；上游 failed 立即关闭清缓存
 
 ===/<repository>/packages/material/===
-CHANGELOG.md[SZ4S]: F:material 包的变更记录 | R:- | A:- | S:按版本记录官方物料包的变更与修复
-package.json[FO4T]: F:material 包的元数据与脚本定义 | R:- | A:- | S:声明包名版本子路径导出与构建脚本
+CHANGELOG.md[SZ4M]: F:官方 material 包 0.1.0 与 0.2.0 变更记录 | R:code:packages/material/package.json | A:检查器描述符与配置组 / 数据源与推送 / 物料渲染 / 状态视图 / 发布依赖 | S:记录描述符迁移、推送写回、渲染盒修复与状态视图收敛
+package.json[FO4T]: F:官方物料包的元数据、导出与构建脚本 | R:- | A:- | S:私有 workspace 包只发布 dist；auto-register 是唯一声明的副作用入口
 tsconfig.build.json[FO4T]: F:material 构建期声明输出的编译配置 | R:code:packages/material/tsconfig.json | A:- | S:继承包基础配置追加声明输出
 tsconfig.json[FO4T]: F:material 的类型检查编译配置 | R:code:packages/material/tsconfig.build.json | A:- | S:包级编译选项基线
 vite.config.ts[FO4T]: F:material 的 Vite 构建配置 | R:- | A:- | S:库模式多入口构建配置，覆盖八种子路径
@@ -1273,8 +1235,8 @@ table.ts[EA7L]: F:表格官方物料的定义、manifest 与键盘可访问渲�
 text.ts[EA7M]: F:文本官方物料的定义与 manifest | R:code:packages/material/src/base-material.ts | A:- | S:数据能力含 host-resource 可直接读推送指标，但不开放宿主资源选择入口；垂直居中与底对齐用内层 flex 包装，元素本身保持 block
 
 ===/<repository>/packages/plugin-core/===
-CHANGELOG.md[SZ5M]: F:plugin-core 包的变更记录 | R:- | A:- | S:按版本记录插件核心契约与校验的变更与修复
-package.json[FO4T]: F:plugin-core 包的元数据与脚本定义 | R:- | A:- | S:声明包名版本入口与构建脚本
+CHANGELOG.md[SZ5M]: F:plugin-core 从 0.1.0 到 0.2.0 的契约、运行时与作者面变更记录 | R:- | A:破坏性契约 / 蓝图与组件状态 / 描述符与物料规范 / 数据源与修复 | S:0.2.0 已用节点图与组件状态取代 relations/rules、条件样式；早期条目含已删除能力，不能当作现状
+package.json[FO4T]: F:plugin-core 包的元数据、根导出与构建脚本 | R:- | A:- | S:无导入副作用；唯一外部运行时依赖是 contracts，且只开放根入口
 tsconfig.build.json[FO4T]: F:plugin-core 构建期声明输出的编译配置 | R:code:packages/plugin-core/tsconfig.json | A:- | S:继承包基础配置追加声明输出
 tsconfig.json[FO4T]: F:plugin-core 的类型检查编译配置 | R:code:packages/plugin-core/tsconfig.build.json | A:- | S:包级编译选项基线
 
@@ -1293,7 +1255,7 @@ index.ts[FC7S]: F:plugin-core 包公共入口再导出 | R:code:packages/plugin-
 plugin.ts[DB7M]: F:插件 manifest 与命令请求的失败关闭解析 | R:code:packages/plugin-core/src/contribution-kind.ts | A:- | S:manifest 严格只含 id dependencies capabilities contributions，id 须 ASCII 标识；命令请求严格只含 commandId 与 args，参与贡献身份与能力表校验
 
 ===/<repository>/packages/plugin-core/src/editor/===
-editor-ai-description.ts[OA7S]: F:物料样式 schema 到 AI 提示 TS 接口的投影 | R:code:packages/plugin-core/src/editor/editor-descriptor-model.ts | A:- | S:模型看到的就是 schema 本身，字段名路径枚举范围来自声明无从编造；只做确定性投影不新增 manifest 字段
+editor-ai-description.ts[OA7S]: F:把物料 styleSchema 与编辑器描述符确定性投影为 AI 可读 TS 样式签名 | R:code:packages/plugin-core/src/editor/editor-descriptor-model.ts,code:packages/plugin-core/src/material/material-schema.ts | A:保留键与主题说明 / 描述符注释 / 嵌套类型与约束 / 深度收敛 | S:最多展开四层；物料 styleSchema 后合并并可覆盖保留键定义；深层对象降为 Record<string, unknown>
 editor-descriptor-conditions.ts[DB6T]: F:编辑器描述符条件声明的校验 | R:code:packages/plugin-core/src/editor/editor-descriptor-model.ts | A:- | S:校验条件 id 与引用关系，可选 target 指定读 props 或 style 侧
 editor-descriptor-events.ts[DB7M]: F:编辑器描述符事件声明的校验 | R:code:packages/plugin-core/src/editor/editor-descriptor-model.ts | A:- | S:事件名须 ASCII 标识且不重复，并须在 manifest.events 中声明，否则报字段无效
 editor-descriptor-inference.ts[DB7S]: F:按字段语义推导检查器控件（ADR-0102 §4） | R:code:packages/plugin-core/src/editor/editor-descriptor-model.ts | A:inferBaseScreenMaterialEditorControl | S:color 或 xxxColor 键为取色器；小整数计数跨度≤24 为步进器且只认 schema 自身边界；有界跨度≤1000 为滑杆读数；同语义在所有物料同控件
@@ -1317,8 +1279,8 @@ material-validation-utils.ts[DB7M]: F:物料校验的底层工具函数集 | R:c
 material.ts[FC4T]: F:物料校验公共 API 的再导出 | R:code:packages/plugin-core/src/material/material-manifest.ts | A:- | S:汇总清单解析身份校验保留样式键与 props 校验的导出，不承载实现
 
 ===/<repository>/packages/plugin-manager/===
-CHANGELOG.md[SZ5M]: F:plugin-manager 包的变更记录 | R:- | A:- | S:按版本记录插件管理器的激活预检与冲突裁决的变更
-package.json[FO4T]: F:plugin-manager 包的元数据与脚本定义 | R:- | A:- | S:声明包名版本子路径导出与构建脚本
+CHANGELOG.md[SZ5M]: F:plugin-manager 的激活、能力授权、贡献投影与组合分片变更记录 | R:- | A:运行时贡献 / 原子激活与懒加载 / 能力管线 / 分片贡献 / 故障归因 | S:0.1.0 所述懒激活与能力声明不对称已由后续条目修复；历史已知问题不是当前行为
+package.json[FO4T]: F:plugin-manager 包的元数据、主入口与 remote-sandbox 子路径定义 | R:- | A:- | S:无导入副作用；依赖 contracts 与 plugin-core，远程沙箱经独立子路径导出
 tsconfig.build.json[FO4T]: F:plugin-manager 构建期声明输出的编译配置 | R:code:packages/plugin-manager/tsconfig.json | A:- | S:继承包基础配置追加声明输出
 tsconfig.json[FO4T]: F:plugin-manager 的类型检查编译配置 | R:code:packages/plugin-manager/tsconfig.build.json | A:- | S:包级编译选项基线
 
@@ -1343,8 +1305,8 @@ session.ts[IA6S]: F:插件激活会话与其端口的构造 | R:code:packages/pl
 types.ts[FC7T]: F:插件管理器的公共类型与状态定义 | R:code:packages/plugin-manager/src/preflight-types.ts | A:- | S:状态含未激活激活中活动中停用中失败清理中已清理；激活失败按插件记录不扩散，快照汇总目录与索引
 
 ===/<repository>/packages/plugin-sdk/===
-CHANGELOG.md[SZ5M]: F:plugin-sdk 包的变更记录 | R:- | A:- | S:按版本记录物料定义加载视图与插件打包辅助的变更
-package.json[FO4T]: F:plugin-sdk 包的元数据与脚本定义 | R:- | A:- | S:声明包名版本入口与构建脚本
+CHANGELOG.md[SZ5M]: F:plugin-sdk 的物料作者面、组合分片、注册辅助与历史外围插件变更记录 | R:- | A:在线物料规格 / 渲染函数骨架 / 描述符与配置组 / 分片定义 / 审计与示例 | S:历史插件和示例条目仅记录演进；现行作者面以 0.2.0 的 spec、描述符与组合审计为准
+package.json[FO4T]: F:plugin-sdk 包的元数据、根导出与构建测试脚本 | R:- | A:- | S:无导入副作用；依赖 contracts 与 plugin-core，测试命令允许空测试集
 tsconfig.build.json[FO4T]: F:plugin-sdk 构建期声明输出的编译配置 | R:code:packages/plugin-sdk/tsconfig.json | A:- | S:继承包基础配置追加声明输出
 tsconfig.json[FO4T]: F:plugin-sdk 的类型检查编译配置 | R:code:packages/plugin-sdk/tsconfig.build.json | A:- | S:包级编译选项基线
 
@@ -1373,9 +1335,9 @@ plugin-package.ts[IB6S]: F:插件包的构造与定义 | R:code:packages/plugin-
 plugin-registration.ts[IB8M]: F:宿主侧插件与物料的注册编排 | R:code:packages/plugin-sdk/src/plugin-package.ts | A:- | S:创建期纯数据校验不触碰浏览器全局；define 先对注册表整体冲突预检，任何冲突在首个 define 之前失败关闭；同构造函数重复 tag 视为幂等重放；插件上限 128 条目 512
 
 ===/<repository>/packages/react/===
-CHANGELOG.md[SZ4S]: F:react 适配包的变更记录 | R:- | A:- | S:按版本记录 React 组件与物料适配的变更
+CHANGELOG.md[SZ4S]: F:React 桥接组件的迟挂载、生命周期、独立包迁移与依赖升级记录 | R:- | A:组件挂载 / 物料桥接 / 宿主协议 / 发布迁移 | S:0.2.0 起移除 React/Vue 转发子路径，桥接包须独立安装；0.2.1 仅跟随 base-screen 0.3.0
 README.md[SZ4T]: F:react 适配包的说明文档 | R:- | A:- | S:说明 React 挂载组件与物料适配的用法
-package.json[FO4T]: F:react 适配包的元数据与脚本定义 | R:- | A:- | S:声明包名版本入口与 React 对等依赖
+package.json[FO4T]: F:React 桥接包的发布元数据、根导出与构建脚本 | R:- | A:- | S:公开发布；React 与 ReactDOM 是 ^19.1.0 peer，不随包内联
 tsconfig.build.json[FO4T]: F:react 构建期声明输出的编译配置 | R:code:packages/react/tsconfig.json | A:- | S:继承包基础配置追加声明输出
 tsconfig.json[FO4T]: F:react 的类型检查编译配置 | R:code:packages/react/tsconfig.build.json | A:- | S:包级编译选项基线
 vite.config.ts[FO4T]: F:react 适配包的 Vite 构建配置 | R:- | A:- | S:库模式构建入口配置，体量极小
@@ -1388,9 +1350,9 @@ components.ts[IA7M]: F:React 设计器与查看器挂载组件 | R:code:packages
 index.ts[IB7S]: F:React 物料定义与组件入口汇总 | R:code:packages/react/src/components.ts | A:- | S:导出挂载组件与 React 物料定义构造器；桥接渲染的非交互控件用原生 CSS 门控指针事件，规则按属性作用域幂等注入
 
 ===/<repository>/packages/renderer/===
-CHANGELOG.md[SZ5M]: F:renderer 包的变更记录 | R:- | A:- | S:按版本记录渲染管线与数据源调度的变更
+CHANGELOG.md[SZ5M]: F:renderer 的数据实例化、目录热更新、组件状态、从画布与推送运行时演进记录 | R:- | A:组件状态 / 从画布 / 推送数据源 / 主题与保留样式 / 挂载性能 / 失败策略 | S:0.2.0 的节点图、组件状态、从画布与推送是当前形态；旧条件样式和 popups 条目仅属历史
 README.md[SZ4T]: F:renderer 包说明 | R:code:packages/renderer/src/index.ts | A:- | S:纯展示不感知设计器；configure 端口在渲染器创建时捕获，之后赋值被拒
-package.json[FO4T]: F:renderer 包的元数据与脚本定义 | R:- | A:- | S:声明包名版本入口与构建脚本
+package.json[FO4T]: F:renderer 包的元数据、根导出与构建脚本 | R:- | A:- | S:无导入副作用；仅依赖 contracts、core 与 plugin-core，保持纯展示包边界
 tsconfig.build.json[FO4T]: F:renderer 构建期声明输出的编译配置 | R:code:packages/renderer/tsconfig.json | A:- | S:继承包基础配置追加声明输出
 tsconfig.json[FO4T]: F:renderer 的类型检查编译配置 | R:code:packages/renderer/tsconfig.build.json | A:- | S:包级编译选项基线
 vite.config.ts[FO4T]: F:renderer 的 Vite 构建配置 | R:- | A:- | S:库模式构建入口配置，体量极小
@@ -1412,11 +1374,11 @@ renderer-data-source.ts[DB7S]: F:实例结果到物料 dataState 的逐组件投
 renderer-diagnostics.ts[DB5T]: F:渲染器诊断的构造前缀与排序 | R:- | A:- | S:统一诊断构造按路径加前缀并排序，渲染失败时给出稳定输出
 renderer-effective-style.ts[RG7T]: F:物料有效模型求值与组件透明度合成 | R:code:packages/renderer/src/renderer/renderer-component-states.ts | A:状态样式覆盖 / 祖先 opacity 连乘 / 环防护 | S:model.style 恒为主题已解析基础样式；生效状态覆盖它但不回写文档；文档后代是 DOM 兄弟，容器 opacity 必须沿 parentId 链连乘给每个组件
 renderer-material-dom.ts[EA7S]: F:物料几何帧、宿主样式、数据标记、透明度与显示的 DOM 应用 | R:code:packages/renderer/src/renderer/renderer-types.ts | A:几何与 opacity 写入 / 宿主保留样式 / stale 标记 / display 收尾 | S:max-content 宽度在 model 未重赋值时保留；display 须在 model 赋值后收尾；opacity 用合成值同值守卫写入；ready+stale 打 data-base-screen-data-stale；事件穿透只在运行时或开启事件时写
-renderer-mounted-material.ts[EA7S]: F:已挂载物料的复用、模型键比对、透明度应用与事件处理 | R:code:packages/renderer/src/renderer/renderer-material-dom.ts | A:复用帧刷新 / 状态与数据重投影 / 事件门控 | S:输入签名全等只重跑几何帧、opacity 与 display 不重赋 model；复用路径用本次文档；事件门控读最近一次 render 的候选
-renderer-state.ts[RG8M]: F:渲染器运行状态容器 | R:code:packages/renderer/src/renderer/renderer.ts | A:挂载与候选 / 数据源实例 / 组件状态 / 合成透明度 / 子画布 | S:数据源实例是请求身份缓存与代际唯一所有者；设计态不订阅推送且不建页面层；dataset 仅 queryScope 声明时共享；opacities 由每次 render 重算供 DOM 兄弟后代继承
+renderer-mounted-material.ts[EA7S]: F:已挂载物料的输入签名比对、显隐收尾、模型重写与事件裁决 | R:code:packages/renderer/src/renderer/renderer-material-dom.ts,code:packages/renderer/src/renderer/renderer-state.ts | A:签名复用 / 显隐专用路径 / 模型应用 / 当前候选事件门控 | S:签名相同或仅可见转隐藏时跳过 model；隐藏时写入的物料重显必重写；事件按最近一次 render 的候选裁决
+renderer-state.ts[RG8M]: F:渲染器共享运行状态与宿主资源运行时装配 | R:code:packages/renderer/src/resource/data-source-runtime.ts,code:packages/renderer/src/resource/source-query-port.ts,code:packages/renderer/src/renderer/renderer.ts | A:端口与请求协调 / 数据源与推送 / 可见性与从画布 / 组件状态 / 执行上下文 | S:数据源实例是请求身份、缓存与代际唯一所有者；设计态不订阅推送且不建页面层；dataset 仅显式 queryScope 才共享；透明度每次 render 重算
 renderer-theme.ts[RG5T]: F:style 中主题色引用的解析 | R:code:packages/contracts/src/document/theme.ts | A:- | S:解析不到的引用进 unresolved 由调用方失败关闭，不能渲染成字面字符串
 renderer-types.ts[FC5T]: F:渲染候选、已挂载物料与校验缓存类型 | R:code:packages/renderer/src/renderer/renderer.ts | A:- | S:候选带各非默认状态预校验样式；缓存 style 已是主题解析结果，主题变化视为未命中
-renderer.ts[EA9L]: F:核心渲染器的实现 | R:code:packages/renderer/src/renderer/renderer-candidates.ts,code:packages/renderer/src/renderer/renderer-mounted-material.ts,code:packages/renderer/src/sub-canvas-layer.ts | A:候选校验与挂载 / 透明度合成 / 状态与数据刷新 / 目录交换 / 回调排队 | S:候选失败缺省 fail、Viewer skip；目录先校验再交换；状态变化只重算依赖来源组件并重算祖先透明度；画布与状态回调排在本次渲染之后
+renderer.ts[EA9L]: F:核心渲染器的文档校验、候选挂载、数据投影与蓝图及画布运行时 | R:code:packages/renderer/src/renderer/renderer-candidates.ts,code:packages/renderer/src/renderer/renderer-mounted-material.ts,code:packages/renderer/src/renderer/renderer-state.ts,code:packages/renderer/src/sub-canvas-layer.ts | A:候选与失败策略 / 挂载复用与目录交换 / 数据源与变量 / 状态与透明度 / 从画布与生命周期 | S:候选默认失败关闭，Viewer 可 skip；目录实现变化才重挂载；数据源结果只重投影读者和状态依赖者；状态变化整体重算祖先透明度；render 末尾才更新 state.document，复用模型须传本次文档
 
 ===/<repository>/packages/renderer/src/resource/===
 data-source-runtime.ts[RG9L]: F:数据源实例的运行期状态、请求与推送订阅管理 | R:code:packages/renderer/src/resource/request-coordinator.ts,code:packages/renderer/src/resource/push-window.ts | A:- | S:一实例一条状态；请求键由来源与规范参数组成，path 与 dataBinding 不进键；文档中消失的实例取消在途并丢弃；设计态 push 只拉一次；订阅身份即请求键，退订后旧 sink 事件丢弃
@@ -1439,9 +1401,9 @@ viewer-variable-handles.ts[RG7S]: F:查看器变量写入权限的守卫与句�
 viewer.ts[EA9L]: F:查看器自定义元素的实现 | R:code:packages/renderer/src/viewer/viewer-variable-controller.ts,code:packages/renderer/src/renderer/renderer.ts,code:packages/renderer/src/sub-canvas-layer.ts | A:- | S:装载替换重新武装 ready 每文档至多一次；分发中的状态与画布改变排队后分发；setter 只保留值不独立初始化；蓝图编译失败也要撤骨架；带过期角标默认样式
 
 ===/<repository>/packages/sdk/===
-CHANGELOG.md[SZ5L]: F:sdk 包的变更记录 | R:- | A:- | S:按版本记录产品元素注册运行时与挂载 API 的变更
+CHANGELOG.md[SZ5L]: F:sdk 产品组合入口的版本变更记录 | R:- | A:- | S:变更按 changeset 汇总，依赖升级只列提交与包版本；破坏性移除及迁移方式写在对应 Minor Changes，不能把依赖列表当功能变更
 README.md[SZ4T]: F:sdk 包的说明文档 | R:- | A:- | S:说明产品 SDK 的接入与运行时用法
-package.json[FO4T]: F:sdk 包的元数据与子路径导出定义 | R:- | A:- | S:声明包名版本众多子路径导出与构建脚本
+package.json[FO4T]: F:私有 sdk 组合包的元数据、子路径导出与构建脚本 | R:- | A:- | S:私有包仅发布 dist；sideEffects 限自动注册与宿主令牌；内部依赖用 workspace，构建复制引擎令牌
 tsconfig.build.json[FO4T]: F:sdk 构建期声明输出的编译配置 | R:code:packages/sdk/tsconfig.json | A:- | S:继承包基础配置追加声明输出
 tsconfig.json[FO4T]: F:sdk 的类型检查编译配置 | R:code:packages/sdk/tsconfig.build.json | A:- | S:包级编译选项基线
 vite.config.ts[FO4T]: F:sdk 的 Vite 构建配置 | R:- | A:- | S:库模式多子路径构建入口配置
@@ -1487,9 +1449,9 @@ viewer-runtime.ts[IA5T]: F:只读查看器运行时的构造 | R:code:packages/s
 viewer.ts[IB5T]: F:查看器子路径的元素注册与 API 汇总 | R:code:packages/sdk/src/definition.ts | A:- | S:定义 BASE_SCREEN_VIEWER_TAG_NAME，注册查看器元素并再导出配置元素类挂载选项与运行时构造
 
 ===/<repository>/packages/vue/===
-CHANGELOG.md[SZ4S]: F:vue 适配包的变更记录 | R:- | A:- | S:按版本记录 Vue 组件与物料适配的变更
+CHANGELOG.md[SZ4S]: F:Vue 适配包的版本变更记录 | R:- | A:- | S:0.2.0 改从 @base-screen/vue 导入以断包图环；0.2.1 仅依赖升级；0.1.0 记迟装配与生命周期
 README.md[SZ4T]: F:vue 适配包的说明文档 | R:- | A:- | S:说明 Vue 挂载组件与物料适配的用法
-package.json[FO4T]: F:vue 适配包的元数据与脚本定义 | R:- | A:- | S:声明包名版本入口与 Vue 对等依赖
+package.json[FO4T]: F:Vue 适配包的元数据、入口与构建脚本 | R:- | A:- | S:仅发布 dist 的公开 ESM 包；依赖 base-screen，Vue ^3.5.0 为 peer，sideEffects false
 tsconfig.build.json[FO4T]: F:vue 构建期声明输出的编译配置 | R:code:packages/vue/tsconfig.json | A:- | S:继承包基础配置追加声明输出
 tsconfig.json[FO4T]: F:vue 的类型检查编译配置 | R:code:packages/vue/tsconfig.build.json | A:- | S:包级编译选项基线
 vite.config.ts[FO4T]: F:vue 适配包的 Vite 构建配置 | R:- | A:- | S:库模式构建入口配置，体量极小
@@ -1503,7 +1465,8 @@ global-styles.ts[IB6T]: F:全局样式的收集与传播辅助 | R:code:packages
 index.ts[IB7M]: F:Vue 物料定义与组件入口汇总 | R:code:packages/vue/src/components.ts,code:packages/vue/src/global-styles.ts | A:- | S:导出挂载组件与 Vue 物料定义构造器；挂载前把全局样式传播进 shadow root 使组件库首次初始化拿到正确尺寸；非交互控件用 CSS 门控指针事件
 
 ===/<repository>/plugins/plugin-materials/===
-package.json[FO4T]: F:plugin-materials 插件包的元数据定义 | R:- | A:- | S:声明包名版本入口与 peer 依赖，作为物料插件交付单元
+CHANGELOG.md[SZ5S]: F:大屏物料插件包的版本变更记录 | R:- | A:- | S:0.2.0 记录容器与组合分片、状态物料重做及 ADR-0099 作者面收敛；旧 speedSeconds、emptyText、statusPalette 等键校验失败关闭，须迁移
+package.json[FO4T]: F:大屏物料插件包的元数据、入口与构建脚本 | R:- | A:- | S:私有 ESM 包仅发布 dist；contracts/plugin-core/plugin-sdk 为内部依赖，ECharts 同时为 peer/dev，sideEffects false
 tsconfig.build.json[FO4T]: F:plugin-materials 构建期声明输出的编译配置 | R:code:plugins/plugin-materials/tsconfig.json | A:- | S:继承包基础配置追加声明输出
 tsconfig.json[FO4T]: F:plugin-materials 的类型检查编译配置 | R:code:plugins/plugin-materials/tsconfig.build.json | A:- | S:包级编译选项基线
 
@@ -1571,7 +1534,7 @@ vite-library-config.ts[FO5T]: F:库模式 Vite 配置的公共工厂 | R:- | A:-
 write-schema-artifact.mjs[FO4T]: F:schema 产物的写入脚本 | R:code:tooling/build/emit-schema-golden.mjs | A:- | S:把生成的 schema 写入目标产物路径，体量极小
 
 ===/<repository>/tooling/checks/===
-api-changesets.mjs[FO6S]: F:API 变更与 changeset 的一致性门禁 | R:code:tooling/checks/packages.mjs | A:- | S:API 报告变更须伴随 changeset；SDK 再导出目录的变更也被纳入检查范围
+api-changesets.mjs[FO6M]: F:API 报告变更与 changeset 声明的一致性门禁 | R:code:tooling/checks/packages.mjs | A:- | S:已删除 changeset 仅在包版本提升时算声明；无痕消费须有 changeset 删除且版本与 CHANGELOG 同批变化，普通 PR 删文件仍失败；SDK 再导出目录也纳入
 api.mjs[FO5T]: F:公共生命周期 API 的门禁 | R:code:tooling/build/api-reports.mjs | A:- | S:按包核验必需的生命周期 API 集合是否存在，复用 API 报告校验能力
 boundaries.mjs[FO8M]: F:工作区依赖边界的门禁 | R:code:tooling/checks/packages.mjs | A:- | S:按包声明允许的工作区依赖集合校验实际 import，单包分发 base-screen 把内部包内联为构建期依赖，宿主只需装一个包
 designer-style-scan.mjs[FO6S]: F:设计器样式门禁的轻量 CSS 块扫描器 | R:code:tooling/checks/designer-styles.mjs | A:- | S:保留每条规则块的直接声明并解析嵌套选择器，忽略注释与引号字符串使 data URL 中的分号不切分声明
@@ -1617,14 +1580,15 @@ test-scope.mjs[FB9L]: F:测试范围选择的编排脚本 | R:code:tooling/lib/s
 
 ===/<repository>/tooling/verification/browser-harness/agent/===
 assert-agent-host-resource-proposal.mjs[FB6T]: F:智能体引用宿主资源提案的浏览器断言 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:@ 引用图片资产后提案先不提交，采纳后组件读文档级 host-resource 数据源实例，文档不含解析后的 URL
+assert-agent-proposal-review.mjs[FB7M]: F:智能体变更提案评审的浏览器断言 | R:code:tooling/verification/browser-harness/feature-cases.ts,code:tooling/verification/browser-harness/run-browser-harness.mjs | A:单组件字号草案与新旧对比 / 删除标记 / 整屏替换评审与原子采纳 | S:单组件草案隐藏旧标题并显示 64px 幽灵，切旧版不改文档；放弃不入历史；整屏提案无单元采纳，评审后整体采纳且可 undo
 
 ===/<repository>/tooling/verification/browser-harness/authoring/===
 assert-composite-insertion.mjs[FB7S]: F:组合分片插入的浏览器断言 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:整片父子成组、只平移不变形、单条历史整片回退；插入后能进组选中子组件；库不可见物料与未知父键被拒；props/style 增量由默认值补齐
 assert-inspector-data-tab.mjs[FB5T]: F:检查器数据源页签显隐的浏览器断言 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:只有声明数据能力的物料出现数据源页签，显式 display 不得把 hidden 漏回；外观页签必须在场
 assert-inspector-form-consistency.mjs[FB7M]: F:检查器表单控件视觉一致性的浏览器断言（ADR-0102） | R:code:tooling/verification/browser-harness/main.ts | A:- | S:逐个插入每种物料展开全部分区，按控件类型比对高度、圆角、底色、字体、内距与起止位置而非截图；须量到大部分物料；验证基础与全量切换
 assert-inspector.mjs[FB9L]: F:检查器与调色板的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖表单滚动连续性、坐标与尺寸输入、描述符步进器、导入探测、可编辑快捷键与调色板布局交互；断言后还原原值避免污染后续步骤
-assert-interactions.mjs[FB9L]: F:设计器交互的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖选区与框选、多选批量编辑、画布内文本编辑、吸附与覆盖层复用、变换预览、图层、事件守卫、主题隔离、控件样式与提示
-assert-workbench.mjs[FB9L]: F:工作台外壳与作者流的浏览器断言集合 | R:code:tooling/verification/browser-harness/run-browser-harness.mjs | A:顶栏与命令面板 / 嵌套菜单与桌面基线几何 / 项目与物料作者流 / 原生事件开关探针 / 文本数据态与预览及宿主集成 | S:覆盖顶栏项目名、命令面板、嵌套菜单可命中性、项目冲突继续/重载/重试、物料数据态、桌面几何与实例隔离、直接预览往返、宿主集成；单元格点击须依次发 cellClick 与同行 rowClick，共 8 条事件；canvas 缩放六档下拉不回退分段
+assert-interactions.mjs[FB9L]: F:设计器选区、变换与交互守卫的浏览器断言集合 | R:code:tooling/verification/browser-harness/run-browser-harness.mjs,code:tooling/verification/browser-harness/shared/harness-utils.mjs | A:选区与框选 / 多选批量与文本编辑 / 吸附和覆盖层复用 / 变换预览与图层 / 事件守卫 / 主题控件与提示 | S:Ctrl/Cmd+A 只选根级；批量字号先展开样式 details；吸附与变换结束恢复文档；覆盖层复用要求节点与 MutationObserver 零写入；锁定组件不参与画布选择与框选；主题样式不跨实例，tooltip 延迟、Esc 抑制重弹且键盘聚焦即时
+assert-workbench.mjs[FB9L]: F:工作台外壳、项目与作者流的浏览器断言集合 | R:code:tooling/verification/browser-harness/run-browser-harness.mjs,code:tooling/verification/browser-harness/shared/harness-utils.mjs,code:tooling/verification/browser-harness/shared/layout-assertions.mjs | A:顶栏与命令面板 / 嵌套菜单与桌面几何 / 项目保存冲突恢复 / 物料作者流 / 原生事件开关 / 数据态预览与宿主集成 | S:保存限定顶栏按钮避免降级兜底歧义；组件数以文档实际值为基准；原生事件关闭时官方物料与 React/Vue 桥接均静默，开启共 8 事件（单元格 2）；桌面基线固定 48/30/22 几何；草稿物料发布预检失败关闭
 
 ===/<repository>/tooling/verification/browser-harness/blueprint/===
 assert-blueprint.mjs[FB9L]: F:蓝图工作台与相关作者流的浏览器断言 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖蓝图工作台、组件文本提交与语义图表作者流；陈旧 revision 失败关闭并重发权威状态；内部事件面板只读
@@ -1634,8 +1598,8 @@ board-composition-fixture.ts[FB7M]: F:大屏组合场景的固定文档夹具 | 
 cases.html[FB8L]: F:浏览器验证专项案例的页面骨架 | R:code:tooling/verification/browser-harness/cases.ts | A:- | S:标题 Base Screen 专项案例，加载 cases.ts 承载案例列表、筛选与导航
 cases.ts[FB7M]: F:专项案例目录页的渲染与交互 | R:code:tooling/verification/browser-harness/feature-case-catalog.ts | A:- | S:按包筛选与搜索案例，渲染基线卡、案例卡与可复制的验证命令，含键盘导航与空态
 component-workshop-host.ts[FB5T]: F:harness 中挂载组件工坊 | R:code:examples/vanilla-host/src/screen/component-workshop.ts | A:- | S:复用三端示例同一份工坊实现，存储换成 localStorage 并重建 catalog 后刷新；只在带 workshop 参数时挂载，避免固定按钮干扰命中测试
-feature-case-catalog.ts[FB7S]: F:功能案例目录的定义 | R:code:tooling/verification/browser-harness/feature-cases.ts | A:- | S:集中声明各功能案例的 id 标题摘要与查询接口，供导航与断言共用
-feature-cases.ts[FB9L]: F:功能案例的构建与分发 | R:code:tooling/verification/browser-harness/feature-case-catalog.ts | A:- | S:把案例目录映射到设计器操作；插件物料与组合插入案例用公开插入接口再覆盖布局与 props，props/style 在默认值上覆盖避免漏必填
+feature-case-catalog.ts[FB7M]: F:功能案例元数据与查询参数的集中目录 | R:code:tooling/verification/browser-harness/feature-cases.ts | A:- | S:目录声明案例元数据、包范围与验证命令；查询统一带 designer/case，压力案例附加 material-group-stress；提案评审聚焦四个变更模块测试
+feature-cases.ts[FB9L]: F:功能案例的应用、URL 分发与停靠栏交互 | R:code:tooling/verification/browser-harness/feature-case-catalog.ts,code:tooling/verification/browser-harness/main.ts | A:URL 历史与案例停靠栏 / 智能体宿主资源与提案 / 插件面板和物料 / 数据面板与变量 / 组合插入 | S:CASE_APPLIERS 以 satisfies 保证目录全覆盖；重复应用按类型+名称跳过；插件物料先 insertComponent 再基于 manifest 默认值 patch，不重写 dataSource；组合分片一次 insertComponentFragment 建四节点；压力参数不一致时先导航再 apply
 hosted-material-package.ts[FB9L]: F:宿主托管物料包的验证夹具 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:定义供浏览器验证的宿主托管物料包，用于验证物料包注册与目录构建通路
 index.html[FB7M]: F:浏览器验证主页面骨架 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:标题 Base Screen Browser Harness，加载 main.ts 承载设计器与查看器验证场景
 inspector-control-fixture.ts[FB7M]: F:检查器控件样例的夹具 | R:code:tooling/verification/browser-harness/feature-cases.ts | A:- | S:定义自定义检查器控件物料类型供验证插件作者面路径
@@ -1645,17 +1609,17 @@ main.ts[FB9L]: F:浏览器验证的引导入口 | R:code:tooling/verification/br
 plugin-panel-element.ts[FB5T]: F:插件面板元素的夹具 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:定义供验证的插件面板自定义元素
 push.html[FB5T]: F:推送数据源探针页骨架（ADR-0104） | R:code:tooling/verification/browser-harness/push.ts | A:- | S:上方设计器只拉取不订阅，下方查看器订阅；事件由页面暴露的 emit 按需投递
 push.ts[FB7M]: F:推送数据源浏览器探针页的宿主实现 | R:code:tooling/verification/browser-harness/dataset/assert-push.mjs | A:- | S:宿主资源端口由页面实现，subscribe 只登记不自推；标量快照、时序增量、静默超时三类资源加只拉取对照组；向已退订 sink 投递以证明 abort 后事件被丢弃
-run-browser-harness.mjs[FB7M]: F:浏览器验证的运行编排 | R:code:tooling/verification/browser-verification.mjs | A:- | S:按固定顺序调用各断言模块，会改选区或草稿的断言放后避免污染；事件系统断言只在 1440 桌面视口执行；含表单一致性与推送专项
+run-browser-harness.mjs[FB7M]: F:浏览器验证的视口编排与断言顺序控制 | R:code:tooling/verification/browser-verification.mjs | A:- | S:先预热吃掉 Vite 强制预构建刷新；桌面按 data-size-tier 降级跳过，完整作者链与事件守卫仅 1440；会改选区或草稿的断言后置，物料几何兜底最后
 semantic-chart-material.ts[FB9L]: F:语义图表验证物料的定义 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:演示条件字段、可重排数组、字段选择器与结构化事件声明的复合作者面物料；渲染层只为让断言能观察投影结果
 system.html[FB4T]: F:设计系统清单的页面 | R:code:tooling/verification/browser-harness/system/system-gallery.ts | A:- | S:承载令牌状态矩阵与组件原语的展示页面
 vite.config.ts[FB5T]: F:浏览器验证的 Vite 配置 | R:- | A:- | S:别名把 @base-screen 与 base-screen 子路径指向各包 src，子路径先于裸包匹配；watch packages 目录以热更新
 
 ===/<repository>/tooling/verification/browser-harness/canvas/===
-assert-canvas.mjs[FB9L]: F:画布基础、内容裁剪与精度的浏览器断言 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖初始指针焦点、键盘进入菜单、内容裁剪与坐标尺寸精度；参考线须绘制在所有组件之上，双击移除持久参考线
+assert-canvas.mjs[FB9L]: F:画布基础、内容裁剪与坐标精度的浏览器断言 | R:code:tooling/verification/browser-harness/run-browser-harness.mjs,code:tooling/verification/browser-harness/shared/harness-utils.mjs | A:初始指针与键盘焦点 / 基础手势与菜单 / 内容裁剪和预览 / 标尺参考线 / 缩放网格与 resize | S:指针聚焦无 focus ring、键盘聚焦有；内容 clip 不裁作者覆盖层，预览 hidden；参考线不改文档、置于所有组件之上并可双击删除；缩放锚定中心，标尺随缩放/resize 重绘；Alt 复制按当前组件数增量
 
 ===/<repository>/tooling/verification/browser-harness/dataset/===
 assert-dataset-panel.mjs[FB9L]: F:数据集面板的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖数据集面板字段绑定与映射步骤的大量断言
-assert-dataset.mjs[FB9L]: F:数据集作者流与数据面渲染的浏览器断言 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:优先点组头走真实展开路径，组头不可见才程序化展开；滚动断言需重试以抵消焦点恢复回滚
+assert-dataset.mjs[FB9L]: F:数据集作者流与单一路径数据面的浏览器断言 | R:code:tooling/verification/browser-harness/run-browser-harness.mjs | A:数据预览与参数 / 字段映射与绑定 / 处理刷新作者流 / 全屏工作台 / 数据面布局与滚动导航 | S:参数固定值/变量用行内两段开关，picker 只列变量；检查器实例设置只读并跳工作台；滚动导航重试到段可见，组头优先真实点击；通知自种子避免顺序依赖；非数据源段规则由单测守并删除无效 DOM 断言
 assert-push.mjs[FB8L]: F:推送数据源专项的浏览器断言（ADR-0104） | R:code:tooling/verification/browser-harness/push.html | A:- | S:只等可观测结果不靠固定延时；覆盖订阅身份、快照与合并追加、游标重复与重同步、重连角标、静默超时、挂起回落、failed 退订、设计态不订阅与工作台回写
 assert-source-switch.mjs[FB6S]: F:固定值与变量回到数据集的浏览器断言 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:固定值与变量没有来源卡，须保留一行绑定方式作为回程入口；该段不得被 :empty 折叠
 
@@ -1663,7 +1627,7 @@ assert-source-switch.mjs[FB6S]: F:固定值与变量回到数据集的浏览器�
 assert-left-panel.mjs[FB9L]: F:左侧面板的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖物料与图层、右键菜单、面板布局宽度、宿主分组与蓝图跨模式及宿主公共令牌；列数随宽度自适应只锁卡片下限
 
 ===/<repository>/tooling/verification/browser-harness/materials/===
-assert-materials.mjs[FB9L]: F:物料库与物料渲染的浏览器断言集合 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖物料分组导航与更新、可用性、宿主状态、封面缩略图、图片密度、作者视觉与几何；组合分片卡排在大屏组物料之后；分组计数按 canonical 类型
+assert-materials.mjs[FB9L]: F:物料分组、宿主状态与渲染质量的浏览器断言集合 | R:code:tooling/verification/browser-harness/run-browser-harness.mjs,code:tooling/verification/browser-harness/shared/layout-assertions.mjs | A:分组压力与响应式 / 目录布局筛选与原子更新 / 宿主状态错误台 / 封面与图片密度 / 作者视觉与全目录几何 | S:宽面板内联 chip、窄面板 286px 弹层，阈值 264px；平铺分组 secondary 隐藏；分组更新须覆盖可见物料且无效赋值全有或全无；封面懒加载且几何不变；图片密度不落文档；全目录渲染盒等于声明尺寸，容差 1px
 
 ===/<repository>/tooling/verification/browser-harness/plugins/===
 assert-board-composition.mjs[FB6S]: F:宿主组合路径的端到端浏览器断言 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:覆盖计时器、脚本过滤器与推送三条组合路径；须确认插件进入快照、动作落到声明 id，文档只存 processorId
@@ -1678,7 +1642,7 @@ assert-runtime-data.mjs[FB7M]: F:运行时取数与画布内容裁剪联动的�
 constants.mjs[FB4T]: F:浏览器验证的共享常量 | R:- | A:- | S:单一常量导出，体量极小
 harness-utils.mjs[FB6S]: F:浏览器验证的共享操作工具 | R:code:tooling/verification/browser-harness/main.ts | A:- | S:顶栏菜单按触发器展开返回 locator；画布辅助菜单先 Escape 保证可重入；子菜单沿真实 hover 路径水平移入浮层；点击组件按画布缩放换算偏移
 layout-assertions.mjs[FB5T]: F:布局断言的共享助手 | R:code:tooling/verification/browser-harness/shared/harness-utils.mjs | A:- | S:封装几何位置与尺寸的通用断言供各功能断言复用
-open-viewport.mjs[FB6S]: F:打开视口的共享助手 | R:code:tooling/verification/browser-harness/shared/harness-utils.mjs | A:- | S:封装进入画布视口与就绪等待的通用流程
+open-viewport.mjs[FB6S]: F:打开设计器与查看器视口并执行渲染冒烟的共享助手 | R:code:tooling/verification/browser-harness/run-browser-harness.mjs,code:tooling/verification/browser-harness/shared/constants.mjs | A:- | S:校验插件注册与官方构造器；设计器/查看器数量取文档实际值，截图至少 10KB；验证数据集两按钮及三态；窄屏检查 896×640 提示与不溢出
 
 ===/<repository>/tooling/verification/browser-harness/system/===
 assert-system-gallery.mjs[FB6M]: F:设计系统清单的浏览器断言 | R:code:tooling/verification/browser-harness/system/system-gallery.ts | A:控件尺寸与禁用态 / 分段轨道几何 / 自绘下拉弹层对齐 / 浅深主题主按钮 | S:深色下校验 input/分段/按钮尺寸与圆角 6px、最小字号≥11；切换浅色后主按钮背景与文字必须变化；expect 是 (condition,message) 收集器，不能链式 toBeTruthy/not.toBe
