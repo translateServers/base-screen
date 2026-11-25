@@ -3,6 +3,7 @@ import { designerIcon } from '../../browser/dom/designer-icons.js';
 import { downloadDesignerDocument } from '../../browser/dom/workspace/designer-workspace.js';
 import { selectedComponents } from '../../common/operations/selection/designer-selection.js';
 import type { ScreenProjectPhase } from '../../common/project/project-controller.js';
+import { listDesignerArtboardComponentIds } from '../../common/session/designer-artboard.js';
 import { DESIGNER_TOOLS } from '../../common/tools/designer-tools.js';
 import {
   DESIGNER_UI_TEXT,
@@ -93,7 +94,12 @@ export function renderStatusBar(element: DesignerElementHost): void {
   }
   const components = root.querySelector<HTMLElement>('[data-status-components]');
   if (components !== null && document !== undefined) {
-    components.textContent = DESIGNER_UI_TEXT.componentCount(document.components.length);
+    // 只计当前画板的组件（ADR-0108）：画板外组件在视图里只是被隐藏锁定。
+    const count =
+      (document.subCanvases?.length ?? 0) > 0
+        ? listDesignerArtboardComponentIds(document).size
+        : document.components.length;
+    components.textContent = DESIGNER_UI_TEXT.componentCount(count);
   }
 }
 

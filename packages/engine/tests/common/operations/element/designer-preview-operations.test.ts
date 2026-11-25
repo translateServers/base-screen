@@ -10,7 +10,7 @@ function documentValue(): ScreenDocument {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 
@@ -57,6 +57,9 @@ function createHost(overrides: HostOverrides): DesignerElementOperationsHost {
     hasClipboard: () => false,
     canGroup: () => false,
     canUngroup: () => false,
+    isFragmentSaveAvailable: () => false,
+    canSaveFragment: () => false,
+    requestFragmentSave: () => undefined,
     canEnterGroupEditing: () => false,
     canExitGroupEditing: () => false,
     canAlign: () => false,

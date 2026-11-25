@@ -1,5 +1,6 @@
 import {
   BASE_SCREEN_MATERIAL_EVENT,
+  type BaseScreenChartData,
   type BaseScreenMaterialModel,
   parseBaseScreenChartData,
 } from '@base-screen/plugin-core';
@@ -19,6 +20,23 @@ import {
 import { cancelChartRender, scheduleChartRender } from './chart-render-scheduler.js';
 import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from './manifest.js';
 
+/** 读屏替代表格的行数上限（与官方折线图物料一致）。 */
+const ECHARTS_A11Y_TABLE_ROW_LIMIT = 200;
+
+/** 摘要里可聚焦的控件（标题 + 每行操作按钮）；无 DOM 的测试替身返回空。 */
+function summaryFocusables(details: HTMLElement): HTMLElement[] {
+  if (typeof details.querySelectorAll !== 'function') return [];
+  return [...details.querySelectorAll<HTMLElement>('summary, button')];
+}
+
+/** 焦点在摘要内的第几个控件上（可穿过 shadow 边界）；不在摘要内时为 -1。 */
+function focusedIndexIn(details: HTMLElement): number {
+  if (typeof details.getRootNode !== 'function') return -1;
+  const root = details.getRootNode() as Document | ShadowRoot;
+  const active = root.activeElement;
+  return active instanceof HTMLElement ? summaryFocusables(details).indexOf(active) : -1;
+}
+
 export class PluginEchartsElement extends HTMLElement {
   static readonly manifest = PLUGIN_ECHARTS_MATERIAL_MANIFEST;
 
@@ -29,6 +47,7 @@ export class PluginEchartsElement extends HTMLElement {
   #renderQueued = false;
   /** ECharts 运行期正在动态加载：避免同一元素重复发起加载。 */
   #loading = false;
+  #summary: HTMLDetailsElement | undefined;
   /** 加载失败终态：按物料降级路径呈现，不做隐式重试。 */
   #loadFailed = false;
   readonly #deferredRender = (): void => {
@@ -68,8 +87,11 @@ export class PluginEchartsElement extends HTMLElement {
     }
     // 只设 display：宿主元素的宽高由渲染器按 canonical `component.size` 写死，
     // 这里再写 `100%` 会把组件撑满画布（曾被 E2E 的几何门禁捕获）。
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.backgroundColor = readString(model.style.backgroundColor, 'transparent');
+    this.setAttribute('role', 'group');
+    this.setAttribute('aria-label', PLUGIN_ECHARTS_MATERIAL_MANIFEST.name);
     // 实例化（echarts 按需加载 + init + 首次 setOption）按帧预算排队：多图表同屏时
     // 首帧只出轻量内容，图表随后逐帧补齐；已实例化的图表仍走同步更新。
     if (this.#handle === undefined) {
@@ -98,11 +120,15 @@ export class PluginEchartsElement extends HTMLElement {
       return;
     }
     if (model.dataState.status !== 'ready') {
+      this.#summary?.remove();
+      this.#summary = undefined;
       handle.render({});
       return;
     }
     const parsed = parseBaseScreenChartData(model.dataState.value);
     if (!parsed.ok) {
+      this.#summary?.remove();
+      this.#summary = undefined;
       handle.render({});
       return;
     }
@@ -121,6 +147,81 @@ export class PluginEchartsElement extends HTMLElement {
         ? buildPluginEchartsOption(input)
         : buildChartFamilyOption(this.chartFamily, input),
     );
+    this.#renderAccessibleSummary(parsed.value, model.interactive);
+  }
+
+  #renderAccessibleSummary(data: BaseScreenChartData, interactive: boolean): void {
+    // 数据刷新会整块重建摘要：记下展开状态与焦点位置（摘要标题或第几个操作按钮），重建后放回，
+    // 否则正在用键盘浏览数据表的用户每次刷新都会被踢回 body、表格也被收起。
+    const previous = this.#summary;
+    const wasOpen = previous?.open === true;
+    const focusIndex = previous === undefined ? -1 : focusedIndexIn(previous);
+    this.#summary?.remove();
+    const doc = this.ownerDocument;
+    const details = doc.createElement('details');
+    details.className = 'base-screen-chart-a11y';
+    details.open = wasOpen;
+    const summary = doc.createElement('summary');
+    summary.textContent = '图表数据与键盘操作';
+    // 设计态不进 Tab 序列（<summary> 天生可聚焦）：设计器里 Tab 不该钻进物料内部。
+    if (!interactive) summary.tabIndex = -1;
+    const table = doc.createElement('table');
+    const caption = doc.createElement('caption');
+    caption.textContent = '图表数据';
+    const head = doc.createElement('thead');
+    const headerRow = doc.createElement('tr');
+    for (const label of ['系列', 'X', 'Y', '操作']) {
+      const cell = doc.createElement('th');
+      cell.scope = 'col';
+      cell.textContent = label;
+      headerRow.appendChild(cell);
+    }
+    head.appendChild(headerRow);
+    const body = doc.createElement('tbody');
+    // 行数上限：数据点上万时整表进 DOM 代价过高，超出部分在标题里说明总数。
+    let listed = 0;
+    const pointCount = data.series.reduce((sum, series) => sum + series.points.length, 0);
+    data.series.forEach((series, seriesIndex) => {
+      series.points.forEach((point, pointIndex) => {
+        if (listed >= ECHARTS_A11Y_TABLE_ROW_LIMIT) return;
+        listed += 1;
+        const row = doc.createElement('tr');
+        for (const value of [series.label, point.x, point.y]) {
+          const cell = doc.createElement('td');
+          cell.textContent = String(value);
+          row.appendChild(cell);
+        }
+        const actionCell = doc.createElement('td');
+        if (interactive) {
+          const button = doc.createElement('button');
+          button.type = 'button';
+          button.textContent = `选择 ${series.label} ${String(point.x)} ${point.y}`;
+          button.addEventListener('click', () => {
+            this.#emitSeriesClick({
+              seriesIndex,
+              seriesName: series.label,
+              pointIndex,
+              x: String(point.x),
+              y: point.y,
+            });
+          });
+          actionCell.appendChild(button);
+        }
+        row.appendChild(actionCell);
+        body.appendChild(row);
+      });
+    });
+    if (pointCount > ECHARTS_A11Y_TABLE_ROW_LIMIT) {
+      caption.textContent = `图表数据（仅列出前 ${ECHARTS_A11Y_TABLE_ROW_LIMIT} 个，共 ${pointCount} 个数据点）`;
+    }
+    table.append(caption, head, body);
+    details.append(summary, table);
+    this.appendChild(details);
+    this.#summary = details;
+    if (focusIndex >= 0) {
+      const focusables = summaryFocusables(details);
+      focusables[Math.min(focusIndex, focusables.length - 1)]?.focus({ preventScroll: true });
+    }
   }
 
   /**
@@ -168,7 +269,22 @@ export class PluginEchartsElement extends HTMLElement {
   #createHandle(adapter: EchartsChartAdapter): void {
     const host = this.ownerDocument.createElement('div');
     host.style.cssText = 'width:100%;height:100%';
-    this.replaceChildren(host);
+    const style = this.ownerDocument.createElement('style');
+    style.textContent = `
+      .base-screen-chart-a11y {
+        position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      }
+      .base-screen-chart-a11y:focus-within {
+        left: 8px; bottom: 8px; width: min(360px, calc(100% - 16px)); height: auto;
+        max-height: 80%; overflow: auto; clip: auto; white-space: normal;
+        padding: 8px; border: 1px solid CanvasText; background: Canvas; color: CanvasText; z-index: 2;
+      }
+      .base-screen-chart-a11y table { width: 100%; border-collapse: collapse; }
+      .base-screen-chart-a11y th, .base-screen-chart-a11y td { padding: 4px; border-bottom: 1px solid CanvasText; text-align: left; }
+    `;
+    this.#summary = undefined;
+    this.replaceChildren(style, host);
     const handle = adapter.createChartHandle(host);
     handle.onSeriesClick((payload) => this.#emitSeriesClick(payload));
     this.#handle = handle;
@@ -181,6 +297,8 @@ export class PluginEchartsElement extends HTMLElement {
   }
 
   #releaseHandle(): void {
+    this.#summary?.remove();
+    this.#summary = undefined;
     this.#resizeObserver?.disconnect();
     this.#resizeObserver = undefined;
     this.#handle?.dispose();

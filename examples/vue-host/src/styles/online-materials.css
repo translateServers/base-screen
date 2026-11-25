@@ -1,7 +1,7 @@
 /* 宿主在线物料面板（ADR-0090）：三端共用的浮层入口与编辑对话框。 */
 
 .editor-online-toggle {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--bs-host-shadow-float);
 }
 
 .online-materials-dialog {
@@ -16,7 +16,7 @@
 }
 
 .online-materials-dialog::backdrop {
-  background: rgba(1, 6, 14, 0.72);
+  background: var(--bs-host-surface-scrim);
   backdrop-filter: blur(3px);
 }
 
@@ -40,14 +40,14 @@
 
 .online-materials-title {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--bs-host-font-size-lg);
   font-weight: 600;
 }
 
 .online-materials-subtitle {
   margin: 4px 0 0;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--bs-host-font-size-xs);
   line-height: 1.5;
 }
 
@@ -64,7 +64,7 @@
   min-height: 0;
   padding: var(--spacing-4);
   border-right: 1px solid var(--color-border);
-  background: rgba(5, 13, 26, 0.45);
+  background: color-mix(in srgb, var(--bs-host-surface-panel) 45%, transparent);
 }
 
 .online-materials-list-head {
@@ -77,7 +77,7 @@
   flex: 1;
   color: var(--color-text-muted);
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
-  font-size: 10px;
+  font-size: var(--bs-host-font-size-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -98,24 +98,24 @@
   padding: 9px 10px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: rgba(8, 26, 46, 0.6);
+  background: color-mix(in srgb, var(--bs-host-surface-panel) 60%, transparent);
   color: inherit;
   text-align: left;
   cursor: pointer;
 }
 
 .online-material-item:hover {
-  background: rgba(14, 45, 74, 0.8);
+  background: var(--bs-host-surface-control-hover);
 }
 
 .online-material-item.is-selected {
   border-color: var(--color-accent);
-  background: rgba(56, 189, 248, 0.12);
+  background: color-mix(in srgb, var(--bs-host-accent) 12%, transparent);
 }
 
 .online-material-name {
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--bs-host-font-size-sm);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -126,7 +126,7 @@
   overflow: hidden;
   color: var(--color-text-muted);
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
-  font-size: 9px;
+  font-size: var(--bs-host-font-size-xs);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -136,7 +136,7 @@
   margin: 0;
   padding: var(--spacing-4) var(--spacing-2);
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--bs-host-font-size-xs);
   line-height: 1.6;
   text-align: center;
 }
@@ -144,10 +144,10 @@
 .online-materials-errors {
   margin: 0;
   padding: 8px 10px;
-  border: 1px solid rgba(248, 113, 113, 0.35);
+  border: 1px solid color-mix(in srgb, var(--bs-host-danger) 35%, transparent);
   border-radius: var(--radius-sm);
-  color: #fecaca;
-  font-size: 10px;
+  color: var(--bs-host-danger-text);
+  font-size: var(--bs-host-font-size-xs);
   line-height: 1.6;
   white-space: pre-wrap;
 }
@@ -173,41 +173,41 @@
   flex-direction: column;
   gap: 4px;
   color: var(--color-text-muted);
-  font-size: 10px;
+  font-size: var(--bs-host-font-size-xs);
 }
 
 .online-material-input {
-  height: 30px;
-  padding: 0 9px;
+  height: var(--bs-host-control-height);
+  padding: 0 var(--bs-host-control-padding-inline);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: rgba(5, 13, 26, 0.65);
+  background: color-mix(in srgb, var(--bs-host-surface-workspace) 65%, transparent);
   color: var(--color-text);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--bs-host-font-size-sm);
 }
 
 .online-material-input[readonly] {
   color: var(--color-text-muted);
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
-  font-size: 10px;
+  font-size: var(--bs-host-font-size-xs);
 }
 
 .online-material-input:focus {
-  outline: 2px solid rgba(56, 189, 248, 0.45);
+  outline: 2px solid var(--bs-host-focus-ring);
   outline-offset: 1px;
 }
 
 .online-materials-preview {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: rgba(5, 13, 26, 0.4);
+  background: color-mix(in srgb, var(--bs-host-surface-workspace) 40%, transparent);
 }
 
 .online-materials-preview summary {
   padding: 9px 12px;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--bs-host-font-size-xs);
   cursor: pointer;
 }
 
@@ -222,7 +222,7 @@
   margin: 8px 0 4px;
   color: var(--color-accent);
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
-  font-size: 9px;
+  font-size: var(--bs-host-font-size-xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -230,11 +230,11 @@
 .online-materials-preview pre {
   margin: 0;
   padding: 6px 8px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.28);
-  color: #c7d8e8;
+  border-radius: var(--bs-host-radius-2);
+  background: color-mix(in srgb, var(--bs-host-surface-workspace) 28%, transparent);
+  color: var(--bs-host-text-secondary);
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
-  font-size: 9px;
+  font-size: var(--bs-host-font-size-xs);
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -243,7 +243,7 @@
 .online-materials-hint {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 10px;
+  font-size: var(--bs-host-font-size-xs);
   line-height: 1.6;
 }
 
@@ -254,13 +254,13 @@
 }
 
 .online-materials-actions .button {
-  height: 30px;
+  height: var(--bs-host-control-height);
   padding: 0 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: rgba(8, 26, 46, 0.8);
+  background: color-mix(in srgb, var(--bs-host-surface-panel) 80%, transparent);
   color: var(--color-text);
-  font-size: 11px;
+  font-size: var(--bs-host-font-size-xs);
   cursor: pointer;
 }
 
@@ -269,7 +269,9 @@
 }
 
 .online-materials-actions .button:disabled {
-  opacity: 0.42;
+  border-color: var(--bs-host-border-subtle);
+  background: var(--bs-host-surface-control);
+  color: var(--bs-host-text-disabled);
   cursor: not-allowed;
 }
 
@@ -277,12 +279,12 @@
   min-height: 16px;
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 10px;
+  font-size: var(--bs-host-font-size-xs);
   line-height: 1.6;
 }
 
 .online-materials-status[data-tone="error"] {
-  color: #fecaca;
+  color: var(--bs-host-danger-text);
 }
 
 @media (max-width: 860px) {

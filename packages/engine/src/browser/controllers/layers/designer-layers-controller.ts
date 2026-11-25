@@ -22,6 +22,7 @@ import {
   filterDesignerLayerItems,
   getDesignerLayerSelectionTarget,
   renderDesignerLayers,
+  resolveDesignerLayerBranchAction,
 } from '../../dom/layers/designer-layers-dom.js';
 import type {
   DesignerLayerArrangeAction,
@@ -282,9 +283,11 @@ export class DesignerLayersController {
     const collapse = target.closest<HTMLElement>('[data-layer-collapse]');
     if (collapse?.dataset.layerCollapse !== undefined) {
       const id = collapse.dataset.layerCollapse;
-      if (this.#collapsed.has(id)) this.#collapsed.delete(id);
-      else this.#collapsed.add(id);
-      this.render(collapse.closest<HTMLElement>('[data-layers]') ?? undefined);
+      this.setCollapsed(
+        id,
+        !this.#collapsed.has(id),
+        collapse.closest<HTMLElement>('[data-layers]') ?? undefined,
+      );
       return true;
     }
     const toggle = target.closest<HTMLElement>('[data-layer-toggle]');
@@ -416,6 +419,9 @@ export class DesignerLayersController {
   private navigateTree(target: HTMLButtonElement, event: KeyboardEvent): boolean {
     const root = target.closest<HTMLElement>('[data-layer-root]');
     if (root === null) return false;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      return this.navigateBranch(root, target, event);
+    }
     const controls = [...root.querySelectorAll<HTMLButtonElement>('[data-layer-select]')].filter(
       (control) => !control.disabled,
     );
@@ -437,6 +443,72 @@ export class DesignerLayersController {
     next.focus();
     this.selectLayer(next.dataset.layerSelect!, event);
     return true;
+  }
+
+  /**
+   * 左右键走「树」的语义而不是「列表」的语义：右键展开分组或进入首个子行，
+   * 左键折叠分组或退回父行。上下键只负责可见序列的相邻漫游，两者分工与文件树一致。
+   *
+   * 判定交给 resolveDesignerLayerBranchAction（纯函数，可脱离 DOM 单测），这里只取样并执行。
+   * 折叠会重建 tree 的子节点，但 tree 容器由 ensureLayerChrome 复用，渲染后仍可按 id
+   * 找回焦点——少了这一步，键盘用户按一下左键就会被抛回文档起点。
+   */
+  private navigateBranch(
+    root: HTMLElement,
+    target: HTMLButtonElement,
+    event: KeyboardEvent,
+  ): boolean {
+    const row = target.closest<HTMLElement>('[data-layer-id]');
+    const id = row?.dataset.layerId;
+    if (row === null || id === undefined) return false;
+    const controls = [...root.querySelectorAll<HTMLButtonElement>('[data-layer-select]')];
+    const parentId = row.dataset.layerParent;
+    const firstChildId =
+      controls.find(
+        (control) => control.closest<HTMLElement>('[data-layer-id]')?.dataset.layerParent === id,
+      )?.dataset.layerSelect ?? null;
+    const action = resolveDesignerLayerBranchAction({
+      direction: event.key === 'ArrowRight' ? 'right' : 'left',
+      id,
+      isGroup: row.dataset.layerGroup === 'true',
+      expanded:
+        row.querySelector<HTMLElement>('[data-layer-collapse]')?.getAttribute('aria-expanded') ===
+        'true',
+      parentId: parentId === undefined || parentId === '' ? null : parentId,
+      firstChildId,
+      searchActive: this.#search !== '',
+    });
+    // 左右键在树里始终属于导航：没有可去之处也要吃掉按键，
+    // 否则焦点在树内按左右键会横向滚动整个面板。
+    event.preventDefault();
+    if (action === undefined) return true;
+    if (action.type === 'focus') {
+      const control = controls.find((candidate) => candidate.dataset.layerSelect === action.id);
+      if (control === undefined) return true;
+      control.focus();
+      this.selectLayer(action.id, event);
+      return true;
+    }
+    this.setCollapsed(
+      action.id,
+      action.type === 'collapse',
+      root.closest<HTMLElement>('[data-layers]') ?? undefined,
+    );
+    this.focusLayerSelect(root, action.id);
+    return true;
+  }
+
+  private setCollapsed(id: string, collapsed: boolean, panel: HTMLElement | undefined): void {
+    if (collapsed) this.#collapsed.add(id);
+    else this.#collapsed.delete(id);
+    this.render(panel);
+  }
+
+  private focusLayerSelect(root: HTMLElement, id: string): void {
+    const control = [...root.querySelectorAll<HTMLButtonElement>('[data-layer-select]')].find(
+      (candidate) => candidate.dataset.layerSelect === id,
+    );
+    control?.focus({ preventScroll: true });
   }
 
   onDragStart(event: DragEvent): boolean {

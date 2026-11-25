@@ -43,7 +43,9 @@ export function renderDesignerSelection(
   selection.style.height = `${bounds.bottom - bounds.top}px`;
   selection.replaceChildren();
   appendSelectionTag(selection, ownerDocument, selected);
-  appendSelectionGrab(selection, ownerDocument, covered, bounds);
+  // 只挖掉显式选中的组件：子孙在父组件的矩形里，再挖一次会被 evenodd 翻回「填充」，
+  // 拖拽层就盖住了子组件（双击进组、点子组件都点到拖拽层上）。
+  appendSelectionGrab(selection, ownerDocument, selected, bounds);
   appendTransformControls(selection, ownerDocument, document, selected, catalog);
 }
 
@@ -67,8 +69,10 @@ function appendSelectionTag(
   selection.appendChild(tag);
 }
 
-// 拖拽层覆盖包围盒空白区域（clip-path 挖掉组件区域），组件区域仍可点击；
+// 拖拽层覆盖包围盒空白区域（clip-path 挖掉选中组件的区域），组件区域仍可点击；
 // grab 先于 handles 插入，handles/rotate 在命中测试中优先。
+// 规则是 evenodd：只传选中的根组件。传入整棵子树时，外壳的矩形与子组件的矩形嵌套，
+// 子组件区域会被挖两次、重新变成「填充」。
 function appendSelectionGrab(
   selection: HTMLDivElement,
   ownerDocument: Document,

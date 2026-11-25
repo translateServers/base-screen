@@ -1,5 +1,6 @@
 import {
   type BaseScreenMaterialLibraryGrouping,
+  materialLibraryGroupEntryCount,
   materialLibraryGroupMaterialTypes,
   materialLibraryGroupPath,
 } from '../../../common/operations/material-library/material-library-grouping.js';
@@ -68,7 +69,7 @@ export function renderMaterialLibraryGroupNavigation(
     if (label !== null) label.textContent = selected?.label ?? DESIGNER_UI_TEXT.allMaterialGroups;
   }
 
-  const allCount = materialLibraryGroupMaterialTypes(grouping).length;
+  const allCount = materialLibraryGroupEntryCount(grouping);
   renderMaterialGroupButtons(view.roots, [
     {
       key: 'all',
@@ -92,7 +93,7 @@ export function renderMaterialLibraryGroupNavigation(
         accessibleLabel: DESIGNER_UI_TEXT.materialGroupSelect(group.label),
         path: group.label,
         icon: icon === 'grid' ? 'rect' : icon,
-        count: types.length,
+        count: materialLibraryGroupEntryCount(grouping, group.id),
         selected: path[0]?.id === group.id,
         hasChildren: group.children !== undefined,
       };
@@ -111,10 +112,7 @@ export function renderMaterialLibraryGroupNavigation(
           : DESIGNER_UI_TEXT.materialGroupSelectAll(branch.label),
       path:
         branchPath.map((group) => group.label).join(' / ') || DESIGNER_UI_TEXT.allMaterialGroups,
-      count:
-        branch === undefined
-          ? allCount
-          : materialLibraryGroupMaterialTypes(grouping, branch.id).length,
+      count: branch === undefined ? allCount : materialLibraryGroupEntryCount(grouping, branch.id),
       selected: selected?.id === branch?.id,
     },
     ...(branch?.children ?? []).map(
@@ -125,7 +123,7 @@ export function renderMaterialLibraryGroupNavigation(
         label: group.label,
         accessibleLabel: DESIGNER_UI_TEXT.materialGroupSelect(group.label),
         path: [...branchPath, group].map((entry) => entry.label).join(' / '),
-        count: materialLibraryGroupMaterialTypes(grouping, group.id).length,
+        count: materialLibraryGroupEntryCount(grouping, group.id),
         selected: selected?.id === group.id,
         hasChildren: group.children !== undefined,
       }),

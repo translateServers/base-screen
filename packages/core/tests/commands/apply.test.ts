@@ -218,24 +218,23 @@ describe('applyScreenDocumentCommand', () => {
     const result = applyScreenDocumentCommand(document, {
       type: 'replace-blueprint',
       blueprint: {
-        relations: [
+        nodes: [
+          { kind: 'component', id: 'component:group', componentId: 'group' },
+          { kind: 'component', id: 'component:other', componentId: 'other' },
+        ],
+        edges: [
           {
-            type: 'behavior',
-            id: 'relation-1',
-            source: {
-              kind: 'component',
-              componentId: 'group',
-              event: { type: 'material-event', eventName: 'valueClick' },
-            },
-            target: { kind: 'component', componentId: 'other' },
-            effect: { type: 'request-component-data' },
+            kind: 'flow',
+            id: 'edge-1',
+            from: { node: 'component:group', port: 'event:valueClick' },
+            to: { node: 'component:other', port: 'request-data' },
           },
         ],
       },
     });
 
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.document.blueprint.relations[0]?.id).toBe('relation-1');
+    if (result.ok) expect(result.document.blueprint.edges[0]?.id).toBe('edge-1');
   });
 
   it('does not retain mutable command JSON references', () => {
@@ -479,46 +478,46 @@ describe('applyScreenDocumentCommand update-canvas background image', () => {
   });
 });
 
-describe('applyScreenDocumentCommand styleRules patch', () => {
-  const warnRule = {
-    id: 'warn',
-    when: { path: [], operator: 'gt', value: 100 },
-    style: { color: '#ff0000' },
+describe('applyScreenDocumentCommand states patch (ADR-0110)', () => {
+  const states = {
+    items: [{ id: 'warn', name: '警告', style: { color: '#ff0000' } }],
+    judge: {
+      input: { kind: 'component-data', path: [] },
+      cases: [{ operator: 'gt', value: 100, stateId: 'warn' }],
+    },
   } as const;
 
-  it('R2 replaces styleRules wholesale and clears them with an empty array', () => {
+  it('R2 replaces states wholesale and removes them with null', () => {
     const document = makeDocument({ components: [makeComponent({ id: 'metric' })] });
     const applied = applyScreenDocumentCommand(document, {
       type: 'update-components',
       componentIds: ['metric'],
-      patch: { styleRules: [warnRule] },
+      patch: { states },
     });
     expect(applied.ok).toBe(true);
     if (!applied.ok) return;
-    expect(applied.document.components[0]?.styleRules).toEqual([warnRule]);
+    expect(applied.document.components[0]?.states).toEqual(states);
     expect(applied.changedComponentIds).toEqual(['metric']);
-    expect(document.components[0]?.styleRules).toBeUndefined();
+    expect(document.components[0]?.states).toBeUndefined();
 
     const cleared = applyScreenDocumentCommand(applied.document, {
       type: 'update-components',
       componentIds: ['metric'],
-      patch: { styleRules: [] },
+      patch: { states: null },
     });
     expect(cleared.ok).toBe(true);
     if (cleared.ok) {
-      expect(cleared.document.components[0]?.styleRules).toEqual([]);
+      expect('states' in cleared.document.components[0]!).toBe(false);
       expect(cleared.changedComponentIds).toEqual(['metric']);
     }
   });
 
-  it('R2 keeps no-op semantics for an equal rules array', () => {
-    const document = makeDocument({
-      components: [makeComponent({ id: 'metric', styleRules: [warnRule] })],
-    });
+  it('R2 keeps no-op semantics for equal states', () => {
+    const document = makeDocument({ components: [makeComponent({ id: 'metric', states })] });
     const result = applyScreenDocumentCommand(document, {
       type: 'update-components',
       componentIds: ['metric'],
-      patch: { styleRules: [{ ...warnRule }] },
+      patch: { states: JSON.parse(JSON.stringify(states)) },
     });
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -527,12 +526,12 @@ describe('applyScreenDocumentCommand styleRules patch', () => {
     }
   });
 
-  it('R2 fails closed on contract-invalid rules and leaves the document unchanged', () => {
+  it('R2 fails closed on contract-invalid states and leaves the document unchanged', () => {
     const document = makeDocument({ components: [makeComponent({ id: 'metric' })] });
     const result = applyScreenDocumentCommand(document, {
       type: 'update-components',
       componentIds: ['metric'],
-      patch: { styleRules: [warnRule, warnRule] },
+      patch: { states: { items: [states.items[0], states.items[0]] } },
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -540,7 +539,7 @@ describe('applyScreenDocumentCommand styleRules patch', () => {
     }
   });
 
-  it('R2 rejects styleRules patches on effectively locked targets', () => {
+  it('R2 rejects states patches on effectively locked targets', () => {
     const document = makeDocument({
       components: [
         makeComponent({ id: 'group', status: { locked: true, hidden: false } }),
@@ -550,7 +549,7 @@ describe('applyScreenDocumentCommand styleRules patch', () => {
     const result = applyScreenDocumentCommand(document, {
       type: 'update-components',
       componentIds: ['child'],
-      patch: { styleRules: [warnRule] },
+      patch: { states },
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {

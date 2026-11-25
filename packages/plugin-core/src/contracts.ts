@@ -4,11 +4,15 @@ import type {
   ScreenDocument,
   ScreenJsonObject,
   ScreenJsonValue,
+  ScreenLevelScale,
   ScreenMaterialErrorCode,
   ScreenParseResult,
   ScreenSize,
+  ScreenSourceDelivery,
+  ScreenThemeSlot,
 } from '@base-screen/contracts';
 import type { BaseScreenMaterialEditorDescriptor } from './editor/editor-descriptor.js';
+import type { BaseScreenFragmentDefinition } from './fragment/fragment.js';
 
 export const BASE_SCREEN_MATERIAL_EVENT = 'base-screen-material-event' as const;
 
@@ -19,7 +23,15 @@ export type BaseScreenMaterialMode = 'design' | 'preview' | 'viewer';
 export type BaseScreenMaterialDataState =
   | { readonly status: 'idle' }
   | { readonly status: 'loading' }
-  | { readonly status: 'ready'; readonly value: ScreenJsonValue }
+  | {
+      readonly status: 'ready';
+      readonly value: ScreenJsonValue;
+      /**
+       * 推送实例的值已过期（ADR-0104 §2.6）：连接 reconnecting / suspended、重同步中，或超过
+       * 静默超时。物料可据此弱化显示；不读此字段的物料行为不变。只在为 true 时出现。
+       */
+      readonly stale?: true;
+    }
   | {
       readonly status: 'error';
       readonly code: ScreenMaterialErrorCode;
@@ -34,62 +46,6 @@ export interface BaseScreenMaterialModel {
   readonly style: ScreenJsonObject;
   readonly size: ScreenSize;
   readonly dataState: BaseScreenMaterialDataState;
-}
-
-/** ADR-0059 宿主条件样式端口请求：组件身份与其当前完整数据状态（含 idle/loading/error）。 */
-export interface BaseScreenConditionalStyleRequest {
-  readonly componentId: string;
-  readonly dataState: BaseScreenMaterialDataState;
-}
-
-/**
- * ADR-0059 宿主条件样式端口：同步、无副作用、不发起 I/O。宿主当前已发布的告警/视觉快照
- * 不变时，相同 (componentId, dataState) 必须返回等价覆盖；快照变化后结果可变，但宿主必须
- * 先提交快照，再调用 refreshConditionalStyles() 让已挂载视觉与快照对齐。
- * 返回样式覆盖键值（merge 语义，同 styleRules 的 style），undefined 表示无覆盖；
- * 非法覆盖与抛异常由 Renderer 同路径 fail-closed 隔离。
- */
-export interface BaseScreenConditionalStylePort {
-  resolve(request: BaseScreenConditionalStyleRequest): ScreenJsonObject | undefined;
-}
-
-/**
- * 宿主条件样式的条件源（如告警 key）与条件（如等级）。
- *
- * 只用于作者面展示：Engine 渲染通用表单，不解释 sourceId/conditionId 的语义，
- * 也不持有外部系统的传输、凭证或阈值配置。
- */
-export interface BaseScreenHostConditionalStyleCondition {
-  readonly id: string;
-  readonly label: string;
-}
-
-export interface BaseScreenHostConditionalStyleSource {
-  readonly id: string;
-  readonly label: string;
-  readonly conditions: readonly BaseScreenHostConditionalStyleCondition[];
-}
-
-/** 某组件在一个条件源 + 条件命中的样式覆盖；同源同条件可携带多个样式键。 */
-export interface BaseScreenHostConditionalStyleBinding {
-  readonly sourceId: string;
-  readonly conditionId: string;
-  readonly style: ScreenJsonObject;
-}
-
-/**
- * 宿主条件样式作者口：Engine 只负责原生表单与调用时序，条件源、持久化与语义归宿主。
- *
- * `bindings` 返回该组件当前完整绑定；`save` 接收替换后的完整列表，宿主必须在 resolve 前
- * 让新绑定对 `conditionalStylePort` 生效。保存成功后 Engine 会重算该组件样式。
- */
-export interface BaseScreenHostConditionalStyleAuthoringPort {
-  readonly sources: readonly BaseScreenHostConditionalStyleSource[];
-  bindings(componentId: string): readonly BaseScreenHostConditionalStyleBinding[];
-  save(
-    componentId: string,
-    bindings: readonly BaseScreenHostConditionalStyleBinding[],
-  ): Promise<ScreenParseResult<void>>;
 }
 
 export type BaseScreenMaterialPropSchema =
@@ -222,6 +178,18 @@ export interface BaseScreenMaterialManifest {
   readonly cover?: string;
   /** 可选：JSON-safe 声明式作者描述（appearance/data/interaction/events）。 */
   readonly editorDescriptor?: BaseScreenMaterialEditorDescriptor;
+  /**
+   * 可选：新建组件时跟随文档主题色板的样式键（样式键 → 主题色位，ADR-0101）。
+   *
+   * 文档带色板时，这些键取当前色板的颜色写入新组件；没有色板时仍用 `defaultStyle`。
+   * 只影响插入那一刻（见 `resolveBaseScreenMaterialDefaultStyle`），不改变已有组件。
+   */
+  readonly themeStyle?: Readonly<Record<string, ScreenThemeSlot>>;
+  /**
+   * 可选：「按分级生成状态」时预置覆盖的样式键（ADR-0110 §2.6.3）。指定后优先于设计器的推断
+   * （主色、描边色、发光）；颜色键写状态色位引用，开关键（boolean）在危险等级打开。
+   */
+  readonly statePresetKeys?: readonly string[];
 }
 
 export interface BaseScreenMaterialElement extends HTMLElement {
@@ -281,6 +249,13 @@ export interface BaseScreenPluginDataResourceTypeContribution {
   /** 显式共享声明（Data Runtime Hardening / DRH-R2）：仅 'resource' 开启同实例
    *  in-flight 共享；缺省为组件域，不共享。仅作声明，不含其它运行时语义。 */
   readonly queryScope?: 'resource';
+  /**
+   * 推送能力声明（ADR-0104 §2.3）：缺省视为只支持拉取，设计器不提供「实时推送」。
+   * 声明即表示宿主的资源端口为该类型实现了 `subscribe`。
+   */
+  readonly delivery?: ScreenSourceDelivery;
+  /** 宿主分级表（ADR-0110 §2.6.2）：只在作者面使用，文档不保存，运行时不读。 */
+  readonly levelScales?: readonly ScreenLevelScale[];
 }
 
 /**
@@ -342,7 +317,16 @@ export type BaseScreenPluginContribution =
       readonly name: string;
       /** 由宿主 registry 解析的 custom element 标签；editorDescriptor 字段用 tagName 引用它。 */
       readonly tagName: string;
-    };
+    }
+  | BaseScreenPluginFragmentContribution;
+
+/**
+ * 插件随物料一起交付的组合分片（ADR-0100）：分片定义本身就是 JSON-safe 数据，直接写进清单。
+ * 不需要能力授权——它只在作者期被展开成普通组件，不在运行期执行任何代码。
+ */
+export interface BaseScreenPluginFragmentContribution extends BaseScreenFragmentDefinition {
+  readonly kind: 'fragment';
+}
 
 export interface BaseScreenRuntimeContributionIndex {
   getResourceType(resourceType: string): BaseScreenPluginDataResourceTypeContribution | undefined;
@@ -358,6 +342,10 @@ export interface BaseScreenRuntimeContributionIndex {
   getDataProcessor?(processorId: string): BaseScreenPluginDataProcessorContribution | undefined;
   /** 枚举生效的数据处理器，供作者面生成处理器选择器。 */
   listDataProcessors?(): readonly BaseScreenPluginDataProcessorContribution[];
+  /** 按 id 查插件贡献的组合分片（ADR-0100）；未声明即 undefined。 */
+  getFragment?(fragmentId: string): BaseScreenPluginFragmentContribution | undefined;
+  /** 枚举插件贡献的组合分片，供物料库展示。可选，同 listResourceTypes 的兼容约定。 */
+  listFragments?(): readonly BaseScreenPluginFragmentContribution[];
 }
 
 export interface BaseScreenPluginManifest {

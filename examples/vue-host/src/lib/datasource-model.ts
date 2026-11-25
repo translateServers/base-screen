@@ -508,9 +508,26 @@ export function draftSignature(draft: DatasourceDraft): string {
   return JSON.stringify(draft);
 }
 
+/**
+ * 校验失败时指向的表单项：抽屉据此给对应控件标 aria-invalid / aria-describedby。
+ * 没有单一控件可指（如「至少勾选 1 列」「过滤条件不完整」）的错误只出提示文案。
+ */
+export type DraftField =
+  | 'name'
+  | 'file'
+  | 'table'
+  | 'columns'
+  | 'sql'
+  | 'filters'
+  | 'url'
+  | 'headers'
+  | 'params'
+  | 'staticColumns'
+  | 'staticRows';
+
 export type DraftValidation =
   | { readonly ok: true }
-  | { readonly ok: false; readonly message: string };
+  | { readonly ok: false; readonly message: string; readonly field?: DraftField };
 
 /**
  * 表单校验（前端先拦，避免把明显不合法的东西发出去）。
@@ -519,54 +536,70 @@ export type DraftValidation =
  * （名称空、没选库/表/列、URL 空），不重复实现 BLOB/白名单这类需要后端知识的判断。
  */
 export function validateDraft(draft: DatasourceDraft): DraftValidation {
-  if (draft.name.trim() === '') return { ok: false, message: '请填写名称。' };
-  if (draft.name.trim().length > 64) return { ok: false, message: '名称最多 64 字。' };
+  if (draft.name.trim() === '') return { ok: false, field: 'name', message: '请填写名称。' };
+  if (draft.name.trim().length > 64)
+    return { ok: false, field: 'name', message: '名称最多 64 字。' };
   if (draft.type === 'sqlite') {
-    if (draft.file === '') return { ok: false, message: '请选择数据库文件。' };
+    if (draft.file === '') return { ok: false, field: 'file', message: '请选择数据库文件。' };
     if (draft.sqliteMode === 'table') {
-      if (draft.table === '') return { ok: false, message: '请选择表或视图。' };
-      if (draft.columns.length === 0) return { ok: false, message: '请至少勾选 1 列。' };
+      if (draft.table === '') return { ok: false, field: 'table', message: '请选择表或视图。' };
+      if (draft.columns.length === 0)
+        return { ok: false, field: 'columns', message: '请至少勾选 1 列。' };
     } else if (draft.sql.trim() === '') {
-      return { ok: false, message: '请填写 SQL 语句。' };
+      return { ok: false, field: 'sql', message: '请填写 SQL 语句。' };
     }
     const params = validateParams(draft.params);
     if (params.ok === false) return params;
     for (const filter of draft.filters) {
       if (filter.column === '' || filter.param === '') {
-        return { ok: false, message: '过滤条件需要同时填写列与参数名。' };
+        return { ok: false, field: 'filters', message: '过滤条件需要同时填写列与参数名。' };
       }
       if (PARAMETER_NAME_PATTERN.test(filter.param) === false) {
-        return { ok: false, message: `参数名 ${filter.param} 不合法（字母或下划线开头）。` };
+        return {
+          ok: false,
+          field: 'filters',
+          message: `参数名 ${filter.param} 不合法（字母或下划线开头）。`,
+        };
       }
       if (draft.params.every((parameter) => parameter.name !== filter.param)) {
-        return { ok: false, message: `过滤参数 ${filter.param} 未在参数区声明。` };
+        return {
+          ok: false,
+          field: 'filters',
+          message: `过滤参数 ${filter.param} 未在参数区声明。`,
+        };
       }
     }
     return { ok: true };
   }
   if (draft.type === 'rest') {
     const url = draft.url.trim();
-    if (url === '') return { ok: false, message: '请填写请求地址。' };
+    if (url === '') return { ok: false, field: 'url', message: '请填写请求地址。' };
     if (/^https?:\/\//i.test(url) === false) {
-      return { ok: false, message: '请求地址只支持 http:// 或 https://。' };
+      return { ok: false, field: 'url', message: '请求地址只支持 http:// 或 https://。' };
     }
     for (const header of draft.headers) {
-      if (header.name.trim() === '') return { ok: false, message: 'header 名不能为空。' };
+      if (header.name.trim() === '') {
+        return { ok: false, field: 'headers', message: 'header 名不能为空。' };
+      }
       if (header.hasValue === false && header.value === '') {
-        return { ok: false, message: `请填写 header ${header.name} 的值。` };
+        return { ok: false, field: 'headers', message: `请填写 header ${header.name} 的值。` };
       }
     }
     return validateParams(draft.params);
   }
   const columns = draft.staticColumns.map((column) => column.trim());
-  if (columns.length === 0) return { ok: false, message: '请至少填写 1 列。' };
+  if (columns.length === 0) {
+    return { ok: false, field: 'staticColumns', message: '请至少填写 1 列。' };
+  }
   if (columns.some((column) => column === '')) {
-    return { ok: false, message: '列名不能为空。' };
+    return { ok: false, field: 'staticColumns', message: '列名不能为空。' };
   }
   if (new Set(columns).size !== columns.length) {
-    return { ok: false, message: '列名不能重复。' };
+    return { ok: false, field: 'staticColumns', message: '列名不能重复。' };
   }
-  if (draft.staticRows.length === 0) return { ok: false, message: '请至少填写 1 行。' };
+  if (draft.staticRows.length === 0) {
+    return { ok: false, field: 'staticRows', message: '请至少填写 1 行。' };
+  }
   return { ok: true };
 }
 
@@ -575,9 +608,9 @@ function validateParams(params: readonly ParamDraft[]): DraftValidation {
   for (const parameter of params) {
     const name = parameter.name.trim();
     if (PARAMETER_NAME_PATTERN.test(name) === false) {
-      return { ok: false, message: `参数名 ${name} 不合法（字母或下划线开头）。` };
+      return { ok: false, field: 'params', message: `参数名 ${name} 不合法（字母或下划线开头）。` };
     }
-    if (names.has(name)) return { ok: false, message: `参数名 ${name} 重复。` };
+    if (names.has(name)) return { ok: false, field: 'params', message: `参数名 ${name} 重复。` };
     names.add(name);
   }
   return { ok: true };

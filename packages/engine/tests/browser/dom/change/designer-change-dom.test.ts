@@ -14,7 +14,7 @@ function proposal(
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
   return {
     id: 'change-1',
@@ -367,7 +367,7 @@ describe('change diff presentation', () => {
           changedUnit([
             { path: 'size.width', before: '320', after: '360' },
             { path: 'rotation', before: '0', after: '15' },
-            { path: 'styleRules', before: '[]', after: '[{"id":"alert"}]' },
+            { path: 'states', before: 'null', after: '{"items":[]}' },
           ]),
         ],
       }),
@@ -375,8 +375,8 @@ describe('change diff presentation', () => {
     );
     expect(html).toContain('宽度');
     expect(html).toContain('旋转');
-    expect(html).toContain('条件样式');
+    expect(html).toContain('组件状态');
     expect(html).not.toContain('size.width');
-    expect(html).not.toContain('styleRules');
+    expect(html).not.toContain('"items"');
   });
 });

@@ -24,21 +24,17 @@ function visibilityDocument(): Record<string, unknown> {
     components: [component('button'), component('panel')],
     variables: [],
     blueprint: {
-      relations: [
+      nodes: [
+        { kind: 'component', id: 'component:button', componentId: 'button' },
+        { kind: 'component', id: 'component:panel', componentId: 'panel' },
+      ],
+      edges: [
         {
-          type: 'behavior',
+          kind: 'flow',
           id: 'toggle-panel',
-          source: {
-            kind: 'component',
-            componentId: 'button',
-            event: { type: 'material-event', eventName: 'click' },
-          },
-          target: { kind: 'component', componentId: 'panel' },
-          effect: {
-            type: 'component-visibility',
-            operation: 'toggle',
-            transition: { effect: 'fade', durationMs: 240, easing: 'ease-in-out-quad' },
-          },
+          from: { node: 'component:button', port: 'event:click' },
+          to: { node: 'component:panel', port: 'toggle' },
+          transition: { effect: 'fade', durationMs: 240, easing: 'ease-in-out-quad' },
         },
       ],
       layout: {
@@ -54,36 +50,31 @@ function visibilityDocument(): Record<string, unknown> {
 
 type MutableVisibilityDocument = {
   blueprint: {
-    relations: Array<{
-      target: { componentId: string };
-      effect: {
-        transition: { extra?: boolean };
-      };
-    }>;
+    nodes: Array<{ componentId: string }>;
+    edges: Array<{ transition: { extra?: boolean } }>;
   };
 };
 
 describe('component visibility blueprint document', () => {
-  it('parses visibility relations and persisted layout strictly', () => {
+  it('parses visibility edges and persisted layout strictly', () => {
     const input = visibilityDocument();
     expect(parseScreenDocument(input)).toMatchObject({ ok: true });
 
     const missingTarget = structuredClone(input) as unknown as MutableVisibilityDocument;
-    missingTarget.blueprint.relations[0]!.target.componentId = 'missing';
+    missingTarget.blueprint.nodes[1]!.componentId = 'missing';
     expect(parseScreenDocument(missingTarget)).toMatchObject({
       ok: false,
-      diagnostics: [{ path: ['blueprint', 'relations', 0, 'target', 'componentId'] }],
+      diagnostics: [{ path: ['blueprint', 'nodes', 1, 'componentId'] }],
     });
 
     const unknownTransitionField = structuredClone(input) as unknown as MutableVisibilityDocument;
-    unknownTransitionField.blueprint.relations[0]!.effect.transition.extra = true;
+    unknownTransitionField.blueprint.edges[0]!.transition.extra = true;
     const unknownResult = parseScreenDocument(unknownTransitionField);
     expect(unknownResult.ok).toBe(false);
     if (!unknownResult.ok) {
       expect(
         unknownResult.diagnostics.some(
-          (diagnostic) =>
-            diagnostic.path.join('.') === 'blueprint.relations.0.effect.transition.extra',
+          (diagnostic) => diagnostic.path.join('.') === 'blueprint.edges.0.transition.extra',
         ),
       ).toBe(true);
     }

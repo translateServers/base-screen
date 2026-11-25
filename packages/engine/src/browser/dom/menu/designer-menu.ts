@@ -345,7 +345,9 @@ export class DesignerMenuController {
           : 'canvas';
     const pluginItems = this.callbacks.getPluginCommandItems?.(`context.${kind}`) ?? [];
     const heading = kind === 'multi' ? contextMenuSummaryHtml(selectedIds.length) : '';
-    menu.innerHTML = `${heading}${contextMenuHtml(DESIGNER_CONTEXT_MENU[kind])}${pluginCommandMenuSection(
+    const canvasSection =
+      kind === 'canvas' ? '' : (this.callbacks.getCanvasMenuSection?.(selectedIds) ?? '');
+    menu.innerHTML = `${heading}${contextMenuHtml(DESIGNER_CONTEXT_MENU[kind])}${canvasSection}${pluginCommandMenuSection(
       pluginItems,
       { label: DESIGNER_UI_TEXT.contextMenuPlugin },
     )}`;

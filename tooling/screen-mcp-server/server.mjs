@@ -66,7 +66,7 @@ export function createScreenMcpServer(provider) {
     server,
     'diff_screens',
     { before: z.unknown().optional(), after: z.unknown() },
-    'Structurally diff two Screen Documents by id. Omit before to diff against the loaded snapshot, which answers "what did this candidate change". Reports canvas fields, added/removed/changed components with changed field names, data sources, variables and blueprint relations. Both sides pass the same migration + schema read path.',
+    'Structurally diff two Screen Documents by id. Omit before to diff against the loaded snapshot, which answers "what did this candidate change". Reports canvas fields, added/removed/changed components with changed field names, data sources, variables and blueprint node / edge counts. Both sides pass the same migration + schema read path.',
     (input) => provider.diffScreens(input),
   );
   registerTool(
@@ -113,7 +113,7 @@ export function createScreenMcpServer(provider) {
           maxComponents: z.number().int().positive().optional(),
           maxDepth: z.number().int().positive().optional(),
           maxBindings: z.number().int().positive().optional(),
-          maxStyleRules: z.number().int().positive().optional(),
+          maxComponentStates: z.number().int().positive().optional(),
         })
         .optional(),
     },

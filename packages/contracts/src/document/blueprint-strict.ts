@@ -5,50 +5,55 @@ import type {
 } from '../diagnostics/collector.js';
 import { checkStrictObjectKeys, isJsonObject } from './strict-object.js';
 
-const BLUEPRINT_FIELDS = new Set(['relations', 'layout']);
-const BEHAVIOR_RELATION_FIELDS = new Set([
-  'type',
+const BLUEPRINT_FIELDS = new Set(['nodes', 'edges', 'layout']);
+const NODE_FIELDS: Readonly<Record<string, ReadonlySet<string>>> = {
+  component: new Set(['kind', 'id', 'componentId', 'enabled']),
+  variable: new Set(['kind', 'id', 'variableId', 'enabled']),
+  host: new Set(['kind', 'id', 'enabled']),
+  lifecycle: new Set(['kind', 'id', 'enabled']),
+  timer: new Set(['kind', 'id', 'intervalSeconds', 'name', 'enabled']),
+  condition: new Set(['kind', 'id', 'condition', 'name', 'enabled']),
+  'sub-canvas': new Set(['kind', 'id', 'canvasId', 'enabled']),
+  'main-canvas': new Set(['kind', 'id', 'enabled']),
+};
+// 未知 kind 的兜底字段集：让 Zod 报出无效判别值，而不是被严格键检查抢先拒绝。
+const UNKNOWN_NODE_FIELDS = new Set([
+  'kind',
   'id',
-  'source',
+  'componentId',
+  'variableId',
+  'canvasId',
+  'intervalSeconds',
   'condition',
-  'target',
-  'effect',
+  'name',
+  'enabled',
+]);
+const FLOW_EDGE_FIELDS = new Set([
+  'kind',
+  'id',
+  'from',
+  'to',
+  'value',
+  'payload',
+  'transition',
+  'stateId',
   'requiredCapabilities',
 ]);
-const SEMANTIC_RELATION_FIELDS = new Set(['type', 'id', 'source', 'target', 'role']);
-const RELATION_SOURCE_COMPONENT_FIELDS = new Set(['kind', 'componentId', 'event']);
-const RELATION_SOURCE_VARIABLE_FIELDS = new Set(['kind', 'variableId', 'event']);
-const RELATION_SOURCE_LIFECYCLE_FIELDS = new Set(['kind', 'event']);
-const RELATION_SOURCE_TIMER_FIELDS = new Set(['kind', 'intervalSeconds', 'event']);
-const RELATION_SOURCE_EVENT_FIELDS = new Set(['type', 'eventName']);
-const RELATION_TARGET_COMPONENT_FIELDS = new Set(['kind', 'componentId']);
-const RELATION_TARGET_VARIABLE_FIELDS = new Set(['kind', 'variableId']);
-const RELATION_TARGET_HOST_FIELDS = new Set(['kind']);
-const COMPONENT_VISIBILITY_EFFECT_FIELDS = new Set(['type', 'operation', 'transition']);
-const REQUEST_COMPONENT_DATA_EFFECT_FIELDS = new Set(['type']);
-const SET_VARIABLE_EFFECT_FIELDS = new Set(['type', 'value']);
-const REQUEST_VARIABLE_EFFECT_FIELDS = new Set(['type']);
-const EMIT_HOST_EVENT_EFFECT_FIELDS = new Set(['type', 'eventName', 'payload']);
-const HOST_ACTION_EFFECT_FIELDS = new Set(['type', 'actionId', 'payload']);
-// 未知 type 的兜底字段集：让 Zod 报出无效判别值，而不是被严格键检查抢先拒绝。
-const UNKNOWN_EFFECT_FIELDS = new Set([
-  'type',
-  'operation',
-  'transition',
-  'value',
-  'eventName',
-  'payload',
-  'actionId',
-]);
-const COMPONENT_VISIBILITY_TRANSITION_FIELDS = new Set(['effect', 'durationMs', 'easing']);
+const SEMANTIC_EDGE_FIELDS = new Set(['kind', 'id', 'from', 'to', 'role']);
+const UNKNOWN_EDGE_FIELDS = new Set([...FLOW_EDGE_FIELDS, 'role']);
+const PORT_REF_FIELDS = new Set(['node', 'port']);
+const SEMANTIC_END_FIELDS = new Set(['node']);
+const TRANSITION_FIELDS = new Set(['effect', 'durationMs', 'easing']);
 const BLUEPRINT_LAYOUT_FIELDS = new Set(['nodes', 'viewport']);
 const BLUEPRINT_LAYOUT_NODE_FIELDS = new Set(['id', 'x', 'y', 'collapsed']);
 const BLUEPRINT_LAYOUT_VIEWPORT_FIELDS = new Set(['x', 'y', 'zoom']);
 const BLUEPRINT_CONDITION_FIELDS = new Set(['left', 'operator', 'right']);
 
+type At = (path: DiagnosticSegment[]) => DiagnosticSegment[];
+
 export function validateBlueprintStrictKeys(
   blueprint: Record<string, unknown>,
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
+  at: At,
   collector: DiagnosticCollector,
   phase: DiagnosticPhase,
 ): boolean {
@@ -56,17 +61,81 @@ export function validateBlueprintStrictKeys(
     return false;
   }
   validateLayoutStrictKeys(blueprint.layout, at, collector, phase);
-  if (Array.isArray(blueprint.relations)) {
-    for (let index = 0; index < blueprint.relations.length; index++) {
-      validateRelationStrictKeys(blueprint.relations[index], index, at, collector, phase);
-    }
+  if (Array.isArray(blueprint.nodes)) {
+    blueprint.nodes.forEach((node, index) => {
+      validateNodeStrictKeys(node, index, at, collector, phase);
+    });
+  }
+  if (Array.isArray(blueprint.edges)) {
+    blueprint.edges.forEach((edge, index) => {
+      validateEdgeStrictKeys(edge, index, at, collector, phase);
+    });
   }
   return true;
 }
 
+function validateNodeStrictKeys(
+  node: unknown,
+  index: number,
+  at: At,
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): void {
+  if (!isJsonObject(node)) return;
+  const base: DiagnosticSegment[] = ['blueprint', 'nodes', index];
+  const fields =
+    typeof node.kind === 'string'
+      ? (NODE_FIELDS[node.kind] ?? UNKNOWN_NODE_FIELDS)
+      : UNKNOWN_NODE_FIELDS;
+  if (!checkStrictObjectKeys(node, fields, at(base), collector, phase)) return;
+  if (node.kind === 'condition' && isJsonObject(node.condition)) {
+    checkStrictObjectKeys(
+      node.condition,
+      BLUEPRINT_CONDITION_FIELDS,
+      at([...base, 'condition']),
+      collector,
+      phase,
+    );
+  }
+}
+
+function validateEdgeStrictKeys(
+  edge: unknown,
+  index: number,
+  at: At,
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): void {
+  if (!isJsonObject(edge)) return;
+  const base: DiagnosticSegment[] = ['blueprint', 'edges', index];
+  const fields =
+    edge.kind === 'flow'
+      ? FLOW_EDGE_FIELDS
+      : edge.kind === 'semantic'
+        ? SEMANTIC_EDGE_FIELDS
+        : UNKNOWN_EDGE_FIELDS;
+  if (!checkStrictObjectKeys(edge, fields, at(base), collector, phase)) return;
+  const endFields = edge.kind === 'semantic' ? SEMANTIC_END_FIELDS : PORT_REF_FIELDS;
+  for (const end of ['from', 'to'] as const) {
+    const value = edge[end];
+    if (isJsonObject(value)) {
+      checkStrictObjectKeys(value, endFields, at([...base, end]), collector, phase);
+    }
+  }
+  if (isJsonObject(edge.transition)) {
+    checkStrictObjectKeys(
+      edge.transition,
+      TRANSITION_FIELDS,
+      at([...base, 'transition']),
+      collector,
+      phase,
+    );
+  }
+}
+
 function validateLayoutStrictKeys(
   layout: unknown,
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
+  at: At,
   collector: DiagnosticCollector,
   phase: DiagnosticPhase,
 ): void {
@@ -97,127 +166,6 @@ function validateLayoutStrictKeys(
       layout.viewport,
       BLUEPRINT_LAYOUT_VIEWPORT_FIELDS,
       at(['blueprint', 'layout', 'viewport']),
-      collector,
-      phase,
-    );
-  }
-}
-
-function validateRelationStrictKeys(
-  relation: unknown,
-  index: number,
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): void {
-  const base = ['blueprint', 'relations', index] as DiagnosticSegment[];
-  if (!isJsonObject(relation)) return;
-  const semantic = relation.type === 'semantic';
-  if (
-    !checkStrictObjectKeys(
-      relation,
-      semantic ? SEMANTIC_RELATION_FIELDS : BEHAVIOR_RELATION_FIELDS,
-      at(base),
-      collector,
-      phase,
-    )
-  ) {
-    return;
-  }
-  validateSourceStrictKeys(relation.source, [...base, 'source'], at, collector, phase);
-  if (semantic) {
-    validateTargetStrictKeys(relation.target, [...base, 'target'], at, collector, phase);
-    return;
-  }
-  if (
-    isJsonObject(relation.condition) &&
-    !checkStrictObjectKeys(
-      relation.condition,
-      BLUEPRINT_CONDITION_FIELDS,
-      at([...base, 'condition']),
-      collector,
-      phase,
-    )
-  ) {
-    return;
-  }
-  validateTargetStrictKeys(relation.target, [...base, 'target'], at, collector, phase);
-  validateEffectStrictKeys(relation.effect, [...base, 'effect'], at, collector, phase);
-}
-
-function validateSourceStrictKeys(
-  source: unknown,
-  base: DiagnosticSegment[],
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): void {
-  if (!isJsonObject(source)) return;
-  const sourceFields =
-    source.kind === 'variable'
-      ? RELATION_SOURCE_VARIABLE_FIELDS
-      : source.kind === 'lifecycle'
-        ? RELATION_SOURCE_LIFECYCLE_FIELDS
-        : source.kind === 'timer'
-          ? RELATION_SOURCE_TIMER_FIELDS
-          : RELATION_SOURCE_COMPONENT_FIELDS;
-  checkStrictObjectKeys(source, sourceFields, at(base), collector, phase);
-  if (isJsonObject(source.event)) {
-    checkStrictObjectKeys(
-      source.event,
-      RELATION_SOURCE_EVENT_FIELDS,
-      at([...base, 'event']),
-      collector,
-      phase,
-    );
-  }
-}
-
-function validateTargetStrictKeys(
-  target: unknown,
-  base: DiagnosticSegment[],
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): void {
-  if (!isJsonObject(target)) return;
-  const fields =
-    target.kind === 'variable'
-      ? RELATION_TARGET_VARIABLE_FIELDS
-      : target.kind === 'host'
-        ? RELATION_TARGET_HOST_FIELDS
-        : RELATION_TARGET_COMPONENT_FIELDS;
-  checkStrictObjectKeys(target, fields, at(base), collector, phase);
-}
-
-function validateEffectStrictKeys(
-  effect: unknown,
-  base: DiagnosticSegment[],
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): void {
-  if (!isJsonObject(effect)) return;
-  const fields =
-    effect.type === 'component-visibility'
-      ? COMPONENT_VISIBILITY_EFFECT_FIELDS
-      : effect.type === 'request-component-data'
-        ? REQUEST_COMPONENT_DATA_EFFECT_FIELDS
-        : effect.type === 'set-variable'
-          ? SET_VARIABLE_EFFECT_FIELDS
-          : effect.type === 'request-variable'
-            ? REQUEST_VARIABLE_EFFECT_FIELDS
-            : effect.type === 'emit-host-event'
-              ? EMIT_HOST_EVENT_EFFECT_FIELDS
-              : effect.type === 'host-action'
-                ? HOST_ACTION_EFFECT_FIELDS
-                : UNKNOWN_EFFECT_FIELDS;
-  checkStrictObjectKeys(effect, fields, at(base), collector, phase);
-  if (effect.type === 'component-visibility' && isJsonObject(effect.transition)) {
-    checkStrictObjectKeys(
-      effect.transition,
-      COMPONENT_VISIBILITY_TRANSITION_FIELDS,
-      at([...base, 'transition']),
       collector,
       phase,
     );

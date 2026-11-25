@@ -8,6 +8,8 @@ export class FakeElement {
   readonly children: FakeElement[] = [];
   readonly dataset: Record<string, string> = {};
   readonly attributes: Record<string, string> = {};
+  /** 色卡填色写 `style.backgroundColor`：桩只需可写对象。 */
+  readonly style: Record<string, string> = {};
   /** 最小 classList：只服务「读出当前类名 + 追加类名」，与 className 串保持一致。 */
   readonly classList = {
     add: (...tokens: string[]): void => {
@@ -73,6 +75,10 @@ export class FakeElement {
   appendChild(child: FakeElement): FakeElement {
     this.children.push(child);
     return child;
+  }
+
+  append(...children: FakeElement[]): void {
+    for (const child of children) this.appendChild(child);
   }
 
   /** `<select>` 的 option 集合：分段控件按它派生按钮，与浏览器一致。 */
@@ -169,7 +175,7 @@ export function document(
       },
     ],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 

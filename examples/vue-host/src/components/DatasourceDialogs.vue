@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DatasourceRefScreen } from '../lib/datasource-model';
 import { DATASOURCE_TEXT, screenEditHref } from '../lib/datasource-model';
 import { formatDateTime } from '../lib/format';
+import { trapModalFocus } from '../lib/modal-focus';
 
 /**
  * 数据源页的三个弹层（删除保护 / 轻确认 / 放弃修改）。
@@ -20,6 +21,25 @@ const emit = defineEmits<{
   (event: 'cancel'): void;
   (event: 'confirm'): void;
 }>();
+
+const dialogRef = ref<HTMLElement | null>(null);
+let releaseFocus: (() => void) | undefined;
+const setupFocus = async (): Promise<void> => {
+  releaseFocus?.();
+  releaseFocus = undefined;
+  if (props.kind === 'none') return;
+  await nextTick();
+  if (dialogRef.value !== null) {
+    releaseFocus = trapModalFocus(dialogRef.value, { onEscape: () => emit('cancel') });
+  }
+};
+onMounted(() => void setupFocus());
+onBeforeUnmount(() => releaseFocus?.());
+watch(
+  () => props.kind,
+  () => void setupFocus(),
+  { flush: 'post' },
+);
 
 const title = computed((): string => {
   switch (props.kind) {
@@ -41,6 +61,7 @@ const title = computed((): string => {
 <template>
   <div v-if="kind !== 'none'" class="ds-overlay">
     <div
+      ref="dialogRef"
       class="ds-dialog"
       role="dialog"
       aria-modal="true"

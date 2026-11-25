@@ -102,7 +102,7 @@ function document(): ScreenDocument {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
     components: [component()],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 
@@ -185,6 +185,49 @@ describe('BaseScreenDesignerElement.refreshCatalog', () => {
         (item) => item.materialType,
       ),
     ).toEqual(['acme.alpha']);
+  });
+
+  // ADR-0105 P2：分组必须覆盖全部可见物料，新增在线物料时旧分组对新 catalog 不成立，
+  // 而先改分组又对旧 catalog 不成立——分组只能随 catalog 一起交换。
+  it('swaps the material library grouping together with the catalog', () => {
+    const current = catalog([entry('acme.alpha')]);
+    const grouping: BaseScreenMaterialLibraryGrouping = {
+      groups: [{ id: 'main', label: 'Main', materialTypes: ['acme.alpha'] }],
+    };
+    const designer = configuredDesigner(current, grouping);
+    const next = catalog([entry('acme.alpha'), entry('acme.online')]);
+
+    expect(designer.refreshCatalog(next).ok).toBe(false);
+    const nextGrouping: BaseScreenMaterialLibraryGrouping = {
+      groups: [
+        ...grouping.groups,
+        { id: 'online', label: 'Online', materialTypes: ['acme.online'] },
+      ],
+    };
+    const result = designer.refreshCatalog(next, { materialLibraryGrouping: nextGrouping });
+
+    expect(result.ok).toBe(true);
+    expect(designer.catalog).toBe(next);
+    expect(designer.materialLibraryGrouping?.groups.map((group) => group.id)).toEqual([
+      'main',
+      'online',
+    ]);
+  });
+
+  it('keeps the catalog and grouping when the next grouping does not fit the next catalog', () => {
+    const current = catalog([entry('acme.alpha')]);
+    const grouping: BaseScreenMaterialLibraryGrouping = {
+      groups: [{ id: 'main', label: 'Main', materialTypes: ['acme.alpha'] }],
+    };
+    const designer = configuredDesigner(current, grouping);
+
+    const result = designer.refreshCatalog(catalog([entry('acme.alpha'), entry('acme.online')]), {
+      materialLibraryGrouping: grouping,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(designer.catalog).toBe(current);
+    expect(designer.materialLibraryGrouping?.groups.map((group) => group.id)).toEqual(['main']);
   });
 
   it('fails closed when a document is loaded without an initialized renderer', () => {

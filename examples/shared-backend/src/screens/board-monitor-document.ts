@@ -8,15 +8,20 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  * | 通道 | 组件 | 说明 |
  * | --- | --- | --- |
  * | `static` | 标题/标签/选择器表格/班组表 | 不依赖接口的文字与示例表 |
- * | `dataset` | 设备灯阵 ← `monitor.devices`、告警流水 ← `monitor.alarms`、工序链 ← `monitor.pipeline` | 走 `describe/query`，参数由变量槽位求值 |
+ * | `dataset` | 设备灯阵 + 状态图例 ← 文档级共享实例 `devices`（`monitor.devices`）、告警流水 ← `monitor.alarms`、工序链 ← `monitor.pipeline` | 走 `describe/query`，参数由变量槽位求值 |
  * | `variable` | 产线/时间窗/状态/播报/时钟/更新时间 | 3 个 static 变量可交互，3 个 `production.*` 由宿主只读提供 |
  * | `host-resource` | 5 张 KPI + 产量趋势 + 产线负载排行 | 旧的 `demo_metric/series/ranking` 通道，用来证明新链路没有挤掉旧链路 |
+ * | `host-resource` + `push` | OEE 读数 ← 文档级实例 `live-oee`、产量趋势 ← `live-output-trend` | ADR-0104 推送：查看器订阅 `/api/metrics/stream`，宿主刷新控制器不再轮询它们 |
  *
- * 版式纪律（与 `board-demo-document.ts` 同）：所有组件都是**根节点**。宿主配置
- * `groupMaterialType` 后组壳几何由引擎持有，把面板当父节点会在第一次无关编辑时被压平。
+ * 版式纪律（与 `board-demo-document.ts` 同）：所有组件都是**根节点**，整体搬动靠编辑期的成组。
  *
  * 数据纪律：这里只写"形状"，不写任何时间戳或随机值——数值全部来自后端与宿主变量，
  * 因此种子本身是确定性的，可被根级文档测试逐字段断言。
+ *
+ * 共享纪律（ADR-0100 F4）：灯阵与图例读的是同一份设备数据，因此引用同一个文档级实例
+ * `dataSources.devices`，切产线只发一次 query；两者经各自的 `dataBinding` 取不同的列。
+ * 告警流水与工序链各读各的数据集，保留组件自带 `dataSource` 的旧形态——这张屏同时
+ * 证明两种写法可以并存。
  */
 
 interface DemoComponent {
@@ -32,7 +37,24 @@ interface DemoComponent {
   readonly props: Readonly<Record<string, unknown>>;
   readonly style: Readonly<Record<string, unknown>>;
   readonly dataSource: unknown;
+  readonly dataValue?: unknown;
+  readonly dataBinding?: unknown;
 }
+
+/** 灯阵与图例共享的文档级实例 id（见 `BOARD_MONITOR_DOCUMENT.dataSources`）。 */
+const DEVICES_SOURCE_ID = 'devices';
+/** 推送实例（ADR-0104）：OEE 读数与产量趋势由查看器订阅更新，不进宿主轮询表。 */
+const LIVE_OEE_SOURCE_ID = 'live-oee';
+const LIVE_OUTPUT_TREND_SOURCE_ID = 'live-output-trend';
+
+function liveRef(dataSourceId: string) {
+  return { kind: 'data-source-field' as const, dataSourceId, path: [] };
+}
+const DEVICES_REF = {
+  kind: 'data-source-field' as const,
+  dataSourceId: DEVICES_SOURCE_ID,
+  path: [],
+};
 
 const components: DemoComponent[] = [];
 let zIndex = 0;
@@ -136,11 +158,10 @@ function frame(id: string, name: string, box: Box): void {
     size: { width, height },
     rotation: 0,
     status: { locked: false, hidden: false },
-    props: { borderStyle: 'corner-brackets', bracketSize: 16, lineWidth: 2 },
+    props: { borderStyle: 'corner-brackets', bracketSize: 16 },
     style: {
       backgroundColor: 'rgba(8, 26, 46, .55)',
       borderColor: '#1d5b8f',
-      color: '#7fb0cf',
     },
     dataSource: null,
   });
@@ -156,16 +177,6 @@ function metricSource(resourceId: string, points = 24): unknown {
   };
 }
 
-function seriesSource(resourceId: string): unknown {
-  return {
-    type: 'host-resource',
-    resourceType: 'demo_series',
-    resourceId,
-    params: { points: { kind: 'literal', value: 24 } },
-    binding: { fields: { dimension: ['t'], measures: ['value'] } },
-  };
-}
-
 function rankingSource(dimension: string, limit: number): unknown {
   return {
     type: 'host-resource',
@@ -176,7 +187,15 @@ function rankingSource(dimension: string, limit: number): unknown {
   };
 }
 
-function flop(id: string, name: string, box: Box, resourceId: string, decimals: number): void {
+/** `liveSourceId` 给出时读文档级推送实例，否则沿用组件自带的 `host-resource` 旧形态。 */
+function flop(
+  id: string,
+  name: string,
+  box: Box,
+  resourceId: string,
+  decimals: number,
+  liveSourceId?: string,
+): void {
   const [x, y, width, height] = box;
   push({
     id,
@@ -189,7 +208,7 @@ function flop(id: string, name: string, box: Box, resourceId: string, decimals: 
     status: { locked: false, hidden: false },
     props: {
       prefix: '',
-      suffix: '',
+      unit: '',
       decimals,
       thousandsSeparator: true,
       flipAnimation: true,
@@ -200,7 +219,13 @@ function flop(id: string, name: string, box: Box, resourceId: string, decimals: 
       accentColor: '#0e3b5c',
       fontSize: 40,
     },
-    dataSource: metricSource(resourceId),
+    ...(liveSourceId === undefined
+      ? { dataSource: metricSource(resourceId) }
+      : {
+          dataSource: null,
+          dataValue: liveRef(liveSourceId),
+          dataBinding: { fields: { value: ['value'] } },
+        }),
   });
 }
 
@@ -209,6 +234,7 @@ function chart(
   name: string,
   box: Box,
   seriesType: 'line' | 'bar' | 'area',
+  /** 旧形态 `host-resource` 数据源，或 `{ live: 实例 id }` 读文档级推送实例。 */
   source: unknown,
   seriesColor = '#38bdf8',
 ): void {
@@ -230,8 +256,22 @@ function chart(
       seriesColor,
       opacity: 1,
     },
-    dataSource: source,
+    ...(isLiveSource(source)
+      ? {
+          dataSource: null,
+          dataValue: liveRef(source.live),
+          dataBinding: { fields: { dimension: ['t'], measures: ['value'] } },
+        }
+      : { dataSource: source }),
   });
+}
+
+function isLiveSource(source: unknown): source is { readonly live: string } {
+  return (
+    source !== null &&
+    typeof source === 'object' &&
+    typeof (source as { readonly live?: unknown }).live === 'string'
+  );
 }
 
 /** 静态表格：`base.table` 的 `staticData.kind='tabular'` 要求同时给 binding。 */
@@ -272,12 +312,12 @@ function staticTable(
 }
 
 /**
- * 选择器：**用 `board.scroll-board` 而不是 `base.table`**。
+ * 选择器：用 `board.scroll-board`。
  *
- * 原因：蓝图联动走物料的 `rowClick` 事件，而 `base.table` 的 `td` 上挂了
- * `stopPropagation` 的 `cellClick`，真实点击永远先命中单元格、`rowClick` 不会触发；
- * `scroll-board` 的行是 div，点击即 `rowClick`，payload 里带整行 `{ row }`，正是
- * 「点一行 → 取该行的 line/window/level 写进变量」需要的形状。
+ * 蓝图联动走物料的 `rowClick` 事件，payload 里带整行 `{ row }`，正是
+ * 「点一行 → 取该行的 line/window/level 写进变量」需要的形状；看板风格也与本屏一致。
+ * （早期 `base.table` 的单元格点击会拦下冒泡、`rowClick` 永远不触发，这是当时选它的原因；
+ * 现在单元格激活会先发 `cellClick` 再发 `rowClick`，两者都可以做选择器。）
  */
 function selectorBoard(
   id: string,
@@ -304,7 +344,6 @@ function selectorBoard(
       // 选择器必须静止：轮播会让「点第二行」变成点到一个不断移动的目标。
       autoScroll: false,
       statusColumn: '',
-      statusPalette: {},
     },
     style: {
       backgroundColor: 'rgba(9, 26, 44, .7)',
@@ -357,7 +396,7 @@ push({
   rotation: 0,
   status: { locked: false, hidden: false },
   // 绑定变量而不是数据集：`window` 是 static 变量，用户切选择器时它整屏联动。
-  props: { prefix: '', suffix: '', decimals: 0, thousandsSeparator: false, flipAnimation: true },
+  props: { prefix: '', unit: '', decimals: 0, thousandsSeparator: false, flipAnimation: true },
   style: { backgroundColor: 'transparent', color: '#7ff0ff', accentColor: '#0e3b5c', fontSize: 22 },
   dataSource: { type: 'variable', variableId: 'window' },
 });
@@ -381,7 +420,14 @@ variableText('top-clock', '当前时间', [1600, 20, 296, 18], 'clock', {
 
 // ── KPI 五卡 ──────────────────────────────────────────────────────────────
 const KPI_CARDS = [
-  { id: 'kpi-oee', label: 'OEE（%）', metric: 'oee', kind: 'flop', decimals: 1 },
+  {
+    id: 'kpi-oee',
+    label: 'OEE（%）',
+    metric: 'oee',
+    kind: 'flop',
+    decimals: 1,
+    liveSourceId: LIVE_OEE_SOURCE_ID,
+  },
   {
     id: 'kpi-online',
     label: '设备在线率（%）',
@@ -421,7 +467,7 @@ KPI_CARDS.forEach((card, index) => {
       size: { width: 328, height: 30 },
       rotation: 0,
       status: { locked: false, hidden: false },
-      props: { segments: 20, showValue: true, decimals: card.decimals, glow: true },
+      props: { segments: 20, showValue: true, decimals: card.decimals },
       style: {
         backgroundColor: 'transparent',
         color: '#cfe9ff',
@@ -438,6 +484,7 @@ KPI_CARDS.forEach((card, index) => {
       [x + 16, 140, 328, 78],
       card.metric,
       card.decimals,
+      'liveSourceId' in card ? card.liveSourceId : undefined,
     );
   }
 });
@@ -455,50 +502,71 @@ push({
   name: '设备状态灯阵',
   parentId: null,
   position: { x: 24, y: 288 },
-  size: { width: 604, height: 412 },
+  // 底部 28 px 让给独立的状态图例（ADR-0099：图例是另一个原子），格子尺寸与拆分前一致。
+  size: { width: 604, height: 384 },
   rotation: 0,
   status: { locked: false, hidden: false },
   props: {
     columns: 8,
-    showLegend: true,
     // 灯阵不带单位（adapter 只投影值），负载的具体数值由用户按需打开；
-    // 面板标题里的「设备状态」+ 图例已足够表达"这是什么"。
+    // 面板标题里的「设备状态」+ 下方图例已足够表达"这是什么"。
     showValue: false,
     labelVisible: false,
-    emptyText: '无设备数据',
+    // 异常优先：故障、离线排在最前，一眼可见（与 plugin-materials 新插入组件的默认一致）。
+    sortAbnormalFirst: true,
   },
   style: {
     backgroundColor: 'transparent',
     color: '#e6f1ff',
     labelColor: '#8aa4c0',
-    legendColor: '#8aa4c0',
-    runningColor: '#52c41a',
-    standbyColor: '#fa8c16',
+    runningColor: '#3e7b5e',
+    standbyColor: '#8c7a46',
     faultColor: '#f5222d',
-    offlineColor: '#6b7d8f',
-    unknownColor: '#6b7d8f',
+    offlineColor: '#8796a5',
+    unknownColor: '#4f5d6b',
     tileGap: 6,
     tileRadius: 4,
     fontSize: 11,
   },
-  dataSource: {
-    type: 'dataset',
-    datasetId: 'monitor.devices',
-    // 参数顺序与 `describe().parameters` 一致；`line` 走变量槽位，切产线即整屏联动。
-    params: {
-      line: { kind: 'variable', variableId: 'line' },
-      limit: { kind: 'literal', value: 48 },
-    },
-    binding: { fields: { items: ['name', 'status', 'load'] } },
+  // 读共享实例 `devices`；参数（产线变量、条数）在实例上，切产线即整屏联动。
+  dataSource: null,
+  dataValue: DEVICES_REF,
+  dataBinding: { fields: { items: ['name', 'status', 'load'] } },
+});
+// 五态分布图例：与灯阵读同一个文档级实例，只取状态列——两个组件只发一次 query。
+push({
+  id: 'grid-legend',
+  type: 'board.status-legend',
+  name: '设备状态图例',
+  parentId: null,
+  position: { x: 32, y: 672 },
+  size: { width: 588, height: 22 },
+  rotation: 0,
+  status: { locked: false, hidden: false },
+  props: { showCount: true },
+  style: {
+    backgroundColor: 'transparent',
+    color: '#8aa4c0',
+    fontSize: 11,
+    runningColor: '#3e7b5e',
+    standbyColor: '#8c7a46',
+    faultColor: '#f5222d',
+    offlineColor: '#8796a5',
+    unknownColor: '#4f5d6b',
   },
+  dataSource: null,
+  dataValue: DEVICES_REF,
+  dataBinding: { fields: { status: ['status'] } },
 });
 
-text('trend-title', '趋势标题', [652, 262, 320, 20], '产量趋势（最近 24 个采样点）', {
+text('trend-title', '趋势标题', [652, 262, 320, 20], '产量趋势（实时推送，最近 24 个采样点）', {
   color: '#a8d4ea',
   fontSize: 14,
   fontWeight: '700',
 });
-chart('trend-output', '产量趋势', [644, 288, 644, 412], 'area', seriesSource('output_count'));
+chart('trend-output', '产量趋势', [644, 288, 644, 412], 'area', {
+  live: LIVE_OUTPUT_TREND_SOURCE_ID,
+});
 
 text('rank-title', '排行标题', [1312, 262, 320, 18], '产线负载排行', {
   color: '#a8d4ea',
@@ -555,7 +623,7 @@ push({
   size: { width: 288, height: 180 },
   rotation: 0,
   status: { locked: false, hidden: false },
-  props: { segments: 20, showValue: true, decimals: 1, glow: true },
+  props: { segments: 20, showValue: true, decimals: 1 },
   style: {
     backgroundColor: 'transparent',
     color: '#cfe9ff',
@@ -589,12 +657,6 @@ push({
     autoScroll: true,
     // 等级色列：`level` 是绑定里的第二列，行左侧出现状态色条 + 文本染色。
     statusColumn: 'level',
-    statusPalette: {
-      critical: '#f5222d',
-      warning: '#fa8c16',
-      info: '#1677ff',
-      default: '#6b7d8f',
-    },
   },
   style: {
     backgroundColor: 'transparent',
@@ -604,6 +666,10 @@ push({
     borderColor: '#143a5c',
     fontSize: 12,
     rowHeight: 20,
+    criticalColor: '#f5222d',
+    warningColor: '#fa8c16',
+    infoColor: '#1677ff',
+    unknownColor: '#6b7d8f',
   },
   dataSource: {
     type: 'dataset',
@@ -638,18 +704,16 @@ push({
     decimals: 0,
     nameLines: 1,
     statusVisible: true,
-    emptyText: '该产线无工序配置',
   },
   style: {
     backgroundColor: 'transparent',
     color: '#e6f1ff',
     labelColor: '#8aa4c0',
-    legendColor: '#8aa4c0',
-    runningColor: '#52c41a',
-    standbyColor: '#fa8c16',
+    runningColor: '#3e7b5e',
+    standbyColor: '#8c7a46',
     faultColor: '#f5222d',
-    offlineColor: '#6b7d8f',
-    unknownColor: '#6b7d8f',
+    offlineColor: '#8796a5',
+    unknownColor: '#4f5d6b',
     nodeBackground: '#0b1a2b',
     nodeBorderColor: '#1e3a5f',
     connectorColor: '#38bdf8',
@@ -787,6 +851,38 @@ export const BOARD_MONITOR_DOCUMENT = {
     },
   },
   components,
+  dataSources: [
+    {
+      id: DEVICES_SOURCE_ID,
+      name: 'monitor-devices',
+      source: { kind: 'dataset' as const, datasetId: 'monitor.devices' },
+      // 参数顺序与 `describe().parameters` 一致；`line` 走变量槽位。
+      params: {
+        line: { kind: 'variable' as const, variableId: 'line' },
+        limit: { kind: 'inline' as const, value: 48 },
+      },
+    },
+    // 推送实例（ADR-0104）：断线超过 suspended 阈值时按 30 秒回退轮询。
+    {
+      id: LIVE_OEE_SOURCE_ID,
+      name: 'live-oee',
+      source: { kind: 'host-resource' as const, resourceType: 'demo_metric', resourceId: 'oee' },
+      params: { points: { kind: 'inline' as const, value: 24 } },
+      updatePolicy: { mode: 'push' as const, fallbackIntervalSeconds: 30 },
+    },
+    {
+      id: LIVE_OUTPUT_TREND_SOURCE_ID,
+      name: 'live-output-trend',
+      source: {
+        kind: 'host-resource' as const,
+        resourceType: 'demo_series',
+        resourceId: 'output_count',
+      },
+      params: { points: { kind: 'inline' as const, value: 24 } },
+      // 横轴只显示 HH:mm，窗口按行数保留，与「最近 24 个采样点」的标题一致。
+      updatePolicy: { mode: 'push' as const, fallbackIntervalSeconds: 30, retain: { rows: 24 } },
+    },
+  ],
   variables: [
     // `name` 必须是 ASCII 标识符（canonical schema 的 `VARIABLE_NAME_INVALID` 会拒绝中文），
     // 中文说明放 `description`。
@@ -841,50 +937,37 @@ export const BOARD_MONITOR_DOCUMENT = {
     },
   ],
   blueprint: {
-    // 三条关系形态完全一致：选择器表格 rowClick → set-variable。
+    // 三条连线形态完全一致：选择器表格 rowClick → 变量 set。
     // `event-payload` 的路径取自物料事件 payload：`{ rowIndex, row }`。
-    relations: [
+    nodes: [
+      { kind: 'component' as const, id: 'component:sel-line', componentId: 'sel-line' },
+      { kind: 'component' as const, id: 'component:sel-window', componentId: 'sel-window' },
+      { kind: 'component' as const, id: 'component:sel-severity', componentId: 'sel-severity' },
+      { kind: 'variable' as const, id: 'variable:line', variableId: 'line' },
+      { kind: 'variable' as const, id: 'variable:window', variableId: 'window' },
+      { kind: 'variable' as const, id: 'variable:severity', variableId: 'severity' },
+    ],
+    edges: [
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'rule-line',
-        source: {
-          kind: 'component' as const,
-          componentId: 'sel-line',
-          event: { type: 'material-event' as const, eventName: 'rowClick' },
-        },
-        target: { kind: 'variable' as const, variableId: 'line' },
-        effect: {
-          type: 'set-variable' as const,
-          value: { kind: 'event-payload' as const, path: ['row', 'line'] },
-        },
+        from: { node: 'component:sel-line', port: 'event:rowClick' },
+        to: { node: 'variable:line', port: 'set' },
+        value: { kind: 'event-payload' as const, path: ['row', 'line'] },
       },
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'rule-window',
-        source: {
-          kind: 'component' as const,
-          componentId: 'sel-window',
-          event: { type: 'material-event' as const, eventName: 'rowClick' },
-        },
-        target: { kind: 'variable' as const, variableId: 'window' },
-        effect: {
-          type: 'set-variable' as const,
-          value: { kind: 'event-payload' as const, path: ['row', 'window'] },
-        },
+        from: { node: 'component:sel-window', port: 'event:rowClick' },
+        to: { node: 'variable:window', port: 'set' },
+        value: { kind: 'event-payload' as const, path: ['row', 'window'] },
       },
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'rule-severity',
-        source: {
-          kind: 'component' as const,
-          componentId: 'sel-severity',
-          event: { type: 'material-event' as const, eventName: 'rowClick' },
-        },
-        target: { kind: 'variable' as const, variableId: 'severity' },
-        effect: {
-          type: 'set-variable' as const,
-          value: { kind: 'event-payload' as const, path: ['row', 'level'] },
-        },
+        from: { node: 'component:sel-severity', port: 'event:rowClick' },
+        to: { node: 'variable:severity', port: 'set' },
+        value: { kind: 'event-payload' as const, path: ['row', 'level'] },
       },
     ],
   },

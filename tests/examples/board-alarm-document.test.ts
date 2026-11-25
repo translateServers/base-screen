@@ -23,8 +23,8 @@ import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-materia
  * 2) manifest schema 才知道 required 与"未声明键一律拒绝"；
  * 3) 数据集/宿主资源绑定必须回到后端定义与演示通道的字段上核对。
  *
- * 额外一层是这张屏的存在理由：组件 id 必须与宿主 `alarm.open` 演示绑定的两个 id 对齐，
- * 且等级色块与流水的 statusPalette 必须同源——两处任一漂移，屏幕就不再是"告警演示屏"。
+ * 额外一层是这张屏的存在理由：两个组件按宿主告警等级切换状态（ADR-0110），
+ * 且等级色块与流水的等级语义色必须同源——两处任一漂移，屏幕就不再是"告警演示屏"。
  */
 const MANIFESTS = [
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
@@ -177,11 +177,27 @@ describe('alarm demo document', () => {
     }
   });
 
-  it('reuses the component ids the host alarm binding targets', () => {
+  it('switches the alarm reading and notice by the host alarm level', () => {
     if (!parsed.ok) throw new Error('document did not parse');
     const byId = new Map(parsed.value.components.map((component) => [component.id, component]));
+    const source = parsed.value.dataSources?.find((item) => item.id === 'alarm_open');
+    expect(source?.source).toEqual({
+      kind: 'host-resource',
+      resourceType: 'alarm',
+      resourceId: 'alarm.open',
+    });
+    expect(source?.updatePolicy).toEqual({ mode: 'push' });
+    for (const id of ['kpi-alarm-value', 'top-notice']) {
+      const states = byId.get(id)?.states;
+      expect(states?.items.map((item) => item.id)).toEqual(['critical', 'warning', 'info']);
+      expect(states?.items[0]?.style.color).toBe('theme:danger');
+      expect(states?.judge?.input).toEqual({
+        kind: 'data-source-field',
+        dataSourceId: 'alarm_open',
+        path: ['level'],
+      });
+    }
 
-    // 宿主后端种子 `ALARM_DEMO_BINDINGS['alarm.open']` 只认这两个 id；改名等于让告警推送失去落点。
     const alarmValue = byId.get('kpi-alarm-value');
     expect(alarmValue?.type).toBe('board.digital-flop');
     expect(alarmValue?.style.color).toBe('#7ff0ff');
@@ -205,16 +221,12 @@ describe('alarm demo document', () => {
 
     // 告警流水的行级色条必须与色块同源，否则"同一等级两种红"。
     const stream = byId.get('alarm-stream');
-    const props = stream?.props as {
-      statusColumn?: string;
-      statusPalette?: Record<string, string>;
-    };
-    expect(props.statusColumn).toBe('level');
-    expect(props.statusPalette).toEqual({
-      critical: BOARD_ALARM_LEVEL_COLORS.critical,
-      warning: BOARD_ALARM_LEVEL_COLORS.warning,
-      info: BOARD_ALARM_LEVEL_COLORS.info,
-      default: BOARD_ALARM_LEVEL_COLORS.unknown,
+    expect(stream?.props.statusColumn).toBe('level');
+    expect(stream?.style).toMatchObject({
+      criticalColor: BOARD_ALARM_LEVEL_COLORS.critical,
+      warningColor: BOARD_ALARM_LEVEL_COLORS.warning,
+      infoColor: BOARD_ALARM_LEVEL_COLORS.info,
+      unknownColor: BOARD_ALARM_LEVEL_COLORS.unknown,
     });
   });
 
@@ -224,29 +236,31 @@ describe('alarm demo document', () => {
       parsed.value.components.map((component) => [component.id, component]),
     );
     const variableIds = new Set(parsed.value.variables.map((variable) => variable.id));
-    const relations = parsed.value.blueprint.relations;
-    expect(relations.map((relation) => relation.id)).toEqual(['rule-line', 'rule-severity']);
+    const blueprint = parsed.value.blueprint;
+    const nodes = new Map(blueprint.nodes.map((node) => [node.id, node]));
+    expect(blueprint.edges.map((edge) => edge.id)).toEqual(['rule-line', 'rule-severity']);
 
-    for (const relation of relations) {
-      expect(relation.type).toBe('behavior');
-      if (relation.type !== 'behavior') continue;
-      expect(relation.source.kind).toBe('component');
-      if (relation.source.kind !== 'component') continue;
-      const component = componentById.get(relation.source.componentId);
-      expect(component, `${relation.id} → ${relation.source.componentId}`).toBeDefined();
+    for (const edge of blueprint.edges) {
+      expect(edge.kind).toBe('flow');
+      if (edge.kind !== 'flow') continue;
+      const source = nodes.get(edge.from.node);
+      expect(source?.kind).toBe('component');
+      if (source?.kind !== 'component') continue;
+      const component = componentById.get(source.componentId);
+      expect(component, `${edge.id} → ${source.componentId}`).toBeDefined();
       if (component === undefined) continue;
       const manifest = MANIFESTS.find((item) => item.type === component.type);
-      // eventName 必须是该物料真实声明的事件，否则关系永远不会触发。
-      expect(manifest?.events).toContain(relation.source.event.eventName);
-      expect(relation.target.kind).toBe('variable');
-      if (relation.target.kind !== 'variable') continue;
-      expect(variableIds.has(relation.target.variableId)).toBe(true);
-      expect(relation.effect.type).toBe('set-variable');
-      if (relation.effect.type !== 'set-variable') continue;
-      expect(relation.effect.value.kind).toBe('event-payload');
-      if (relation.effect.value.kind !== 'event-payload') continue;
+      // 事件锚点必须是该物料真实声明的事件，否则连线永远不会触发。
+      expect(manifest?.events).toContain(edge.from.port.slice('event:'.length));
+      const target = nodes.get(edge.to.node);
+      expect(target?.kind).toBe('variable');
+      if (target?.kind !== 'variable') continue;
+      expect(variableIds.has(target.variableId)).toBe(true);
+      expect(edge.to.port).toBe('set');
+      expect(edge.value?.kind).toBe('event-payload');
+      if (edge.value?.kind !== 'event-payload') continue;
       // 取值路径从物料事件 payload（`{ rowIndex, row }`）里取。
-      expect(relation.effect.value.path).toEqual(['row', expect.any(String)]);
+      expect(edge.value.path).toEqual(['row', expect.any(String)]);
     }
   });
 

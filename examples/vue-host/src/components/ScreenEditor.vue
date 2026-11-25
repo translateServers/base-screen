@@ -18,11 +18,7 @@ import { createLogger } from '../lib/logger';
 import { showToast } from '../lib/toast';
 import { createHostAssetLibrary, HOST_ASSET_LIBRARY_GROUP_ID } from '../screen/asset-library';
 import { loadVueDesignerRuntime } from '../screen/composition-runtime';
-import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
-import {
-  createHostAlarmStyleAuthoring,
-  parseHostAlarmBindings,
-} from '../screen/host-alarm-style-authoring';
+import { attachHostComponentWorkshop } from '../screen/fragment-shelf';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -45,7 +41,6 @@ const stage = shallowRef<DesignerStage | null>(null);
 // shallowRef：不代理设计器实例（自定义元素内部状态无需 Vue 响应式）。
 const designer = shallowRef<BaseScreenDesignerElement | null>(null);
 
-let alarms: ReturnType<typeof createHostAlarmController> | undefined;
 let disposed = false;
 let lastError: string | undefined;
 
@@ -58,20 +53,6 @@ function notifyError(message: string): void {
 // 保存由用户显式触发（顶栏「保存」/ Ctrl+S，经宿主 project adapter）；宿主不订阅文档变化，
 // 也不在离开前隐式落盘——未保存的改动随页面卸载丢弃。三端逐条对等。
 
-async function loadAlarmBindings(screenId: string): Promise<HostAlarmBindings> {
-  const result = await api.getScreenAlarmBindings(screenId);
-  if (!result.ok) {
-    logger.warn('alarm bindings unavailable', result.error);
-    return {};
-  }
-  const parsed = parseHostAlarmBindings(result.data.bindings);
-  if (parsed === undefined) {
-    logger.warn('alarm bindings malformed', result.data.bindings);
-    return {};
-  }
-  return parsed;
-}
-
 onMounted(() => {
   const screenId = route.params.screenId;
   if (typeof screenId !== 'string') {
@@ -83,34 +64,7 @@ onMounted(() => {
     const runtime = await loadVueDesignerRuntime();
     if (disposed) return;
 
-    // 2) 告警端口：必须在 configure 前注入，首快照最多等 800ms（超时先按基础样式渲染，
-    //    快照到达后由失效 API 补齐）。绑定按 screenId 从宿主读取。
-    const alarmBindings = await loadAlarmBindings(screenId);
-    if (disposed) return;
-    const controller = createHostAlarmController({
-      apiBase: resolveApiBase(),
-      bindings: alarmBindings,
-      onInvalidate: (componentIds) => designer.value?.refreshConditionalStyles(componentIds),
-    });
-    alarms = controller;
-    await controller.ready(800);
-    if (disposed) return;
-
-    // 3) 宿主条件样式的作者口：引擎在组件检查器渲染通用表单，保存后热更新端口。
-    const alarmStyleAuthoring = createHostAlarmStyleAuthoring({
-      initialBindings: alarmBindings,
-      save: async (bindings) => {
-        const result = await api.updateScreenAlarmBindings(screenId, bindings);
-        if (!result.ok) return { ok: false, message: result.error.message };
-        const parsed = parseHostAlarmBindings(result.data.bindings);
-        if (parsed === undefined) {
-          return { ok: false, message: '业务系统返回的告警绑定格式无效。' };
-        }
-        return { ok: true, bindings: parsed };
-      },
-      onSaved: (bindings) => controller.setBindings(bindings),
-    });
-    // 数据集与来源目录通道同理一并提交，否则设计器的数据源面板与变量面板会退化。
+    // 2) 数据集与来源目录通道一并提交，否则设计器的数据源面板与变量面板会退化。
     const datasetPort = createHostDatasetPort({ api, logger });
 
     stage.value = {
@@ -127,17 +81,15 @@ onMounted(() => {
           noticeSource: () => datasetPort.snapshot().alarms,
           logger,
         }),
-        conditionalStylePort: controller.port,
-        hostConditionalStyleAuthoring: alarmStyleAuthoring,
         // 返回按钮由基座顶栏渲染，宿主只负责点击后跳回自己的路由。
         backButton: true,
         hostResourceSelectionButton: true,
+        fragmentSaveAction: true,
         leftPanelGroups: [{ id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' }],
       },
     };
   })().catch((error: unknown) => {
     if (disposed) return;
-    alarms?.stop();
     logger.error('editor bootstrap failed', error);
     notifyError('设计器初始化失败，请返回列表重试。');
   });
@@ -145,7 +97,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   disposed = true;
-  alarms?.stop();
   logger.debug('edit view released');
 });
 
@@ -181,6 +132,8 @@ function onDesignerMounted(
   const assetLibrary = createHostAssetLibrary({ designer: element, screenId });
   handle.onDispose(() => assetLibrary.dispose());
   element.append(assetLibrary.element);
+  // 组件工坊（ADR-0105）：在线制作原子组件与组合组件；预置「指标卡」，接管「存为组合」。
+  attachHostComponentWorkshop(element, (cleanup) => handle.onDispose(cleanup));
 
   return () => {
     if (designer.value === element) designer.value = null;
@@ -210,7 +163,6 @@ function onDiagnostics(
   if (context?.instanceAvailable) {
     notifyError('物料目录更新失败，当前设计器仍可继续使用。');
   } else {
-    alarms?.stop();
     notifyError('设计器加载失败，请查看控制台日志。');
   }
 }

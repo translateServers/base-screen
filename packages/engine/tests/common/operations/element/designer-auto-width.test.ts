@@ -41,7 +41,7 @@ function document(components = [component()]): ScreenDocument {
     components,
     dataSources: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 
@@ -275,6 +275,63 @@ describe('text automatic width geometry', () => {
       size: { width: 320, height: 72 },
       props: { autoWidth: true },
     });
+  });
+
+  it('re-fits a group whose auto-width text got narrower since the last fit', () => {
+    // 组壳上次按 200 px 的渲染宽度拟合；文本内容变短后渲染宽度变成 125.63，但这一步不产生事务。
+    // 下一次无关编辑时右边的 74 px 是测量漂移，不是内边距，组壳应当收回去。
+    const source = document([
+      component('group', {
+        type: 'base.container',
+        props: {},
+        size: { width: 200, height: 72 },
+      }),
+      component('text', { parentId: 'group' }),
+      component('note', { props: {}, position: { x: 600, y: 0 } }),
+    ]);
+    const transaction = withDerivedDesignerGroupBounds(
+      source,
+      { commands: [{ type: 'update-components', componentIds: ['note'], patch: { name: 'n' } }] },
+      'base.container',
+      (next) => projectDesignerAutoWidths(next, new Map([['text', 125.63]])),
+    );
+    const result = applyScreenDocumentTransaction(source, transaction);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.document.components[0]).toMatchObject({
+      position: { x: 0, y: 0 },
+      size: { width: 125.63, height: 72 },
+    });
+  });
+
+  it('keeps the padding of a card whose auto-width title is not its widest child', () => {
+    const source = document([
+      component('card', {
+        type: 'base.container',
+        props: {},
+        size: { width: 300, height: 120 },
+      }),
+      component('text', {
+        parentId: 'card',
+        position: { x: 16, y: 10 },
+        size: { width: 220, height: 24 },
+      }),
+      component('body', {
+        parentId: 'card',
+        props: {},
+        position: { x: 16, y: 40 },
+        size: { width: 268, height: 60 },
+      }),
+      component('note', { props: {}, position: { x: 600, y: 0 } }),
+    ]);
+    const transaction = withDerivedDesignerGroupBounds(
+      source,
+      { commands: [{ type: 'update-components', componentIds: ['note'], patch: { name: 'n' } }] },
+      'base.container',
+      (next) => projectDesignerAutoWidths(next, new Map([['text', 64]])),
+    );
+    // 标题的左边与卡片的左内边距都在 16 px：自适应宽度只改右边界，不能让左边因此跟随。
+    expect(transaction.commands).toHaveLength(1);
   });
 
   it('归一化只重写 commands，不丢 provenance', () => {

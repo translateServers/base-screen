@@ -131,7 +131,12 @@ function previewGroupSummary(options: DesignerDataSourcePanelOptions): string {
   return DESIGNER_UI_TEXT.dataSource.responseIdle;
 }
 
-/** 空态（尚未请求）：图标 + 结论 + 一句说明 + 当前参数摘要。 */
+/**
+ * 空态（尚未请求）：图标 + 一句行动说明 + 当前参数摘要。
+ *
+ * 不再重复「尚未请求」——组头摘要已经写着同一句话，空态里再说一遍等于把
+ * 同一个结论刷两行。这里只回答「下一次请求会带什么参数」。
+ */
 function previewEmpty(
   ownerDocument: Document,
   options: DesignerDataSourcePanelOptions,
@@ -143,17 +148,15 @@ function previewEmpty(
   icon.className = 'designer-data-preview-empty-icon';
   icon.setAttribute('aria-hidden', 'true');
   icon.innerHTML = designerIcon('table');
-  const title = ownerDocument.createElement('strong');
-  title.textContent = DESIGNER_UI_TEXT.dataSource.previewIdle;
   const detail = ownerDocument.createElement('p');
   detail.textContent = DESIGNER_UI_TEXT.dataSource.previewIdleHint;
-  body.append(icon, title, detail);
+  body.append(icon, detail);
   const summary = previewParamSummary(options);
   if (summary !== '') {
     const chip = ownerDocument.createElement('span');
     chip.className = 'designer-data-preview-empty-params';
     chip.dataset.datasetParamSummary = 'true';
-    chip.textContent = summary;
+    chip.textContent = `${DESIGNER_UI_TEXT.dataSource.previewParamLead} · ${summary}`;
     chip.title = summary;
     body.appendChild(chip);
   }

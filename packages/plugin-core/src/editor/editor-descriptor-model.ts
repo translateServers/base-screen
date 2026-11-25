@@ -31,6 +31,7 @@ export type BaseScreenMaterialEditorControl =
   | 'field-selector'
   | 'unit-number'
   | 'stepper'
+  | 'spacing'
   | 'custom';
 
 export type BaseScreenMaterialEditorConditionOperator =
@@ -44,6 +45,12 @@ export type BaseScreenMaterialEditorConditionOperator =
 export type BaseScreenMaterialEditorPathSegment = string | number;
 
 export interface BaseScreenMaterialEditorCondition {
+  /**
+   * 条件读哪一侧的值。省略时与字段同侧（props 字段读 props，style 字段读 style）。
+   * 跨侧依赖要显式写出：例如「读数色」（style）只在「显示读数」（props）打开时出现
+   * （base-screen-docs ADR-0105 §4 范式改进 P1）。
+   */
+  readonly target?: 'props' | 'style';
   readonly path: readonly BaseScreenMaterialEditorPathSegment[];
   readonly operator: BaseScreenMaterialEditorConditionOperator;
   readonly value?: ScreenJsonValue;
@@ -107,6 +114,32 @@ export interface BaseScreenMaterialEditorDescriptor {
   readonly events?: readonly BaseScreenMaterialEventDescriptor[];
 }
 
+/**
+ * 作者写的描述符字段（base-screen-docs ADR-0102 D2）：`control` 可省略，解析时按字段语义推导补齐
+ * （`inferBaseScreenMaterialEditorControl`）。解析结果是 `BaseScreenMaterialEditorField`，`control` 必有。
+ */
+export type BaseScreenMaterialEditorFieldInput = Omit<
+  BaseScreenMaterialEditorField,
+  'control' | 'itemFields'
+> & {
+  readonly control?: BaseScreenMaterialEditorControl;
+  readonly itemFields?: readonly BaseScreenMaterialEditorFieldInput[];
+};
+
+export type BaseScreenMaterialEditorSectionInput = Omit<
+  BaseScreenMaterialEditorSection,
+  'fields'
+> & {
+  readonly fields: readonly BaseScreenMaterialEditorFieldInput[];
+};
+
+export interface BaseScreenMaterialEditorDescriptorInput {
+  readonly appearance?: readonly BaseScreenMaterialEditorSectionInput[];
+  readonly data?: readonly BaseScreenMaterialEditorSectionInput[];
+  readonly interaction?: readonly BaseScreenMaterialEditorSectionInput[];
+  readonly events?: readonly BaseScreenMaterialEventDescriptor[];
+}
+
 export const EDITOR_ZONES = ['appearance', 'data', 'interaction', 'events'] as const;
 
 export const EDITOR_CONTROLS: ReadonlySet<string> = new Set([
@@ -124,6 +157,9 @@ export const EDITOR_CONTROLS: ReadonlySet<string> = new Set([
   'field-selector',
   'unit-number',
   'stepper',
+  // 四边距是对象值（top/right/bottom/left 四个数字），因此也不进 SCALAR_CONTROLS：
+  // 它不能绑 data，也不冒充数组容器，只用于 props/style 上的一个复合字段。
+  'spacing',
   // 不进 SCALAR_CONTROLS / ARRAY_CONTROLS：因此不能绑 data，也不能冒充数组容器。
   'custom',
 ]);
@@ -180,7 +216,7 @@ export const EVENT_KNOWN = new Set([
   'requiredCapability',
 ]);
 
-export const CONDITION_KNOWN = new Set(['path', 'operator', 'value']);
+export const CONDITION_KNOWN = new Set(['target', 'path', 'operator', 'value']);
 
 export const CONDITION_OPERATORS: ReadonlySet<string> = new Set([
   'eq',

@@ -69,6 +69,11 @@ export interface CreateDesignerSwitchOptions {
 
 export interface DesignerSelectOption {
   readonly disabled?: boolean;
+  /**
+   * 次级读数（如尺寸预设的 `1920 × 1080`）：与标签分成主次两级排版，只在触发器与弹层里
+   * 以弱化数字字形显示，不进入原生选项文本——原生 select 的取值与读屏文本仍是标签本身。
+   */
+  readonly detail?: string;
   readonly label: string;
   readonly selected?: boolean;
   readonly value: string;
@@ -374,12 +379,14 @@ export function createDesignerInput(
   input.type = options.type ?? inputTypeForAppearance(appearance);
   input.className = designerClassNames(inputClassNameForAppearance(appearance), options.className);
   applyDesignerSize(input, options.size);
-  if (options.value !== undefined) input.value = options.value;
-  if (options.placeholder !== undefined) input.placeholder = options.placeholder;
-  if (options.ariaLabel !== undefined) input.ariaLabel = options.ariaLabel;
+  // 先定范围再赋值：range 的默认区间是 0–100，先赋值会被浏览器按默认区间钳住
+  // （亮度 150、字号 120 的滑杆停在最右端 100 处），之后再设 max 也不会恢复。
   if (options.min !== undefined) input.min = String(options.min);
   if (options.max !== undefined) input.max = String(options.max);
   if (options.step !== undefined) input.step = String(options.step);
+  if (options.value !== undefined) input.value = options.value;
+  if (options.placeholder !== undefined) input.placeholder = options.placeholder;
+  if (options.ariaLabel !== undefined) input.ariaLabel = options.ariaLabel;
   if (options.disabled !== undefined) input.disabled = options.disabled;
   if (options.readOnly !== undefined) input.readOnly = options.readOnly;
   return input;
@@ -437,6 +444,7 @@ export function createDesignerSelect(
     const option = ownerDocument.createElement('option');
     option.value = optionDefinition.value;
     option.textContent = optionDefinition.label;
+    if (optionDefinition.detail !== undefined) option.dataset.detail = optionDefinition.detail;
     if (optionDefinition.selected !== undefined) option.selected = optionDefinition.selected;
     if (optionDefinition.disabled !== undefined) option.disabled = optionDefinition.disabled;
     select.appendChild(option);

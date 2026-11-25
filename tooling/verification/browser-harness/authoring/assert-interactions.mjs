@@ -1,7 +1,12 @@
 // 选区/框选、吸附、变换预览、图层、事件守卫、主题与控件样式
 // 由 9 个原 assert 模块合并；调用顺序由 run-browser-harness.mjs 编排。
 import { screenshotDirectory } from '../shared/constants.mjs';
-import { componentCount, componentPositions, zoomResetViaMenu } from '../shared/harness-utils.mjs';
+import {
+  clickComponentAt,
+  componentCount,
+  componentPositions,
+  zoomResetViaMenu,
+} from '../shared/harness-utils.mjs';
 
 // ---- 源模块：assert-authoring-selection.mjs ----
 export async function assertAuthoringSelection(page, designer) {
@@ -471,7 +476,8 @@ export async function assertAuthoringMarquee(page, designer) {
   // 画布内文本编辑（ADR-0052）：双击文本组件进入 overlay 编辑，Enter 提交产生一条
   // 历史（撤销恢复原文），Esc 取消零副作用。
   // 说明：page.mouse.dblclick 在 harness 页面布局（designer 与底部 viewer 并列）下可能
-  // 命中 viewer 渲染的物料，故在 designer 画布内以 composed dblclick 派发验证完整链路。
+  // 命中 viewer 渲染的物料，故用 clickComponentAt 在 designer 画布内按「该位置实际最上层的
+  // 元素」双击——先单击选中，第二击会落在选框覆盖层上（与真实鼠标一致），不再直接派发给组件。
   // 注意：前序作者桥断言（line ~845）把 title 静态数据设为 'Base Screen 设计器r'。
   const textEditValueBefore = await page.evaluate(() => {
     const component = window.baseScreenHarness.designer.document.components.find(
@@ -479,15 +485,7 @@ export async function assertAuthoringMarquee(page, designer) {
     );
     return component?.dataSource?.value;
   });
-  await page.evaluate(() => {
-    const root = window.baseScreenHarness.designer.shadowRoot;
-    const canvas = root.querySelector('[data-canvas]');
-    const element = [...canvas.querySelectorAll('[data-base-screen-component-id]')].find(
-      (entry) => entry.getAttribute('data-base-screen-component-id') === 'title',
-    );
-    if (element === undefined) throw new Error('BROWSER_HARNESS_TEXT_EDIT_TITLE_MISSING');
-    element.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, composed: true }));
-  });
+  await clickComponentAt(page, 'title', { double: true });
   const textEditOverlay = designer.locator('[data-text-edit-overlay]');
   await textEditOverlay.waitFor({ state: 'attached', timeout: 2_000 });
   const overlayInitialText = await textEditOverlay.textContent();
@@ -530,14 +528,7 @@ export async function assertAuthoringMarquee(page, designer) {
     );
     return component?.dataSource?.value === before;
   }, textEditValueBefore);
-  await page.evaluate(() => {
-    const root = window.baseScreenHarness.designer.shadowRoot;
-    const canvas = root.querySelector('[data-canvas]');
-    const element = [...canvas.querySelectorAll('[data-base-screen-component-id]')].find(
-      (entry) => entry.getAttribute('data-base-screen-component-id') === 'title',
-    );
-    element.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, composed: true }));
-  });
+  await clickComponentAt(page, 'title', { double: true });
   const cancelOverlay = designer.locator('[data-text-edit-overlay]');
   await cancelOverlay.waitFor({ state: 'attached', timeout: 2_000 });
   await page.keyboard.press('Escape');
@@ -589,8 +580,9 @@ async function assertSnapWorkflow(designer, page) {
     const hostDataResult = window.baseScreenHarness.designer.executeCommand({
       type: 'update-components',
       componentIds: ['host-data'],
-      // 保留 title 左侧对齐轨道，专供验证拖拽时的 Moveable 式间距标注。
-      patch: { position: { x: 350, y: 300 }, rotation: 0 },
+      // 保留 title 左侧对齐轨道，专供验证拖拽时的 Moveable 式间距标注。y=200 让它在拖动全程
+      // 都处于吸附邻近范围（DESIGNER_SNAP_REACH=180）内：title 位于 0..100 时间距 ≤ 128。
+      patch: { position: { x: 350, y: 200 }, rotation: 0 },
     });
     if (!titleResult.ok || !subtitleResult.ok || !hostDataResult.ok) {
       throw new Error('BROWSER_HARNESS_SNAP_BASELINE_FAILED');
@@ -612,7 +604,7 @@ async function assertSnapWorkflow(designer, page) {
           subtitle?.position.y === 100 &&
           subtitle?.rotation === 0 &&
           hostData?.position.x === 350 &&
-          hostData?.position.y === 300 &&
+          hostData?.position.y === 200 &&
           hostData?.rotation === 0
         );
       },
@@ -746,7 +738,7 @@ async function assertSnapWorkflow(designer, page) {
     }
   };
   // y 轴验证：title top 对齐画布 top=0（差 2px 进入捕获阈值）→ 吸附 -100。
-  // 渲染阈值 1px：吸附（5px）与渲染分离，ALIGN 阶段（dist 2）无线（Moveable snapRenderThreshold 语义）。
+  // 吸上即显示参考线：ALIGN 阶段（dist 2）已吸附，画布 top 线随之出现。
   const targetDeltaY = 0 - baseline.title.position.y;
   await page.mouse.move(startX, startY);
   await page.mouse.down();
@@ -756,6 +748,9 @@ async function assertSnapWorkflow(designer, page) {
   await page.mouse.move(startX, startY + targetDeltaY - 2, { steps: 5 });
   let translate = await readTranslate('title');
   await expectAxis(translate, 'y', targetDeltaY, 'ALIGN');
+  if ((await designer.locator('.canvas-guide-snap[data-axis="y"]').count()) < 1) {
+    throw new Error('BROWSER_HARNESS_SNAP_ALIGN_GUIDE_FAILED');
+  }
   const dragMeasurements = await designer.locator('.canvas-measurement').evaluateAll((elements) =>
     elements.map((element) => ({
       axis: element.dataset.axis,
@@ -773,35 +768,37 @@ async function assertSnapWorkflow(designer, page) {
       `BROWSER_HARNESS_SNAP_MEASUREMENT_DURING_DRAG_FAILED:${JSON.stringify(dragMeasurements)}`,
     );
   }
-  // 捕获阈值内（4px ≤ 5px）每帧重新吸附：保持吸附目标（×1.0，无额外释放带，Nebula/Moveable 语义）。
+  // 捕获阈值内（4px ≤ 6px）每帧重新吸附：保持吸附目标（×1.0，无额外释放带，Moveable/Penpot 语义）。
   await assertSnapOverlayReuse(designer, page, { x: startX, y: startY + targetDeltaY });
   await page.mouse.move(startX, startY + targetDeltaY + 4, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', targetDeltaY, 'HOLD');
-  // 超出捕获阈值（6px > 5px）立即释放：translate 恢复原始位移。
-  await page.mouse.move(startX, startY + targetDeltaY + 6, { steps: 2 });
+  // 超出捕获阈值（9px > 6px）立即释放：translate 恢复原始位移。
+  await page.mouse.move(startX, startY + targetDeltaY + 9, { steps: 2 });
   translate = await readTranslate('title');
-  await expectAxis(translate, 'y', targetDeltaY + 6, 'RELEASE_BEYOND');
+  await expectAxis(translate, 'y', targetDeltaY + 9, 'RELEASE_BEYOND');
   // 没有组件、画布或用户参考线命中时，移动保持原始位移。
-  await page.mouse.move(startX, startY + targetDeltaY + 7, { steps: 2 });
+  await page.mouse.move(startX, startY + targetDeltaY + 10, { steps: 2 });
   translate = await readTranslate('title');
-  await expectAxis(translate, 'y', targetDeltaY + 7, 'RAW_MOVE');
+  await expectAxis(translate, 'y', targetDeltaY + 10, 'RAW_MOVE');
   // 超出画布边界吸附阈值后，bottom 锚点距 subtitle top（100）2px → 按距离重新吸附。
   const releaseDelta =
     baseline.subtitle.position.y - (baseline.title.position.y + baseline.title.size.height);
   await page.mouse.move(startX, startY + targetDeltaY + 30, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', releaseDelta, 'RELEASE');
-  // title 与 host-data 的 left=350 已精确重合；即使 y 轴仍在 2px 捕获范围内，
-  // x 轴也不得因零校正而出现贯穿画布的辅助线。
-  if ((await designer.locator('.canvas-guide-snap[data-axis="x"]').count()) !== 0) {
+  // title 与 host-data 的 left=350 已精确重合：拖动虽没动 x，已重合的边同样画线（业界一致）。
+  if ((await designer.locator('.canvas-guide-snap[data-axis="x"]').count()) < 1) {
     throw new Error('BROWSER_HARNESS_SNAP_EXACT_X_GUIDE_FAILED');
   }
-  // 指针也精确落在重合边界时，两轴均无需校正，因此不应保留任何 snap overlay。
+  // 指针精确落在重合边界时两轴都保持重合，两轴都有线。
   await page.mouse.move(startX, startY + releaseDelta, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', releaseDelta, 'EXACT_BOUNDARY');
-  if ((await designer.locator('.canvas-guide-snap').count()) !== 0) {
+  if (
+    (await designer.locator('.canvas-guide-snap[data-axis="y"]').count()) < 1 ||
+    (await designer.locator('.canvas-guide-snap[data-axis="x"]').count()) < 1
+  ) {
     throw new Error('BROWSER_HARNESS_SNAP_EXACT_BOUNDARY_GUIDE_FAILED');
   }
   await page.mouse.up();
@@ -827,13 +824,13 @@ async function assertSnapWorkflow(designer, page) {
       `BROWSER_HARNESS_SNAP_COMMIT_FAILED:${JSON.stringify({ committed, targetDeltaY, commitTargetY, baseline: baseline.title.position })}`,
     );
   }
-  // 旋转候选：subtitle 移到 title 右侧并转 90°，按 visual bounds 左边缘吸附。
-  // x=800 使旋转后的 visual left（991）远离 title，隔离旋转候选断言。
+  // 旋转候选：subtitle 移到 title 左侧并转 90°，title 左边按其 visual bounds 右边缘吸附。
+  // x=0 使旋转后的 visual right（239）远离 title 且在 1440px 视口可见区内（吸附只取可见组件）。
   await designer.evaluate(() => {
     const result = window.baseScreenHarness.designer.executeCommand({
       type: 'update-components',
       componentIds: ['subtitle'],
-      patch: { position: { x: 800, y: 100 }, rotation: 90 },
+      patch: { position: { x: 0, y: 100 }, rotation: 90 },
     });
     if (!result.ok) throw new Error('BROWSER_HARNESS_SNAP_ROTATION_FAILED');
   });
@@ -841,7 +838,7 @@ async function assertSnapWorkflow(designer, page) {
     const subtitle = window.baseScreenHarness.designer.document.components.find(
       (item) => item.id === 'subtitle',
     );
-    return subtitle?.position.x === 800 && subtitle?.rotation === 90;
+    return subtitle?.position.x === 0 && subtitle?.rotation === 90;
   });
   const rotated = await page.evaluate(() => {
     const subtitle = window.baseScreenHarness.designer.document.components.find(
@@ -851,8 +848,8 @@ async function assertSnapWorkflow(designer, page) {
     const centerX = subtitle.position.x + subtitle.size.width / 2;
     return { centerX, height: subtitle.size.height };
   });
-  const rotatedLeft = rotated.centerX - rotated.height / 2;
-  const rotatedDelta = rotatedLeft - (baseline.title.position.x + baseline.title.size.width);
+  const rotatedRight = rotated.centerX + rotated.height / 2;
+  const rotatedDelta = rotatedRight - baseline.title.position.x;
   const settledAfterCommit = await page
     .waitForFunction(
       (expected) => {

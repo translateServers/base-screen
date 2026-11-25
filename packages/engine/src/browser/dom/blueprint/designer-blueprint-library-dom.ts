@@ -1,20 +1,10 @@
-import type { ScreenBlueprintRelation, ScreenDocument } from '@base-screen/contracts';
-import { readScreenBlueprintRelationCategory } from '@base-screen/contracts';
-import {
-  LIFECYCLE_BLUEPRINT_NODE_ID,
-  timerBlueprintNodeId,
-  timerIntervalFromBlueprintNodeId,
-} from '../../../common/operations/blueprint/designer-blueprint-node-ids.js';
+import type { ScreenDocument } from '@base-screen/contracts';
+import type { DesignerBlueprintLibraryEntry } from '../../../common/operations/blueprint/designer-blueprint-model.js';
 import type {
-  BaseScreenBlueprintCanvasEdge,
   BaseScreenBlueprintCanvasGraph,
-  BaseScreenBlueprintCanvasNode,
+  BaseScreenBlueprintCanvasNodeKind,
   BaseScreenBlueprintCanvasSelection,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
-import {
-  type DesignerVariableView,
-  readDesignerVariableViews,
-} from '../../../common/operations/designer-variable-view.js';
 import {
   type BaseScreenDesignerLeftPanelGroup,
   baseScreenDesignerLeftPanelGroupSupportsMode,
@@ -38,31 +28,51 @@ const LIBRARY_TABS: readonly DesignerBlueprintLibraryBuiltinTab[] = [
   'variables',
 ];
 
+/** 「功能节点」分组里可直接加入的节点种类（组件 / 变量从各自分组加入）。 */
+const FUNCTION_NODE_KINDS: readonly Exclude<
+  BaseScreenBlueprintCanvasNodeKind,
+  'component' | 'variable' | 'sub-canvas' | 'main-canvas'
+>[] = ['lifecycle', 'timer', 'condition', 'host'];
+
+const TEXT = DESIGNER_UI_TEXT.blueprint;
+
+export interface DesignerBlueprintLibraryModel {
+  readonly document: ScreenDocument | undefined;
+  readonly graph: BaseScreenBlueprintCanvasGraph;
+  readonly components: readonly DesignerBlueprintLibraryEntry[];
+  readonly variables: readonly DesignerBlueprintLibraryEntry[];
+  readonly selection: BaseScreenBlueprintCanvasSelection;
+  readonly query: string;
+  readonly activeTab: DesignerBlueprintLibraryTab;
+  readonly groups: readonly BaseScreenDesignerLeftPanelGroup[] | undefined;
+}
+
+/**
+ * 左侧「蓝图节点库」（布局沿用设计器左栏：竖向页签 + 搜索 + 列表）。
+ * 组件 / 变量条目单击加入或定位、可拖入画布；功能节点条目单击在视口中心新建；
+ * 「关系」页签同时列出全部连线，单击选中并定位。
+ */
 export function renderDesignerBlueprintLibrary(
   container: HTMLElement | undefined,
-  document: ScreenDocument | undefined,
-  graph: BaseScreenBlueprintCanvasGraph,
-  componentLibrary: readonly BaseScreenBlueprintCanvasNode[],
-  selection: BaseScreenBlueprintCanvasSelection,
-  query: string,
-  activeTab: DesignerBlueprintLibraryTab,
-  groups: readonly BaseScreenDesignerLeftPanelGroup[] | undefined,
+  model: DesignerBlueprintLibraryModel,
 ): void {
   if (container === undefined) return;
-  const hostGroups = (groups ?? []).filter((group) =>
+  const hostGroups = (model.groups ?? []).filter((group) =>
     baseScreenDesignerLeftPanelGroupSupportsMode(group, 'blueprint'),
   );
-  const requestedHostGroupId = hostLeftPanelGroupId(activeTab);
+  const requestedHostGroupId = hostLeftPanelGroupId(model.activeTab);
   const activeHostGroupId = hostGroups.some((group) => group.id === requestedHostGroupId)
     ? requestedHostGroupId
     : undefined;
-  const activeBuiltinTab = isDesignerBlueprintLibraryBuiltinTab(activeTab)
-    ? activeTab
+  const activeBuiltinTab = isDesignerBlueprintLibraryBuiltinTab(model.activeTab)
+    ? model.activeTab
     : 'components';
   const resolvedActiveTab =
     activeHostGroupId === undefined ? activeBuiltinTab : hostLeftPanelTab(activeHostGroupId);
+  const placeholder =
+    activeBuiltinTab === 'relations' ? TEXT.relationList.search : TEXT.librarySearch;
   container.innerHTML = `<div class="blueprint-library-shell">
-    <nav class="rail-tabs blueprint-library-rail" role="tablist" aria-orientation="vertical" aria-label="${DESIGNER_UI_TEXT.blueprint.library}">
+    <nav class="rail-tabs blueprint-library-rail" role="tablist" aria-orientation="vertical" aria-label="${TEXT.library}">
       ${LIBRARY_TABS.map((tab) => libraryTab(tab, resolvedActiveTab)).join('')}
       ${hostGroups.map((group) => hostLibraryTab(group, activeHostGroupId)).join('')}
     </nav>
@@ -70,11 +80,11 @@ export function renderDesignerBlueprintLibrary(
       <div class="layer-panel-controls blueprint-library-controls">
         <label class="designer-field layer-search blueprint-library-search">
           <span class="layer-search-glyph" aria-hidden="true">${designerIcon('search')}</span>
-          <input type="search" class="designer-control designer-input" data-blueprint-library-search value="${escapeAttribute(query)}" placeholder="${activeBuiltinTab === 'relations' ? DESIGNER_UI_TEXT.blueprint.relationList.search : DESIGNER_UI_TEXT.blueprint.librarySearch}" aria-label="${activeBuiltinTab === 'relations' ? DESIGNER_UI_TEXT.blueprint.relationList.search : DESIGNER_UI_TEXT.blueprint.librarySearch}">
+          <input type="search" class="designer-control designer-input" data-blueprint-library-search value="${escapeAttribute(model.query)}" placeholder="${placeholder}" aria-label="${placeholder}">
         </label>
       </div>
       <div class="blueprint-panel-scroll" id="designer-blueprint-library-${activeBuiltinTab}-panel" role="tabpanel" aria-labelledby="designer-blueprint-library-${activeBuiltinTab}-tab" tabindex="0">
-        ${libraryPane(activeBuiltinTab, document, graph, componentLibrary, selection, query)}
+        ${libraryPane(activeBuiltinTab, model)}
       </div>
     </section>
   </div>`;
@@ -82,315 +92,230 @@ export function renderDesignerBlueprintLibrary(
 
 function libraryPane(
   activeTab: DesignerBlueprintLibraryBuiltinTab,
-  document: ScreenDocument | undefined,
-  graph: BaseScreenBlueprintCanvasGraph,
-  componentLibrary: readonly BaseScreenBlueprintCanvasNode[],
-  selection: BaseScreenBlueprintCanvasSelection,
-  query: string,
+  model: DesignerBlueprintLibraryModel,
 ): string {
-  const normalized = query.trim().toLocaleLowerCase();
+  const query = model.query.trim().toLocaleLowerCase();
   if (activeTab === 'components') {
-    return componentPane(graph, componentLibrary, selection, normalized);
+    return entityPane(model.components, model.selection, query, TEXT.layers, TEXT.noComponentNodes);
   }
-  if (activeTab === 'relations') return relationsPane(document, graph, selection, normalized);
-  return variablePane(document, graph, selection, normalized);
+  if (activeTab === 'variables') {
+    return entityPane(
+      model.variables,
+      model.selection,
+      query,
+      TEXT.globalVariables,
+      TEXT.noVariables,
+    );
+  }
+  return functionPane(model, query);
 }
 
-function componentPane(
-  graph: BaseScreenBlueprintCanvasGraph,
-  componentLibrary: readonly BaseScreenBlueprintCanvasNode[],
+function entityPane(
+  entries: readonly DesignerBlueprintLibraryEntry[],
   selection: BaseScreenBlueprintCanvasSelection,
   query: string,
+  title: string,
+  empty: string,
 ): string {
-  const placed = new Set(
-    graph.nodes.filter((node) => node.kind === 'component').map((node) => node.id),
+  const visible = entries.filter(
+    (entry) =>
+      query.length === 0 ||
+      `${entry.name} ${entry.entityId} ${entry.subtitle}`.toLocaleLowerCase().includes(query),
   );
-  const components = componentLibrary.filter(
-    (node) =>
-      node.kind === 'component' &&
-      (query.length === 0 ||
-        `${node.componentName ?? ''} ${node.componentId ?? ''} ${node.materialType ?? ''}`
-          .toLocaleLowerCase()
-          .includes(query)),
-  );
-  if (components.length === 0) return emptyState(DESIGNER_UI_TEXT.blueprint.noComponentNodes);
-  const byId = new Map(components.map((node) => [node.componentId ?? '', node] as const));
-  const countsById = new Map(
-    graph.nodes
-      .filter((node) => node.componentId !== undefined)
-      .map((node) => [node.componentId ?? '', node] as const),
-  );
-  const depthOf = (node: BaseScreenBlueprintCanvasNode): number => {
-    let depth = 0;
-    let parentId = node.parentId;
-    const seen = new Set<string>();
-    while (parentId !== undefined && !seen.has(parentId)) {
-      seen.add(parentId);
-      depth += 1;
-      parentId = byId.get(parentId)?.parentId;
-    }
-    return depth;
-  };
-  return `<section class="blueprint-palette-group" aria-label="${DESIGNER_UI_TEXT.blueprint.layers}">
-    <header><strong>${DESIGNER_UI_TEXT.blueprint.currentCanvas}</strong><span>${components.length}</span></header>
+  if (visible.length === 0) return emptyState(empty);
+  return `<section class="blueprint-palette-group" aria-label="${escapeAttribute(title)}">
+    <header><strong>${escapeHtml(title)}</strong><span>${visible.length}</span></header>
     <div class="blueprint-palette-list">
-      ${components
-        .map((node) =>
-          componentItem(
-            node,
-            placed.has(node.id),
-            selection?.kind === 'node' && selection.id === node.id,
-            depthOf(node),
-            countsById.get(node.componentId ?? ''),
-          ),
-        )
-        .join('')}
+      ${visible.map((entry) => entityItem(entry, selection)).join('')}
     </div>
-    <p class="blueprint-library-hint">${DESIGNER_UI_TEXT.blueprint.componentNodeHint}</p>
+    <p class="blueprint-library-hint">${TEXT.componentNodeHint}</p>
   </section>`;
 }
 
-function componentItem(
-  node: BaseScreenBlueprintCanvasNode,
-  placed: boolean,
-  selected: boolean,
-  depth = 0,
-  counts?: BaseScreenBlueprintCanvasNode,
+function entityItem(
+  entry: DesignerBlueprintLibraryEntry,
+  selection: BaseScreenBlueprintCanvasSelection,
 ): string {
-  const componentId = node.componentId ?? '';
-  const name = node.componentName ?? componentId;
-  const eventCount = (node.events ?? []).filter((event) => event.available).length;
+  const placed = entry.nodeId !== undefined;
+  const selected = placed && selection.nodes.includes(entry.nodeId ?? '');
+  const isComponent = entry.kind === 'component';
   const action = placed
-    ? `data-blueprint-select-node="${escapeAttribute(node.id)}"`
-    : `data-blueprint-add-component="${escapeAttribute(componentId)}"`;
-  const actionLabel = placed
-    ? DESIGNER_UI_TEXT.blueprint.locateComponent(name)
-    : DESIGNER_UI_TEXT.blueprint.addComponent(name);
-  const structure =
-    node.childCount === undefined
-      ? ''
-      : ` · ${DESIGNER_UI_TEXT.blueprint.structure.children} ${node.childCount}`;
-  const relationCount =
-    placed && counts !== undefined
-      ? `<em class="blueprint-palette-counts">${escapeHtml(DESIGNER_UI_TEXT.blueprint.relationCounts(counts.outboundCount ?? 0, counts.inboundCount ?? 0))}</em>`
-      : '';
-  return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-depth="${depth}" style="--bp-indent: ${depth * 16}px" data-placed="${String(placed)}" data-selected="${String(selected)}"${placed ? '' : ` draggable="true" data-blueprint-drag-kind="component" data-component-id="${escapeAttribute(componentId)}" data-blueprint-drag-label="${escapeAttribute(name)}"`}>
-    <button type="button" class="blueprint-palette-primary" ${action} aria-label="${escapeAttribute(actionLabel)}">
-      <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('layers')}</span>
-      <span><strong>${escapeHtml(name)}</strong><small>${escapeHtml(node.materialType ?? '')} · ${DESIGNER_UI_TEXT.blueprint.componentEventCount(eventCount)}${escapeHtml(structure)}</small></span>
-      ${relationCount}
+    ? `data-blueprint-select-node="${escapeAttribute(entry.nodeId ?? '')}"`
+    : isComponent
+      ? `data-blueprint-add-component="${escapeAttribute(entry.entityId)}"`
+      : `data-blueprint-add-variable="${escapeAttribute(entry.entityId)}"`;
+  const label = placed
+    ? isComponent
+      ? TEXT.locateComponent(entry.name)
+      : TEXT.locateVariable(entry.name)
+    : isComponent
+      ? TEXT.addComponent(entry.name)
+      : TEXT.addVariableNode(entry.name);
+  const drag = placed
+    ? ''
+    : ` draggable="true" data-blueprint-drag-kind="${entry.kind}" data-${isComponent ? 'component' : 'variable'}-id="${escapeAttribute(entry.entityId)}" data-blueprint-drag-label="${escapeAttribute(entry.name)}"`;
+  const icon: DesignerIconName = isComponent ? 'layers' : 'variable';
+  const detail = isComponent ? TEXT.componentEventCount(entry.eventCount) : entry.subtitle;
+  return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-depth="${entry.depth}" style="--bp-indent: ${entry.depth * 16}px" data-placed="${String(placed)}" data-selected="${String(selected)}" data-node-kind="${entry.kind}"${drag}>
+    <button type="button" class="blueprint-palette-primary" ${action} aria-label="${escapeAttribute(label)}" data-tip="${escapeAttribute(label)}">
+      <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon(icon)}</span>
+      <span class="blueprint-palette-copy"><strong>${escapeHtml(entry.name)}</strong><small>${escapeHtml(detail)}</small></span>
+      <span class="blueprint-palette-state" aria-hidden="true">${placed ? designerIcon('check') : designerIcon('plus')}</span>
     </button>
-    <button type="button" class="blueprint-palette-action" ${action} data-tip="${escapeAttribute(actionLabel)}" aria-label="${escapeAttribute(actionLabel)}">${designerIcon(placed ? 'locate' : 'plus')}</button>
   </div>`;
 }
 
-function relationsPane(
-  document: ScreenDocument | undefined,
-  graph: BaseScreenBlueprintCanvasGraph,
-  selection: BaseScreenBlueprintCanvasSelection,
-  query: string,
-): string {
-  if (document === undefined)
-    return emptyState(DESIGNER_UI_TEXT.blueprint.relationList.noRelations);
-  const groups = new Map<keyof typeof DESIGNER_UI_TEXT.blueprint.relationCategories, string[]>();
-  const push = (
-    category: keyof typeof DESIGNER_UI_TEXT.blueprint.relationCategories,
-    line: string,
-  ) => {
-    const rows = groups.get(category) ?? [];
-    rows.push(line);
-    groups.set(category, rows);
-  };
-  for (const relation of document.blueprint.relations) {
-    const line = relationRow(document, graph, relation, selection, query);
-    if (line !== null) push(readScreenBlueprintRelationCategory(relation), line);
-  }
-  for (const edge of graph.edges) {
-    if (edge.kind !== 'containment') continue;
-    const line = containmentRow(document, edge, selection, query);
-    if (line !== null) push('structure', line);
-  }
-  const host = graph.nodes.find((node) => node.id === 'host');
-  const hostRow =
-    host === undefined
-      ? `<div class="designer-list-row blueprint-palette-item" data-density="default"><button type="button" class="blueprint-palette-primary" data-blueprint-insert-host aria-label="${DESIGNER_UI_TEXT.blueprint.relationList.addHost}"><span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('activity')}</span><span><strong>${DESIGNER_UI_TEXT.blueprint.hostNode}</strong><small>${DESIGNER_UI_TEXT.blueprint.hostNodeHint}</small></span><span class="blueprint-palette-inline-add" aria-hidden="true">${designerIcon('plus')}</span></button></div>`
-      : `<div class="designer-list-row blueprint-palette-item" data-density="default" data-placed="true" data-selected="${String(selection?.kind === 'node' && selection.id === host.id)}"><button type="button" class="blueprint-palette-primary" data-blueprint-select-node="${host.id}" aria-label="${DESIGNER_UI_TEXT.blueprint.hostNode}"><span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('activity')}</span><span><strong>${DESIGNER_UI_TEXT.blueprint.hostNode}</strong><small>${DESIGNER_UI_TEXT.blueprint.hostNodeHint}</small></span><em>${DESIGNER_UI_TEXT.blueprint.placed}</em></button></div>`;
-  const order: readonly (keyof typeof DESIGNER_UI_TEXT.blueprint.relationCategories)[] = [
-    'structure',
-    'interaction',
-    'data',
-    'exit',
-    'semantic',
-  ];
-  const sections = order
-    .map((category) => {
-      const rows = groups.get(category);
-      if (rows === undefined || rows.length === 0) return '';
-      return `<section class="blueprint-palette-group" aria-label="${DESIGNER_UI_TEXT.blueprint.relationCategories[category]}"><header><strong>${DESIGNER_UI_TEXT.blueprint.relationCategories[category]}</strong><span>${rows.length}</span></header><div class="blueprint-palette-list">${rows.join('')}</div></section>`;
+function functionPane(model: DesignerBlueprintLibraryModel, query: string): string {
+  const graphText = TEXT.graph;
+  const singletons = new Set(
+    model.graph.nodes
+      .filter((node) => node.kind === 'host' || node.kind === 'lifecycle')
+      .map((node) => node.kind),
+  );
+  const kinds = FUNCTION_NODE_KINDS.filter(
+    (kind) =>
+      query.length === 0 ||
+      `${graphText.nodeKinds[kind]} ${graphText.nodeKindHints[kind]} ${kind}`
+        .toLocaleLowerCase()
+        .includes(query),
+  );
+  const items = kinds
+    .map((kind) => {
+      const existing =
+        kind === 'host' || kind === 'lifecycle'
+          ? model.graph.nodes.find((node) => node.kind === kind)
+          : undefined;
+      const placed = singletons.has(kind);
+      const action =
+        existing !== undefined
+          ? `data-blueprint-select-node="${escapeAttribute(existing.id)}"`
+          : `data-blueprint-insert-node="${kind}"`;
+      const label = TEXT.addLogicNode(graphText.nodeKinds[kind]);
+      const icon: DesignerIconName =
+        kind === 'timer'
+          ? 'activity'
+          : kind === 'condition'
+            ? 'sliders'
+            : kind === 'host'
+              ? 'terminal'
+              : 'play';
+      return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-placed="${String(placed)}" data-node-kind="${kind}"${placed ? '' : ` draggable="true" data-blueprint-drag-kind="${kind}" data-blueprint-drag-label="${escapeAttribute(graphText.nodeKinds[kind])}"`}>
+        <button type="button" class="blueprint-palette-primary" ${action} aria-label="${escapeAttribute(label)}" data-tip="${escapeAttribute(label)}">
+          <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon(icon)}</span>
+          <span class="blueprint-palette-copy"><strong>${escapeHtml(graphText.nodeKinds[kind])}</strong><small>${escapeHtml(graphText.nodeKindHints[kind])}</small></span>
+          <span class="blueprint-palette-state" aria-hidden="true">${placed ? designerIcon('check') : designerIcon('plus')}</span>
+        </button>
+      </div>`;
     })
     .join('');
-  const hostSection = `<section class="blueprint-palette-group" aria-label="${DESIGNER_UI_TEXT.blueprint.hostNode}"><header><strong>${DESIGNER_UI_TEXT.blueprint.hostNode}</strong><span>${host === undefined ? 0 : 1}</span></header><div class="blueprint-palette-list">${hostRow}</div></section>`;
-  const lifecycle = graph.nodes.find((node) => node.id === LIFECYCLE_BLUEPRINT_NODE_ID);
-  const timerNodes = graph.nodes
-    .filter((node) => node.kind === 'timer')
-    .sort((left, right) => (left.intervalSeconds ?? 0) - (right.intervalSeconds ?? 0));
-  const lifecycleRow = instanceNodeRow(lifecycle, selection, {
-    insertAttribute: 'data-blueprint-insert-lifecycle',
-    label: DESIGNER_UI_TEXT.blueprint.lifecycleNode,
-    hint: DESIGNER_UI_TEXT.blueprint.lifecycleNodeHint,
-    icon: 'activity',
-  });
-  const timerRows = timerNodes.map((node) =>
-    instanceNodeRow(node, selection, {
-      insertAttribute: 'data-blueprint-insert-timer',
-      label: DESIGNER_UI_TEXT.blueprint.timerNode(node.intervalSeconds ?? 0),
-      hint: DESIGNER_UI_TEXT.blueprint.timerNodeHint,
-      icon: 'play',
-    }),
-  );
-  if (!timerNodes.some((node) => node.intervalSeconds === 5)) {
-    timerRows.unshift(
-      instanceNodeRow(undefined, selection, {
-        insertAttribute: 'data-blueprint-insert-timer',
-        label: DESIGNER_UI_TEXT.blueprint.relationList.addTimer,
-        hint: DESIGNER_UI_TEXT.blueprint.timerNodeHint,
-        icon: 'play',
-      }),
-    );
-  }
-  const lifecycleSection = `<section class="blueprint-palette-group" aria-label="${DESIGNER_UI_TEXT.blueprint.lifecycleNode}"><header><strong>${DESIGNER_UI_TEXT.blueprint.lifecycleNode}</strong><span>${lifecycle === undefined ? 0 : 1}</span></header><div class="blueprint-palette-list">${lifecycleRow}</div></section>`;
-  const timerSection = `<section class="blueprint-palette-group" aria-label="${DESIGNER_UI_TEXT.blueprint.canvasSurface.nodeKind.timer}"><header><strong>${DESIGNER_UI_TEXT.blueprint.canvasSurface.nodeKind.timer}</strong><span>${timerNodes.length}</span></header><div class="blueprint-palette-list">${timerRows.join('')}</div></section>`;
-  const content = `${sections}${hostSection}${lifecycleSection}${timerSection}`;
-  return content === '' ? emptyState(DESIGNER_UI_TEXT.blueprint.relationList.noRelations) : content;
-}
-
-function instanceNodeRow(
-  node: BaseScreenBlueprintCanvasNode | undefined,
-  selection: BaseScreenBlueprintCanvasSelection,
-  options: {
-    readonly insertAttribute: string;
-    readonly label: string;
-    readonly hint: string;
-    readonly icon: DesignerIconName;
-  },
-): string {
-  const glyph = `<span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon(options.icon)}</span>`;
-  const body = `<span><strong>${options.label}</strong><small>${options.hint}</small></span>`;
-  if (node === undefined) {
-    return `<div class="designer-list-row blueprint-palette-item" data-density="default"><button type="button" class="blueprint-palette-primary" ${options.insertAttribute} aria-label="${options.label}">${glyph}${body}<span class="blueprint-palette-inline-add" aria-hidden="true">${designerIcon('plus')}</span></button></div>`;
-  }
-  return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-placed="true" data-selected="${String(selection?.kind === 'node' && selection.id === node.id)}"><button type="button" class="blueprint-palette-primary" data-blueprint-select-node="${node.id}" aria-label="${options.label}">${glyph}${body}<em>${DESIGNER_UI_TEXT.blueprint.placed}</em></button></div>`;
-}
-
-function relationRow(
-  document: ScreenDocument,
-  graph: BaseScreenBlueprintCanvasGraph,
-  relation: ScreenBlueprintRelation,
-  selection: BaseScreenBlueprintCanvasSelection,
-  query: string,
-): string | null {
-  const edgeId =
-    relation.type === 'semantic' ? `semantic:${relation.id}` : `relation:${relation.id}`;
-  const edge = graph.edges.find((candidate) => candidate.id === edgeId);
-  if (edge === undefined) return null;
-  const source = nodeLabel(document, sourceNodeId(relation));
-  const target = nodeLabel(document, targetNodeId(relation));
-  const meta =
-    relation.type === 'semantic'
-      ? DESIGNER_UI_TEXT.blueprint.semanticRoles[relation.role]
-      : `${relation.source.event.eventName} · ${DESIGNER_UI_TEXT.blueprint.relationEffects[relation.effect.type]}`;
-  const condition =
-    relation.type === 'behavior' && relation.condition !== undefined
-      ? DESIGNER_UI_TEXT.blueprint.conditionExpression
-      : DESIGNER_UI_TEXT.blueprint.relationNode.noCondition;
-  const text = `${source} ${target} ${meta} ${condition}`.toLocaleLowerCase();
-  if (query.length > 0 && !text.includes(query)) return null;
-  const selected = selection?.kind === 'edge' && selection.id === edgeId;
-  return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-kind="relation" data-selected="${String(selected)}">
-    <button type="button" class="blueprint-palette-primary" data-blueprint-select-relation="${escapeAttribute(edgeId)}" aria-label="${escapeAttribute(`${source} → ${target}`)}">
-      <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon(relation.type === 'semantic' ? 'link' : 'activity')}</span>
-      <span><strong>${escapeHtml(source)} → ${escapeHtml(target)}</strong><small>${escapeHtml(meta)}</small></span>
-    </button>
-  </div>`;
-}
-
-function containmentRow(
-  document: ScreenDocument,
-  edge: BaseScreenBlueprintCanvasEdge,
-  selection: BaseScreenBlueprintCanvasSelection,
-  query: string,
-): string | null {
-  const source = nodeLabel(document, edge.source);
-  const target = nodeLabel(document, edge.target);
-  const meta = DESIGNER_UI_TEXT.blueprint.relationList.containment;
-  const text = `${source} ${target} ${meta}`.toLocaleLowerCase();
-  if (query.length > 0 && !text.includes(query)) return null;
-  const selected = selection?.kind === 'edge' && selection.id === edge.id;
-  return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-kind="structure" data-selected="${String(selected)}">
-    <button type="button" class="blueprint-palette-primary" data-blueprint-select-relation="${escapeAttribute(edge.id)}" aria-label="${escapeAttribute(`${source} → ${target}`)}" data-tip="${escapeAttribute(DESIGNER_UI_TEXT.blueprint.relationList.containmentHint)}">
-      <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('group')}</span>
-      <span><strong>${escapeHtml(source)} → ${escapeHtml(target)}</strong><small>${meta}</small></span>
-      <em>${DESIGNER_UI_TEXT.blueprint.relationList.readOnly}</em>
-    </button>
-  </div>`;
-}
-
-function variablePane(
-  document: ScreenDocument | undefined,
-  graph: BaseScreenBlueprintCanvasGraph,
-  selection: BaseScreenBlueprintCanvasSelection,
-  query: string,
-): string {
-  const placed = new Set(
-    graph.nodes.filter((node) => node.kind === 'variable').map((node) => node.id),
-  );
-  const variables = readDesignerVariableViews(document).filter((variable) =>
-    `${variable.name} ${variable.type} ${variable.type === 'static' ? JSON.stringify(variable.initialValue) : variable.sourceId}`
+  const titles = new Map(model.graph.nodes.map((node) => [node.id, node.title]));
+  const edges = model.graph.edges.filter((edge) => {
+    if (query.length === 0) return true;
+    return `${titles.get(edge.source) ?? ''} ${titles.get(edge.target) ?? ''} ${edge.label} ${edge.sourcePort} ${edge.targetPort}`
       .toLocaleLowerCase()
-      .includes(query),
-  );
-  if (variables.length === 0) return emptyState(DESIGNER_UI_TEXT.blueprint.noVariables);
-  return `<div class="blueprint-palette-list">
-    ${variables
-      .map((variable) =>
-        variableItem(
-          variable,
-          placed.has(`variable:${variable.id}`),
-          selection?.kind === 'node' && selection.id === `variable:${variable.id}`,
-        ),
-      )
-      .join('')}
-  </div>`;
+      .includes(query);
+  });
+  const edgeItems = edges
+    .map((edge) => {
+      const selected = model.selection.edges.includes(edge.id);
+      const text = `${titles.get(edge.source) ?? edge.source} → ${titles.get(edge.target) ?? edge.target}`;
+      return `<div class="designer-list-row blueprint-relation-item" data-density="default" data-selected="${String(selected)}" data-category="${edge.category}" data-active="${String(edge.active)}">
+        <button type="button" class="blueprint-palette-primary" data-blueprint-select-edge="${escapeAttribute(edge.id)}" aria-label="${escapeAttribute(text)}">
+          <span class="blueprint-relation-swatch" aria-hidden="true"></span>
+          <span class="blueprint-palette-copy"><strong>${escapeHtml(text)}</strong><small>${escapeHtml(`${graphText.edgeCategories[edge.category]} · ${edge.label}`)}</small></span>
+        </button>
+      </div>`;
+    })
+    .join('');
+  return `<section class="blueprint-palette-group" aria-label="${TEXT.logic}">
+      <header><strong>${TEXT.logic}</strong><span>${kinds.length}</span></header>
+      <div class="blueprint-palette-list">${items || emptyState(TEXT.noLogicNodes)}</div>
+      <p class="blueprint-library-hint">${TEXT.directNodeHint}</p>
+    </section>
+    ${canvasGroup(model, query)}
+    <section class="blueprint-palette-group" aria-label="${TEXT.graph.edgeList}">
+      <header><strong>${TEXT.graph.edgeList}</strong><span>${edges.length}</span></header>
+      <div class="blueprint-palette-list">${edgeItems || emptyState(graphText.noEdges)}</div>
+    </section>`;
 }
 
-function variableItem(variable: DesignerVariableView, placed: boolean, selected: boolean): string {
-  const detail =
-    variable.type === 'static' ? JSON.stringify(variable.initialValue) : variable.sourceId;
-  const action = placed
-    ? `data-blueprint-select-node="variable:${escapeAttribute(variable.id)}"`
-    : `data-blueprint-add-variable="${escapeAttribute(variable.id)}"`;
-  const actionLabel = placed
-    ? DESIGNER_UI_TEXT.blueprint.locateVariable(variable.name)
-    : DESIGNER_UI_TEXT.blueprint.addVariableNode(variable.name);
-  return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-kind="variable" data-placed="${String(placed)}" data-selected="${String(selected)}"${placed ? '' : ` draggable="true" data-blueprint-drag-kind="variable" data-variable-id="${escapeAttribute(variable.id)}" data-blueprint-drag-label="${escapeAttribute(variable.name)}"`}>
-    <button type="button" class="blueprint-palette-primary" ${action} aria-label="${escapeAttribute(actionLabel)}">
-      <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('variable')}</span>
-      <span><strong>${escapeHtml(variable.name)}</strong><small>${escapeHtml(DESIGNER_UI_TEXT.blueprint.variableKind[variable.type])} · ${escapeHtml(detail)}</small></span>${placed ? `<em>${DESIGNER_UI_TEXT.blueprint.placed}</em>` : `<span class="blueprint-palette-inline-add" aria-hidden="true">${designerIcon('plus')}</span>`}
-    </button>
-  </div>`;
+/**
+ * 画布节点（ADR-0109）：主画布（页面导航，单例）与每个从画布各一个条目；未加入时单击加入、可拖入，
+ * 已加入时定位。主画布条目只在文档有页面时出现。
+ */
+function canvasGroup(model: DesignerBlueprintLibraryModel, query: string): string {
+  const subCanvases = model.document?.subCanvases ?? [];
+  const hasPages = subCanvases.some((canvas) => canvas.display === 'page');
+  const entries: {
+    readonly id: string;
+    readonly name: string;
+    readonly detail: string;
+    readonly icon: 'grid' | 'doc' | 'copy';
+    readonly kind: 'main-canvas' | 'sub-canvas';
+  }[] = [
+    ...(hasPages
+      ? [
+          {
+            id: '',
+            name: TEXT.graph.nodeKinds['main-canvas'],
+            detail: TEXT.mainCanvasEntry,
+            icon: 'grid' as const,
+            kind: 'main-canvas' as const,
+          },
+        ]
+      : []),
+    ...subCanvases.map((canvas) => ({
+      id: canvas.id,
+      name: canvas.name,
+      detail:
+        canvas.display === 'page'
+          ? TEXT.pageSize
+          : `${TEXT.graph.subCanvasKinds.popup} · ${TEXT.popupSize(canvas.width, canvas.height)}`,
+      icon: canvas.display === 'page' ? ('doc' as const) : ('copy' as const),
+      kind: 'sub-canvas' as const,
+    })),
+  ].filter(
+    (entry) =>
+      query.length === 0 || `${entry.name} ${entry.id}`.toLocaleLowerCase().includes(query),
+  );
+  const items = entries
+    .map((entry) => {
+      const node = model.graph.nodes.find((candidate) =>
+        entry.kind === 'main-canvas'
+          ? candidate.kind === 'main-canvas'
+          : candidate.kind === 'sub-canvas' && candidate.canvasId === entry.id,
+      );
+      const placed = node !== undefined;
+      const selected = placed && model.selection.nodes.includes(node.id);
+      const action = placed
+        ? `data-blueprint-select-node="${escapeAttribute(node.id)}"`
+        : `data-blueprint-add-canvas="${escapeAttribute(entry.id)}"`;
+      const label = placed ? TEXT.locateCanvas(entry.name) : TEXT.addCanvasNode(entry.name);
+      const drag = placed
+        ? ''
+        : ` draggable="true" data-blueprint-drag-kind="${entry.kind}"${entry.kind === 'sub-canvas' ? ` data-canvas-id="${escapeAttribute(entry.id)}"` : ''} data-blueprint-drag-label="${escapeAttribute(entry.name)}"`;
+      return `<div class="designer-list-row blueprint-palette-item" data-density="default" data-placed="${String(placed)}" data-selected="${String(selected)}" data-node-kind="${entry.kind}"${drag}>
+        <button type="button" class="blueprint-palette-primary" ${action} aria-label="${escapeAttribute(label)}" data-tip="${escapeAttribute(label)}">
+          <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon(entry.icon)}</span>
+          <span class="blueprint-palette-copy"><strong>${escapeHtml(entry.name)}</strong><small>${escapeHtml(entry.detail)}</small></span>
+          <span class="blueprint-palette-state" aria-hidden="true">${placed ? designerIcon('check') : designerIcon('plus')}</span>
+        </button>
+      </div>`;
+    })
+    .join('');
+  return `<section class="blueprint-palette-group" aria-label="${TEXT.canvases}">
+      <header><strong>${TEXT.canvases}</strong><span>${entries.length}</span></header>
+      <div class="blueprint-palette-list">${items || emptyState(TEXT.noSubCanvases)}</div>
+    </section>`;
 }
 
 function libraryTab(
   tab: DesignerBlueprintLibraryBuiltinTab,
   activeTab: DesignerBlueprintLibraryTab,
 ): string {
-  const visibleLabel = DESIGNER_UI_TEXT.blueprint.libraryTabs[tab];
+  const visibleLabel = TEXT.libraryTabs[tab];
   const label =
-    tab === 'components'
-      ? DESIGNER_UI_TEXT.blueprint.layers
-      : tab === 'relations'
-        ? DESIGNER_UI_TEXT.blueprint.library
-        : DESIGNER_UI_TEXT.blueprint.globalVariables;
+    tab === 'components' ? TEXT.layers : tab === 'relations' ? TEXT.logic : TEXT.globalVariables;
   const icon: DesignerIconName =
     tab === 'components' ? 'layers' : tab === 'relations' ? 'link' : 'variable';
   return `<button type="button" class="designer-tab blueprint-library-rail-tab" id="designer-blueprint-library-${tab}-tab" role="tab" aria-controls="designer-blueprint-library-${tab}-panel" aria-selected="${String(tab === activeTab)}" tabindex="${tab === activeTab ? 0 : -1}" data-blueprint-library-tab="${tab}" data-tip="${label}" aria-label="${label}"><span class="rail-tab-glyph" aria-hidden="true">${designerIcon(icon)}</span><span class="rail-tab-label">${visibleLabel}</span></button>`;
@@ -410,42 +335,6 @@ export function isDesignerBlueprintLibraryBuiltinTab(
   value: string,
 ): value is DesignerBlueprintLibraryBuiltinTab {
   return value === 'components' || value === 'relations' || value === 'variables';
-}
-
-function sourceNodeId(relation: ScreenBlueprintRelation): string {
-  if (relation.type === 'semantic') return `component:${relation.source.componentId}`;
-  if (relation.source.kind === 'lifecycle') return LIFECYCLE_BLUEPRINT_NODE_ID;
-  if (relation.source.kind === 'timer') {
-    return timerBlueprintNodeId(relation.source.intervalSeconds);
-  }
-  return relation.source.kind === 'component'
-    ? `component:${relation.source.componentId}`
-    : `variable:${relation.source.variableId}`;
-}
-
-function targetNodeId(relation: ScreenBlueprintRelation): string {
-  if (relation.type === 'semantic') return `component:${relation.target.componentId}`;
-  if (relation.target.kind === 'component') return `component:${relation.target.componentId}`;
-  if (relation.target.kind === 'variable') return `variable:${relation.target.variableId}`;
-  return 'host';
-}
-
-function nodeLabel(document: ScreenDocument, nodeId: string): string {
-  if (nodeId === 'host') return DESIGNER_UI_TEXT.blueprint.hostNode;
-  if (nodeId === LIFECYCLE_BLUEPRINT_NODE_ID) return DESIGNER_UI_TEXT.blueprint.lifecycleNode;
-  const timerInterval = timerIntervalFromBlueprintNodeId(nodeId);
-  if (timerInterval !== undefined) {
-    return DESIGNER_UI_TEXT.blueprint.timerNode(timerInterval);
-  }
-  if (nodeId.startsWith('component:')) {
-    const id = nodeId.slice('component:'.length);
-    return document.components.find((component) => component.id === id)?.name ?? id;
-  }
-  if (nodeId.startsWith('variable:')) {
-    const id = nodeId.slice('variable:'.length);
-    return document.variables.find((variable) => variable.id === id)?.name ?? id;
-  }
-  return nodeId;
 }
 
 function emptyState(message: string): string {

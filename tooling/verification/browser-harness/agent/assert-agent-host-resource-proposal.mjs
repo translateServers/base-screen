@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 
 export async function assertAgentHostResourceProposal(baseUrl, browser) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  await page.goto(`${baseUrl}/?designer&case=agent-host-resource&hostCanvas`, {
+  await page.goto(`${baseUrl}/?designer&verify&case=agent-host-resource&hostCanvas`, {
     waitUntil: 'networkidle',
   });
   await page.waitForFunction(() => window.baseScreenHarness?.designer !== undefined);

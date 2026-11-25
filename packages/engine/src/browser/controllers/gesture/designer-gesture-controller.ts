@@ -81,7 +81,10 @@ export class DesignerGestureController {
       { type: 'lostpointercapture', listener: () => this.cancel() },
       {
         type: 'dblclick',
-        listener: (event) => this.#groupEditing.onDoubleClick(event as MouseEvent),
+        listener: (event) =>
+          this.#groupEditing.onDoubleClick(event as MouseEvent, () =>
+            this.topComponentHitId(event as MouseEvent),
+          ),
       },
       { type: 'selectstart', listener: (event) => event.preventDefault() },
       { type: 'dragover', listener: (event) => this.#create.onDragOver(event as DragEvent) },
@@ -264,6 +267,13 @@ export class DesignerGestureController {
     }
     event.preventDefault();
     this.#drag.start(event, components);
+  }
+
+  /** 指针位置下最上层的可见组件（几何命中，不看 DOM）。 */
+  private topComponentHitId(event: MouseEvent): string | undefined {
+    const document = this.callbacks.getDocument();
+    if (document === undefined || this.#canvas === undefined) return undefined;
+    return hitTestScreenComponents(document, this.#environment.canvasPoint(event))[0];
   }
 
   /**

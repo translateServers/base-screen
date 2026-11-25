@@ -175,6 +175,21 @@ export function validateControlForSchema(
   if (control === 'custom') {
     return;
   }
+  // 四边距只接受「四条边都是数字」的对象：缺一条就在渲染期无从取值，失败关闭。
+  if (control === 'spacing') {
+    const sides = ['top', 'right', 'bottom', 'left'] as const;
+    const complete =
+      resolved.kind === 'object' &&
+      sides.every((side) => resolved.properties[side]?.kind === 'number');
+    if (!complete) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        diagnosticPath,
+        'Spacing control requires an object field with numeric top, right, bottom and left.',
+      );
+    }
+    return;
+  }
   const expected =
     control === 'number' || control === 'unit-number' || control === 'stepper'
       ? 'number'

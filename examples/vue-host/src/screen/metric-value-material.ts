@@ -57,8 +57,8 @@ function readDataStateValue(model: BaseScreenMaterialModel): number | null {
  * 组装指标读数物料：桥接产出元素构造器 + catalog 条目（含表格适配器）。
  * 与 Vanilla / React 两端同一形态；元素注册由调用方显式完成（公开入口）。
  *
- * 样式说明：Vue 桥接会把文档全局样式规则传播进设计器 shadow root，
- * 因此物料样式可以写在应用样式表里（见 src/styles/components.css 的 .metric-value）。
+ * 样式说明：三端物料共用 `metric-value.ts` 中的视觉常量，Vue SFC 通过内联样式绑定消费，
+ * 不依赖文档全局样式是否传播进 shadow root。
  */
 export function createMetricValueMaterial(): BaseScreenMaterialCatalogEntry {
   const definition = createVueMaterialDefinition<MetricValueProps>({

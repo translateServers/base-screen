@@ -1,7 +1,7 @@
 import {
   isScreenThemeSlot,
   SCREEN_CANVAS_FIELDS,
-  SCREEN_THEME_SLOTS,
+  SCREEN_THEME_BASE_SLOTS,
   type ScreenDocument,
   screenJsonEquals,
 } from '@base-screen/contracts';
@@ -10,6 +10,7 @@ import { prefixDiagnostic, sortDiagnostics } from '../internal/diagnostics.js';
 import { assertCoreValidDocument } from '../internal/document.js';
 import {
   applyAddComponentCommand,
+  applyMoveComponentsCommand,
   applyRemoveComponentsCommand,
   applyReparentComponentsCommand,
   applyUpdateComponentsCommand,
@@ -129,6 +130,10 @@ function applyValidatedCommand(
       return applyReplaceDataSourcesCommand(document, command.dataSources);
     case 'replace-variables':
       return applyVariables(document, command.variables);
+    case 'replace-sub-canvases':
+      return applySubCanvases(document, command.subCanvases, command.startCanvasId);
+    case 'move-components':
+      return applyMoveComponentsCommand(document, command.componentIds, command.canvasId);
     case 'rename-variable':
       return applyRenameVariableCommand(document, command);
     case 'update-theme':
@@ -190,8 +195,9 @@ function applyTheme(document: ScreenDocument, patch: unknown): ScreenCommandResu
     }
   }
   const palette = { ...document.theme?.palette, ...patch } as Record<string, string>;
-  // 色板要么不存在、要么六槽齐全：半套色板会让 theme: 引用解析到空洞。
-  if (SCREEN_THEME_SLOTS.some((slot) => typeof palette[slot] !== 'string')) {
+  // 色板要么不存在、要么六个基础色位齐全：半套色板会让 theme: 引用解析到空洞。
+  // 状态色位（ADR-0110 §2.6.4）可省略，省略时取内置默认色。
+  if (SCREEN_THEME_BASE_SLOTS.some((slot) => typeof palette[slot] !== 'string')) {
     return screenCommandFailure(
       document,
       invalidScreenCommand('Theme patch must complete all palette slots.', ['patch']),
@@ -215,8 +221,49 @@ function applyVariables(document: ScreenDocument, variables: unknown): ScreenCom
   return finalizeScreenCommand(document, { ...document, variables }, []);
 }
 
+function applySubCanvases(
+  document: ScreenDocument,
+  subCanvases: unknown,
+  startCanvasId: unknown,
+): ScreenCommandResult {
+  if (!Array.isArray(subCanvases)) {
+    return screenCommandFailure(
+      document,
+      invalidScreenCommand('Sub canvases must be an array.', ['subCanvases']),
+    );
+  }
+  if (startCanvasId !== undefined && startCanvasId !== null && typeof startCanvasId !== 'string') {
+    return screenCommandFailure(
+      document,
+      invalidScreenCommand('startCanvasId must be a string or null.', ['startCanvasId']),
+    );
+  }
+  const next = { ...document } as { subCanvases?: unknown; startCanvasId?: unknown };
+  if (subCanvases.length === 0) delete next.subCanvases;
+  else next.subCanvases = subCanvases;
+  if (startCanvasId === null) delete next.startCanvasId;
+  else if (typeof startCanvasId === 'string') next.startCanvasId = startCanvasId;
+  else if (
+    // 缺省保持原值；原起始页已不是页面（被删 / 改为弹框）时随之去掉，免得整份文档校验失败。
+    document.startCanvasId !== undefined &&
+    !subCanvases.some(
+      (canvas) =>
+        isRecord(canvas) && canvas.id === document.startCanvasId && canvas.display === 'page',
+    )
+  ) {
+    delete next.startCanvasId;
+  }
+  if (
+    screenJsonEquals(document.subCanvases ?? [], subCanvases) &&
+    next.startCanvasId === document.startCanvasId
+  ) {
+    return screenCommandSuccess(document, []);
+  }
+  return finalizeScreenCommand(document, next as ScreenDocument, []);
+}
+
 function applyBlueprint(document: ScreenDocument, blueprint: unknown): ScreenCommandResult {
-  if (!isRecord(blueprint) || !Array.isArray(blueprint.relations)) {
+  if (!isRecord(blueprint) || !Array.isArray(blueprint.nodes) || !Array.isArray(blueprint.edges)) {
     return screenCommandFailure(
       document,
       invalidScreenCommand('Blueprint must be a canonical object.', ['blueprint']),

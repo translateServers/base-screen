@@ -1,6 +1,6 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { relationsFromRules } from '../__fixtures__/blueprint-relations.js';
+import { graphFromRules } from '../__fixtures__/blueprint-graph.js';
 import {
   component,
   createHostResourceCatalog,
@@ -17,8 +17,8 @@ const ALL_CAPABILITIES = {
   hasBlueprintCapability: () => true,
 };
 
-function readyRelations(eventName = 'ready_fired'): ScreenDocument['blueprint']['relations'] {
-  return relationsFromRules([
+function readyBlueprint(eventName = 'ready_fired'): ScreenDocument['blueprint'] {
+  return graphFromRules([
     {
       id: 'ready',
       trigger: { type: 'lifecycle', eventName: 'ready' },
@@ -34,10 +34,10 @@ function readyRelations(eventName = 'ready_fired'): ScreenDocument['blueprint'][
   ]);
 }
 
-function timerRelations(
+function timerBlueprint(
   entries: readonly { readonly interval: number; readonly eventName: string }[],
-): ScreenDocument['blueprint']['relations'] {
-  return relationsFromRules(
+): ScreenDocument['blueprint'] {
+  return graphFromRules(
     entries.map((entry) => ({
       id: `timer-${entry.interval}`,
       trigger: {
@@ -79,7 +79,7 @@ describe('viewer blueprint lifecycle', () => {
   it('emits lifecycle ready exactly once per document load', async () => {
     const { viewer, dispatched } = await createViewerHarness({
       catalog: createHostResourceCatalog(),
-      document: screenWith({ relations: readyRelations() }),
+      document: screenWith(readyBlueprint()),
       resourcePort: createImmediateResourcePort().port,
       runtimeContributions: ALL_CAPABILITIES,
     });
@@ -95,14 +95,14 @@ describe('viewer blueprint lifecycle', () => {
   it('re-arms ready when the document is replaced', async () => {
     const { viewer, dispatched } = await createViewerHarness({
       catalog: createHostResourceCatalog(),
-      document: screenWith({ relations: readyRelations() }),
+      document: screenWith(readyBlueprint()),
       resourcePort: createImmediateResourcePort().port,
       runtimeContributions: ALL_CAPABILITIES,
     });
     await flush();
     expect(hostEventNames(dispatched)).toHaveLength(1);
 
-    viewer.document = screenWith({ relations: readyRelations() });
+    viewer.document = screenWith(readyBlueprint());
     await flush();
     expect(hostEventNames(dispatched)).toHaveLength(2);
   });
@@ -111,12 +111,12 @@ describe('viewer blueprint lifecycle', () => {
     vi.useFakeTimers();
     const { dispatched } = await createViewerHarness({
       catalog: createHostResourceCatalog(),
-      document: screenWith({
-        relations: timerRelations([
+      document: screenWith(
+        timerBlueprint([
           { interval: 2, eventName: 'tick_2' },
           { interval: 3, eventName: 'tick_3' },
         ]),
-      }),
+      ),
       resourcePort: createImmediateResourcePort().port,
       runtimeContributions: ALL_CAPABILITIES,
     });
@@ -133,7 +133,7 @@ describe('viewer blueprint lifecycle', () => {
     vi.useFakeTimers();
     const { dispatched } = await createViewerHarness({
       catalog: createHostResourceCatalog(),
-      document: screenWith({ relations: readyRelations() }),
+      document: screenWith(readyBlueprint()),
       resourcePort: createImmediateResourcePort().port,
       runtimeContributions: ALL_CAPABILITIES,
     });
@@ -147,9 +147,7 @@ describe('viewer blueprint lifecycle', () => {
     vi.useFakeTimers();
     const { viewer, dispatched } = await createViewerHarness({
       catalog: createHostResourceCatalog(),
-      document: screenWith({
-        relations: timerRelations([{ interval: 5, eventName: 'tick_5' }]),
-      }),
+      document: screenWith(timerBlueprint([{ interval: 5, eventName: 'tick_5' }])),
       resourcePort: createImmediateResourcePort().port,
       runtimeContributions: ALL_CAPABILITIES,
     });
@@ -167,9 +165,7 @@ describe('viewer blueprint lifecycle', () => {
     vi.useFakeTimers();
     const { viewer, dispatched } = await createViewerHarness({
       catalog: createHostResourceCatalog(),
-      document: screenWith({
-        relations: timerRelations([{ interval: 4, eventName: 'tick_4' }]),
-      }),
+      document: screenWith(timerBlueprint([{ interval: 4, eventName: 'tick_4' }])),
       resourcePort: createImmediateResourcePort().port,
       runtimeContributions: ALL_CAPABILITIES,
     });
@@ -188,7 +184,7 @@ describe('viewer blueprint lifecycle', () => {
   it('does not emit ready when the blueprint cannot be compiled', async () => {
     const { dispatched } = await createViewerHarness({
       catalog: createHostResourceCatalog(),
-      document: screenWith({ relations: readyRelations() }),
+      document: screenWith(readyBlueprint()),
       resourcePort: createImmediateResourcePort().port,
     });
     await flush();

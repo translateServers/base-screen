@@ -19,6 +19,7 @@ import {
 } from './designer-color-palette-model.js';
 import {
   addedColorPaletteStopIndex,
+  applyDesignerFillColorPickerValue,
   isDesignerFillColorPickerProxyDispatch,
   readPaletteState,
   selectColorPaletteStop,
@@ -30,6 +31,14 @@ import {
   updateColorPalettePreview,
   updateDesignerColorPaletteChrome,
 } from './designer-color-palette-state-dom.js';
+import {
+  designerColorPaletteThemeSlots,
+  findDesignerColorThemeSlot,
+  readDesignerColorPaletteTheme,
+  registerDesignerColorPaletteTheme,
+  runDesignerColorPaletteThemePick,
+} from './designer-color-palette-theme.js';
+import type { DesignerColorThemeSlot } from './designer-color-palette-types.js';
 import {
   isColorPaletteManualValueField,
   updateColorPaletteManualValueValidity,
@@ -61,6 +70,7 @@ export {
   switchColorPaletteMode,
   updateColorPaletteStop,
 } from './designer-color-palette-model.js';
+export type { DesignerColorThemeSlot } from './designer-color-palette-types.js';
 
 function createColorPaletteTrigger(ownerDocument: Document, popoverId: string): HTMLButtonElement {
   const trigger = createDesignerButton(ownerDocument, {
@@ -104,12 +114,16 @@ export function createDesignerColorPalette(
   options: DesignerColorPaletteOptions = {},
 ): DesignerColorPalette {
   const allowGradient = options.allowGradient !== false;
-  const parsedValue = parseColorPaletteValue(value);
+  // 主题色位引用按当前色板解析成颜色再进入调色板状态；读回时只要颜色没被改动仍返回引用。
+  const themeSlots = options.themeSlots ?? [];
+  const themeSlot = findDesignerColorThemeSlot(value, themeSlots);
+  const resolvedValue = themeSlot === undefined ? value : themeSlot.color;
+  const parsedValue = parseColorPaletteValue(resolvedValue);
   const parsed = allowGradient ? parsedValue : solidColorPaletteState(parsedValue);
   const cached = fieldKey === undefined ? undefined : colorPaletteDraft(fieldKey);
   // 仅当文档值仍等于缓存当前模式的序列化结果时复用草稿（撤销/重做/替换文档会自然失效）。
   const cachedState =
-    cached !== undefined && serializeColorPaletteValue(cached) === value ? cached : parsed;
+    cached !== undefined && serializeColorPaletteValue(cached) === resolvedValue ? cached : parsed;
   const state = allowGradient ? cachedState : solidColorPaletteState(cachedState);
   const cachedSelection = fieldKey === undefined ? undefined : colorPaletteSelection(fieldKey);
   const selectedStop = selectedColorPaletteStopFromCache(cachedSelection, state.stops.length);
@@ -120,6 +134,11 @@ export function createDesignerColorPalette(
   element.dataset.colorPaletteSelectedStop = String(selectedStop);
   element.dataset.colorPaletteOpen = 'false';
   if (fieldKey !== undefined) element.dataset.colorPaletteKey = fieldKey;
+  if (themeSlots.length > 0) registerDesignerColorPaletteTheme(element, themeSlots);
+  if (themeSlot !== undefined && state.mode === 'solid') {
+    element.dataset.colorPaletteThemeSlot = themeSlot.slot;
+    element.dataset.colorPaletteThemeSolid = state.solid;
+  }
 
   const identity = Math.random().toString(36).slice(2);
   const popoverId = `designer-color-popover-${identity}`;
@@ -189,6 +208,9 @@ export function createDesignerColorPalette(
     selectedStop,
   );
   popover.appendChild(body);
+  for (const row of createColorPaletteThemeRows(ownerDocument, themeSlots)) {
+    popover.appendChild(row);
+  }
   element.appendChild(popover);
 
   element.addEventListener('click', (event) => {
@@ -209,6 +231,10 @@ export function createDesignerColorPalette(
           focusDesignerColorPaletteDialog(element);
         }
       }
+      return;
+    }
+    if (action === 'theme') {
+      pickColorPaletteTheme(element, button.dataset.colorPaletteThemeSlot);
       return;
     }
     if (action === 'close') {
@@ -306,6 +332,58 @@ export function createDesignerColorPalette(
   };
 }
 
+/** 「主题色」「状态色」两排色卡：与页面配置同样分组，样式同「常用颜色」；只在纯色模式下显示。 */
+function createColorPaletteThemeRows(
+  ownerDocument: Document,
+  slots: readonly DesignerColorThemeSlot[],
+): HTMLElement[] {
+  const rows: HTMLElement[] = [];
+  for (const group of ['theme', 'status'] as const) {
+    const entries = slots.filter((entry) => entry.group === group);
+    if (entries.length === 0) continue;
+    const row = ownerDocument.createElement('section');
+    row.className = 'designer-fill-color-quick designer-color-palette-theme';
+    row.dataset.colorPaletteThemeGroup = group;
+    const title = ownerDocument.createElement('span');
+    title.textContent = DESIGNER_UI_TEXT.propertiesPanel.colorPickerSlotGroup(group);
+    row.appendChild(title);
+    const grid = ownerDocument.createElement('div');
+    for (const entry of entries) {
+      const button = ownerDocument.createElement('button');
+      button.type = 'button';
+      button.className = 'designer-fill-color-swatch';
+      button.dataset.colorPaletteAction = 'theme';
+      button.dataset.colorPaletteThemeSlot = entry.slot;
+      button.setAttribute('style', `--designer-fill-swatch:${entry.color}`);
+      const label = DESIGNER_UI_TEXT.propertiesPanel.colorPickerSlotValue(group, entry.label);
+      button.setAttribute('aria-label', label);
+      button.setAttribute('data-tip', label);
+      button.setAttribute('aria-pressed', 'false');
+      grid.appendChild(button);
+    }
+    row.appendChild(grid);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function pickColorPaletteTheme(palette: HTMLElement, slot: string | undefined): void {
+  if (palette.dataset.colorPaletteMode !== 'solid') return;
+  const entry = designerColorPaletteThemeSlots(palette).find((item) => item.slot === slot);
+  if (entry === undefined) return;
+  palette.dataset.colorPaletteThemeSlot = entry.slot;
+  delete palette.dataset.colorPaletteThemeSolid;
+  runDesignerColorPaletteThemePick(palette, () =>
+    applyDesignerFillColorPickerValue(palette, entry.color, 'change'),
+  );
+  // 提交可能已整栏重建（这个调色板随之脱离文档）；仍在时记下规范化后的纯色，供之后读值比较。
+  const after = readPaletteState(palette);
+  if (after !== undefined && after.mode === 'solid') {
+    palette.dataset.colorPaletteThemeSolid = after.solid;
+  }
+  updateDesignerColorPaletteChrome(palette);
+}
+
 function solidColorPaletteState(state: ColorPaletteState): ColorPaletteState {
   return state.mode === 'solid' ? state : switchColorPaletteMode(state, 'solid', state.mode, 0);
 }
@@ -321,7 +399,8 @@ export function readDesignerColorPaletteValue(target: EventTarget | null): strin
     cacheColorPaletteDraft(fieldKey, state);
     cacheColorPaletteSelection(fieldKey, selectedColorPaletteStop(palette, state.stops.length));
   }
-  return serializeColorPaletteValue(state);
+  const theme = readDesignerColorPaletteTheme(palette, state);
+  return theme === undefined ? serializeColorPaletteValue(state) : `theme:${theme.slot}`;
 }
 
 export function applyDesignerColorPaletteStopAction(

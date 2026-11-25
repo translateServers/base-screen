@@ -256,6 +256,56 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     expect(designer.materialLibraryItems).toBe(configured);
   });
 
+  it('accepts host material library fragments and hides those the catalog cannot expand', () => {
+    const designer = new BaseScreenDesignerElement();
+    const dispatched: CustomEvent[] = [];
+    Object.assign(designer, {
+      dispatchEvent: (event: CustomEvent) => {
+        dispatched.push(event);
+        return true;
+      },
+    });
+    const fragments = [
+      {
+        id: 'acme.card',
+        name: 'Card',
+        category: 'Base',
+        keywords: [],
+        nodes: [{ key: 'image', materialType: 'base.image' }],
+      },
+    ];
+    expect(
+      designer.configure({ catalog: projectableCatalog(), materialLibraryFragments: fragments }).ok,
+    ).toBe(true);
+    expect(designer.materialLibraryFragments).toEqual(fragments);
+    const configured = designer.materialLibraryFragments;
+
+    designer.materialLibraryFragments = [{ ...fragments[0]!, extra: true }] as never;
+    expect(designer.materialLibraryFragments).toBe(configured);
+    expect(dispatched.at(-1)?.detail.diagnostics[0]?.severity).toBe('error');
+
+    const state = getDesignerElementState(designer);
+    expect(state.runtime.listMaterialLibraryFragmentItems(designer).map((item) => item.id)).toEqual(
+      ['acme.card'],
+    );
+    designer.materialLibraryFragments = [
+      { ...fragments[0]!, id: 'acme.missing', nodes: [{ key: 'x', materialType: 'acme.missing' }] },
+    ];
+    expect(designer.materialLibraryFragments?.map((fragment) => fragment.id)).toEqual([
+      'acme.missing',
+    ]);
+    expect(state.runtime.listMaterialLibraryFragmentItems(designer)).toEqual([]);
+    const warning = dispatched.at(-1)?.detail.diagnostics[0];
+    expect(warning).toMatchObject({
+      severity: 'warning',
+      path: ['fragments', 'acme.missing', 'nodes', 0, 'materialType'],
+    });
+    // 同一组输入只试运行一次：再次读取不重复上报。
+    const count = dispatched.length;
+    state.runtime.listMaterialLibraryFragmentItems(designer);
+    expect(dispatched).toHaveLength(count);
+  });
+
   it('rejects a designer host adapter whose capabilities disagree with its ports', () => {
     const designer = new BaseScreenDesignerElement();
     const result = designer.configure({
@@ -417,64 +467,6 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     const configured = designer.configure({ catalog: catalog(), previewHandler: handler });
     expect(configured.ok).toBe(true);
     expect(designer.previewHandler).toBe(handler);
-  });
-
-  it('CSP-P3-C02 accepts a valid conditional style port and rejects an invalid one atomically', () => {
-    const port = { resolve: () => undefined };
-    const designer = new BaseScreenDesignerElement();
-    const valid = designer.configure({ catalog: catalog(), conditionalStylePort: port });
-    expect(valid.ok).toBe(true);
-    expect(designer.conditionalStylePort).toBe(port);
-
-    const invalid = new BaseScreenDesignerElement();
-    const firstCatalog = catalog();
-    invalid.catalog = firstCatalog;
-    const result = invalid.configure({
-      catalog: catalog(),
-      conditionalStylePort: { nope: 1 } as unknown as never,
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
-    }
-    // 失败配置零副作用：既有 catalog 保持原样、端口未提交。
-    expect(invalid.catalog).toBe(firstCatalog);
-    expect(invalid.conditionalStylePort).toBeUndefined();
-  });
-
-  it('accepts a valid host conditional style authoring port and rejects an invalid one atomically', () => {
-    const port = {
-      sources: [
-        {
-          id: 'alarm.open',
-          label: '未处理告警',
-          conditions: [{ id: 'warning', label: '警告' }],
-        },
-      ],
-      bindings: () => [],
-      save: async () => ({ ok: true as const, value: undefined, diagnostics: [] }),
-    };
-    const designer = new BaseScreenDesignerElement();
-    const valid = designer.configure({
-      catalog: catalog(),
-      hostConditionalStyleAuthoring: port,
-    });
-    expect(valid.ok).toBe(true);
-    expect(designer.hostConditionalStyleAuthoring).toBe(port);
-
-    const invalid = new BaseScreenDesignerElement();
-    const firstCatalog = catalog();
-    invalid.catalog = firstCatalog;
-    const result = invalid.configure({
-      catalog: catalog(),
-      hostConditionalStyleAuthoring: { sources: [] } as unknown as never,
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
-    }
-    expect(invalid.catalog).toBe(firstCatalog);
-    expect(invalid.hostConditionalStyleAuthoring).toBeUndefined();
   });
 
   it('accepts the host resource selection button flag and exposes it via getter (ADR-0089)', () => {

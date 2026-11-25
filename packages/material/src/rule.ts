@@ -6,47 +6,64 @@ import type {
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { BaseScreenOfficialMaterialElement } from './base-material.js';
+import { propField, styleField, withOfficialEditorDescriptor } from './editor-descriptor.js';
 
 const RULE_AXES = ['horizontal', 'vertical'] as const;
 const RULE_DASHES = ['solid', 'dashed', 'dotted'] as const;
 
-export const BASE_SCREEN_RULE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
-  type: 'base.rule',
-  tagName: 'base-screen-rule',
-  name: '分割线',
-  category: '基础',
-  keywords: ['分割线', '分隔', '线条'],
-  defaultSize: { width: 320, height: 2 },
-  defaultProps: { axis: 'horizontal' },
-  defaultStyle: { color: '#1f2a44', thickness: 2, dash: 'solid', opacity: 1 },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      color: { kind: 'string' },
-      thickness: { kind: 'number', minimum: 1, maximum: 24 },
-      dash: { kind: 'enum', values: [...RULE_DASHES] },
-      opacity: { kind: 'number', minimum: 0, maximum: 1 },
+export const BASE_SCREEN_RULE_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
+  withOfficialEditorDescriptor(
+    {
+      type: 'base.rule',
+      tagName: 'base-screen-rule',
+      name: '分割线',
+      category: '基础',
+      keywords: ['分割线', '分隔', '线条'],
+      defaultSize: { width: 320, height: 2 },
+      defaultProps: { axis: 'horizontal' },
+      defaultStyle: { color: '#1f2a44', thickness: 2, dash: 'solid', opacity: 1 },
+      styleSchema: {
+        kind: 'object',
+        properties: {
+          color: { kind: 'string' },
+          thickness: { kind: 'number', minimum: 1, maximum: 24 },
+          dash: { kind: 'enum', values: [...RULE_DASHES] },
+          opacity: { kind: 'number', minimum: 0, maximum: 1 },
+        },
+        required: ['color', 'thickness', 'dash'],
+      },
+      stylePanel: [],
+      propsSchema: {
+        kind: 'object',
+        properties: {
+          axis: { kind: 'enum', values: [...RULE_AXES] },
+        },
+        required: ['axis'],
+      },
+      propertyPanel: [],
+      events: [],
+      dataCapabilities: [],
+      designCapabilities: { resize: true, rotate: true, children: false },
     },
-    required: ['color', 'thickness', 'dash'],
-  },
-  stylePanel: [
-    { style: 'color', label: '线条颜色', control: 'color' },
-    { style: 'thickness', label: '线宽', control: 'number' },
-    { style: 'dash', label: '线型', control: 'select' },
-    { style: 'opacity', label: '不透明度', control: 'number' },
-  ],
-  propsSchema: {
-    kind: 'object',
-    properties: {
-      axis: { kind: 'enum', values: [...RULE_AXES] },
+    {
+      appearance: [
+        {
+          id: 'structure',
+          label: '结构',
+          fields: [propField('axis', '方向', 'select')],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            styleField('color', '线条颜色', 'color'),
+            styleField('thickness', '线宽', 'number'),
+            styleField('dash', '线型', 'select'),
+          ],
+        },
+      ],
     },
-    required: ['axis'],
-  },
-  propertyPanel: [{ prop: 'axis', label: '方向', control: 'select' }],
-  events: [],
-  dataCapabilities: [],
-  designCapabilities: { resize: true, rotate: true, children: false },
-};
+  );
 
 /**
  * 官方分割线物料：只画一条线。
@@ -80,7 +97,6 @@ export class BaseScreenRuleMaterialElement extends BaseScreenOfficialMaterialEle
     this.style.borderLeft = '';
     if (vertical) this.style.borderLeft = line;
     else this.style.borderTop = line;
-    this.style.opacity = typeof model.style.opacity === 'number' ? String(model.style.opacity) : '';
   }
 }
 

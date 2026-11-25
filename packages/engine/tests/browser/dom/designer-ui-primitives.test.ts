@@ -115,6 +115,31 @@ describe('private designer UI primitives', () => {
     expect(button.innerHTML).toContain('aria-hidden="true"');
   });
 
+  // 回归：range 的默认区间是 0–100，先赋值再设 max 会把 150 钳成 100（滑杆停错位置）。
+  it('applies the range before the value so values above 100 are not clamped', () => {
+    const assigned: string[] = [];
+    const input = {
+      dataset: {} as Record<string, string>,
+      className: '',
+      type: '',
+      set min(value: string) {
+        assigned.push(`min=${value}`);
+      },
+      set max(value: string) {
+        assigned.push(`max=${value}`);
+      },
+      set step(value: string) {
+        assigned.push(`step=${value}`);
+      },
+      set value(value: string) {
+        assigned.push(`value=${value}`);
+      },
+    };
+    const document = { createElement: () => input } as unknown as Document;
+    createDesignerInput(document, { appearance: 'range', min: 0, max: 300, step: 1, value: '150' });
+    expect(assigned).toEqual(['min=0', 'max=300', 'step=1', 'value=150']);
+  });
+
   it('creates consistent inputs, checkboxes, selects, and textareas', () => {
     const document = ownerDocument();
     const number = createDesignerInput(document, {

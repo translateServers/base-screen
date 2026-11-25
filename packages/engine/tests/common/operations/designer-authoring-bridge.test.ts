@@ -25,7 +25,7 @@ const document: ScreenDocument = {
     },
   ],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 
 describe('AE-ED-C07 authoring commit guards', () => {
@@ -105,7 +105,7 @@ describe('AE-ED-C07 detached editor context', () => {
     expect(context.requestId).toBe('authoring-9');
     expect(context.componentId).toBe('chart-1');
     expect(context.componentSnapshot).not.toBeNull();
-    expect(context.blueprint).toEqual({ relations: [] });
+    expect(context.blueprint).toEqual({ nodes: [], edges: [] });
     expect(context.limits.maxJsonDepth).toBeGreaterThan(0);
     expect(JSON.stringify(context)).not.toContain('function');
   });

@@ -29,8 +29,9 @@ import {
   type ScreenInteractionState,
 } from '@base-screen/core';
 import type {
-  BaseScreenConditionalStylePort,
-  BaseScreenHostConditionalStyleAuthoringPort,
+  BaseScreenComponentFragmentInsertionIntent,
+  BaseScreenFragmentBody,
+  BaseScreenFragmentDefinition,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
   BaseScreenPluginInspectorControlCatalog,
@@ -42,7 +43,10 @@ import type {
   BaseScreenDesignerSetWorkbenchModeOptions,
   BaseScreenDesignerWorkbenchMode,
 } from '../common/operations/blueprint/designer-blueprint-protocol.js';
-import type { BaseScreenMaterialCatalogRefreshResult } from '../common/operations/catalog/designer-catalog-refresh.js';
+import type {
+  BaseScreenMaterialCatalogRefreshOptions,
+  BaseScreenMaterialCatalogRefreshResult,
+} from '../common/operations/catalog/designer-catalog-refresh.js';
 import type { DesignerChangeProposalInput } from '../common/operations/change/designer-change-proposal.js';
 import type { DesignerReviewMeta } from '../common/operations/change/designer-review.js';
 import type {
@@ -60,14 +64,9 @@ import type {
 } from '../common/operations/host-resource/host-resource-selection.js';
 import type { DesignerIntentHandler } from '../common/operations/intent/designer-intent.js';
 import type { BaseScreenComponentInsertionIntent } from '../common/operations/material-component/material-component.js';
-import type { BaseScreenComponentFragmentInsertionIntent } from '../common/operations/material-component/material-component-fragment.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../common/operations/material-library/material-library-grouping.js';
 import { type BaseScreenMaterialLibraryItem } from '../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../common/operations/material-library/material-library-state.js';
-import type {
-  DesignerSceneDescriptor,
-  DesignerSceneHandler,
-} from '../common/operations/scene/designer-scene.js';
 import { type BaseScreenDesignerLeftPanelGroup } from '../common/operations/workbench/designer-left-panel-groups.js';
 import type { ScreenProjectState } from '../common/project/project-controller.js';
 import { type DesignerToolMaterialTypes } from '../common/tools/designer-tools.js';
@@ -96,9 +95,6 @@ export class BaseScreenDesignerElement extends ElementBase {
       // 浅色主题下会一直留着深色墨水（实测 rgb(141,141,141) 停在 #fcfcfc 上，
       // 直到下一次缩放才刷新）。这里主动重绘一次。
       this.#designerState.workbenchController.renderRulers();
-      // 主题切换只改 CSS 变量，画布颜色随之变化：重新测量守卫结果。
-      const document = this.#designerState.session.document;
-      if (document !== undefined) this.#designerState.guardController.schedule(document);
     }
   }
 
@@ -109,11 +105,14 @@ export class BaseScreenDesignerElement extends ElementBase {
   /**
    * 初始化后热刷新物料目录（ADR-0090）：全有或全无；changed 中的代码身份变化会重挂载，
    * Manifest-only 变化不重挂载；失败时 catalog、文档、DOM、历史与数据源状态保持原样。
+   * 配置了物料库分组的宿主新增 / 下架物料时，经 `options.materialLibraryGrouping` 让分组随
+   * catalog 一起交换（ADR-0105 P2）。
    */
   refreshCatalog(
     catalog: BaseScreenMaterialCatalog,
+    options?: BaseScreenMaterialCatalogRefreshOptions,
   ): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult> {
-    return this.#designerState.runtime.refreshCatalog(this, catalog);
+    return this.#designerState.runtime.refreshCatalog(this, catalog, options);
   }
 
   get workbenchMode(): BaseScreenDesignerWorkbenchMode {
@@ -182,6 +181,19 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#designerState.runtime.writeMaterialLibraryItems(this, value);
   }
 
+  /**
+   * 宿主组合分片（ADR-0100）：与插件 `fragment` 贡献一起在物料库中展示，带「组合」角标；
+   * 点击或拖入画布即按 `insertComponentFragment` 的语义整片插入。引用的物料在 catalog 中
+   * 缺失或不可插入时，该分片被隐藏并上报 warning 诊断，其余物料库不受影响。
+   */
+  get materialLibraryFragments(): readonly BaseScreenFragmentDefinition[] | undefined {
+    return this.#designerState.runtime.readMaterialLibraryFragments(this);
+  }
+
+  set materialLibraryFragments(value: readonly BaseScreenFragmentDefinition[] | undefined) {
+    this.#designerState.runtime.writeMaterialLibraryFragments(this, value);
+  }
+
   get runtimeContributions(): BaseScreenRuntimeContributionIndex | undefined {
     return this.#designerState.runtime.readRuntimeContributions(this);
   }
@@ -228,6 +240,11 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   get hostResourceSelectionButton(): boolean {
     return this.#designerState.runtime.readHostResourceSelectionButton(this);
+  }
+
+  /** 是否提供「存为组合」操作；经 `configure({ fragmentSaveAction: true })` 开启。 */
+  get fragmentSaveAction(): boolean {
+    return this.#designerState.runtime.readFragmentSaveAction(this);
   }
 
   set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined) {
@@ -280,24 +297,6 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   set hostCatalogPort(value: ScreenHostCatalogPort | undefined) {
     this.#designerState.runtime.writeHostCatalogPort(this, value);
-  }
-
-  get conditionalStylePort(): BaseScreenConditionalStylePort | undefined {
-    return this.#designerState.runtime.readConditionalStylePort(this);
-  }
-
-  set conditionalStylePort(value: BaseScreenConditionalStylePort | undefined) {
-    this.#designerState.runtime.writeConditionalStylePort(this, value);
-  }
-
-  get hostConditionalStyleAuthoring(): BaseScreenHostConditionalStyleAuthoringPort | undefined {
-    return this.#designerState.runtime.readHostConditionalStyleAuthoring(this);
-  }
-
-  set hostConditionalStyleAuthoring(value:
-    | BaseScreenHostConditionalStyleAuthoringPort
-    | undefined) {
-    this.#designerState.runtime.writeHostConditionalStyleAuthoring(this, value);
   }
 
   get datasetPort(): ScreenHostDatasetPort | undefined {
@@ -356,6 +355,16 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.getDocument(this);
   }
 
+  /** 当前编辑的画板（ADR-0108）：`null` 是主画布，其余是弹框 id。 */
+  get artboard(): string | null {
+    return this.#designerState.session.artboard;
+  }
+
+  /** 切换编辑画板；不改文档、不进历史。弹框不存在时失败关闭。 */
+  setArtboard(artboard: string | null): ScreenParseResult<null> {
+    return this.#designerState.session.setArtboard(artboard);
+  }
+
   replaceDocument(document: ScreenDocument): ScreenParseResult<ScreenDocument> {
     return this.#designerState.runtime.replaceDocument(this, document);
   }
@@ -410,6 +419,17 @@ export class BaseScreenDesignerElement extends ElementBase {
    */
   insertComponent(intent: BaseScreenComponentInsertionIntent): ScreenParseResult<ScreenDocument> {
     return this.#designerState.runtime.insertComponent(this, intent);
+  }
+
+  /**
+   * 把组件（缺省为当前选区，连同后代）提取为分片组合（ADR-0100）：只读，不改文档。
+   * 结果可直接交给 `insertComponentFragment`，或补上 id / name / category 作为物料库分片保存。
+   * 选区引用变量时失败关闭；被舍弃的条件样式、锁定 / 隐藏状态与跨出选区的关系以 warning 诊断告知。
+   */
+  createComponentFragment(
+    componentIds?: readonly string[],
+  ): ScreenParseResult<BaseScreenFragmentBody> {
+    return this.#designerState.runtime.createComponentFragment(this, componentIds);
   }
 
   /**
@@ -585,37 +605,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.requestComponentChoice(this, candidateIds, prompt);
   }
 
-  /**
-   * 宿主提供的场景目录（左栏顶部）：只包含身份与展示名，内容由 `setSceneHandler` 产出。
-   * 传 `undefined` 清除目录；`activeSceneId` 用于标记当前场景。
-   */
-  setSceneCatalog(
-    scenes: readonly DesignerSceneDescriptor[] | undefined,
-    activeSceneId?: string,
-  ): ScreenParseResult<null> {
-    return this.#designerState.runtime.setSceneCatalog(this, scenes, activeSceneId);
-  }
-
-  setActiveScene(sceneId: string | undefined): void {
-    this.#designerState.runtime.setActiveScene(this, sceneId);
-  }
-
-  get activeSceneId(): string | undefined {
-    return this.#designerState.runtime.readActiveSceneId(this);
-  }
-
-  get sceneAvailable(): boolean {
-    return this.#designerState.runtime.readSceneAvailable(this);
-  }
-
-  /**
-   * 绑定场景处理器：宿主把目标场景翻译成一批文档命令。引擎在副本上试算后只挂预览，
-   * 用户点「应用」才走一次事务；不调用模型、不按场景名推断内容。
-   */
-  setSceneHandler(handler: DesignerSceneHandler | undefined): void {
-    this.#designerState.runtime.setSceneHandler(this, handler);
-  }
-
   /** 进入评审态：画布只读、右栏固定为智能体页签，逐条批准/驳回。 */
   enterReviewMode(meta: DesignerReviewMeta = {}): void {
     this.#designerState.runtime.enterReviewMode(this, meta);
@@ -724,11 +713,6 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   refreshVariables(options?: ScreenVariableRefreshOptions): void {
     return this.#designerState.runtime.refreshVariables(this, options);
-  }
-
-  /** 宿主告警/视觉状态变化后只重算条件样式（画布与预览），不重新取数、不改文档。 */
-  refreshConditionalStyles(componentIds?: readonly string[]): void {
-    return this.#designerState.runtime.refreshConditionalStyles(this, componentIds);
   }
 
   getVariable(id: string): ScreenVariableHandle | undefined {

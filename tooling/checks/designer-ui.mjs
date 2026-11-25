@@ -124,6 +124,10 @@ const templateAdoptionOwners = new Map([
     'dom/blueprint/designer-blueprint-library-dom.ts',
     'controllers/blueprint/designer-blueprint-panels-controller.ts',
   ],
+  [
+    'dom/blueprint/designer-blueprint-inspector-dom.ts',
+    'controllers/blueprint/designer-blueprint-panels-controller.ts',
+  ],
 ]);
 
 const sharedControlDomClasses = new Set([

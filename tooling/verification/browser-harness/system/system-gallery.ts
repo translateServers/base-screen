@@ -42,7 +42,7 @@ const EMPTY_DOCUMENT: ScreenDocument = {
   canvas: { width: 960, height: 540, backgroundColor: '#17212b' },
   components: [],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 
 /** 清单页自己的排版骨架。只做布局，不重画任何组件的外观；取值全部来自令牌。 */
@@ -63,7 +63,7 @@ const GALLERY_CSS = `
 .sg-lede { margin: 0; color: var(--designer-text-secondary); }
 .sg-lede code { padding: 0 var(--designer-space-1); border-radius: var(--designer-radius-1); background: var(--designer-surface-control); font: var(--designer-font-numeric); font-size: var(--designer-font-size-xs); }
 .sg-toc { display: flex; flex-wrap: wrap; gap: var(--designer-space-2); margin-top: var(--designer-space-2); }
-.sg-toc a { padding: 2px var(--designer-space-3); border-radius: var(--designer-radius-pill); background: var(--designer-surface-control); color: var(--designer-text-secondary); font: var(--designer-font-small); text-decoration: none; }
+.sg-toc a { display: inline-flex; min-height: 24px; align-items: center; padding: 2px var(--designer-space-3); border-radius: var(--designer-radius-pill); background: var(--designer-surface-control); color: var(--designer-text-secondary); font: var(--designer-font-small); text-decoration: none; }
 .sg-toc a:hover { background: var(--designer-surface-control-hover); color: var(--designer-text-primary); }
 .sg-section { display: grid; gap: var(--designer-space-5); margin-top: var(--designer-space-7); padding-top: var(--designer-space-6); border-top: 1px solid var(--designer-border-subtle); }
 .sg-h2 { margin: 0; font-size: var(--designer-font-size-lg); font-weight: 600; letter-spacing: var(--designer-tracking-heading); }
@@ -154,7 +154,7 @@ const SPACES: readonly { name: string; value: string }[] = [
 
 const RADII: readonly { name: string; value: string }[] = [
   { name: 'radius-1', value: '2px' },
-  { name: 'radius-2', value: '6px' },
+  { name: 'radius-2', value: '4px' },
   { name: 'radius-4', value: '8px' },
   { name: 'radius-5', value: '12px' },
   { name: 'radius-pill', value: '999px' },
@@ -331,14 +331,14 @@ const STATIC_HTML = `
     <thead><tr><th>条目</th><th>Geist 规范</th><th>我们的落点</th><th>状态</th></tr></thead>
     <tbody>
       <tr><td>字体栈</td><td>Geist / Geist Mono，全局 liga</td><td><code>font-family</code> / <code>font-family-mono</code></td><td>对齐</td></tr>
-      <tr><td>文本灰阶</td><td>#171717 / #4d4d4d / #666666 / #808080</td><td><code>text-primary/secondary/muted/disabled</code>（同值）</td><td>对齐</td></tr>
-      <tr><td>主操作按钮</td><td>#171717 底 + 白字；暗色主题反白</td><td><code>.designer-button[data-variant="primary"]</code> 用 text-primary / surface-raised</td><td>对齐</td></tr>
+      <tr><td>文本灰阶</td><td>#171717 / #4d4d4d / #666666 / #808080</td><td><code>text-primary/secondary/muted/disabled</code>（双主题对比度档）</td><td>有意偏离：按双主题背景压深或提亮</td></tr>
+      <tr><td>主操作按钮</td><td>#171717 底 + 白字；暗色主题反白</td><td><code>.designer-button[data-variant="primary"]</code> 用 button-primary-* / text-on-accent</td><td>对齐：主操作统一走强调色令牌</td></tr>
       <tr><td>阴影当边框</td><td><code>0 0 0 1px rgb(0 0 0 / 8%)</code></td><td><code>--designer-elev-ring</code>（33 处在用）</td><td>对齐，真实 border 仍在迁移</td></tr>
       <tr><td>卡片阴影栈</td><td>描边 + 2px 微抬 + 8px 远距 + 内圈 #fafafa</td><td><code>--designer-elev-card</code></td><td>本批新增</td></tr>
       <tr><td>字距</td><td>-2.4px@48 → normal@14，随字号收紧</td><td><code>tracking-display / heading / ui / base</code></td><td>本批新增（折成 em）</td></tr>
       <tr><td>字重</td><td>400 / 500 / 600 三档，正文不用 700</td><td>原 650 与 700 全部收进 600</td><td>本批对齐</td></tr>
       <tr><td>焦点环</td><td>2px 蓝色 hsla(212, 100%, 48%)</td><td><code>--designer-focus-ring</code> #0070f3 / #5297fc</td><td>对齐</td></tr>
-      <tr><td>圆角</td><td>2 / 4 / 6 / 8 / 12 / pill</td><td>2 / 6 / 6 / 8 / 12 / pill —— 缺 4px，第 2、3 档重复</td><td>待收敛（改动面 50 处，单独一批）</td></tr>
+      <tr><td>圆角</td><td>2 / 4 / 6 / 8 / 12 / pill</td><td><code>radius-1..5 / radius-pill</code></td><td>对齐</td></tr>
       <tr><td>间距</td><td>8 基数，16 之后直接跳 32</td><td>2–24 + 新增 32</td><td>有意偏离：密集面板需要 24 这一档</td></tr>
       <tr><td>字号阶梯</td><td>12–48px（营销页）</td><td>11–18px（工作台）</td><td>有意偏离：密度优先，字距按同比例折算</td></tr>
       <tr><td>工作流三色</td><td>Ship 红 / Preview 粉 / Develop 蓝</td><td>无（产品里没有流水线语义）</td><td>不适用</td></tr>
@@ -353,9 +353,9 @@ const STATIC_HTML = `
   <table class="sg-table">
     <thead><tr><th>缺口</th><th>现状</th><th>唯一落点应在这</th></tr></thead>
     <tbody>
-      <tr><td>状态没有语义层</td><td>悬停 / 按下 / 禁用 / 焦点仍由各面板本地绘制</td><td><code>designer-workbench-states.css</code>（待建）</td></tr>
+      <tr><td>状态语义分层</td><td>交互四态由控件层统一绘制，面板只声明状态</td><td><code>designer-controls-*</code> / <code>designer-workbench-chrome.css</code></td><td>对齐</td></tr>
       <tr><td>选中画法曾有四版</td><td>淡底+竖条 → 实心 → 空心描边 → 中性块；现在只保留最后一版</td><td><code>designer-workbench-selection.css</code></td></tr>
-      <tr><td>几何没有全部进令牌</td><td>gap / padding / margin 仍有字面量，按基线逐步清零</td><td><code>designer-tokens.css</code> 的几何组</td></tr>
+      <tr><td>组件专属几何</td><td>画布、节点、封面等仍有局部尺寸；间距与外观指标已清零</td><td>对应组件令牌或有明确理由的局部例外</td></tr>
     </tbody>
   </table>
 </section>
@@ -414,6 +414,7 @@ function layerRow(
     toggle.type = 'button';
     toggle.className = `designer-control designer-button layer-${property === 'hidden' ? 'eye' : 'lock'}`;
     toggle.dataset.layerToggle = property;
+    toggle.ariaLabel = `${property === 'hidden' ? (state.hidden === true ? '显示' : '隐藏') : state.locked === true ? '解锁' : '锁定'} ${state.name}`;
     toggle.ariaPressed = String(
       property === 'hidden' ? state.hidden === true : state.locked === true,
     );
@@ -453,6 +454,7 @@ function blueprintRow(
   const action = ownerDocument.createElement('button');
   action.type = 'button';
   action.className = 'blueprint-palette-action';
+  action.ariaLabel = state.placed === true ? `定位 ${state.name}` : `添加 ${state.name}`;
   action.innerHTML = designerIcon(state.placed === true ? 'locate' : 'plus');
   row.append(primary, action);
   return row;

@@ -88,6 +88,8 @@ const REFRESH_FAILURE = {
 
 const HOSTS = ['vanilla-host', 'react-host', 'vue-host'] as const;
 const SHARED_FILES = [
+  'src/screen/component-workshop.ts',
+  'src/screen/fragment-shelf.ts',
   'src/screen/online-materials.ts',
   'src/styles/online-materials.css',
   'src/types.ts',
@@ -284,7 +286,6 @@ describe('online material package contract (ADR-0090)', () => {
     expect(draft.manifest.stylePanel).toEqual([
       { style: 'background', label: '背景色', control: 'color' },
       { style: 'accent', label: '强调色', control: 'color' },
-      { style: 'opacity', label: '不透明度', control: 'number' },
     ]);
     const parsed = parseBaseScreenMaterialManifest(draft.manifest);
     expect(parsed.ok).toBe(true);

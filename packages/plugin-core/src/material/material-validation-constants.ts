@@ -38,4 +38,6 @@ export const MANIFEST_FIELDS = new Set([
   'libraryVisible',
   'cover',
   'editorDescriptor',
+  'themeStyle',
+  'statePresetKeys',
 ]);

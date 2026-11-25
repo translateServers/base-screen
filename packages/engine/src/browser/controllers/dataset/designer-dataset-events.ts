@@ -11,6 +11,7 @@ import type { DesignerDatasetControllerContext } from './designer-dataset-contro
 import {
   applyDatasetDraft,
   autoMatchDatasetBindings,
+  commitAuthoringUpdatePolicy,
   describeDataset,
   restoreDatasetControlFocus,
   selectDatasetInstance,
@@ -33,6 +34,7 @@ import {
   handleStaticClick,
   handleStaticInput,
 } from './designer-static-data-events.js';
+import { UPDATE_POLICY_SETTINGS } from './designer-update-policy-authoring.js';
 
 export function handleDatasetInput(
   context: DesignerDatasetControllerContext,
@@ -642,7 +644,9 @@ function updateAuthoringSetting(
   } else if (setting === 'refreshStrategy') {
     if (!(target instanceof HTMLSelectElement)) return;
     const refreshStrategy: DesignerDatasetRefreshStrategy =
-      target.value === 'auto' || target.value === 'manual' ? target.value : 'once';
+      target.value === 'auto' || target.value === 'manual' || target.value === 'push'
+        ? target.value
+        : 'once';
     value = refreshStrategy;
     context.state.authoring = { ...context.state.authoring, refreshStrategy };
   } else if (setting === 'refreshInterval') {
@@ -650,8 +654,22 @@ function updateAuthoringSetting(
     if (!Number.isFinite(parsed)) return;
     value = Math.min(3600, Math.max(1, Math.round(parsed)));
     context.state.authoring = { ...context.state.authoring, refreshInterval: value };
+  } else if (setting === 'pushFallbackInterval') {
+    // 0 表示不回退；其余按契约范围 1..86400 秒收敛（ADR-0104 §2.1）。
+    const parsed = Number(target.value);
+    if (!Number.isFinite(parsed)) return;
+    const rounded = Math.round(parsed);
+    value = rounded <= 0 ? 0 : Math.min(86_400, rounded);
+    context.state.authoring = { ...context.state.authoring, pushFallbackInterval: value };
+  } else if (setting === 'pushRetainRows') {
+    const parsed = Number(target.value);
+    if (!Number.isFinite(parsed)) return;
+    value = Math.min(10_000, Math.max(1, Math.round(parsed)));
+    context.state.authoring = { ...context.state.authoring, pushRetainRows: value };
   } else return;
   context.callbacks.requestAuthoringAction?.('update-settings', { setting, value });
+  // 更新方式是实例字段：写回文档（宿主事件照发，旧宿主的监听不受影响）。
+  if (UPDATE_POLICY_SETTINGS.has(setting)) commitAuthoringUpdatePolicy(context);
   context.renderSurface();
 }
 

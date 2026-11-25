@@ -15,11 +15,6 @@ export type DesignerMetricName =
   | 'draft_discarded'
   | 'change_adopt'
   | 'change_reject'
-  | 'guard_fail'
-  | 'fix_preview'
-  | 'fix_apply'
-  | 'scene_preview'
-  | 'scene_apply'
   | 'revert'
   | 'patch_record';
 

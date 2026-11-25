@@ -1,5 +1,6 @@
 import type { ScreenJsonObject, ScreenJsonValue } from '@base-screen/contracts';
 import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
+import { isDesignerMaterialEditorKey } from './designer-material-appearance.js';
 
 const DEFAULT_VISIBLE_BORDER_WIDTH = 1;
 
@@ -20,7 +21,7 @@ export function createDesignerStyleFieldPatch(
     return patch;
   }
   const widthSchema = manifest.styleSchema.properties.borderWidth;
-  const exposesWidth = (manifest.stylePanel ?? []).some((item) => item.style === 'borderWidth');
+  const exposesWidth = isDesignerMaterialEditorKey(manifest, 'style', 'borderWidth');
   if (widthSchema?.kind !== 'number' || !exposesWidth) return patch;
   const borderWidth = Math.max(DEFAULT_VISIBLE_BORDER_WIDTH, widthSchema.minimum ?? 0);
   if (widthSchema.maximum !== undefined && borderWidth > widthSchema.maximum) return patch;

@@ -6,49 +6,61 @@ import {
 } from '../../src/document/limits.js';
 import { component, document, parse } from './__fixtures__/document-test-fixtures.js';
 
-interface RelationOptions {
+interface EdgeOptions {
   readonly condition?: unknown;
   readonly requiredCapabilities?: readonly string[];
-  readonly targetKind?: 'component' | 'variable' | 'host';
-  readonly targetId?: string;
 }
 
-function relation(id: string, effect: Record<string, unknown>, options: RelationOptions = {}) {
-  const targetKind =
-    options.targetKind ??
-    (effect.type === 'set-variable' || effect.type === 'request-variable'
-      ? 'variable'
-      : effect.type === 'emit-host-event' || effect.type === 'host-action'
-        ? 'host'
-        : 'component');
-  const target =
-    targetKind === 'host'
-      ? { kind: 'host' }
-      : targetKind === 'variable'
-        ? { kind: 'variable', variableId: options.targetId ?? 'count' }
-        : { kind: 'component', componentId: options.targetId ?? 'button' };
-  return {
-    type: 'behavior',
+/** 单条「按钮点击 → 目标锚点」的节点图；带条件时经条件节点的 `yes` 分支。 */
+function edgeBlueprint(
+  id: string,
+  target: { readonly kind: 'component' | 'variable' | 'host'; readonly port: string },
+  fields: Record<string, unknown>,
+  options: EdgeOptions = {},
+): { nodes: unknown[]; edges: unknown[] } {
+  const targetNode =
+    target.kind === 'host'
+      ? { kind: 'host', id: 'host' }
+      : target.kind === 'variable'
+        ? { kind: 'variable', id: 'count-node', variableId: 'count' }
+        : { kind: 'component', id: 'button-node', componentId: 'button' };
+  const nodes: unknown[] = [{ kind: 'component', id: 'button-node', componentId: 'button' }];
+  if (targetNode.id !== 'button-node') nodes.push(targetNode);
+  const edges: unknown[] = [];
+  let from = { node: 'button-node', port: 'event:click' };
+  if (options.condition !== undefined) {
+    nodes.push({ kind: 'condition', id: 'cond', condition: options.condition });
+    edges.push({ kind: 'flow', id: `${id}-judge`, from, to: { node: 'cond', port: 'judge' } });
+    from = { node: 'cond', port: 'yes' };
+  }
+  edges.push({
+    kind: 'flow',
     id,
-    source: {
-      kind: 'component',
-      componentId: 'button',
-      event: { type: 'material-event', eventName: 'click' },
-    },
-    ...(options.condition === undefined ? {} : { condition: options.condition }),
-    target,
-    effect,
+    from,
+    to: { node: targetNode.id, port: target.port },
+    ...fields,
     ...(options.requiredCapabilities === undefined
       ? {}
       : { requiredCapabilities: options.requiredCapabilities }),
-  };
+  });
+  // 组件自连会被拒绝：目标是按钮自己时改用独立的面板组件。
+  if (targetNode.id === 'button-node') {
+    nodes.push({ kind: 'component', id: 'panel-node', componentId: 'panel' });
+    (edges[edges.length - 1] as { to: { node: string } }).to.node = 'panel-node';
+  }
+  return { nodes, edges };
 }
+
+const HOST_ACTION = { kind: 'host', port: 'action:project.notify' } as const;
+const SET_COUNT = { kind: 'variable', port: 'set' } as const;
+const REQUEST_DATA = { kind: 'component', port: 'request-data' } as const;
+const COMPONENTS = [component({ id: 'button' }), component({ id: 'panel' })];
 
 describe('parseScreenDocument blueprint expressions', () => {
   it('R6 accepts host variables and authorized host actions without transport details', () => {
     const result = parse(
       document({
-        components: [component({ id: 'button' })],
+        components: COMPONENTS,
         variables: [
           {
             type: 'data-source',
@@ -59,15 +71,9 @@ describe('parseScreenDocument blueprint expressions', () => {
             controlled: true,
           },
         ],
-        blueprint: {
-          relations: [
-            relation('notify', {
-              type: 'host-action',
-              actionId: 'project.notify',
-              payload: { kind: 'variable', variableId: 'tenant' },
-            }),
-          ],
-        },
+        blueprint: edgeBlueprint('notify', HOST_ACTION, {
+          payload: { kind: 'variable', variableId: 'tenant' },
+        }),
       }),
     );
     expect(result.ok).toBe(true);
@@ -95,29 +101,24 @@ describe('parseScreenDocument blueprint expressions', () => {
 
   it('rejects legacy raw blueprint action values and invalid condition right placement', () => {
     const rawValue = document({
-      components: [component({ id: 'button' })],
+      components: COMPONENTS,
       variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
-      blueprint: {
-        relations: [relation('raw', { type: 'set-variable', value: 1 })],
-      },
+      blueprint: edgeBlueprint('raw', SET_COUNT, { value: 1 }),
     });
     const existsWithRight = document({
-      components: [component({ id: 'button' })],
-      blueprint: {
-        relations: [
-          relation(
-            'exists',
-            { type: 'request-component-data' },
-            {
-              condition: {
-                left: { kind: 'literal', value: true },
-                operator: 'exists',
-                right: { kind: 'literal', value: true },
-              },
-            },
-          ),
-        ],
-      },
+      components: COMPONENTS,
+      blueprint: edgeBlueprint(
+        'exists',
+        REQUEST_DATA,
+        {},
+        {
+          condition: {
+            left: { kind: 'literal', value: true },
+            operator: 'exists',
+            right: { kind: 'literal', value: true },
+          },
+        },
+      ),
     });
     expect(parse(rawValue).ok).toBe(false);
     expect(parse(existsWithRight).ok).toBe(false);
@@ -125,16 +126,15 @@ describe('parseScreenDocument blueprint expressions', () => {
 
   it('accepts dotted Blueprint capability identities without coercing them', () => {
     const input = document({
-      components: [component({ id: 'button' })],
-      blueprint: {
-        relations: [
-          relation(
-            'capability',
-            { type: 'request-component-data' },
-            { requiredCapabilities: ['blueprint.value.variable'] },
-          ),
-        ],
-      },
+      components: COMPONENTS,
+      blueprint: edgeBlueprint(
+        'capability',
+        REQUEST_DATA,
+        {},
+        {
+          requiredCapabilities: ['blueprint.value.variable'],
+        },
+      ),
     });
 
     expect(parse(input)).toMatchObject({ ok: true });
@@ -142,28 +142,18 @@ describe('parseScreenDocument blueprint expressions', () => {
 
   it('rejects unknown expression fields and dangerous event paths', () => {
     const expressionExtra = document({
-      components: [component({ id: 'button' })],
+      components: COMPONENTS,
       variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
-      blueprint: {
-        relations: [
-          relation('extra', {
-            type: 'set-variable',
-            value: { kind: 'literal', value: 1, extra: true },
-          }),
-        ],
-      },
+      blueprint: edgeBlueprint('extra', SET_COUNT, {
+        value: { kind: 'literal', value: 1, extra: true },
+      }),
     });
     const dangerousPath = document({
-      components: [component({ id: 'button' })],
+      components: COMPONENTS,
       variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
-      blueprint: {
-        relations: [
-          relation('path', {
-            type: 'set-variable',
-            value: { kind: 'event-payload', path: ['constructor'] },
-          }),
-        ],
-      },
+      blueprint: edgeBlueprint('path', SET_COUNT, {
+        value: { kind: 'event-payload', path: ['constructor'] },
+      }),
     });
 
     expect(parse(expressionExtra).ok).toBe(false);
@@ -177,16 +167,9 @@ describe('parseScreenDocument blueprint expressions', () => {
     >;
     const result = parse(
       document({
-        components: [component({ id: 'button' })],
+        components: COMPONENTS,
         variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
-        blueprint: {
-          relations: [
-            relation('key', {
-              type: 'set-variable',
-              value: { kind: 'object', properties },
-            }),
-          ],
-        },
+        blueprint: edgeBlueprint('key', SET_COUNT, { value: { kind: 'object', properties } }),
       }),
     );
 
@@ -195,9 +178,8 @@ describe('parseScreenDocument blueprint expressions', () => {
       expect(result.diagnostics[0]?.code).toBe('JSON_DANGEROUS_KEY');
       expect(result.diagnostics[0]?.path).toEqual([
         'blueprint',
-        'relations',
+        'edges',
         0,
-        'effect',
         'value',
         'properties',
         '__proto__',
@@ -219,30 +201,21 @@ describe('parseScreenDocument blueprint expressions', () => {
     };
     const cases = [
       document({
-        components: [component({ id: 'button' })],
+        components: COMPONENTS,
         variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
-        blueprint: {
-          relations: [relation('deep', { type: 'set-variable', value: deep })],
-        },
+        blueprint: edgeBlueprint('deep', SET_COUNT, { value: deep }),
       }),
       document({
-        components: [component({ id: 'button' })],
+        components: COMPONENTS,
         variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
-        blueprint: {
-          relations: [relation('containers', { type: 'set-variable', value: containers })],
-        },
+        blueprint: edgeBlueprint('containers', SET_COUNT, { value: containers }),
       }),
       document({
-        components: [component({ id: 'button' })],
+        components: COMPONENTS,
         variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
-        blueprint: {
-          relations: [
-            relation('bytes', {
-              type: 'set-variable',
-              value: { kind: 'literal', value: 'x'.repeat(MAX_BLUEPRINT_EXPRESSION_BYTES) },
-            }),
-          ],
-        },
+        blueprint: edgeBlueprint('bytes', SET_COUNT, {
+          value: { kind: 'literal', value: 'x'.repeat(MAX_BLUEPRINT_EXPRESSION_BYTES) },
+        }),
       }),
     ];
 

@@ -69,6 +69,6 @@ function emptyDocument(): ScreenDocument {
     canvas: { width: 0, height: 0, backgroundColor: 'transparent' },
     components: [],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }

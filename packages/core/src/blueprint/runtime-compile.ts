@@ -2,9 +2,12 @@ import {
   deriveScreenBlueprintRules,
   readScreenVariableRecord,
   SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY,
+  type ScreenBlueprintAction,
+  type ScreenBlueprintRuleStep,
   type ScreenDocument,
   type ScreenJsonValue,
   type ScreenParseResult,
+  screenBlueprintRuleActions,
 } from '@base-screen/contracts';
 import { cloneCondition, cloneExpression, cloneValue, failure } from './runtime-json.js';
 import type { ScreenBlueprintCapabilityIndex, ScreenBlueprintPlan } from './runtime-types.js';
@@ -12,6 +15,10 @@ import type { ScreenBlueprintCapabilityIndex, ScreenBlueprintPlan } from './runt
 // 能力 id 的唯一来源在 contracts；此处保留同名再导出以维持 core 的公共 API 形状。
 export { SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY };
 
+/**
+ * 把节点图编译成运行时计划（ADR-0107 §2.3）：规则由 contracts 的 `deriveScreenBlueprintRules`
+ * 从图派生（深度优先步骤树），这里只做能力门禁与深拷贝，未授权能力失败关闭。
+ */
 export function compileScreenBlueprint(
   document: ScreenDocument,
   capabilities: ScreenBlueprintCapabilityIndex = { hasBlueprintCapability: () => true },
@@ -24,7 +31,7 @@ export function compileScreenBlueprint(
       }
     }
     if (
-      rule.actions.some((action) => action.type === 'component-visibility') &&
+      screenBlueprintRuleActions(rule).some((action) => action.type === 'component-visibility') &&
       !capabilities.hasBlueprintCapability(SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY)
     ) {
       return failure('BLUEPRINT_CAPABILITY_UNAVAILABLE', 'Blueprint capability is unavailable.');
@@ -44,30 +51,52 @@ export function compileScreenBlueprint(
       rules: rules.map((rule) => ({
         ...rule,
         trigger: { ...rule.trigger },
-        ...(rule.condition ? { condition: cloneCondition(rule.condition) } : {}),
-        actions: rule.actions.map((action) => {
-          if (
-            action.type === 'component-visibility' ||
-            action.type === 'request-variable' ||
-            action.type === 'request-component-data'
-          ) {
-            return {
-              ...action,
-              ...(action.type === 'component-visibility' && action.transition !== undefined
-                ? { transition: { ...action.transition } }
-                : {}),
-            };
-          }
-          return {
-            ...action,
-            ...(action.type === 'set-variable'
-              ? { value: cloneExpression(action.value) }
-              : { payload: cloneExpression(action.payload) }),
-          };
-        }),
+        ...(rule.requiredCapabilities === undefined
+          ? {}
+          : { requiredCapabilities: [...rule.requiredCapabilities] }),
+        steps: cloneSteps(rule.steps),
       })),
       initialVariables,
     },
     diagnostics: [],
   };
+}
+
+function cloneSteps(steps: readonly ScreenBlueprintRuleStep[]): ScreenBlueprintRuleStep[] {
+  return steps.map((step) =>
+    step.type === 'action'
+      ? { type: 'action', edgeId: step.edgeId, action: cloneAction(step.action) }
+      : {
+          type: 'condition',
+          edgeId: step.edgeId,
+          nodeId: step.nodeId,
+          condition: cloneCondition(step.condition),
+          yes: cloneSteps(step.yes),
+          no: cloneSteps(step.no),
+        },
+  );
+}
+
+function cloneAction(action: ScreenBlueprintAction): ScreenBlueprintAction {
+  switch (action.type) {
+    case 'component-visibility':
+      return {
+        ...action,
+        ...(action.transition === undefined ? {} : { transition: { ...action.transition } }),
+      };
+    case 'request-variable':
+    case 'request-component-data':
+    case 'page-navigation':
+    case 'component-state':
+      return { ...action };
+    case 'canvas-visibility':
+      return action.payload === undefined
+        ? { ...action }
+        : { ...action, payload: cloneExpression(action.payload) };
+    case 'set-variable':
+      return { ...action, value: cloneExpression(action.value) };
+    case 'emit-host-event':
+    case 'host-action':
+      return { ...action, payload: cloneExpression(action.payload) };
+  }
 }

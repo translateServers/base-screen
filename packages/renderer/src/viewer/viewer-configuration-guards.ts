@@ -44,14 +44,6 @@ export function isScreenBlueprintRuntimePort(value: unknown): boolean {
   );
 }
 
-export function isBaseScreenConditionalStylePort(value: unknown): boolean {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    typeof (value as Record<string, unknown>).resolve === 'function'
-  );
-}
-
 export function isScreenBlueprintHostActionPort(value: unknown): boolean {
   return (
     value !== null &&

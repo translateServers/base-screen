@@ -1,13 +1,19 @@
 import type { BaseScreenMaterialObjectSchema } from '../contracts.js';
 import { PluginDiagnosticCollector } from '../diagnostics.js';
 import { isValidCustomElementName } from '../material/material-validation-utils.js';
+import { inferBaseScreenMaterialEditorControl } from './editor-descriptor-inference.js';
 import {
+  type BaseScreenMaterialEditorTarget,
   EDITOR_CONTROLS,
   FIELD_KNOWN,
   MAX_EDITOR_ITEM_FIELDS,
   MAX_EDITOR_ITEM_PATH_DEPTH,
 } from './editor-descriptor-model.js';
-import { validateControlForSchema, validateFieldPath } from './editor-descriptor-schema.js';
+import {
+  resolveSchema,
+  validateControlForSchema,
+  validateFieldPath,
+} from './editor-descriptor-schema.js';
 import {
   isDisplayString,
   isIdentifier,
@@ -92,15 +98,16 @@ function validateItemField(
   }
   const rawPath = value.path;
   if (!isPath(rawPath, MAX_EDITOR_ITEM_PATH_DEPTH, path, collector)) return;
-  const control = value.control;
-  if (typeof control !== 'string' || !EDITOR_CONTROLS.has(control)) {
-    collector.add(
-      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      [...path, 'control'],
-      'Item control is unsupported.',
-    );
-    return;
-  }
+  const schema =
+    target === 'interaction'
+      ? value.projection === 'style'
+        ? styleSchema
+        : propsSchema
+      : target === 'props' || target === 'style'
+        ? itemsSchema
+        : undefined;
+  const control = resolveFieldControl(value, target, rawPath, schema, path, collector);
+  if (control === undefined) return;
   validateColorGradientCapability(value.allowGradient, control, path, collector);
   validateCustomControlBinding(value.tagName, control, target, path, collector);
   if (!isDisplayString(value.label, 256)) {
@@ -117,16 +124,56 @@ function validateItemField(
       'Item fields cannot nest further item fields.',
     );
   }
-  const schema =
-    target === 'interaction'
-      ? value.projection === 'style'
-        ? styleSchema
-        : propsSchema
-      : target === 'props' || target === 'style'
-        ? itemsSchema
-        : undefined;
   validateFieldPath(target, rawPath, schema, undefined, collector, path);
   validateControlForSchema(target, control, rawPath, schema, collector, path);
+}
+
+/**
+ * 字段控件：显式声明时必须是已知控件；省略时按语义推导（ADR-0102 D2），推不出来（数据参数、
+ * 路径不解析）要求显式声明。返回 `undefined` 表示已记诊断、调用方停止校验该字段。
+ */
+export function resolveFieldControl(
+  value: Readonly<Record<string, unknown>>,
+  target: BaseScreenMaterialEditorTarget,
+  fieldPath: readonly (string | number)[],
+  schema: BaseScreenMaterialObjectSchema | undefined,
+  path: readonly (string | number)[],
+  collector: PluginDiagnosticCollector,
+): string | undefined {
+  const declared = value.control;
+  if (declared !== undefined) {
+    if (typeof declared === 'string' && EDITOR_CONTROLS.has(declared)) return declared;
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      [...path, 'control'],
+      'Editor control is unsupported.',
+    );
+    return undefined;
+  }
+  const inferred = inferBaseScreenMaterialEditorControl(
+    {
+      target,
+      path: fieldPath,
+      ...(value.projection === 'props' || value.projection === 'style'
+        ? { projection: value.projection }
+        : {}),
+      ...(typeof value.tagName === 'string' ? { tagName: value.tagName } : {}),
+      ...(typeof value.allowGradient === 'boolean' ? { allowGradient: value.allowGradient } : {}),
+      ...(typeof value.unit === 'string' ? { unit: value.unit } : {}),
+      ...(typeof value.min === 'number' ? { min: value.min } : {}),
+      ...(typeof value.max === 'number' ? { max: value.max } : {}),
+      ...(typeof value.step === 'number' ? { step: value.step } : {}),
+    },
+    schema === undefined ? undefined : resolveSchema(fieldPath, schema),
+  );
+  if (inferred === undefined) {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      [...path, 'control'],
+      'Editor control cannot be inferred from the schema; declare it explicitly.',
+    );
+  }
+  return inferred;
 }
 
 export function validateColorGradientCapability(

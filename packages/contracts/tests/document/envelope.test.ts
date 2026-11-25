@@ -12,7 +12,7 @@ function envelope(overrides: Record<string, unknown> = {}): Record<string, unkno
       components: [],
       dataSources: [],
       variables: [],
-      blueprint: { relations: [] },
+      blueprint: { nodes: [], edges: [] },
     },
     metadata: {},
     ...overrides,
@@ -105,7 +105,7 @@ describe('parseScreenProjectEnvelope', () => {
           canvas: { width: 1, height: 1, backgroundColor: '#000', extra: true },
           components: [],
           variables: [],
-          blueprint: { relations: [] },
+          blueprint: { nodes: [], edges: [] },
         },
       }),
     );
@@ -136,7 +136,7 @@ describe('parseScreenProjectEnvelope', () => {
           canvas: { width: 1, height: 1, backgroundColor: '#000' },
           components: [],
           variables: [],
-          blueprint: { relations: [] },
+          blueprint: { nodes: [], edges: [] },
           props: documentBody,
         },
         metadata: { note: 'big' },
@@ -155,7 +155,7 @@ describe('parseScreenProjectEnvelope', () => {
       canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
       components: [],
       variables: [],
-      blueprint: { relations: [] },
+      blueprint: { nodes: [], edges: [] },
     };
     for (let index = 0; index < 150; index++) {
       badDocument[`unknown${index}`] = 1;

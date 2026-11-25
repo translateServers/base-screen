@@ -1,6 +1,6 @@
 import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
-import type { DesignerBlueprintConnectionFailureReason } from '../../../common/operations/blueprint/designer-blueprint-connection.js';
+import type { DesignerBlueprintConnectionFailureReason } from '../../../common/operations/blueprint/designer-blueprint-graph.js';
 import type { BaseScreenBlueprintCanvasCommandResult } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { cloneAndFreeze } from '../../../common/tools/designer-json-snapshot.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
@@ -47,8 +47,9 @@ export function blueprintCapabilityReader(
 export function designerBlueprintConnectionFailureMessage(
   reason: DesignerBlueprintConnectionFailureReason,
 ): string {
-  if (reason === 'duplicate') return DESIGNER_UI_TEXT.blueprint.duplicateConnection;
-  if (reason === 'source-unconnected') return DESIGNER_UI_TEXT.blueprint.sourceNodeUnconnected;
-  if (reason === 'unconfigured') return DESIGNER_UI_TEXT.blueprint.nodeNeedsConfiguration;
-  return DESIGNER_UI_TEXT.blueprint.invalidConnection;
+  const text = DESIGNER_UI_TEXT.blueprint.graph.connection;
+  if (reason === 'duplicate') return text.duplicate;
+  if (reason === 'cycle') return text.cycle;
+  if (reason === 'unavailable') return text.unavailable;
+  return text.invalid;
 }

@@ -44,7 +44,7 @@ function harness() {
     canvas: { width: 960, height: 540, backgroundColor: '#ffffff' },
     components: [component('a'), component('b')],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
   const input: DesignerChangeProposalInput = {
     title: 'Rename',

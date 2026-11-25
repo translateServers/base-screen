@@ -101,7 +101,15 @@ export function sectionContentKey(
         previewSummary(model),
       ]);
     case 'authoring':
-      return stableKey([model.authoring, model.dirty, model.surface]);
+      // 推送能力决定「实时推送」选项与保留行数是否出现；实例策略决定组头摘要
+      // （ADR-0104）。两者变了而键不变，下拉与摘要就会停在旧口径上。
+      return stableKey([
+        model.authoring,
+        model.dirty,
+        model.surface,
+        model.pushDelivery ?? null,
+        model.instance?.updatePolicy ?? null,
+      ]);
     default:
       return stableKey([
         model.link.catalog.status,

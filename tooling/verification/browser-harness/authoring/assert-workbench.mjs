@@ -122,32 +122,30 @@ async function assertDesktopWorkbench(designer, viewport) {
   assertPositiveNonOverlappingRects(workbench.horizontal, 'HORIZONTAL', viewport);
   assertPositiveNonOverlappingRects(workbench.vertical, 'VERTICAL', viewport);
 
-  // 页面配置的缩放方式是 3×2 的六档分段：第二行必须留在容器内，且不能压到下一个字段。
+  // 页面配置的缩放方式是六档下拉：必须是 6 个选项、当前值合法，且整行只占一行高度
+  // （改成分段的 3×2 时会涨到两行，这里正好把「不再回退成分段」锁住）。
   const canvasScale = await designer.evaluate((element) => {
     const root = element.shadowRoot;
     const field = root?.querySelector('.designer-canvas-scale-field');
     if (field === null || field === undefined) return null;
-    const segmented = field.querySelector('.designer-canvas-scale-segmented');
-    const options = [...(segmented?.querySelectorAll('.designer-segmented-option') ?? [])];
+    const select = field.querySelector('select');
+    const fieldRect = field.getBoundingClientRect();
     return {
-      optionCount: options.length,
-      segmentedBottom: segmented?.getBoundingClientRect().bottom ?? 0,
-      lastOptionBottom: Math.max(
-        ...options.map((option) => option.getBoundingClientRect().bottom),
-        0,
-      ),
+      optionCount: select?.options.length ?? 0,
+      value: select?.value ?? '',
+      fieldHeight: fieldRect.height,
       nextTop: field.nextElementSibling?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
+      fieldBottom: fieldRect.bottom,
     };
   });
   if (
     canvasScale !== null &&
     (canvasScale.optionCount !== 6 ||
-      canvasScale.segmentedBottom < canvasScale.lastOptionBottom - 1 ||
-      canvasScale.nextTop < canvasScale.segmentedBottom - 1)
+      !['fill', 'fit', 'width', 'height', 'original', 'none'].includes(canvasScale.value) ||
+      canvasScale.fieldHeight > 48 ||
+      canvasScale.nextTop < canvasScale.fieldBottom - 1)
   ) {
-    throw new Error(
-      `BROWSER_HARNESS_CANVAS_SCALE_SEGMENTED_OVERFLOW_FAILED:${JSON.stringify(canvasScale)}`,
-    );
+    throw new Error(`BROWSER_HARNESS_CANVAS_SCALE_FIELD_FAILED:${JSON.stringify(canvasScale)}`);
   }
 }
 
@@ -623,32 +621,24 @@ async function assertNativeEventsToggle(designer, page) {
       ],
       variables: [],
       blueprint: {
-        relations: [
+        nodes: [
+          { kind: 'component', id: 'component:probe-text', componentId: 'probe-text' },
+          { kind: 'component', id: 'component:probe-chart', componentId: 'probe-chart' },
+          { kind: 'host', id: 'host' },
+        ],
+        edges: [
           {
-            type: 'behavior',
+            kind: 'flow',
             id: 'probe-native-events-blueprint',
-            source: {
-              kind: 'component',
-              componentId: 'probe-text',
-              event: { type: 'material-event', eventName: 'valueClick' },
-            },
-            target: { kind: 'component', componentId: 'probe-chart' },
-            effect: { type: 'component-visibility', operation: 'toggle' },
+            from: { node: 'component:probe-text', port: 'event:valueClick' },
+            to: { node: 'component:probe-chart', port: 'toggle' },
           },
           {
-            type: 'behavior',
+            kind: 'flow',
             id: 'probe-native-events-blueprint-host',
-            source: {
-              kind: 'component',
-              componentId: 'probe-text',
-              event: { type: 'material-event', eventName: 'valueClick' },
-            },
-            target: { kind: 'host' },
-            effect: {
-              type: 'emit-host-event',
-              eventName: 'probe_blueprint_ran',
-              payload: { kind: 'literal', value: true },
-            },
+            from: { node: 'component:probe-text', port: 'event:valueClick' },
+            to: { node: 'host', port: 'event:probe_blueprint_ran' },
+            payload: { kind: 'literal', value: true },
           },
         ],
       },
@@ -692,13 +682,18 @@ async function assertNativeEventsToggle(designer, page) {
       );
       return true;
     };
-    const matches = (expected) => {
-      const actual = probeEvents.at(-1);
+    const sameEvent = (actual, expected) =>
+      actual !== undefined &&
+      actual.componentId === expected.componentId &&
+      actual.type === expected.type &&
+      actual.name === expected.name;
+    const matches = (expected) => sameEvent(probeEvents.at(-1), expected);
+    // 最近 N 条事件依次与期望一致：一次交互可能按顺序派发多个事件（单元格 → 所在行）。
+    const matchesTail = (expected) => {
+      const tail = probeEvents.slice(-expected.length);
       return (
-        actual !== undefined &&
-        actual.componentId === expected.componentId &&
-        actual.type === expected.type &&
-        actual.name === expected.name
+        tail.length === expected.length &&
+        tail.every((actual, index) => sameEvent(actual, expected[index]))
       );
     };
     // 原生 CSS 交互探针：语义图表圆点的 pointer 光标与 mouseenter 放大同样受开关门控。
@@ -765,9 +760,15 @@ async function assertNativeEventsToggle(designer, page) {
       row:
         dispatch('probe-table', 'tbody tr') &&
         matches({ componentId: 'probe-table', type: 'base.table', name: 'rowClick' }),
+      // 真实点击总是命中单元格（单元格铺满整行）：一次点击先发 cellClick、再发所在行的 rowClick，
+      // 且是同一行；只断言最后一条 cellClick 测不出「rowClick 永远没有入口」。
       cell:
         dispatch('probe-table', 'td') &&
-        matches({ componentId: 'probe-table', type: 'base.table', name: 'cellClick' }),
+        matchesTail([
+          { componentId: 'probe-table', type: 'base.table', name: 'cellClick' },
+          { componentId: 'probe-table', type: 'base.table', name: 'rowClick' },
+        ]) &&
+        probeEvents.at(-2)?.payload?.rowIndex === probeEvents.at(-1)?.payload?.rowIndex,
       bridgeReact:
         dispatch('probe-react', 'button') &&
         matches({
@@ -848,7 +849,8 @@ async function assertNativeEventsToggle(designer, page) {
     probe.hoverOn.cursor !== 'pointer' ||
     probe.bridgeOn.react !== 'auto' ||
     probe.bridgeOn.vue !== 'auto' ||
-    probe.onCount !== 7 ||
+    // text / chart / semanticChart / row 各 1，单元格点击 2（cellClick + rowClick），桥接 2。
+    probe.onCount !== 8 ||
     probe.offCount !== probe.onCount ||
     probe.bridgeAfterOff.react !== 'none' ||
     probe.bridgeAfterOff.vue !== 'none' ||

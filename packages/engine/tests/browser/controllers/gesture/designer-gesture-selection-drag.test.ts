@@ -166,6 +166,65 @@ describe('DesignerGestureController selection and drag', () => {
     });
   });
 
+  // 回归：第一击选中组后，选框拖动层盖在组上，第二击（dblclick）的 DOM 目标是拖动层。
+  // 以前按 DOM 找不到组件就直接返回，真实鼠标双击永远进不了组；现在按指针位置几何命中兜底。
+  it('R3 drills into a group when the double click lands on the selection grab', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const group = {
+      ...document().components[0]!,
+      id: 'group',
+      type: 'base.group',
+      position: { x: 0, y: 0 },
+      size: { width: 300, height: 200 },
+    };
+    const child = {
+      ...document().components[0]!,
+      id: 'child',
+      parentId: 'group',
+      position: { x: 20, y: 30 },
+      size: { width: 100, height: 80 },
+      zIndex: 1,
+    };
+    const current = { ...document(), components: [group, child] };
+    const interaction = {
+      selectedComponentIds: ['group'] as string[],
+      focusedComponentId: 'group' as string | null,
+    };
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: groupCatalog,
+      getDocument: () => current,
+      getInteraction: () => interaction,
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: (action) => {
+        if (action.type === 'replace-selection') {
+          interaction.selectedComponentIds = [...action.componentIds];
+          interaction.focusedComponentId = action.focusedComponentId;
+        }
+      },
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('dblclick', {
+      clientX: 50,
+      clientY: 60,
+      preventDefault: () => undefined,
+      target: createGrabTarget(),
+    } as unknown as PointerEvent);
+    expect(interaction).toEqual({ selectedComponentIds: ['child'], focusedComponentId: 'child' });
+    expect(controller.canExitGroupEditingContext()).toBe(true);
+  });
+
   it('R5 moves an existing same-parent selection in one transaction', () => {
     vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);

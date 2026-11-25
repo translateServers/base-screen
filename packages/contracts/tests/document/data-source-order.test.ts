@@ -29,7 +29,7 @@ function document(dataSources: readonly ScreenDataSource[]): ScreenDocument {
     components: [],
     dataSources,
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 
@@ -39,7 +39,7 @@ describe('screenDataSourceOrder', () => {
       canvas: { width: 1, height: 1, backgroundColor: '#000000' },
       components: [],
       variables: [],
-      blueprint: { relations: [] },
+      blueprint: { nodes: [], edges: [] },
     };
     expect(screenDataSourceOrder(document([]))).toEqual([]);
     expect(screenDataSourceOrder(withoutDataSources)).toEqual([]);

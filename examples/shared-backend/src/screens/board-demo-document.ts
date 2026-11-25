@@ -8,9 +8,7 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  * 真正的合法性仍由 contracts 的 canonical 解析器和各 manifest 的 schema 把关
  * （见 tests/examples/board-demo-document.test.ts）。
  *
- * 版式约定：所有组件都是根节点。组壳几何由引擎持有，配置 groupMaterialType 后
- * 任何一次事务都会把 base.container 吸附到子孙包围盒——把面板当父节点会在第一次
- * 无关编辑时压平内缩留白。
+ * 版式约定：所有组件都是根节点，整体搬动靠编辑期的成组。
  */
 
 interface DemoComponent {
@@ -177,11 +175,10 @@ function frame(
     size: { width, height },
     rotation: 0,
     status: { locked: false, hidden: false },
-    props: { borderStyle: 'corner-brackets', bracketSize: 18, lineWidth: 2 },
+    props: { borderStyle: 'corner-brackets', bracketSize: 18 },
     style: {
       backgroundColor: 'rgba(8, 26, 46, .72)',
       borderColor: '#1d5b8f',
-      color: '#7fb0cf',
       ...style,
     },
     dataSource: null,
@@ -208,7 +205,7 @@ function flop(
     status: { locked: false, hidden: false },
     props: {
       prefix: '',
-      suffix: '',
+      unit: '',
       decimals,
       thousandsSeparator: true,
       flipAnimation: true,
@@ -269,7 +266,7 @@ function capsule(
     size: { width, height },
     rotation: 0,
     status: { locked: false, hidden: false },
-    props: { segments: 24, showValue: true, decimals: 1, glow: true },
+    props: { segments: 24, showValue: true, decimals: 1 },
     style: {
       backgroundColor: 'transparent',
       color: '#cfe9ff',
@@ -512,7 +509,7 @@ push({
   size: { width: 1560, height: 26 },
   rotation: 0,
   status: { locked: false, hidden: false },
-  props: { speedSeconds: 26, gap: 72 },
+  props: { periodMs: 26000, gap: 72 },
   style: { backgroundColor: 'transparent', color: '#8fd6ff', fontSize: 13 },
   dataSource: {
     type: 'static',
@@ -544,7 +541,7 @@ export const BOARD_DEMO_DOCUMENT = {
   },
   components,
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 } as const;
 
 /** 序列化成品文档；启动期即校验，写错时立刻失败而不是等前端加载。 */

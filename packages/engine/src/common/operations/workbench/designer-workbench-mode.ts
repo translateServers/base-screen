@@ -15,8 +15,8 @@ export function parseDesignerWorkbenchModeRequest(
     Object.keys(options.focus).some((key) => key !== 'kind' && key !== 'id') ||
     (options.focus.kind !== 'component' &&
       options.focus.kind !== 'variable' &&
-      options.focus.kind !== 'rule' &&
-      options.focus.kind !== 'action') ||
+      options.focus.kind !== 'node' &&
+      options.focus.kind !== 'edge') ||
     typeof options.focus.id !== 'string' ||
     options.focus.id.length === 0 ||
     options.focus.id.length > 256

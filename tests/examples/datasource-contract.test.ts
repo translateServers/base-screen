@@ -157,7 +157,7 @@ describe('三端项目身份守卫', () => {
         canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
         components: [],
         variables: [],
-        blueprint: { relations: [] },
+        blueprint: { nodes: [], edges: [] },
       });
       if (!document.ok) throw new Error('测试文档无效');
       const adapter = createAdapter('allowed');

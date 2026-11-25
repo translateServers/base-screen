@@ -1,8 +1,10 @@
 import type {
+  ScreenComponentNode,
   ScreenDataSourceSource,
   ScreenDiagnostic,
   ScreenJsonObject,
   ScreenResourceExecutionContext,
+  ScreenSourceDelivery,
 } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalog,
@@ -20,7 +22,9 @@ import {
   SourceQueryPort,
   type SourceQueryRequest,
 } from '../resource/source-query-port.js';
+import { SubCanvasController } from '../sub-canvas-layer.js';
 import type { CreateBaseScreenRendererOptions } from './renderer.js';
+import { ComponentStateMemory } from './renderer-component-states.js';
 import type {
   ComponentValidationCache,
   MountedMaterial,
@@ -32,9 +36,17 @@ export interface RendererState {
   catalog: BaseScreenMaterialCatalog;
   mounted: Map<string, MountedMaterial>;
   candidates: Map<string, RenderCandidate>;
+  /** 当前文档每个组件含祖先容器合成的透明度，由 render() 重算。 */
+  opacities: ReadonlyMap<string, number>;
   document: import('@base-screen/contracts').ScreenDocument | undefined;
   lastValidatedInput: import('@base-screen/contracts').ScreenDocument | undefined;
   validationCache: ComponentValidationCache;
+  /**
+   * 解析结果里的组件 → 宿主传入的组件。文档解析对首次出现的组件引用做克隆、对上一份输入里已有的
+   * 引用原样复用，同一个输入组件因此在相邻两次渲染里先是克隆、后是它本身。model 重赋值守卫按
+   * 输入组件判定，未变组件才不会在下一次渲染被白白重写一遍。
+   */
+  readonly componentSources: WeakMap<ScreenComponentNode, ScreenComponentNode>;
   variables: ScreenJsonObject;
   dataSuspended: boolean;
   disposed: boolean;
@@ -44,8 +56,14 @@ export interface RendererState {
   /** 数据源实例运行时：请求身份、缓存、代际的唯一所有者。 */
   readonly dataSources: DataSourceRuntime;
   readonly visibility: BlueprintVisibilityController;
+  /** 从画布运行时（ADR-0109）；设计态不建页面层与浮层。 */
+  readonly subCanvases: SubCanvasController;
+  /** 组件状态（ADR-0110）的会话记忆：判定结果、蓝图设置与最近一次生效的状态。 */
+  readonly componentStates: ComponentStateMemory;
   /** 实例状态变化后由 Renderer 注入的重投影钩子（构造期先给空实现）。 */
   onDataSourceChanged: (dataSourceId: string) => void;
+  /** 切页后按同一文档重新渲染；由 Renderer 注入。 */
+  requestRender: () => void;
 }
 
 export function createRendererState(options: CreateBaseScreenRendererOptions): RendererState {
@@ -79,15 +97,24 @@ export function createRendererState(options: CreateBaseScreenRendererOptions): R
     emit: (event) => emitDataSourceEvent(state, event),
     onChanged: (dataSourceId) => state.onDataSourceChanged(dataSourceId),
     validateParams: (source, params) => validateHostResourceParams(state, source, params),
+    push: {
+      // 设计态不订阅：push 实例在画布上只做一次 authoring preview 拉取（ADR-0104 §2.4.10）。
+      enabled: options.mode !== 'design',
+      delivery: (source) => pushDeliveryOf(state, source),
+      snapshotTimeoutMs: options.resourceTimeoutMs ?? 15_000,
+      onWarning: (item) => options.onDiagnostic?.(item),
+    },
   });
   state = {
     options,
     catalog: options.catalog,
     mounted: new Map(),
     candidates: new Map(),
+    opacities: new Map(),
     document: undefined,
     lastValidatedInput: undefined,
     validationCache: { entries: new Map() },
+    componentSources: new WeakMap(),
     variables: {},
     dataSuspended: false,
     disposed: false,
@@ -96,7 +123,16 @@ export function createRendererState(options: CreateBaseScreenRendererOptions): R
     sourceQueries,
     dataSources,
     visibility: new BlueprintVisibilityController(options.root),
+    subCanvases: new SubCanvasController({
+      root: options.root,
+      enabled: options.mode !== 'design',
+      onChange: options.onCanvasChange,
+      requestRender: () => state.requestRender(),
+      ...(options.initialPageId === undefined ? {} : { initialPageId: options.initialPageId }),
+    }),
+    componentStates: new ComponentStateMemory(),
     onDataSourceChanged: () => {},
+    requestRender: () => {},
   };
   return state;
 }
@@ -147,6 +183,27 @@ function validateHostResourceParams(
   };
 }
 
+/**
+ * 来源的推送能力（ADR-0104 §2.3）：
+ * - `host-resource`：以插件贡献的 `delivery.push` 为准；宿主没有提供贡献索引时不做类型门控
+ *   （与 configSchema 门控同一口径），只看端口是否实现了 `subscribe`；
+ * - `host-catalog`：渲染器拿不到目录项描述，运行时只看端口是否实现了 `subscribe`，
+ *   `ScreenHostCatalogDescriptor.delivery` 由设计器在作者面门控；
+ * - `dataset` / `url-query`：不支持。
+ */
+function pushDeliveryOf(
+  state: RendererState,
+  source: ScreenDataSourceSource,
+): ScreenSourceDelivery['push'] | undefined {
+  if (source.kind === 'host-resource') {
+    const index = state.options.contributionIndex;
+    if (index === undefined) return {};
+    return index.getResourceType(source.resourceType)?.delivery?.push;
+  }
+  if (source.kind === 'host-catalog') return {};
+  return undefined;
+}
+
 export function emitDataSourceEvent(
   state: RendererState,
   event: DataSourceRuntimeObserverEvent,
@@ -165,6 +222,8 @@ export function emitDataSourceEvent(
       ...(event.fieldCount === undefined ? {} : { fieldCount: event.fieldCount }),
       ...(event.rowCount === undefined ? {} : { rowCount: event.rowCount }),
       ...(event.code === undefined ? {} : { code: event.code }),
+      ...(event.cursor === undefined ? {} : { cursor: event.cursor }),
+      ...(event.connection === undefined ? {} : { connection: event.connection }),
     });
   } catch {
     // Observer failures are isolated from rendering.

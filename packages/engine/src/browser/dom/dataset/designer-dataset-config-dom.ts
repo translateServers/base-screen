@@ -222,10 +222,10 @@ function renderDatasetSummary(
   header.append(mark, copy, change);
   summary.appendChild(header);
   if (descriptor.description !== null && descriptor.description.length > 0) {
-    const description = ownerDocument.createElement('p');
-    description.className = 'designer-dataset-description';
-    description.textContent = descriptor.description;
-    summary.appendChild(description);
+    // 数据集描述是「这份数据是什么」的补充说明，不是每次都要逐字读的一行：
+    // 改挂摘要卡片的 tooltip 与无障碍描述，卡片高度回到「名称 + 数据集 ID」两行。
+    header.dataset.tip = descriptor.description;
+    header.setAttribute('aria-description', descriptor.description);
   }
   appendInstancePicker(ownerDocument, summary, options);
   // 检查器把三颗灯放在卡片里（设计稿 `.health`）：它就是「这份来源现在通不通」的答案，
@@ -377,8 +377,21 @@ function renderParameters(
           ?.setAttribute('aria-required', 'true');
       }
       control.appendChild(editor);
+      // 固定值不再渲染「固定值2」这种摘要触发器：输入框里已经有值，摘要只是把同一个数
+      // 再说一遍。这里只留一个「改绑变量」图标入口，一行三件套收成两件。
+      const bind = createDesignerIconButton(ownerDocument, {
+        className: 'designer-dataset-parameter-bind',
+        icon: 'variable',
+        label: DESIGNER_UI_TEXT.dataset.parameterVariableLabel(parameter.label),
+      });
+      bind.dataset.datasetParameterBind = parameter.name;
+      bind.addEventListener('click', () => {
+        picker.element.querySelector<HTMLButtonElement>('[data-value-ref-trigger]')?.click();
+      });
+      control.appendChild(bind);
+    } else {
+      control.appendChild(picker.element);
     }
-    control.appendChild(picker.element);
     if (mode === 'variable') {
       const clear = createDesignerIconButton(ownerDocument, {
         className: 'designer-dataset-parameter-clear',

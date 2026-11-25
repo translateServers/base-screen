@@ -38,7 +38,13 @@ export interface DesignerElementOperationsHost {
   readonly hasClipboard: () => boolean;
   readonly canGroup: () => boolean;
   readonly canUngroup: () => boolean;
+  /** 宿主开启了「存为组合」（ADR-0100）。 */
+  readonly isFragmentSaveAvailable: () => boolean;
+  readonly canSaveFragment: () => boolean;
+  readonly requestFragmentSave: () => void;
   readonly canEnterGroupEditing: () => boolean;
+  /** 正在编辑的组（双击进入）；省略或返回 null 表示画布根层。「全选」只选这一层。 */
+  readonly getGroupEditingParentId?: () => string | null;
   readonly canExitGroupEditing: () => boolean;
   readonly canAlign: () => boolean;
   readonly canDistribute: () => boolean;
@@ -78,6 +84,8 @@ export interface DesignerElementOperationsHost {
   readonly setActiveTool: (tool: DesignerToolId) => void;
   readonly cancelGesture: () => void;
   readonly canMutateSelection: () => boolean;
+  /** 删除专用：不要求选区同属一个父级（父子混选时删最上层）；省略时回落到 `canMutateSelection`。 */
+  readonly canDeleteSelection?: () => boolean;
   readonly canEditPosition: () => boolean;
   readonly canEditSize: () => boolean;
   readonly canSelectLayer: (direction: 'up' | 'down') => boolean;

@@ -233,7 +233,7 @@ const BOARD_CASE_COMPONENTS: readonly {
     position: { x: 12, y: 12 },
     size: { width: 636, height: 516 },
     zIndex: BOARD_CASE_FRAME_Z_INDEX,
-    props: { borderStyle: 'corner-brackets', bracketSize: 22, lineWidth: 2 },
+    props: { borderStyle: 'corner-brackets', bracketSize: 22 },
   },
   {
     type: 'board.digital-flop',

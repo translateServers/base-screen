@@ -4,7 +4,7 @@ import { el } from '../lib/dom';
  * 应用外壳：顶栏（品牌 + 主导航 + 运行环境标记）+ 主区域。高度链由 CSS 保证
  * （html/body/#app 全高），设计器嵌入时不再额外推断尺寸。
  *
- * 导航三项（大屏 / 数据源 / 素材）；`aria-current="page"` 让读屏与冒烟都能判断当前页。
+ * 导航四项（大屏 / 数据源 / 素材 / 组件库）；`aria-current="page"` 让读屏与冒烟都能判断当前页。
  */
 function tab(label: string, href: string, active: boolean): HTMLElement {
   const link = el('a', {
@@ -15,7 +15,7 @@ function tab(label: string, href: string, active: boolean): HTMLElement {
   if (active) link.setAttribute('aria-current', 'page');
   return link;
 }
-export type ShellSection = 'screens' | 'datasources' | 'assets';
+export type ShellSection = 'screens' | 'datasources' | 'assets' | 'components';
 
 export function createAppShell(
   main: HTMLElement,
@@ -30,6 +30,7 @@ export function createAppShell(
     tab('大屏', '#/', active === 'screens'),
     tab('数据源', '#/datasources', active === 'datasources'),
     tab('素材', '#/assets', active === 'assets'),
+    tab('组件库', '#/components', active === 'components'),
   ]);
   const meta = el('span', { class: 'shell__meta', text: 'VANILLA TS · ENGINE EMBEDDED' });
   const header = el('header', { class: 'shell__header' }, [brand, tabs, meta]);

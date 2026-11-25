@@ -51,7 +51,7 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
 ```text
 lib/api-base.ts  lib/api.ts  lib/asset-model.ts  lib/datasource-model.ts  lib/format.ts  lib/logger.ts
 lib/render-diagnostics.ts
-screen/host-alarm-controller.ts  screen/host-alarm-style-authoring.ts
+screen/host-alarm-controller.ts
 screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
 screen/asset-library.ts  screen/asset-return.ts
 screen/datasource-return.ts
@@ -126,6 +126,7 @@ styles/asset-library.css  styles/online-materials.css
 | `PATCH /api/material-packages/:id/visibility` | `{ visible }` | `{ package }`（只改 `libraryVisible`） | `404` |
 | `DELETE /api/material-packages/:id` | — | `{ deleted: true, id }` | `404` / `409 MATERIAL_IN_USE` + `refScreens` |
 | `GET /api/metrics/series?metric=&points=` | — | `{ metric, unit, points: [{ t, value }] }` | `400 UNKNOWN_METRIC` / `400 INVALID_POINTS` |
+| `GET /api/metrics/stream?metric=&points=` | — | SSE（ADR-0104 推送演示）：订阅先发 `event: snapshot`（`{ metric, unit, points }`，最近 `points` 个采样点），之后每 2 秒 `event: point`（`{ metric, point: { t, value } }`），每 15 秒 `event: heartbeat`；数据事件带 `id: <epoch>:<revision>`，序号来自服务端统一时钟、重连不回退，进程重启换 epoch；落后超过一个窗口时改发新 `snapshot` | `400 UNKNOWN_METRIC` / `400 INVALID_POINTS`（建立流之前返回） |
 | `GET /api/metrics/ranking?dimension=&limit=` | — | `{ dimension, unit, items: [{ name, value }] }` | `400 UNKNOWN_DIMENSION` / `400 INVALID_LIMIT` |
 | `GET /api/demo/alarms` | — | `{ revision, alarms: [{ id, key, level, message, raisedAt, acknowledged, suppressed }] }` | — |
 | `GET /api/demo/alarms/stream` | — | SSE：订阅先发 snapshot，随后 raise / clear / ack / suppress / heartbeat | — |
@@ -222,7 +223,7 @@ pnpm verify:examples        # 依次跑三端冒烟
 三端断言集合一致：种子列表渲染、设计器注册并挂载、指标读数经 host-resource
 数据通道渲染出后端数值、查看器播放种子文档、指标接口确定性、**生产监控大屏的数据层六条**
 （首屏灯阵/工序链/告警流水、URL 播种、变量联动、空结果、失败保留上一帧、后台暂停）、
-**实时告警演示大屏**（流水 14 行 / critical 2 条 / 等级色块与 statusPalette 同色 / 4 个 KPI
+**实时告警演示大屏**（流水 14 行 / critical 2 条 / 等级色块与流水等级语义色同色 / 4 个 KPI
 出数），以及**实时告警样式**（在该屏上 `poll=0` 打开：SSE snapshot → warning；raise critical →
 变色；clear → 恢复；期间 dataset query 数与 canonical 文档不变），最后是无未捕获页面错误。
 数据层断言的详细口径见下文「数据层接入」。
@@ -265,7 +266,7 @@ M 段是**宿主资源作者面**闭环：编辑页右下角打开作者面，�
 
 | dataSource | 组件 | 数据来自 |
 | --- | --- | --- |
-| `dataset` | 设备状态灯阵 / 告警流水 / 产线工序链 | `monitor.devices` / `monitor.alarms` / `monitor.pipeline`（`/api/datasets`） |
+| `dataset` | 设备状态灯阵 + 状态图例 / 告警流水 / 产线工序链 | `monitor.devices`（文档级共享实例 `devices`）/ `monitor.alarms` / `monitor.pipeline`（`/api/datasets`） |
 | `variable` | 当前产线 / 时间窗 / 数据源状态 / 告警播报 / 时钟 / 更新时间 | 3 个 `static` 变量（可交互）+ 3 个 `production.*` 宿主只读变量 |
 | `host-resource` | 5 张 KPI（OEE / 在线率 / 产量 / 目标达成 / 未处理告警）+ 产量趋势 + 产线负载排行 | `demo_metric` / `demo_series` / `demo_ranking`（`/api/metrics`） |
 | `static` | 标题、标签、班组绩效表、三个选择器 | 文档内字面量 |
@@ -273,6 +274,11 @@ M 段是**宿主资源作者面**闭环：编辑页右下角打开作者面，�
 它同时是「物料形状 × 数据形状」的对照样本：`board.status-grid` 承载多实体灯阵（48 台设备
 一眼扫完），`board.pipeline` 承载保序工序链（哪道卡住），`board.scroll-board` 承载带等级色条
 的告警流水（逐条读），三者消费的是同一个后端的三张表。
+
+灯阵与下方的状态图例读的是同一份设备数据，因此引用同一个文档级数据源实例（`dataSources.devices`，
+参数 `line` 走变量槽位）：两个组件经各自的 `dataBinding` 取不同的列，切产线只发一次设备查询
+（ADR-0100 F4；三端冒烟在首屏断言设备数据集恰好查询 1 次）。告警流水与工序链仍用组件自带的
+`dataSource`——两种写法在同一张屏上并存。
 
 **「实时告警演示大屏」**——告警链路的专用屏，三块共用同一套等级语义：
 
@@ -282,11 +288,12 @@ M 段是**宿主资源作者面**闭环：编辑页右下角打开作者面，�
 | KPI 读数 | `kpi-alarm-value` 翻牌 ← `alarm_open` | `demo_metric`（`/api/metrics`） |
 | 等级色块 | 3 组「矩形色块 + 色条 + 翻牌」 | `alarm_critical` / `alarm_warning` / `alarm_info` |
 
-这张屏的存在理由是**把演示 key 落到具体组件上**：告警绑定按大屏持久化在宿主后端
-（`ScreenAlarmBinding`），种子把 `alarm.open` 映射到组件 id（`kpi-alarm-value`、`top-notice`），
-作为开箱模板；组件检查器的「业务条件样式」段可以改条件源、等级与样式并保存。
-组件沿用与生产监控屏相同的两个 id 与基础色，文档本身仍然没有告警 key、阈值或样式规则。
-等级色块的三条实色条与流水的 `statusPalette` 同源（`#f5222d` / `#fa8c16` / `#1677ff`），
+这张屏演示**宿主只给分级、大屏决定样式**（ADR-0110 §2.6）：数据源 `alarm_open` 是宿主的
+推送资源（`alarm` / `alarm.open`，值 `{ level, count }`），`kpi-alarm-value` 与 `top-notice` 带
+严重 / 一般 / 提示三个组件状态，按 `alarm_open.level` 判定，颜色引用文档状态色位。
+阈值与告警生命周期留在宿主，文档里只有告警资源身份与「等级 → 状态」。
+等级色块的三条实色条与流水的等级语义色（`criticalColor` / `warningColor` / `infoColor`）同源
+（`#f5222d` / `#fa8c16` / `#1677ff`），
 根测试按 `BOARD_ALARM_LEVEL_COLORS` 逐色比对，避免"同一等级两种红"。
 
 页面内配置路径（不依赖 JSON 导入或改代码）：
@@ -318,7 +325,7 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 交互只有两条：点城市榜任意行 → 蓝图 `rowClick` 关系写 `city`；点 24/48 小时按钮 →
 `valueClick` 写 `hours`，两张趋势图同步切换。城市榜同时承担排名与城市选择，时间窗显式
 可见；默认城市为上海（AQI 36，优），北京仍固定排在榜单第 1 行，风险不被隐藏。
-等级/超标着色走 canonical `styleRules`（ADR-0058），不注入宿主 CSS。
+等级/超标着色走组件状态（ADR-0110），不注入宿主 CSS。
 
 **案例复盘：真实数据链路暴露的边界（本轮已修诊断可见性与共享实例，其余记录如下）**
 
@@ -332,9 +339,9 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 - **表格类物料的列 id 必须是 ASCII**：`scroll-board`/`base.table` 的列 id 走
   `PLUGIN_CORE_DATA_CONTRACT_INVALID` 的标识符校验；中文列别名能用于标量与图表，
   但不能直接做表格列。本案例用 ASCII 排名列 + 文档层表头解释列义。
-- **scroll-board 不能逐行着色，也没有选中行样式**：`statusPalette` 只有四个固定键，
-  中文等级值只能落到 default 色；榜单的行内等级色因此是统一的青色。当前城市由主视觉
-  与榜单标题表达；主视觉的等级/标准比/达标状态/优良率用 `styleRules` 条件着色。
+- **scroll-board 不能逐行着色，也没有选中行样式**：等级语义色只认 critical / warning / info，
+  中文等级值只能落到未知等级色（`unknownColor`）；榜单的行内等级色因此是统一的青色。当前城市由主视觉
+  与榜单标题表达；主视觉的等级/标准比/达标状态/优良率用组件状态着色。
 - **ECharts 物料不暴露轴范围**：评审稿的固定量程（AQI 0–160 / 颗粒物 0–120）无法在
   文档层设置，双趋势图使用自适应量程；固定刻度需要给图表物料增加轴 props。
 - **时间窗按钮没有选中态**：`base.text` 没有 selected/active 样式；文档层用「当前
@@ -424,27 +431,21 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 
 ### 实时告警（宿主推送）
 
-外部告警系统拥有条件样式的判定与视觉映射，并通过 SSE 推送当前告警。Base Screen **不连接**
-告警系统，也不保存告警状态：
+外部告警系统拥有告警判定与分级，并通过 SSE 推送当前告警。宿主把它整理成一个推送数据源，
+大屏按等级切换组件状态（ADR-0110 §2.6）：
 
 ```text
-告警系统 --SSE--> 宿主 host-alarm-controller
-                     ├─ 维护当前快照（revision、Map、重连重同步、乱序丢弃）
-                     ├─ conditionalStylePort.resolve(componentId) → 样式覆盖
-                     └─ element.refreshConditionalStyles(componentIds)
+告警系统 --SSE--> 宿主 host-alarm-controller（快照、revision、重连重同步、乱序丢弃）
+                     └─ 按告警 key 汇总 { level, count }
+                          └─ resourcePort.subscribe（资源类型 alarm）→ 推送数据源 → 组件状态
 ```
 
-- **端口必须在 `configure` 前提交**；三端在配置前 `await alarms.ready(800)`，首快照未到时
-  先按基础样式渲染，到达后由失效 API 补齐。
-- **绑定在宿主侧，按屏持久化**：`GET/PUT /api/screens/:id/alarm-bindings` 保存
-  `alarm key → 组件 id → 等级 → 样式`。种子屏的开箱映射（`alarm.open` → `kpi-alarm-value`
-  与 `top-notice`）只在缺少记录时补种；组件检查器的「业务条件样式」段按当前物料
-  Manifest 过滤样式字段，保存后经 `controller.setBindings()` 热更新并重算样式，不重建 SSE。
-  文档里没有告警 key、阈值或样式规则。
-- **合并与优先级**：同一组件命中多条告警时取 `critical > warning > info`，同级按 alarm id
-  字典序；`acknowledged` / `suppressed` 不参与样式。
-- **一帧一次**：控制器按 `requestAnimationFrame` 合并事件，只失效受影响的组件；`stop()` 后
-  不再回调。事件 revision 重复/倒序丢弃，缺口触发重连并以 snapshot 全量替换。
+- **宿主只给分级**：资源类型 `alarm` 在 `host-resource-plugin.ts` 声明 `delivery.push` 与
+  `levelScales`（critical / warning / info → 危险 / 警告 / 提示色调）；设计器据此给出等级下拉与
+  「按分级生成状态」。样式不由宿主保存，也不注入大屏。
+- **合并与优先级**：同一 key 有多条告警时取 `critical > warning > info`，`acknowledged` /
+  `suppressed` 不计入。多个组件共用一条 SSE，最后一个读者离开 2 秒后断开。
+- **快照语义**：事件 revision 重复/倒序丢弃，缺口触发重连并以 snapshot 全量替换。
 - **验证**：查看页顶栏有 `[data-alarm-status]` chip 与「模拟告警 / 解除告警」按钮。冒烟以
   `poll=0` 打开**「实时告警演示大屏」**，先 `POST reset` 等待 warning，再 `POST raise` 断言
   critical，`POST clear` 断言恢复；同时断言 dataset query 数与 canonical 文档未变化。
@@ -496,22 +497,22 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
   拖到另一组件表达详情/分组/下钻。检查器可改效果类型、条件与变量；事件字段可直接填写
   `row.city`：声明过的 payload 字段只是建议，物料没声明 `payloadSchema` 也能用。
 
-### 条件样式
+### 组件状态
 
-- 「样式」页签底部的「条件样式」按组件数据值判定：路径留空表示数据值本身；操作符支持
-  `eq / neq / gt / gte / lt / lte / contains / exists`；命中后覆盖物料 stylePanel 里的颜色键。
-- 规则可新增、删除、上下移动，最多 8 条；提交走 `update-components` 的 `styleRules` 整体替换，
-  合并后的完整 style 会过一次物料 `styleSchema`，不认识的颜色键不会写进文档。
-- 空气质量种子里的 `hero-level`（6 条等级色）、`hero-ratio` / `hero-good`（阈值色）都能在
-  这个面板里直接改；查看页切城市时颜色随数据值变化。
+- 检查器顶部「外观状态」：默认 + 自建状态；选中某个状态后，外观区的改动只写进该状态的覆盖。
+- 「判定」：取值可选组件数据 / 变量 / 数据源（可按行查找，匹配值可引用变量）；条件按顺序判定，
+  第一条命中即生效，都不命中为默认。蓝图「设置状态 / 恢复自动」优先于判定。
+- 空气质量种子里的 `hero-level`（6 个等级状态）、`hero-ratio` / `hero-good`（阈值状态）都能在
+  这里直接改；查看页切城市时状态随数据值变化。
 
 ## 数据绑定演示
 
 起始文档里那张卡片**不是一个物料**，而是四个原子物料按 zIndex 叠出来的：`stage-card-bg`
 （`base.rectangle` 底座与边框）、`stage-card-title`（`base.text`）、`stage-card-rule`
-（`base.rule`）与 `stage-card-value`。四个节点都是根节点——组壳的几何由引擎持有，配置了
-`groupMaterialType` 之后任何一次事务都会把 `base.container` 吸附到其子孙的包围盒并集，拿它当
-父节点会在第一次无关编辑时压平卡片的内缩留白。其中 `stage-card-value` 的 `dataSource` 是 `host-resource`
+（`base.rule`）与 `stage-card-value`。四个节点都是根节点，整体搬动靠编辑期的成组。配置了
+`groupMaterialType` 之后 `base.container` 是组壳：贴着子项的边跟随子项，留有内边距的边保持不动、
+只在子项越出时外扩，因此把底座当父节点也不会再被压平（组合分片的卡片就是这么做的）。其中
+`stage-card-value` 的 `dataSource` 是 `host-resource`
 （`resourceType: 'demo_metric'`、`resourceId: 'cpu_usage'`）。三端各自的
 `src/screen/host-data-channel.ts` 把它解析成一次 `/api/metrics/series` 查询，
 经物料的 tabular 适配器投影为组件视图模型——这正是宿主接入真实数据源的形态。
@@ -521,6 +522,27 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 文档能在三端渲染**。三端的 `configure` 都带 `groupMaterialType: 'base.container'`，所以多选原子
 物料即可成组整体移动/缩放/旋转；要成套插入同一份组合，用 `insertComponentFragment`，预设 JSON
 由宿主自己存。
+
+三端编辑页还给设计器配了一份宿主分片「指标卡」（`src/screen/metric-value.ts` 的 `METRIC_CARD_FRAGMENT`，
+经 `element.materialLibraryFragments` 注入）：容器底座 + 标题文本 + 指标读数。它在物料库「业务指标」分类里带
+「组合」角标，点击或拖入画布即展开为三个普通组件（父子成组、一次撤销），文档里不留分片引用（ADR-0100）。
+编辑页同时开启了 `fragmentSaveAction`：选中组件后右键「存为组合」，设计器派发 `base-screen-fragment-save-request`，
+由组件工坊接管命名、归类、体检与保存。
+
+### 组件工坊（ADR-0105）
+
+编辑页右下角的「组件工坊」（`src/screen/component-workshop.ts`，三端逐字共享；接线在 `src/screen/fragment-shelf.ts`）
+在线制作两类组件，都先体检再发布，无需刷新页面：
+
+- **原子组件**：写规格（可调项按分区声明、数据形状选无 / 单值 / 多行）与渲染函数体，右侧实时预览四态、预览检查器表单、
+  显示体检结论（ADR-0099 原子判定与门禁、ADR-0102 表单范式、渲染代码静态检查）。发布即存为在线物料包
+  （后端 `MaterialPackage`，代码是导出 `spec` + `render` 的 ES 模块），经 `host-runtime` 热刷新进物料库；
+  可上架 / 下架、复制为新组件、删除（被大屏引用时后端拒绝）。旧模板生成的在线物料包仍按原方式加载。
+- **组合组件**：在画布上摆好（容器做外壳、标题用文本），选中后「从选区新建组合」或右键「存为组合」，
+  起名归类、看体检（ADR-0100 F 规则）后保存；可用当前选区更新、插入、删除。示例把组合存在 localStorage，
+  真实宿主应写入自己的后端。预置「指标卡」只读。
+
+工坊是宿主研发 / 管理员工具：在线代码与宿主页面同源执行（ADR-0090 §8 信任边界不变），终端租户自助仍需独立的威胁模型。
 
 三端的数据通道都支持四种宿主资源类型，投影形状与绑定角色一一对应：
 

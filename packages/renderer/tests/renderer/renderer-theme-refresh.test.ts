@@ -1,4 +1,3 @@
-import type { ScreenJsonValue } from '@base-screen/contracts';
 import { describe, expect, it } from 'vitest';
 import { createBaseScreenRenderer } from '../../src/renderer/renderer.js';
 import {
@@ -41,18 +40,27 @@ describe('renderer theme input invalidation', () => {
     expect(root.children[0]?.model?.style.color).toBe('#111111');
   });
 
-  it('applies a new palette to conditional style port results on the first replace', () => {
+  it('applies a new palette to state styles on the first replace', () => {
     const root = new FakeRoot();
     const renderer = createBaseScreenRenderer({
       root: root as unknown as HTMLElement,
-      catalog: createCatalog(),
+      catalog: createCatalog('base.test', ['static']),
       mode: 'viewer',
       interactive: false,
       onMaterialEvent: undefined,
       resourcePort: undefined,
-      conditionalStylePort: { resolve: () => ({ color: 'theme:accent' }) },
     });
-    const shared = { ...component('ported', 0), style: { color: '#ffffff' } };
+    const shared = {
+      ...component('stated', 0, null, { type: 'static', value: 5 }),
+      style: { color: '#ffffff' },
+      states: {
+        items: [{ id: 'hot', name: '高', style: { color: 'theme:accent' } }],
+        judge: {
+          input: { kind: 'component-data', path: [] },
+          cases: [{ operator: 'gt', value: 0, stateId: 'hot' }],
+        },
+      },
+    } as const;
 
     expect(renderer.render({ ...document([shared]), theme: { palette } }).ok).toBe(true);
     expect(root.children[0]?.model?.style.color).toBe('#555555');
@@ -64,9 +72,8 @@ describe('renderer theme input invalidation', () => {
     expect(root.children[0]?.model?.style.color).toBe('#888888');
   });
 
-  it('applies host-level reserved styles on conditional style refresh', () => {
+  it('applies host-level reserved styles when a state switches', () => {
     const root = new FakeRoot();
-    let portStyle: Record<string, ScreenJsonValue> = {};
     const renderer = createBaseScreenRenderer({
       root: root as unknown as HTMLElement,
       catalog: createCatalog(),
@@ -74,22 +81,27 @@ describe('renderer theme input invalidation', () => {
       interactive: false,
       onMaterialEvent: undefined,
       resourcePort: undefined,
-      conditionalStylePort: { resolve: () => portStyle },
     });
-    expect(renderer.render(document([component('hosted', 0)])).ok).toBe(true);
+    const hosted = {
+      ...component('hosted', 0),
+      states: {
+        items: [{ id: 'muted', name: '静音', style: { filterBlur: 10, passThrough: true } }],
+      },
+    } as const;
+    expect(renderer.render(document([hosted])).ok).toBe(true);
     const element = root.children[0]!;
     expect(element.style.pointerEvents).toBe('');
     expect(element.style.filter).toBe('');
 
-    portStyle = { filterBlur: 10, passThrough: true };
-    renderer.refreshConditionalStyles();
+    renderer.applyBlueprintStateEffects([
+      { componentId: 'hosted', operation: 'set', stateId: 'muted' },
+    ]);
     // model 与宿主元素 CSS 必须同步：保留键由引擎写，物料不消费它们。
     expect(element.model?.style.passThrough).toBe(true);
     expect(element.style.pointerEvents).toBe('none');
     expect(element.style.filter).toContain('blur(10px)');
 
-    portStyle = {};
-    renderer.refreshConditionalStyles();
+    renderer.applyBlueprintStateEffects([{ componentId: 'hosted', operation: 'reset' }]);
     expect(element.style.pointerEvents).toBe('');
     expect(element.style.filter).toBe('');
   });

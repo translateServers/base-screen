@@ -12,7 +12,7 @@ import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-cor
 import type { BaseScreenRenderer } from '@base-screen/renderer';
 import { describe, expect, it, vi } from 'vitest';
 import { DesignerCanvasRuntimeController } from '../../../src/browser/controllers/designer-canvas-runtime-controller.js';
-import { relationsFromRules } from '../../__fixtures__/blueprint-relations.js';
+import { graphFromRules } from '../../__fixtures__/blueprint-graph.js';
 
 class FakeRenderer implements BaseScreenRenderer {
   readonly calls: string[] = [];
@@ -20,7 +20,7 @@ class FakeRenderer implements BaseScreenRenderer {
   readonly contexts: Array<{ readonly trigger?: string; readonly traceId?: string } | undefined> =
     [];
   readonly refreshes: (string | undefined)[] = [];
-  readonly conditionalStyleRefreshes: (readonly string[] | undefined)[] = [];
+  readonly stateEffects: unknown[] = [];
   readonly visibilityEffects: (readonly ScreenBlueprintVisibilityEffect[])[] = [];
 
   render(
@@ -47,9 +47,17 @@ class FakeRenderer implements BaseScreenRenderer {
     this.refreshes.push(componentId);
   }
 
-  refreshConditionalStyles(componentIds?: readonly string[]): void {
-    this.calls.push('conditional-style');
-    this.conditionalStyleRefreshes.push(componentIds);
+  applyBlueprintStateEffects(effects: readonly unknown[]): void {
+    this.calls.push('state');
+    this.stateEffects.push(...effects);
+  }
+
+  readComponentState(): undefined {
+    return undefined;
+  }
+
+  resetComponentStates(): void {
+    this.calls.push('reset-states');
   }
 
   // 数据源实例接口（T02c-2）：设计器画布运行时不走这条路径，桩实现即可。
@@ -86,6 +94,18 @@ class FakeRenderer implements BaseScreenRenderer {
   }
 
   resetBlueprintVisibility(): void {}
+  applyBlueprintCanvasEffects(): void {}
+  openCanvas(): boolean {
+    return false;
+  }
+  closeCanvas(): boolean {
+    return false;
+  }
+  announceStartPage(): void {}
+  isCanvasOpen(): boolean {
+    return false;
+  }
+  readonly currentPage = null;
   clear(): void {}
   dispose(): void {}
 }
@@ -98,7 +118,7 @@ function documentWith(
     canvas: { width: 960, height: 540, backgroundColor },
     components: [],
     variables,
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 
@@ -149,12 +169,16 @@ function catalogPort(resolve: ScreenHostCatalogPort['resolve']): ScreenHostCatal
 }
 
 describe('DesignerCanvasRuntimeController', () => {
-  it('CSR-D05 forwards conditional style refreshes with the requested component scope', () => {
+  it('previews a component state on the canvas and resets back to the judge', () => {
     const { controller, renderer } = createHarness();
 
-    controller.refreshConditionalStyles(['a', 'b']);
+    controller.previewComponentState('a', 'warn');
+    controller.previewComponentState('a', 'default');
 
-    expect(renderer.conditionalStyleRefreshes).toEqual([['a', 'b']]);
+    expect(renderer.stateEffects).toEqual([
+      { componentId: 'a', operation: 'set', stateId: 'warn' },
+      { componentId: 'a', operation: 'reset' },
+    ]);
   });
 
   it('applies static document variables before the canvas render', () => {
@@ -507,7 +531,7 @@ describe('DesignerCanvasRuntimeController', () => {
     const document: ScreenDocument = {
       ...documentWith([{ type: 'static', id: 'status', name: 'status', initialValue: 'idle' }]),
       blueprint: {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'run-on-click',
             trigger: { type: 'material-event', componentId: 'button', eventName: 'valueClick' },
@@ -567,7 +591,7 @@ describe('DesignerCanvasRuntimeController', () => {
         { type: 'static', id: 'mirror-id', name: 'mirror', initialValue: 'idle' },
       ]),
       blueprint: {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'mirror-status',
             trigger: {
@@ -611,7 +635,7 @@ describe('DesignerCanvasRuntimeController', () => {
     const document: ScreenDocument = {
       ...documentWith([]),
       blueprint: {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'unsupported-visibility',
             trigger: { type: 'material-event', componentId: 'button', eventName: 'valueClick' },

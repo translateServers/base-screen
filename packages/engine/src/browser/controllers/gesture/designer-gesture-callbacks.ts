@@ -17,6 +17,8 @@ import type {
   DesignerToolMaterialTypes,
 } from '../../../common/tools/designer-tools.js';
 import type {
+  DesignerSelectionSnapBounds,
+  DesignerSnapGuides,
   DesignerSnapPoint,
   DesignerSnapPreview,
   DesignerSnapTranslation,
@@ -53,6 +55,11 @@ export interface DesignerGestureCallbacks {
     offset: { readonly x: number; readonly y: number },
     excludedComponentIds?: readonly string[],
   ) => DesignerSnapTranslation;
+  /** Guides for geometry derived from a snapped pointer (resize, drawing a new component). */
+  readonly snapCanvasGuides?: (
+    bounds: DesignerSelectionSnapBounds,
+    excludedComponentIds?: readonly string[],
+  ) => DesignerSnapGuides | undefined;
   readonly renderSnapPreview?: (point: DesignerSnapPreview | undefined) => void;
   readonly setSnapSessionActive?: (active: boolean) => void;
   readonly reduceSelection: (action: ScreenInteractionAction) => void;
@@ -64,6 +71,11 @@ export interface DesignerGestureCallbacks {
     intent: BaseScreenHostResourceAuthoringIntent,
     position: ScreenPosition,
   ) => ScreenParseResult<ScreenDocument>;
+  /** 物料库分片拖放落点（ADR-0100）：position 是组合包围盒左上角；未知分片返回 undefined。 */
+  readonly insertMaterialLibraryFragmentAt?: (
+    fragmentId: string,
+    position: ScreenPosition,
+  ) => ScreenParseResult<ScreenDocument> | undefined;
   readonly reportDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
   readonly renderSelection: () => void;
   readonly focusViewport?: () => void;

@@ -1,7 +1,10 @@
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
+  materialLibraryGroupCells,
   materialLibraryGroupChildren,
+  materialLibraryGroupEntryCount,
+  materialLibraryGroupFragmentIds,
   materialLibraryGroupMaterialTypes,
   materialLibraryGroupPath,
   parseBaseScreenMaterialLibraryGrouping,
@@ -199,5 +202,74 @@ describe('material library grouping navigation helpers', () => {
       'charts',
       'trend',
     ]);
+  });
+});
+
+describe('material library grouping fragment ids (ADR-0100)', () => {
+  function withFragments() {
+    return {
+      groups: [
+        {
+          id: 'charts',
+          label: 'Charts',
+          materialTypes: ['base.chart'],
+          fragmentIds: ['acme.trend-card'],
+          children: [{ id: 'cards', label: 'Cards', fragmentIds: ['acme.kpi', 'acme.gauge'] }],
+        },
+        { id: 'content', label: 'Content', materialTypes: ['base.text'] },
+      ],
+    };
+  }
+
+  it('accepts a group that only declares fragments and exposes them in tree order', () => {
+    const parsed = parseBaseScreenMaterialLibraryGrouping(withFragments());
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(materialLibraryGroupFragmentIds(parsed.value)).toEqual([
+      'acme.trend-card',
+      'acme.kpi',
+      'acme.gauge',
+    ]);
+    expect(materialLibraryGroupFragmentIds(parsed.value, 'cards')).toEqual([
+      'acme.kpi',
+      'acme.gauge',
+    ]);
+    expect(materialLibraryGroupEntryCount(parsed.value)).toBe(5);
+    expect(materialLibraryGroupEntryCount(parsed.value, 'charts')).toBe(4);
+    expect(materialLibraryGroupCells(parsed.value)).toEqual([
+      { materialTypes: ['base.chart'], fragmentIds: ['acme.trend-card'] },
+      { materialTypes: [], fragmentIds: ['acme.kpi', 'acme.gauge'] },
+      { materialTypes: ['base.text'], fragmentIds: [] },
+    ]);
+  });
+
+  it('rejects invalid, empty and repeated fragment ids', () => {
+    const invalid = parseBaseScreenMaterialLibraryGrouping({
+      groups: [{ id: 'cards', label: 'Cards', fragmentIds: ['9bad'] }],
+    });
+    const empty = parseBaseScreenMaterialLibraryGrouping({
+      groups: [{ id: 'cards', label: 'Cards', fragmentIds: [] }],
+    });
+    const repeated = parseBaseScreenMaterialLibraryGrouping({
+      groups: [
+        { id: 'a', label: 'A', fragmentIds: ['acme.kpi'] },
+        { id: 'b', label: 'B', fragmentIds: ['acme.kpi'] },
+      ],
+    });
+    expect(invalid.ok).toBe(false);
+    expect(empty.ok).toBe(false);
+    expect(repeated.ok).toBe(false);
+    expect(repeated.diagnostics[0]?.path).toEqual(['groups', 1, 'fragmentIds', 0]);
+  });
+
+  it('does not validate fragment ids against the catalog', () => {
+    const parsed = parseBaseScreenMaterialLibraryGrouping(withFragments());
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const validated = validateBaseScreenMaterialLibraryGroupingForCatalog(
+      parsed.value,
+      catalog(['base.chart', 'base.text']),
+    );
+    expect(validated.ok).toBe(true);
   });
 });

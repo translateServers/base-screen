@@ -1,4 +1,5 @@
 import {
+  listScreenComponentStateDependencies,
   parseScreenDocument,
   parseScreenJsonValue,
   readScreenComponentValueRef,
@@ -16,9 +17,13 @@ import {
   type ScreenValueRef,
 } from '@base-screen/contracts';
 import type { ScreenValueRefEvaluation } from '@base-screen/core';
-import { getPainterOrder, type ScreenBlueprintVisibilityEffect } from '@base-screen/core';
+import {
+  getPainterOrder,
+  type ScreenBlueprintCanvasEffect,
+  type ScreenBlueprintStateEffect,
+  type ScreenBlueprintVisibilityEffect,
+} from '@base-screen/core';
 import type {
-  BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
   BaseScreenMaterialElement,
   BaseScreenMaterialMode,
@@ -28,18 +33,23 @@ import type {
 import { diffBaseScreenMaterialCatalogs } from '@base-screen/plugin-core';
 import { applyCanvasBackground } from '../canvas-background.js';
 import { createMountedProjectionState } from '../resource/resource-state.js';
+import type { BaseScreenCanvasChange, BaseScreenCanvasChangeReason } from '../sub-canvas-layer.js';
 import {
   type ComponentDataResolution,
   type ComponentFailurePolicy,
   prepareCandidates,
   readComponentData,
 } from './renderer-candidates.js';
+import type { BaseScreenComponentStateChange } from './renderer-component-states.js';
 import { diagnostic, failure, renderFailure } from './renderer-diagnostics.js';
-import { resolveEffectiveModel } from './renderer-effective-style.js';
-import { applyMaterial } from './renderer-material-dom.js';
+import { resolveComponentOpacities, resolveEffectiveModel } from './renderer-effective-style.js';
+import {
+  applyMaterial,
+  applyMaterialDataMarker,
+  applyMaterialOpacity,
+} from './renderer-material-dom.js';
 import {
   appliedModelKeyOf,
-  applyMountedConditionalStyle,
   applyMountedModel,
   handleMaterialEvent,
   reconcileMountedMaterial,
@@ -65,8 +75,6 @@ export interface CreateBaseScreenRendererOptions {
   readonly datasetPort?: ScreenHostDatasetPort;
   /** 来源目录端口（`host-catalog` / `url-query` 来源）。 */
   readonly hostCatalogPort?: ScreenHostCatalogPort;
-  /** ADR-0059 宿主条件样式端口：缺省时与既有渲染路径逐字节一致。 */
-  readonly conditionalStylePort?: BaseScreenConditionalStylePort;
   readonly resourceTimeoutMs?: number;
   /**
    * 候选校验失败策略：缺省 `fail`（设计器失败关闭）。
@@ -87,6 +95,12 @@ export interface CreateBaseScreenRendererOptions {
    * 不重复发请求（实例缓存已在运行时里）。
    */
   readonly onDataSourceSettled?: (dataSourceId: string) => void;
+  /** 从画布开合与页面切换后回调（ADR-0109），按发生顺序；设计态不建页面层与浮层，也不会回调。 */
+  readonly onCanvasChange?: (change: BaseScreenCanvasChange) => void;
+  /** 起始页（宿主指定）；不存在或不是页面时回落到文档的起始页。 */
+  readonly initialPageId?: string;
+  /** 组件生效状态改变后回调（ADR-0110 §2.3）；排在本次渲染之后，按发生顺序。 */
+  readonly onComponentStateChange?: (change: BaseScreenComponentStateChange) => void;
 }
 
 /** 单次解析的执行上下文（trigger/traceId 由调用方按操作派生，不复用可变全局状态）。 */
@@ -104,12 +118,16 @@ export interface BaseScreenRenderer {
   setVariables(variables: ScreenJsonObject): ScreenParseResult<null>;
   refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void;
   /**
-   * 宿主条件样式状态变化后的样式-only 重算：不取数、不改文档、不进历史。
-   *
-   * 仅重写已挂载物料的 effective model；未提供端口时 no-op（文档规则不会脱离数据变化）。
-   * `componentIds` 缺省时处理全部已挂载组件，否则只处理给定组件。
+   * 清空组件状态的会话记忆（蓝图设置与判定结果，ADR-0110 §2.3）。查看器在文档装载 / 替换时调用；
+   * 设计器的编辑重渲染不调用，作者正在预览的状态因此不会被每次提交清掉。
    */
-  refreshConditionalStyles(componentIds?: readonly string[]): void;
+  resetComponentStates(): void;
+  /** 执行蓝图「设置状态 / 恢复自动」（ADR-0110 §2.4）：只重写受影响组件的外观。 */
+  applyBlueprintStateEffects(effects: readonly ScreenBlueprintStateEffect[]): void;
+  /** 组件当前生效的状态（`default` 为默认）与判定读到的取值；未挂载返回 undefined。 */
+  readComponentState(
+    componentId: string,
+  ): { readonly stateId: string; readonly value?: ScreenJsonValue } | undefined;
   /**
    * 只确保数据源实例（启动请求），不挂载任何物料。
    *
@@ -158,6 +176,20 @@ export interface BaseScreenRenderer {
     effects: readonly ScreenBlueprintVisibilityEffect[],
   ): ScreenParseResult<null>;
   resetBlueprintVisibility(): void;
+  /** 执行蓝图从画布动作与页面导航（ADR-0109）。 */
+  applyBlueprintCanvasEffects(effects: readonly ScreenBlueprintCanvasEffect[]): void;
+  /** 宿主打开 / 关闭从画布（页面 = 切页 / 返回）；返回是否发生了变化。 */
+  openCanvas(
+    canvasId: string,
+    payload?: ScreenJsonValue,
+    reason?: BaseScreenCanvasChangeReason,
+  ): boolean;
+  closeCanvas(canvasId: string, reason?: BaseScreenCanvasChangeReason): boolean;
+  /** 发起始页的「已打开」与「页面已切换」（「实例就绪」之后调用一次）。 */
+  announceStartPage(): void;
+  isCanvasOpen(canvasId: string): boolean;
+  /** 当前页；文档没有页面时为 null。 */
+  readonly currentPage: string | null;
   clear(): void;
   dispose(): void;
 }
@@ -172,10 +204,20 @@ class Renderer implements BaseScreenRenderer {
   readonly #state: RendererState;
   /** 实例 → 读它的组件（文档顺序）：结果落地时只重投影这些组件。 */
   #readers = new Map<string, readonly string[]>();
+  /** 实例 → 判定取值依赖它的组件（ADR-0110）：结果落地时重算这些组件的状态。 */
+  #stateReaders = new Map<string, readonly string[]>();
 
   constructor(options: CreateBaseScreenRendererOptions) {
     this.#state = createRendererState(options);
     this.#state.onDataSourceChanged = (dataSourceId) => this.#handleDataSourceChanged(dataSourceId);
+    this.#state.requestRender = () => {
+      const input = this.#state.lastValidatedInput;
+      if (input !== undefined && !this.#state.disposed) this.render(input);
+    };
+  }
+
+  get currentPage(): string | null {
+    return this.#state.subCanvases.currentPage;
   }
 
   render(
@@ -192,6 +234,10 @@ class Renderer implements BaseScreenRenderer {
     if (!parsedDocument.ok) {
       return parsedDocument;
     }
+    recordComponentSources(this.#state, document, parsedDocument.value);
+    // 先同步从画布（ADR-0109）：只挂载主画布、当前页与弹框的组件，别的页不渲染、不投影。
+    this.#state.subCanvases.prepare(parsedDocument.value);
+    const view = this.#state.subCanvases.visibleDocument(parsedDocument.value);
     const renderContext: ResolveContext = {
       trigger: context?.trigger ?? 'manual',
       traceId: context?.traceId ?? '',
@@ -199,9 +245,10 @@ class Renderer implements BaseScreenRenderer {
     // 先确保实例状态与请求：候选投影要从实例运行时读结果，所以这一步必须在
     // prepareCandidates 之前。请求本身是异步的，首帧材料先落 loading。
     this.#state.dataSources.ensure(parsedDocument.value, this.#state.variables, renderContext);
-    this.#readers = collectReaders(parsedDocument.value);
+    this.#readers = collectReaders(view);
+    this.#stateReaders = collectStateReaders(view);
     const prepared = prepareCandidates(
-      parsedDocument.value,
+      view,
       this.#state.catalog,
       this.#state.options.mode,
       this.#state.interactive,
@@ -214,11 +261,16 @@ class Renderer implements BaseScreenRenderer {
       return prepared;
     }
     const painterIndex = new Map(
-      getPainterOrder(parsedDocument.value).map((componentId, index) => [componentId, index]),
+      getPainterOrder(view).map((componentId, index) => [componentId, index]),
     );
-    this.#state.visibility.prepare(parsedDocument.value);
+    this.#state.visibility.prepare(view);
     const candidates = [...prepared.value].sort(
       (left, right) => painterIndex.get(left.component.id)! - painterIndex.get(right.component.id)!,
+    );
+    this.#state.opacities = resolveComponentOpacities(
+      this.#state,
+      new Map(candidates.map((candidate) => [candidate.component.id, candidate])),
+      parsedDocument.value,
     );
     const next = new Map<string, MountedMaterial>();
     const runtimeDiagnostics: ScreenDiagnostic[] = [];
@@ -233,11 +285,20 @@ class Renderer implements BaseScreenRenderer {
             existing,
             stackOrder,
             parsedDocument.value,
+            this.#state.opacities.get(candidate.component.id) ?? 1,
           );
         } catch {
           runtimeDiagnostics.push(
             renderFailure(candidate, 'Material model update raised an exception.'),
           );
+        }
+        // 组件换了归属（主画布 / 页面 / 弹框 / 下方层）时把已挂载元素搬到新容器；归属不变时不碰 DOM，
+        // 重新 append 会打断物料正在处理的浏览器事件帧。
+        const panel = this.#state.subCanvases.containerFor(candidate.component.id);
+        const current = existing.element.parentElement ?? undefined;
+        const root = this.#state.options.root;
+        if (panel !== undefined ? current !== panel : current !== undefined && current !== root) {
+          (panel ?? root).appendChild(existing.element);
         }
         next.set(candidate.component.id, existing);
         continue;
@@ -272,12 +333,15 @@ class Renderer implements BaseScreenRenderer {
           mountedModel,
           this.#state.visibility.isHidden(candidate.component.id),
           stackOrder,
+          this.#state.opacities.get(candidate.component.id) ?? 1,
         );
       } catch {
         runtimeDiagnostics.push(renderFailure(candidate, 'Material render raised an exception.'));
         continue;
       }
-      this.#state.options.root.appendChild(element);
+      (
+        this.#state.subCanvases.containerFor(candidate.component.id) ?? this.#state.options.root
+      ).appendChild(element);
       const mounted: MountedMaterial = {
         type: candidate.component.type,
         element,
@@ -309,7 +373,10 @@ class Renderer implements BaseScreenRenderer {
       this.#state.options.root.style.overflow = 'hidden';
     }
     applyCanvasBackground(this.#state.options.root, parsedDocument.value.canvas);
+    // 弹框打开期间新挂到画布根上的组件同样不可交互（ADR-0108 §2.3）。
+    this.#state.subCanvases.syncInert();
     this.#state.mounted = next;
+    this.#state.componentStates.retain(new Set(next.keys()));
     this.#state.candidates = new Map(
       candidates.map((candidate) => [candidate.component.id, candidate]),
     );
@@ -427,6 +494,35 @@ class Renderer implements BaseScreenRenderer {
 
   resetBlueprintVisibility(): void {
     this.#state.visibility.reset();
+    this.#state.subCanvases.reset();
+  }
+
+  applyBlueprintCanvasEffects(effects: readonly ScreenBlueprintCanvasEffect[]): void {
+    if (this.#state.disposed) return;
+    this.#state.subCanvases.apply(effects);
+  }
+
+  openCanvas(
+    canvasId: string,
+    payload?: ScreenJsonValue,
+    reason: BaseScreenCanvasChangeReason = 'host',
+  ): boolean {
+    if (this.#state.disposed) return false;
+    return this.#state.subCanvases.open(canvasId, payload, reason);
+  }
+
+  closeCanvas(canvasId: string, reason: BaseScreenCanvasChangeReason = 'host'): boolean {
+    if (this.#state.disposed) return false;
+    return this.#state.subCanvases.close(canvasId, reason);
+  }
+
+  announceStartPage(): void {
+    if (this.#state.disposed) return;
+    this.#state.subCanvases.announceStartPage();
+  }
+
+  isCanvasOpen(canvasId: string): boolean {
+    return this.#state.subCanvases.isOpen(canvasId);
   }
 
   suspendData(): void {
@@ -444,6 +540,7 @@ class Renderer implements BaseScreenRenderer {
         };
         mounted.element.model = model;
         mounted.appliedModel = model;
+        applyMaterialDataMarker(mounted.element, model);
       }
     }
   }
@@ -466,28 +563,20 @@ class Renderer implements BaseScreenRenderer {
     this.#state.dataSources.refresh(ref.dataSourceId, refreshContext);
   }
 
-  refreshConditionalStyles(componentIds?: readonly string[]): void {
-    if (this.#state.disposed || this.#state.options.conditionalStylePort === undefined) return;
-    const document = this.#state.document;
-    if (document === undefined) return;
-    const ids =
-      componentIds === undefined ? [...this.#state.mounted.keys()] : [...new Set(componentIds)];
-    for (const componentId of ids) {
-      const candidate = this.#state.candidates.get(componentId);
-      const mounted = this.#state.mounted.get(componentId);
-      if (candidate === undefined || mounted === undefined) continue;
-      try {
-        applyMountedConditionalStyle(this.#state, candidate, mounted, document);
-      } catch {
-        this.#state.options.onDiagnostic?.(
-          diagnostic(
-            'PLUGIN_CORE_RENDER_FAILED',
-            ['components', componentId, 'conditionalStyle'],
-            'Conditional style refresh failed for material.',
-          ),
-        );
-      }
-    }
+  resetComponentStates(): void {
+    this.#state.componentStates.reset();
+  }
+
+  applyBlueprintStateEffects(effects: readonly ScreenBlueprintStateEffect[]): void {
+    if (this.#state.disposed || effects.length === 0) return;
+    this.#refreshStates(this.#state.componentStates.apply(effects));
+  }
+
+  readComponentState(
+    componentId: string,
+  ): { readonly stateId: string; readonly value?: ScreenJsonValue } | undefined {
+    if (!this.#state.mounted.has(componentId)) return undefined;
+    return this.#state.componentStates.read(componentId);
   }
 
   prepareDataSources(
@@ -542,6 +631,8 @@ class Renderer implements BaseScreenRenderer {
     this.#state.sourceQueries.clear();
     this.#state.dataSources.clear();
     this.#readers = new Map();
+    this.#stateReaders = new Map();
+    this.#state.componentStates.reset();
     for (const mounted of this.#state.mounted.values()) {
       mounted.element.removeEventListener('base-screen-material-event', mounted.onEvent);
       mounted.element.remove();
@@ -556,7 +647,27 @@ class Renderer implements BaseScreenRenderer {
   dispose(): void {
     if (!this.#state.disposed) {
       this.clear();
+      this.#state.subCanvases.dispose();
       this.#state.disposed = true;
+    }
+  }
+
+  #refreshStates(componentIds: readonly string[]): void {
+    if (componentIds.length > 0) refreshComponentStates(this.#state, componentIds);
+    this.#refreshOpacities();
+  }
+
+  /** 组件状态变化会改祖先容器的 opacity，Document 后代是 DOM 兄弟，需整体重算。 */
+  #refreshOpacities(): void {
+    const document = this.#state.document;
+    if (document === undefined) return;
+    this.#state.opacities = resolveComponentOpacities(
+      this.#state,
+      this.#state.candidates,
+      document,
+    );
+    for (const [componentId, mounted] of this.#state.mounted) {
+      applyMaterialOpacity(mounted.element, this.#state.opacities.get(componentId) ?? 1);
     }
   }
 
@@ -569,6 +680,7 @@ class Renderer implements BaseScreenRenderer {
     const document = this.#state.document;
     if (!this.#state.disposed && document !== undefined) {
       this.#reprojectReaders(dataSourceId, document);
+      this.#refreshStates(this.#stateReaders.get(dataSourceId) ?? []);
     }
     // 结果落定（ready / error）后通知宿主：Viewer 用它重算派生变量 / 触发首次渲染。
     const entry = this.#state.dataSources.read(dataSourceId);
@@ -609,9 +721,84 @@ class Renderer implements BaseScreenRenderer {
       }
       mounted.projection.dataState = resolved.dataState;
       mounted.projection.projectionKey = resolved.dataSource?.projectionKey;
-      applyMountedModel(this.#state, nextCandidate, mounted, mounted.stackOrder, document);
+      applyMountedModel(
+        this.#state,
+        nextCandidate,
+        mounted,
+        mounted.stackOrder,
+        document,
+        this.#state.opacities.get(componentId) ?? 1,
+      );
     }
   }
+}
+
+/**
+ * 记下解析结果里每个组件对应的输入组件（解析按下标一一对应；克隆才需要记，复用的就是它本身）。
+ */
+function recordComponentSources(
+  state: RendererState,
+  input: ScreenDocument,
+  parsed: ScreenDocument,
+): void {
+  if (input === parsed || input.components === parsed.components) return;
+  const sources = input.components;
+  if (!Array.isArray(sources) || sources.length !== parsed.components.length) return;
+  for (let index = 0; index < sources.length; index++) {
+    const source = sources[index]!;
+    const component = parsed.components[index]!;
+    if (source !== component && source.id === component.id) {
+      state.componentSources.set(component, source);
+    }
+  }
+}
+
+/**
+ * 按当前输入重算组件状态：守卫签名（含生效状态）变了才重写 model，未变零写入。
+ * 变量变化走整次 render（守卫里的 stateId 会变）；这里处理数据源结果与蓝图设置。
+ */
+function refreshComponentStates(state: RendererState, componentIds: readonly string[]): void {
+  const document = state.document;
+  if (document === undefined) return;
+  for (const componentId of componentIds) {
+    const candidate = state.candidates.get(componentId);
+    const mounted = state.mounted.get(componentId);
+    if (candidate === undefined || mounted === undefined) continue;
+    try {
+      const key = appliedModelKeyOf(state, candidate, mounted.stackOrder, document);
+      if (mounted.applied !== undefined && mounted.applied.stateId === key.stateId) continue;
+      applyMountedModel(
+        state,
+        candidate,
+        mounted,
+        mounted.stackOrder,
+        document,
+        state.opacities.get(componentId) ?? 1,
+      );
+    } catch {
+      state.options.onDiagnostic?.(
+        diagnostic(
+          'PLUGIN_CORE_RENDER_FAILED',
+          ['components', componentId, 'states'],
+          'Component state refresh failed for material.',
+        ),
+      );
+    }
+  }
+}
+
+/** 实例 → 判定取值依赖它的组件 id（文档顺序）。 */
+function collectStateReaders(document: ScreenDocument): Map<string, readonly string[]> {
+  const readers = new Map<string, string[]>();
+  for (const component of document.components) {
+    for (const dataSourceId of listScreenComponentStateDependencies(component.states)
+      .dataSourceIds) {
+      const list = readers.get(dataSourceId);
+      if (list === undefined) readers.set(dataSourceId, [component.id]);
+      else list.push(component.id);
+    }
+  }
+  return readers;
 }
 
 /** 实例 → 读它的组件 id（文档顺序）。只经取值引用读取，不碰旧 `dataSource` 形态。 */

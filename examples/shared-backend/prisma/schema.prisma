@@ -21,16 +21,6 @@ model Screen {
   revision     Int                 @default(1)
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
-  alarmBinding ScreenAlarmBinding?
-}
-
-/// 宿主侧告警绑定：key → 组件 id → 等级 → 样式覆盖。屏幕文档不保存告警知识，
-/// 这张表就是宿主按屏持久化的那一份；值为 JSON，结构由 alarm-binding-guard 校验。
-model ScreenAlarmBinding {
-  screenId  String   @id
-  screen    Screen   @relation(fields: [screenId], references: [id], onDelete: Cascade)
-  config    String
-  updatedAt DateTime @updatedAt
 }
 
 /// 宿主素材库（ADR-0089）：文件落在 data/assets/，这张表只存元数据与稳定 id。
@@ -69,6 +59,37 @@ model MaterialPackage {
   revision  Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+/// 组件库草稿（ADR-0106 D3）：原子组件的编辑中版本，与已发布的 `MaterialPackage` 分开存。
+/// `source` 是规格模块源码（`export const spec` + `export function render`），只存储、不执行；
+/// 发布成功后由前端删除草稿，因此「有草稿」即「有未发布的改动」。
+model ComponentDraft {
+  id        String   @id @default(uuid())
+  /// 稳定物料 type，与 MaterialPackage.type 对应（首次发布前也已确定）
+  type      String   @unique
+  name      String
+  source    String
+  revision  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+/// 组件库组合（ADR-0106 §2.6）：分片定义（ADR-0100）的 JSON，插入即展开，文档不记录来源。
+model ComponentFragment {
+  /// 分片 id：跨构建稳定，即物料库条目身份
+  id         String   @id
+  name       String
+  category   String
+  /// JSON：完整 BaseScreenFragmentDefinition，由前端经 plugin-core 解析器校验
+  definition String
+  revision   Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([updatedAt])
 }

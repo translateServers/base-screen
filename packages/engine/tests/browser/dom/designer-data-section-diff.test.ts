@@ -147,6 +147,28 @@ describe('surface 守卫（QA 注入点：删掉 sectionContentKey 里的 surfac
 });
 
 describe('sectionContentKey', () => {
+  it('authoring 键随推送能力与实例策略变化（ADR-0104）', () => {
+    const base = sectionContentKey('authoring', model());
+    expect(sectionContentKey('authoring', model({ pushDelivery: { append: true } }))).not.toBe(
+      base,
+    );
+    expect(
+      sectionContentKey(
+        'authoring',
+        model({
+          instance: {
+            id: 'ds-orders',
+            name: '订单',
+            sourceKind: 'host-resource',
+            updatePolicy: { mode: 'push', fallbackIntervalSeconds: 30 },
+            processorId: undefined,
+            status: 'document',
+          },
+        }),
+      ),
+    ).not.toBe(base);
+  });
+
   it('同一输入永远同一键', () => {
     expect(sectionContentKey('source', model())).toBe(sectionContentKey('source', model()));
     expect(sectionContentKey('preview', model())).toBe(sectionContentKey('preview', model()));

@@ -2,6 +2,8 @@ import { designerIcon } from '../dom/designer-icons.js';
 
 /**
  * 自绘下拉（设计原型 .select）：触发器 + 自绘弹层，隐藏的原生 select 承担取值与事件。
+ * 选项可带 `data-detail`（如尺寸预设的 `1920 × 1080`）：触发器与弹层把它排在标签右侧，
+ * 用弱化的等宽数字呈现，主次两级一起读出「是什么 + 具体多少」，又不把它写进原生选项文本。
  *
  * 迁移方式刻意做成「增强既有元素」而不是重写调用点：既有面板把原生 select 当值载体
  * （读 .value、听 change），本函数只在外层套上触发器与弹层并把原生 select 视觉收进 1px，
@@ -55,6 +57,12 @@ export function enhanceDesignerSelect(select: HTMLSelectElement): DesignerSelect
   if (label !== null) trigger.setAttribute('aria-label', label);
   const value = ownerDocument.createElement('span');
   value.className = 'designer-select-value';
+  const valueText = ownerDocument.createElement('span');
+  valueText.className = 'designer-select-value-text';
+  const valueDetail = ownerDocument.createElement('span');
+  valueDetail.className = 'designer-select-value-detail';
+  value.appendChild(valueText);
+  value.appendChild(valueDetail);
   const caret = ownerDocument.createElement('span');
   caret.className = 'designer-select-caret';
   caret.innerHTML = designerIcon('chevron-down');
@@ -92,10 +100,17 @@ export function enhanceDesignerSelect(select: HTMLSelectElement): DesignerSelect
       button.disabled = option.disabled;
       const text = ownerDocument.createElement('span');
       text.textContent = option.textContent;
+      button.appendChild(text);
+      const detail = option.dataset?.detail;
+      if (detail !== undefined && detail !== '') {
+        const detailText = ownerDocument.createElement('span');
+        detailText.className = 'designer-select-option-detail';
+        detailText.textContent = detail;
+        button.appendChild(detailText);
+      }
       const check = ownerDocument.createElement('span');
       check.className = 'designer-select-check';
       check.innerHTML = designerIcon('check');
-      button.appendChild(text);
       button.appendChild(check);
       menu.appendChild(button);
       optionButtons.push(button);
@@ -117,7 +132,11 @@ export function enhanceDesignerSelect(select: HTMLSelectElement): DesignerSelect
   const sync = (): void => {
     const current = selectedIndex();
     const option = current >= 0 ? select.options[current] : undefined;
-    value.textContent = option?.textContent ?? '';
+    const detail = option?.dataset?.detail ?? '';
+    valueText.textContent = option?.textContent ?? '';
+    valueDetail.textContent = detail;
+    // 用属性而不是 :empty 控制次级读数的显隐：模板里的空行/空格不会让它意外占位。
+    value.dataset.detail = String(detail !== '');
     value.dataset.placeholder = String(option === undefined || option.value === '');
     optionButtons.forEach((button, index) => {
       button.setAttribute('aria-selected', String(index === current));

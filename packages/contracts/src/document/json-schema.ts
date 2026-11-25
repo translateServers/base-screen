@@ -21,29 +21,57 @@ export function generateScreenDocumentJsonSchema(): ScreenJsonObject {
   const component = getObject(components.items);
   const componentProperties = getObject(component.properties);
   getObject(componentProperties.name).maxLength = MAX_NAME_CODE_POINTS;
-  const styleRuleWhen = getObject(
-    getObject(getObject(getObject(componentProperties.styleRules).items).properties).when,
-  );
-  styleRuleWhen.allOf = [
+  const states = getObject(getObject(componentProperties.states).properties);
+  const judge = getObject(getObject(states.judge).properties);
+  const stateCase = getObject(getObject(judge.cases).items);
+  stateCase.allOf = [
     {
       if: { properties: { operator: { const: 'exists' } }, required: ['operator'] },
       then: { not: { required: ['value'] } },
       else: { required: ['value'] },
     },
   ];
-  // 数据源实例的刷新策略交叉约束：auto 必须带 intervalSeconds，其余模式禁止带。
-  const updatePolicy = getObject(
-    getObject(getObject(getObject(properties.dataSources).items).properties).updatePolicy,
-  );
+  // 数据源实例的刷新策略交叉约束：auto 必须带 intervalSeconds，其余模式禁止带；
+  // fallbackIntervalSeconds 与 retain 只属于 push；url-query 来源禁止 push（ADR-0104）。
+  const dataSourceItem = getObject(getObject(properties.dataSources).items);
+  dataSourceItem.allOf = [
+    {
+      if: {
+        properties: {
+          source: { properties: { kind: { const: 'url-query' } }, required: ['kind'] },
+        },
+        required: ['source'],
+      },
+      then: {
+        not: {
+          properties: {
+            updatePolicy: { properties: { mode: { const: 'push' } }, required: ['mode'] },
+          },
+          required: ['updatePolicy'],
+        },
+      },
+    },
+  ];
+  const updatePolicy = getObject(getObject(dataSourceItem.properties).updatePolicy);
   updatePolicy.allOf = [
     {
       if: { properties: { mode: { const: 'auto' } }, required: ['mode'] },
       then: { required: ['intervalSeconds'] },
       else: { not: { required: ['intervalSeconds'] } },
     },
+    {
+      if: { properties: { mode: { const: 'push' } }, required: ['mode'] },
+      else: {
+        not: {
+          anyOf: [{ required: ['fallbackIntervalSeconds'] }, { required: ['retain'] }],
+        },
+      },
+    },
   ];
-  const behaviorRelation = findObjectWithTypeConst(generated, 'behavior');
-  const condition = getObject(getObject(behaviorRelation.properties).condition);
+  const retain = getObject(getObject(updatePolicy.properties).retain);
+  retain.dependentRequired = { seconds: ['timeField'], timeField: ['seconds'] };
+  const conditionNode = findObjectWithConst(generated, 'kind', 'condition');
+  const condition = getObject(getObject(conditionNode.properties).condition);
   condition.allOf = [
     {
       if: { properties: { operator: { const: 'exists' } }, required: ['operator'] },
@@ -83,45 +111,51 @@ function isExpressionSchema(value: unknown): boolean {
   });
 }
 
-function findObjectWithTypeConst(root: unknown, constant: string): Record<string, unknown> {
-  const found = searchObjectWithTypeConst(root, constant);
+function findObjectWithConst(
+  root: unknown,
+  field: string,
+  constant: string,
+): Record<string, unknown> {
+  const found = searchObjectWithConst(root, field, constant);
   if (found === undefined) {
-    throw new Error(`Schema branch with type "${constant}" is missing.`);
+    throw new Error(`Schema branch with ${field} "${constant}" is missing.`);
   }
   return found;
 }
 
-function searchObjectWithTypeConst(
+function searchObjectWithConst(
   value: unknown,
+  field: string,
   constant: string,
 ): Record<string, unknown> | undefined {
   if (value === null || typeof value !== 'object') return undefined;
   if (Array.isArray(value)) {
     for (const item of value) {
-      const found = searchObjectWithTypeConst(item, constant);
+      const found = searchObjectWithConst(item, field, constant);
       if (found !== undefined) return found;
     }
     return undefined;
   }
-  const direct = tryFindObjectWithTypeConst(value, constant);
+  const direct = tryFindObjectWithConst(value, field, constant);
   if (direct !== undefined) return direct;
   for (const child of Object.values(value)) {
-    const found = searchObjectWithTypeConst(child, constant);
+    const found = searchObjectWithConst(child, field, constant);
     if (found !== undefined) return found;
   }
   return undefined;
 }
 
-function tryFindObjectWithTypeConst(
+function tryFindObjectWithConst(
   value: unknown,
+  field: string,
   constant: string,
 ): Record<string, unknown> | undefined {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const properties = (value as { properties?: unknown }).properties;
   if (properties === null || typeof properties !== 'object') return undefined;
-  const type = (properties as { type?: unknown }).type;
-  if (type === null || typeof type !== 'object') return undefined;
-  return (type as { const?: unknown }).const === constant
+  const discriminator = (properties as Record<string, unknown>)[field];
+  if (discriminator === null || typeof discriminator !== 'object') return undefined;
+  return (discriminator as { const?: unknown }).const === constant
     ? (value as Record<string, unknown>)
     : undefined;
 }

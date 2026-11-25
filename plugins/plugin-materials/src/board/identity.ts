@@ -31,12 +31,25 @@ export const PLUGIN_BOARD_MARQUEE_TAG_NAME = 'base-screen-board-marquee';
 export const PLUGIN_BOARD_STATUS_GRID_TYPE = 'board.status-grid';
 export const PLUGIN_BOARD_STATUS_GRID_TAG_NAME = 'base-screen-board-status-grid';
 
+export const PLUGIN_BOARD_STATUS_LEGEND_TYPE = 'board.status-legend';
+export const PLUGIN_BOARD_STATUS_LEGEND_TAG_NAME = 'base-screen-board-status-legend';
+
 export const PLUGIN_BOARD_PIPELINE_TYPE = 'board.pipeline';
 export const PLUGIN_BOARD_PIPELINE_TAG_NAME = 'base-screen-board-pipeline';
+
+export const PLUGIN_BOARD_TITLE_DECOR_TYPE = 'board.title-decor';
+export const PLUGIN_BOARD_TITLE_DECOR_TAG_NAME = 'base-screen-board-title-decor';
+
+export const PLUGIN_BOARD_TABS_TYPE = 'board.tabs';
+export const PLUGIN_BOARD_TABS_TAG_NAME = 'base-screen-board-tabs';
 
 /** 本插件自己的检查器控件：装饰边框的样式选择器，经 editorDescriptor 的 `control: 'custom'` 授权使用。 */
 export const PLUGIN_BOARD_BORDER_PICKER_ID = 'base-screen.board.border-style-picker';
 export const PLUGIN_BOARD_BORDER_PICKER_TAG_NAME = 'base-screen-board-border-picker';
+
+/** 标题装饰的形态选择器：与边框样式选择器同一套契约（`control: 'custom'` 授权）。 */
+export const PLUGIN_BOARD_TITLE_DECOR_PICKER_ID = 'base-screen.board.title-decor-picker';
+export const PLUGIN_BOARD_TITLE_DECOR_PICKER_TAG_NAME = 'base-screen-board-title-decor-picker';
 
 /** 文档事务命令：在选中的装饰边框上轮换样式（走 command.execute，天然可撤销）。 */
 export const PLUGIN_BOARD_CYCLE_BORDER_COMMAND_ID = 'base-screen.board.cycle-border-style';
@@ -69,6 +82,27 @@ export function isBoardBorderStyle(value: unknown): value is BoardBorderStyle {
   return typeof value === 'string' && (BOARD_BORDER_STYLES as readonly string[]).includes(value);
 }
 
+/**
+ * 标题装饰形态：大屏卡片标题栏最常见的四种做法（左侧竖条、渐隐下划线、两端括号、
+ * 双箭头引导）。每一种都只是图元，文字由放在里面的 `base.text` 承担。
+ */
+export const BOARD_TITLE_DECOR_STYLES = ['bar', 'underline', 'brackets', 'chevron'] as const;
+
+export type BoardTitleDecorStyle = (typeof BOARD_TITLE_DECOR_STYLES)[number];
+
+export const BOARD_TITLE_DECOR_STYLE_LABELS: Readonly<Record<BoardTitleDecorStyle, string>> = {
+  bar: '竖条',
+  underline: '渐隐下划线',
+  brackets: '两端括号',
+  chevron: '双箭头',
+};
+
+export function isBoardTitleDecorStyle(value: unknown): value is BoardTitleDecorStyle {
+  return (
+    typeof value === 'string' && (BOARD_TITLE_DECOR_STYLES as readonly string[]).includes(value)
+  );
+}
+
 /** 大屏组件共用的默认配色，避免每个 manifest 各写一份十六进制字面量。 */
 export const BOARD_DEFAULT_SURFACE = {
   backgroundColor: '#0b1a2b',
@@ -85,16 +119,49 @@ export const BOARD_DEFAULT_SURFACE = {
  * 值班员就无法用颜色做跨区块对照。
  *
  * 颜色**不是唯一编码**：每处用色都必须同时有文字（`fault` 旁边要有「故障」）。
+ *
+ * 取值遵循 ISA-101 高性能 HMI 的「正常低饱和、异常才高亮」：运行、待机是常态，用压暗的
+ * 绿与土黄，几十格铺满也不抢眼；故障是唯一的高饱和色，离线比未知亮一档（通信中断是需要
+ * 处理的异常，未知只是读不出）。旧版运行色是饱和绿 `#52c41a`，48 格灯阵里一个红格会被
+ * 绿色淹没——这正是 ThingsBoard「高性能 / 传统」两种显示模式对比时传统模式的毛病。
  */
 export const BOARD_STATUS_COLORS = {
-  running: '#52c41a',
-  standby: '#fa8c16',
+  running: '#3e7b5e',
+  standby: '#8c7a46',
   fault: '#f5222d',
-  offline: '#6b7d8f',
-  unknown: '#6b7d8f',
+  offline: '#8796a5',
+  unknown: '#4f5d6b',
+} as const;
+
+export const BOARD_STATUS_TEXT_COLORS = {
+  running: '#70b88f',
+  standby: '#c2b273',
+  fault: '#ff6b6b',
+  offline: '#b7c3cf',
+  unknown: '#94a3b8',
 } as const;
 
 export type BoardStatusKey = keyof typeof BOARD_STATUS_COLORS;
+
+/**
+ * 异常优先的排序权重（小者在前）：故障 → 离线 → 未知 → 待机 → 运行。
+ *
+ * 灯阵容量不够时，被 `+N` 收起来的是排在最后的那些格子；不排序时被收起来的可能恰好是
+ * 故障设备。分布条、图例的展示顺序仍按 `STATUS_LEGEND_ORDER`（从正常到异常的阅读顺序），
+ * 二者服务不同的判断，不共用一张表。
+ */
+export const BOARD_STATUS_PRIORITY: Readonly<Record<BoardStatusKey, number>> = {
+  fault: 0,
+  offline: 1,
+  unknown: 2,
+  standby: 3,
+  running: 4,
+};
+
+/** 需要值班员处理的状态：分布图例里给它们的计数上色加粗，灯阵里给故障格加描边。 */
+export function isBoardAbnormalStatus(status: BoardStatusKey): boolean {
+  return status === 'fault' || status === 'offline' || status === 'unknown';
+}
 
 /**
  * 状态词汇（中文展示名）。颜色**不是唯一编码**：每处用色都必须能同时给出这段文字，

@@ -9,7 +9,7 @@ import {
   getDesignerFocusedMaterialEvents,
   renderDesignerEventsPanel,
 } from '../../../../src/browser/dom/blueprint/designer-blueprint-dom.js';
-import { relationsFromRules } from '../../../__fixtures__/blueprint-relations.js';
+import { graphFromRules } from '../../../__fixtures__/blueprint-graph.js';
 
 class FakeElement {
   readonly children: FakeElement[] = [];
@@ -95,7 +95,7 @@ const document: ScreenDocument = {
   ],
   variables: [],
   blueprint: {
-    relations: relationsFromRules([
+    ...graphFromRules([
       {
         id: 'r1',
         trigger: { type: 'material-event', componentId: 'chart-1', eventName: 'seriesClick' },
@@ -216,7 +216,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
         { type: 'static', id: 'selectedAmount', name: 'selectedAmount', initialValue: 0 },
       ],
       blueprint: {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'configured-rule',
             trigger: {
@@ -237,7 +237,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
               },
               {
                 type: 'emit-host-event',
-                eventName: 'chart-selection',
+                eventName: 'chart_selection',
                 payload: { kind: 'event-payload', path: [] },
               },
               {
@@ -263,7 +263,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
     expect(text).toContain('动作触发条件');
     expect(text).toContain('事件数据 · amount 大于等于 固定值 10');
     expect(text).toContain('更新全局变量 · selectedAmount');
-    expect(text).toContain('发送业务事件 · chart-selection');
+    expect(text).toContain('发送业务事件 · chart_selection');
     // ADR-0076：该索引进没有声明 focus-record，作者面必须明确标为未声明，
     // 而不是沿用过时的 "执行业务动作" 文案让作者误以为可用。
     expect(text).toContain('未声明的业务动作 · focus-record');
@@ -298,7 +298,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
       ],
       variables: [],
       blueprint: {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'declared-rule',
             trigger: {

@@ -8,6 +8,14 @@ import {
 } from '@base-screen/contracts';
 import type { ScreenDocumentCommand } from '@base-screen/core';
 
+/**
+ * 变量引用位置。蓝图引用的 `ruleId` 是节点或连线 id，`blueprintTargetId` 是工作台定位用的
+ * `node:<id>` / `edge:<id>`：
+ * - `blueprint-trigger`：变量节点本身（节点存在即引用，删变量前须先删节点）；
+ * - `blueprint-action-target`：写入 / 请求该变量的连线；
+ * - `blueprint-condition`：条件节点表达式；
+ * - `blueprint-action-expression`：连线写入值 / 负载表达式。
+ */
 export type DesignerVariableReference =
   | {
       readonly kind: 'component-parameter';
@@ -105,81 +113,67 @@ export function collectVariableReferences(
       });
     }
   }
-  for (const relation of document.blueprint.relations) {
-    if (relation.type === 'semantic') continue;
-    const blueprintTargetId = `relation:${relation.id}`;
-    if (relation.source.kind === 'variable' && include(relation.source.variableId)) {
-      references.push({
-        kind: 'blueprint-trigger',
-        variableId: relation.source.variableId,
-        ruleId: relation.id,
-        blueprintTargetId,
-      });
+  const variableNodes = new Map<string, string>();
+  for (const node of document.blueprint.nodes) {
+    const nodeTarget = `node:${node.id}`;
+    if (node.kind === 'variable') {
+      variableNodes.set(node.id, node.variableId);
+      if (include(node.variableId)) {
+        references.push({
+          kind: 'blueprint-trigger',
+          variableId: node.variableId,
+          ruleId: node.id,
+          blueprintTargetId: nodeTarget,
+        });
+      }
+      continue;
     }
-    if (relation.condition !== undefined) {
-      collectExpressionVariableReferences(relation.condition.left, [], (name, expressionPath) => {
+    if (node.kind !== 'condition') continue;
+    const sides = [
+      ['left', node.condition.left],
+      ['right', node.condition.right],
+    ] as const;
+    for (const [side, expression] of sides) {
+      if (expression === undefined) continue;
+      collectExpressionVariableReferences(expression, [], (name, expressionPath) => {
         if (!include(name)) return;
         references.push({
           kind: 'blueprint-condition',
           variableId: name,
-          ruleId: relation.id,
-          side: 'left',
+          ruleId: node.id,
+          side,
           expressionPath,
-          blueprintTargetId,
+          blueprintTargetId: nodeTarget,
         });
       });
-      if (relation.condition.right !== undefined) {
-        collectExpressionVariableReferences(
-          relation.condition.right,
-          [],
-          (name, expressionPath) => {
-            if (!include(name)) return;
-            references.push({
-              kind: 'blueprint-condition',
-              variableId: name,
-              ruleId: relation.id,
-              side: 'right',
-              expressionPath,
-              blueprintTargetId,
-            });
-          },
-        );
-      }
     }
-    if (relation.target.kind === 'variable' && include(relation.target.variableId)) {
+  }
+  for (const edge of document.blueprint.edges) {
+    if (edge.kind !== 'flow') continue;
+    const edgeTarget = `edge:${edge.id}`;
+    const target = variableNodes.get(edge.to.node);
+    if (target !== undefined && include(target)) {
       references.push({
         kind: 'blueprint-action-target',
-        variableId: relation.target.variableId,
-        ruleId: relation.id,
+        variableId: target,
+        ruleId: edge.id,
         actionIndex: 0,
-        blueprintTargetId,
+        blueprintTargetId: edgeTarget,
       });
     }
-    const effect = relation.effect;
-    if (effect.type === 'set-variable') {
-      collectExpressionVariableReferences(effect.value, [], (name, expressionPath) => {
+    for (const field of ['value', 'payload'] as const) {
+      const expression = edge[field];
+      if (expression === undefined) continue;
+      collectExpressionVariableReferences(expression, [], (name, expressionPath) => {
         if (!include(name)) return;
         references.push({
           kind: 'blueprint-action-expression',
           variableId: name,
-          ruleId: relation.id,
+          ruleId: edge.id,
           actionIndex: 0,
-          field: 'value',
+          field,
           expressionPath,
-          blueprintTargetId,
-        });
-      });
-    } else if (effect.type === 'emit-host-event' || effect.type === 'host-action') {
-      collectExpressionVariableReferences(effect.payload, [], (name, expressionPath) => {
-        if (!include(name)) return;
-        references.push({
-          kind: 'blueprint-action-expression',
-          variableId: name,
-          ruleId: relation.id,
-          actionIndex: 0,
-          field: 'payload',
-          expressionPath,
-          blueprintTargetId,
+          blueprintTargetId: edgeTarget,
         });
       });
     }

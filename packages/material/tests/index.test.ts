@@ -53,12 +53,18 @@ describe('official materials', () => {
     for (const manifest of [
       BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
       BASE_SCREEN_CHART_MATERIAL_MANIFEST,
-      BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
     ]) {
       expect(manifest.propertyPanel).toEqual([]);
       expect(manifest.propsSchema).toEqual({ kind: 'object', properties: {}, required: [] });
       expect(manifest.defaultProps).toEqual({});
     }
+    expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.propertyPanel).toEqual([]);
+    expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.propsSchema).toEqual({
+      kind: 'object',
+      properties: { alt: { kind: 'string' } },
+      required: [],
+    });
+    expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.defaultProps).toEqual({ alt: '' });
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.propsSchema.properties).not.toHaveProperty('text');
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.defaultProps).toEqual({ autoWidth: false });
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.defaultData).toBe('文本');

@@ -109,7 +109,12 @@ describe('DesignerPanelController property drafts', () => {
     expect(transactions).toHaveLength(1);
   });
 
-  it('routes flip button clicks through the canonical property transaction', () => {
+  // 翻转是引擎级保留键（ADR-0099 §2.3）：物料未申报 flipX/flipY 时同样可用。
+  const declaredFlip = { flipX: { kind: 'boolean' }, flipY: { kind: 'boolean' } };
+  it.each([
+    ['declared', declaredFlip],
+    ['undeclared', {}],
+  ])('routes %s flip clicks through the canonical property transaction', (_, styleProperties) => {
     vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     vi.stubGlobal('HTMLInputElement', FakeInput);
@@ -125,7 +130,7 @@ describe('DesignerPanelController property drafts', () => {
           stylePanel: [],
           styleSchema: {
             kind: 'object',
-            properties: { flipX: { kind: 'boolean' }, flipY: { kind: 'boolean' } },
+            properties: styleProperties,
             required: [],
           },
         },
@@ -445,6 +450,28 @@ describe('DesignerPanelController canvas background drafts', () => {
           { type: 'update-canvas', patch: { backgroundImage: 'https://cdn.x/screens/bg.png' } },
         ],
       },
+    ]);
+  });
+
+  it('commits a canvas size preset as one width and height patch', () => {
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeInput);
+    const { controller, transactions } = createCanvasController(() => ({
+      ok: true,
+      value: document(),
+      diagnostics: [],
+    }));
+
+    controller.onPropertyChange({
+      target: new FakeInput('size', '1920x1080', 'canvasProperty'),
+    } as unknown as Event);
+    // 「自定义」只是提示用户改下面的宽高，不提交任何东西。
+    controller.onPropertyChange({
+      target: new FakeInput('size', 'custom', 'canvasProperty'),
+    } as unknown as Event);
+
+    expect(transactions).toEqual([
+      { commands: [{ type: 'update-canvas', patch: { width: 1920, height: 1080 } }] },
     ]);
   });
 

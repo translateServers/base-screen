@@ -223,7 +223,7 @@ export class DesignerViewportController {
           canvas: { width: size.width, height: size.height, backgroundColor: '#000000' },
           components: [],
           variables: [],
-          blueprint: { relations: [] },
+          blueprint: { nodes: [], edges: [] },
         },
         { width: viewport.clientWidth, height: viewport.clientHeight },
       ),

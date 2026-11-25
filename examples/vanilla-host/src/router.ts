@@ -2,12 +2,18 @@ export type Route =
   | { readonly name: 'list' }
   | { readonly name: 'datasources' }
   | { readonly name: 'assets' }
+  | { readonly name: 'components' }
+  /** `type` 省略即新建（`?template=` 选模板）。 */
+  | { readonly name: 'component-atomic'; readonly type: string | undefined }
+  /** `id` 省略即新建组合。 */
+  | { readonly name: 'component-fragment'; readonly id: string | undefined }
   | { readonly name: 'edit'; readonly id: string }
   | { readonly name: 'view'; readonly id: string }
   | { readonly name: 'not-found' };
 
 const EDIT_PATTERN = /^#\/screens\/([^/]+)\/edit$/;
 const VIEW_PATTERN = /^#\/screens\/([^/]+)\/view$/;
+const COMPONENT_PATTERN = /^#\/components\/(atomic|fragment)\/([^/]+)$/;
 
 export function parseRoute(hash: string): Route {
   // hash 里可以带查询串（`#/screens/1/view?line=LINE-B`）：先切掉再匹配路由，
@@ -19,6 +25,15 @@ export function parseRoute(hash: string): Route {
   // 数据源页：查询串已在上面切掉，因此 `#/datasources?type=sqlite` 也命中这一条
   if (path === '#/datasources') return { name: 'datasources' };
   if (path === '#/assets') return { name: 'assets' };
+  // 组件库（ADR-0106）：列表 + 原子组件 / 组合两个全页编辑器；`new` 表示新建。
+  if (path === '#/components') return { name: 'components' };
+  const component = COMPONENT_PATTERN.exec(path);
+  if (component?.[1] !== undefined && component[2] !== undefined) {
+    const key = component[2] === 'new' ? undefined : decodeURIComponent(component[2]);
+    return component[1] === 'atomic'
+      ? { name: 'component-atomic', type: key }
+      : { name: 'component-fragment', id: key };
+  }
   const edit = EDIT_PATTERN.exec(path);
   if (edit?.[1] !== undefined) return { name: 'edit', id: decodeURIComponent(edit[1]) };
   const view = VIEW_PATTERN.exec(path);
@@ -44,6 +59,12 @@ async function resolveView(route: Route): Promise<ViewModule> {
       return (await import('./views/datasource-list.js')).datasourceListView;
     case 'assets':
       return (await import('./views/asset-list.js')).assetListView;
+    case 'components':
+      return (await import('./views/component-list.js')).componentListView;
+    case 'component-atomic':
+      return (await import('./views/component-atomic-edit.js')).componentAtomicEditView;
+    case 'component-fragment':
+      return (await import('./views/component-fragment-edit.js')).componentFragmentEditView;
     case 'edit':
       return (await import('./views/screen-edit.js')).screenEditView;
     case 'view':

@@ -1,3 +1,4 @@
+import { resolveBaseScreenMaterialDefaultStyle } from '@base-screen/plugin-core';
 import {
   clampScreenCoordinate,
   roundScreenGeometry,
@@ -12,12 +13,14 @@ import type { DesignerToolId } from '../../../common/tools/designer-tools.js';
 import { createInitialDataSource } from '../../dom/panel/designer-panel-dom.js';
 import {
   MATERIAL_DRAG_TYPE,
+  MATERIAL_LIBRARY_FRAGMENT_DRAG_TYPE,
   MATERIAL_LIBRARY_ITEM_DRAG_TYPE,
 } from '../panel/designer-panel-controller.js';
 import type { DesignerGestureCallbacks } from './designer-gesture-callbacks.js';
 import {
   DesignerGestureEnvironment,
   type DesignerGesturePoint,
+  isDesignerSnapBypassed,
 } from './designer-gesture-environment.js';
 
 interface CreateState {
@@ -73,7 +76,17 @@ export class DesignerCreateGesture {
   move(event: PointerEvent): boolean {
     const state = this.#state;
     if (state === undefined || event.pointerId !== state.pointerId) return false;
-    this.renderPreview(state, this.environment.snapCanvasPoint(event));
+    const end = this.environment.resolveCanvasPoint(event);
+    this.renderPreview(state, end);
+    // Guides follow the drawn rectangle, so the fixed start corner's alignments show too.
+    const rect = normalizedRect(state.start, end);
+    this.environment.previewGeometry(
+      isDesignerSnapBypassed(event)
+        ? undefined
+        : { left: rect.x, top: rect.y, right: rect.x + rect.width, bottom: rect.y + rect.height },
+      [],
+      end,
+    );
     return true;
   }
 
@@ -119,7 +132,7 @@ export class DesignerCreateGesture {
               ) + 1,
             status: { locked: false, hidden: false },
             props: entry.manifest.defaultProps,
-            style: entry.manifest.defaultStyle,
+            style: resolveBaseScreenMaterialDefaultStyle(entry.manifest, document.theme),
             dataSource: createInitialDataSource(entry.manifest),
           },
         },
@@ -160,7 +173,8 @@ export class DesignerCreateGesture {
     }
     if (
       !event.dataTransfer?.types.includes(MATERIAL_DRAG_TYPE) &&
-      !event.dataTransfer?.types.includes(MATERIAL_LIBRARY_ITEM_DRAG_TYPE)
+      !event.dataTransfer?.types.includes(MATERIAL_LIBRARY_ITEM_DRAG_TYPE) &&
+      !event.dataTransfer?.types.includes(MATERIAL_LIBRARY_FRAGMENT_DRAG_TYPE)
     ) {
       return;
     }
@@ -186,9 +200,24 @@ export class DesignerCreateGesture {
         validated.value,
         this.environment.snapCanvasPoint(event),
       );
+      this.environment.clearSnapPreview();
       if (inserted === undefined) return true;
       if (!inserted.ok) this.callbacks.reportDiagnostics?.(inserted.diagnostics);
+      return true;
+    }
+    if (event.dataTransfer?.types.includes(MATERIAL_LIBRARY_FRAGMENT_DRAG_TYPE)) {
+      const fragmentId = event.dataTransfer.getData(MATERIAL_LIBRARY_FRAGMENT_DRAG_TYPE);
+      if (fragmentId === '') return false;
+      const snapped = this.environment.snapCanvasPoint(event);
+      const inserted = this.callbacks.insertMaterialLibraryFragmentAt?.(fragmentId, {
+        x: roundScreenGeometry(clampScreenCoordinate(snapped.x)),
+        y: roundScreenGeometry(clampScreenCoordinate(snapped.y)),
+      });
       this.environment.clearSnapPreview();
+      if (inserted === undefined) return false;
+      if (!inserted.ok) this.callbacks.reportDiagnostics?.(inserted.diagnostics);
+      event.preventDefault();
+      event.stopPropagation();
       return true;
     }
     const itemId = event.dataTransfer?.types.includes(MATERIAL_LIBRARY_ITEM_DRAG_TYPE)
@@ -230,7 +259,7 @@ export class DesignerCreateGesture {
               ) + 1,
             status: { locked: false, hidden: false },
             props: manifest.defaultProps,
-            style: manifest.defaultStyle,
+            style: resolveBaseScreenMaterialDefaultStyle(manifest, document.theme),
             dataSource:
               item === undefined
                 ? createInitialDataSource(manifest)

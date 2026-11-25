@@ -96,6 +96,10 @@ export const DESIGNER_OPERATION_TEXT = {
   duplicate: { label: '原地复制', tooltip: '原地复制选中组件', shortcut: 'Ctrl+D' },
   group: { label: '编组', tooltip: '将选中组件编组', shortcut: 'Ctrl+G' },
   ungroup: { label: '取消编组', tooltip: '取消选中组件的编组', shortcut: 'Ctrl+Shift+G' },
+  'save-as-fragment': {
+    label: '存为组合',
+    tooltip: '把选中组件（连同子组件）存为组合，交给宿主保存到素材库',
+  },
   'group-enter': { label: '进入组内', tooltip: '进入选中组的组内编辑', shortcut: 'Enter' },
   'group-exit': {
     label: '退出组内',

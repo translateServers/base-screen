@@ -10,12 +10,10 @@ import type {
 } from '@base-screen/contracts';
 import { isScreenHostDatasetPort } from '@base-screen/contracts';
 import type {
-  BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import {
-  isBaseScreenConditionalStylePort,
   isBaseScreenMaterialCatalog,
   isBaseScreenRuntimeContributionIndex,
   isScreenBlueprintHostActionPort,
@@ -31,8 +29,6 @@ export interface BaseScreenViewerConfiguration {
   readonly datasetPort?: ScreenHostDatasetPort;
   /** 来源目录端口：`host-catalog` 与 `url-query` 两种来源共用。 */
   readonly hostCatalogPort?: ScreenHostCatalogPort;
-  /** ADR-0059 宿主条件样式端口：configure-only（Renderer 创建时捕获，无独立 setter）。 */
-  readonly conditionalStylePort?: BaseScreenConditionalStylePort;
   readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
   readonly blueprintRuntimePort?: ScreenBlueprintRuntimePort;
   readonly blueprintHostActionPort?: ScreenBlueprintHostActionPort;
@@ -43,6 +39,11 @@ export interface BaseScreenViewerConfiguration {
   /** 非持久化执行上下文附加信息（RB2）：提供时流入每次 resolve 与 observer 事件。 */
   readonly projectId?: string;
   readonly documentRevision?: string;
+  /**
+   * 起始页（ADR-0109 §2.3）：宿主按路由等指定；不存在或不是页面时回落到文档的 `startCanvasId`
+   * / 第一个页面。只在装载时生效，之后用 `openCanvas()` 切页。
+   */
+  readonly initialPageId?: string;
 }
 
 export type BaseScreenViewerRefreshOptions = {
@@ -91,12 +92,6 @@ export function parseBaseScreenViewerConfiguration(
     return lifecycleFailure('Viewer host catalog port 必须同时提供 list、describe 与 resolve。');
   }
   if (
-    configuration.conditionalStylePort !== undefined &&
-    !isBaseScreenConditionalStylePort(configuration.conditionalStylePort)
-  ) {
-    return lifecycleFailure('Viewer conditional style port 必须是含 resolve 的对象。');
-  }
-  if (
     configuration.runtimeContributions !== undefined &&
     !isBaseScreenRuntimeContributionIndex(configuration.runtimeContributions)
   ) {
@@ -113,6 +108,12 @@ export function parseBaseScreenViewerConfiguration(
     !isScreenBlueprintHostActionPort(configuration.blueprintHostActionPort)
   ) {
     return lifecycleFailure('Viewer blueprint host action port 必须是含 execute 的对象。');
+  }
+  if (
+    configuration.initialPageId !== undefined &&
+    typeof configuration.initialPageId !== 'string'
+  ) {
+    return lifecycleFailure('Viewer initialPageId 必须是字符串。');
   }
   return {
     ok: true,

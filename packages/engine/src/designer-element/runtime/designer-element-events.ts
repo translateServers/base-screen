@@ -159,6 +159,10 @@ export function onKeyDown(element: DesignerElementHost, event: KeyboardEvent): v
     event.preventDefault();
     return;
   }
+  if (event.key === 'Escape' && elementState.artboardController.closeMenu()) {
+    event.preventDefault();
+    return;
+  }
   if (elementState.menuController.onKeyDown(event)) return;
   if (elementState.workbenchController.onKeyDown(event)) return;
   if (

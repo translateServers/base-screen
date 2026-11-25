@@ -16,16 +16,17 @@ import {
 
 export type { DesignerFillColorPickerCallbacks } from './designer-fill-color-picker-runtime.js';
 
+/** 常用颜色：键是文案表里的颜色名（悬停提示「名称 · 色值」）。 */
 const QUICK_COLORS = [
-  '#2483ff',
-  '#39c5bb',
-  '#00c9a7',
-  '#7c6cff',
-  '#f0b94b',
-  '#ff765c',
-  '#ed5f82',
-  '#d9e0e8',
-  '#18222e',
+  ['blue', '#2483ff'],
+  ['teal', '#39c5bb'],
+  ['mint', '#00c9a7'],
+  ['violet', '#7c6cff'],
+  ['amber', '#f0b94b'],
+  ['coral', '#ff765c'],
+  ['rose', '#ed5f82'],
+  ['silver', '#d9e0e8'],
+  ['ink', '#18222e'],
 ] as const;
 
 const pickerRuntime = new WeakMap<HTMLElement, DesignerFillColorPickerRuntime>();
@@ -124,16 +125,18 @@ export function createDesignerFillColorPicker(
   quick.appendChild(quickTitle);
   const quickGrid = ownerDocument.createElement('div');
   const quickButtons: HTMLButtonElement[] = [];
-  for (const color of QUICK_COLORS) {
+  for (const [name, color] of QUICK_COLORS) {
     const button = ownerDocument.createElement('button');
     button.type = 'button';
     button.className = 'designer-fill-color-swatch';
     button.dataset.fillColorQuick = color;
     button.setAttribute('style', `--designer-fill-swatch:${color}`);
-    button.setAttribute(
-      'aria-label',
-      DESIGNER_UI_TEXT.propertiesPanel.colorPickerQuickColor(color),
+    const label = DESIGNER_UI_TEXT.propertiesPanel.colorPickerQuickColor(
+      DESIGNER_UI_TEXT.propertiesPanel.colorPickerQuickColorNames[name],
+      color.toUpperCase(),
     );
+    button.setAttribute('aria-label', label);
+    button.setAttribute('data-tip', label);
     quickGrid.appendChild(button);
     quickButtons.push(button);
   }

@@ -133,7 +133,7 @@ export function createWorkbench(
             },
           ],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
   const interaction: {
     focusedComponentId: string | null;

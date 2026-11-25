@@ -47,7 +47,7 @@ function documentWith(datasetId: string, bindingFields: readonly string[]): unkn
       },
     ],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 

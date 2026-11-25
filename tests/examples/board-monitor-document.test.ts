@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DATASET_DEFINITIONS } from '../../examples/shared-backend/src/datasets/dataset-definitions';
 import { BOARD_MONITOR_DOCUMENT } from '../../examples/shared-backend/src/screens/board-monitor-document';
-import type { ScreenDatasetField, ScreenDocument } from '../../packages/contracts/src/index.js';
+import type {
+  ScreenComponentNode,
+  ScreenDataBinding,
+  ScreenDatasetField,
+  ScreenDocument,
+} from '../../packages/contracts/src/index.js';
 import { parseScreenDocument } from '../../packages/contracts/src/index.js';
 import { validateScreenHostResourceBinding } from '../../packages/core/src/index.js';
 import {
@@ -20,6 +25,7 @@ import { PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-materia
 import { PLUGIN_BOARD_PIPELINE_MANIFEST } from '../../plugins/plugin-materials/src/board/pipeline.js';
 import { PLUGIN_BOARD_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-materials/src/board/scroll-board.js';
 import { PLUGIN_BOARD_STATUS_GRID_MANIFEST } from '../../plugins/plugin-materials/src/board/status-grid.js';
+import { PLUGIN_BOARD_STATUS_LEGEND_MANIFEST } from '../../plugins/plugin-materials/src/board/status-legend.js';
 import { PLUGIN_BOARD_WATER_LEVEL_MANIFEST } from '../../plugins/plugin-materials/src/board/water-level.js';
 import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from '../../plugins/plugin-materials/src/echarts/manifest.js';
 
@@ -41,6 +47,7 @@ const MANIFESTS = [
   PLUGIN_BOARD_WATER_LEVEL_MANIFEST,
   PLUGIN_BOARD_SCROLL_BOARD_MANIFEST,
   PLUGIN_BOARD_STATUS_GRID_MANIFEST,
+  PLUGIN_BOARD_STATUS_LEGEND_MANIFEST,
   PLUGIN_BOARD_PIPELINE_MANIFEST,
   PLUGIN_ECHARTS_MATERIAL_MANIFEST,
 ];
@@ -60,9 +67,48 @@ const FIELDS: Readonly<Record<string, readonly ScreenDatasetField[]>> = {
 /** 每个 dataset 组件的绑定顺序（防"绑对了列但顺序错"，顺序即位置语义）。 */
 const EXPECTED_BINDING_ORDER: Readonly<Record<string, readonly string[]>> = {
   'grid-devices': ['name', 'status', 'load'],
+  'grid-legend': ['status'],
   'alarm-stream': ['t', 'level', 'deviceName', 'message'],
   'stage-pipeline': ['name', 'status', 'throughput'],
 };
+
+interface DatasetReader {
+  readonly component: ScreenComponentNode;
+  readonly datasetId: string;
+  /** 旧形态参数（literal / variable）与实例参数（inline / variable / data-source-field）的共同面。 */
+  readonly params: Readonly<
+    Record<string, { readonly kind: string; readonly variableId?: string }>
+  >;
+  readonly binding: ScreenDataBinding | null | undefined;
+}
+
+/**
+ * 读数据集的组件，两种写法统一成一张表：组件自带 `dataSource`（旧形态），或经 `dataValue`
+ * 读文档级实例（ADR-0100 F4）——后者的数据集与参数在实例上，字段映射在组件的 `dataBinding`。
+ */
+function datasetReaders(document: ScreenDocument): readonly DatasetReader[] {
+  const instances = new Map((document.dataSources ?? []).map((item) => [item.id, item]));
+  return document.components.flatMap((component): DatasetReader[] => {
+    const legacy = component.dataSource;
+    if (legacy?.type === 'dataset') {
+      return [
+        { component, datasetId: legacy.datasetId, params: legacy.params, binding: legacy.binding },
+      ];
+    }
+    const ref = component.dataValue;
+    if (ref?.kind !== 'data-source-field') return [];
+    const instance = instances.get(ref.dataSourceId);
+    if (instance?.source.kind !== 'dataset') return [];
+    return [
+      {
+        component,
+        datasetId: instance.source.datasetId,
+        params: instance.params,
+        binding: component.dataBinding,
+      },
+    ];
+  });
+}
 
 describe('production monitor document', () => {
   const parsed = parseScreenDocument(BOARD_MONITOR_DOCUMENT);
@@ -77,9 +123,9 @@ describe('production monitor document', () => {
     }
     expect(parsed.value.canvas).toMatchObject({ width: 1920, height: 1080 });
     expect(parsed.value.canvas.backgroundColor).toBe('#06101c');
-    // 53 个根节点。QA 复核时是 49，本轮补 C16/C17 新增 4 个（`rank-line` 是改尺寸不是新增）：
-    // 主轴负载标签 + 水位图 + 能耗标签 + 能耗胶囊。
-    expect(parsed.value.components.length).toBe(53);
+    // 54 个根节点。QA 复核时是 49，补 C16/C17 新增 4 个（`rank-line` 是改尺寸不是新增）：
+    // 主轴负载标签 + 水位图 + 能耗标签 + 能耗胶囊；ADR-0099 把灯阵图例拆成独立的 `grid-legend`。
+    expect(parsed.value.components.length).toBe(54);
   });
 
   it('contains the C16 / C17 blocks with their own metrics', () => {
@@ -163,13 +209,12 @@ describe('production monitor document', () => {
     let datasetCount = 0;
     let variableParamCount = 0;
 
-    for (const component of parsed.value.components) {
-      const source = component.dataSource;
-      if (source === null || source.type !== 'dataset') continue;
+    for (const reader of datasetReaders(parsed.value)) {
+      const { component } = reader;
       datasetCount += 1;
 
-      const definition = definitions.get(source.datasetId);
-      expect(definition, `unknown dataset ${source.datasetId} on ${component.id}`).toBeDefined();
+      const definition = definitions.get(reader.datasetId);
+      expect(definition, `unknown dataset ${reader.datasetId} on ${component.id}`).toBeDefined();
       if (definition === undefined) continue;
 
       const manifest = MANIFESTS.find((item) => item.type === component.type);
@@ -184,7 +229,7 @@ describe('production monitor document', () => {
         ...(field.nullable === undefined ? {} : { nullable: field.nullable }),
       }));
       const binding = validateScreenHostResourceBinding(
-        source.binding,
+        reader.binding ?? undefined,
         fields,
         manifest.dataBinding.roles,
       );
@@ -198,13 +243,13 @@ describe('production monitor document', () => {
 
       // 参数名必须在该数据集的 parameters 里（后端 `forbidNonWhitelisted` 会 400）。
       const parameterNames = new Set(definition.parameters.map((parameter) => parameter.name));
-      for (const name of Object.keys(source.params)) {
+      for (const name of Object.keys(reader.params)) {
         expect(parameterNames.has(name), `${component.id} param ${name}`).toBe(true);
       }
       // 变量槽位引用的变量必须存在。
       const variableIds = new Set(parsed.value.variables.map((variable) => variable.id));
-      for (const parameter of Object.values(source.params)) {
-        if (parameter.kind !== 'variable') continue;
+      for (const parameter of Object.values(reader.params)) {
+        if (parameter.kind !== 'variable' || parameter.variableId === undefined) continue;
         variableParamCount += 1;
         expect(
           variableIds.has(parameter.variableId),
@@ -213,7 +258,7 @@ describe('production monitor document', () => {
       }
 
       // 绑定顺序 = 位置语义，且必须是该数据集字段顺序的子序列（不许重排）。
-      const boundIds = Object.values(source.binding?.fields ?? {}).flat();
+      const boundIds = Object.values(reader.binding?.fields ?? {}).flat();
       expect(boundIds).toEqual(EXPECTED_BINDING_ORDER[component.id]);
       const datasetOrder = definition.fields.map((field) => field.id);
       const positions = boundIds.map((id) => datasetOrder.indexOf(id));
@@ -221,10 +266,41 @@ describe('production monitor document', () => {
       expect([...positions].sort((left, right) => left - right)).toEqual(positions);
     }
 
-    // 设备灯阵 + 告警流水 + 工序链 = 3 个数据集组件。
-    expect(datasetCount).toBe(3);
-    // 参数里的变量槽位：grid 1 + alarm 3 + pipeline 1 = 5 处（≥2 即满足"参数真的靠变量驱动"）。
+    // 设备灯阵 + 状态图例 + 告警流水 + 工序链 = 4 个读数据集的组件（灯阵与图例共用一个实例）。
+    expect(datasetCount).toBe(4);
+    // 参数里的变量槽位：devices 1（灯阵、图例各计一次）+ alarm 3 + pipeline 1（≥2 即满足"参数真的靠变量驱动"）。
     expect(variableParamCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it('lets the device grid and its legend share one document-level instance (ADR-0100 F4)', () => {
+    if (!parsed.ok) throw new Error('document did not parse');
+    expect(parsed.value.dataSources?.map((item) => item.id)).toEqual([
+      'devices',
+      'live-oee',
+      'live-output-trend',
+    ]);
+    const readers = parsed.value.components
+      .filter(
+        (component) =>
+          component.dataValue?.kind === 'data-source-field' &&
+          component.dataValue.dataSourceId === 'devices',
+      )
+      .map((component) => component.id);
+    expect(readers).toEqual(['grid-devices', 'grid-legend']);
+    for (const id of readers) {
+      const component = parsed.value.components.find((item) => item.id === id);
+      // 共享实例的读者不再带旧形态 dataSource（文档契约：两者互斥）。
+      expect(component?.dataSource).toBeNull();
+      expect(component?.dataValue).toMatchObject({ dataSourceId: 'devices', path: [] });
+    }
+    // 旧形态里不再有任何组件单独查 monitor.devices：重复查询的来源被消除。
+    expect(
+      parsed.value.components.some(
+        (component) =>
+          component.dataSource?.type === 'dataset' &&
+          component.dataSource.datasetId === 'monitor.devices',
+      ),
+    ).toBe(false);
   });
 
   it('binds every host resource to fields the sample channel returns', () => {
@@ -251,8 +327,45 @@ describe('production monitor document', () => {
         );
       }
     }
-    // 5 张 KPI + 趋势 1 + 排行 1 + 主轴负载水位 1 + 能耗胶囊 1 = 9。
-    expect(hostResourceCount).toBe(9);
+    // 4 张 KPI + 排行 1 + 主轴负载水位 1 + 能耗胶囊 1 = 7（OEE 读数与产量趋势改读推送实例）。
+    expect(hostResourceCount).toBe(7);
+  });
+
+  it('reads OEE and the output trend from push instances (ADR-0104)', () => {
+    if (!parsed.ok) throw new Error('document did not parse');
+    const instances = new Map((parsed.value.dataSources ?? []).map((item) => [item.id, item]));
+    const expectations = [
+      { componentId: 'kpi-oee-value', instanceId: 'live-oee', resourceType: 'demo_metric' },
+      {
+        componentId: 'trend-output',
+        instanceId: 'live-output-trend',
+        resourceType: 'demo_series',
+      },
+    ] as const;
+    for (const { componentId, instanceId, resourceType } of expectations) {
+      const component = parsed.value.components.find((item) => item.id === componentId);
+      expect(component?.dataSource).toBeNull();
+      expect(component?.dataValue).toMatchObject({ dataSourceId: instanceId, path: [] });
+      const instance = instances.get(instanceId);
+      expect(instance?.updatePolicy).toMatchObject({ mode: 'push', fallbackIntervalSeconds: 30 });
+      if (instance?.source.kind !== 'host-resource') {
+        throw new Error(`${instanceId} 必须是 host-resource 推送实例`);
+      }
+      expect(instance.source.resourceType).toBe(resourceType);
+      // 字段映射与旧形态同一口径：必须落在示例通道返回的字段上。
+      const fields = FIELDS[resourceType];
+      const manifest = MANIFESTS.find((item) => item.type === component?.type);
+      if (fields === undefined || manifest?.dataBinding === undefined || component === undefined) {
+        throw new Error(`${componentId} 缺少字段或物料绑定声明`);
+      }
+      const binding = validateScreenHostResourceBinding(
+        component.dataBinding ?? null,
+        fields,
+        manifest.dataBinding.roles,
+      );
+      expect(binding.ok, `${componentId} binding invalid`).toBe(true);
+    }
+    expect(instances.get('live-output-trend')?.updatePolicy?.retain).toEqual({ rows: 24 });
   });
 
   it('keeps every static table binding aligned with its own fields', () => {
@@ -278,33 +391,35 @@ describe('production monitor document', () => {
       parsed.value.components.map((component) => [component.id, component]),
     );
     const variableIds = new Set(parsed.value.variables.map((variable) => variable.id));
-    const relations = parsed.value.blueprint.relations;
-    expect(relations.map((relation) => relation.id)).toEqual([
+    const blueprint = parsed.value.blueprint;
+    const nodes = new Map(blueprint.nodes.map((node) => [node.id, node]));
+    expect(blueprint.edges.map((edge) => edge.id)).toEqual([
       'rule-line',
       'rule-window',
       'rule-severity',
     ]);
 
-    for (const relation of relations) {
-      expect(relation.type).toBe('behavior');
-      if (relation.type !== 'behavior') continue;
-      expect(relation.source.kind).toBe('component');
-      if (relation.source.kind !== 'component') continue;
-      const component = componentById.get(relation.source.componentId);
-      expect(component, `${relation.id} → ${relation.source.componentId}`).toBeDefined();
+    for (const edge of blueprint.edges) {
+      expect(edge.kind).toBe('flow');
+      if (edge.kind !== 'flow') continue;
+      const source = nodes.get(edge.from.node);
+      expect(source?.kind).toBe('component');
+      if (source?.kind !== 'component') continue;
+      const component = componentById.get(source.componentId);
+      expect(component, `${edge.id} → ${source.componentId}`).toBeDefined();
       if (component === undefined) continue;
       const manifest = MANIFESTS.find((item) => item.type === component.type);
-      // eventName 必须是该物料真实声明的事件，否则关系永远不会触发。
-      expect(manifest?.events).toContain(relation.source.event.eventName);
-      expect(relation.target.kind).toBe('variable');
-      if (relation.target.kind !== 'variable') continue;
-      expect(variableIds.has(relation.target.variableId)).toBe(true);
-      expect(relation.effect.type).toBe('set-variable');
-      if (relation.effect.type !== 'set-variable') continue;
-      expect(relation.effect.value.kind).toBe('event-payload');
-      if (relation.effect.value.kind !== 'event-payload') continue;
+      // 事件锚点必须是该物料真实声明的事件，否则连线永远不会触发。
+      expect(manifest?.events).toContain(edge.from.port.slice('event:'.length));
+      const target = nodes.get(edge.to.node);
+      expect(target?.kind).toBe('variable');
+      if (target?.kind !== 'variable') continue;
+      expect(variableIds.has(target.variableId)).toBe(true);
+      expect(edge.to.port).toBe('set');
+      expect(edge.value?.kind).toBe('event-payload');
+      if (edge.value?.kind !== 'event-payload') continue;
       // 取值路径从物料事件 payload（`{ rowIndex, row }`）里取。
-      expect(relation.effect.value.path).toEqual(['row', expect.any(String)]);
+      expect(edge.value.path).toEqual(['row', expect.any(String)]);
     }
   });
 

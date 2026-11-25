@@ -10,12 +10,6 @@ export {
   sameBaseScreenMaterialDefinition,
 } from './catalog-diff.js';
 export type {
-  BaseScreenConditionalStylePort,
-  BaseScreenConditionalStyleRequest,
-  BaseScreenHostConditionalStyleAuthoringPort,
-  BaseScreenHostConditionalStyleBinding,
-  BaseScreenHostConditionalStyleCondition,
-  BaseScreenHostConditionalStyleSource,
   BaseScreenMaterialArraySchema,
   BaseScreenMaterialBooleanSchema,
   BaseScreenMaterialCatalog,
@@ -53,6 +47,7 @@ export type {
   BaseScreenPluginDataResourceTypeContribution,
   BaseScreenPluginDependency,
   BaseScreenPluginDesignSnapshot,
+  BaseScreenPluginFragmentContribution,
   BaseScreenPluginInspectorControlCatalog,
   BaseScreenPluginInspectorControlCatalogEntry,
   BaseScreenPluginInspectorControlConstructor,
@@ -110,14 +105,19 @@ export type {
   BaseScreenMaterialEditorCondition,
   BaseScreenMaterialEditorConditionOperator,
   BaseScreenMaterialEditorControl,
+  BaseScreenMaterialEditorControlInferenceInput,
   BaseScreenMaterialEditorDescriptor,
+  BaseScreenMaterialEditorDescriptorInput,
   BaseScreenMaterialEditorField,
+  BaseScreenMaterialEditorFieldInput,
   BaseScreenMaterialEditorProjection,
   BaseScreenMaterialEditorSection,
+  BaseScreenMaterialEditorSectionInput,
   BaseScreenMaterialEditorTarget,
   BaseScreenMaterialEventDescriptor,
 } from './editor/editor-descriptor.js';
 export {
+  inferBaseScreenMaterialEditorControl,
   MAX_EDITOR_CONDITION_VALUES,
   MAX_EDITOR_CONDITIONS,
   MAX_EDITOR_EVENTS,
@@ -131,6 +131,19 @@ export {
   resolveSchema,
 } from './editor/editor-descriptor.js';
 export {
+  type BaseScreenComponentFragmentInsertionIntent,
+  type BaseScreenFragmentBlueprint,
+  type BaseScreenFragmentBody,
+  type BaseScreenFragmentDataSource,
+  type BaseScreenFragmentDefinition,
+  type BaseScreenFragmentEntry,
+  type BaseScreenFragmentNode,
+  type BaseScreenFragmentShell,
+  isBaseScreenBoundedName,
+  parseBaseScreenComponentFragmentInsertionIntent,
+  parseBaseScreenFragmentDefinition,
+} from './fragment/fragment.js';
+export {
   BASE_SCREEN_RESERVED_STYLE_SCHEMAS,
   parseBaseScreenMaterialEventDetail,
   parseBaseScreenMaterialManifest,
@@ -138,6 +151,7 @@ export {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from './material/material.js';
+export { resolveBaseScreenMaterialDefaultStyle } from './material/material-theme.js';
 export { isValidCustomElementName } from './material/material-validation-utils.js';
 export {
   parseBaseScreenPluginManifest,

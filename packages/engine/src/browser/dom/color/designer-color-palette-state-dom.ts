@@ -15,6 +15,7 @@ import {
   setColorPaletteStopHandlePosition,
   updateColorPaletteHandleAccessibility,
 } from './designer-color-palette-stop-utils.js';
+import { readDesignerColorPaletteTheme } from './designer-color-palette-theme.js';
 import {
   applyColorPaletteColorInputValue,
   colorAlphaFromPercent,
@@ -50,17 +51,33 @@ export function updateDesignerColorPaletteChrome(palette: HTMLElement, updatePic
   const trigger = palette.querySelector<HTMLButtonElement>('[data-color-palette-action="toggle"]');
   const swatch = palette.querySelector<HTMLElement>('[data-color-palette-trigger-swatch]');
   const value = palette.querySelector<HTMLElement>('[data-color-palette-trigger-value]');
+  // 引用主题色位时触发器显示色位名，提示里带上解析出的颜色。
+  const theme = readDesignerColorPaletteTheme(palette, state);
+  const shown =
+    theme === undefined
+      ? serialized
+      : `${DESIGNER_UI_TEXT.propertiesPanel.colorPickerSlotValue(theme.group, theme.label)} ${serialized}`;
   if (trigger !== null) {
-    trigger.setAttribute(
-      'aria-label',
-      DESIGNER_UI_TEXT.propertiesPanel.colorPickerTrigger(serialized),
-    );
-    trigger.setAttribute('data-tip', serialized);
+    trigger.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.colorPickerTrigger(shown));
+    trigger.setAttribute('data-tip', shown);
   }
   if (swatch !== null) {
     swatch.setAttribute('style', `--designer-color-palette-value:${serialized}`);
   }
-  if (value !== null) value.textContent = colorPaletteTriggerSummary(state);
+  if (value !== null) {
+    value.textContent =
+      theme === undefined
+        ? colorPaletteTriggerSummary(state)
+        : DESIGNER_UI_TEXT.propertiesPanel.colorPickerSlotValue(theme.group, theme.label);
+  }
+  for (const button of palette.querySelectorAll<HTMLButtonElement>(
+    '[data-color-palette-theme-slot]',
+  )) {
+    button.setAttribute(
+      'aria-pressed',
+      String(button.dataset.colorPaletteThemeSlot === theme?.slot),
+    );
+  }
   const picker = palette.querySelector<HTMLElement>('[data-designer-fill-color-picker]');
   if (picker !== null && updatePicker) {
     updateDesignerFillColorPicker(picker, activeDesignerColorPaletteValue(state, palette));

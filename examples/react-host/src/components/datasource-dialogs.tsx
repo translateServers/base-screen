@@ -1,6 +1,8 @@
+import { useEffect, useRef } from 'react';
 import type { DatasourceRefScreen } from '../lib/datasource-model';
 import { DATASOURCE_TEXT, screenEditHref } from '../lib/datasource-model';
 import { formatDateTime } from '../lib/format';
+import { trapModalFocus } from '../lib/modal-focus';
 
 /**
  * 数据源页的三个弹层（PRD §9.4 / §9.5 / R5）。
@@ -19,7 +21,7 @@ export function ConfirmDeleteDialog({
   readonly onConfirm: () => void;
 }): React.ReactElement {
   return (
-    <Overlay kind="confirm-delete" label="确认删除">
+    <Overlay kind="confirm-delete" label="确认删除" onEscape={onCancel}>
       <h2 className="ds-dialog__title">删除「{name}」？</h2>
       <p className="ds-dialog__body">删除后不可撤销，引用它的大屏会显示「数据源不可用」。</p>
       <footer className="ds-dialog__actions">
@@ -49,7 +51,7 @@ export function DeleteBlockedDialog({
   readonly onClose: () => void;
 }): React.ReactElement {
   return (
-    <Overlay kind="delete-blocked" label={DATASOURCE_TEXT.deleteBlockedTitle}>
+    <Overlay kind="delete-blocked" label={DATASOURCE_TEXT.deleteBlockedTitle} onEscape={onClose}>
       <h2 className="ds-dialog__title">无法删除：「{name}」</h2>
       <p className="ds-dialog__body">
         仍有 {refScreens.length} 张大屏在使用它。{DATASOURCE_TEXT.refHint}
@@ -92,7 +94,7 @@ export function FieldChangeDialog({
   readonly onConfirm: () => void;
 }): React.ReactElement {
   return (
-    <Overlay kind="fields" label={DATASOURCE_TEXT.fieldChangesTitle}>
+    <Overlay kind="fields" label={DATASOURCE_TEXT.fieldChangesTitle} onEscape={onCancel}>
       <h2 className="ds-dialog__title">
         {DATASOURCE_TEXT.fieldChangesTitle}（{refScreens.length} 张）
       </h2>
@@ -137,7 +139,7 @@ export function DiscardDialog({
   readonly onConfirm: () => void;
 }): React.ReactElement {
   return (
-    <Overlay kind="discard" label={DATASOURCE_TEXT.discardTitle}>
+    <Overlay kind="discard" label={DATASOURCE_TEXT.discardTitle} onEscape={onCancel}>
       <h2 className="ds-dialog__title">{DATASOURCE_TEXT.discardTitle}</h2>
       <p className="ds-dialog__body">{DATASOURCE_TEXT.discardBody}</p>
       <footer className="ds-dialog__actions">
@@ -160,15 +162,28 @@ export function DiscardDialog({
 function Overlay({
   kind,
   label,
+  onEscape,
   children,
 }: {
   readonly kind: string;
   readonly label: string;
+  readonly onEscape: () => void;
   readonly children: React.ReactNode;
 }): React.ReactElement {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onEscapeRef = useRef(onEscape);
+  onEscapeRef.current = onEscape;
+  useEffect(
+    () =>
+      dialogRef.current === null
+        ? undefined
+        : trapModalFocus(dialogRef.current, { onEscape: () => onEscapeRef.current() }),
+    [],
+  );
   return (
     <div className="ds-overlay">
       <div
+        ref={dialogRef}
         className="ds-dialog"
         role="dialog"
         aria-modal="true"

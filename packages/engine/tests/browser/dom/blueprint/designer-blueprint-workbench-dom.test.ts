@@ -1,52 +1,42 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import { renderDesignerBlueprintInspector } from '../../../../src/browser/dom/blueprint/designer-blueprint-inspector-dom.js';
 import { renderDesignerBlueprintLibrary } from '../../../../src/browser/dom/blueprint/designer-blueprint-library-dom.js';
 import { renderDesignerBlueprintWorkbenchChrome } from '../../../../src/browser/dom/blueprint/designer-blueprint-workbench-dom.js';
+import {
+  buildDesignerBlueprintComponentLibrary,
+  buildDesignerBlueprintGraph,
+  buildDesignerBlueprintVariableLibrary,
+} from '../../../../src/common/operations/blueprint/designer-blueprint-model.js';
+import {
+  type BaseScreenBlueprintCanvasSelection,
+  EMPTY_BLUEPRINT_CANVAS_SELECTION,
+} from '../../../../src/common/operations/blueprint/designer-blueprint-protocol.js';
+import { DESIGNER_UI_TEXT } from '../../../../src/common/ui-text/designer-ui-text.js';
 
-const relationship = {
-  type: 'behavior' as const,
-  id: 'relation-1',
-  source: {
-    kind: 'component' as const,
-    componentId: 'source',
-    event: { type: 'material-event' as const, eventName: 'click' },
-  },
-  target: { kind: 'component' as const, componentId: 'source' },
-  effect: { type: 'component-visibility' as const, operation: 'show' as const },
-};
-
-const graph = {
-  nodes: [
-    {
-      id: 'component:source',
-      kind: 'component' as const,
-      x: 0,
-      y: 0,
-      componentId: 'source',
-      componentName: 'Source',
-      materialType: 'base.button',
-      events: [{ name: 'click', label: 'Click', available: true }],
+const catalog = {
+  get: () => ({
+    manifest: {
+      events: ['click'],
+      editorDescriptor: {
+        events: [
+          {
+            name: 'click',
+            label: 'Click',
+            payloadSchema: {
+              kind: 'object',
+              properties: {
+                row: { kind: 'object', properties: { id: { kind: 'string' } }, required: [] },
+              },
+              required: [],
+            },
+          },
+        ],
+      },
     },
-  ],
-  edges: [
-    {
-      id: 'relation:relation-1',
-      source: 'component:source',
-      target: 'component:source',
-      sourceHandle: 'event:click',
-      targetHandle: 'relation:in',
-      relationId: 'relation-1',
-      relationKind: 'behavior' as const,
-      kind: 'relation' as const,
-      effectType: 'component-visibility' as const,
-      eventName: 'click',
-      operation: 'show' as const,
-      deletable: true,
-    },
-  ],
-};
-const componentLibrary = graph.nodes;
+  }),
+} as unknown as BaseScreenMaterialCatalog;
 
 const document: ScreenDocument = {
   canvas: { width: 100, height: 100, backgroundColor: '#000000' },
@@ -67,10 +57,78 @@ const document: ScreenDocument = {
     },
   ],
   variables: [
-    { type: 'static', id: 'selected<script>', name: 'selected<script>', initialValue: null },
+    { type: 'static', id: 'selected', name: 'selected<script>', initialValue: null },
+    { type: 'static', id: 'fallback', name: 'fallback', initialValue: 1 },
   ],
-  blueprint: { relations: [relationship] },
+  blueprint: {
+    nodes: [
+      { kind: 'component', id: 'component:source', componentId: 'source' },
+      { kind: 'variable', id: 'variable:selected', variableId: 'selected' },
+      {
+        kind: 'condition',
+        id: 'condition-1',
+        name: 'Gate',
+        condition: { left: { kind: 'event-payload', path: ['row'] }, operator: 'exists' },
+      },
+    ],
+    edges: [
+      {
+        kind: 'flow',
+        id: 'judge',
+        from: { node: 'component:source', port: 'event:click' },
+        to: { node: 'condition-1', port: 'judge' },
+      },
+      {
+        kind: 'flow',
+        id: 'write',
+        from: { node: 'condition-1', port: 'yes' },
+        to: { node: 'variable:selected', port: 'set' },
+        value: { kind: 'event-payload', path: ['row', 'id'] },
+      },
+    ],
+  },
 };
+
+const runtime = { getResourceType: () => undefined, hasBlueprintCapability: () => true };
+const graph = buildDesignerBlueprintGraph(document, catalog, runtime, DESIGNER_UI_TEXT.blueprint);
+
+function library(
+  selection: BaseScreenBlueprintCanvasSelection,
+  activeTab: string,
+  groups?: never[],
+) {
+  const container = { innerHTML: '' } as HTMLElement;
+  renderDesignerBlueprintLibrary(container, {
+    document,
+    graph,
+    components: buildDesignerBlueprintComponentLibrary(document, catalog, runtime),
+    variables: buildDesignerBlueprintVariableLibrary(document, DESIGNER_UI_TEXT.blueprint),
+    selection,
+    query: '',
+    activeTab: activeTab as never,
+    groups,
+  });
+  return container.innerHTML;
+}
+
+function inspector(
+  selection: BaseScreenBlueprintCanvasSelection,
+  tab: 'configuration' | 'problems' | 'trace',
+  extra: { diagnostics?: never[]; trace?: never } = {},
+) {
+  const container = { innerHTML: '' } as HTMLElement;
+  renderDesignerBlueprintInspector(
+    container,
+    document,
+    graph,
+    selection,
+    tab,
+    extra.diagnostics ?? [],
+    extra.trace ?? null,
+    catalog,
+  );
+  return container.innerHTML;
+}
 
 describe('Designer Blueprint panel DOM', () => {
   it('reveals the Blueprint panels and restores the canvas heading on mode changes', () => {
@@ -134,205 +192,102 @@ describe('Designer Blueprint panel DOM', () => {
     expect(rightTitle.textContent).toBe('页面配置');
   });
 
-  it('renders component, logic and variable navigation with bounded actions', () => {
-    const container = { innerHTML: '' } as HTMLElement;
-
-    renderDesignerBlueprintLibrary(
-      container,
-      document,
-      graph,
-      componentLibrary,
-      { kind: 'edge', id: 'edge:rule-1:trigger' },
-      '',
-      'variables',
-      undefined,
-    );
-
-    expect(container.innerHTML).toContain('组件');
-    expect(container.innerHTML).toContain('关系');
-    expect(container.innerHTML).toContain('变量');
-    expect(container.innerHTML).toContain('data-blueprint-add-variable="selected&lt;script&gt;"');
-    expect(container.innerHTML).toContain('data-blueprint-drag-kind="variable"');
-    expect(container.innerHTML).toContain('selected&lt;script&gt;');
-    expect(container.innerHTML).not.toContain('selected<script>');
+  it('renders the component, logic and variable library with escaped, bounded actions', () => {
+    const variables = library(EMPTY_BLUEPRINT_CANVAS_SELECTION, 'variables');
+    expect(variables).toContain('data-blueprint-select-node="variable:selected"');
+    expect(variables).toContain('data-blueprint-add-variable="fallback"');
+    expect(variables).toContain('data-blueprint-drag-kind="variable"');
+    expect(variables).toContain('selected&lt;script&gt;');
+    expect(variables).not.toContain('selected<script>');
+    const logic = library({ nodes: [], edges: ['write'] }, 'relations');
+    expect(logic).toContain('data-blueprint-insert-node="timer"');
+    expect(logic).toContain('data-blueprint-insert-node="condition"');
+    expect(logic).toContain('data-blueprint-select-edge="write"');
+    expect(logic).toMatch(/data-selected="true"[^>]*data-category="data"/);
   });
 
   it('projects Blueprint-enabled host groups into the shared rail without duplicating slots', () => {
-    const container = { innerHTML: '' } as HTMLElement;
-
-    renderDesignerBlueprintLibrary(
-      container,
-      document,
-      graph,
-      componentLibrary,
-      null,
-      '',
-      'host:automation',
-      [
-        { id: 'assets', label: 'Canvas assets' },
-        {
-          id: 'automation',
-          label: 'Automation <tools>',
-          icon: 'sparkle',
-          workbenchModes: ['blueprint'],
-        },
-      ],
-    );
-
-    expect(container.innerHTML).toContain('data-blueprint-library-tab="host:automation"');
-    expect(container.innerHTML).toContain('data-host-left-panel-mode="blueprint"');
-    expect(container.innerHTML).toContain('aria-controls="designer-host-automation-panel"');
-    expect(container.innerHTML).toContain('class="rail-view blueprint-library-main" hidden');
-    expect(container.innerHTML).toContain('Automation &lt;tools&gt;');
-    expect(container.innerHTML).not.toContain('host:assets');
-    expect(container.innerHTML).not.toContain('<slot');
+    const html = library(EMPTY_BLUEPRINT_CANVAS_SELECTION, 'host:automation', [
+      { id: 'assets', label: 'Canvas assets' },
+      {
+        id: 'automation',
+        label: 'Automation <tools>',
+        icon: 'sparkle',
+        workbenchModes: ['blueprint'],
+      },
+    ] as never[]);
+    expect(html).toContain('data-blueprint-library-tab="host:automation"');
+    expect(html).toContain('data-host-left-panel-mode="blueprint"');
+    expect(html).toContain('aria-controls="designer-host-automation-panel"');
+    expect(html).toContain('class="rail-view blueprint-library-main" hidden');
+    expect(html).toContain('Automation &lt;tools&gt;');
+    expect(html).not.toContain('host:assets');
+    expect(html).not.toContain('<slot');
   });
 
-  it('renders problems and the latest simulation trace in dedicated inspector tabs', () => {
-    const container = { innerHTML: '' } as HTMLElement;
+  it('renders problems and the depth-first simulation trace in dedicated tabs', () => {
     const diagnostics = [
       {
-        severity: 'error' as const,
-        code: 'BLUEPRINT_CONDITION_INVALID' as const,
+        severity: 'error',
+        code: 'BLUEPRINT_CONDITION_INVALID',
         path: [],
-        message: '规则 <script> 无效',
+        message: 'rule <script> broken',
       },
-    ];
+    ] as never[];
     const trace = {
-      executedEdgeIds: ['edge:rule-1:action:0'],
-      failedRuleIds: [],
-      lines: ['rule-1 · 条件无 · 执行 1 个动作'],
-    };
-
-    renderDesignerBlueprintInspector(
-      container,
-      document,
-      graph,
-      null,
-      'problems',
+      trigger: { nodeId: 'component:source', port: 'event:click' },
+      executedEdgeIds: ['judge'],
+      visitedNodeIds: ['component:source', 'condition-1'],
+      steps: [
+        { kind: 'trigger', nodeId: 'component:source', depth: 0, text: 'Source' },
+        {
+          kind: 'condition',
+          nodeId: 'condition-1',
+          edgeId: 'judge',
+          passed: false,
+          depth: 1,
+          text: 'Gate <b>',
+        },
+      ],
+      failed: false,
+    } as never;
+    const problems = inspector(EMPTY_BLUEPRINT_CANVAS_SELECTION, 'problems', {
       diagnostics,
       trace,
-    );
-    expect(container.innerHTML).toContain('校验问题');
-    expect(container.innerHTML).toContain('规则 &lt;script&gt; 无效');
-    expect(container.innerHTML).not.toContain('规则 <script> 无效');
-
-    renderDesignerBlueprintInspector(container, document, graph, null, 'trace', diagnostics, trace);
-    expect(container.innerHTML).toContain('运行轨迹');
-    expect(container.innerHTML).toContain('1 条连线执行');
-    expect(container.innerHTML).toContain('rule-1 · 条件无 · 执行 1 个动作');
+    });
+    expect(problems).toContain('rule &lt;script&gt; broken');
+    expect(problems).not.toContain('rule <script> broken');
+    const run = inspector(EMPTY_BLUEPRINT_CANVAS_SELECTION, 'trace', { diagnostics, trace });
+    expect(run).toContain('data-blueprint-trace');
+    expect(run).toContain('data-kind="condition" data-passed="false"');
+    expect(run).toContain('Gate &lt;b&gt;');
+    expect(run).toContain('data-blueprint-clear-trace');
   });
 
-  it('renders component structure and relation lists', () => {
-    const container = { innerHTML: '' } as HTMLElement;
-
-    renderDesignerBlueprintInspector(
-      container,
-      document,
-      graph,
-      { kind: 'node', id: 'component:source' },
-      'configuration',
-      [],
-      null,
-    );
-
-    expect(container.innerHTML).toContain('结构');
-    expect(container.innerHTML).toContain('data-blueprint-select-relation');
-    expect(container.innerHTML).toContain('data-blueprint-delete');
+  it('renders node configuration groups with anchors, rename and upstream / downstream edges', () => {
+    const html = inspector({ nodes: ['condition-1'], edges: [] }, 'configuration');
+    expect(html).toContain('data-blueprint-node-config="condition-1"');
+    expect(html).toContain('data-blueprint-node-field="name"');
+    expect(html).toContain('data-blueprint-node-field="operator"');
+    expect(html).toContain('data-blueprint-expression="left"');
+    expect(html).toContain('data-blueprint-select-edge="judge"');
+    expect(html).toContain('data-blueprint-select-edge="write"');
+    expect(html).toContain('<code>judge</code>');
   });
 
-  it('renders keyboard-native set-variable source controls from declared event fields', () => {
-    const container = { innerHTML: '' } as HTMLElement;
-    const setVariableRelation = {
-      type: 'behavior' as const,
-      id: 'relation-2',
-      source: relationship.source,
-      target: { kind: 'variable' as const, variableId: 'selected' },
-      effect: {
-        type: 'set-variable' as const,
-        value: { kind: 'event-payload' as const, path: ['row', 'id'] },
-      },
-    };
-    const configuredDocument: ScreenDocument = {
-      ...document,
-      variables: [
-        { type: 'static', id: 'selected', name: 'selected', initialValue: null },
-        { type: 'static', id: 'fallback', name: 'fallback', initialValue: 1 },
-      ],
-      blueprint: { relations: [setVariableRelation] },
-    };
-    const configuredGraph = {
-      nodes: [
-        ...graph.nodes,
-        {
-          id: 'variable:selected',
-          kind: 'variable' as const,
-          x: 300,
-          y: 0,
-          variableId: 'selected',
-          variableName: 'selected',
-          variableType: 'static' as const,
-          variableInitialValue: null,
-          events: [],
-        },
-      ],
-      edges: [
-        {
-          id: 'relation:relation-2',
-          source: 'component:source',
-          target: 'variable:selected',
-          sourceHandle: 'event:click',
-          targetHandle: 'relation:in',
-          relationId: 'relation-2',
-          relationKind: 'behavior' as const,
-          kind: 'relation' as const,
-          effectType: 'set-variable' as const,
-          eventName: 'click',
-          variableId: 'selected',
-          deletable: true,
-        },
-      ],
-    };
-    const catalog = {
-      get: () => ({
-        manifest: {
-          editorDescriptor: {
-            events: [
-              {
-                name: 'click',
-                payloadSchema: {
-                  kind: 'object',
-                  properties: {
-                    row: {
-                      kind: 'object',
-                      properties: { id: { kind: 'string' } },
-                      required: [],
-                    },
-                  },
-                  required: [],
-                },
-              },
-            ],
-          },
-        },
-      }),
-    } as never;
-
-    renderDesignerBlueprintInspector(
-      container,
-      configuredDocument,
-      configuredGraph,
-      { kind: 'edge', id: 'relation:relation-2' },
+  it('renders edge value editors from declared event fields and batch actions for multi-selection', () => {
+    const edge = inspector({ nodes: [], edges: ['write'] }, 'configuration');
+    expect(edge).toContain('data-blueprint-edge-config="write"');
+    expect(edge).toContain('data-blueprint-expression="value"');
+    expect(edge).toContain('data-expression-part="field"');
+    expect(edge).toContain('value="row.id"');
+    expect(edge).toContain('value="variable"');
+    expect(edge).toContain('data-blueprint-delete');
+    const multi = inspector(
+      { nodes: ['condition-1', 'variable:selected'], edges: [] },
       'configuration',
-      [],
-      null,
-      catalog,
     );
-
-    expect(container.innerHTML).toContain('data-blueprint-action-value-source');
-    expect(container.innerHTML).toContain('data-blueprint-action-event-path');
-    expect(container.innerHTML).toContain('row.id');
-    expect(container.innerHTML).toContain('value="variable"');
-    expect(container.innerHTML).toContain('<select');
+    expect(multi).toContain('data-blueprint-nodes-enabled="false"');
+    expect(multi).toContain('data-blueprint-delete');
   });
 });

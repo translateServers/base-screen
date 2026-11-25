@@ -74,7 +74,7 @@ const document: ScreenDocument = {
     },
   ],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 
 const interaction = { selectedComponentIds: ['chart-1'], focusedComponentId: 'chart-1' };
@@ -468,5 +468,71 @@ describe('AE-ED-C03 array transactions', () => {
       catalog(),
     );
     expect(outOfRange?.ok).toBe(false);
+  });
+});
+
+describe('descriptor top-level fields share the flat panel commit semantics', () => {
+  const boxStyleSchema = {
+    kind: 'object' as const,
+    properties: {
+      borderColor: { kind: 'string' as const },
+      borderWidth: { kind: 'number' as const, minimum: 0, maximum: 100 },
+      lineHeight: { kind: 'number' as const, minimum: 1, maximum: 512 },
+    },
+    required: ['borderColor', 'borderWidth'],
+  };
+  const box: ScreenComponentNode = {
+    ...document.components[0]!,
+    style: { borderColor: '#000000', borderWidth: 0, lineHeight: 24 },
+  };
+  const boxDocument: ScreenDocument = { ...document, components: [box] };
+  const boxCatalog = {
+    get: () => ({
+      manifest: {
+        propsSchema,
+        styleSchema: boxStyleSchema,
+        stylePanel: [
+          { style: 'borderColor', label: '边框颜色', control: 'color' },
+          { style: 'borderWidth', label: '边框宽度', control: 'number' },
+        ],
+      },
+    }),
+  } as unknown as BaseScreenMaterialCatalog;
+
+  function styleControl(key: string, control: string, value: string) {
+    return new FakeControl(
+      {
+        descriptorFieldId: key,
+        descriptorTarget: 'style',
+        descriptorPath: JSON.stringify([key]),
+        descriptorControl: control,
+      },
+      value,
+    );
+  }
+
+  function patchedStyle(control: FakeControl) {
+    const result = createDescriptorFieldTransaction(
+      control as unknown as EventTarget,
+      boxDocument,
+      interaction,
+      boxCatalog,
+    );
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return undefined;
+    const command = result.value.commands[0] as { patch: { style: Record<string, unknown> } };
+    return command.patch.style;
+  }
+
+  it('removes an optional number when its reading is cleared', () => {
+    const style = patchedStyle(styleControl('lineHeight', 'number', ''));
+    expect(style).toBeDefined();
+    expect(Object.hasOwn(style!, 'lineHeight')).toBe(false);
+  });
+
+  it('enables a zero-width border when the border color changes', () => {
+    const style = patchedStyle(styleControl('borderColor', 'color', '#ff0000'));
+    expect(style).toMatchObject({ borderColor: '#ff0000' });
+    expect(style?.borderWidth).toBeGreaterThan(0);
   });
 });

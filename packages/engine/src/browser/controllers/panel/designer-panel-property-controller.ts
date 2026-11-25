@@ -1,6 +1,7 @@
 import type { ScreenDiagnostic, ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction } from '@base-screen/core';
 import { createDesignerImageDensityTransaction } from '../../../common/operations/element/designer-image-density.js';
+import { findDesignerLevelScale } from '../../../common/operations/style/designer-component-states.js';
 import {
   createDesignerQuickStyleTransaction,
   type DesignerQuickStyleAction,
@@ -17,21 +18,25 @@ import {
   type DesignerCanvasPresentationSettings,
   renderDesignerProperties,
 } from '../../dom/panel/designer-panel-dom.js';
+import {
+  handleDesignerComponentStateChange,
+  handleDesignerComponentStateClick,
+} from './designer-component-states-controller.js';
 import { captureInspectorFocus, restoreInspectorFocus } from './designer-inspector-focus.js';
 import type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
-import {
-  handleDesignerStyleRuleChange,
-  handleDesignerStyleRuleClick,
-} from './designer-style-rules-controller.js';
 
 export class DesignerPanelPropertyController {
   readonly #canvasPresentation: DesignerCanvasPresentationSettings =
     createDesignerCanvasPresentationSettings();
 
+  /** 最近一次渲染的检查器容器：切换编辑状态这类不改文档的操作要原地重绘。 */
+  #properties: HTMLElement | undefined;
+
   constructor(private readonly callbacks: DesignerPanelControllerCallbacks) {}
 
   render(properties: HTMLElement | undefined): void {
     if (properties === undefined) return;
+    this.#properties = properties;
     // 整栏重建会连焦点一起换掉；先记住当前控件，重建后找回同一个。
     const focus = captureInspectorFocus(properties);
     renderDesignerProperties(
@@ -43,14 +48,31 @@ export class DesignerPanelPropertyController {
       this.callbacks.isHostResourceSelectionButtonVisible?.() ?? false,
       this.#canvasPresentation,
       this.callbacks.getInspectorControls?.(),
-      this.callbacks.getHostConditionalStyleAuthoring?.(),
-      this.callbacks.refreshConditionalStyles,
+      {
+        editingStateId: (component) =>
+          this.callbacks.componentStateEditing?.get(component) ?? 'default',
+        readRuntime: (componentId) => this.callbacks.readComponentStateRuntime?.(componentId),
+        levelScale: (component, input) => {
+          const document = this.callbacks.getDocument();
+          const read = this.callbacks.readLevelScales;
+          return document === undefined || read === undefined
+            ? undefined
+            : findDesignerLevelScale(document, component, input, read);
+        },
+      },
+      this.callbacks.getArtboardSubCanvas?.(),
+      this.callbacks.getStartPageId?.() ?? null,
     );
     restoreInspectorFocus(properties, focus);
   }
 
   onClick(target: Element): boolean {
-    if (handleDesignerStyleRuleClick(target, this.callbacks)) return true;
+    const stateAction = handleDesignerComponentStateClick(target, this.callbacks);
+    if (stateAction === 'rerender') {
+      this.render(this.#properties);
+      return true;
+    }
+    if (stateAction === 'handled') return true;
     const backgroundImageAction = target.closest<HTMLButtonElement>(
       '[data-canvas-background-image-action]',
     );
@@ -107,7 +129,7 @@ export class DesignerPanelPropertyController {
     if (
       target !== null &&
       typeof (target as { readonly closest?: unknown }).closest === 'function' &&
-      handleDesignerStyleRuleChange(target as Element, this.callbacks)
+      handleDesignerComponentStateChange(target as Element, this.callbacks)
     ) {
       return;
     }
@@ -165,7 +187,9 @@ export class DesignerPanelPropertyController {
       !event.isComposing &&
       target !== null &&
       typeof (target as { readonly matches?: unknown }).matches === 'function' &&
-      (target as Element).matches('[data-style-rule-path], [data-style-rule-value]')
+      (target as Element).matches(
+        '[data-state-name], [data-state-input-path], [data-state-row-field], [data-state-row-literal], [data-state-case-value]',
+      )
     ) {
       event.preventDefault();
       this.onPropertyChange(event);
@@ -185,7 +209,16 @@ export class DesignerPanelPropertyController {
   }
 
   private updateScaleMode(button: HTMLButtonElement): void {
-    const value = button.dataset.canvasSettingValue;
+    this.applyScaleMode(button.dataset.canvasSettingValue);
+    for (const control of button.parentElement?.querySelectorAll<HTMLButtonElement>(
+      '[data-canvas-setting="scaleMode"]',
+    ) ?? []) {
+      control.ariaPressed = String(control === button);
+    }
+  }
+
+  /** 缩放档位的唯一写入点：分段按钮与下拉共用，避免两套校验漂移。 */
+  private applyScaleMode(value: string | undefined): void {
     if (
       value !== 'fill' &&
       value !== 'fit' &&
@@ -198,14 +231,16 @@ export class DesignerPanelPropertyController {
     }
     this.#canvasPresentation.scaleMode = value;
     this.callbacks.onCanvasPresentationChange?.(this.#canvasPresentation);
-    for (const control of button.parentElement?.querySelectorAll<HTMLButtonElement>(
-      '[data-canvas-setting="scaleMode"]',
-    ) ?? []) {
-      control.ariaPressed = String(control === button);
-    }
   }
 
   private updateCanvasPresentationSetting(target: EventTarget | null, setting: string): void {
+    // 用 tagName 而不是 instanceof：单测环境没有注册 HTMLSelectElement 全局，
+    // instanceof 会直接抛 ReferenceError，把无关用例一起带崩。
+    const element = target as { readonly tagName?: string; readonly value?: string } | null;
+    if (element?.tagName === 'SELECT') {
+      if (setting === 'scaleMode') this.applyScaleMode(element.value);
+      return;
+    }
     if (!(target instanceof HTMLInputElement)) return;
     if (setting === 'opacity') {
       // 面板读数是 0–100 的百分比（与组件不透明度同一档），呈现层仍持有 0–1 的比值。

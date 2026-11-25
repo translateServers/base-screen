@@ -1,17 +1,15 @@
 import type { ScreenDocument } from '@base-screen/contracts';
-import type {
-  BaseScreenMaterialCatalog,
-  BaseScreenMaterialManifest,
+import {
+  type BaseScreenMaterialCatalog,
+  type BaseScreenMaterialManifest,
+  parseBaseScreenComponentFragmentInsertionIntent,
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
   nextMaterialComponentId,
   nextMaterialComponentZIndex,
 } from '../../../../src/common/operations/material-component/material-component.js';
-import {
-  createBaseScreenComponentFragmentTransaction,
-  parseBaseScreenComponentFragmentInsertionIntent,
-} from '../../../../src/common/operations/material-component/material-component-fragment.js';
+import { createBaseScreenComponentFragmentTransaction } from '../../../../src/common/operations/material-component/material-component-fragment.js';
 
 function manifest(overrides: Partial<BaseScreenMaterialManifest> = {}): BaseScreenMaterialManifest {
   return {
@@ -54,7 +52,7 @@ function documentWith(
     canvas: { width: 640, height: 480, backgroundColor: '#000000' },
     components: components as ScreenDocument['components'],
     variables: [],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   } as ScreenDocument;
 }
 
@@ -143,6 +141,8 @@ describe('component fragment transaction', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.componentIds).toEqual(['acme-text-1', 'acme-text-2']);
+    // 没有 shell 时两个根节点都选中。
+    expect(result.value.selectionIds).toEqual(['acme-text-1', 'acme-text-2']);
     const commands = result.value.transaction.commands;
     const zIndexes = commands.map((command) =>
       command.type === 'add-component' ? command.component.zIndex : -1,
@@ -185,6 +185,8 @@ describe('component fragment transaction', () => {
       'acme-text-1',
     ]);
     expect(result.value.focusedComponentId).toBe('acme-container-1');
+    // 只选 shell：外壳与其子节点混选会让画布拖动失效（选区必须同属一个父级）。
+    expect(result.value.selectionIds).toEqual(['acme-container-1']);
   });
 
   it('rejects an unknown parent key rather than silently rooting the node', () => {
@@ -275,6 +277,48 @@ describe('component fragment transaction', () => {
     expect(result.diagnostics[0]?.code).toBe('AUTHORING_LIMIT_EXCEEDED');
   });
 
+  it('places a dropped fragment at the anchor without fitting it into the canvas', () => {
+    const intent = okFragment({
+      nodes: [
+        { key: 'a', materialType: 'acme.text', offset: { x: 0, y: 0 } },
+        { key: 'b', materialType: 'acme.rect', offset: { x: 400, y: 0 } },
+      ],
+    });
+    const positions = (anchor: { x: number; y: number }) => {
+      const result = createBaseScreenComponentFragmentTransaction({
+        document: documentWith(),
+        catalog: CARD_CATALOG,
+        intent,
+        anchor,
+        placement: 'at-anchor',
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return [];
+      return result.value.transaction.commands.map((command) =>
+        command.type === 'add-component' ? command.component.position : undefined,
+      );
+    };
+    // 拖放落点即包围盒左上角：越出画布也不贴边（与单个物料拖放一致），相对位移不变。
+    expect(positions({ x: 600, y: 300 })).toEqual([
+      { x: 600, y: 300 },
+      { x: 1000, y: 300 },
+    ]);
+    // 比画布还宽的组合在拖放时也能放下，不失败关闭。
+    const wide = createBaseScreenComponentFragmentTransaction({
+      document: documentWith(),
+      catalog: CARD_CATALOG,
+      intent: okFragment({
+        nodes: [
+          { key: 'a', materialType: 'acme.text', offset: { x: 0, y: 0 } },
+          { key: 'b', materialType: 'acme.text', offset: { x: 900, y: 0 } },
+        ],
+      }),
+      anchor: { x: 10, y: 10 },
+      placement: 'at-anchor',
+    });
+    expect(wide.ok).toBe(true);
+  });
+
   it('merges props over manifest defaults and validates them against the schema', () => {
     const merged = build({
       nodes: [{ key: 'a', materialType: 'acme.text', props: { unit: 'GB' } }],
@@ -325,5 +369,172 @@ describe('material component factory extensions', () => {
     expect(nextMaterialComponentZIndex(documentWith())).toBe(0);
     expect(nextMaterialComponentZIndex(documentWith([{ id: 'x', zIndex: 4 }]))).toBe(5);
     expect(nextMaterialComponentZIndex(documentWith(), new Set([9]))).toBe(10);
+  });
+});
+
+describe('component fragment transaction with shared data and relations (ADR-0100 phase 2)', () => {
+  const sales = {
+    key: 'sales',
+    name: '销售',
+    source: { kind: 'dataset', datasetId: 'sales' },
+    params: {},
+  };
+  const detail = {
+    key: 'detail',
+    name: '明细',
+    source: { kind: 'dataset', datasetId: 'detail' },
+    params: { region: { kind: 'data-source-field', dataSourceId: 'sales', path: ['region'] } },
+  };
+
+  function withExisting(): ScreenDocument {
+    return {
+      ...documentWith([{ id: 'acme.text', type: 'acme.text', zIndex: 0 }]),
+      dataSources: [
+        { id: 'sales', name: '已有', source: { kind: 'dataset', datasetId: 'x' }, params: {} },
+      ],
+      blueprint: {
+        nodes: [{ kind: 'component', id: 'link', componentId: 'acme.text' }],
+        edges: [],
+      },
+    } as ScreenDocument;
+  }
+
+  it('creates data sources first, remaps keys to unique ids and keeps params pointing inside', () => {
+    const built = build(
+      {
+        nodes: [
+          {
+            key: 'value',
+            materialType: 'acme.text',
+            dataValue: { kind: 'data-source-field', dataSourceId: 'detail', path: [] },
+          },
+        ],
+        dataSources: [sales, detail],
+      },
+      { x: 0, y: 0 },
+      withExisting(),
+    );
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const [first, second] = built.value.transaction.commands;
+    expect(first?.type).toBe('replace-data-sources');
+    expect(second?.type).toBe('add-component');
+    expect(built.value.dataSourceIds).toEqual(['sales-2', 'detail']);
+    if (first?.type !== 'replace-data-sources') return;
+    const replaced = first.dataSources;
+    expect(replaced.map((source) => source.id)).toEqual(['sales', 'sales-2', 'detail']);
+    expect(replaced[2]?.params.region).toMatchObject({ dataSourceId: 'sales-2' });
+    const component = (second as { component: ScreenDocument['components'][number] }).component;
+    expect(component.dataSource).toBeNull();
+    expect(component.dataValue).toEqual({
+      kind: 'data-source-field',
+      dataSourceId: 'detail',
+      path: [],
+    });
+  });
+
+  it('appends the remapped blueprint after the components and dedupes ids', () => {
+    const built = build(
+      {
+        nodes: [
+          { key: 'a', materialType: 'acme.text' },
+          { key: 'b', materialType: 'acme.text', offset: { x: 0, y: 50 } },
+        ],
+        blueprint: {
+          nodes: [
+            { kind: 'component', id: 'na', componentId: 'a' },
+            { kind: 'component', id: 'nb', componentId: 'b' },
+          ],
+          edges: [
+            {
+              kind: 'semantic',
+              id: 'link',
+              from: { node: 'na' },
+              to: { node: 'nb' },
+              role: 'detail',
+            },
+          ],
+        },
+      },
+      { x: 0, y: 0 },
+      withExisting(),
+    );
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const commands = built.value.transaction.commands;
+    expect(commands.at(-1)?.type).toBe('replace-blueprint');
+    const blueprint = (commands.at(-1) as { blueprint: ScreenDocument['blueprint'] }).blueprint;
+    // 已有节点占用了 id `link`：节点与连线共用 id 空间，分片连线去重为 `link-2`。
+    expect(blueprint.edges.map((edge) => edge.id)).toEqual(['link-2']);
+    const added = blueprint.edges[0]!;
+    const componentOf = (nodeId: string) => {
+      const node = blueprint.nodes.find((candidate) => candidate.id === nodeId);
+      return node?.kind === 'component' ? node.componentId : undefined;
+    };
+    expect([componentOf(added.from.node), componentOf(added.to.node)]).toEqual(
+      built.value.componentIds,
+    );
+    expect(built.value.edgeIds).toEqual(['link-2']);
+  });
+
+  it('applies an entry rotation to the created component', () => {
+    const built = build({ nodes: [{ key: 'a', materialType: 'acme.text', rotation: 30 }] });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const component = (
+      built.value.transaction.commands[0] as {
+        component: ScreenDocument['components'][number];
+      }
+    ).component;
+    expect(component.rotation).toBe(30);
+  });
+});
+
+describe('fragment nodes and the document theme (ADR-0101)', () => {
+  const palette = {
+    primary: '#ff6600',
+    text: '#ffffff',
+    textSecondary: '#cccccc',
+    background: '#000000',
+    accent: '#00ccff',
+    accentSecondary: '#0066aa',
+  };
+  const themed = manifest({ themeStyle: { color: 'primary' } });
+  const themedCatalog = catalogOf(SHELL, themed);
+
+  function styles(intent: unknown, document: ScreenDocument) {
+    const built = createBaseScreenComponentFragmentTransaction({
+      document,
+      catalog: themedCatalog,
+      intent: okFragment(intent),
+      anchor: { x: 0, y: 0 },
+    });
+    if (!built.ok) throw new Error(JSON.stringify(built.diagnostics));
+    return built.value.transaction.commands.map((command) =>
+      command.type === 'add-component' ? command.component.style : undefined,
+    );
+  }
+
+  it('takes the palette colour for keys the fragment does not set', () => {
+    const document = { ...documentWith(), theme: { palette } } as ScreenDocument;
+    expect(styles({ nodes: [{ key: 'a', materialType: 'acme.text' }] }, document)).toEqual([
+      { color: '#ff6600' },
+    ]);
+  });
+
+  it('keeps the colour the fragment writes explicitly', () => {
+    const document = { ...documentWith(), theme: { palette } } as ScreenDocument;
+    expect(
+      styles(
+        { nodes: [{ key: 'a', materialType: 'acme.text', style: { color: '#123456' } }] },
+        document,
+      ),
+    ).toEqual([{ color: '#123456' }]);
+  });
+
+  it('falls back to the manifest default without a palette', () => {
+    expect(styles({ nodes: [{ key: 'a', materialType: 'acme.text' }] }, documentWith())).toEqual([
+      { color: '#fff' },
+    ]);
   });
 });

@@ -17,6 +17,7 @@ class FakeElement {
   step = '';
   type = '';
   className = '';
+  selected = false;
   value = '';
 
   constructor(readonly tagName: string) {}
@@ -58,6 +59,10 @@ class FakeElement {
 
   focus(): void {
     this.ownerDocument.activeElement = this;
+  }
+
+  select(): void {
+    this.selected = true;
   }
 
   blur(): void {
@@ -148,6 +153,14 @@ describe('createDesignerStepper', () => {
     expect(increment.disabled).toBe(true);
     expect(decrement.disabled).toBe(false);
     expect(decrement.ownerDocument.activeElement).toBe(decrement);
+  });
+
+  it('R5 selects the whole value on focus so typing replaces it', () => {
+    const { input } = createHarness({ value: 12 });
+
+    input.dispatchEvent({ type: 'focus' });
+
+    expect(input.selected).toBe(true);
   });
 
   it('R5 clamps typed values on commit and honours a custom step', () => {

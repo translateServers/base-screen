@@ -106,8 +106,80 @@ function stableJson(value) {
   return JSON.stringify(value);
 }
 
+/**
+ * 在设计器画布里按「组件所在位置上实际最上层的元素」点击或双击。
+ *
+ * 不用 page.mouse：harness 页面里 designer 与底部 viewer 并列，真实鼠标可能落到 viewer 的物料上。
+ * 也不直接向组件元素派发：那会绕过选框拖拽层这类覆盖层（真实双击的第二击常落在拖拽层上），
+ * 抓不到覆盖层吞事件的缺陷。这里用 designer shadow root 的 elementFromPoint 找真实目标，
+ * 顺序与浏览器一致：pointerdown → pointerup → click，双击再补一组和 dblclick。
+ *
+ * `offset` 是相对组件左上角的画布坐标（默认组件中心）。返回每一击实际命中的元素描述。
+ */
+async function clickComponentAt(page, componentId, { double = false, offset } = {}) {
+  return page.evaluate(
+    ({ componentId, double, offset }) => {
+      const designer = window.baseScreenHarness.designer;
+      const root = designer.shadowRoot;
+      const element = root.querySelector(
+        `[data-canvas] [data-base-screen-component-id="${componentId}"]`,
+      );
+      if (element === null) throw new Error(`BROWSER_HARNESS_CLICK_TARGET_MISSING:${componentId}`);
+      const rect = element.getBoundingClientRect();
+      const component = designer.document.components.find((item) => item.id === componentId);
+      const scale = component === undefined ? 1 : rect.width / component.size.width || 1;
+      const x = offset === undefined ? rect.left + rect.width / 2 : rect.left + offset.x * scale;
+      const y = offset === undefined ? rect.top + rect.height / 2 : rect.top + offset.y * scale;
+      const describe = (target) =>
+        target === null
+          ? null
+          : (target.getAttribute('data-base-screen-component-id') ??
+            (target.hasAttribute('data-selection-grab') ? 'selection-grab' : target.className));
+      const hits = [];
+      const press = (detail) => {
+        const down = root.elementFromPoint(x, y);
+        hits.push(describe(down));
+        const pointer = {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          clientX: x,
+          clientY: y,
+          pointerId: 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+          button: 0,
+        };
+        down?.dispatchEvent(new PointerEvent('pointerdown', { ...pointer, buttons: 1 }));
+        const up = root.elementFromPoint(x, y);
+        up?.dispatchEvent(new PointerEvent('pointerup', { ...pointer, buttons: 0 }));
+        up?.dispatchEvent(new MouseEvent('click', { ...pointer, detail }));
+      };
+      press(1);
+      if (double) {
+        press(2);
+        const target = root.elementFromPoint(x, y);
+        hits.push(describe(target));
+        target?.dispatchEvent(
+          new MouseEvent('dblclick', {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            clientX: x,
+            clientY: y,
+            detail: 2,
+          }),
+        );
+      }
+      return hits;
+    },
+    { componentId, double, offset },
+  );
+}
+
 export {
   assertCanvasAidChecked,
+  clickComponentAt,
   componentCount,
   componentPositions,
   hoverNestedSubmenu,

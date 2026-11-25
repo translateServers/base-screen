@@ -116,18 +116,18 @@
 }
 
 .designer-button[data-variant="primary"] {
-  background: var(--designer-text-primary);
+  background: var(--designer-button-primary-background);
   box-shadow: var(--designer-shadow-float);
-  color: var(--designer-surface-raised);
+  color: var(--designer-text-on-accent);
 }
 
 .designer-button[data-variant="primary"]:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--designer-text-primary), var(--designer-surface-raised) 10%);
-  color: var(--designer-surface-raised);
+  background: var(--designer-button-primary-hover);
+  color: var(--designer-text-on-accent);
 }
 
 .designer-button[data-variant="primary"]:not(:disabled):active {
-  background: color-mix(in oklab, var(--designer-text-primary), var(--designer-surface-raised) 14%);
+  background: var(--designer-button-primary-active);
 }
 
 .designer-button[data-variant="danger"] {
@@ -407,7 +407,7 @@
   flex: 0 0 auto;
   min-width: 64px;
   padding: 0 var(--designer-space-4);
-  background: var(--designer-accent);
+  background: var(--designer-button-primary-background);
   box-shadow: none;
   color: var(--designer-text-on-accent);
   font-size: var(--designer-font-size-sm);

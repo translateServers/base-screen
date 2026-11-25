@@ -13,7 +13,7 @@ const document = {
   canvas: { width: 1000, height: 500, backgroundColor: '#000000' },
   components: [],
   variables: [],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 } as const;
 
 describe('designer viewport helpers', () => {

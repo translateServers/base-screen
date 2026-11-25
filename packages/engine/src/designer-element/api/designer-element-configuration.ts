@@ -1,6 +1,10 @@
 import type { ScreenDesignerHostAdapter, ScreenParseResult } from '@base-screen/contracts';
 import { validateScreenDesignerHostAdapter } from '@base-screen/contracts';
-import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type {
+  BaseScreenFragmentDefinition,
+  BaseScreenMaterialCatalog,
+} from '@base-screen/plugin-core';
+import { parseBaseScreenMaterialLibraryFragments } from '../../common/operations/material-library/material-library-fragments.js';
 import {
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,
@@ -20,8 +24,6 @@ import {
   parseBaseScreenDesignerLeftPanelGroups,
 } from '../../common/operations/workbench/designer-left-panel-groups.js';
 import {
-  isBaseScreenConditionalStylePort,
-  isBaseScreenHostConditionalStyleAuthoringPort,
   isBaseScreenMaterialCatalog,
   isBaseScreenPluginCatalog,
   isBaseScreenPluginInspectorControlCatalog,
@@ -92,6 +94,12 @@ export function configure(
     materialLibraryItems,
   );
   if (!resolvedMaterialLibraryItems.ok) return resolvedMaterialLibraryItems;
+  let materialLibraryFragments: readonly BaseScreenFragmentDefinition[] | undefined;
+  if (configuration.materialLibraryFragments !== undefined) {
+    const parsed = parseBaseScreenMaterialLibraryFragments(configuration.materialLibraryFragments);
+    if (!parsed.ok) return parsed;
+    materialLibraryFragments = parsed.value;
+  }
   let materialLibraryGrouping: BaseScreenMaterialLibraryGrouping | undefined;
   if (configuration.materialLibraryGrouping !== undefined) {
     const parsed = parseBaseScreenMaterialLibraryGrouping(configuration.materialLibraryGrouping);
@@ -128,6 +136,15 @@ export function configure(
     };
   }
   if (
+    configuration.fragmentSaveAction !== undefined &&
+    typeof configuration.fragmentSaveAction !== 'boolean'
+  ) {
+    return {
+      ok: false,
+      diagnostics: [lifecycleDiagnostic('Designer fragmentSaveAction 必须是布尔值。')],
+    };
+  }
+  if (
     configuration.resourcePort !== undefined &&
     !isScreenHostResourcePort(configuration.resourcePort)
   ) {
@@ -144,30 +161,6 @@ export function configure(
       ok: false,
       diagnostics: [
         lifecycleDiagnostic('Designer host catalog port 必须包含 list/describe/resolve。'),
-      ],
-    };
-  }
-  if (
-    configuration.conditionalStylePort !== undefined &&
-    !isBaseScreenConditionalStylePort(configuration.conditionalStylePort)
-  ) {
-    return {
-      ok: false,
-      diagnostics: [
-        lifecycleDiagnostic('Designer conditional style port 必须是含 resolve 的对象。'),
-      ],
-    };
-  }
-  if (
-    configuration.hostConditionalStyleAuthoring !== undefined &&
-    !isBaseScreenHostConditionalStyleAuthoringPort(configuration.hostConditionalStyleAuthoring)
-  ) {
-    return {
-      ok: false,
-      diagnostics: [
-        lifecycleDiagnostic(
-          'Designer host conditional style authoring 必须提供 sources/bindings/save。',
-        ),
       ],
     };
   }
@@ -255,13 +248,12 @@ export function configure(
     elementState.hostCatalogPort = configuration.hostCatalogPort;
     elementState.datasetPort = configuration.datasetPort;
   }
-  elementState.conditionalStylePort = configuration.conditionalStylePort;
-  elementState.hostConditionalStyleAuthoring = configuration.hostConditionalStyleAuthoring;
   elementState.catalog = configuration.catalog;
   elementState.leftPanelGroups = leftPanelGroups;
   elementState.materialLibraryState = materialLibraryState;
   elementState.materialLibraryGrouping = materialLibraryGrouping;
   elementState.materialLibraryItems = materialLibraryItems;
+  elementState.materialLibraryFragments = materialLibraryFragments;
   elementState.resolvedMaterialLibraryItems = resolvedMaterialLibraryItems.value;
   elementState.runtimeContributions = configuration.runtimeContributions;
   elementState.pluginCatalog = configuration.pluginCatalog;
@@ -273,6 +265,7 @@ export function configure(
   elementState.previewHandler = configuration.previewHandler;
   elementState.backButton = configuration.backButton ?? false;
   elementState.hostResourceSelectionButton = configuration.hostResourceSelectionButton ?? false;
+  elementState.fragmentSaveAction = configuration.fragmentSaveAction ?? false;
   elementState.blueprintWorkbenchController.setInitialMode(initialWorkbenchMode);
   elementState.runtime.initialize(element);
   return { ok: true, value: null, diagnostics: [] };

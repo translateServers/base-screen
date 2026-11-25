@@ -60,7 +60,12 @@ function appendQuickStyleSection(
   section.dataset.quickStyleSection = 'true';
   section.dataset.quickStyleVariant = options.variant ?? 'single';
   const details = properties.ownerDocument.createElement('details');
-  details.open = true;
+  // 与检查器其他分区共用同一套 disclosure 外观：缺这个类时收起态没有 chevron，
+  // 看起来像一条孤立的分隔线而不是可展开的段。
+  details.className = 'designer-inspector-disclosure';
+  // 默认收起：九宫格预设 + 三行配置常驻要占约 200px，是样式页里最大的一块，
+  // 而它是一次性选择（选完就不再动）。收起后几何/状态/通用/行为重新回到首屏。
+  details.open = false;
   const summary = properties.ownerDocument.createElement('summary');
   summary.className =
     'designer-inspector-section-title designer-descriptor-group-summary designer-inspector-section-summary';

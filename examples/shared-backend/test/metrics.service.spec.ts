@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { MetricsService } from '../src/metrics/metrics.service';
+import { MetricsService, STREAM_TICK_MS } from '../src/metrics/metrics.service';
 
 describe('MetricsService', () => {
   async function createService(): Promise<MetricsService> {
@@ -144,5 +144,29 @@ describe('MetricsService', () => {
     expect(ranking.items.map((item) => item.name)).toEqual(['LINE-A', 'LINE-B', 'LINE-C']);
     expect(ranking.items.map((item) => item.value)).toEqual([1284, 962, 431]);
     expect(service.ranking('line', 2).items).toHaveLength(2);
+  });
+
+  describe('push stream (ADR-0104)', () => {
+    it('windows end at the shared clock index and advance one point per tick', async () => {
+      const service = await createService();
+      const start = Date.now();
+
+      const first = service.streamWindow('oee', 24, start);
+      const later = service.streamWindow('oee', 24, start + STREAM_TICK_MS * 3);
+
+      expect(first.series.points).toHaveLength(24);
+      expect(later.revision - first.revision).toBe(3);
+      // 同一序号在任何窗口里都是同一个值：后一个窗口的前 21 个点就是前一个窗口的后 21 个点。
+      expect(later.series.points.slice(0, 21)).toEqual(first.series.points.slice(3));
+      expect(service.streamPoint('oee', later.revision)).toEqual(later.series.points.at(-1));
+    });
+
+    it('keeps a process-level epoch and rejects invalid parameters closed', async () => {
+      const service = await createService();
+
+      expect(service.streamEpoch).toMatch(/^boot-/);
+      expect(() => service.streamWindow('nope', 24)).toThrow(BadRequestException);
+      expect(() => service.streamWindow('oee', 0)).toThrow(BadRequestException);
+    });
   });
 });

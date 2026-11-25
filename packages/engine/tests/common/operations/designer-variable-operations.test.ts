@@ -9,7 +9,7 @@ import {
   referencedVariableIds,
   variableReferenceCounts,
 } from '../../../src/common/operations/designer-variable-operations.js';
-import { relationsFromRules } from '../../__fixtures__/blueprint-relations.js';
+import { graphFromRules } from '../../__fixtures__/blueprint-graph.js';
 
 function component(id: string, dataSource: ScreenComponentNode['dataSource']): ScreenComponentNode {
   return {
@@ -31,7 +31,7 @@ function component(id: string, dataSource: ScreenComponentNode['dataSource']): S
 function document(
   variables: readonly ScreenVariable[],
   components: readonly ScreenComponentNode[] = [],
-  blueprint: ScreenDocument['blueprint'] = { relations: [] },
+  blueprint: ScreenDocument['blueprint'] = { nodes: [], edges: [] },
 ): ScreenDocument {
   return {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
@@ -66,7 +66,7 @@ describe('designer variable operations', () => {
 
   it('collects variable references from blueprint set-variable actions and expressions', () => {
     const source = document([], [], {
-      relations: relationsFromRules([
+      ...graphFromRules([
         {
           id: 'r1',
           trigger: { type: 'material-event', componentId: 'a', eventName: 'click' },
@@ -124,7 +124,7 @@ describe('designer variable operations', () => {
         }),
       ],
       {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'rule-1',
             trigger: { type: 'material-event', componentId: 'chart', eventName: 'click' },
@@ -162,17 +162,23 @@ describe('designer variable operations', () => {
       {
         kind: 'blueprint-condition',
         variableId: 'selected',
-        ruleId: 'rule-1',
+        ruleId: 'rule-1:condition',
         side: 'left',
         expressionPath: ['filters'],
-        blueprintTargetId: 'relation:rule-1',
+        blueprintTargetId: 'node:rule-1:condition',
+      },
+      {
+        kind: 'blueprint-trigger',
+        variableId: 'selected',
+        ruleId: 'variable:selected',
+        blueprintTargetId: 'node:variable:selected',
       },
       {
         kind: 'blueprint-action-target',
         variableId: 'selected',
         ruleId: 'rule-1',
         actionIndex: 0,
-        blueprintTargetId: 'relation:rule-1',
+        blueprintTargetId: 'edge:rule-1',
       },
       {
         kind: 'blueprint-action-expression',
@@ -181,12 +187,12 @@ describe('designer variable operations', () => {
         actionIndex: 0,
         field: 'value',
         expressionPath: [0],
-        blueprintTargetId: 'relation:rule-1',
+        blueprintTargetId: 'edge:rule-1',
       },
     ]);
     expect(variableReferenceCounts(source)).toEqual(
       new Map([
-        ['selected', 4],
+        ['selected', 5],
         ['other', 1],
       ]),
     );

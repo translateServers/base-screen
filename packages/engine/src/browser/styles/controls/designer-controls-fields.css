@@ -1,12 +1,17 @@
 .designer-field {
   display: grid;
   gap: var(--designer-space-2);
-  margin-bottom: var(--designer-space-4);
+  /* 字段间距 8 → 6：30px 行盒 + 6px 呼吸仍能分出层次，但 12 个字段的段落少占 24px，
+     滚动一屏多看一行。再紧（4px）相邻标签就开始粘连了。 */
+  margin-bottom: var(--designer-space-3);
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
 }
 
-/* 字段行只有一档行高：30px，与 --designer-control-height 对齐。
+/* 检查器表单控件视觉规范见 base-screen-docs ADR-0102；browser-harness 的
+   assert-inspector-form-consistency 按计算样式校验同类控件一致。
+
+   字段行只有一档行高：30px，与 --designer-control-height 对齐。
    历史上这里叠过三档（骨架 34 / 检查器 30 / 几何 28），滚动时节奏肉眼可见地不齐；
    34 那 4px 注释说是"安全余量"，其实是控件高度变化后没回收的遗留值，不是预留。
    需要更紧凑时调 row-gap，不要再改行盒。 */
@@ -20,17 +25,31 @@
   font-size: var(--designer-font-size-base);
 }
 
-.inspector-pane .designer-field-range-value {
-  height: var(--designer-control-height-compact);
-  padding: 0 calc(var(--designer-space-3) + 1px);
-  font: var(--designer-font-numeric);
+/* 开关 / 复选框字段行没有控件列，同样落在 30px 一档行盒上；横向排布由检查器层负责。 */
+.inspector-pane .designer-field:has(> .designer-switch),
+.inspector-pane .designer-field:has(> .designer-checkbox) {
+  min-height: var(--designer-control-height);
 }
 
-/* 带单位符号的数字读数要给后缀让位，否则 % 会被右对齐的数字压住。
-   画布不透明度与组件不透明度是同一条读数语言，共用这一处外观。 */
+/* 滑杆读数是一个普通数字框：高度、内距、字体与数字输入同一档（ADR-0102 §3.2/§3.4），
+   以前这里是 28px + 12px 等宽，紧挨着 30px 的数字框一眼能看出矮一截。 */
+.inspector-pane .designer-field-range-value {
+  height: var(--designer-control-height);
+  padding: 0 var(--designer-control-padding-inline);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 带单位符号的数字读数要给后缀让位，否则 % 会被数字压住。画布不透明度、组件不透明度与
+   描述符里带单位的有界数值（字号 px、线宽 px…）是同一条读数语言，共用这一处外观。 */
 .designer-canvas-opacity-field .designer-field-range-value,
-.designer-opacity-field .designer-field-range-value {
+.designer-opacity-field .designer-field-range-value,
+.designer-field-range-reading > .designer-field-range-value {
   padding-right: calc(var(--designer-space-6) + var(--designer-space-1));
+}
+
+.designer-field-range-reading {
+  width: 58px;
 }
 
 /* 几何网格不再单独收紧行高：紧凑感由 grid 的 row-gap 提供，行盒与其他字段一致。 */
@@ -72,10 +91,17 @@
   gap: var(--designer-space-2);
 }
 
+/* 盒状控件一律占满控件列（ADR-0102 §3.2）。带单位的数字、步进器、分段以前按内容取宽，
+   同一栏里出现 61 / 67 / 175px 三种数字框宽度。 */
 .designer-field-control > .designer-input,
 .designer-field-control > .designer-select-control,
 .designer-field-control > .designer-color-palette,
-.designer-field-control > .designer-textarea {
+.designer-field-control > .designer-textarea,
+.designer-field-control > .designer-unit-input,
+.designer-field-control > .designer-stepper,
+.designer-field-control > .designer-segmented,
+.designer-field-control > .designer-descriptor-segmented {
+  flex: 1 1 auto;
   width: 100%;
 }
 
@@ -213,4 +239,229 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── 四边距（spacing）──
+   一个对象值只占一格：宽栏一行四格（30px），窄栏换成两行两列（60px）。
+   宽度判断走容器查询：右栏可拖到 276–480px，写死面板宽度的分支必然在某一档失效。
+   容器放在 frame 上，量的是「四个格子的实际宽度」——单位在 frame 外，不参与阈值。
+
+   scope 是 flex 容器：frame 吃掉剩余宽度，单位挂在尾部只出现一次。 */
+.designer-spacing-scope {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-3);
+  width: 100%;
+  min-width: 0;
+}
+
+/* 容器查询元素在 flex 里必须显式占满：inline-size 包含会把自身的内容宽度算成 0，
+   不写 flex 的话整个控件塌成方向字宽度。 */
+.designer-spacing-frame {
+  container-type: inline-size;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.designer-spacing {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  height: var(--designer-control-height);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+  box-shadow: var(--designer-elev-ring);
+  overflow: hidden;
+}
+
+/* 联动后只剩一个值：整格一个输入，数字左对齐，像普通输入框。 */
+.designer-spacing[data-spacing-mode="linked"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.designer-spacing[data-spacing-mode="linked"] .designer-spacing-cell {
+  border-left: 0;
+}
+
+.designer-spacing[data-spacing-mode="linked"] .designer-spacing-input {
+  text-align: left;
+}
+
+.designer-spacing-cell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--designer-space-2);
+  min-width: 0;
+  padding: 0 var(--designer-space-3) 0 var(--designer-space-2);
+  border-left: 1px solid var(--designer-border-subtle);
+}
+
+.designer-spacing-cell:first-child {
+  border-left: 0;
+}
+
+/* 方向字是前缀不是标签列：11px 是字号下限，再小就成装饰。 */
+.designer-spacing-dir {
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+  line-height: 1;
+}
+
+/* 每格读成「方向 + 数字」：数字紧跟方向字、左对齐，与其他数字框同一字体（ADR-0102 §3.4）。
+   输入要退掉控件基座（.designer-control 的底、描边环与圆角），外壳只留一层描边，
+   否则四格里会出现四个小胶囊。 */
+.designer-spacing-cell .designer-spacing-input {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--designer-text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  appearance: textfield;
+}
+
+.designer-spacing-cell .designer-spacing-input:hover:not(:disabled):not(:focus),
+.designer-spacing-cell .designer-spacing-input:focus {
+  box-shadow: none;
+}
+
+.designer-spacing-cell:focus-within {
+  box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
+}
+
+.designer-spacing-unit {
+  flex: none;
+  color: var(--designer-text-muted);
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-family-mono);
+}
+
+/* 标签旁的联动按钮：只画图标，22px 命中区；状态靠图标形状与 aria-pressed 表达。 */
+.designer-spacing-toggle {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-2);
+  background: none;
+  color: var(--designer-text-muted);
+  cursor: pointer;
+}
+
+.designer-spacing-toggle:hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-secondary);
+}
+
+.designer-spacing-toggle[aria-pressed="true"] {
+  color: var(--designer-text-secondary);
+}
+
+.designer-spacing-toggle:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 1px;
+}
+
+.designer-spacing-toggle svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+/* 可选数值的「恢复自动」（ADR-0102 §8）：标签列尾的复位按钮。18px 命中区让四个汉字的标签
+   （52px）+ 按钮仍放得进 74px 标签列；只在已设置时出现，所以不常驻占位。 */
+.designer-field-label-text.designer-field-label-with-action {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
+}
+
+.designer-field-label-content {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-field-reset {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-2);
+  background: none;
+  color: var(--designer-text-muted);
+  cursor: pointer;
+}
+
+.designer-field-reset:hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.designer-field-reset:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 1px;
+}
+
+.designer-field-reset svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+/* 标签由「文字 + 动作」组成：文字先省略，按钮固定在列尾。 */
+.designer-field-label-text.designer-spacing-label {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-3);
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
+}
+
+.designer-spacing-label-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container (max-width: 189px) {
+  .designer-spacing {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    height: auto;
+  }
+
+  .designer-spacing-cell {
+    height: var(--designer-control-height);
+    border-left: 0;
+  }
+
+  /* 两行两列时竖分隔线只画在左列（第 1、3 格），横分隔线只画在上排（第 1、2 格）。 */
+  .designer-spacing-cell:nth-child(1),
+  .designer-spacing-cell:nth-child(3) {
+    border-right: 1px solid var(--designer-border-subtle);
+  }
+
+  .designer-spacing-cell:nth-child(1),
+  .designer-spacing-cell:nth-child(2) {
+    border-bottom: 1px solid var(--designer-border-subtle);
+  }
 }

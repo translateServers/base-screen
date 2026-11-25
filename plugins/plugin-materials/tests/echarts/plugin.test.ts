@@ -3,6 +3,7 @@ import {
   parseBaseScreenMaterialManifest,
   parseBaseScreenPluginManifest,
 } from '@base-screen/plugin-core';
+import { auditBaseScreenMaterialEditorForm } from '@base-screen/plugin-sdk';
 import { describe, expect, it } from 'vitest';
 import { PLUGIN_ECHARTS_TABULAR_DATA_ADAPTER } from '../../src/echarts/chart-data-adapter.js';
 import {
@@ -102,6 +103,14 @@ describe('plugin-echarts material manifest', () => {
         [1, 0, 2],
       ]);
     if (kind === 'gauge') expect(series[0]?.data).toEqual([{ value: 2, name: '' }]);
+  });
+
+  it('conforms to the inspector form paradigm (ADR-0102 R9/R11–R14)', () => {
+    expect(
+      PLUGIN_ECHARTS_MATERIAL_MANIFESTS.flatMap((manifest) =>
+        auditBaseScreenMaterialEditorForm(manifest),
+      ),
+    ).toEqual([]);
   });
 
   it('does not collide with the core library material type', () => {

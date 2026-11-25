@@ -6,11 +6,10 @@ import type {
 import { canonicalByteLength, codePointLength, hasControlCharacter } from '../json/canonical.js';
 import type { ScreenJsonValue } from '../types/json.js';
 import {
+  MAX_COMPONENT_STATE_NAME_CODE_POINTS,
+  MAX_COMPONENT_STATE_VALUE_BYTES,
   MAX_DATA_SOURCE_VALUE_BYTES,
   MAX_NAME_CODE_POINTS,
-  MAX_STYLE_RULE_ID_CODE_POINTS,
-  MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
-  MAX_STYLE_RULE_VALUE_BYTES,
 } from './limits.js';
 import { componentSchema, dataBindingSchema } from './schema.js';
 import { checkStrictObjectKeys, isJsonObject } from './strict-object.js';
@@ -33,10 +32,12 @@ const COMPONENT_FIELDS = new Set([
   'status',
   'props',
   'style',
-  'styleRules',
+  'states',
   'dataSource',
   'dataValue',
   'dataBinding',
+  'canvasId',
+  'belowSubCanvas',
 ]);
 /** 组件位上经手工校验的字段：zod 只负责其余字段，避免同一字段两套口径。 */
 const MANUALLY_VALIDATED_COMPONENT_FIELDS = new Set(['dataValue', 'dataBinding']);
@@ -55,8 +56,23 @@ const DATASET_DATA_SOURCE_FIELDS = new Set(['type', 'datasetId', 'params', 'bind
 const VARIABLE_DATA_SOURCE_FIELDS = new Set(['type', 'variableId', 'binding', 'processorId']);
 const HOST_RESOURCE_PARAMETER_FIELDS = new Set(['kind', 'value', 'variableId']);
 const HOST_RESOURCE_BINDING_FIELDS = new Set(['fields']);
-const STYLE_RULE_FIELDS = new Set(['id', 'when', 'style']);
-const STYLE_RULE_WHEN_FIELDS = new Set(['path', 'operator', 'value']);
+const STATES_FIELDS = new Set(['items', 'judge']);
+const STATE_FIELDS = new Set(['id', 'name', 'style']);
+const STATE_JUDGE_FIELDS = new Set(['input', 'cases']);
+const STATE_CASE_FIELDS = new Set(['operator', 'value', 'stateId']);
+const STATE_INPUT_FIELDS: Readonly<Record<string, ReadonlySet<string>>> = {
+  'component-data': new Set(['kind', 'path']),
+  variable: new Set(['kind', 'variableId', 'path']),
+  'data-source-field': new Set(['kind', 'dataSourceId', 'where', 'path']),
+};
+const STATE_INPUT_ANY_FIELDS = new Set(['kind', 'path', 'variableId', 'dataSourceId', 'where']);
+const STATE_WHERE_FIELDS = new Set(['field', 'equals']);
+const STATE_EQUALS_FIELDS: Readonly<Record<string, ReadonlySet<string>>> = {
+  literal: new Set(['kind', 'value']),
+  variable: new Set(['kind', 'variableId']),
+};
+/** 「默认」是隐式状态，不能被声明（ADR-0110 D1）。 */
+const RESERVED_STATE_ID = 'default';
 
 export function validateComponent(
   component: unknown,
@@ -127,7 +143,7 @@ export function validateComponent(
   if (!validateComponentName(component.name as string, baseSegments, at, collector, phase)) {
     clean = false;
   }
-  if (!validateComponentStyleRules(component.styleRules, baseSegments, at, collector, phase)) {
+  if (!validateComponentStates(component.states, baseSegments, at, collector, phase)) {
     clean = false;
   }
   const dataSource = component.dataSource;
@@ -175,38 +191,58 @@ function validateComponentStrictNestedKeys(
       return false;
     }
   }
-  if (!validateStyleRuleStrictKeys(component.styleRules, base, at, collector, phase)) return false;
+  if (!validateStatesStrictKeys(component.states, base, at, collector, phase)) return false;
   return validateDataSourceStrictKeys(component.dataSource, base, at, collector, phase);
 }
 
-function validateStyleRuleStrictKeys(
-  styleRules: unknown,
+function validateStatesStrictKeys(
+  states: unknown,
   base: DiagnosticSegment[],
   at: DocumentDiagnosticPath,
   collector: DiagnosticCollector,
   phase: DiagnosticPhase,
 ): boolean {
-  if (!Array.isArray(styleRules)) return true;
-  for (let index = 0; index < styleRules.length; index++) {
-    const rule = styleRules[index];
-    const ruleBase = [...base, 'styleRules', index] as DiagnosticSegment[];
-    if (
-      !isJsonObject(rule) ||
-      !checkStrictObjectKeys(rule, STYLE_RULE_FIELDS, at(ruleBase), collector, phase)
-    ) {
-      return false;
+  if (!isJsonObject(states)) return true;
+  const statesBase = [...base, 'states'] as DiagnosticSegment[];
+  const strict = (value: unknown, fields: ReadonlySet<string>, path: DiagnosticSegment[]) =>
+    !isJsonObject(value) ||
+    checkStrictObjectKeys(value, fields, at(path), collector, phase, 'DOCUMENT_UNKNOWN_FIELD');
+  if (!strict(states, STATES_FIELDS, statesBase)) return false;
+  if (Array.isArray(states.items)) {
+    for (let index = 0; index < states.items.length; index++) {
+      if (!strict(states.items[index], STATE_FIELDS, [...statesBase, 'items', index])) return false;
     }
-    if (
-      isJsonObject(rule.when) &&
-      !checkStrictObjectKeys(
-        rule.when,
-        STYLE_RULE_WHEN_FIELDS,
-        at([...ruleBase, 'when']),
-        collector,
-        phase,
-      )
-    ) {
-      return false;
+  }
+  const judge = states.judge;
+  if (!isJsonObject(judge)) return true;
+  const judgeBase = [...statesBase, 'judge'] as DiagnosticSegment[];
+  if (!strict(judge, STATE_JUDGE_FIELDS, judgeBase)) return false;
+  const input = judge.input;
+  if (isJsonObject(input)) {
+    const inputBase = [...judgeBase, 'input'] as DiagnosticSegment[];
+    const fields =
+      typeof input.kind === 'string' ? STATE_INPUT_FIELDS[input.kind] : STATE_INPUT_ANY_FIELDS;
+    if (!strict(input, fields ?? STATE_INPUT_ANY_FIELDS, inputBase)) return false;
+    const where = input.where;
+    if (isJsonObject(where)) {
+      if (!strict(where, STATE_WHERE_FIELDS, [...inputBase, 'where'])) return false;
+      const equals = where.equals;
+      if (isJsonObject(equals) && typeof equals.kind === 'string') {
+        const equalsFields = STATE_EQUALS_FIELDS[equals.kind];
+        if (
+          equalsFields !== undefined &&
+          !strict(equals, equalsFields, [...inputBase, 'where', 'equals'])
+        ) {
+          return false;
+        }
+      }
+    }
+  }
+  if (Array.isArray(judge.cases)) {
+    for (let index = 0; index < judge.cases.length; index++) {
+      if (!strict(judge.cases[index], STATE_CASE_FIELDS, [...judgeBase, 'cases', index])) {
+        return false;
+      }
     }
   }
   return true;
@@ -284,7 +320,7 @@ function validateDataSourceStrictKeys(
   return true;
 }
 
-function validateComponentDataValue(
+export function validateComponentDataValue(
   dataValue: unknown,
   base: DiagnosticSegment[],
   at: DocumentDiagnosticPath,
@@ -312,7 +348,7 @@ function validateComponentDataValue(
   return true;
 }
 
-function validateComponentDataBinding(
+export function validateComponentDataBinding(
   dataBinding: unknown,
   base: DiagnosticSegment[],
   at: DocumentDiagnosticPath,
@@ -391,73 +427,63 @@ function validateComponentName(
   return clean;
 }
 
-function validateComponentStyleRules(
-  styleRules: unknown,
+/**
+ * 组件状态的语义校验（ADR-0110 §2.2）：形状已由 zod 保证。状态 id 唯一且不是 `default`，
+ * 名称长度与字符，判定条件指向本组件声明的状态，比较值大小。变量 / 数据源引用由 `references.ts` 判定。
+ */
+function validateComponentStates(
+  states: unknown,
   baseSegments: DiagnosticSegment[],
   at: DocumentDiagnosticPath,
   collector: DiagnosticCollector,
   phase: DiagnosticPhase,
 ): boolean {
-  if (!Array.isArray(styleRules)) return true;
+  if (!isJsonObject(states) || !Array.isArray(states.items)) return true;
+  const statesBase = [...baseSegments, 'states'] as DiagnosticSegment[];
   let clean = true;
-  const seenIds = new Set<string>();
-  for (let index = 0; index < styleRules.length; index++) {
-    const rule = styleRules[index];
-    if (!isJsonObject(rule)) continue;
-    const base = [...baseSegments, 'styleRules', index] as DiagnosticSegment[];
-    const id = rule.id;
-    if (typeof id === 'string') {
-      if (codePointLength(id) > MAX_STYLE_RULE_ID_CODE_POINTS) {
-        collector.add(
-          'DOCUMENT_FIELD_INVALID',
-          at([...base, 'id']),
-          phase,
-          `Style rule id exceeds ${MAX_STYLE_RULE_ID_CODE_POINTS} code points.`,
-        );
-        clean = false;
-      }
-      if (seenIds.has(id)) {
-        collector.add(
-          'DOCUMENT_FIELD_INVALID',
-          at([...base, 'id']),
-          phase,
-          'Style rule ids must be unique within a component.',
-        );
-        clean = false;
-      }
-      seenIds.add(id);
+  const fail = (path: DiagnosticSegment[], message: string, code = 'DOCUMENT_FIELD_INVALID') => {
+    collector.add(code as 'DOCUMENT_FIELD_INVALID', at(path), phase, message);
+    clean = false;
+  };
+  const ids = new Set<string>();
+  states.items.forEach((item, index) => {
+    if (!isJsonObject(item)) return;
+    const base = [...statesBase, 'items', index] as DiagnosticSegment[];
+    const id = item.id as string;
+    if (id === RESERVED_STATE_ID) {
+      fail([...base, 'id'], 'State id "default" is reserved for the implicit default state.');
+    } else if (ids.has(id)) {
+      fail([...base, 'id'], 'State ids must be unique within a component.');
     }
-    const when = rule.when;
-    if (!isJsonObject(when)) continue;
-    if (Array.isArray(when.path)) {
-      for (let segmentIndex = 0; segmentIndex < when.path.length; segmentIndex++) {
-        const segment = when.path[segmentIndex];
-        if (
-          typeof segment === 'string' &&
-          codePointLength(segment) > MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS
-        ) {
-          collector.add(
-            'DOCUMENT_FIELD_INVALID',
-            at([...base, 'when', 'path', segmentIndex]),
-            phase,
-            `Style rule path segment exceeds ${MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS} code points.`,
-          );
-          clean = false;
-        }
-      }
+    ids.add(id);
+    const name = item.name as string;
+    if (codePointLength(name) > MAX_COMPONENT_STATE_NAME_CODE_POINTS) {
+      fail(
+        [...base, 'name'],
+        `State name exceeds ${MAX_COMPONENT_STATE_NAME_CODE_POINTS} code points.`,
+      );
+    } else if (hasControlCharacter(name) || !/\S/.test(name)) {
+      fail([...base, 'name'], 'State name must be visible text without control characters.');
+    }
+  });
+  const judge = states.judge;
+  if (!isJsonObject(judge) || !Array.isArray(judge.cases)) return clean;
+  judge.cases.forEach((entry, index) => {
+    if (!isJsonObject(entry)) return;
+    const base = [...statesBase, 'judge', 'cases', index] as DiagnosticSegment[];
+    if (!ids.has(entry.stateId as string)) {
+      fail([...base, 'stateId'], 'State case must point at a state declared by this component.');
     }
     if (
-      when.value !== undefined &&
-      canonicalByteLength(when.value as ScreenJsonValue) > MAX_STYLE_RULE_VALUE_BYTES
+      entry.value !== undefined &&
+      canonicalByteLength(entry.value as ScreenJsonValue) > MAX_COMPONENT_STATE_VALUE_BYTES
     ) {
-      collector.add(
+      fail(
+        [...base, 'value'],
+        `State case value exceeds ${MAX_COMPONENT_STATE_VALUE_BYTES} UTF-8 bytes.`,
         'DOCUMENT_LIMIT_EXCEEDED',
-        at([...base, 'when', 'value']),
-        phase,
-        `Style rule value exceeds ${MAX_STYLE_RULE_VALUE_BYTES} UTF-8 bytes.`,
       );
-      clean = false;
     }
-  }
+  });
   return clean;
 }

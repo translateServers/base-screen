@@ -31,7 +31,7 @@
 - 「数据源」页只有一条渲染路径：`datasetPort` 是否提供只决定 `dataset` 选项可用性，不得再用它决定渲染哪套面板；面板按 `data-ds-section` 分段，状态变化只换受影响段。
 - 图片资产（上传、存储、转码、CDN、目录、权限与删除保护）归宿主，Base Screen 只提供统一资源选择桥与有界校验，不建立资产目录或网络客户端。文档只存 `host-resource` 身份，`static` URL 仅用于历史/外部图片。组件提交只写 legacy `dataSource`，且只接受没有 `dataValue` 键的组件——命令不能删键，契约禁止两种取值写法并存。
 - 在线物料包由宿主生成 ESM 并负责审核与 `import()`；Base Screen 不 fetch，只接收重建后的 catalog。物料 `type` 跨构建稳定，代码更新用同 type 配新 tagName/constructor，文档与 Manifest 不存版本字段。
-- 宿主实时告警与条件样式只经 `conditionalStylePort` 与 `refreshConditionalStyles()` 适配：快照变化只重算样式，不取数、不写文档、不进历史，屏幕文档保持零告警知识。
+- 宿主告警以数据接入（普通或推送数据源，ADR-0110 §2.6）：宿主给出等级，等级对应的外观由组件状态与文档状态色位决定；宿主不向大屏注入样式。
 - 事件 Blueprint：`blueprint.relations` 是唯一持久化模型，运行时规则由 `deriveScreenBlueprintRules` 派生且**不得写回文档**；`blueprint.layout` 只存节点位置与视口，其余选择/拖动/高亮属 session。宿主启用工作台必须经 `blueprintCapability` 声明能力，未授权能力失败关闭。
 - 宿主作者扩展只用公开 Custom Element method/event 与 JSON-safe authoring bridge；不得依赖 Engine 私有 Shadow DOM、内部 Store、`src` 路径或未声明的 UI 注入逃生口。
 
@@ -55,7 +55,9 @@
 - **plugin 三层：** `plugin-core` 是唯一契约层；`plugin-manager` 与 `plugin-sdk` 可依赖 `contracts` 与 `plugin-core`，二者不得互相依赖。
 - **material 与 renderer：** 物料契约归 `plugin-core` 拥有；renderer 只经其 catalog 渲染，不依赖具体官方物料。
 - **UI 文案边界**：用户可见字符串集中到 `common/ui-text/designer-ui-text.ts`，不得内联硬编码。`check-designer-ui.mjs` 扫描整个 `browser/` 树，字符串字面量出现 CJK 即失败，且禁止引入 `i18n`/`locale`/`language` 机制。
-- **物料原子化**：一个物料只做一件事，不内建标题、说明或装饰性文案——需要标题时由文档层另放 `base.text` 组合。判定：prop 属于"读数本身的构成"（单位、前后缀、表头列名）则保留；只是"描述这个组件是什么"则移除。`material-atomicity.mjs` 把它变成可执行检查：禁止读取 manifest 未声明的 `props`/`style` 键。图表类的 `title`/`legend`/`axis` 按脚本豁免名单处理，非图表物料一律不豁免。
+- **物料原子化**：一个物料只做一件事，不内建标题、说明或装饰性文案——需要标题时由文档层另放 `base.text` 组合。判定：prop 属于"读数本身的构成"（单位、前后缀、表头列名）则保留；只是"描述这个组件是什么"则移除。`material-atomicity.mjs` 把它变成可执行检查：禁止读取 manifest 未声明的 `props`/`style` 键。图表类的 `title`/`legend`/`axis` 按脚本豁免名单处理，非图表物料一律不豁免。判据（T1–T5）、props/style 分界、检查器分区与样式键词典见 ADR-0099，门禁 R4–R9 与存量违规清单 `PARADIGM_DEBT` 也落在 `material-atomicity.mjs`；标题、图例等由文档层组合承担，组合分片见 ADR-0100（ADR 均在 `base-screen-docs` 仓库 `decisions/`）。
+- **检查器表单范式**（ADR-0102）：物料的检查器只写 `editorDescriptor`，扁平 `propertyPanel`/`stylePanel` 留空（引擎会把第三方的扁平面板转换成描述符，仓库内物料不再写）。字段只声明语义（schema、范围、`unit`），`control` 省略、由解析期推导；小数位、千分位、前缀、单位、图表标题、图例用 `plugin-sdk` 的配置组。物料包的测试对每个 manifest 断言 `auditBaseScreenMaterialEditorForm(manifest)` 为空；控件外观由 browser-harness 的 `assert-inspector-form-consistency` 按计算样式校验。
+- **组件工坊**（ADR-0105）：在线原子组件写 `plugin-sdk` 的物料规格（`BaseScreenMaterialSpec`）+ 渲染函数，Manifest 由 `compileBaseScreenMaterialSpec` 派生、元素骨架由 `createBaseScreenSpecMaterialDefinition` 生成，发布前跑 `auditBaseScreenMaterialSpec`；组合组件保存前跑 `auditBaseScreenFragment`。样式键词典在 `material-atomicity.mjs` 与 `plugin-sdk/src/material-style-keys.ts` 各一份，改一处必须同步另一处（`tests/tooling/material-style-keys.test.ts` 锁定）。工坊界面是宿主代码（三端 `src/screen/component-workshop.ts` 逐字共享），browser-harness 用 `?designer&workshop` 挂载。
 - **物料渲染盒不变式**：物料宿主元素的渲染盒必须等于 canonical `component.size`——渲染器先写像素宽高再赋 `model`，故 `renderMaterial()` 里写宿主 `width`/`height` 会覆盖声明尺寸；画边框必须 `box-sizing: border-box`。
 - **sdk 聚合层**：`base-screen` 只做组合与转发，不得实现 contracts、core、renderer、engine、material 或 plugin-manager 的领域与运行时逻辑；包内实现仍直接经各包公共导出交互，不得经 sdk 反向耦合。
 - **轻量 Viewer**：`createBaseScreenViewerRuntime()` 不得静态引入 Designer 或全部官方物料，参数默认 `{}`、默认目录为空。此边界约束浏览器 bundle。

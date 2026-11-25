@@ -12,19 +12,17 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  * | KPI 读数 | `board.digital-flop` ← `kpi-alarm-value` | `host-resource` `demo_metric` `alarm_open` |
  * | 等级色块 | 3 组「矩形色块 + 翻牌读数」 | `demo_metric` `alarm_critical` / `alarm_warning` / `alarm_info` |
  *
- * **演示 key 的对齐是这张屏的存在理由**：告警绑定按大屏持久化在宿主后端
- * （`ScreenAlarmBinding`），种子把 `alarm.open` 映射到两个**组件 id**
- * （`kpi-alarm-value`、`top-notice`）作为开箱模板；组件检查器的「业务条件样式」段可以
- * 增删改这份映射。因此这里的两个组件沿用与生产监控屏相同的 id 与基础色，种子屏
- * 一行命令就能被 `POST /api/demo/alarms/raise { key: 'alarm.open' }` 换色。反过来说，
- * **文档里没有告警 key、阈值或样式规则**——告警判定与视觉映射都归宿主。
+ * **宿主只给分级、本屏决定样式**（ADR-0110 §2.6）：数据源 `alarm_open` 是宿主的推送资源
+ * （`host-resource` · `alarm` / `alarm.open`），值为 `{ level, count }`，等级由宿主的告警规则算出；
+ * `kpi-alarm-value`、`top-notice` 用「按分级生成状态」得到严重 / 一般 / 提示三个状态，判定取
+ * `alarm_open.level`，颜色引用文档状态色位。文档只存告警资源身份与「等级 → 状态」，阈值与告警
+ * 生命周期留在宿主；`POST /api/demo/alarms/raise { key: 'alarm.open' }` 即可看到状态切换。
  *
  * 等级色板的单一来源是 `plugin-materials` 的 `BOARD_ALARM_LEVEL_COLORS`。后端
  * 不 import 插件包（CJS 宿主不依赖 ESM 插件），所以这里写同值字面量，由根测试
  * `tests/examples/board-alarm-document.test.ts` 逐色比对，避免两处各改一半。
  *
- * 版式纪律（与其余种子同）：所有组件都是**根节点**，组壳几何由引擎持有；把色块当
- * 父节点会在第一次无关编辑时被压平。
+ * 版式纪律（与其余种子同）：所有组件都是**根节点**，整体搬动靠编辑期的成组。
  *
  * 数据纪律：文档里只写"形状"，不写时间戳与随机值；读数全部来自演示指标接口与宿主
  * 变量，因此整份种子是确定性的，可被根级文档测试逐字段断言。
@@ -59,9 +57,34 @@ interface DemoComponent {
   readonly props: Readonly<Record<string, unknown>>;
   readonly style: Readonly<Record<string, unknown>>;
   readonly dataSource: unknown;
+  readonly states?: unknown;
 }
 
 const components: DemoComponent[] = [];
+
+/** 宿主分级（critical / warning / info）→ 组件状态；颜色引用状态色位，改主题即全屏同步。 */
+function alarmStates(extra: Readonly<Record<string, unknown>> = {}): unknown {
+  const tone = { critical: 'danger', warning: 'warning', info: 'info' } as const;
+  const names = { critical: '严重', warning: '一般', info: '提示' } as const;
+  const levels = ['critical', 'warning', 'info'] as const;
+  return {
+    items: levels.map((level) => ({
+      id: level,
+      name: names[level],
+      style: { color: `theme:${tone[level]}`, ...(level === 'info' ? {} : extra) },
+    })),
+    judge: {
+      input: { kind: 'data-source-field', dataSourceId: 'alarm_open', path: ['level'] },
+      cases: levels.map((level) => ({ operator: 'eq', value: level, stateId: level })),
+    },
+  };
+}
+
+function withStates(id: string, states: unknown): void {
+  const index = components.findIndex((component) => component.id === id);
+  if (index < 0) throw new Error(`state target not found: ${id}`);
+  components[index] = { ...components[index]!, states };
+}
 let zIndex = 0;
 
 function push(component: Omit<DemoComponent, 'zIndex'>): void {
@@ -163,11 +186,10 @@ function frame(id: string, name: string, box: Box): void {
     size: { width, height },
     rotation: 0,
     status: { locked: false, hidden: false },
-    props: { borderStyle: 'corner-brackets', bracketSize: 16, lineWidth: 2 },
+    props: { borderStyle: 'corner-brackets', bracketSize: 16 },
     style: {
       backgroundColor: 'rgba(10, 16, 26, .55)',
       borderColor: '#7a2a33',
-      color: '#c98b93',
     },
     dataSource: null,
   });
@@ -196,7 +218,7 @@ function flop(
     status: { locked: false, hidden: false },
     props: {
       prefix: '',
-      suffix: '',
+      unit: '',
       decimals: 0,
       thousandsSeparator: true,
       flipAnimation: true,
@@ -245,7 +267,6 @@ function selectorBoard(
       // 选择器必须静止：轮播会让「点第三行」变成点一个不断移动的目标。
       autoScroll: false,
       statusColumn: '',
-      statusPalette: {},
     },
     style: {
       backgroundColor: 'rgba(9, 18, 30, .7)',
@@ -283,7 +304,7 @@ text('top-notice-label', '播报前缀', [596, 56, 52, 18], '播报：', {
   fontSize: 12,
   textAlign: 'right',
 });
-// 与生产监控屏同 id、同基础色：宿主 `alarm.open` 的 warning/critical 覆盖直接命中。
+// 与生产监控屏同 id、同基础色；告警等级经组件状态改色（见文件末尾 withStates）。
 variableText('top-notice', '告警播报', [652, 56, 720, 18], 'notice', {
   color: '#ffd591',
   fontSize: 13,
@@ -387,7 +408,6 @@ push({
     autoScroll: true,
     // 等级色列：`level` 是绑定的第二列，行左侧出现 4px 色条 + 等级文字染色。
     statusColumn: 'level',
-    statusPalette: { ...LEVEL_COLORS, default: '#6b7d8f' },
   },
   style: {
     backgroundColor: 'transparent',
@@ -397,6 +417,11 @@ push({
     borderColor: '#22364d',
     fontSize: 13,
     rowHeight: 40,
+    // 等级语义色与色块同源（ADR-0099：等级色是 style，可被宿主条件样式覆盖）。
+    criticalColor: LEVEL_COLORS.critical,
+    warningColor: LEVEL_COLORS.warning,
+    infoColor: LEVEL_COLORS.info,
+    unknownColor: '#6b7d8f',
   },
   dataSource: {
     type: 'dataset',
@@ -424,10 +449,10 @@ rectangle('guide-card', '演示链路卡片底', [1280, 312, 608, 232], {
   borderRadius: 6,
 });
 const GUIDE_LINES: readonly string[] = [
-  '① 业务系统把 alarm.open 映射到 kpi-alarm-value 与 top-notice',
-  '② warning → #fa8c16 ／ critical → #f5222d，只改样式不改文档',
-  '③ SSE 到达即重算条件样式，一帧只失效一次',
-  '④ clear 后回到文档基础色，canonical 文档字节不变',
+  '① 宿主告警规则给出 alarm.open 的等级，经推送数据源 alarm_open 到达',
+  '② 组件状态按等级判定：严重 → 危险色，一般 → 警告色，提示 → 提示色',
+  '③ 颜色引用文档状态色位，改主题色板即全屏同步',
+  '④ clear 后等级为空，组件回到默认外观',
   '⑤ POST /api/demo/alarms/raise { key: "alarm.open", level: "critical" }',
   '⑥ POST /api/demo/alarms/clear { key: "alarm.open" }',
 ];
@@ -459,7 +484,7 @@ const CALIBER_LINES: readonly string[] = [
   '未处理告警：当前未确认快照，不按产线拆分',
   '等级计数：近 1 小时新增（critical / warning / info）',
   '告警流水：所选产线、近 60 分钟、最多 20 条',
-  '等级色板与流水的 statusPalette 同源：#f5222d / #fa8c16 / #1677ff',
+  '等级色板与流水的等级语义色同源：#f5222d / #fa8c16 / #1677ff',
   '读数来自演示指标接口，只保证确定性，不对应真实告警台账',
 ];
 CALIBER_LINES.forEach((line, index) => {
@@ -557,6 +582,9 @@ text(
   { color: '#4a6b85', fontSize: 11, textAlign: 'right' },
 );
 
+withStates('kpi-alarm-value', alarmStates());
+withStates('top-notice', alarmStates({ fontWeight: '700' }));
+
 export const BOARD_ALARM_DOCUMENT = {
   canvas: {
     width: 1920,
@@ -573,6 +601,16 @@ export const BOARD_ALARM_DOCUMENT = {
     },
   },
   components,
+  // 宿主告警汇总（ADR-0110 §2.6）：推送更新，不轮询。
+  dataSources: [
+    {
+      id: 'alarm_open',
+      name: '未处理告警等级',
+      source: { kind: 'host-resource' as const, resourceType: 'alarm', resourceId: 'alarm.open' },
+      params: {},
+      updatePolicy: { mode: 'push' as const },
+    },
+  ],
   variables: [
     // `name` 必须是 ASCII 标识符（canonical schema 的 `VARIABLE_NAME_INVALID` 拒绝中文），
     // 中文说明放 `description`。
@@ -627,59 +665,30 @@ export const BOARD_ALARM_DOCUMENT = {
     },
   ],
   blueprint: {
-    // 两条关系形态一致：选择器 rowClick → set-variable；`event-payload` 路径取自物料
+    // 两条连线形态一致：选择器 rowClick → 变量 set；`event-payload` 路径取自物料
     // 事件 payload 的 `{ rowIndex, row }`。
-    relations: [
+    nodes: [
+      { kind: 'component' as const, id: 'component:sel-line', componentId: 'sel-line' },
+      { kind: 'component' as const, id: 'component:sel-severity', componentId: 'sel-severity' },
+      { kind: 'variable' as const, id: 'variable:line', variableId: 'line' },
+      { kind: 'variable' as const, id: 'variable:severity', variableId: 'severity' },
+    ],
+    edges: [
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'rule-line',
-        source: {
-          kind: 'component' as const,
-          componentId: 'sel-line',
-          event: { type: 'material-event' as const, eventName: 'rowClick' },
-        },
-        target: { kind: 'variable' as const, variableId: 'line' },
-        effect: {
-          type: 'set-variable' as const,
-          value: { kind: 'event-payload' as const, path: ['row', 'line'] },
-        },
+        from: { node: 'component:sel-line', port: 'event:rowClick' },
+        to: { node: 'variable:line', port: 'set' },
+        value: { kind: 'event-payload' as const, path: ['row', 'line'] },
       },
       {
-        type: 'behavior' as const,
+        kind: 'flow' as const,
         id: 'rule-severity',
-        source: {
-          kind: 'component' as const,
-          componentId: 'sel-severity',
-          event: { type: 'material-event' as const, eventName: 'rowClick' },
-        },
-        target: { kind: 'variable' as const, variableId: 'severity' },
-        effect: {
-          type: 'set-variable' as const,
-          value: { kind: 'event-payload' as const, path: ['row', 'level'] },
-        },
+        from: { node: 'component:sel-severity', port: 'event:rowClick' },
+        to: { node: 'variable:severity', port: 'set' },
+        value: { kind: 'event-payload' as const, path: ['row', 'level'] },
       },
     ],
-  },
-} as const;
-
-/**
- * 宿主侧告警绑定的开箱值：`alarm.open` × 两个组件 × warning/critical。
- *
- * 落库位置是 `ScreenAlarmBinding`（按 screenId），不再由前端用常量硬编码——页面里
- * 的「业务条件样式」段读取和覆盖的就是这份数据。样式键必须落在目标物料的
- * Manifest styleSchema 内（digital-flop 只有 color；base.text 额外支持 fontWeight），
- * 根级测试会对着 manifest 与种子文档核验。
- */
-export const ALARM_DEMO_BINDINGS = {
-  'alarm.open': {
-    'kpi-alarm-value': {
-      warning: { color: '#fa8c16' },
-      critical: { color: '#f5222d' },
-    },
-    'top-notice': {
-      warning: { color: '#fa8c16', fontWeight: '700' },
-      critical: { color: '#f5222d', fontWeight: '700' },
-    },
   },
 } as const;
 

@@ -1,10 +1,15 @@
 import type {
-  ScreenBlueprintBehaviorRelation,
   ScreenBlueprintCondition,
+  ScreenBlueprintFlowEdge,
+  ScreenBlueprintNode,
   ScreenBlueprintValueExpression,
   ScreenDocument,
 } from '@base-screen/contracts';
-import { SCREEN_BLUEPRINT_CAPABILITIES } from '@base-screen/contracts';
+import {
+  readScreenBlueprintEventPort,
+  SCREEN_BLUEPRINT_CAPABILITIES,
+  screenBlueprintEdgeAction,
+} from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
@@ -12,6 +17,20 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { hasDesignerBlueprintCapability } from '../../../common/operations/blueprint/designer-blueprint-capabilities.js';
+import { findComponentBlueprintNode } from '../../../common/operations/blueprint/designer-blueprint-graph.js';
+
+/** 组件事件锚点连出的一条连线及其目标节点（组件检查器的「交互事件」摘要用）。 */
+interface DesignerEventEdge {
+  readonly edge: ScreenBlueprintFlowEdge;
+  readonly eventName: string;
+  readonly target: ScreenBlueprintNode | undefined;
+  /** 目标是条件节点时，其 yes / no 锚点连出的动作连线（按执行顺序）；否则就是这条连线自身。 */
+  readonly actions: readonly {
+    readonly edge: ScreenBlueprintFlowEdge;
+    readonly target: ScreenBlueprintNode | undefined;
+  }[];
+}
+
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerButton } from '../designer-ui-primitives.js';
 
@@ -45,13 +64,27 @@ export function renderDesignerEventsPanel(
   if (panel === undefined) return;
   panel.replaceChildren();
   const focused = interaction.focusedComponentId;
-  const relations =
-    document?.blueprint.relations.filter(
-      (relation): relation is ScreenBlueprintBehaviorRelation =>
-        relation.type === 'behavior' &&
-        relation.source.kind === 'component' &&
-        relation.source.componentId === focused,
-    ) ?? [];
+  const node =
+    document === undefined || focused === null || focused === undefined
+      ? undefined
+      : findComponentBlueprintNode(document.blueprint, focused);
+  const nodes = new Map(document?.blueprint.nodes.map((item) => [item.id, item]) ?? []);
+  const relations: DesignerEventEdge[] = [];
+  for (const edge of document?.blueprint.edges ?? []) {
+    if (edge.kind !== 'flow' || node === undefined || edge.from.node !== node.id) continue;
+    const eventName = readScreenBlueprintEventPort(edge.from.port);
+    if (eventName === undefined) continue;
+    const target = nodes.get(edge.to.node);
+    const actions =
+      target?.kind === 'condition'
+        ? (document?.blueprint.edges ?? []).flatMap((next) =>
+            next.kind === 'flow' && next.from.node === target.id
+              ? [{ edge: next, target: nodes.get(next.to.node) }]
+              : [],
+          )
+        : [{ edge, target }];
+    relations.push({ edge, eventName, target, actions });
+  }
   const preferenceContext = document?.components.find((item) => item.id === focused)?.type;
   const events = getDesignerFocusedMaterialEvents(document, interaction, catalog);
   const descriptors = getDesignerFocusedEventDescriptors(document, interaction, catalog);
@@ -88,17 +121,14 @@ export function renderDesignerEventsPanel(
 
 function appendInteractionEventGroup(
   panel: HTMLElement,
-  relations: readonly ScreenBlueprintBehaviorRelation[],
+  relations: readonly DesignerEventEdge[],
   declaredEvents: readonly string[],
   descriptors: readonly BaseScreenMaterialEventDescriptor[],
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
   preferenceContext: string | undefined,
 ): void {
   const eventNames = [
-    ...new Set([
-      ...declaredEvents,
-      ...relations.map((relation) => relation.source.event.eventName),
-    ]),
+    ...new Set([...declaredEvents, ...relations.map((relation) => relation.eventName)]),
   ];
   const { body } = appendBlueprintGroup(
     panel,
@@ -113,9 +143,7 @@ function appendInteractionEventGroup(
   }
   for (const eventName of eventNames) {
     const descriptor = descriptors.find((candidate) => candidate.name === eventName);
-    const eventRelations = relations.filter(
-      (relation) => relation.source.event.eventName === eventName,
-    );
+    const eventRelations = relations.filter((relation) => relation.eventName === eventName);
     const event = panel.ownerDocument.createElement('section');
     event.className = 'designer-blueprint-event';
     const header = panel.ownerDocument.createElement('header');
@@ -163,31 +191,36 @@ function readDeclaredAction(
 
 function renderRelationCard(
   panel: HTMLElement,
-  relation: ScreenBlueprintBehaviorRelation,
+  relation: DesignerEventEdge,
   index: number,
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
 ): HTMLElement {
   const card = panel.ownerDocument.createElement('article');
   card.className = 'designer-blueprint-rule-card';
-  card.dataset.blueprintSummaryRule = relation.id;
-  card.dataset.blueprintSummaryRelation = relation.id;
+  // 卡片以首个动作连线标识（经条件节点时就是 yes 分支的第一条），与工作台定位的连线一致。
+  const anchorEdge = relation.actions[0]?.edge.id ?? relation.edge.id;
+  card.dataset.blueprintSummaryRule = anchorEdge;
+  card.dataset.blueprintSummaryRelation = anchorEdge;
   const header = panel.ownerDocument.createElement('header');
   const title = panel.ownerDocument.createElement('strong');
   title.textContent = DESIGNER_UI_TEXT.blueprint.relationSummary(index + 1);
   const status = panel.ownerDocument.createElement('span');
   status.className = 'designer-blueprint-state';
-  status.dataset.state = 'ready';
-  status.textContent = DESIGNER_UI_TEXT.blueprint.enabled;
+  const enabled = relation.target?.enabled !== false;
+  status.dataset.state = enabled ? 'ready' : 'pending';
+  status.textContent = enabled
+    ? DESIGNER_UI_TEXT.blueprint.enabled
+    : DESIGNER_UI_TEXT.blueprint.graph.disabled;
   header.append(title, status);
   const facts = panel.ownerDocument.createElement('dl');
   facts.className = 'designer-blueprint-rule-facts';
-  appendDefinition(facts, DESIGNER_UI_TEXT.blueprint.eventType, relation.source.event.eventName);
+  appendDefinition(facts, DESIGNER_UI_TEXT.blueprint.eventType, relation.eventName);
   appendDefinition(
     facts,
     DESIGNER_UI_TEXT.blueprint.triggerCondition,
-    relation.condition === undefined
-      ? DESIGNER_UI_TEXT.blueprint.noCondition
-      : conditionSummary(relation.condition),
+    relation.target?.kind === 'condition'
+      ? conditionSummary(relation.target.condition)
+      : DESIGNER_UI_TEXT.blueprint.noCondition,
   );
   appendDefinition(facts, DESIGNER_UI_TEXT.blueprint.relationNode.target, targetLabel(relation));
   const effects = panel.ownerDocument.createElement('div');
@@ -195,53 +228,84 @@ function renderRelationCard(
   const heading = panel.ownerDocument.createElement('strong');
   heading.textContent = DESIGNER_UI_TEXT.blueprint.interactionActions;
   effects.appendChild(heading);
-  effects.appendChild(renderEffect(panel, relation, runtimeContributions));
+  for (const action of relation.actions) {
+    effects.appendChild(renderEffect(panel, action, runtimeContributions));
+  }
+  if (relation.actions.length === 0) {
+    effects.appendChild(blueprintEmpty(panel.ownerDocument, DESIGNER_UI_TEXT.blueprint.noActions));
+  }
   card.append(header, facts, effects);
   return card;
 }
 
-function targetLabel(relation: ScreenBlueprintBehaviorRelation): string {
-  if (relation.target.kind === 'component') return relation.target.componentId;
-  if (relation.target.kind === 'variable') return relation.target.variableId;
-  return DESIGNER_UI_TEXT.blueprint.hostNode;
+function targetLabel(relation: DesignerEventEdge): string {
+  const target = relation.target;
+  if (target === undefined) return relation.edge.to.node;
+  if (target.kind === 'component') return target.componentId;
+  if (target.kind === 'variable') return target.variableId;
+  if (target.kind === 'host') return DESIGNER_UI_TEXT.blueprint.hostNode;
+  return target.kind === 'timer' || target.kind === 'condition'
+    ? (target.name ?? DESIGNER_UI_TEXT.blueprint.graph.nodeKinds[target.kind])
+    : DESIGNER_UI_TEXT.blueprint.graph.nodeKinds[target.kind];
 }
 
 function renderEffect(
   panel: HTMLElement,
-  relation: ScreenBlueprintBehaviorRelation,
+  relation: DesignerEventEdge['actions'][number],
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
 ): HTMLElement {
   const row = panel.ownerDocument.createElement('div');
   row.className = 'designer-blueprint-action-row';
   const title = panel.ownerDocument.createElement('strong');
   const value = panel.ownerDocument.createElement('small');
-  const effect = relation.effect;
-  if (effect.type === 'set-variable') {
-    title.textContent = DESIGNER_UI_TEXT.blueprint.setVariableAction(
-      relation.target.kind === 'variable' ? relation.target.variableId : '',
-    );
-    value.textContent = expressionSummary(effect.value);
-  } else if (effect.type === 'emit-host-event') {
-    title.textContent = DESIGNER_UI_TEXT.blueprint.emitHostEventAction(effect.eventName);
-    value.textContent = expressionSummary(effect.payload);
-  } else if (effect.type === 'component-visibility') {
-    title.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityAction} · ${relation.target.kind === 'component' ? relation.target.componentId : ''} · ${effect.operation}`;
-    value.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityTransition} · ${effect.transition?.effect ?? 'appear'}`;
-  } else if (effect.type === 'request-variable') {
-    title.textContent = `request-variable · ${relation.target.kind === 'variable' ? relation.target.variableId : ''}`;
+  const action =
+    relation.target === undefined
+      ? undefined
+      : screenBlueprintEdgeAction(relation.edge, relation.target);
+  if (action === undefined) {
+    title.textContent = DESIGNER_UI_TEXT.blueprint.graph.nodeKinds.condition;
+    value.textContent = DESIGNER_UI_TEXT.blueprint.graph.ports.judge ?? '';
+  } else if (action.type === 'set-variable') {
+    title.textContent = DESIGNER_UI_TEXT.blueprint.setVariableAction(action.variableId);
+    value.textContent = expressionSummary(action.value);
+  } else if (action.type === 'emit-host-event') {
+    title.textContent = DESIGNER_UI_TEXT.blueprint.emitHostEventAction(action.eventName);
+    value.textContent = expressionSummary(action.payload);
+  } else if (action.type === 'component-visibility') {
+    title.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityAction} · ${action.componentId} · ${action.operation}`;
+    value.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityTransition} · ${action.transition?.effect ?? 'appear'}`;
+  } else if (action.type === 'request-variable') {
+    title.textContent = `request-variable · ${action.variableId}`;
     value.textContent = DESIGNER_UI_TEXT.blueprint.globalVariables;
-  } else if (effect.type === 'request-component-data') {
-    title.textContent = `request-component-data · ${relation.target.kind === 'component' ? relation.target.componentId : ''}`;
+  } else if (action.type === 'request-component-data') {
+    title.textContent = `request-component-data · ${action.componentId}`;
     value.textContent = DESIGNER_UI_TEXT.blueprint.layers;
+  } else if (action.type === 'canvas-visibility') {
+    title.textContent = DESIGNER_UI_TEXT.blueprint.canvasAction(
+      DESIGNER_UI_TEXT.blueprint.graph.subCanvasPorts.popup[action.operation] ?? action.operation,
+      action.canvasId,
+    );
+    value.textContent = DESIGNER_UI_TEXT.blueprint.canvases;
+  } else if (action.type === 'page-navigation') {
+    title.textContent =
+      DESIGNER_UI_TEXT.blueprint.graph.mainCanvasPorts[action.operation] ?? action.operation;
+    value.textContent = DESIGNER_UI_TEXT.blueprint.canvases;
+  } else if (action.type === 'component-state') {
+    title.textContent = `${
+      DESIGNER_UI_TEXT.blueprint.graph.ports[
+        action.operation === 'set' ? 'set-state' : 'reset-state'
+      ] ?? action.operation
+    } · ${action.componentId}`;
+    value.textContent = action.stateId ?? '';
   } else {
     // ADR-0076：宿主动作由插件声明。已声明显示其清单名，未声明明确标出——
     // 执行侧同样会失败关闭，作者面提前把同一事实讲清楚。
-    const declared = readDeclaredAction(runtimeContributions, effect.actionId);
+    const declared = readDeclaredAction(runtimeContributions, action.actionId);
     title.textContent =
       declared === undefined
-        ? DESIGNER_UI_TEXT.blueprint.hostActionUndeclared(effect.actionId)
-        : DESIGNER_UI_TEXT.blueprint.hostActionDeclared(declared.name, effect.actionId);
-    value.textContent = expressionSummary(effect.payload);
+        ? DESIGNER_UI_TEXT.blueprint.hostActionUndeclared(action.actionId)
+        : DESIGNER_UI_TEXT.blueprint.hostActionDeclared(declared.name, action.actionId);
+    value.textContent = expressionSummary(action.payload);
   }
   row.append(title, value);
   return row;

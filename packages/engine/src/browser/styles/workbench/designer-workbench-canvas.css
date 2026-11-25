@@ -321,7 +321,7 @@
 
 /* 智能对齐线（参考 Moveable/Nebula）：走强调色族（编辑 affordance），参考线 1px，
    吸附目标线（active）2px 更醒目 + 柔和发光，距离标签显示间距；
-   仅渲染阈值（1px）内的命中才显示，吸附与渲染分离。 */
+   吸上即显示（每个吸附轴一条，贴角时两条）；拖动中未移动的轴、拉伸手柄不作用的轴不标线。 */
 .canvas-guide-snap {
   background: var(--designer-snap-guide);
 }
@@ -427,6 +427,24 @@
   translate: 0 -50%;
 }
 
+/* 等间距标注（tldraw / Penpot）：与同排其它间距精确相等时，实线 + 强调色读数胶囊，
+   和对齐轨道上的普通虚线间距区分。 */
+.canvas-measurement-equal[data-axis="x"] {
+  border-top-style: solid;
+}
+
+.canvas-measurement-equal[data-axis="y"] {
+  border-left-style: solid;
+}
+
+.canvas-measurement-equal .canvas-measurement-label {
+  padding: 0 calc(var(--designer-overlay-pixel, 1px) * 4);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-snap-guide);
+  color: var(--designer-text-on-accent);
+  text-shadow: none;
+}
+
 .canvas-guide[data-axis="x"] {
   top: 0;
   bottom: 0;
@@ -438,6 +456,40 @@
   left: 0;
   height: var(--designer-overlay-pixel, 1px);
   transform: translateY(-50%);
+}
+
+/* 吸附点 × 标记（Penpot / Grida / tldraw）：标出这条线因哪些点重合而出现，屏幕尺寸固定。 */
+.canvas-guide-marker {
+  position: absolute;
+  width: var(--designer-overlay-marker-size, 6px);
+  height: var(--designer-overlay-marker-size, 6px);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.canvas-guide[data-axis="x"] > .canvas-guide-marker {
+  left: 50%;
+}
+
+.canvas-guide[data-axis="y"] > .canvas-guide-marker {
+  top: 50%;
+}
+
+.canvas-guide-marker::before,
+.canvas-guide-marker::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 141%;
+  height: var(--designer-overlay-pixel, 1px);
+  background: var(--designer-snap-guide);
+  content: "";
+  translate: -50% -50%;
+  rotate: 45deg;
+}
+
+.canvas-guide-marker::after {
+  rotate: -45deg;
 }
 /* 选中框视觉轮廓与吸附锚点使用同一选区几何（组件包围盒）：
    outline-offset 取 -1px 使 2px 轮廓以边缘为中线，与 1px 吸附预览线重合。 */
@@ -771,9 +823,8 @@
   height: 100%;
 }
 
-/* 草案条与场景预览条：声明「未写入」，采纳/放弃与对比旧版都从这里进出。 */
-.designer-draft-bar,
-.designer-scene-bar {
+/* 草案条：声明「未写入」，采纳/放弃与对比旧版都从这里进出。 */
+.designer-draft-bar {
   position: absolute;
   top: var(--designer-space-4);
   left: 50%;
@@ -793,7 +844,7 @@
   white-space: nowrap;
 }
 
-/* 智能体草案条：与场景预览条共用悬浮位置，但按 Vercel 式信息分段组织。 */
+/* 智能体草案条：按 Vercel 式信息分段组织。 */
 .designer-draft-bar {
   min-height: 42px;
   gap: 0;
@@ -857,19 +908,14 @@
   text-overflow: ellipsis;
 }
 
-.designer-draft-bar[hidden],
-.designer-scene-bar[hidden] {
+.designer-draft-bar[hidden] {
   display: none;
 }
 
-.draft-actions,
-.scene-bar-actions {
+.draft-actions {
   display: flex;
   align-items: center;
   gap: var(--designer-space-2);
-}
-
-.draft-actions {
   padding-left: var(--designer-space-3);
   border-left: 1px solid var(--designer-border-subtle);
 }
@@ -878,26 +924,6 @@
    只靠 4px 等距时，两个实心块会和前两个文字键连成一片。 */
 .draft-actions [data-change-action="discard"] {
   margin-left: var(--designer-space-2);
-}
-
-.scene-bar-dot {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: var(--designer-radius-pill);
-  background: var(--designer-warning);
-}
-
-.scene-bar-label {
-  color: var(--designer-warning);
-  font-weight: 600;
-}
-
-.scene-bar-name {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--designer-text-primary);
-  text-overflow: ellipsis;
 }
 
 /* 目标屏叠加：安全区 / 拼接缝 / 3m 标注。只做显示，不参与布局、不接收指针事件。 */
@@ -937,7 +963,7 @@
   position: absolute;
   top: 56px;
   right: 16px;
-  z-index: 45;
+  z-index: var(--designer-z-popover);
   width: 268px;
   padding: var(--designer-space-3);
   border-radius: var(--designer-radius-4);
@@ -1014,4 +1040,356 @@
   font-size: var(--designer-font-size-xs);
   color: var(--designer-text-muted);
   line-height: 1.5;
+}
+
+/* ── 画布标签条（ADR-0109 §2.5）───────────────────────────────────────────
+   画布底部浮起一条「主画布 | 页面… | 弹框…」：选中只用一个信号——控件按下底 + 内发丝描边，
+   强调色只留在图标上；起始页带星标；「+」新建页面 / 弹框（菜单挂在工作区上，贴按钮向上展开），
+   末尾是参照底图开关。
+   选择器统一带 .designer-canvas-tabs 前缀：控件层的 `[data-variant="ghost"]` 特异性是 (0,2,0)，
+   直接写 .designer-canvas-tab 会被它压掉字色（未选中曾被渲染成与选中态同亮度的白字）。 */
+.designer-canvas-tabs {
+  position: absolute;
+  bottom: var(--designer-space-3);
+  left: calc(var(--designer-ruler-size) + var(--designer-space-3));
+  z-index: var(--designer-z-workspace-overlay);
+  display: flex;
+  max-width: calc(100% - var(--designer-ruler-size) - var(--designer-space-6));
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-2);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
+}
+
+.designer-canvas-tabs:empty {
+  display: none;
+}
+
+/* 有标签条时，画布底部的首次提示上移到标签条之上，二者不叠在一起。
+   36px = 26px 标签 + 2×4px 内距 + 2×1px 描边，改内距或标签高度时同步这里。 */
+.canvas-stage:has(> .designer-canvas-tabs:not(:empty)) .canvas-hint {
+  bottom: calc(var(--designer-space-3) + 36px + var(--designer-space-3));
+}
+
+.designer-canvas-tabs-list {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-1);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.designer-canvas-tabs-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* 溢出提示：滚动条已隐藏，用一端 / 两端的渐隐说明「还有标签在可视区外」。
+   纯 CSS 判不出溢出方向，取值由控制器按 scrollLeft 写进 data-overflow（'' / start / end / both）。
+   遮罩按 alpha 通道生效，`black` 只是不透明占位，与主题色无关。 */
+.designer-canvas-tabs-list[data-overflow="end"] {
+  mask-image: linear-gradient(to right, black calc(100% - 16px), transparent);
+}
+
+.designer-canvas-tabs-list[data-overflow="start"] {
+  mask-image: linear-gradient(to left, black calc(100% - 16px), transparent);
+}
+
+.designer-canvas-tabs-list[data-overflow="both"] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--designer-space-6),
+    black calc(100% - var(--designer-space-6)),
+    transparent
+  );
+}
+
+.designer-canvas-tabs .designer-canvas-tab {
+  position: relative;
+  display: inline-flex;
+  max-width: 180px;
+  height: 26px;
+  min-height: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--designer-space-3);
+  padding: 0 var(--designer-space-4);
+  border-radius: var(--designer-radius-2);
+  color: var(--designer-text-secondary);
+  /* 字重全态统一：切换标签不能改字宽，否则整条标签会跟着重排（不得抖动的硬约束）。 */
+  font: var(--designer-font-small);
+  font-weight: 500;
+}
+
+/* 画布条内的按钮都在横向滚动容器里，外扩的焦点环会被裁掉，改为内嵌。 */
+.designer-canvas-tabs .designer-canvas-tab:focus-visible,
+.designer-canvas-tabs .designer-canvas-tabs-add:focus-visible,
+.designer-canvas-tabs .designer-canvas-tabs-reference:focus-visible {
+  outline-offset: -2px;
+}
+
+/* 标签条内的按钮都不吃「悬停加 1px 外环」的输入控件反应（.designer-control:hover）：
+   外环比选中态的底色更亮，悬停会看起来像被选中。这里悬停只给软底，选中态才带内环。
+   特异性锚点是根上的 [data-canvas-tabs]：工作台层不允许沿用控件类名做外观覆盖
+   （designer-styles 门禁的 CONTROL_APPEARANCE 指标），只能靠根属性把权重抬过 (0,4,0)。 */
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tab:hover:not([aria-selected="true"]) {
+  background: var(--designer-surface-control-hover);
+  box-shadow: none;
+  color: var(--designer-text-primary);
+}
+
+.designer-canvas-tab-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--designer-text-muted);
+}
+
+.designer-canvas-tab-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.designer-canvas-tab-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-canvas-tab-start {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--designer-warning);
+}
+
+.designer-canvas-tab-start svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* 选中：底色 + 内发丝描边。悬停不再改变选中态底色，避免「悬停后分不清选的是哪个」。 */
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tab[aria-selected="true"],
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tab[aria-selected="true"]:hover {
+  background: var(--designer-surface-control-active);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+  color: var(--designer-text-primary);
+}
+
+.designer-canvas-tabs .designer-canvas-tab[aria-selected="true"] .designer-canvas-tab-icon {
+  color: var(--designer-accent);
+}
+
+.designer-canvas-tabs .designer-canvas-tabs-add {
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  flex: 0 0 auto;
+  border-radius: var(--designer-radius-2);
+  color: var(--designer-text-muted);
+}
+
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tabs-add:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  box-shadow: none;
+  color: var(--designer-text-primary);
+}
+
+/* 原地改名：标签换成同高的输入框，宽度随标签上限。 */
+.designer-canvas-tab-renaming {
+  padding-right: var(--designer-space-1);
+}
+.designer-canvas-tab-rename {
+  width: 120px;
+  height: 20px;
+  min-height: 0;
+  padding: 0 var(--designer-space-2);
+  border-radius: var(--designer-radius-2);
+  font: var(--designer-font-small);
+}
+
+.designer-canvas-tabs-divider {
+  width: 1px;
+  height: 14px;
+  flex: 0 0 auto;
+  background: var(--designer-border-default);
+}
+
+.designer-canvas-tabs .designer-canvas-tabs-reference {
+  display: inline-flex;
+  height: 26px;
+  min-height: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--designer-space-3);
+  padding: 0 var(--designer-space-4);
+  border-radius: var(--designer-radius-2);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  font-weight: 500;
+}
+
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tabs-reference:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  box-shadow: none;
+  color: var(--designer-text-primary);
+}
+
+/* 参照底图是辅助视图开关，不是主操作：开启时只把图标和文字转成强调色，不铺整块强调底，
+   否则右端的色块会比「当前编辑哪个画布」更抢眼。 */
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tabs-reference[aria-pressed="true"] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-accent-text);
+}
+
+.designer-canvas-tabs[data-canvas-tabs]
+  .designer-canvas-tabs-reference[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-accent-text);
+}
+
+.designer-canvas-tabs .designer-canvas-tabs-reference[aria-pressed="true"] svg {
+  color: var(--designer-accent);
+}
+
+.designer-artboard-menu {
+  min-width: 200px;
+  max-height: 360px;
+  overflow-y: auto;
+  transform-origin: bottom left;
+}
+
+/* 参照底图：挂在主渲染器挂载根的最前面，画板背景 → 32% 的参照内容 → 当前画板组件；只读，不拦截指针。 */
+.canvas-reference {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.canvas-reference[hidden] {
+  display: none;
+}
+
+.canvas-reference-root {
+  width: 100%;
+  height: 100%;
+  opacity: 0.32;
+}
+
+/* 「事件」开着时参照层是实况预览：不透明，组件可以点（层本身仍不拦截空白处的指针）。 */
+.canvas-reference[data-live] .canvas-reference-root {
+  opacity: 1;
+}
+
+.canvas-reference[data-live] .canvas-reference-root > * {
+  pointer-events: auto;
+}
+
+/* 从画布设置段（ADR-0109）：显示方式分段、起始页标记、操作按钮并排。 */
+.designer-sub-canvas-display {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-1);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+}
+
+.designer-sub-canvas-display-option {
+  min-width: 64px;
+  height: 24px;
+  min-height: 0;
+  padding: 0 var(--designer-space-3);
+}
+
+.designer-sub-canvas-display-option[aria-checked="true"] {
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  font-weight: 600;
+}
+
+.designer-sub-canvas-start {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--designer-space-2);
+  border-radius: var(--designer-radius-pill);
+  background: color-mix(in srgb, var(--designer-accent) 16%, transparent);
+  color: var(--designer-accent);
+  font: var(--designer-font-small);
+  line-height: 20px;
+}
+
+.designer-sub-canvas-actions {
+  display: flex;
+  gap: var(--designer-space-2);
+}
+
+.designer-sub-canvas-actions > * {
+  flex: 1 1 0;
+}
+
+/* 弹框位置九宫格：3×3 图钉，选中格亮起强调色圆点（ADR-0108 §2.6）。 */
+.designer-popup-anchor-grid {
+  display: grid;
+  width: max-content;
+  grid-template-columns: repeat(3, 24px);
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-1);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+}
+
+.designer-popup-anchor {
+  display: grid;
+  width: 24px;
+  min-width: 0;
+  height: 24px;
+  min-height: 0;
+  place-items: center;
+  padding: 0;
+}
+
+.designer-popup-anchor::before {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-border-strong);
+  content: "";
+}
+
+.designer-popup-anchor[aria-checked="true"] {
+  background: var(--designer-surface-control-active);
+}
+
+.designer-popup-anchor[aria-checked="true"]::before {
+  width: 8px;
+  height: 8px;
+  background: var(--designer-accent);
+}
+
+/* 设计态弹框预览（ADR-0108 §2.7）：状态栏「事件」开着时，蓝图打开的弹框以运行时浮层盖在画布上，
+   层级高于选区与参考线；没有弹框打开时整层隐藏，不挡画布编辑。 */
+.canvas-popup-preview {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--designer-z-canvas-selection) + 2);
+  overflow: clip;
+  border-radius: inherit;
+}
+
+.canvas-popup-preview[hidden] {
+  display: none;
+}
+
+.canvas-popup-preview-root {
+  width: 100%;
+  height: 100%;
 }

@@ -8,11 +8,16 @@ import type { ScreenAbortSignal } from '@base-screen/contracts';
 import { ScreenDatasetDefinition } from '@base-screen/contracts';
 import { ScreenDatasetEntries } from '@base-screen/contracts';
 import { ScreenHostDatasetPort } from '@base-screen/contracts';
+import type { ScreenHostSubscribeOptions } from '@base-screen/contracts';
+import type { ScreenJsonValue } from '@base-screen/contracts';
 import { ScreenMigrationResult } from '@base-screen/contracts';
 import type { ScreenParseResult } from '@base-screen/contracts';
 import { ScreenProjectAdapter } from '@base-screen/contracts';
 import { ScreenProjectEnvelope } from '@base-screen/contracts';
+import type { ScreenPushCursor } from '@base-screen/contracts';
 import type { ScreenResourceExecutionContext } from '@base-screen/contracts';
+import type { ScreenSourcePushEvent } from '@base-screen/contracts';
+import type { ScreenSourcePushSink } from '@base-screen/contracts';
 import { ScreenTabularDataset } from '@base-screen/contracts';
 
 // @public
@@ -29,6 +34,12 @@ export function createHttpProjectAdapter(options: HttpProjectAdapterOptions): Sc
 
 // @public
 export function createRestDatasetPort(options: RestDatasetPortOptions): ScreenHostDatasetPort;
+
+// @public
+export function createSseSubscribe<Request>(options: SseSubscribeOptions<Request>): HostKitSubscribe<Request>;
+
+// @public
+export function createSubscriptionHub<Request>(options: SubscriptionHubOptions<Request>): HostKitSubscriptionHub<Request>;
 
 // @public (undocumented)
 type DescribeRequest = Parameters<ScreenHostDatasetPort['describe']>[0];
@@ -53,6 +64,24 @@ export interface HostDatasetPortOptions<GroupsPayload = unknown, ListPayload = u
     // (undocumented)
     readonly query: HostKitOperation<QueryRequest, QueryPayload>;
 }
+
+// @public
+export interface HostKitEventSource {
+    // (undocumented)
+    addEventListener(type: string, listener: (event: {
+        readonly data?: unknown;
+        readonly lastEventId?: string;
+    }) => void): void;
+    // (undocumented)
+    close(): void;
+    // (undocumented)
+    readonly readyState: number;
+}
+
+// @public (undocumented)
+export type HostKitEventSourceConstructor = new (url: string, init?: {
+    readonly withCredentials?: boolean;
+}) => HostKitEventSource;
 
 // @public (undocumented)
 export interface HostKitHttp {
@@ -146,6 +175,33 @@ export type HostKitOperationResult<Payload> = {
     readonly error: HostKitOperationError;
 };
 
+// @public
+export interface HostKitPushSnapshot {
+    // (undocumented)
+    readonly cursor?: ScreenPushCursor;
+    // (undocumented)
+    readonly value: ScreenJsonValue;
+}
+
+// @public
+export interface HostKitSseMessage {
+    // (undocumented)
+    readonly data: unknown;
+    readonly event: string;
+    // (undocumented)
+    readonly lastEventId: string;
+}
+
+// @public
+export type HostKitSubscribe<Request> = (request: Request, sink: ScreenSourcePushSink, options: ScreenHostSubscribeOptions) => ScreenParseResult<null>;
+
+// @public (undocumented)
+export interface HostKitSubscriptionHub<Request> {
+    channelCount(): number;
+    dispose(): void;
+    readonly subscribe: HostKitSubscribe<Request>;
+}
+
 // @public (undocumented)
 export interface HostProjectAdapterOptions<LoadPayload = unknown, SavePayload = unknown> {
     // (undocumented)
@@ -190,6 +246,27 @@ export interface RestDatasetPortOptions extends HostKitHttpOptions {
 
 // @public (undocumented)
 type SaveRequest = Parameters<ScreenProjectAdapter['save']>[0];
+
+// @public (undocumented)
+export interface SseSubscribeOptions<Request> {
+    readonly cursorFromEventId?: boolean;
+    readonly events?: readonly string[];
+    readonly EventSource?: HostKitEventSourceConstructor;
+    readonly fetchSnapshot?: (request: Request, signal: AbortSignal) => Promise<ScreenParseResult<HostKitPushSnapshot>>;
+    readonly mapEvent?: (message: HostKitSseMessage, request: Request) => ScreenSourcePushEvent | readonly ScreenSourcePushEvent[] | undefined;
+    readonly suspendAfterMs?: number;
+    readonly url: (request: Request) => string | undefined;
+    // (undocumented)
+    readonly withCredentials?: boolean;
+}
+
+// @public (undocumented)
+export interface SubscriptionHubOptions<Request> {
+    readonly keyOf: (request: Request) => string;
+    readonly lingerMs?: number;
+    readonly open: HostKitSubscribe<Request>;
+    readonly replayRows?: number;
+}
 
 // @public
 export function toAbortSignal(source: ScreenAbortSignal | undefined): AbortSignal | undefined;

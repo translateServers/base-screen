@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildStatusLegend,
   computeStatusGridLayout,
-  STATUS_GRID_LEGEND_ORDER,
+  computeStatusGridTileSize,
   STATUS_GRID_MAX_COLUMNS,
   STATUS_GRID_MIN_TILE_SIZE,
+  sortStatusGridItems,
+  statusGridTileTextLines,
+  summarizeStatusGridOverflow,
 } from '../../src/board/status-grid.js';
+import {
+  buildStatusLegend,
+  readStatusLegendCounts,
+  STATUS_LEGEND_ORDER,
+  STATUS_LEGEND_TABULAR_DATA_ADAPTER,
+  statusLegendBarSegments,
+} from '../../src/board/status-legend.js';
 import {
   createBoardStateAdapter,
   readBoardStateRows,
@@ -112,22 +121,145 @@ describe('computeStatusGridLayout', () => {
   });
 });
 
-describe('buildStatusLegend', () => {
-  it('counts the five states in a fixed order and sums to the row count', () => {
-    const items = [
+describe('computeStatusGridTileSize', () => {
+  it('keeps tiles square when there are few rows (no more tall colour bars)', () => {
+    // 旧版：3 台设备一行 8 列，格子被拉到满高（~380 px 高的细长条）。
+    const size = computeStatusGridTileSize({
+      width: 588,
+      height: 376,
+      columns: 8,
+      rows: 1,
+      tileGap: 6,
+    });
+    expect(size).toBe(Math.floor((588 - 7 * 6) / 8));
+  });
+
+  it('is capped by the height when the rows are what does not fit', () => {
+    // 48 台、8 列 6 行、容器 588×368：宽给得起 68 px，高只给得起 56 px。
+    const size = computeStatusGridTileSize({
+      width: 588,
+      height: 368,
+      columns: 8,
+      rows: 6,
+      tileGap: 6,
+    });
+    expect(size).toBe(56);
+  });
+
+  it('never returns less than one pixel', () => {
+    const size = computeStatusGridTileSize({
+      width: 0,
+      height: 0,
+      columns: 8,
+      rows: 6,
+      tileGap: 6,
+    });
+    expect(size).toBe(1);
+  });
+});
+
+describe('statusGridTileTextLines', () => {
+  it('degrades from two lines to one line to colour only as the tile shrinks', () => {
+    expect(statusGridTileTextLines(56, 11)).toBe(2);
+    expect(statusGridTileTextLines(32, 11)).toBe(1);
+    expect(statusGridTileTextLines(24, 11)).toBe(0);
+  });
+
+  it('scales the thresholds with the font size', () => {
+    expect(statusGridTileTextLines(56, 16)).toBe(1);
+  });
+});
+
+describe('sortStatusGridItems', () => {
+  it('puts abnormal states first and keeps row order within a state', () => {
+    const rows = [
       { name: 'a', status: 'running' },
       { name: 'b', status: 'fault' },
-      { name: 'c', status: 'fault' },
-      // 不在五态内：归 unknown，不能被丢掉（否则图例合计对不上格数）。
-      { name: 'd', status: 'unknown-ish' },
-      { name: 'e', status: '' },
+      { name: 'c', status: 'standby' },
+      { name: 'd', status: 'MELTING' },
+      { name: 'e', status: 'offline' },
+      { name: 'f', status: 'fault' },
+      { name: 'g', status: 'running' },
     ];
+    expect(sortStatusGridItems(rows).map((row) => row.name)).toEqual([
+      'b',
+      'f',
+      'e',
+      'd',
+      'c',
+      'a',
+      'g',
+    ]);
+    // 不改原数组：行序仍是数据的事实。
+    expect(rows[0]?.name).toBe('a');
+  });
+});
 
-    const counts = buildStatusLegend(items);
+describe('summarizeStatusGridOverflow', () => {
+  it('names the state when everything hidden shares it', () => {
+    const hidden = Array.from({ length: 12 }, () => ({ status: 'running' }));
+    expect(summarizeStatusGridOverflow(hidden)).toEqual({
+      text: '+12 运行',
+      detail: '另有 12 项未显示：运行 12',
+    });
+  });
 
-    expect(STATUS_GRID_LEGEND_ORDER).toEqual(['running', 'standby', 'fault', 'offline', 'unknown']);
-    expect(counts).toEqual({ running: 1, standby: 0, fault: 2, offline: 0, unknown: 2 });
-    expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(items.length);
+  it('falls back to a bare count and lists the breakdown abnormal-first', () => {
+    const hidden = [{ status: 'running' }, { status: 'standby' }, { status: 'running' }];
+    expect(summarizeStatusGridOverflow(hidden)).toEqual({
+      text: '+3',
+      detail: '另有 3 项未显示：待机 1、运行 2',
+    });
+  });
+});
+
+describe('statusLegendBarSegments', () => {
+  it('splits 100 % across the non-zero states in legend order', () => {
+    const segments = statusLegendBarSegments({
+      running: 7,
+      standby: 2,
+      fault: 1,
+      offline: 1,
+      unknown: 1,
+    });
+    expect(segments.map((segment) => segment.state)).toEqual([
+      'running',
+      'standby',
+      'fault',
+      'offline',
+      'unknown',
+    ]);
+    expect(segments.reduce((sum, segment) => sum + segment.percent, 0)).toBeCloseTo(100, 6);
+  });
+
+  it('closes the bar exactly when the shares do not divide evenly', () => {
+    const segments = statusLegendBarSegments({
+      running: 1,
+      standby: 1,
+      fault: 1,
+      offline: 0,
+      unknown: 0,
+    });
+    expect(segments.map((segment) => segment.percent)).toEqual([33.33, 33.33, 33.34]);
+  });
+
+  it('returns no segments for an empty table so the caller draws an empty track', () => {
+    expect(
+      statusLegendBarSegments({ running: 0, standby: 0, fault: 0, offline: 0, unknown: 0 }),
+    ).toEqual([]);
+  });
+});
+
+describe('buildStatusLegend', () => {
+  it('counts the five states in a fixed order and sums to the row count', () => {
+    // 不在五态内的值（含空串、null）归 unknown，不能被丢掉（否则图例合计对不上格数）。
+    const statuses = ['running', 'fault', 'fault', 'unknown-ish', '', null];
+
+    const counts = buildStatusLegend(statuses);
+
+    expect(STATUS_LEGEND_ORDER).toEqual(['running', 'standby', 'fault', 'offline', 'unknown']);
+    expect(counts).toEqual({ running: 1, standby: 0, fault: 2, offline: 0, unknown: 3 });
+    expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(statuses.length);
   });
 
   it('returns five zero counts for an empty list', () => {
@@ -138,6 +270,55 @@ describe('buildStatusLegend', () => {
       offline: 0,
       unknown: 0,
     });
+  });
+});
+
+describe('status-legend adapter', () => {
+  const nameField = { id: 'name', label: '设备', valueType: 'string' as const };
+  const statusField = { id: 'status', label: '状态', valueType: 'string' as const };
+
+  it('counts only the column bound to the status role', () => {
+    const result = STATUS_LEGEND_TABULAR_DATA_ADAPTER.adapt({
+      dataset: {
+        fields: [nameField, statusField],
+        rows: [
+          { name: '1#冲压机', status: 'fault' },
+          { name: '2#冲床', status: 'running' },
+          { name: '3#焊机', status: 'MELTING' },
+        ],
+      },
+      fields: { status: [statusField] },
+    });
+
+    if (!result.ok) throw new Error('the adapter must accept a status binding');
+    expect(result.value).toEqual({
+      counts: { running: 1, standby: 0, fault: 1, offline: 0, unknown: 1 },
+      total: 3,
+    });
+    expect(readStatusLegendCounts(result.value)).toEqual({
+      running: 1,
+      standby: 0,
+      fault: 1,
+      offline: 0,
+      unknown: 1,
+    });
+  });
+
+  it('fails closed when the status role is not bound', () => {
+    const result = STATUS_LEGEND_TABULAR_DATA_ADAPTER.adapt({
+      dataset: { fields: [nameField], rows: [{ name: 'a' }] },
+      fields: {},
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false ? result.diagnostics[0]?.code : undefined).toBe(
+      'HOST_DATASET_BINDING_INVALID',
+    );
+  });
+
+  it('rejects a payload that is not a five-state count map', () => {
+    expect(readStatusLegendCounts({ counts: { melting: 1 } })).toBeUndefined();
+    expect(readStatusLegendCounts({ counts: { fault: -1 } })).toBeUndefined();
+    expect(readStatusLegendCounts([])).toBeUndefined();
   });
 });
 

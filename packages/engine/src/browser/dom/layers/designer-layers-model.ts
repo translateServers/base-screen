@@ -5,6 +5,7 @@ import {
   type ScreenInteractionState,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { listDesignerArtboardComponentIds } from '../../../common/session/designer-artboard.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerIconName } from '../../dom/designer-icons.js';
 import { materialCategoryIcon } from '../material-library/designer-material-library-dom.js';
@@ -105,7 +106,13 @@ export function createDesignerLayerView(
   const byId = new Map(document.components.map((component) => [component.id, component]));
   const order = new Map(document.components.map((component, index) => [component.id, index]));
   const children = new Map<string | null, string[]>();
+  // 只列当前画板的组件（ADR-0109）：别的画板的组件在视图里只是被隐藏锁定。
+  const onArtboard =
+    (document.subCanvases?.length ?? 0) > 0
+      ? listDesignerArtboardComponentIds(document)
+      : undefined;
   for (const component of document.components) {
+    if (onArtboard !== undefined && !onArtboard.has(component.id)) continue;
     const siblings = children.get(component.parentId) ?? [];
     siblings.push(component.id);
     children.set(component.parentId, siblings);
@@ -133,18 +140,16 @@ export function createDesignerLayerView(
   };
 }
 
-/** 出现在任何蓝图关系（触发器源、目标、动作目标）里的组件 id。 */
+/** 在蓝图里有节点且至少连了一条线的组件 id。 */
 function collectInteractedComponents(document: ScreenDocument): ReadonlySet<string> {
+  const connected = new Set<string>();
+  for (const edge of document.blueprint.edges) {
+    connected.add(edge.from.node);
+    connected.add(edge.to.node);
+  }
   const ids = new Set<string>();
-  for (const relation of document.blueprint.relations) {
-    if (relation.type === 'semantic') {
-      ids.add(relation.source.componentId);
-      ids.add(relation.target.componentId);
-      continue;
-    }
-    // effect 只描述「做什么」，作用对象由 source / target 承载，不另带组件 id。
-    if ('componentId' in relation.source) ids.add(relation.source.componentId);
-    if ('componentId' in relation.target) ids.add(relation.target.componentId);
+  for (const node of document.blueprint.nodes) {
+    if (node.kind === 'component' && connected.has(node.id)) ids.add(node.componentId);
   }
   return ids;
 }
@@ -186,6 +191,39 @@ export function filterDesignerLayerItems(
     if (collapsed.has(item.id)) hidden.add(item.id);
     return true;
   });
+}
+
+/**
+ * 左右键在树上的动作：展开/折叠分组，或进出父子层级。
+ *
+ * 与上下键分开是因为两者的「下一步」不同源：上下键走可见序列，左右键走层级关系。
+ * 把判定收在这里，DOM 查询只负责取样（是否分组、是否展开、父与首个子行），
+ * 叶子行右键该不该消费、折叠态的父行该不该跳这类分支才有唯一落点，也才能脱离 DOM 单测。
+ */
+export type DesignerLayerBranchAction =
+  | { readonly type: 'collapse'; readonly id: string }
+  | { readonly type: 'expand'; readonly id: string }
+  | { readonly type: 'focus'; readonly id: string };
+
+export function resolveDesignerLayerBranchAction(input: {
+  readonly direction: 'left' | 'right';
+  readonly id: string;
+  readonly isGroup: boolean;
+  readonly expanded: boolean;
+  readonly parentId: string | null;
+  readonly firstChildId: string | null;
+  readonly searchActive: boolean;
+}): DesignerLayerBranchAction | undefined {
+  const { direction, id, isGroup, expanded, parentId, firstChildId, searchActive } = input;
+  // 搜索态下可见性由查询决定，折叠集合不再生效：此时再发 expand/collapse 只会改一个
+  // 当前看不见的状态，用户按了键却没有任何画面变化。搜索时左右键只做层级移动。
+  if (direction === 'right') {
+    if (!isGroup) return undefined;
+    if (!expanded && !searchActive) return { type: 'expand', id };
+    return firstChildId === null ? undefined : { type: 'focus', id: firstChildId };
+  }
+  if (isGroup && expanded && !searchActive) return { type: 'collapse', id };
+  return parentId === null ? undefined : { type: 'focus', id: parentId };
 }
 
 function addLayerDescendants(

@@ -14,7 +14,7 @@ export async function assertTextAutoWidth(browser, baseUrl) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
-    await page.goto(`${baseUrl}/?designer`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}/?designer&verify`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.baseScreenHarness?.designer?.document !== undefined);
     const designer = page.locator('base-screen-designer').first();
     expect(
@@ -40,7 +40,7 @@ export async function assertTextAutoWidth(browser, baseUrl) {
             },
           ],
           variables: [],
-          blueprint: { relations: [] },
+          blueprint: { nodes: [], edges: [] },
         }).ok;
       }),
     ).toBe(true);

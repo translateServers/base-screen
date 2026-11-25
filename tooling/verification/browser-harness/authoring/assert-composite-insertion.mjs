@@ -2,6 +2,7 @@
 // 单条历史可整片回退。由 run-browser-harness.mjs 编排调用。
 
 import { expect } from '@playwright/test';
+import { clickComponentAt } from '../shared/harness-utils.mjs';
 
 const CARD_SHELL_NAME = '组合底座';
 
@@ -10,7 +11,9 @@ export async function assertCompositeInsertion(browser, baseUrl) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
-    await page.goto(`${baseUrl}/?designer&case=composite-insertion`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}/?designer&verify&case=composite-insertion`, {
+      waitUntil: 'networkidle',
+    });
     await page.waitForFunction(() => window.baseScreenHarness?.designer?.document !== undefined);
 
     const fragment = await page.evaluate((shellName) => {
@@ -49,6 +52,9 @@ export async function assertCompositeInsertion(browser, baseUrl) {
         ok: result.ok,
         added: designer.document.components.length - before,
         selected: [...designer.selection.selectedComponentIds],
+        selectedShellOnly:
+          designer.selection.selectedComponentIds.length === 1 &&
+          designer.selection.selectedComponentIds[0] === shell?.id,
         focused: designer.selection.focusedComponentId === shell?.id,
       };
       designer.undo();
@@ -56,7 +62,9 @@ export async function assertCompositeInsertion(browser, baseUrl) {
     });
     expect(selection.ok).toBe(true);
     expect(selection.added).toBe(2);
-    expect(selection.selected.length).toBe(2);
+    // 只选 shell：外壳与子节点混选时画布拖动要求「同一父级」不成立，新插入的整片会拖不动。
+    expect(selection.selected.length).toBe(1);
+    expect(selection.selectedShellOnly).toBe(true);
     expect(selection.focused).toBe(true);
     // 一个事务：撤销一次整片消失，而不是逐个节点回退。
     expect(selection.restored).toBe(true);
@@ -77,6 +85,44 @@ export async function assertCompositeInsertion(browser, baseUrl) {
     }, CARD_SHELL_NAME);
     expect(undone.stillPresent).toBe(false);
     expect(undone.after).toBe(undone.before);
+
+    // 双击进组：先单击选中外壳，再在子组件位置双击。第二击落在选框拖拽层上（真实鼠标就是这样），
+    // 必须仍能进组并选中子组件——以前拖拽层把子组件区域盖住，双击处理又只认组件元素，进不了组。
+    const drill = await page.evaluate(() => {
+      const designer = window.baseScreenHarness.designer;
+      const result = designer.insertComponentFragment({
+        anchor: { x: 520, y: 320 },
+        shell: {
+          key: 's',
+          materialType: 'base.container',
+          name: '双击外壳',
+          size: { width: 240, height: 140 },
+        },
+        nodes: [
+          {
+            key: 'a',
+            materialType: 'base.rectangle',
+            offset: { x: 20, y: 20 },
+            size: { width: 80, height: 60 },
+          },
+        ],
+      });
+      const shell = designer.document.components.find((item) => item.name === '双击外壳');
+      const child = designer.document.components.find((item) => item.parentId === shell?.id);
+      return { ok: result.ok, shellId: shell?.id, childId: child?.id };
+    });
+    expect(drill.ok).toBe(true);
+    const readSelection = () =>
+      page.evaluate(() => [...window.baseScreenHarness.designer.selection.selectedComponentIds]);
+    await clickComponentAt(page, drill.shellId);
+    expect(await readSelection()).toEqual([drill.shellId]);
+    const drillHits = await clickComponentAt(page, drill.childId, { double: true });
+    expect(await readSelection(), JSON.stringify(drillHits)).toEqual([drill.childId]);
+    await page.evaluate(() => {
+      const designer = window.baseScreenHarness.designer;
+      designer.shadowRoot.querySelector('[data-viewport]')?.focus();
+      designer.undo();
+    });
 
     // 失败关闭：libraryVisible: false 的物料不能当普通节点插入；未知父键同样被拒。
     const rejected = await page.evaluate(() => {

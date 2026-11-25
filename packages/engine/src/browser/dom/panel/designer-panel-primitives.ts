@@ -5,10 +5,15 @@ import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerIconName } from '../../dom/designer-icons.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
 import {
+  appendDesignerFieldReset,
   appendDesignerRangeField,
   createDesignerFieldElement,
   createDesignerFieldRow,
+  createDesignerSwitchField,
+  DESIGNER_ALIGNMENT_ICONS,
   type DesignerFieldRow,
+  isDesignerAlignmentEnum,
+  isDesignerRangeEligible,
 } from '../designer-field-primitives.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
@@ -34,25 +39,14 @@ function isSelectLike(
 function isRangeEligible(
   schema: BaseScreenMaterialPropSchema,
 ): schema is Extract<BaseScreenMaterialPropSchema, { readonly kind: 'number' }> {
-  if (schema.kind !== 'number') return false;
-  if (schema.minimum === undefined || schema.maximum === undefined) return false;
-  return schema.maximum - schema.minimum <= 1000;
+  return schema.kind === 'number' && isDesignerRangeEligible(schema.minimum, schema.maximum);
 }
 
-/**
- * 控件落位：开关 / 勾选框直接挂在字段行上（`:has(> .designer-switch)` 行式布局），
- * 自绘下拉与其余控件进控件列。
- */
+/** 控件落位：开关之外的控件都进控件列；开关走 `createDesignerSwitchField` 的行式布局。 */
 function placeFieldControl(
-  field: HTMLElement,
   control: HTMLElement,
   input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
-  inline: boolean,
 ): void {
-  if (inline) {
-    field.appendChild(input);
-    return;
-  }
   if (isSelectLike(input)) {
     control.appendChild(enhanceDesignerSelect(input).element);
   } else {
@@ -152,6 +146,22 @@ export function appendBatchStyleControl(
   disabled: boolean,
   hint: string,
 ): void {
+  if (control === 'boolean') {
+    const { field, input } = createDesignerSwitchField(parent.ownerDocument, {
+      label: labelText,
+      checked: !mixed && value === true,
+      disabled,
+    });
+    input.dataset.multiProperty = `style:${style}`;
+    input.setAttribute('data-tip', hint);
+    if (mixed) {
+      input.dataset.mixed = 'true';
+      input.indeterminate = true;
+    }
+    appendDesignerFieldMessage(field, input, `multi-style-${style}`);
+    parent.appendChild(field);
+    return;
+  }
   const isColor = control === 'color';
   const row = createDesignerFieldRow(parent.ownerDocument, {
     label: labelText,
@@ -179,10 +189,7 @@ export function appendBatchStyleControl(
     input.setAttribute('data-tip', hint);
     if (mixed) {
       input.dataset.mixed = 'true';
-      if (control === 'boolean' && input instanceof HTMLInputElement) {
-        input.checked = false;
-        input.indeterminate = true;
-      } else if (control === 'select' && isSelectLike(input)) {
+      if (control === 'select' && isSelectLike(input)) {
         const option = parent.ownerDocument.createElement('option');
         option.value = '';
         option.textContent = DESIGNER_UI_TEXT.inspectorUi.mixed;
@@ -194,7 +201,7 @@ export function appendBatchStyleControl(
           DESIGNER_UI_TEXT.inspectorUi.mixed;
       }
     }
-    placeFieldControl(row.field, row.control, input, control === 'boolean');
+    placeFieldControl(row.control, input);
     appendDesignerFieldMessage(row.field, input, `multi-style-${style}`);
   }
   parent.appendChild(row.field);
@@ -236,18 +243,34 @@ export function appendPropertySwitch(
   property: string,
   value: boolean,
 ): void {
-  const row = createDesignerFieldRow(parent.ownerDocument, { label: labelText });
-  const control = createDesignerSwitch(parent.ownerDocument, {
-    ariaLabel: labelText,
+  const { field, input } = createDesignerSwitchField(parent.ownerDocument, {
+    label: labelText,
     checked: value,
   });
-  control.dataset.property = property;
-  control.addEventListener('change', () => {
-    control.value = String(control.checked);
+  input.dataset.property = property;
+  input.addEventListener('change', () => {
+    input.value = String(input.checked);
   });
-  row.control.appendChild(control);
-  appendDesignerFieldMessage(row.field, control, `property-${property}`);
-  parent.appendChild(row.field);
+  appendDesignerFieldMessage(field, input, `property-${property}`);
+  parent.appendChild(field);
+}
+
+/** 属性 / 样式布尔：与页面配置同一个开关字段行，整行可点（ADR-0102 §5）。 */
+function appendSwitchControl(
+  parent: HTMLElement,
+  labelText: string,
+  value: ScreenJsonValue | undefined,
+  target: 'prop' | 'style',
+  key: string,
+): void {
+  const { field, input } = createDesignerSwitchField(parent.ownerDocument, {
+    label: labelText,
+    checked: value === true,
+  });
+  if (target === 'prop') input.dataset.prop = key;
+  else input.dataset.style = key;
+  appendDesignerFieldMessage(field, input, `${target}-${key}`);
+  parent.appendChild(field);
 }
 
 export function appendPropControl(
@@ -260,6 +283,10 @@ export function appendPropControl(
   paletteKey: string,
   allowGradient: boolean,
 ): void {
+  if (control === 'boolean') {
+    appendSwitchControl(parent, labelText, value, 'prop', prop);
+    return;
+  }
   const isColor = control === 'color';
   const row = createDesignerFieldRow(parent.ownerDocument, {
     label: labelText,
@@ -279,10 +306,19 @@ export function appendPropControl(
   } else {
     const input = createControl(parent.ownerDocument, value, schema, control, labelText);
     input.dataset.prop = prop;
-    placeFieldControl(row.field, row.control, input, control === 'boolean');
+    placeFieldControl(row.control, input);
     appendDesignerFieldMessage(row.field, input, `prop-${prop}`);
   }
   parent.appendChild(row.field);
+}
+
+export interface DesignerStyleControlExtras {
+  /** 可选键：已设置时提供「恢复自动」，清空即删除该键。 */
+  readonly optional?: boolean;
+  /** 读数单位（内嵌在读数右缘）。 */
+  readonly unit?: string;
+  /** 「自动」时滑杆停的位置：取该键缺省时的实际效果值，而不是最小值。 */
+  readonly autoValue?: number;
 }
 
 export function appendStyleControl(
@@ -294,11 +330,20 @@ export function appendStyleControl(
   control: string,
   paletteKey: string,
   allowGradient: boolean,
+  extras: DesignerStyleControlExtras = {},
 ): void {
+  if (control === 'boolean') {
+    appendSwitchControl(parent, labelText, value, 'style', style);
+    return;
+  }
   const isColor = control === 'color';
+  const range = control === 'number' && isRangeEligible(schema);
+  const resettable = range && extras.optional === true && typeof value === 'number';
   const row = createDesignerFieldRow(parent.ownerDocument, {
     label: labelText,
     ...(isColor ? { tagName: 'span', stacked: true } : {}),
+    // 复位按钮不能落在 <label> 里（见 appendDesignerFieldReset）。
+    ...(resettable ? { tagName: 'span' } : {}),
   });
   if (isColor) {
     const palette = createDesignerColorPalette(
@@ -310,14 +355,15 @@ export function appendStyleControl(
     for (const input of palette.controls) input.dataset.style = style;
     row.control.appendChild(palette.element);
     appendDesignerFieldMessage(row.field, palette.controls[0]!, `style-${style}`);
-  } else if (control === 'number' && isRangeEligible(schema)) {
-    appendStyleRangeControl(row, labelText, style, value, schema);
+  } else if (range && schema.kind === 'number') {
+    const number = appendStyleRangeControl(row, labelText, style, value, schema, extras);
+    if (resettable) appendDesignerFieldReset(row.labelText, number, labelText);
   } else if (control === 'select' && isAlignmentEnum(schema)) {
     appendStyleSegmentedControl(row, labelText, style, value, schema);
   } else {
     const input = createControl(parent.ownerDocument, value, schema, control, labelText);
     input.dataset.style = style;
-    placeFieldControl(row.field, row.control, input, control === 'boolean');
+    placeFieldControl(row.control, input);
     appendDesignerFieldMessage(row.field, input, `style-${style}`);
   }
   parent.appendChild(row.field);
@@ -334,10 +380,12 @@ function appendStyleRangeControl(
   style: string,
   value: ScreenJsonValue | undefined,
   schema: Extract<BaseScreenMaterialPropSchema, { readonly kind: 'number' }>,
-): void {
+  extras: DesignerStyleControlExtras,
+): HTMLInputElement {
   const minimum = schema.minimum ?? 0;
   const maximum = schema.maximum ?? 100;
-  const current = typeof value === 'number' && Number.isFinite(value) ? value : minimum;
+  const current =
+    typeof value === 'number' && Number.isFinite(value) ? value : (extras.autoValue ?? minimum);
   const step = Number.isInteger(minimum) && Number.isInteger(maximum) ? 1 : 0.01;
   const rangeField = appendDesignerRangeField(row.control, {
     ariaLabel: labelText,
@@ -349,6 +397,7 @@ function appendStyleRangeControl(
     value: value === undefined ? '' : String(current),
     rangeValue: String(current),
     numberClassName: 'designer-field-range-value',
+    ...(extras.unit === undefined ? {} : { numberSymbol: extras.unit }),
     ...(value === undefined
       ? { placeholder: DESIGNER_UI_TEXT.inspectorUi.autoValue, empty: true }
       : {}),
@@ -357,15 +406,14 @@ function appendStyleRangeControl(
   rangeField.range.dataset.styleRange = style;
   rangeField.number.dataset.style = style;
   appendDesignerFieldMessage(row.field, rangeField.number, `style-${style}`);
+  return rangeField.number;
 }
 
 /** 三档水平对齐（left / center / right）在原型里是图标分段控件。 */
 function isAlignmentEnum(
   schema: BaseScreenMaterialPropSchema,
 ): schema is Extract<BaseScreenMaterialPropSchema, { readonly kind: 'enum' }> {
-  if (schema.kind !== 'enum' || schema.values.length !== 3) return false;
-  if (!schema.values.every((option) => typeof option === 'string')) return false;
-  return schema.values.join('|') === 'left|center|right';
+  return schema.kind === 'enum' && isDesignerAlignmentEnum(schema.values);
 }
 
 /**
@@ -392,11 +440,6 @@ function appendStyleSegmentedControl(
   });
   select.className += ' designer-segmented-native';
   select.dataset.style = style;
-  const icons: Readonly<Record<string, DesignerIconName>> = {
-    left: 'align-left',
-    center: 'align-center',
-    right: 'align-right',
-  };
   const { element: segmented, buttons } = createDesignerSegmented(ownerDocument, {
     ariaLabel: labelText,
     selected: current,
@@ -404,7 +447,7 @@ function appendStyleSegmentedControl(
       value: optionValue,
       label: optionValue,
       ariaLabel: optionValue,
-      icon: icons[optionValue] ?? 'align-left',
+      icon: DESIGNER_ALIGNMENT_ICONS[optionValue] ?? 'align-left',
       dataset: { segmentedValue: optionValue },
     })),
   });
@@ -426,6 +469,7 @@ export function appendSection(
   advanced = false,
   open?: boolean,
   key?: string,
+  summary?: string,
 ): HTMLElement {
   // Sections render as native disclosures so every region can be collapsed with
   // pointer or keyboard; open state is persisted by the inspector group
@@ -436,6 +480,7 @@ export function appendSection(
     title,
     ...(open === undefined ? {} : { open }),
     ...(key === undefined ? {} : { key }),
+    ...(summary === undefined ? {} : { summary }),
   }).element;
 }
 

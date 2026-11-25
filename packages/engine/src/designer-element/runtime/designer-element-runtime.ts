@@ -57,22 +57,24 @@ import {
   ungroup,
 } from '../api/designer-element-editing.js';
 import {
-  readConditionalStylePort,
+  canRequestFragmentSave,
+  createComponentFragment,
+  readFragmentSaveAction,
+  requestFragmentSave,
+} from '../api/designer-element-fragment-save.js';
+import {
   readDatasetCatalogPort,
   readDesignerHostAdapter,
   readDocument,
   readHostCatalogPort,
-  readHostConditionalStyleAuthoring,
   readProjectCatalogPort,
   readProjectPreviewPort,
   readProjectSnapshotPort,
   readResourcePort,
-  writeConditionalStylePort,
   writeDatasetCatalogPort,
   writeDesignerHostAdapter,
   writeDocument,
   writeHostCatalogPort,
-  writeHostConditionalStyleAuthoring,
   writeProjectCatalogPort,
   writeProjectPreviewPort,
   writeProjectSnapshotPort,
@@ -96,6 +98,12 @@ import {
   setIntentHandler,
   setIntentReferenceCatalog,
 } from '../api/designer-element-intent.js';
+import {
+  insertMaterialLibraryFragment,
+  listMaterialLibraryFragmentItems,
+  readMaterialLibraryFragments,
+  writeMaterialLibraryFragments,
+} from '../api/designer-element-material-library-fragments.js';
 import {
   readBackButton,
   readGroupMaterialType,
@@ -144,7 +152,6 @@ import {
   load,
   previewProject,
   publish,
-  refreshConditionalStyles,
   refreshData,
   refreshVariables,
   reloadRemote,
@@ -154,13 +161,6 @@ import {
   unload,
 } from '../api/designer-element-project.js';
 import { enterReviewMode, exitReviewMode, readReviewing } from '../api/designer-element-review.js';
-import {
-  readActiveSceneId,
-  readSceneAvailable,
-  setActiveScene,
-  setSceneCatalog,
-  setSceneHandler,
-} from '../api/designer-element-scene.js';
 import { readWorkbenchMode, setWorkbenchMode } from '../api/designer-element-workbench.js';
 import {
   executeDesignerCommand,
@@ -189,6 +189,8 @@ import {
 } from './designer-element-plugin-commands.js';
 import {
   applyNativeEvents,
+  createPopupPreviewRenderer,
+  createReferenceRenderer,
   createRenderer,
   executeOperationFromTarget,
   forwardNativeMaterialEvent,
@@ -242,6 +244,14 @@ export const designerElementRuntime = {
   writeMaterialLibraryGrouping,
   readMaterialLibraryItems,
   writeMaterialLibraryItems,
+  readMaterialLibraryFragments,
+  writeMaterialLibraryFragments,
+  listMaterialLibraryFragmentItems,
+  insertMaterialLibraryFragment,
+  createComponentFragment,
+  readFragmentSaveAction,
+  canRequestFragmentSave,
+  requestFragmentSave,
   readRuntimeContributions,
   readPluginCatalog,
   writePluginCatalog,
@@ -267,10 +277,6 @@ export const designerElementRuntime = {
   writeResourcePort,
   readHostCatalogPort,
   writeHostCatalogPort,
-  readConditionalStylePort,
-  writeConditionalStylePort,
-  readHostConditionalStyleAuthoring,
-  writeHostConditionalStyleAuthoring,
   readDatasetCatalogPort,
   writeDatasetCatalogPort,
   readProjectCatalogPort,
@@ -307,11 +313,6 @@ export const designerElementRuntime = {
   setIntentReferenceCatalog,
   readIntentAvailable,
   requestComponentChoice,
-  setSceneCatalog,
-  setSceneHandler,
-  setActiveScene,
-  readActiveSceneId,
-  readSceneAvailable,
   enterReviewMode,
   exitReviewMode,
   readReviewing,
@@ -365,7 +366,6 @@ export const designerElementRuntime = {
   restoreSnapshot,
   refreshData,
   refreshVariables,
-  refreshConditionalStyles,
   save,
   publish,
   retryLastProjectOperation,
@@ -387,6 +387,8 @@ export const designerElementRuntime = {
   renderLayers,
   renderProperties,
   renderInspectorInteraction,
+  createPopupPreviewRenderer,
+  createReferenceRenderer,
   createRenderer,
   applyNativeEvents,
   forwardNativeMaterialEvent,

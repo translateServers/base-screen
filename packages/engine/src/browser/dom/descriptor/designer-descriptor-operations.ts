@@ -18,6 +18,7 @@ import {
 } from '@base-screen/core';
 import {
   type BaseScreenMaterialCatalog,
+  type BaseScreenMaterialManifest,
   type BaseScreenMaterialObjectSchema,
   type BaseScreenMaterialPropSchema,
   type BaseScreenPluginInspectorControlElement,
@@ -26,6 +27,7 @@ import {
   createValidatedPropsTransaction,
   createValidatedStyleTransaction,
 } from '../../../common/operations/element/designer-layout-operations.js';
+import { createDesignerStyleFieldPatch } from '../../../common/operations/style/designer-style-field.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { readDesignerColorPaletteValue } from '../color/designer-color-palette-dom.js';
 
@@ -52,6 +54,15 @@ export function createDescriptorFieldTransaction(
       [],
       DESIGNER_UI_TEXT.propertiesPanel.dataSourceInvalid,
     );
+  }
+  const topLevelKey =
+    control.path.length === 1 && typeof control.path[0] === 'string' ? control.path[0] : undefined;
+  if (
+    (control.target === 'props' || control.target === 'style') &&
+    topLevelKey !== undefined &&
+    control.control !== 'custom'
+  ) {
+    return writeTopLevelField(component, manifest, control.target, topLevelKey, control, target);
   }
   if (control.target === 'props') {
     return writeObjectPath(
@@ -195,6 +206,49 @@ function writeObjectPath(
     : createValidatedStyleTransaction(component.id, next, schema);
 }
 
+const NUMERIC_CONTROLS: ReadonlySet<string> = new Set(['number', 'unit-number', 'stepper']);
+
+/**
+ * 顶层 props/style 键：与扁平面板同一套提交语义，外观区换成描述符不改变写入结果——
+ * 清空可选数值即删除该键；style 写入经 `createDesignerStyleFieldPatch`（例如改边框色时
+ * 自动启用零宽边框）。嵌套路径仍走 `writeObjectPath`。
+ */
+function writeTopLevelField(
+  component: ScreenComponentNode,
+  manifest: BaseScreenMaterialManifest,
+  target: 'props' | 'style',
+  key: string,
+  control: DescriptorFieldDataset,
+  eventTarget: EventTarget | null,
+): ScreenParseResult<ScreenDocumentTransaction> | undefined {
+  const schema = target === 'props' ? manifest.propsSchema : manifest.styleSchema;
+  const root = target === 'props' ? component.props : component.style;
+  const input = eventTarget as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+  if (input === null) return undefined;
+  const commit = (next: ScreenJsonObject) =>
+    target === 'props'
+      ? createValidatedPropsTransaction(component.id, next, schema)
+      : createValidatedStyleTransaction(component.id, next, schema);
+  if (
+    schema.properties[key]?.kind === 'number' &&
+    NUMERIC_CONTROLS.has(control.control ?? '') &&
+    typeof input.value === 'string' &&
+    input.value.trim() === '' &&
+    !schema.required.includes(key)
+  ) {
+    const next = { ...root };
+    delete next[key];
+    return commit(next);
+  }
+  const value = parseControlValue(control, input, schema, [key]);
+  if (value === undefined) return undefined;
+  return commit(
+    target === 'style'
+      ? createDesignerStyleFieldPatch(root, key, value, manifest)
+      : { ...root, [key]: value },
+  );
+}
+
 function writeDataSourcePath(
   component: ScreenComponentNode,
   path: readonly (string | number)[],
@@ -305,7 +359,7 @@ function parseControlValue(
     // 因此还原原始枚举值必须走同一条映射，否则数字/布尔枚举会写回字符串。
     return resolved.values.find((candidate) => String(candidate) === target.value);
   }
-  if (control.control === 'json') {
+  if (control.control === 'json' || control.control === 'spacing') {
     try {
       const parsed = parseScreenJsonValue(JSON.parse(target.value));
       return parsed.ok ? parsed.value : undefined;

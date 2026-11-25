@@ -60,14 +60,6 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <span class="designer-badge panel-count" data-tone="neutral" id="designer-left-panel-count" role="status" aria-label="${DESIGNER_UI_TEXT.leftPanelCount(DESIGNER_UI_TEXT.materials, visibleMaterialCount)}" aria-live="polite" aria-atomic="true" data-material-count data-left-panel-count data-material-total="${visibleMaterialCount}">${visibleMaterialCount}</span>
         <span class="panel-scope" data-left-panel-scope>${DESIGNER_UI_TEXT.panelScope.builtin}</span>
       </header>
-      <section class="scenes" data-scene-block aria-label="${DESIGNER_UI_TEXT.scene.label}" hidden>
-        <header class="scene-heading">
-          <span class="scene-label">${DESIGNER_UI_TEXT.scene.label}</span>
-          <span class="scene-count" data-scene-count></span>
-        </header>
-        <div class="scene-list" data-scene-list role="group" aria-label="${DESIGNER_UI_TEXT.scene.label}"></div>
-        <p class="scene-note" data-scene-note role="status" aria-live="polite" hidden></p>
-      </section>
       <div class="rail-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.leftPanel}">
         <button type="button" class="designer-tab" id="designer-materials-tab" role="tab" aria-controls="designer-materials-panel" aria-selected="true" data-panel-tab="materials" data-tip="${DESIGNER_UI_TEXT.materials}">
           <span class="rail-tab-glyph" aria-hidden="true">${designerIcon('grid')}</span>
@@ -179,7 +171,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           ${labeledActionButton('project-publish', designerIcon('upload'), 'topbar-publish')}
         </div>
         ${menuPanel('file', DESIGNER_UI_TEXT.file, ['project-workspace', 'import', 'export', 'separator', 'project-save', 'project-publish', 'project-retry', 'project-cancel'])}
-        ${menuPanel('edit', DESIGNER_UI_TEXT.edit, ['undo', 'redo', 'separator', 'copy', 'paste', 'duplicate', 'delete', 'edit-position', 'edit-size', 'separator', 'group', 'ungroup', { label: DESIGNER_UI_TEXT.arrange, entries: ['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'separator', 'distribute-horizontal', 'distribute-vertical'] }, { label: DESIGNER_UI_TEXT.layer, entries: ['select-layer-up', 'select-layer-down', 'separator', 'bring-to-front', 'bring-forward', 'send-backward', 'send-to-back', 'lock', 'unlock', 'hide'] }])}
+        ${menuPanel('edit', DESIGNER_UI_TEXT.edit, ['undo', 'redo', 'separator', 'copy', 'paste', 'duplicate', 'delete', 'edit-position', 'edit-size', 'separator', 'group', 'ungroup', 'save-as-fragment', { label: DESIGNER_UI_TEXT.arrange, entries: ['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'separator', 'distribute-horizontal', 'distribute-vertical'] }, { label: DESIGNER_UI_TEXT.layer, entries: ['select-layer-up', 'select-layer-down', 'separator', 'bring-to-front', 'bring-forward', 'send-backward', 'send-to-back', 'lock', 'unlock', 'hide'] }])}
         ${menuPanel('view', DESIGNER_UI_TEXT.view, ['zoom-in', 'zoom-out', 'zoom-reset', 'zoom-fit', 'separator', 'toggle-grid', 'toggle-guides', 'toggle-border-guides'])}
         ${menuPanel('tools', DESIGNER_UI_TEXT.tools, ['toggle-workbench', 'show-help'])}
       </header>
@@ -187,6 +179,8 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <div class="designer-display-panel" id="designer-display-panel" data-display-panel role="dialog" aria-label="${DESIGNER_UI_TEXT.targetDisplay.label}" hidden></div>
 
       <input type="file" accept="application/json" data-import-document hidden>
+
+      <div class="designer-context-menu designer-artboard-menu" data-artboard-menu role="menu" aria-label="${DESIGNER_UI_TEXT.artboard.createMenu}" hidden tabindex="-1"></div>
 
       <div class="workspace-local-toolbar" data-canvas-local-toolbar aria-label="${DESIGNER_UI_TEXT.tools}">
         <div class="topbar-segment designer-tool-cluster" role="group" aria-label="${DESIGNER_UI_TEXT.tools}">
@@ -211,23 +205,16 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <div class="canvas-stage">
         <div class="ruler ruler-vertical" aria-hidden="true"><canvas class="ruler-canvas" data-ruler-canvas></canvas></div>
         <div class="designer-draft-bar" data-draft-bar hidden></div>
-        <div class="designer-scene-bar" data-scene-preview-bar role="status" aria-live="polite" hidden>
-          <span class="scene-bar-dot" aria-hidden="true"></span>
-          <span class="scene-bar-label">${DESIGNER_UI_TEXT.scene.previewLabel}</span>
-          <span class="scene-bar-name" data-scene-preview-name></span>
-          <span class="scene-bar-actions">
-            <button type="button" class="designer-control designer-button" data-scene-action="cancel">${DESIGNER_UI_TEXT.scene.cancel}</button>
-            <button type="button" class="designer-control designer-button" data-variant="primary" data-scene-action="apply">${DESIGNER_UI_TEXT.scene.apply}</button>
-          </span>
-        </div>
         <div class="viewport" data-viewport>
           <div class="canvas" data-canvas>
+            <div class="canvas-reference" data-canvas-reference hidden aria-hidden="true"><div class="canvas-reference-root" data-canvas-reference-root></div></div>
             <div class="canvas-content" data-canvas-content></div>
             <div class="canvas-ghost" data-canvas-ghost hidden aria-hidden="true"><div class="canvas-ghost-root" data-canvas-ghost-root></div></div>
             <div class="canvas-display-overlay" data-display-overlay-layer hidden aria-hidden="true"></div>
             <div class="selection" data-selection></div>
             <div class="marquee" data-marquee></div>
             <div class="canvas-guides" data-canvas-guides></div>
+            <div class="canvas-popup-preview" data-popup-preview-layer hidden><div class="canvas-popup-preview-root" data-popup-preview-root></div></div>
           </div>
           <div class="canvas-hint" data-canvas-hint>
             <span class="canvas-hint-glyph" aria-hidden="true">${designerIcon('pointer')}</span>
@@ -245,6 +232,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             <p class="designer-coordinate-entry-error" id="designer-size-entry-error" data-size-entry-error role="alert" aria-live="assertive"></p>
           </form>
         </div>
+        <nav class="designer-canvas-tabs" data-canvas-tabs aria-label="${DESIGNER_UI_TEXT.artboard.tabsAria}"></nav>
       </div>
       <section class="designer-blueprint-surface" data-blueprint-surface hidden aria-label="${DESIGNER_UI_TEXT.blueprint.canvas}">
         <slot name="${BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT}" data-blueprint-canvas-slot></slot>
@@ -266,7 +254,6 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           <span class="status-revision" data-project-revision></span>
           <span class="status-feedback" data-status-feedback role="status" aria-live="polite"></span>
         </div>
-        <button type="button" class="statusbar-guard" data-guard-toggle data-state="pass" aria-haspopup="dialog" aria-expanded="false" aria-controls="designer-guard-popover" aria-label="${DESIGNER_UI_TEXT.guard.stripAria(0)}"></button>
         <div class="statusbar-group statusbar-end">
           <span class="status-components" data-status-components></span>
           <span class="status-divider" aria-hidden="true"></span>
@@ -285,7 +272,6 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             ${DESIGNER_ZOOM_PRESETS.map((percent) => `<button type="button" class="designer-control designer-button designer-menu-item" data-status-zoom-preset="${percent}" role="menuitem"><span class="menu-item-label">${percent}%</span></button>`).join('')}
           </div>
         </div>
-        <section class="designer-guard-popover" id="designer-guard-popover" data-guard-popover role="dialog" aria-label="${DESIGNER_UI_TEXT.guard.dialogTitle}" hidden></section>
       </footer>
       <div class="designer-notifications" data-notifications aria-label="${DESIGNER_UI_TEXT.notifications}"></div>
       <div class="designer-tooltip" id="designer-tooltip" data-tooltip role="tooltip" data-side="top"></div>
@@ -338,7 +324,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <div class="inspector-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.inspector}">
         <button type="button" class="designer-tab" id="designer-appearance-tab" role="tab" aria-controls="designer-appearance-panel" aria-selected="true" data-inspector-tab="appearance"><span>${DESIGNER_UI_TEXT.appearance}</span></button>
         <button type="button" class="designer-tab" id="designer-data-tab" role="tab" aria-controls="designer-data-panel" aria-selected="false" data-inspector-tab="data"><span>${DESIGNER_UI_TEXT.inspectorUi.dataSource}</span></button>
-        <button type="button" class="designer-tab" id="designer-interaction-tab" role="tab" aria-controls="designer-interaction-panel" aria-selected="false" data-inspector-tab="interaction"><span>${DESIGNER_UI_TEXT.inspectorUi.advanced}</span></button>
+        <button type="button" class="designer-tab" id="designer-interaction-tab" role="tab" aria-controls="designer-interaction-panel" aria-selected="false" data-inspector-tab="interaction"><span>${DESIGNER_UI_TEXT.inspectorUi.interactionTab}</span></button>
       </div>
       <div class="blueprint-inspector" data-blueprint-inspector hidden></div>
       <div class="inspector-context" data-inspector-context></div>

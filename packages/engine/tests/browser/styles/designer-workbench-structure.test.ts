@@ -165,8 +165,9 @@ describe('designer workbench structure and layout', () => {
     expect(diffRow).not.toContain('box-shadow');
     expect(workbenchCss).toMatch(/\.change-diff-list\s*\{[^}]*gap: var\(--designer-space-5\);/s);
 
+    // 检查器里的卡片（「按分级生成状态」，ADR-0110）与提案卡同一配方。
     const styleRule =
-      workbenchCss.match(/\.properties \.designer-style-rule\s*\{([^}]*)\}/s)?.[1] ?? '';
+      workbenchCss.match(/\.properties \.designer-state-generate\s*\{([^}]*)\}/s)?.[1] ?? '';
     expect(styleRule).toContain('gap: var(--designer-space-3);');
     expect(styleRule).toContain('padding: var(--designer-space-4);');
     expect(styleRule).toContain('border: 1px solid var(--designer-border-subtle);');

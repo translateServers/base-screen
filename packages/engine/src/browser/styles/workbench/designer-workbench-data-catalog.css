@@ -221,8 +221,7 @@
 
 .designer-dataset-summary small,
 .designer-dataset-binding-heading span,
-.designer-dataset-binding-hint,
-.designer-dataset-description {
+.designer-dataset-binding-hint {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
 }
@@ -234,7 +233,6 @@
   white-space: nowrap;
 }
 
-.designer-dataset-description,
 .designer-dataset-binding-hint {
   margin: 0;
   line-height: 1.55;
@@ -331,10 +329,31 @@
   padding-bottom: var(--designer-space-3);
 }
 
+/* 「高级设置」段内四块（编辑方式 / 过滤器 / 只读事实 / 工具）各带一圈边框，
+   6px 时「可视化编辑 / 代码编辑」的边框几乎贴住过滤器行的边框，像两个控件被粘住；
+   这一段单独放到 8px。选择器必须落到 details 的 group 标记上——段内容挂在
+   .designer-data-group-content 里，不是工作台的 .designer-dataset-authoring。 */
+.designer-data-group[data-details-group="refresh"] > .designer-data-group-content {
+  gap: var(--designer-space-4);
+}
+
 /* 检查器里的实例级只读事实：与可编辑控件刻意用不同类名（计数断言的作用域隔离）。 */
 .designer-dataset-instance-facts {
   display: grid;
-  gap: var(--designer-space-2);
+  /* 父级 .designer-dataset-authoring-settings 是 repeat(2, 1fr) 的两列网格。
+     不声明跨列时这块只占左半列：「更新方式」的读数被挤到中间、按钮也只能缩在左半边，
+     右半格整片空白——看起来就是间距乱了。跨满两列后 space-between 才落在真实宽度上。 */
+  grid-column: 1 / -1;
+  /* 行与跳转按钮之间留 6px：4px 时按钮顶在「更新方式」下沿，看起来像同一行被切断。 */
+  gap: var(--designer-space-3);
+  /* 与父级边框之间留白：facts 贴边时文字紧咬圆角。 */
+  padding: var(--designer-space-3);
+}
+
+/* 跳转按钮右对齐到读数列：只留内容宽度会让它悬在「手动」左边，
+   与上方 space-between 的读数边缘错开一截，像没对齐的表单项。 */
+.designer-dataset-instance-facts > .designer-button {
+  justify-self: end;
 }
 
 .designer-dataset-instance-fact {

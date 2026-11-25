@@ -4,6 +4,11 @@ export {
   type CreateBaseScreenRendererOptions,
   createBaseScreenRenderer,
 } from './renderer/renderer.js';
+export type { BaseScreenComponentStateChange } from './renderer/renderer-component-states.js';
+export type {
+  BaseScreenCanvasChange,
+  BaseScreenCanvasChangeReason,
+} from './sub-canvas-layer.js';
 export {
   type BaseScreenViewerConfiguration,
   BaseScreenViewerElement,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type CreateMaterialDefinitionOptions,
   createMaterialDefinition,
+  defineBaseScreenFragment,
   definePlugin,
 } from '../src/index.js';
 
@@ -148,5 +149,46 @@ describe('definePlugin', () => {
       dispose: () => undefined,
     });
     expect(matched.ok).toBe(true);
+  });
+});
+
+describe('defineBaseScreenFragment', () => {
+  const fragment = {
+    id: 'acme.kpi-card',
+    name: 'KPI 卡',
+    category: '指标',
+    keywords: ['kpi'],
+    nodes: [
+      { key: 'title', materialType: 'base.text', offset: { x: 0, y: 0 } },
+      { key: 'value', materialType: 'acme.label', offset: { x: 0, y: 32 } },
+    ],
+  };
+
+  it('returns a frozen fragment contribution that a plugin manifest accepts', () => {
+    const defined = defineBaseScreenFragment(fragment);
+
+    expect(defined.ok).toBe(true);
+    if (!defined.ok) return;
+    expect(defined.value.kind).toBe('fragment');
+    expect(Object.isFrozen(defined.value)).toBe(true);
+    const plugin = definePlugin({
+      manifest: {
+        id: 'acme.plugin',
+        dependencies: [],
+        capabilities: [],
+        contributions: [defined.value],
+      },
+      activate() {},
+      deactivate() {},
+      dispose() {},
+    });
+    expect(plugin.ok).toBe(true);
+  });
+
+  it('fails closed on an invalid definition', () => {
+    const defined = defineBaseScreenFragment({ ...fragment, nodes: [] });
+
+    expect(defined.ok).toBe(false);
+    expect(defined.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIMIT_EXCEEDED');
   });
 });

@@ -254,8 +254,8 @@ function diffPathText(path: string): string {
       return text.dataValue;
     case 'dataSource':
       return text.dataSource;
-    case 'styleRules':
-      return text.styleRules;
+    case 'states':
+      return text.states;
     default:
       if (path.startsWith('props.')) {
         const key = path.slice('props.'.length);

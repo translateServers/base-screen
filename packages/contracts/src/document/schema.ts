@@ -1,27 +1,38 @@
 import { z } from 'zod';
-import type { ScreenBlueprintRelationEffect } from '../types/document.js';
-import { screenBlueprintEffectTargetKind } from './blueprint-relations.js';
+import { SCREEN_BLUEPRINT_PORT_PATTERN } from './blueprint-graph.js';
 import { SCREEN_MATERIAL_TYPE_PATTERN } from './identity.js';
 import {
   MAX_BACKGROUND_COLOR_CODE_POINTS,
   MAX_BACKGROUND_GRADIENT_STOPS,
+  MAX_BLUEPRINT_EDGES,
   MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
   MAX_BLUEPRINT_LAYOUT_NODES,
-  MAX_BLUEPRINT_RELATIONS,
+  MAX_BLUEPRINT_NODE_NAME_CODE_POINTS,
+  MAX_BLUEPRINT_NODES,
+  MAX_COMPONENT_STATE_CASES,
+  MAX_COMPONENT_STATE_PATH_SEGMENT_CODE_POINTS,
+  MAX_COMPONENT_STATE_PATH_SEGMENTS,
+  MAX_COMPONENT_STATES,
   MAX_COMPONENTS,
   MAX_DATA_SOURCE_NAME_CODE_POINTS,
   MAX_DATA_SOURCE_PARAMS,
   MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS,
   MAX_DATA_SOURCES,
   MAX_DESCRIPTION_CODE_POINTS,
-  MAX_STYLE_RULE_ID_CODE_POINTS,
-  MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
-  MAX_STYLE_RULE_PATH_SEGMENTS,
-  MAX_STYLE_RULES_PER_COMPONENT,
+  MAX_POPUP_BORDER_RADIUS,
+  MAX_POPUP_OFFSET,
+  MAX_PUSH_RETAIN_ROWS,
+  MAX_PUSH_RETAIN_SECONDS,
+  MAX_PUSH_RETAIN_TIME_FIELD_CODE_UNITS,
+  MAX_SUB_CANVAS_NAME_CODE_POINTS,
+  MAX_SUB_CANVASES,
   MAX_VALUE_REF_PATH_SEGMENTS,
   MAX_VARIABLES,
   MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS,
+  MIN_PUSH_RETAIN_ROWS,
+  MIN_PUSH_RETAIN_SECONDS,
 } from './limits.js';
+import { SCREEN_POPUP_ANCHORS } from './sub-canvas.js';
 
 export const COMPONENT_ID_PATTERN = '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$';
 export const MATERIAL_TYPE_PATTERN = SCREEN_MATERIAL_TYPE_PATTERN;
@@ -118,35 +129,76 @@ export const componentStatusSchema = z.strictObject({
   hidden: z.boolean(),
 });
 
-const styleRuleConditionSchema = z
+const componentStatePathSchema = z
+  .array(z.string().min(1).max(MAX_COMPONENT_STATE_PATH_SEGMENT_CODE_POINTS))
+  .max(MAX_COMPONENT_STATE_PATH_SEGMENTS);
+
+const componentStateRowMatchSchema = z.strictObject({
+  field: componentStatePathSchema.min(1),
+  equals: z.discriminatedUnion('kind', [
+    z.strictObject({
+      kind: z.literal('literal'),
+      value: z.union([z.string(), z.number().finite(), z.boolean()]),
+    }),
+    z.strictObject({
+      kind: z.literal('variable'),
+      variableId: z.string().regex(COMPONENT_ID_REGEXP),
+    }),
+  ]),
+});
+
+const componentStateInputSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('component-data'), path: componentStatePathSchema }),
+  z.strictObject({
+    kind: z.literal('variable'),
+    variableId: z.string().regex(COMPONENT_ID_REGEXP),
+    path: componentStatePathSchema,
+  }),
+  z.strictObject({
+    kind: z.literal('data-source-field'),
+    dataSourceId: z.string().regex(COMPONENT_ID_REGEXP),
+    where: componentStateRowMatchSchema.optional(),
+    path: componentStatePathSchema,
+  }),
+]);
+
+const componentStateCaseSchema = z
   .strictObject({
-    path: z
-      .array(z.string().min(1).max(MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS))
-      .max(MAX_STYLE_RULE_PATH_SEGMENTS),
     operator: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'exists']),
     value: z.any().optional(),
+    stateId: z.string().regex(COMPONENT_ID_REGEXP),
   })
-  .superRefine((condition, context) => {
-    if (condition.operator === 'exists' && condition.value !== undefined) {
+  .superRefine((entry, context) => {
+    if (entry.operator === 'exists' && entry.value !== undefined) {
       context.addIssue({
         code: 'custom',
-        message: 'exists style rule condition must not define value.',
+        message: 'exists state case must not define value.',
         path: ['value'],
       });
     }
-    if (condition.operator !== 'exists' && condition.value === undefined) {
+    if (entry.operator !== 'exists' && entry.value === undefined) {
       context.addIssue({
         code: 'custom',
-        message: 'style rule condition requires value.',
+        message: 'State case must define value unless operator is exists.',
         path: ['value'],
       });
     }
   });
 
-const styleRuleSchema = z.strictObject({
-  id: z.string().min(1).max(MAX_STYLE_RULE_ID_CODE_POINTS),
-  when: styleRuleConditionSchema,
+const componentStateSchema = z.strictObject({
+  id: z.string().regex(COMPONENT_ID_REGEXP),
+  name: z.string().min(1),
   style: z.record(z.string(), z.any()),
+});
+
+const componentStatesSchema = z.strictObject({
+  items: z.array(componentStateSchema).min(1).max(MAX_COMPONENT_STATES),
+  judge: z
+    .strictObject({
+      input: componentStateInputSchema,
+      cases: z.array(componentStateCaseSchema).max(MAX_COMPONENT_STATE_CASES),
+    })
+    .optional(),
 });
 
 export const dataBindingSchema = z.strictObject({
@@ -188,18 +240,46 @@ export const dataSourceSourceSchema = z.discriminatedUnion('kind', [
 ]);
 
 /**
- * 刷新策略。交叉约束（`auto` 必带 `intervalSeconds`，其余模式禁止带）由
- * `superRefine` 表达，JSON Schema 侧的等价 `allOf` 补丁见 `json-schema.ts`。
+ * `push` 实例的保留窗口。`seconds` 与 `timeField` 成对出现由 `superRefine` 表达，
+ * JSON Schema 侧的等价 `dependentRequired` 补丁见 `json-schema.ts`。
+ */
+export const pushRetainPolicySchema = z
+  .strictObject({
+    rows: z.number().int().min(MIN_PUSH_RETAIN_ROWS).max(MAX_PUSH_RETAIN_ROWS).optional(),
+    seconds: z.number().int().min(MIN_PUSH_RETAIN_SECONDS).max(MAX_PUSH_RETAIN_SECONDS).optional(),
+    timeField: z.string().min(1).max(MAX_PUSH_RETAIN_TIME_FIELD_CODE_UNITS).optional(),
+  })
+  .superRefine((retain, context) => {
+    if ((retain.seconds === undefined) !== (retain.timeField === undefined)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Push retain seconds and timeField must be declared together.',
+        path: [retain.seconds === undefined ? 'seconds' : 'timeField'],
+      });
+    }
+  });
+
+/**
+ * 刷新策略。交叉约束（`auto` 必带 `intervalSeconds`，其余模式禁止带；`fallbackIntervalSeconds`
+ * 与 `retain` 只属于 `push`）由 `superRefine` 表达，JSON Schema 侧的等价 `allOf` 补丁见
+ * `json-schema.ts`。
  */
 export const updatePolicySchema = z
   .strictObject({
-    mode: z.enum(['once', 'manual', 'auto']),
+    mode: z.enum(['once', 'manual', 'auto', 'push']),
     intervalSeconds: z
       .number()
       .int()
       .min(MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS)
       .max(MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS)
       .optional(),
+    fallbackIntervalSeconds: z
+      .number()
+      .int()
+      .min(MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS)
+      .max(MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS)
+      .optional(),
+    retain: pushRetainPolicySchema.optional(),
   })
   .superRefine((policy, context) => {
     if (policy.mode === 'auto' && policy.intervalSeconds === undefined) {
@@ -216,21 +296,43 @@ export const updatePolicySchema = z
         path: ['intervalSeconds'],
       });
     }
+    if (policy.mode !== 'push') {
+      for (const field of ['fallbackIntervalSeconds', 'retain'] as const) {
+        if (policy[field] !== undefined) {
+          context.addIssue({
+            code: 'custom',
+            message: `Only push update policy may define ${field}.`,
+            path: [field],
+          });
+        }
+      }
+    }
   });
 
-export const dataSourceSchema = z.strictObject({
-  id: z.string().regex(COMPONENT_ID_REGEXP),
-  name: z.string().min(1).max(MAX_DATA_SOURCE_NAME_CODE_POINTS),
-  source: dataSourceSourceSchema,
-  params: z
-    .record(z.string().min(1).max(128), valueRefSchema)
-    .refine((params) => Object.keys(params).length <= MAX_DATA_SOURCE_PARAMS, {
-      message: `A data source may define at most ${MAX_DATA_SOURCE_PARAMS} params.`,
-    }),
-  updatePolicy: updatePolicySchema.optional(),
-  processorId: z.string().min(1).max(256).optional(),
-  readOnly: z.boolean().optional(),
-});
+export const dataSourceSchema = z
+  .strictObject({
+    id: z.string().regex(COMPONENT_ID_REGEXP),
+    name: z.string().min(1).max(MAX_DATA_SOURCE_NAME_CODE_POINTS),
+    source: dataSourceSourceSchema,
+    params: z
+      .record(z.string().min(1).max(128), valueRefSchema)
+      .refine((params) => Object.keys(params).length <= MAX_DATA_SOURCE_PARAMS, {
+        message: `A data source may define at most ${MAX_DATA_SOURCE_PARAMS} params.`,
+      }),
+    updatePolicy: updatePolicySchema.optional(),
+    processorId: z.string().min(1).max(256).optional(),
+    readOnly: z.boolean().optional(),
+  })
+  .superRefine((instance, context) => {
+    // URL 参数在页面生命周期内不变，订阅没有意义（ADR-0104 §2.1）。
+    if (instance.source.kind === 'url-query' && instance.updatePolicy?.mode === 'push') {
+      context.addIssue({
+        code: 'custom',
+        message: 'url-query data sources cannot use push update policy.',
+        path: ['updatePolicy', 'mode'],
+      });
+    }
+  });
 
 export const variableRecordSchema = z.strictObject({
   id: z.string().regex(COMPONENT_ID_REGEXP),
@@ -294,7 +396,7 @@ export const componentSchema = z.strictObject({
   status: componentStatusSchema,
   props: z.record(z.string(), z.any()),
   style: z.record(z.string(), z.any()),
-  styleRules: z.array(styleRuleSchema).max(MAX_STYLE_RULES_PER_COMPONENT).optional(),
+  states: componentStatesSchema.optional(),
   dataSource: z.union([
     staticDataSourceSchema,
     datasetDataSourceSchema,
@@ -304,7 +406,55 @@ export const componentSchema = z.strictObject({
   ]),
   dataValue: z.union([valueRefSchema, z.null()]).optional(),
   dataBinding: z.union([dataBindingSchema, z.null()]).optional(),
+  canvasId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)).optional(),
+  belowSubCanvas: z.literal(true).optional(),
 });
+
+const subCanvasNameSchema = z
+  .string()
+  .min(1)
+  .refine((value) => [...value].length <= MAX_SUB_CANVAS_NAME_CODE_POINTS, {
+    message: `Sub canvas name must be at most ${MAX_SUB_CANVAS_NAME_CODE_POINTS} code points.`,
+  })
+  .refine((value) => !CONTROL_CHARACTER_REGEXP.test(value), {
+    message: 'Sub canvas name must not contain control characters.',
+  });
+
+/** 页面从画布（ADR-0109）：尺寸随主画布，背景可选。 */
+export const pageCanvasSchema = z.strictObject({
+  id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+  name: subCanvasNameSchema,
+  display: z.literal('page'),
+  backgroundColor: canvasBackgroundColorSchema.optional(),
+  background: canvasBackgroundSchema.optional(),
+});
+
+/** 弹框从画布（ADR-0109；行为沿用 ADR-0108）：尺寸与画布同一上限。 */
+export const popupCanvasSchema = z.strictObject({
+  id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+  name: subCanvasNameSchema,
+  display: z.literal('popup'),
+  width: z.number().int().min(1).max(100_000),
+  height: z.number().int().min(1).max(100_000),
+  backgroundColor: canvasBackgroundColorSchema,
+  background: canvasBackgroundSchema.optional(),
+  borderRadius: z.number().int().min(0).max(MAX_POPUP_BORDER_RADIUS),
+  maskColor: canvasBackgroundColorSchema,
+  closeOnMaskClick: z.boolean(),
+  closeOnEscape: z.boolean(),
+  placement: z
+    .strictObject({
+      anchor: z.enum(SCREEN_POPUP_ANCHORS),
+      offsetX: z.number().int().min(-MAX_POPUP_OFFSET).max(MAX_POPUP_OFFSET),
+      offsetY: z.number().int().min(-MAX_POPUP_OFFSET).max(MAX_POPUP_OFFSET),
+    })
+    .optional(),
+});
+
+export const subCanvasSchema = z.discriminatedUnion('display', [
+  pageCanvasSchema,
+  popupCanvasSchema,
+]);
 
 export const staticVariableSchema = z.strictObject({
   type: z.literal('static'),
@@ -382,124 +532,94 @@ const blueprintVisibilityTransitionSchema = z.strictObject({
   easing: z.enum(['linear', 'ease-in-out-quad', 'ease-in-out-expo']),
 });
 
-const blueprintRelationSourceSchema = z.discriminatedUnion('kind', [
+const blueprintIdSchema = z.string().regex(new RegExp(COMPONENT_ID_PATTERN));
+/** 停用只有一种写法：`enabled: false`；缺省即启用。 */
+const blueprintEnabledSchema = z.literal(false).optional();
+const blueprintNodeNameSchema = z
+  .string()
+  .min(1)
+  .refine((value) => [...value].length <= MAX_BLUEPRINT_NODE_NAME_CODE_POINTS, {
+    message: `Blueprint node name must not exceed ${MAX_BLUEPRINT_NODE_NAME_CODE_POINTS} code points.`,
+  })
+  .refine((value) => !CONTROL_CHARACTER_REGEXP.test(value), {
+    message: 'Blueprint node name must not contain control characters.',
+  });
+
+const blueprintNodeSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('component'),
-    componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-    event: z.strictObject({
-      type: z.literal('material-event'),
-      eventName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
-    }),
+    id: blueprintIdSchema,
+    componentId: blueprintIdSchema,
+    enabled: blueprintEnabledSchema,
   }),
   z.strictObject({
     kind: z.literal('variable'),
-    variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-    event: z.strictObject({
-      type: z.literal('variable-event'),
-      eventName: z.enum(['data-updated', 'request-state']),
-    }),
+    id: blueprintIdSchema,
+    variableId: blueprintIdSchema,
+    enabled: blueprintEnabledSchema,
+  }),
+  z.strictObject({
+    kind: z.literal('host'),
+    id: blueprintIdSchema,
+    enabled: blueprintEnabledSchema,
   }),
   z.strictObject({
     kind: z.literal('lifecycle'),
-    event: z.strictObject({
-      type: z.literal('lifecycle'),
-      eventName: z.enum(['ready']),
-    }),
+    id: blueprintIdSchema,
+    enabled: blueprintEnabledSchema,
   }),
   z.strictObject({
     kind: z.literal('timer'),
+    id: blueprintIdSchema,
     intervalSeconds: z.number().int().min(1).max(86_400),
-    event: z.strictObject({
-      type: z.literal('timer'),
-      eventName: z.enum(['tick']),
-    }),
+    name: blueprintNodeNameSchema.optional(),
+    enabled: blueprintEnabledSchema,
+  }),
+  z.strictObject({
+    kind: z.literal('condition'),
+    id: blueprintIdSchema,
+    condition: blueprintConditionSchema,
+    name: blueprintNodeNameSchema.optional(),
+    enabled: blueprintEnabledSchema,
+  }),
+  z.strictObject({
+    kind: z.literal('sub-canvas'),
+    id: blueprintIdSchema,
+    canvasId: blueprintIdSchema,
+    enabled: blueprintEnabledSchema,
+  }),
+  z.strictObject({
+    kind: z.literal('main-canvas'),
+    id: blueprintIdSchema,
+    enabled: blueprintEnabledSchema,
   }),
 ]);
 
-const blueprintRelationTargetSchema = z.discriminatedUnion('kind', [
-  z.strictObject({
-    kind: z.literal('component'),
-    componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-  }),
-  z.strictObject({
-    kind: z.literal('variable'),
-    variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-  }),
-  z.strictObject({ kind: z.literal('host') }),
-]);
+const blueprintPortRefSchema = z.strictObject({
+  node: blueprintIdSchema,
+  port: z.string().regex(new RegExp(SCREEN_BLUEPRINT_PORT_PATTERN)),
+});
 
-const blueprintRelationEffectSchema = z.discriminatedUnion('type', [
+const blueprintEdgeSchema = z.discriminatedUnion('kind', [
   z.strictObject({
-    type: z.literal('component-visibility'),
-    operation: z.enum(['show', 'hide', 'toggle']),
+    kind: z.literal('flow'),
+    id: blueprintIdSchema,
+    from: blueprintPortRefSchema,
+    to: blueprintPortRefSchema,
+    value: blueprintValueExpressionSchema.optional(),
+    payload: blueprintValueExpressionSchema.optional(),
     transition: blueprintVisibilityTransitionSchema.optional(),
-  }),
-  z.strictObject({ type: z.literal('request-component-data') }),
-  z.strictObject({
-    type: z.literal('set-variable'),
-    value: blueprintValueExpressionSchema,
-  }),
-  z.strictObject({ type: z.literal('request-variable') }),
-  z.strictObject({
-    type: z.literal('emit-host-event'),
-    eventName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
-    payload: blueprintValueExpressionSchema,
+    stateId: blueprintIdSchema.optional(),
+    requiredCapabilities: z.array(blueprintIdSchema).optional(),
   }),
   z.strictObject({
-    type: z.literal('host-action'),
-    actionId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-    payload: blueprintValueExpressionSchema,
+    kind: z.literal('semantic'),
+    id: blueprintIdSchema,
+    from: z.strictObject({ node: blueprintIdSchema }),
+    to: z.strictObject({ node: blueprintIdSchema }),
+    role: z.enum(['related', 'detail', 'group', 'drill-down']),
   }),
 ]);
-
-const blueprintBehaviorRelationSchema = z.strictObject({
-  type: z.literal('behavior'),
-  id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-  source: blueprintRelationSourceSchema,
-  condition: blueprintConditionSchema.optional(),
-  target: blueprintRelationTargetSchema,
-  effect: blueprintRelationEffectSchema,
-  requiredCapabilities: z.array(z.string().regex(new RegExp(COMPONENT_ID_PATTERN))).optional(),
-});
-
-const blueprintSemanticRelationSchema = z.strictObject({
-  type: z.literal('semantic'),
-  id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-  source: z.strictObject({
-    kind: z.literal('component'),
-    componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-  }),
-  target: z.strictObject({
-    kind: z.literal('component'),
-    componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-  }),
-  role: z.enum(['related', 'detail', 'group', 'drill-down']),
-});
-
-const blueprintRelationSchema = z
-  .discriminatedUnion('type', [blueprintBehaviorRelationSchema, blueprintSemanticRelationSchema])
-  .superRefine((relation, context) => {
-    if (relation.type === 'behavior') {
-      const expected = screenBlueprintEffectTargetKind(
-        relation.effect as ScreenBlueprintRelationEffect,
-      );
-      if (relation.target.kind !== expected) {
-        context.addIssue({
-          code: 'custom',
-          message: `Effect "${relation.effect.type}" requires a ${expected} target.`,
-          path: ['target', 'kind'],
-        });
-      }
-      return;
-    }
-    if (relation.source.componentId === relation.target.componentId) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Semantic relation must not target the same component.',
-        path: ['target', 'componentId'],
-      });
-    }
-  });
 
 const blueprintLayoutSchema = z.strictObject({
   nodes: z
@@ -522,7 +642,8 @@ const blueprintLayoutSchema = z.strictObject({
 });
 
 export const blueprintSchema = z.strictObject({
-  relations: z.array(blueprintRelationSchema).max(MAX_BLUEPRINT_RELATIONS),
+  nodes: z.array(blueprintNodeSchema).max(MAX_BLUEPRINT_NODES),
+  edges: z.array(blueprintEdgeSchema).max(MAX_BLUEPRINT_EDGES),
   layout: blueprintLayoutSchema.optional(),
 });
 
@@ -536,12 +657,18 @@ export const themeSchema = z.strictObject({
     background: themeColorSchema,
     accent: themeColorSchema,
     accentSecondary: themeColorSchema,
+    danger: themeColorSchema.optional(),
+    warning: themeColorSchema.optional(),
+    info: themeColorSchema.optional(),
+    success: themeColorSchema.optional(),
   }),
 });
 
 export const documentSchema = z.strictObject({
   canvas: canvasSchema,
   components: z.array(componentSchema).max(MAX_COMPONENTS),
+  subCanvases: z.array(subCanvasSchema).max(MAX_SUB_CANVASES).optional(),
+  startCanvasId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)).optional(),
   dataSources: z.array(dataSourceSchema).max(MAX_DATA_SOURCES).optional(),
   variables: z
     .array(

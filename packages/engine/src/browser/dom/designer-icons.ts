@@ -19,6 +19,9 @@ const ICONS = {
   table:
     '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 4.5v15"/>',
   rect: '<rect x="4" y="5" width="16" height="14" rx="2"/>',
+  // 页面：折角文档。与 rect（容器/分组的空矩形）区分开，否则「页面」在列表里
+  // 读起来像图标缺失。
+  doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
   image:
     '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m20.5 16-4.5-5L8 19.5"/>',
   layers:
@@ -73,6 +76,8 @@ const ICONS = {
 
   'lock-open':
     '<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.9-.7"/>',
+  unlink:
+    '<path d="M10.9 14.2 8.6 16.5a4 4 0 0 1-5.7-5.7l2.3-2.3"/><path d="M13.1 9.8l2.3-2.3a4 4 0 0 1 5.7 5.7l-2.3 2.3"/>',
   calendar:
     '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
   locate:

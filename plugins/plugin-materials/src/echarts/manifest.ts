@@ -1,21 +1,65 @@
 import {
   type BaseScreenMaterialEditorDescriptor,
+  type BaseScreenMaterialEditorFieldInput,
   type BaseScreenMaterialManifest,
   type BaseScreenMaterialObjectSchema,
   type BaseScreenMaterialPropSchema,
   parseBaseScreenMaterialEditorDescriptor,
 } from '@base-screen/plugin-core';
+import {
+  createBaseScreenChartLegendConfig,
+  createBaseScreenChartTitleConfig,
+  createBaseScreenNumberFormatConfig,
+  mergeBaseScreenMaterialConfigGroups,
+} from '@base-screen/plugin-sdk';
 
 export const PLUGIN_ECHARTS_SERIES_PICKER_TAG_NAME = 'base-screen-plugin-echarts-series-picker';
+
+/**
+ * 图表的通用配置走配置组（base-screen-docs ADR-0102 §11）：标题、图例与仪表盘的数值格式在
+ * 所有图表里同键、同顺序、同控件。字段不写 control，由解析期按语义推导。
+ */
+const CHART_TITLE = createBaseScreenChartTitleConfig();
+const CHART_LEGEND = createBaseScreenChartLegendConfig();
+const GAUGE_NUMBER_FORMAT = createBaseScreenNumberFormatConfig({
+  unit: true,
+  decimals: 1,
+  maxDecimals: 4,
+});
+
+/** 仪表盘的量程：无界数字，按语义推导为数字框。 */
+const GAUGE_RANGE_PROPERTIES: Readonly<Record<string, BaseScreenMaterialPropSchema>> = {
+  min: { kind: 'number' },
+  max: { kind: 'number' },
+};
+
+const SHOW_TOOLTIP_FIELD: BaseScreenMaterialEditorFieldInput = {
+  id: 'showTooltip',
+  target: 'props',
+  path: ['showTooltip'],
+  label: '显示提示框',
+};
+
+const CHART_STYLE_SCHEMA = {
+  kind: 'object',
+  properties: {
+    backgroundColor: { kind: 'string' },
+    color: { kind: 'string' },
+    gridColor: { kind: 'string' },
+    seriesColor: { kind: 'string' },
+    opacity: { kind: 'number', minimum: 0, maximum: 1 },
+  },
+  required: ['backgroundColor', 'color', 'gridColor', 'seriesColor'],
+} satisfies BaseScreenMaterialObjectSchema;
 
 const PLUGIN_ECHARTS_PROPS_SCHEMA = {
   kind: 'object',
   properties: {
-    titleText: { kind: 'string' },
+    ...CHART_TITLE.properties,
     showTooltip: { kind: 'boolean' },
     seriesType: { kind: 'enum', values: ['line', 'bar', 'area', 'pie'] },
   },
-  required: ['titleText', 'showTooltip', 'seriesType'],
+  required: [...CHART_TITLE.required, 'showTooltip', 'seriesType'],
 } satisfies BaseScreenMaterialObjectSchema;
 
 export const PLUGIN_ECHARTS_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
@@ -55,30 +99,14 @@ export const PLUGIN_ECHARTS_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     seriesColor: '#38bdf8',
     opacity: 1,
   },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      gridColor: { kind: 'string' },
-      seriesColor: { kind: 'string' },
-      opacity: { kind: 'number', minimum: 0, maximum: 1 },
-    },
-    required: ['backgroundColor', 'color', 'gridColor', 'seriesColor'],
-  },
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color' },
-    { style: 'color', label: '文字色', control: 'color' },
-    { style: 'gridColor', label: '网格色', control: 'color' },
-    { style: 'seriesColor', label: '图形色', control: 'color' },
-  ],
+  styleSchema: CHART_STYLE_SCHEMA,
+  stylePanel: [],
   propsSchema: PLUGIN_ECHARTS_PROPS_SCHEMA,
-  propertyPanel: [
-    { prop: 'titleText', label: '标题', control: 'text' },
-    { prop: 'showTooltip', label: '提示框', control: 'boolean' },
-  ],
+  propertyPanel: [],
   events: ['seriesClick'],
-  editorDescriptor: parseEchartsEditorDescriptor(),
+  editorDescriptor: parseChartEditorDescriptor('plugin.echarts', PLUGIN_ECHARTS_PROPS_SCHEMA, {
+    seriesPicker: true,
+  }),
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
   dataBinding: {
     roles: [
@@ -111,28 +139,32 @@ const CHART_FAMILY_IDENTITIES = [
 export const PLUGIN_ECHARTS_MATERIAL_MANIFESTS: readonly BaseScreenMaterialManifest[] = [
   PLUGIN_ECHARTS_MATERIAL_MANIFEST,
   ...CHART_FAMILY_IDENTITIES.map(([kind, name, width, height]): BaseScreenMaterialManifest => {
-    const extra: Record<string, BaseScreenMaterialPropSchema> =
-      kind === 'gauge'
-        ? {
-            min: { kind: 'number' },
-            max: { kind: 'number' },
-            unit: { kind: 'string' },
-            decimals: { kind: 'number', minimum: 0, maximum: 4 },
-          }
-        : {};
+    const gauge = kind === 'gauge';
+    const groups = mergeBaseScreenMaterialConfigGroups(
+      gauge ? [CHART_TITLE, CHART_LEGEND, GAUGE_NUMBER_FORMAT] : [CHART_TITLE, CHART_LEGEND],
+    );
+    const propsSchema: BaseScreenMaterialObjectSchema = {
+      kind: 'object',
+      properties: {
+        ...groups.properties,
+        showTooltip: { kind: 'boolean' },
+        ...(gauge ? GAUGE_RANGE_PROPERTIES : {}),
+      },
+      required: [...groups.required, 'showTooltip', ...(gauge ? ['min', 'max'] : [])],
+    };
+    const type = `plugin.chart.${kind}`;
     const { editorDescriptor: _descriptor, ...base } = PLUGIN_ECHARTS_MATERIAL_MANIFEST;
     return {
       ...base,
-      type: `plugin.chart.${kind}`,
+      type,
       tagName: `base-screen-plugin-chart-${kind}`,
       name,
       keywords: ['图表', name],
       defaultSize: { width, height },
       defaultProps: {
-        titleText: '',
+        ...groups.defaults,
         showTooltip: true,
-        showLegend: true,
-        ...(kind === 'gauge' ? { min: 0, max: 100, unit: '', decimals: 1 } : {}),
+        ...(gauge ? { min: 0, max: 100 } : {}),
       },
       defaultStyle: {
         backgroundColor: 'transparent',
@@ -141,60 +173,83 @@ export const PLUGIN_ECHARTS_MATERIAL_MANIFESTS: readonly BaseScreenMaterialManif
         seriesColor: '#36cfc9',
         opacity: 1,
       },
-      propsSchema: {
-        kind: 'object',
-        properties: {
-          titleText: { kind: 'string' },
-          showTooltip: { kind: 'boolean' },
-          showLegend: { kind: 'boolean' },
-          ...extra,
-        },
-        required: ['titleText', 'showTooltip', 'showLegend', ...Object.keys(extra)],
-      },
-      propertyPanel: [
-        { prop: 'titleText', label: '标题', control: 'text' },
-        { prop: 'showTooltip', label: '提示框', control: 'boolean' },
-        { prop: 'showLegend', label: '图例', control: 'boolean' },
-        ...(kind === 'gauge'
-          ? [
-              { prop: 'min', label: '最小值', control: 'number' as const },
-              { prop: 'max', label: '最大值', control: 'number' as const },
-              { prop: 'unit', label: '单位', control: 'text' as const },
-              { prop: 'decimals', label: '小数位', control: 'number' as const },
-            ]
-          : []),
-      ],
+      propsSchema,
+      propertyPanel: [],
+      editorDescriptor: parseChartEditorDescriptor(type, propsSchema, { legend: true, gauge }),
     };
   }),
 ];
 
-function parseEchartsEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
+/**
+ * 图表检查器（ADR-0099 §2.4 外观区顺序）：读数格式（仅仪表盘）→ 结构 → 文字 → 填充与描边。
+ * 通用图表的系列类型用插件自带的选择器（`custom`），其余字段都按语义推导控件。
+ */
+function parseChartEditorDescriptor(
+  materialType: string,
+  propsSchema: BaseScreenMaterialObjectSchema,
+  options: {
+    readonly seriesPicker?: boolean;
+    readonly legend?: boolean;
+    readonly gauge?: boolean;
+  },
+): BaseScreenMaterialEditorDescriptor {
+  const structure: BaseScreenMaterialEditorFieldInput[] = [
+    ...(options.seriesPicker === true
+      ? [
+          {
+            id: 'seriesType',
+            target: 'props' as const,
+            path: ['seriesType'],
+            label: '图表类型',
+            control: 'custom' as const,
+            tagName: PLUGIN_ECHARTS_SERIES_PICKER_TAG_NAME,
+          },
+        ]
+      : []),
+    ...CHART_TITLE.fields,
+    ...(options.legend === true ? CHART_LEGEND.fields : []),
+    SHOW_TOOLTIP_FIELD,
+    ...(options.gauge === true
+      ? [
+          { id: 'min', target: 'props' as const, path: ['min'], label: '最小值' },
+          { id: 'max', target: 'props' as const, path: ['max'], label: '最大值' },
+        ]
+      : []),
+  ];
   const parsed = parseBaseScreenMaterialEditorDescriptor(
     {
       appearance: [
+        ...(options.gauge === true
+          ? [{ id: 'format', label: '读数格式', fields: GAUGE_NUMBER_FORMAT.fields }]
+          : []),
+        { id: 'structure', label: '结构', fields: structure },
         {
-          id: 'series',
-          label: '系列',
+          id: 'text',
+          label: '文字',
+          fields: [{ id: 'color', target: 'style', path: ['color'], label: '文字色' }],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
           fields: [
-            {
-              id: 'seriesType',
-              target: 'props',
-              path: ['seriesType'],
-              label: '图表类型',
-              control: 'custom',
-              tagName: PLUGIN_ECHARTS_SERIES_PICKER_TAG_NAME,
-            },
+            { id: 'backgroundColor', target: 'style', path: ['backgroundColor'], label: '背景色' },
+            { id: 'gridColor', target: 'style', path: ['gridColor'], label: '网格色' },
+            { id: 'seriesColor', target: 'style', path: ['seriesColor'], label: '图形色' },
           ],
         },
       ],
     },
-    PLUGIN_ECHARTS_PROPS_SCHEMA,
-    undefined,
+    propsSchema,
+    CHART_STYLE_SCHEMA,
     undefined,
     undefined,
   );
   if (!parsed.ok) {
-    throw new Error('plugin-materials chart editor descriptor is invalid.');
+    throw new Error(
+      `${materialType} editor descriptor is invalid: ${parsed.diagnostics
+        .map((diagnostic) => `${diagnostic.code}@${diagnostic.path.join('.')}`)
+        .join(', ')}`,
+    );
   }
   return parsed.value;
 }

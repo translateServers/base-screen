@@ -1,5 +1,10 @@
 import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
-import { type BaseScreenMaterialEvent, createBaseScreenRenderer } from '@base-screen/renderer';
+import {
+  type BaseScreenCanvasChange,
+  type BaseScreenMaterialEvent,
+  type BaseScreenRenderer,
+  createBaseScreenRenderer,
+} from '@base-screen/renderer';
 import { renderDesignerInteractionPanel } from '../../browser/dom/designer-interaction-dom.js';
 import { renderDesignerLeftPanelGroups } from '../../browser/dom/designer-left-panel-groups-dom.js';
 import { renderDesignerSelection } from '../../browser/dom/designer-selection-dom.js';
@@ -57,6 +62,7 @@ export function initialize(element: DesignerElementHost): void {
       elementState.materialLibraryGrouping,
       elementState.leftPanelGroups,
       deferHydration,
+      elementState.runtime.listMaterialLibraryFragmentItems(element),
     ),
   );
   attachDesignerCanvasHint(shadow, element.ownerDocument);
@@ -85,12 +91,6 @@ export function initialize(element: DesignerElementHost): void {
   elementState.errorConsoleController.connect(
     shadow.querySelector<HTMLElement>('[data-error-console]')!,
     shadow.querySelector<HTMLButtonElement>('[data-error-console-toggle]')!,
-  );
-  elementState.guardController.connect(
-    shadow.querySelector<HTMLButtonElement>('[data-guard-toggle]')!,
-    shadow.querySelector<HTMLElement>('[data-guard-popover]')!,
-    elementState.canvas,
-    shadow.querySelector<HTMLElement>('[data-canvas-content]')!,
   );
   elementState.changeController.connect(
     shadow.querySelector<HTMLElement>('[data-draft-bar]')!,
@@ -130,30 +130,6 @@ export function initialize(element: DesignerElementHost): void {
     // 问句与取消出口就在意图状态行上：不新建浮层，也不再占一块界面。
     elementState.intentChoiceController.connect(intentStatus);
   }
-  const sceneBlock = shadow.querySelector<HTMLElement>('[data-scene-block]');
-  const sceneList = shadow.querySelector<HTMLElement>('[data-scene-list]');
-  const sceneCount = shadow.querySelector<HTMLElement>('[data-scene-count]');
-  const sceneNote = shadow.querySelector<HTMLElement>('[data-scene-note]');
-  const sceneBar = shadow.querySelector<HTMLElement>('[data-scene-preview-bar]');
-  const sceneBarName = shadow.querySelector<HTMLElement>('[data-scene-preview-name]');
-  if (
-    sceneBlock !== null &&
-    sceneList !== null &&
-    sceneCount !== null &&
-    sceneNote !== null &&
-    sceneBar !== null &&
-    sceneBarName !== null
-  ) {
-    elementState.sceneController.connect(
-      sceneBlock,
-      sceneList,
-      sceneCount,
-      sceneNote,
-      sceneBar,
-      sceneBarName,
-    );
-    elementState.sceneController.setInstanceId(elementState.instanceId);
-  }
   const displayLayer = shadow.querySelector<HTMLElement>('[data-display-overlay-layer]');
   if (displayLayer !== null) elementState.targetDisplayController.connect(displayLayer);
   const displayPanel = shadow.querySelector<HTMLElement>('[data-display-panel]');
@@ -161,13 +137,17 @@ export function initialize(element: DesignerElementHost): void {
   if (displayPanel !== null && displayToggle !== null) {
     elementState.targetDisplayController.setPanel(displayPanel, displayToggle);
   }
+  const artboardStrip = shadow.querySelector<HTMLElement>('[data-canvas-tabs]');
+  const artboardMenu = shadow.querySelector<HTMLElement>('[data-artboard-menu]');
+  const artboardHost = shadow.querySelector<HTMLElement>('.workspace');
+  if (artboardStrip !== null && artboardMenu !== null && artboardHost !== null) {
+    elementState.artboardController.connect(artboardStrip, artboardMenu, artboardHost);
+  }
   const designerRoot = shadow.querySelector<HTMLElement>('.designer');
   const presentationHint = shadow.querySelector<HTMLElement>('[data-presentation-lock-hint]');
   if (designerRoot !== null && presentationHint !== null) {
     elementState.presentationLockController.connect(designerRoot, presentationHint, {
-      canEnter: () =>
-        elementState.changeController.pending === undefined &&
-        !elementState.sceneController.previewing,
+      canEnter: () => elementState.changeController.pending === undefined,
       notifyBlocked: () =>
         elementState.notificationController.notify(
           DESIGNER_UI_TEXT.presentationLock.blocked,
@@ -270,6 +250,7 @@ function hydrateDeferredPanels(element: DesignerElementHost): void {
     elementState.resolvedMaterialLibraryItems,
     elementState.materialLibraryState,
     elementState.materialLibraryGrouping,
+    elementState.runtime.listMaterialLibraryFragmentItems(element),
   );
   elementState.panelController.refreshMaterialLibrary(layout);
 }
@@ -343,7 +324,6 @@ export function renderDocument(
     elementState.workbenchController.invalidateGeometry();
     elementState.runtime.syncCanvasFrameSize(element, document);
     elementState.previewController.sync(document);
-    elementState.guardController.schedule(document);
     elementState.targetDisplayController.setDocument(document);
     // 首个文档首次落定：画布尺寸此时才是准的，按它决定要不要退到「适应窗口」。
     // 只做一次——之后的文档变更（改属性、加组件、切场景）都不许动用户当前的缩放。
@@ -433,6 +413,7 @@ export function renderMaterialLibraryGrouping(element: DesignerElementHost): voi
     elementState.resolvedMaterialLibraryItems,
     elementState.materialLibraryState,
     elementState.materialLibraryGrouping,
+    elementState.runtime.listMaterialLibraryFragmentItems(element),
   );
   elementState.panelController.refreshMaterialLibrary(layout);
 }
@@ -541,16 +522,91 @@ export function createRenderer(element: DesignerElementHost): void {
       ? {}
       : { hostCatalogPort: elementState.hostCatalogPort }),
     ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
-    ...(elementState.conditionalStylePort === undefined
-      ? {}
-      : { conditionalStylePort: elementState.conditionalStylePort }),
     // 设计态渲染器获得设计执行上下文（RB2）：design mode，不绑定项目。
     executionMode: 'design',
     ...(elementState.runtimeContributions === undefined
       ? {}
       : { contributionIndex: elementState.runtimeContributions }),
+    // 组件状态改变（ADR-0110）：正在检查的组件换了状态时重绘检查器，「当前 x → 状态」与生效标记跟上画布。
+    onComponentStateChange: (change) => {
+      const selected = elementState.session.interaction.selectedComponentIds;
+      if (selected.length === 1 && selected[0] === change.componentId) {
+        elementState.runtime.renderProperties(element);
+      }
+    },
   });
   createGhostRenderer(elementState);
+  const previewHost = elementState.canvas.querySelector<HTMLElement>('[data-popup-preview-layer]');
+  const previewRoot = elementState.canvas.querySelector<HTMLElement>('[data-popup-preview-root]');
+  if (previewHost !== null && previewRoot !== null) {
+    elementState.popupPreviewController.connect(previewHost, previewRoot);
+  }
+  const referenceHost = elementState.canvas.querySelector<HTMLElement>('[data-canvas-reference]');
+  const referenceRoot = elementState.canvas.querySelector<HTMLElement>(
+    '[data-canvas-reference-root]',
+  );
+  if (referenceHost !== null && referenceRoot !== null) {
+    elementState.referenceLayerController.connect(referenceHost, referenceRoot);
+  }
+}
+
+/**
+ * 参照底图渲染器（ADR-0109 §2.5）：同一份目录与端口，预览模式；默认不可交互，「事件」开着时由参照层
+ * 控制器切成可交互，物料事件经控制器还原组件 id 后进蓝图。
+ */
+export function createReferenceRenderer(
+  element: DesignerElementHost,
+  root: HTMLElement,
+): BaseScreenRenderer | undefined {
+  const elementState = getDesignerElementState(element);
+  if (elementState.catalog === undefined) return undefined;
+  return createBaseScreenRenderer({
+    root,
+    catalog: elementState.catalog,
+    mode: 'preview',
+    interactive: false,
+    onMaterialEvent: (event) => elementState.referenceLayerController.handleMaterialEvent(event),
+    resourcePort: elementState.resourcePort,
+    ...(elementState.hostCatalogPort === undefined
+      ? {}
+      : { hostCatalogPort: elementState.hostCatalogPort }),
+    ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
+    executionMode: 'design',
+    ...(elementState.runtimeContributions === undefined
+      ? {}
+      : { contributionIndex: elementState.runtimeContributions }),
+  });
+}
+
+/**
+ * 设计态弹框预览渲染器（ADR-0108 §2.7）：同一份目录与端口，预览模式、可交互，
+ * 所以弹框浮层（遮罩、定位、Esc、焦点）与查看器一致；只由弹框预览控制器按需创建。
+ */
+export function createPopupPreviewRenderer(
+  element: DesignerElementHost,
+  root: HTMLElement,
+  onMaterialEvent: (event: BaseScreenMaterialEvent) => void,
+  onCanvasChange: (change: BaseScreenCanvasChange) => void,
+): BaseScreenRenderer | undefined {
+  const elementState = getDesignerElementState(element);
+  if (elementState.catalog === undefined) return undefined;
+  return createBaseScreenRenderer({
+    root,
+    catalog: elementState.catalog,
+    mode: 'preview',
+    interactive: true,
+    onMaterialEvent,
+    onCanvasChange,
+    resourcePort: elementState.resourcePort,
+    ...(elementState.hostCatalogPort === undefined
+      ? {}
+      : { hostCatalogPort: elementState.hostCatalogPort }),
+    ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
+    executionMode: 'design',
+    ...(elementState.runtimeContributions === undefined
+      ? {}
+      : { contributionIndex: elementState.runtimeContributions }),
+  });
 }
 
 /**
@@ -576,9 +632,6 @@ function createGhostRenderer(elementState: DesignerElementState): void {
       ? {}
       : { hostCatalogPort: elementState.hostCatalogPort }),
     ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
-    ...(elementState.conditionalStylePort === undefined
-      ? {}
-      : { conditionalStylePort: elementState.conditionalStylePort }),
     executionMode: 'design',
     ...(elementState.runtimeContributions === undefined
       ? {}
@@ -589,12 +642,18 @@ function createGhostRenderer(elementState: DesignerElementState): void {
     clear: () => elementState.ghostRenderer?.clear(),
   };
   elementState.changeController.setGhostHandlers(ghostHandlers);
-  elementState.sceneController.setGhostHandlers(ghostHandlers);
 }
 
 export function applyNativeEvents(element: DesignerElementHost, enabled: boolean): void {
   const elementState = getDesignerElementState(element);
 
+  // 关掉「事件」时收起设计态弹框预览：预览只在交互模式下存在。
+  if (!enabled) {
+    elementState.popupPreviewController.reset();
+    elementState.pagePreviewController.reset();
+  }
+  // 参照层随「事件」在只读底图与实况之间切换。
+  elementState.referenceLayerController.sync();
   const renderer = elementState.renderer;
   if (renderer === undefined) return;
   const result = renderer.setInteractive(enabled);

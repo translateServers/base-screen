@@ -119,6 +119,12 @@ export interface CreateDesignerSectionOptions {
   readonly actions?: readonly HTMLElement[];
   readonly className?: string;
   /**
+   * 折叠态摘要：显示在标题右侧的一段当前值（如背景色、是否已设置）。
+   * 收起的分区不该让用户失去判断依据——没有摘要就得逐段展开确认，
+   * 折叠反而变成负担。只在标题行渲染，不进入内容区。
+   */
+  readonly summary?: string;
+  /**
    * 折叠偏好的稳定标识。缺省时由 `decorateDesignerInspectorSearchables` 补一个
    * 顺序键 `section-N`——插入或删除分区会让顺序键整体平移，用户上一会话的折叠
    * 状态就会串到别的分区。凡是会长期存在的分区都应显式给 key。
@@ -159,6 +165,12 @@ export function createDesignerSection(
   if (collapsible)
     title.classList.add('designer-inspector-section-summary', 'designer-panel-section-summary');
   title.textContent = options.title;
+  if (options.summary !== undefined && options.summary !== '') {
+    const meta = ownerDocument.createElement('span');
+    meta.className = 'designer-inspector-section-meta';
+    meta.textContent = options.summary;
+    title.appendChild(meta);
+  }
   if (collapsible) {
     const disclosure = ownerDocument.createElement('span');
     disclosure.className =

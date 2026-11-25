@@ -136,6 +136,7 @@ type BaseScreenMaterialDataState = {
 } | {
     readonly status: 'ready';
     readonly value: ScreenJsonValue;
+    readonly stale?: true;
 } | {
     readonly status: 'error';
     readonly code: ScreenMaterialErrorCode;
@@ -158,6 +159,7 @@ interface BaseScreenMaterialEditorCondition {
     readonly operator: BaseScreenMaterialEditorConditionOperator;
     // (undocumented)
     readonly path: readonly BaseScreenMaterialEditorPathSegment[];
+    readonly target?: 'props' | 'style';
     // (undocumented)
     readonly value?: ScreenJsonValue;
 }
@@ -166,7 +168,7 @@ interface BaseScreenMaterialEditorCondition {
 type BaseScreenMaterialEditorConditionOperator = 'eq' | 'neq' | 'exists' | 'not-exists' | 'in' | 'not-in';
 
 // @public (undocumented)
-type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'segmented' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'stepper' | 'custom';
+type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'segmented' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'stepper' | 'spacing' | 'custom';
 
 // @public (undocumented)
 interface BaseScreenMaterialEditorDescriptor {
@@ -321,6 +323,7 @@ interface BaseScreenMaterialManifest {
     readonly propertyPanel: readonly BaseScreenMaterialPropertyPanelField[];
     // (undocumented)
     readonly propsSchema: BaseScreenMaterialObjectSchema;
+    readonly statePresetKeys?: readonly string[];
     // (undocumented)
     readonly staticData?: BaseScreenMaterialStaticDataDescriptor;
     // (undocumented)
@@ -329,6 +332,7 @@ interface BaseScreenMaterialManifest {
     readonly styleSchema: BaseScreenMaterialObjectSchema;
     // (undocumented)
     readonly tagName: string;
+    readonly themeStyle?: Readonly<Record<string, ScreenThemeSlot>>;
     // (undocumented)
     readonly type: string;
 }
@@ -618,6 +622,15 @@ interface ScreenTabularDataset {
     // (undocumented)
     readonly totalRowCount?: number;
 }
+
+// @public
+type ScreenThemeBaseSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
+
+// @public (undocumented)
+type ScreenThemeSlot = ScreenThemeBaseSlot | ScreenThemeStatusSlot;
+
+// @public
+type ScreenThemeStatusSlot = 'danger' | 'warning' | 'info' | 'success';
 
 // (No @packageDocumentation comment for this package)
 

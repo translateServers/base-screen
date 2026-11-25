@@ -1578,3 +1578,31 @@ describe('runtime contribution routing (ADR-0076)', () => {
     expect(index.getBlueprintAction?.('acme.pipeline.spotlight')?.name).toBe('Spotlight');
   });
 });
+
+describe('fragment contributions (ADR-0100)', () => {
+  function fragment(id: string) {
+    return {
+      kind: 'fragment' as const,
+      id,
+      name: id,
+      category: '指标',
+      keywords: [],
+      nodes: [{ key: 'value', materialType: 'base.text' }],
+    };
+  }
+
+  it('lists fragments in declaration order without requiring a capability grant', async () => {
+    const plugin = runtime(
+      pluginManifest({ contributions: [fragment('zeta.card'), fragment('alpha.card')] }),
+    );
+    const manager = createBaseScreenPluginManager(managerOptions([plugin]));
+
+    const activated = await manager.activate();
+    expect(activated.ok).toBe(true);
+    const index = manager.snapshot!.contributions;
+    expect(index.listFragments?.().map((item) => item.id)).toEqual(['zeta.card', 'alpha.card']);
+    expect(index.getFragment?.('alpha.card')?.name).toBe('alpha.card');
+    expect(index.getFragment?.('missing.card')).toBeUndefined();
+    await manager.dispose();
+  });
+});

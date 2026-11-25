@@ -14,6 +14,8 @@ const DESIGNER_DRAG_CLICK_THRESHOLD = 3;
 
 interface DragState {
   readonly components: readonly ScreenComponentNode[];
+  /** Stable per gesture so the snap snapshot is reused without re-comparing exclusions. */
+  readonly componentIds: readonly string[];
   readonly pointerId: number;
   readonly startClientX: number;
   readonly startClientY: number;
@@ -61,6 +63,7 @@ export class DesignerDragGesture {
     }
     this.#state = {
       components,
+      componentIds: components.map((component) => component.id),
       pointerId: event.pointerId,
       startClientX: event.clientX,
       startClientY: event.clientY,
@@ -149,7 +152,8 @@ export class DesignerDragGesture {
         x: clampScreenCoordinate((event.clientX - state.startClientX) / zoom),
         y: clampScreenCoordinate((event.clientY - state.startClientY) / zoom),
       },
-      state.components.map((component) => component.id),
+      state.componentIds,
+      event,
     );
     return {
       ...snapped,

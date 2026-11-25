@@ -24,26 +24,22 @@ export async function assertHostTimerComposition(page) {
       const harness = window.baseScreenHarness;
       const designer = harness.designer;
       const index = harness.pluginManager.snapshot.contributions;
-      const relation = designer.document.blueprint.relations.find(
-        (item) => item.id === 'variable-trigger-demo',
-      );
+      const blueprint = designer.document.blueprint;
+      const edge = blueprint.edges.find((item) => item.id === 'variable-trigger-demo');
+      const source = blueprint.nodes.find((node) => node.id === edge?.from.node);
       return {
         // 插件必须真的进了快照：preflight 因能力未授权或 handler 缺失会整插件排除，
         // 只断言变量写成功会漏掉"处理器从未被路由到"这类断线。
         pluginCatalogued: harness.pluginManager.snapshot.plugins.get(pluginId) !== undefined,
         processorIndexed: index.getDataProcessor?.(processorId) !== undefined,
         ruleTrigger:
-          relation?.type === 'behavior' && relation.source.kind === 'variable'
+          source?.kind === 'variable' && edge?.from.port === 'data-updated'
             ? 'variable-event'
             : null,
-        ruleVariableId:
-          relation?.type === 'behavior' && relation.source.kind === 'variable'
-            ? relation.source.variableId
-            : null,
-        ruleActionId:
-          relation?.type === 'behavior' && relation.effect.type === 'host-action'
-            ? relation.effect.actionId
-            : null,
+        ruleVariableId: source?.kind === 'variable' ? source.variableId : null,
+        ruleActionId: edge?.to.port.startsWith('action:')
+          ? edge.to.port.slice('action:'.length)
+          : null,
         variableDeclared: designer.document.variables.some(
           (variable) => variable.id === tickVariableId,
         ),

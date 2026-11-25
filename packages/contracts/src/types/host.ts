@@ -1,9 +1,10 @@
 import type { ScreenHostDatasetPort } from './dataset-port.js';
 import type { ScreenParseResult } from './diagnostics.js';
-import type { ScreenDocument } from './document.js';
+import type { ScreenDocument, ScreenPushRetainPolicy } from './document.js';
 import type { ScreenProjectEnvelope } from './envelope.js';
 import type { ScreenResourceExecutionContext } from './execution.js';
 import type { ScreenJsonValue } from './json.js';
+import type { ScreenSourcePushSink } from './push.js';
 import type { ScreenHostCatalogDescriptor, ScreenHostCatalogPage } from './variable.js';
 
 export interface ScreenProjectLoadRequest {
@@ -180,11 +181,41 @@ export interface ScreenHostResourceResolveOptions {
   readonly context?: ScreenResourceExecutionContext;
 }
 
+/**
+ * 订阅选项（ADR-0104 §2.2）。退订的唯一通道是 `signal`：基座 abort 即退订，宿主须释放连接
+ * 或引用计数；abort 之后基座会丢弃 sink 上的任何事件，不依赖宿主及时停推。
+ */
+export interface ScreenHostSubscribeOptions {
+  readonly signal: ScreenAbortSignal;
+  readonly context?: ScreenResourceExecutionContext;
+  /**
+   * 只读提示：实例的保留窗口（来自 `updatePolicy.retain`）。宿主可据此向服务端请求回填与降采样，
+   * 并把回填结果作为首个 snapshot。运行时的窗口裁剪不依赖宿主是否遵守，始终兜底。
+   */
+  readonly retain?: ScreenPushRetainPolicy;
+}
+
+/**
+ * 宿主订阅契约（实现 `subscribe` 的宿主须遵守）：
+ * 1. 先挂监听，再取快照；每次（重新）订阅后的首个数据事件必须是 `snapshot`。
+ * 2. 宿主有序号时 snapshot 必须带游标；会发 `append` 的来源，snapshot 应回填整个保留窗口。
+ * 3. 能补就从 `revision + 1` 起按序补发 `append`，补不齐就发新的 `snapshot`，不做部分补洞。
+ * 4. 合并物理连接由宿主负责；基座只保证一实例一个逻辑订阅。
+ */
 export interface ScreenHostResourcePort {
   resolve(
     request: ScreenHostResourceRequest,
     options: ScreenHostResourceResolveOptions,
   ): Promise<ScreenParseResult<ScreenJsonValue>>;
+  /**
+   * 可选：订阅推送。同步返回只报告「这个订阅永远不会成功」的错误（未授权的资源类型、参数
+   * 不合法），不得抛异常；运行期错误一律通过 `status: 'failed'` 事件上报。
+   */
+  subscribe?(
+    request: ScreenHostResourceRequest,
+    sink: ScreenSourcePushSink,
+    options: ScreenHostSubscribeOptions,
+  ): ScreenParseResult<null>;
 }
 
 /** 意图通道的作用域：整屏，或画布上选中的组件集合。 */
@@ -300,6 +331,13 @@ export interface ScreenHostCatalogDescribeRequest {
   readonly signal: ScreenAbortSignal;
 }
 
+/** 来源目录项的订阅请求：与 resolve 同参，去掉 `signal`（由订阅选项承载）。 */
+export interface ScreenHostCatalogSubscribeRequest {
+  readonly sourceId: string;
+  readonly params: Readonly<Record<string, ScreenJsonValue>>;
+  readonly purpose: 'runtime' | 'authoring-preview';
+}
+
 /** 按来源目录项解析当前值；参数与运行时一致，由文档级实例提供。 */
 export interface ScreenHostCatalogResolveRequest {
   readonly sourceId: string;
@@ -315,6 +353,12 @@ export interface ScreenHostCatalogPort {
     request: ScreenHostCatalogDescribeRequest,
   ): Promise<ScreenParseResult<ScreenHostCatalogDescriptor>>;
   resolve(request: ScreenHostCatalogResolveRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
+  /** 可选：订阅推送（只对 `host-catalog` 来源；`url-query` 禁止 push）。契约同资源端口。 */
+  subscribe?(
+    request: ScreenHostCatalogSubscribeRequest,
+    sink: ScreenSourcePushSink,
+    options: ScreenHostSubscribeOptions,
+  ): ScreenParseResult<null>;
 }
 
 export interface ScreenBlueprintHostEvent {
@@ -364,8 +408,15 @@ export function validateScreenDesignerHostAdapter(
       methods.every(
         (method) => typeof (portValue as Record<string, unknown>)[method] === 'function',
       );
+    // 可选的 `subscribe`（ADR-0104）：出现时必须是函数，缺省表示该端口只支持拉取。
+    const hasValidSubscribe =
+      (port !== 'resources' && port !== 'hostCatalog') ||
+      portValue === null ||
+      typeof portValue !== 'object' ||
+      (portValue as Record<string, unknown>).subscribe === undefined ||
+      typeof (portValue as Record<string, unknown>).subscribe === 'function';
     if (
-      (capabilityRecord[capability] === true && !hasValidPort) ||
+      (capabilityRecord[capability] === true && !(hasValidPort && hasValidSubscribe)) ||
       (capabilityRecord[capability] === false && portValue !== undefined)
     ) {
       return invalidDesignerHostAdapter(

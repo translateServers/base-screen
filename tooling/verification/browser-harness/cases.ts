@@ -17,9 +17,14 @@ interface BaselineEntry {
 
 const BASELINES: readonly BaselineEntry[] = [
   {
-    title: '全屏设计器',
-    summary: 'Playwright 设计器布局，无案例舱。',
+    title: '范式组件展示',
+    summary: '1920 × 1080 画布，只放交付面的范式物料；物料库同样只列范式物料。',
     href: './?designer',
+  },
+  {
+    title: '全屏设计器（验证文档）',
+    summary: 'Playwright 设计器布局，无案例舱；浏览器断言用的验证文档。',
+    href: './?designer&verify',
   },
   {
     title: '设计系统清单',
@@ -30,6 +35,12 @@ const BASELINES: readonly BaselineEntry[] = [
     title: '加载态观察',
     summary: '设计器骨架、Viewer 骨架、物料 spinner 与「文档加载中」现状；延迟可调，动画肉眼可见。',
     href: './loading-states.html',
+  },
+  {
+    title: '推送数据源',
+    summary:
+      'ADR-0104：查看器订阅、按帧合并、游标重同步、过期角标、回退轮询；设计器「实时推送」门控。事件由控制台 basePushHarness.emit() 投递。',
+    href: './push.html',
   },
 ];
 

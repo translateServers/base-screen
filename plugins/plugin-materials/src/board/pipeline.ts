@@ -2,27 +2,37 @@ import type { ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialConstructor,
+  type BaseScreenMaterialEditorDescriptor,
   type BaseScreenMaterialManifest,
+  type BaseScreenMaterialObjectSchema,
+  parseBaseScreenMaterialEditorDescriptor,
 } from '@base-screen/plugin-core';
-import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+import {
+  createBaseScreenMaterialEmptyView,
+  createMaterialDefinition,
+} from '@base-screen/plugin-sdk';
 import { BoardMaterialElement, type BoardMaterialModel } from './board-element.js';
 import {
   BOARD_DEFAULT_SURFACE,
   BOARD_SECONDARY_COLOR,
   BOARD_STATUS_COLORS,
   BOARD_STATUS_LABELS,
+  BOARD_STATUS_TEXT_COLORS,
   type BoardStatusKey,
   normalizeBoardStatus,
   PLUGIN_BOARD_PIPELINE_TAG_NAME,
   PLUGIN_BOARD_PIPELINE_TYPE,
   statusColorMap,
 } from './identity.js';
-import { readBoolean, readNumber, readString, styleColor } from './json-values.js';
+import { readBoolean, readNumber, styleColor } from './json-values.js';
 import {
   type BoardStateRow,
   createBoardStateAdapter,
   readBoardStateRows,
 } from './tabular-columns-adapter.js';
+
+/** 空态领域文案：属于读数本身，由物料固定给出，不开放成 prop（ADR-0099 §2.5）。 */
+const PIPELINE_EMPTY_LABEL = '该产线无工序配置';
 
 /**
  * 产线工序链：把**保序**的工序数组画成有向链（节点 + 连接线）。
@@ -33,6 +43,51 @@ import {
  * 可见数由 `layoutPipelineStages` 按 `model.size.width` 算出，不测量 DOM：800 px 放 12 道
  * 工序时**必然**出现 `…+N` 收口且不溢出，设计态与预览态一致。
  */
+const PIPELINE_PROPS_SCHEMA = {
+  kind: 'object',
+  properties: {
+    showValue: { kind: 'boolean' },
+    decimals: { kind: 'number', minimum: 0, maximum: 3 },
+    nameLines: { kind: 'number', minimum: 1, maximum: 2 },
+    statusVisible: { kind: 'boolean' },
+  },
+  required: ['showValue', 'decimals', 'nameLines', 'statusVisible'],
+} satisfies BaseScreenMaterialObjectSchema;
+
+const PIPELINE_STYLE_SCHEMA = {
+  kind: 'object',
+  properties: {
+    backgroundColor: { kind: 'string' },
+    color: { kind: 'string' },
+    labelColor: { kind: 'string' },
+    runningColor: { kind: 'string' },
+    standbyColor: { kind: 'string' },
+    faultColor: { kind: 'string' },
+    offlineColor: { kind: 'string' },
+    unknownColor: { kind: 'string' },
+    nodeBackground: { kind: 'string' },
+    nodeBorderColor: { kind: 'string' },
+    connectorColor: { kind: 'string' },
+    connectorWidth: { kind: 'number', minimum: 1, maximum: 8 },
+    valueColor: { kind: 'string' },
+    fontSize: { kind: 'number', minimum: 10, maximum: 32 },
+  },
+  required: [
+    'backgroundColor',
+    'color',
+    'labelColor',
+    'runningColor',
+    'standbyColor',
+    'faultColor',
+    'offlineColor',
+    'unknownColor',
+    'nodeBackground',
+    'nodeBorderColor',
+    'connectorColor',
+    'valueColor',
+  ],
+} satisfies BaseScreenMaterialObjectSchema;
+
 export const PLUGIN_BOARD_PIPELINE_MANIFEST: BaseScreenMaterialManifest = {
   type: PLUGIN_BOARD_PIPELINE_TYPE,
   tagName: PLUGIN_BOARD_PIPELINE_TAG_NAME,
@@ -46,7 +101,6 @@ export const PLUGIN_BOARD_PIPELINE_MANIFEST: BaseScreenMaterialManifest = {
     decimals: 0,
     nameLines: 1,
     statusVisible: true,
-    emptyText: '该产线无工序配置',
   },
   defaultData: {
     fields: [
@@ -69,9 +123,6 @@ export const PLUGIN_BOARD_PIPELINE_MANIFEST: BaseScreenMaterialManifest = {
     backgroundColor: 'transparent',
     color: BOARD_DEFAULT_SURFACE.color,
     labelColor: BOARD_SECONDARY_COLOR,
-    // `legendColor` 与灯阵共用同一组扁平键（种子文档与面板因此只有一套颜色词汇）；
-    // 本物料不画图例，该键仅在面板里可见、渲染时不使用。
-    legendColor: BOARD_SECONDARY_COLOR,
     // 五态色只从 identity.ts 取默认值，物料内不写十六进制字面量。
     runningColor: BOARD_STATUS_COLORS.running,
     standbyColor: BOARD_STATUS_COLORS.standby,
@@ -85,75 +136,11 @@ export const PLUGIN_BOARD_PIPELINE_MANIFEST: BaseScreenMaterialManifest = {
     valueColor: BOARD_SECONDARY_COLOR,
     fontSize: 13,
   },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      labelColor: { kind: 'string' },
-      legendColor: { kind: 'string' },
-      runningColor: { kind: 'string' },
-      standbyColor: { kind: 'string' },
-      faultColor: { kind: 'string' },
-      offlineColor: { kind: 'string' },
-      unknownColor: { kind: 'string' },
-      nodeBackground: { kind: 'string' },
-      nodeBorderColor: { kind: 'string' },
-      connectorColor: { kind: 'string' },
-      connectorWidth: { kind: 'number', minimum: 1, maximum: 8 },
-      valueColor: { kind: 'string' },
-      fontSize: { kind: 'number', minimum: 10, maximum: 32 },
-    },
-    required: [
-      'backgroundColor',
-      'color',
-      'labelColor',
-      'legendColor',
-      'runningColor',
-      'standbyColor',
-      'faultColor',
-      'offlineColor',
-      'unknownColor',
-      'nodeBackground',
-      'nodeBorderColor',
-      'connectorColor',
-      'valueColor',
-    ],
-  },
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color' },
-    { style: 'color', label: '工序名色', control: 'color' },
-    { style: 'labelColor', label: '次级文字色', control: 'color' },
-    { style: 'nodeBackground', label: '节点底色', control: 'color' },
-    { style: 'nodeBorderColor', label: '节点边框色', control: 'color' },
-    { style: 'connectorColor', label: '连接线色', control: 'color' },
-    { style: 'connectorWidth', label: '连接线粗细', control: 'number' },
-    { style: 'valueColor', label: '数值色', control: 'color' },
-    { style: 'runningColor', label: '运行色', control: 'color' },
-    { style: 'standbyColor', label: '待机色', control: 'color' },
-    { style: 'faultColor', label: '故障色', control: 'color' },
-    { style: 'offlineColor', label: '离线色', control: 'color' },
-    { style: 'unknownColor', label: '未知状态色', control: 'color' },
-    { style: 'fontSize', label: '字号', control: 'number' },
-  ],
-  propsSchema: {
-    kind: 'object',
-    properties: {
-      showValue: { kind: 'boolean' },
-      decimals: { kind: 'number', minimum: 0, maximum: 3 },
-      nameLines: { kind: 'number', minimum: 1, maximum: 2 },
-      statusVisible: { kind: 'boolean' },
-      emptyText: { kind: 'string', maxLength: 16 },
-    },
-    required: ['showValue', 'decimals', 'nameLines', 'statusVisible', 'emptyText'],
-  },
-  propertyPanel: [
-    { prop: 'showValue', label: '显示吞吐', control: 'boolean' },
-    { prop: 'decimals', label: '小数位', control: 'number' },
-    { prop: 'nameLines', label: '工序名行数', control: 'number' },
-    { prop: 'statusVisible', label: '显示状态文字', control: 'boolean' },
-    { prop: 'emptyText', label: '空数据文案', control: 'text' },
-  ],
+  styleSchema: PIPELINE_STYLE_SCHEMA,
+  stylePanel: [],
+  propsSchema: PIPELINE_PROPS_SCHEMA,
+  propertyPanel: [],
+  editorDescriptor: parsePipelineEditorDescriptor(),
   // nodeClick 是 P2：本轮不给事件。
   events: [],
   dataCapabilities: ['static', 'dataset', 'host-resource'],
@@ -169,6 +156,193 @@ export const PLUGIN_BOARD_PIPELINE_MANIFEST: BaseScreenMaterialManifest = {
   },
   designCapabilities: { resize: true, rotate: true, children: false },
 };
+
+/**
+ * 检查器编排（ADR-0099 §2.4）：读数格式 → 结构 → 文字 → 填充与描边 → 语义色（默认折叠）。
+ * 小数位只在显示吞吐时出现；连接线粗细是微调项，放进高级。
+ */
+function parsePipelineEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
+  const parsed = parseBaseScreenMaterialEditorDescriptor(
+    {
+      appearance: [
+        {
+          id: 'format',
+          label: '读数格式',
+          fields: [
+            {
+              id: 'showValue',
+              target: 'props',
+              path: ['showValue'],
+              label: '显示吞吐',
+              control: 'boolean',
+            },
+            {
+              id: 'decimals',
+              target: 'props',
+              path: ['decimals'],
+              label: '小数位',
+              min: 0,
+              max: 3,
+              when: [{ path: ['showValue'], operator: 'eq', value: true }],
+            },
+            {
+              id: 'statusVisible',
+              target: 'props',
+              path: ['statusVisible'],
+              label: '显示状态文字',
+              control: 'boolean',
+            },
+          ],
+        },
+        {
+          id: 'structure',
+          label: '结构',
+          fields: [
+            {
+              id: 'nameLines',
+              target: 'props',
+              path: ['nameLines'],
+              label: '工序名行数',
+              min: 1,
+              max: 2,
+            },
+          ],
+        },
+        {
+          id: 'text',
+          label: '文字',
+          fields: [
+            { id: 'color', target: 'style', path: ['color'], label: '文字色', control: 'color' },
+            {
+              id: 'labelColor',
+              target: 'style',
+              path: ['labelColor'],
+              label: '次级文字色',
+              control: 'color',
+            },
+            {
+              id: 'valueColor',
+              target: 'style',
+              path: ['valueColor'],
+              label: '数值色',
+              control: 'color',
+            },
+            {
+              id: 'fontSize',
+              target: 'style',
+              path: ['fontSize'],
+              label: '字号',
+              control: 'number',
+            },
+          ],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            {
+              id: 'backgroundColor',
+              target: 'style',
+              path: ['backgroundColor'],
+              label: '背景色',
+              control: 'color',
+            },
+            {
+              id: 'nodeBackground',
+              target: 'style',
+              path: ['nodeBackground'],
+              label: '节点底色',
+              control: 'color',
+            },
+            {
+              id: 'nodeBorderColor',
+              target: 'style',
+              path: ['nodeBorderColor'],
+              label: '节点边框色',
+              control: 'color',
+            },
+          ],
+        },
+        {
+          // 连接线样式很少改：默认收起，但基础模式可见（ADR-0102 §7「基础、默认收起」层）。
+          // 以前只把「连接线粗细」一个字段标成高级，基础模式下它凭空消失、颜色却还在。
+          id: 'connector',
+          label: '连接线',
+          collapsed: true,
+          fields: [
+            {
+              id: 'connectorColor',
+              target: 'style',
+              path: ['connectorColor'],
+              label: '连接线色',
+              control: 'color',
+            },
+            {
+              id: 'connectorWidth',
+              target: 'style',
+              path: ['connectorWidth'],
+              label: '连接线粗细',
+              unit: 'px',
+              min: 1,
+              max: 8,
+              step: 0.5,
+            },
+          ],
+        },
+        {
+          id: 'states',
+          label: '语义色',
+          collapsed: true,
+          fields: [
+            {
+              id: 'runningColor',
+              target: 'style',
+              path: ['runningColor'],
+              label: '运行色',
+              control: 'color',
+            },
+            {
+              id: 'standbyColor',
+              target: 'style',
+              path: ['standbyColor'],
+              label: '待机色',
+              control: 'color',
+            },
+            {
+              id: 'faultColor',
+              target: 'style',
+              path: ['faultColor'],
+              label: '故障色',
+              control: 'color',
+            },
+            {
+              id: 'offlineColor',
+              target: 'style',
+              path: ['offlineColor'],
+              label: '离线色',
+              control: 'color',
+            },
+            {
+              id: 'unknownColor',
+              target: 'style',
+              path: ['unknownColor'],
+              label: '未知状态色',
+              control: 'color',
+            },
+          ],
+        },
+      ],
+    },
+    PIPELINE_PROPS_SCHEMA,
+    PIPELINE_STYLE_SCHEMA,
+    undefined,
+    undefined,
+  );
+  if (!parsed.ok) {
+    throw new Error('plugin-materials pipeline editor descriptor is invalid.');
+  }
+  return parsed.value;
+}
 
 /** 工序节点最小宽度（px）：再窄就只剩色块，读不出工序名。 */
 export const PIPELINE_MIN_NODE_WIDTH = 64;
@@ -238,7 +412,9 @@ export class PluginBoardPipelineElement extends BoardMaterialElement {
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
 
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.overflow = 'hidden';
     this.style.boxSizing = 'border-box';
     this.setAttribute('role', 'group');
@@ -279,7 +455,7 @@ export class PluginBoardPipelineElement extends BoardMaterialElement {
       BOARD_DEFAULT_SURFACE.borderColor,
     );
     const valueColor = styleColor(model.style.valueColor, BOARD_SECONDARY_COLOR);
-    // 次级文字（空数据文案、`…+N` 收口）走 `labelColor`：与状态文字色区分，
+    // 次级文字（`…+N` 收口）走 `labelColor`：与状态文字色区分，
     // 状态文字用的是状态色（色 + 文字双编码）。
     const labelColor = styleColor(model.style.labelColor, BOARD_SECONDARY_COLOR);
     const showValue = readBoolean(model.props.showValue, true);
@@ -301,12 +477,11 @@ export class PluginBoardPipelineElement extends BoardMaterialElement {
     root.dataset.boardPipeline = '';
     root.style.cssText = `display:flex;align-items:center;justify-content:flex-start;width:100%;height:100%;box-sizing:border-box;padding:${PIPELINE_PADDING}px;overflow:hidden;`;
 
-    const emptyText = readString(model.props.emptyText, '该产线无工序配置');
     if (stages.length === 0) {
-      const empty = doc.createElement('div');
+      // 空态 chrome 与文案统一走 SDK 状态视图（ADR-0099 §2.5）；
+      // 领域文案属于读数本身，由物料固定给出，不再开放成作者可改的 prop。
+      const empty = createBaseScreenMaterialEmptyView(doc, { emptyLabel: PIPELINE_EMPTY_LABEL });
       empty.dataset.boardPipelineEmpty = '';
-      empty.textContent = emptyText;
-      empty.style.cssText = `width:100%;text-align:center;font:${fontSize}px/1.4 sans-serif;color:${labelColor};`;
       root.appendChild(empty);
       this.commit(root);
       return;
@@ -407,7 +582,9 @@ export class PluginBoardPipelineElement extends BoardMaterialElement {
       const statusText = doc.createElement('span');
       statusText.dataset.boardPipelineStatus = '';
       statusText.textContent = BOARD_STATUS_LABELS[status];
-      statusText.style.cssText = `max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${color};font-size:${Math.max(10, Math.round(options.fontSize * 0.85))}px;`;
+      const statusTextColor =
+        color === BOARD_STATUS_COLORS[status] ? BOARD_STATUS_TEXT_COLORS[status] : color;
+      statusText.style.cssText = `max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${statusTextColor};font-size:${Math.max(10, Math.round(options.fontSize * 0.85))}px;`;
       node.appendChild(statusText);
     }
 

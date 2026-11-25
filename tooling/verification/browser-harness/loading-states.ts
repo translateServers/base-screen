@@ -56,7 +56,7 @@ function createTextDocument(): ScreenDocument {
         dataSource: { type: 'static', value: 'projectAdapter.load 返回后渲染的真实文档' },
       },
     ],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
     variables: [],
   };
 }
@@ -87,7 +87,7 @@ function createWaterLevelDocument(): ScreenDocument {
         },
       },
     ],
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
     variables: [],
   };
 }

@@ -11,6 +11,7 @@ import type {
   ScreenVariableEntry,
   ScreenVariableRecord,
 } from '../types/document.js';
+import { migrateRelationBlueprint } from './blueprint-graph-migration.js';
 
 /** 一条迁移决策：旧文档中的位置、做了什么、以及（若有）新建实例的 id。 */
 export interface ScreenMigrationDecision {
@@ -20,6 +21,8 @@ export interface ScreenMigrationDecision {
     | 'variable'
     | 'parameter'
     | 'blueprint-relation'
+    | 'blueprint-node'
+    | 'blueprint-edge'
     | 'blueprint-layout';
   /** 旧文档中的位置。 */
   readonly path: readonly (string | number)[];
@@ -28,6 +31,7 @@ export interface ScreenMigrationDecision {
   readonly detail: string;
   readonly createdDataSourceId?: string;
   readonly createdRelationIds?: readonly string[];
+  readonly createdEdgeIds?: readonly string[];
 }
 
 /**
@@ -67,7 +71,12 @@ interface MigrationContext {
  * @param input 待迁移的原始文档（未校验 JSON）。
  */
 export function migrateScreenDocument(input: unknown): ScreenMigrationResult {
-  const preprocessed = preprocessLegacyBlueprint(input);
+  const legacy = preprocessLegacyBlueprint(input);
+  const graph = migrateRelationBlueprint(legacy.input);
+  const preprocessed = {
+    input: graph.input,
+    decisions: [...legacy.decisions, ...graph.decisions],
+  };
   const parsed = parseScreenDocument(preprocessed.input);
   if (!parsed.ok) {
     return {
@@ -95,6 +104,7 @@ export function migrateScreenDocument(input: unknown): ScreenMigrationResult {
     dataSources: context.dataSources,
     variables,
     blueprint: parsed.value.blueprint,
+    ...(parsed.value.theme === undefined ? {} : { theme: parsed.value.theme }),
   });
   const decisions = [...preprocessed.decisions, ...context.decisions];
   if (!migrated.ok) {
@@ -118,7 +128,8 @@ interface BlueprintPreprocessing {
 }
 
 /**
- * 旧 `blueprint.rules` → 一等 relations 的唯一转换路径。
+ * 旧 `blueprint.rules` → relations 的转换路径（ADR-0091）；产物随后由
+ * `migrateRelationBlueprint` 转成节点图（ADR-0107），因此三种旧形态都能一次迁到当前形态。
  *
  * 只处理结构完整可识别的旧文档；任何无法安全转换的形状都原样返回，让严格解析失败关闭，
  * 不做部分迁移、不静默丢弃规则。
@@ -416,7 +427,7 @@ function migrateComponentDataSource(
     style: component.style,
     // 旧字段保留为 null：当前契约仍要求该键存在，它不再是写入口。
     dataSource: null,
-    ...(component.styleRules === undefined ? {} : { styleRules: component.styleRules }),
+    ...(component.states === undefined ? {} : { states: component.states }),
   } satisfies Omit<ScreenComponentNode, 'dataSource' | 'dataValue' | 'dataBinding'> & {
     dataSource: null;
   };

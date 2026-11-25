@@ -113,7 +113,7 @@ function document(variables: ScreenDocument['variables']): ScreenDocument {
       },
     ],
     variables,
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 

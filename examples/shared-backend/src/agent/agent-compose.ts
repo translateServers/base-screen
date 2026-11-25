@@ -276,7 +276,7 @@ export function composeScreenDocument(input: {
         components,
         variables: [],
         ...(sink.dataSources.length === 0 ? {} : { dataSources: sink.dataSources }),
-        blueprint: { relations: [] },
+        blueprint: { nodes: [], edges: [] },
       },
     },
   };

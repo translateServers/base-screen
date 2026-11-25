@@ -10,7 +10,14 @@ import {
   type ScreenDocument,
   type ScreenJsonObject,
   type ScreenJsonValue,
+  type ScreenParseResult,
+  type ScreenPushCursor,
+  type ScreenPushRetainPolicy,
   type ScreenResourceExecutionContext,
+  type ScreenSourceConnectionStatus,
+  type ScreenSourceDelivery,
+  type ScreenSourcePushEvent,
+  type ScreenUpdatePolicy,
   type ScreenValueRef,
   screenDataSourceOrder,
 } from '@base-screen/contracts';
@@ -21,6 +28,15 @@ import {
 } from '@base-screen/core';
 import type { BaseScreenMaterialDataState } from '@base-screen/plugin-core';
 import { canonicalJsonString } from '../canonical-json.js';
+import {
+  classifyPushCursor,
+  isPushTabularValue,
+  type PushTabularValue,
+  pushRowsMatchFields,
+  readPushCursor,
+  trimPushRows,
+  trimPushValueToBytes,
+} from './push-window.js';
 import type { ResourceRequestCoordinator } from './request-coordinator.js';
 import {
   type SourceQueryPort,
@@ -46,17 +62,86 @@ export interface DataSourceRuntimeEntry {
   requestSlotId: string | undefined;
   /** 最近一次失败的宿主诊断（已归一化前的原始诊断）。 */
   rawError: ScreenDiagnostic | undefined;
+  /** 推送实例的连接状态（ADR-0104 §2.6）；非推送实例或未订阅时为 undefined。只在运行时存在。 */
+  connection: ScreenSourceConnectionStatus | undefined;
 }
+
+/**
+ * 一次推送会话（一个逻辑订阅）。会话对象本身就是代际：订阅被停掉或被新会话取代后，
+ * 旧 sink 上的任何事件都因 `entry.push !== session` 被丢弃，不依赖宿主及时停推。
+ */
+type PushSession = {
+  readonly id: number;
+  /** `fallback-only`：来源不支持订阅、按 `fallbackIntervalSeconds` 轮询。 */
+  readonly mode: 'subscribed' | 'fallback-only';
+  readonly controller: AbortController | undefined;
+  readonly retain: ScreenPushRetainPolicy | undefined;
+  readonly append: boolean;
+  readonly inactivityMs: number | undefined;
+  readonly fallbackMs: number | undefined;
+  cursor: ScreenPushCursor | undefined;
+  snapshotReceived: boolean;
+  resyncing: boolean;
+  inactive: boolean;
+  stopped: boolean;
+  warnedTimeField: boolean;
+  frameEvents: number;
+  cancelFrame: (() => void) | undefined;
+  cancelSnapshotTimer: (() => void) | undefined;
+  cancelInactivityTimer: (() => void) | undefined;
+  cancelFallbackTimer: (() => void) | undefined;
+};
 
 type InternalEntry = DataSourceRuntimeEntry & {
   params: ScreenJsonObject;
   requestId: string | undefined;
   executionContext: ScreenResourceExecutionContext | undefined;
   startedAt: number | undefined;
+  /** 当前生效的 push 策略的规范串：策略切换（含 push ↔ 非 push）时重置实例。 */
+  pushPolicyKey: string | undefined;
+  pushPolicy: ScreenUpdatePolicy | undefined;
+  push: PushSession | undefined;
 };
 
+/** 计时与合帧的注入点：测试可替换为手动时钟。 */
+export interface DataSourceRuntimeClock {
+  now(): number;
+  setTimeout(task: () => void, delayMs: number): () => void;
+  requestFrame(task: () => void): () => void;
+}
+
+export interface DataSourceRuntimePushOptions {
+  /** 设计态不订阅（ADR-0104 §2.4.10）：false 时 push 实例按一次性拉取处理。 */
+  readonly enabled: boolean;
+  /** 来源的推送能力声明；undefined 表示该来源只支持拉取。 */
+  readonly delivery: (source: ScreenDataSourceSource) => ScreenSourceDelivery['push'] | undefined;
+  /** 订阅后等待首个快照的上限；缺省 15000 ms。 */
+  readonly snapshotTimeoutMs?: number;
+  /** 非致命诊断（例如降级为轮询）。 */
+  readonly onWarning?: (diagnostic: ScreenDiagnostic) => void;
+}
+
+const PUSH_CONNECTION_STATUSES: ReadonlySet<string> = new Set([
+  'connecting',
+  'open',
+  'reconnecting',
+  'suspended',
+  'failed',
+]);
+
 export interface DataSourceRuntimeObserverEvent {
-  readonly type: 'started' | 'succeeded' | 'failed' | 'aborted' | 'timed-out' | 'adapted';
+  readonly type:
+    | 'started'
+    | 'succeeded'
+    | 'failed'
+    | 'aborted'
+    | 'timed-out'
+    | 'adapted'
+    | 'subscribed'
+    | 'unsubscribed'
+    | 'pushed'
+    | 'connection'
+    | 'resync';
   readonly dataSourceId: string;
   /** 首个读该实例的组件（观察者定位用）；没有组件读时为实例 id。 */
   readonly componentId: string;
@@ -68,6 +153,8 @@ export interface DataSourceRuntimeObserverEvent {
   readonly fieldCount?: number | undefined;
   readonly rowCount?: number | undefined;
   readonly code?: string | undefined;
+  readonly cursor?: ScreenPushCursor | undefined;
+  readonly connection?: ScreenSourceConnectionStatus | undefined;
 }
 
 export interface DataSourceRuntimeOptions {
@@ -87,6 +174,9 @@ export interface DataSourceRuntimeOptions {
     | ((source: ScreenDataSourceSource, params: ScreenJsonObject) => ScreenDiagnostic | undefined)
     | undefined;
   readonly timeoutMs?: number;
+  /** 推送（ADR-0104）；缺省视为未启用，push 实例按一次性拉取处理。 */
+  readonly push?: DataSourceRuntimePushOptions;
+  readonly clock?: DataSourceRuntimeClock;
 }
 
 /**
@@ -102,11 +192,15 @@ export interface DataSourceRuntimeOptions {
  */
 export class DataSourceRuntime {
   readonly #entries = new Map<string, InternalEntry>();
+  readonly #clock: DataSourceRuntimeClock;
+  #pushSessionSeed = 0;
   #document: ScreenDocument | undefined;
   #variables: ScreenJsonObject = {};
   #variablesKey = canonicalJsonString({});
 
-  constructor(private readonly options: DataSourceRuntimeOptions) {}
+  constructor(private readonly options: DataSourceRuntimeOptions) {
+    this.#clock = options.clock ?? defaultClock();
+  }
 
   /**
    * 变量对象的规范化键：结构相等即同键。渲染守卫用它判定「非实例取值
@@ -229,6 +323,15 @@ export class DataSourceRuntime {
     for (const id of ids) {
       const entry = this.#entries.get(id)!;
       if (entry.requestKey === undefined) continue;
+      // 推送实例：退订后重新订阅拿新快照，不额外 resolve；当前值保留到新快照落地（ADR-0104 §2.4.7）。
+      if (entry.pushPolicy !== undefined) {
+        if (entry.push === undefined && entry.dataState.status === 'loading') continue;
+        this.#cancel(entry);
+        if (entry.dataState.status === 'error') entry.dataState = { status: 'loading' };
+        this.#startPush(entry, entry.pushPolicy, context ?? { trigger: 'manual', traceId: '' });
+        restarted.push(id);
+        continue;
+      }
       // 已有同键在途请求：刷新合并进去，不取消、不重发（重复刷新不放大请求）。
       // 判据用协调器的槽位状态：回包已 settle（槽位释放）但本地回调还没跑完时，
       // 这一轮刷新应当照常重发，而不是被自己的延迟收尾挡掉。
@@ -283,6 +386,10 @@ export class DataSourceRuntime {
       requestId: undefined,
       executionContext: undefined,
       startedAt: undefined,
+      connection: undefined,
+      pushPolicyKey: undefined,
+      pushPolicy: undefined,
+      push: undefined,
     };
     this.#entries.set(dataSourceId, created);
     return created;
@@ -314,6 +421,24 @@ export class DataSourceRuntime {
       entry.dataState = { status: 'loading' };
       entry.rawValue = undefined;
       entry.rawError = undefined;
+    }
+    const pushPolicy = this.#pushPolicyOf(instance);
+    const pushPolicyKey =
+      pushPolicy === undefined
+        ? undefined
+        : canonicalJsonString(pushPolicy as unknown as ScreenJsonValue);
+    if (entry.pushPolicyKey !== pushPolicyKey) {
+      // 策略切换（含 push ↔ 非 push、窗口或回退间隔变化）：旧订阅与旧值一律作废。
+      this.#cancel(entry);
+      entry.pushPolicyKey = pushPolicyKey;
+      entry.pushPolicy = pushPolicy;
+      entry.dataState = { status: 'loading' };
+      entry.rawValue = undefined;
+      entry.rawError = undefined;
+    }
+    if (pushPolicy !== undefined) {
+      this.#ensurePush(entry, pushPolicy, environment, context, startOnly);
+      return;
     }
     if (entry.requestSlotId !== undefined) {
       // 在途：本轮没有结果也没有错误。
@@ -426,6 +551,17 @@ export class DataSourceRuntime {
       if (this.#entries.get(entry.dataSourceId) !== entry) return;
       if (entry.generation !== generation || entry.requestSlotId !== slotId) return;
       entry.requestSlotId = undefined;
+      if (settled.kind !== 'ok' && this.#keepPushValueOnPullFailure(entry)) {
+        this.#emit(entry, settled.kind === 'timeout' ? 'timed-out' : 'failed', {
+          startedAt,
+          code:
+            settled.kind === 'timeout'
+              ? 'HOST_RESOURCE_TIMEOUT'
+              : normalizeScreenMaterialError(settled.diagnostics.diagnostics[0] ?? genericFailure())
+                  .code,
+        });
+        return;
+      }
       if (settled.kind === 'timeout') {
         this.#fail(
           entry,
@@ -467,13 +603,33 @@ export class DataSourceRuntime {
         this.options.onChanged(entry.dataSourceId);
         return;
       }
-      entry.dataState = { status: 'ready', value: parsed.value };
-      entry.rawValue = parsed.value;
-      entry.rawError = undefined;
-      const tabular = readTabularCounts(parsed.value);
+      if (entry.push !== undefined) {
+        // 推送实例的拉取（invalidate / 回退轮询）：结果即新的快照基准。
+        this.#acceptResolvedSnapshot(entry, entry.push, parsed.value);
+      } else {
+        entry.dataState = { status: 'ready', value: parsed.value };
+        entry.rawValue = parsed.value;
+        entry.rawError = undefined;
+      }
+      const tabular = readTabularCounts(entry.rawValue);
       this.#emit(entry, 'succeeded', { startedAt, ...tabular });
       this.options.onChanged(entry.dataSourceId);
     });
+  }
+
+  /**
+   * 推送实例的补拉（回退轮询 / `invalidate`）失败：已有值时保留它并标过期，不清成 error
+   * （ADR-0104 §2.6）。后端整体不可用时，suspended 期间的每次回退轮询都会失败——若按普通
+   * 拉取处理，第一次回退就会把画面清空，正好违背「离线保留旧值并提示过期」。
+   * 订阅仍在；下一个推送事件清除这里置的静默标记，过期与否回到按连接状态推导。
+   */
+  #keepPushValueOnPullFailure(entry: InternalEntry): boolean {
+    const session = entry.push;
+    if (session === undefined || session.mode !== 'subscribed') return false;
+    if (entry.dataState.status !== 'ready' || entry.rawValue === undefined) return false;
+    session.inactive = true;
+    this.#syncStale(entry);
+    return true;
   }
 
   #fail(
@@ -492,6 +648,7 @@ export class DataSourceRuntime {
   }
 
   #cancel(entry: InternalEntry): void {
+    this.#stopPush(entry);
     const slotId = entry.requestSlotId;
     entry.generation++;
     entry.requestSlotId = undefined;
@@ -511,6 +668,8 @@ export class DataSourceRuntime {
       readonly fieldCount?: number | undefined;
       readonly rowCount?: number | undefined;
       readonly code?: string | undefined;
+      readonly cursor?: ScreenPushCursor | undefined;
+      readonly connection?: ScreenSourceConnectionStatus | undefined;
     },
     componentId?: string,
   ): void {
@@ -532,6 +691,455 @@ export class DataSourceRuntime {
       ...(meta.fieldCount === undefined ? {} : { fieldCount: meta.fieldCount }),
       ...(meta.rowCount === undefined ? {} : { rowCount: meta.rowCount }),
       ...(meta.code === undefined ? {} : { code: meta.code }),
+      ...(meta.cursor === undefined ? {} : { cursor: meta.cursor }),
+      ...(meta.connection === undefined ? {} : { connection: meta.connection }),
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 推送（ADR-0104）
+  // ---------------------------------------------------------------------------
+
+  /** 生效的 push 策略：设计态、未启用推送或 `url-query` 来源时为 undefined（按拉取处理）。 */
+  #pushPolicyOf(instance: ScreenDataSource): ScreenUpdatePolicy | undefined {
+    const policy = instance.updatePolicy;
+    if (policy?.mode !== 'push') return undefined;
+    if (this.options.push?.enabled !== true) return undefined;
+    if (instance.source.kind === 'url-query') return undefined;
+    return policy;
+  }
+
+  #ensurePush(
+    entry: InternalEntry,
+    policy: ScreenUpdatePolicy,
+    environment: MutableEnvironment,
+    context: { readonly trigger: string; readonly traceId: string },
+    startOnly: ReadonlySet<string> | undefined,
+  ): void {
+    // 已有会话（含失败后仍在重试的订阅）或在途拉取：只导出当前状态，不重复订阅。
+    const active = entry.push !== undefined || entry.requestSlotId !== undefined;
+    if (!active && entry.dataState.status === 'loading') {
+      if (startOnly !== undefined && !startOnly.has(entry.dataSourceId)) return;
+      this.#startPush(entry, policy, context);
+    }
+    if (entry.dataState.status === 'ready' && entry.rawValue !== undefined) {
+      environment.dataSourceValues.set(entry.dataSourceId, entry.rawValue);
+    } else if (entry.dataState.status === 'error') {
+      environment.dataSourceErrors.set(
+        entry.dataSourceId,
+        entry.rawError ?? genericFailure('Host data source failed.'),
+      );
+    }
+  }
+
+  #startPush(
+    entry: InternalEntry,
+    policy: ScreenUpdatePolicy,
+    context: { readonly trigger: string; readonly traceId: string },
+  ): void {
+    const source = entry.source;
+    const push = this.options.push;
+    if (source === undefined || entry.requestKey === undefined || push === undefined) return;
+    if (this.options.isSuspended()) return;
+    const delivery = push.delivery(source);
+    const fallbackMs =
+      policy.fallbackIntervalSeconds === undefined
+        ? undefined
+        : policy.fallbackIntervalSeconds * 1000;
+    const canSubscribe = delivery !== undefined && this.options.sourcePort.acceptsPush(source);
+    if (!canSubscribe) {
+      if (fallbackMs === undefined) {
+        this.#fail(entry, unavailable('Host data source does not support push.'), {
+          emitStarted: true,
+        });
+        this.options.onChanged(entry.dataSourceId);
+        return;
+      }
+      // 门控降级（ADR-0104 §2.3）：有回退间隔就按间隔轮询，并报一条 warning。
+      push.onWarning?.({
+        severity: 'warning',
+        code: 'HOST_RESOURCE_UNAVAILABLE',
+        path: [],
+        message: 'Host data source does not support push; falling back to polling.',
+      });
+      const session = this.#createSession('fallback-only', policy, undefined, fallbackMs);
+      entry.push = session;
+      this.#startRequest(entry, context);
+      this.#scheduleFallback(entry, session);
+      return;
+    }
+    const paramDiagnostic = this.options.validateParams?.(source, entry.params);
+    if (paramDiagnostic !== undefined) {
+      this.#fail(entry, paramDiagnostic, { emitStarted: false });
+      this.options.onChanged(entry.dataSourceId);
+      return;
+    }
+    const controller = new AbortController();
+    const session = this.#createSession('subscribed', policy, delivery, fallbackMs, controller);
+    entry.push = session;
+    entry.connection = 'connecting';
+    const startedAt = this.#clock.now();
+    const executionContext = this.options.createExecutionContext(context, entry.dataSourceId);
+    entry.executionContext = executionContext;
+    entry.startedAt = startedAt;
+    entry.requestId = `${entry.dataSourceId}:${entry.requestKey}:push:${session.id}`;
+    let result: ScreenParseResult<null>;
+    try {
+      result = this.options.sourcePort.subscribe(
+        { dataSourceId: entry.dataSourceId, source, params: entry.params },
+        { push: (event) => this.#onPushEvent(entry, session, event) },
+        {
+          signal: controller.signal,
+          context: executionContext,
+          ...(policy.retain === undefined ? {} : { retain: policy.retain }),
+        },
+      );
+    } catch {
+      result = { ok: false, diagnostics: [genericFailure('Host subscription failed.')] };
+    }
+    if (entry.push !== session) return; // 宿主在 subscribe 内同步报了 failed
+    if (!result.ok) {
+      this.#stopPush(entry, false);
+      this.#fail(entry, result.diagnostics[0] ?? genericFailure('Host subscription failed.'), {
+        emitStarted: true,
+      });
+      this.options.onChanged(entry.dataSourceId);
+      return;
+    }
+    this.#emit(entry, 'subscribed', { startedAt });
+    if (!session.snapshotReceived) {
+      session.cancelSnapshotTimer = this.#clock.setTimeout(
+        () => this.#onSnapshotTimeout(entry, session),
+        push.snapshotTimeoutMs ?? 15_000,
+      );
+    }
+    this.#armInactivity(entry, session);
+  }
+
+  #createSession(
+    mode: PushSession['mode'],
+    policy: ScreenUpdatePolicy,
+    delivery: ScreenSourceDelivery['push'] | undefined,
+    fallbackMs: number | undefined,
+    controller?: AbortController,
+  ): PushSession {
+    const inactivitySeconds = delivery?.inactivityTimeoutSeconds;
+    return {
+      id: ++this.#pushSessionSeed,
+      mode,
+      controller,
+      retain: policy.retain,
+      append: delivery?.append === true,
+      inactivityMs: inactivitySeconds === undefined ? undefined : inactivitySeconds * 1000,
+      fallbackMs,
+      cursor: undefined,
+      snapshotReceived: false,
+      resyncing: false,
+      inactive: false,
+      stopped: false,
+      warnedTimeField: false,
+      frameEvents: 0,
+      cancelFrame: undefined,
+      cancelSnapshotTimer: undefined,
+      cancelInactivityTimer: undefined,
+      cancelFallbackTimer: undefined,
+    };
+  }
+
+  #onPushEvent(entry: InternalEntry, session: PushSession, event: ScreenSourcePushEvent): void {
+    if (session.stopped || entry.push !== session) return;
+    if (this.#entries.get(entry.dataSourceId) !== entry) return;
+    if (event === null || typeof event !== 'object') return;
+    // 任何事件（含心跳）都刷新静默计时。
+    session.inactive = false;
+    this.#armInactivity(entry, session);
+    switch (event.type) {
+      case 'heartbeat':
+        break;
+      case 'status':
+        this.#onPushStatus(entry, session, event.status, event.diagnostic);
+        if (entry.push !== session) return;
+        break;
+      case 'snapshot':
+        this.#onPushSnapshot(entry, session, event.value, event.cursor);
+        if (entry.push !== session) return;
+        break;
+      case 'append':
+        this.#onPushAppend(entry, session, event.rows, event.cursor);
+        if (entry.push !== session) return;
+        break;
+      case 'invalidate':
+        // 请重新获取快照：同键 resolve，期间保留当前值；已有在途拉取就合并。
+        if (
+          entry.requestSlotId === undefined ||
+          this.options.coordinator?.isPending(entry.requestSlotId) !== true
+        ) {
+          this.#startRequest(entry, { trigger: 'push', traceId: '' });
+        }
+        break;
+      default:
+        return;
+    }
+    this.#syncStale(entry);
+  }
+
+  #onPushStatus(
+    entry: InternalEntry,
+    session: PushSession,
+    status: unknown,
+    diagnostic: ScreenDiagnostic | undefined,
+  ): void {
+    if (typeof status !== 'string' || !PUSH_CONNECTION_STATUSES.has(status)) return;
+    const next = status as ScreenSourceConnectionStatus;
+    if (next === entry.connection) return;
+    entry.connection = next;
+    this.#emit(entry, 'connection', { startedAt: entry.startedAt, connection: next });
+    if (next === 'failed') {
+      // 不可恢复：停订阅、进 error，不保留旧值（ADR-0104 §2.6）。
+      this.#stopPush(entry);
+      this.#fail(entry, diagnostic ?? unavailable('Host data source connection failed.'));
+      this.options.onChanged(entry.dataSourceId);
+      return;
+    }
+    if (next === 'suspended') {
+      if (session.fallbackMs !== undefined) this.#scheduleFallback(entry, session);
+      if (entry.dataState.status !== 'ready') {
+        this.#setError(entry, unavailable('Host data source is offline.'));
+      }
+    } else if (next === 'open') {
+      session.cancelFallbackTimer?.();
+      session.cancelFallbackTimer = undefined;
+    }
+    this.#markChanged(entry);
+  }
+
+  #onPushSnapshot(
+    entry: InternalEntry,
+    session: PushSession,
+    value: unknown,
+    rawCursor: unknown,
+  ): void {
+    const cursor = readPushCursor(rawCursor);
+    if (classifyPushCursor(session.cursor, cursor, 'snapshot') === 'duplicate') return;
+    const parsed = parseScreenJsonValue(value, { maxBytes: MAX_DATA_SOURCE_VALUE_BYTES });
+    if (!parsed.ok) {
+      this.#pushViolation(entry, 'Host push snapshot is invalid JSON.');
+      return;
+    }
+    session.cursor = cursor;
+    session.snapshotReceived = true;
+    session.cancelSnapshotTimer?.();
+    session.cancelSnapshotTimer = undefined;
+    if (session.resyncing) session.resyncing = false;
+    this.#setReady(entry, this.#windowed(entry, session, parsed.value));
+    this.#markChanged(entry);
+  }
+
+  #onPushAppend(
+    entry: InternalEntry,
+    session: PushSession,
+    rows: unknown,
+    rawCursor: unknown,
+  ): void {
+    // 首个快照前、重同步中：增量没有基准，丢弃，等新快照。
+    if (!session.snapshotReceived || session.resyncing) return;
+    if (!session.append) {
+      this.#pushViolation(entry, 'Host pushed append without declaring append delivery.');
+      return;
+    }
+    const current = entry.rawValue;
+    if (!isPushTabularValue(current)) {
+      this.#pushViolation(entry, 'Host pushed append for a non-tabular value.');
+      return;
+    }
+    const cursor = readPushCursor(rawCursor);
+    const verdict = classifyPushCursor(session.cursor, cursor, 'append');
+    if (verdict === 'duplicate') return;
+    if (verdict === 'gap') {
+      session.resyncing = true;
+      this.#emit(entry, 'resync', {
+        startedAt: entry.startedAt,
+        ...(session.cursor === undefined ? {} : { cursor: session.cursor }),
+      });
+      this.#markChanged(entry);
+      return;
+    }
+    const parsed = parseScreenJsonValue(rows, { maxBytes: MAX_DATA_SOURCE_VALUE_BYTES });
+    if (!parsed.ok || !pushRowsMatchFields(parsed.value, current)) {
+      this.#pushViolation(entry, 'Host pushed rows that do not match the dataset fields.');
+      return;
+    }
+    if (cursor !== undefined) session.cursor = cursor;
+    const merged: PushTabularValue = { ...current, rows: [...current.rows, ...parsed.value] };
+    this.#setReady(entry, this.#windowed(entry, session, merged));
+    this.#markChanged(entry);
+  }
+
+  /** 推送实例经 resolve（invalidate / 回退轮询）拿到的结果：作为新快照基准，游标清空。 */
+  #acceptResolvedSnapshot(
+    entry: InternalEntry,
+    session: PushSession,
+    value: ScreenJsonValue,
+  ): void {
+    session.cursor = undefined;
+    session.snapshotReceived = true;
+    session.resyncing = false;
+    session.cancelSnapshotTimer?.();
+    session.cancelSnapshotTimer = undefined;
+    this.#setReady(entry, this.#windowed(entry, session, value));
+  }
+
+  /** 表格值按保留窗口裁剪；只有声明了 `append` 或 `retain` 的会话才裁行。 */
+  #windowed(entry: InternalEntry, session: PushSession, value: ScreenJsonValue): ScreenJsonValue {
+    if (!isPushTabularValue(value)) return value;
+    if (!session.append && session.retain === undefined) return value;
+    const trimmed = trimPushRows(value.rows, session.retain);
+    if (trimmed.unparseableTime && !session.warnedTimeField) {
+      session.warnedTimeField = true;
+      this.options.push?.onWarning?.({
+        severity: 'warning',
+        code: 'HOST_RESOURCE_INVALID',
+        path: ['dataSources', entry.dataSourceId, 'updatePolicy', 'retain', 'timeField'],
+        message:
+          'Push retain timeField is missing or unparseable on some rows; trimming by rows only.',
+      });
+    }
+    return trimmed.rows === value.rows ? value : { ...value, rows: trimmed.rows };
+  }
+
+  /** 宿主违约（形状错误、未声明的增量）：停订阅、实例进 error。 */
+  #pushViolation(entry: InternalEntry, message: string): void {
+    this.#stopPush(entry);
+    this.#fail(entry, { severity: 'error', code: 'HOST_RESOURCE_INVALID', path: [], message });
+    this.options.onChanged(entry.dataSourceId);
+  }
+
+  #onSnapshotTimeout(entry: InternalEntry, session: PushSession): void {
+    session.cancelSnapshotTimer = undefined;
+    if (session.stopped || entry.push !== session || session.snapshotReceived) return;
+    if (entry.dataState.status === 'ready') {
+      // 重新订阅后迟迟没有新快照：保留旧值并标为过期，而不是清掉。
+      session.inactive = true;
+      this.#syncStale(entry);
+      return;
+    }
+    this.#stopPush(entry);
+    this.#fail(entry, {
+      severity: 'error',
+      code: 'HOST_RESOURCE_TIMEOUT',
+      path: [],
+      message: 'Host data source did not deliver a snapshot in time.',
+    });
+    this.#emit(entry, 'timed-out', { startedAt: entry.startedAt, code: 'HOST_RESOURCE_TIMEOUT' });
+    this.options.onChanged(entry.dataSourceId);
+  }
+
+  #armInactivity(entry: InternalEntry, session: PushSession): void {
+    if (session.inactivityMs === undefined || session.stopped) return;
+    session.cancelInactivityTimer?.();
+    session.cancelInactivityTimer = this.#clock.setTimeout(() => {
+      session.cancelInactivityTimer = undefined;
+      if (session.stopped || entry.push !== session) return;
+      session.inactive = true;
+      this.#syncStale(entry);
+    }, session.inactivityMs);
+  }
+
+  /** 回退轮询：fallback-only 会话一直轮询；订阅会话只在连接 `suspended` 期间轮询。 */
+  #scheduleFallback(entry: InternalEntry, session: PushSession): void {
+    if (session.fallbackMs === undefined || session.cancelFallbackTimer !== undefined) return;
+    session.cancelFallbackTimer = this.#clock.setTimeout(() => {
+      session.cancelFallbackTimer = undefined;
+      if (session.stopped || entry.push !== session) return;
+      if (session.mode === 'subscribed' && entry.connection !== 'suspended') return;
+      if (
+        entry.requestSlotId === undefined ||
+        this.options.coordinator?.isPending(entry.requestSlotId) !== true
+      ) {
+        this.#startRequest(entry, { trigger: 'polling', traceId: '' });
+      }
+      this.#scheduleFallback(entry, session);
+    }, session.fallbackMs);
+  }
+
+  #stopPush(entry: InternalEntry, emit = true): void {
+    const session = entry.push;
+    if (session === undefined) return;
+    session.stopped = true;
+    session.controller?.abort();
+    session.cancelFrame?.();
+    session.cancelSnapshotTimer?.();
+    session.cancelInactivityTimer?.();
+    session.cancelFallbackTimer?.();
+    entry.push = undefined;
+    entry.connection = undefined;
+    if (emit && session.mode === 'subscribed') {
+      this.#emit(entry, 'unsubscribed', { startedAt: entry.startedAt });
+    }
+  }
+
+  /** 过期（ADR-0104 §2.6）：连接短暂断开或长期无连接、重同步中、超过静默超时。 */
+  #isStale(entry: InternalEntry): boolean {
+    const session = entry.push;
+    if (session === undefined || session.mode !== 'subscribed') return false;
+    return (
+      entry.connection === 'reconnecting' ||
+      entry.connection === 'suspended' ||
+      session.resyncing ||
+      session.inactive
+    );
+  }
+
+  #setReady(entry: InternalEntry, value: ScreenJsonValue): void {
+    entry.rawValue = value;
+    entry.rawError = undefined;
+    entry.dataState = this.#isStale(entry)
+      ? { status: 'ready', value, stale: true }
+      : { status: 'ready', value };
+  }
+
+  /** 不停订阅的错误态：连接 suspended 且从未有值时用，之后的快照仍能恢复。 */
+  #setError(entry: InternalEntry, diagnostic: ScreenDiagnostic): void {
+    entry.rawValue = undefined;
+    entry.rawError = diagnostic;
+    const normalized = normalizeScreenMaterialError(diagnostic);
+    entry.dataState = { status: 'error', code: normalized.code, message: normalized.message };
+  }
+
+  #syncStale(entry: InternalEntry): void {
+    if (entry.dataState.status !== 'ready' || entry.rawValue === undefined) return;
+    const stale = this.#isStale(entry);
+    if ((entry.dataState.stale === true) === stale) return;
+    this.#setReady(entry, entry.rawValue);
+    this.#markChanged(entry);
+  }
+
+  /** 按帧合并通知（ADR-0104 §2.4.6）：每个实例每帧最多一次 `onChanged`。 */
+  #markChanged(entry: InternalEntry): void {
+    const session = entry.push;
+    if (session === undefined) {
+      this.options.onChanged(entry.dataSourceId);
+      return;
+    }
+    session.frameEvents++;
+    if (session.cancelFrame !== undefined) return;
+    session.cancelFrame = this.#clock.requestFrame(() => {
+      session.cancelFrame = undefined;
+      if (session.stopped || entry.push !== session) return;
+      if (this.#entries.get(entry.dataSourceId) !== entry) return;
+      const value = entry.rawValue;
+      if (entry.dataState.status === 'ready' && isPushTabularValue(value)) {
+        const bounded = trimPushValueToBytes(value, MAX_DATA_SOURCE_VALUE_BYTES);
+        if (bounded !== value) this.#setReady(entry, bounded);
+      }
+      // 观察事件按帧聚合（DRH-R8）：只带行数与游标，不带载荷。
+      session.frameEvents = 0;
+      this.#emit(entry, 'pushed', {
+        startedAt: entry.startedAt,
+        ...readTabularCounts(entry.rawValue),
+        ...(session.cursor === undefined ? {} : { cursor: session.cursor }),
+      });
+      this.options.onChanged(entry.dataSourceId);
     });
   }
 
@@ -619,4 +1227,27 @@ function readTabularCounts(value: ScreenJsonValue | undefined): {
 
 function genericFailure(message: string = 'Host resource request failed.'): ScreenDiagnostic {
   return { severity: 'error', code: 'HOST_RESOURCE_FAILED', path: [], message };
+}
+
+function unavailable(message: string): ScreenDiagnostic {
+  return { severity: 'error', code: 'HOST_RESOURCE_UNAVAILABLE', path: [], message };
+}
+
+/** 默认时钟：有 `requestAnimationFrame` 就按帧合并，否则退化为 16 ms 定时器。 */
+function defaultClock(): DataSourceRuntimeClock {
+  return {
+    now: () => Date.now(),
+    setTimeout: (task, delayMs) => {
+      const handle = globalThis.setTimeout(task, delayMs);
+      return () => globalThis.clearTimeout(handle);
+    },
+    requestFrame: (task) => {
+      if (typeof globalThis.requestAnimationFrame === 'function') {
+        const handle = globalThis.requestAnimationFrame(() => task());
+        return () => globalThis.cancelAnimationFrame(handle);
+      }
+      const handle = globalThis.setTimeout(task, 16);
+      return () => globalThis.clearTimeout(handle);
+    },
+  };
 }

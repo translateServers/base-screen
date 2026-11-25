@@ -61,16 +61,79 @@ describe('designer panel rendering', () => {
     );
     expect(fit?.tagName).toBe('select');
     expect(fit?.disabled).toBe(true); // 无背景图时禁用
-    expect(
-      descendants(properties)
-        .filter((element) => element.tagName === 'option')
-        .map((element) => element.value),
-    ).toEqual(['cover', 'contain']);
+    // 页面配置里有两个 select：背景图适配（两档）与缩放方式（六档）。
+    // 这里只锁背景图那两档——按全表 option 断言会把缩放六档一起算进来。
+    const optionValues = descendants(properties)
+      .filter((element) => element.tagName === 'option')
+      .map((element) => element.value);
+    expect(optionValues.filter((value) => value === 'cover' || value === 'contain')).toEqual([
+      'cover',
+      'contain',
+    ]);
     // 背景填充段里是与组件检查器同源的调色板控件，页面配置不再自带取色 UI。
     const backgroundPalette = descendants(properties).filter((element) =>
       element.className.includes('designer-color-palette'),
     );
     expect(backgroundPalette.length).toBeGreaterThan(0);
+    // 主题色板用色板组：基础色位与状态色位各一组色卡，每组只放一个编辑器。
+    const themeGroups = descendants(properties).filter(
+      (element) => element.dataset.designerColorGroup?.startsWith('canvas:theme:') === true,
+    );
+    expect(themeGroups.map((group) => group.dataset.designerColorGroup)).toEqual([
+      'canvas:theme:base',
+      'canvas:theme:status',
+    ]);
+    expect(
+      themeGroups.map(
+        (group) =>
+          descendants(group).filter((element) => element.dataset.colorGroupKey !== undefined)
+            .length,
+      ),
+    ).toEqual([6, 4]);
+    expect(
+      descendants(properties).filter((element) =>
+        element.dataset.canvasProperty?.startsWith('theme.'),
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('keeps one preset reading on the size row and expands W / H only for custom canvases', () => {
+    const renderSizeRow = (canvas: ScreenDocument['canvas']) => {
+      const ownerDocument = new FakeDocument();
+      const properties = ownerDocument.createElement('div');
+      renderDesignerProperties(
+        properties as unknown as HTMLElement,
+        { ...document(), canvas },
+        { selectedComponentIds: [], focusedComponentId: null },
+        catalog(),
+      );
+      const all = descendants(properties);
+      const custom = all.find((element) =>
+        element.className.split(/\s+/).includes('designer-canvas-size-custom'),
+      );
+      return {
+        select: all.find((element) => element.dataset.canvasProperty === 'size'),
+        custom,
+        options: all.filter((element) => element.tagName === 'option'),
+      };
+    };
+
+    const preset = renderSizeRow({ ...document().canvas, width: 1920, height: 1080 });
+    expect(preset.select?.value).toBe('1920x1080');
+    expect(preset.custom?.hidden).toBe(true);
+    // 分辨率是预设选项的次级读数：下拉本身就读得全，不必再复制一组 W / H。
+    expect(preset.options.find((option) => option.value === '1920x1080')?.dataset.detail).toBe(
+      '1920 × 1080',
+    );
+
+    const custom = renderSizeRow({ ...document().canvas, width: 1600, height: 900 });
+    expect(custom.select?.value).toBe('custom');
+    expect(custom.custom?.hidden).toBe(false);
+    // 自定义态下 W / H 就在同一字段行里，落地即改。
+    const inputs = (custom.custom === undefined ? [] : descendants(custom.custom)).filter(
+      (element) => element.tagName === 'input',
+    );
+    expect(inputs.map((element) => element.dataset.canvasProperty)).toEqual(['width', 'height']);
   });
 
   it('renders the active canvas background through the shared color palette control', () => {
@@ -193,13 +256,15 @@ describe('designer panel rendering', () => {
       'hidden',
     ]);
     expect(propertyInputs).not.toContain('name');
-    // 原有属性/代理输入保持不变；其后是填充颜色控件的精确通道输入，以及行为/滤镜分区的
-    // 三个开关、混合模式下拉与五组滑杆+数值双控件（引擎级保留键，不依赖物料申报）。
-    expect(propertyInputs.slice(8)).toHaveLength(34);
+    // 原有属性/代理输入保持不变；其后是填充颜色控件的精确通道输入，以及公共区不透明度的
+    // 滑杆+数值双控件、行为/滤镜分区的三个开关、混合模式下拉与五组滑杆+数值双控件
+    // （引擎级保留键，不依赖物料申报，ADR-0099 §2.3）。
+    expect(propertyInputs.slice(8)).toHaveLength(36);
+    // 层级是几何的一部分，基础可见（ADR-0102 §7：不单独藏字段）。
     expect(
       descendants(properties).find((element) => element.dataset.propertySymbol === 'Z')?.dataset
         .inspectorAdvanced,
-    ).toBe('true');
+    ).toBeUndefined();
     // style.color 字段同样使用完整三段式调色板：渐变模式全部可用。
     const gradientModes = descendants(properties).filter(
       (element) => element.tagName === 'input' && element.dataset.colorPaletteField === 'mode',
@@ -226,76 +291,36 @@ describe('designer panel rendering', () => {
       descendants(properties)
         .filter((element) => element.tagName === 'summary')
         .map((element) => element.textContent),
-    ).toEqual(['几何', '状态', '行为', '滤镜', '内容', '样式', '条件样式']);
+    ).toEqual(['几何', '状态', '通用', '行为', '滤镜', '内容', '样式']);
     expect(descendants(properties).find((element) => element.dataset.prop === 'title')?.value).toBe(
       'Status',
     );
   });
 
-  it('renders the conditional style editor for existing document rules', () => {
+  it('renders the component states and judge sections and freezes geometry while editing a state', () => {
     const ownerDocument = new FakeDocument();
     const properties = ownerDocument.createElement('div');
     const base = document();
-    const withRules: ScreenDocument = {
+    const stated: ScreenDocument = {
       ...base,
-      components: base.components.map((component) => ({
-        ...component,
-        styleRules: [
-          {
-            id: 'warn',
-            when: { path: ['level'], operator: 'eq', value: 'warn' },
-            style: { color: '#ff4d4f' },
-          },
-        ],
-      })),
+      components: base.components.map((component) =>
+        component.id === 'label-1'
+          ? {
+              ...component,
+              states: {
+                items: [{ id: 'warn', name: '警告', style: { color: '#ff0000' } }],
+                judge: {
+                  input: { kind: 'component-data', path: [] },
+                  cases: [{ operator: 'gt', value: 10, stateId: 'warn' }],
+                },
+              },
+            }
+          : component,
+      ),
     };
-
     renderDesignerProperties(
       properties as unknown as HTMLElement,
-      withRules,
-      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
-      catalog(),
-    );
-
-    const all = descendants(properties);
-    const section = all.find((element) =>
-      element.className.includes('designer-conditional-style-section'),
-    );
-    expect(section).toBeDefined();
-    const rule = descendants(section!).find((element) => element.dataset.styleRuleId === 'warn');
-    expect(rule).toBeDefined();
-    const path = descendants(rule!).find((element) => element.dataset.styleRulePath !== undefined);
-    expect(path?.value).toBe('level');
-    const operator = descendants(rule!).find(
-      (element) => element.dataset.styleRuleOperator !== undefined,
-    );
-    expect(operator?.options.find((option) => option.selected)?.value).toBe('eq');
-    const value = descendants(rule!).find(
-      (element) => element.dataset.styleRuleValue !== undefined,
-    );
-    expect(value?.value).toBe('warn');
-    expect(
-      descendants(rule!)
-        .filter((element) => element.dataset.styleRuleColor !== undefined)
-        .map((element) => element.value),
-    ).toContain('#ff4d4f');
-    expect(descendants(section!).some((element) => element.dataset.styleRuleAction === 'add')).toBe(
-      true,
-    );
-  });
-
-  it('renders the host conditional style section from the host authoring port', () => {
-    const ownerDocument = new FakeDocument();
-    const properties = ownerDocument.createElement('div');
-    const bindings = vi.fn((componentId: string) =>
-      componentId === 'label-1'
-        ? [{ sourceId: 'alarm.open', conditionId: 'warning', style: { color: '#ff0000' } }]
-        : [],
-    );
-
-    renderDesignerProperties(
-      properties as unknown as HTMLElement,
-      document(),
+      stated,
       { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
       catalog(),
       undefined,
@@ -303,50 +328,18 @@ describe('designer panel rendering', () => {
       createDesignerCanvasPresentationSettings(),
       undefined,
       {
-        sources: [
-          {
-            id: 'alarm.open',
-            label: '未处理告警',
-            conditions: [
-              { id: 'warning', label: '警告' },
-              { id: 'critical', label: '严重' },
-            ],
-          },
-        ],
-        bindings,
-        save: async () => ({ ok: true as const, value: undefined, diagnostics: [] }),
+        editingStateId: () => 'warn',
+        readRuntime: () => ({ stateId: 'warn', value: 12 }),
+        levelScale: () => undefined,
       },
     );
-
-    expect(bindings).toHaveBeenCalledWith('label-1');
     const all = descendants(properties);
-    const section = all.find((element) =>
-      element.className.includes('designer-host-conditional-style-section'),
-    );
-    expect(section).toBeDefined();
-    const optionValues = descendants(section!)
-      .filter((element) => element.tagName === 'option')
-      .map((element) => element.value);
-    expect(optionValues).toContain('alarm.open');
-    expect(optionValues).toContain('warning');
-    expect(optionValues).toContain('critical');
-    expect(optionValues).toContain('color');
-    const remove = descendants(section!).find(
-      (element) => element.dataset.hostStyleRemove !== undefined,
-    );
-    expect(remove?.dataset.hostStyleSourceId).toBe('alarm.open');
-    expect(remove?.dataset.hostStyleConditionId).toBe('warning');
-    expect(remove?.dataset.hostStyleKey).toBe('color');
-    expect(
-      descendants(section!).some((element) => element.dataset.hostStyleAdd !== undefined),
-    ).toBe(true);
-    expect(
-      descendants(section!).find((element) => element.dataset.hostStyleStatus !== undefined)
-        ?.textContent,
-    ).toBe('');
-    expect(descendants(section!).some((element) => element.textContent === 'color = #ff0000')).toBe(
-      true,
-    );
+    const chips = all.filter((element) => element.dataset.stateAction === 'select');
+    expect(chips.map((element) => element.dataset.stateId)).toEqual(['default', 'warn']);
+    expect(chips[1]?.dataset.stateLive).toBe('');
+    expect(all.some((element) => element.dataset.stateName === 'warn')).toBe(true);
+    expect(all.some((element) => element.dataset.stateCaseHit !== undefined)).toBe(true);
+    expect(all.some((element) => element.dataset.stateFrozen !== undefined)).toBe(true);
   });
 
   it('disables editable controls while preserving locked and hidden status toggles', () => {

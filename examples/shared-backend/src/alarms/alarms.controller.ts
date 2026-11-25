@@ -5,8 +5,8 @@ import { AlarmsService } from './alarms.service';
 import { AlarmKeyDto, RaiseAlarmDto, SuppressAlarmDto } from './dto/alarm.dto';
 
 /**
- * 实时告警演示：宿主从 `/api/demo/alarms/stream` 消费 SSE，把当前告警快照映射成
- * `conditionalStylePort` 的样式覆盖；屏幕文档本身不保存任何告警知识。
+ * 实时告警演示：宿主从 `/api/demo/alarms/stream` 消费 SSE，按告警 key 汇总成「最高等级 + 条数」，
+ * 作为推送数据源（`alarm` 资源类型）交给大屏；等级对应的外观由组件状态决定（ADR-0110）。
  */
 @ApiTags('alarms')
 @Controller('demo/alarms')

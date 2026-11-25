@@ -12,11 +12,10 @@ import { createLogger } from '../lib/logger';
 import { goToList } from '../lib/navigation';
 import type { Route, ViewModule } from '../router';
 import { createHostAssetLibrary, HOST_ASSET_LIBRARY_GROUP_ID } from '../screen/asset-library';
-import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
 import {
-  createHostAlarmStyleAuthoring,
-  parseHostAlarmBindings,
-} from '../screen/host-alarm-style-authoring';
+  attachHostComponentEntry,
+  HOST_COMPONENT_LIBRARY_GROUP_ID,
+} from '../screen/component-entry';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -43,7 +42,6 @@ export const screenEditView: ViewModule = {
     container.append(stage);
 
     let designer: BaseScreenDesignerElement | undefined;
-    let alarms: ReturnType<typeof createHostAlarmController> | undefined;
     let controller: ReturnType<typeof createBaseScreenDesignerMountController> | undefined;
     let disposed = false;
     let lastError: string | undefined;
@@ -53,47 +51,9 @@ export const screenEditView: ViewModule = {
       showToast(message, 'error');
     };
 
-    const loadAlarmBindings = async (): Promise<HostAlarmBindings> => {
-      const result = await api.getScreenAlarmBindings(screenId);
-      if (!result.ok) {
-        logger.warn('alarm bindings unavailable', result.error);
-        return {};
-      }
-      const parsed = parseHostAlarmBindings(result.data.bindings);
-      if (parsed === undefined) {
-        logger.warn('alarm bindings malformed', result.data.bindings);
-        return {};
-      }
-      return parsed;
-    };
-
     void (async () => {
       const runtime = await loadHostRuntime();
       if (disposed) return;
-      const alarmBindings = await loadAlarmBindings();
-      if (disposed) return;
-      const alarmController = createHostAlarmController({
-        apiBase: resolveApiBase(),
-        bindings: alarmBindings,
-        onInvalidate: (componentIds) => designer?.refreshConditionalStyles(componentIds),
-      });
-      alarms = alarmController;
-      await alarmController.ready(800);
-      if (disposed) return;
-
-      const alarmStyleAuthoring = createHostAlarmStyleAuthoring({
-        initialBindings: alarmBindings,
-        save: async (bindings) => {
-          const result = await api.updateScreenAlarmBindings(screenId, bindings);
-          if (!result.ok) return { ok: false, message: result.error.message };
-          const parsed = parseHostAlarmBindings(result.data.bindings);
-          if (parsed === undefined) {
-            return { ok: false, message: '业务系统返回的告警绑定格式无效。' };
-          }
-          return { ok: true, bindings: parsed };
-        },
-        onSaved: (bindings) => alarmController.setBindings(bindings),
-      });
       const datasetPort = createHostDatasetPort({ api, logger });
       controller = createBaseScreenDesignerMountController({
         runtime,
@@ -108,11 +68,13 @@ export const screenEditView: ViewModule = {
             noticeSource: () => datasetPort.snapshot().alarms,
             logger,
           }),
-          conditionalStylePort: alarmController.port,
-          hostConditionalStyleAuthoring: alarmStyleAuthoring,
           backButton: true,
           hostResourceSelectionButton: true,
-          leftPanelGroups: [{ id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' }],
+          fragmentSaveAction: true,
+          leftPanelGroups: [
+            { id: HOST_ASSET_LIBRARY_GROUP_ID, label: '素材库', icon: 'image' },
+            { id: HOST_COMPONENT_LIBRARY_GROUP_ID, label: '组件库', icon: 'cube' },
+          ],
         },
         onProjectState: (state) => {
           if (disposed) return;
@@ -132,7 +94,6 @@ export const screenEditView: ViewModule = {
           if (context?.instanceAvailable) {
             notifyError('物料目录更新失败，当前设计器仍可继续使用。');
           } else {
-            alarmController.stop();
             notifyError('设计器加载失败，请查看控制台日志。');
           }
         },
@@ -158,19 +119,21 @@ export const screenEditView: ViewModule = {
           const assetLibrary = createHostAssetLibrary({ designer: element, screenId });
           handle.onDispose(() => assetLibrary.dispose());
           element.append(assetLibrary.element);
+          // 组件库入口（ADR-0106）：物料库组合来自后端；「存为组合」命名后存进组件库；左栏「管理组件」。
+          const componentEntry = attachHostComponentEntry({ designer: element, screenId });
+          handle.onDispose(() => componentEntry.dispose());
+          element.append(componentEntry.element);
         },
       });
       await controller.attach(stage);
     })().catch((error: unknown) => {
       if (disposed) return;
-      alarms?.stop();
       logger.error('editor bootstrap failed', error);
       notifyError('设计器初始化失败，请返回列表重试。');
     });
 
     return () => {
       disposed = true;
-      alarms?.stop();
       void controller?.detach();
       designer = undefined;
       stage.remove();

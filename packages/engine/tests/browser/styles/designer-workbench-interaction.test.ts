@@ -148,7 +148,10 @@ describe('designer workbench interaction and accessibility', () => {
       /\.designer-button\s*\{[^}]*background-color var\(--designer-motion\)/s,
     );
     expect(controlsCss).toMatch(
-      /\.designer-button\[data-variant="primary"\]\s*\{[^}]*background: var\(--designer-text-primary\);/s,
+      /\.designer-button\[data-variant="primary"\]\s*\{[^}]*background: var\(--designer-button-primary-background\);/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-button\[data-variant="primary"\]\s*\{[^}]*color: var\(--designer-text-on-accent\);/s,
     );
     expect(controlsCss).toContain('.designer-button:hover:not(:disabled) {');
     expect(controlsCss).toContain(

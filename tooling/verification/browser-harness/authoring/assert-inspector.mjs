@@ -673,14 +673,14 @@ export async function assertAuthoringImportAndInspector(authoringDesigner, page)
   await exportNotification.waitFor();
   await exportNotification.getByRole('button', { name: '\u5173\u95ed\u901a\u77e5' }).click();
   await authoringDesigner.getByRole('tab', { name: '\u6570\u636e' }).click();
-  await authoringDesigner.getByRole('tab', { name: '\u9ad8\u7ea7' }).click();
+  await authoringDesigner.getByRole('tab', { name: '\u4ea4\u4e92' }).click();
   await authoringDesigner.getByRole('tab', { name: '\u6570\u636e' }).focus();
   await page.keyboard.press('ArrowRight');
   const tabState = await authoringDesigner
-    .getByRole('tab', { name: '\u9ad8\u7ea7' })
+    .getByRole('tab', { name: '\u4ea4\u4e92' })
     .getAttribute('aria-selected');
   if (tabState !== 'true') throw new Error('BROWSER_HARNESS_TAB_KEYBOARD_FAILED');
-  await authoringDesigner.getByRole('tab', { name: '\u9ad8\u7ea7' }).focus();
+  await authoringDesigner.getByRole('tab', { name: '\u4ea4\u4e92' }).focus();
   await page.keyboard.press('Home');
   const firstTabState = await authoringDesigner
     .getByRole('tab', { name: '\u6837\u5f0f' })
@@ -688,7 +688,7 @@ export async function assertAuthoringImportAndInspector(authoringDesigner, page)
   await authoringDesigner.getByRole('tab', { name: '\u6837\u5f0f' }).focus();
   await page.keyboard.press('End');
   const lastTabState = await authoringDesigner
-    .getByRole('tab', { name: '\u9ad8\u7ea7' })
+    .getByRole('tab', { name: '\u4ea4\u4e92' })
     .getAttribute('aria-selected');
   if (firstTabState !== 'true' || lastTabState !== 'true') {
     throw new Error('BROWSER_HARNESS_TAB_HOME_END_FAILED');

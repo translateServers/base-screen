@@ -1,5 +1,9 @@
 import type { ScreenJsonValue } from '@base-screen/contracts';
-import type { BaseScreenMaterialElement, BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type {
+  BaseScreenMaterialElement,
+  BaseScreenMaterialManifest,
+  BaseScreenMaterialModel,
+} from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
@@ -126,6 +130,18 @@ function dataModel(value: ScreenJsonValue): BaseScreenMaterialModel {
   };
 }
 
+function appearanceField(manifest: BaseScreenMaterialManifest, key: string) {
+  return (manifest.editorDescriptor?.appearance ?? [])
+    .flatMap((section) => section.fields)
+    .find((field) => field.path[0] === key);
+}
+
+function appearanceKeys(manifest: BaseScreenMaterialManifest): readonly unknown[] {
+  return (manifest.editorDescriptor?.appearance ?? []).flatMap((section) =>
+    section.fields.map((field) => field.path[0]),
+  );
+}
+
 describe('shape material visual capabilities', () => {
   it('keeps visible borders within the canonical component bounds', () => {
     const { style } = mount(
@@ -149,27 +165,19 @@ describe('shape material visual capabilities', () => {
     expect(schema.properties.borderRadius).toEqual({ kind: 'number', minimum: 0, maximum: 512 });
     expect(schema.properties.shadowColor).toEqual({ kind: 'string' });
     expect(schema.properties.shadowBlur).toEqual({ kind: 'number', minimum: 0, maximum: 100 });
-    expect(
-      BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.stylePanel.some(
-        (field) => field.style === 'borderRadius',
-      ),
-    ).toBe(true);
-    expect(
-      BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.stylePanel.some(
-        (field) => field.style === 'shadowBlur',
-      ),
-    ).toBe(true);
+    expect(appearanceKeys(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST).includes('borderRadius')).toBe(
+      true,
+    );
+    expect(appearanceKeys(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST).includes('shadowBlur')).toBe(
+      true,
+    );
     expect(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.defaultStyle.borderRadius).toBe(0);
     expect(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.defaultStyle.shadowColor).toBe('');
     expect(
-      BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.stylePanel.find(
-        (field) => field.style === 'borderColor',
-      )?.allowGradient,
+      appearanceField(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST, 'borderColor')?.allowGradient,
     ).toBe(true);
     expect(
-      BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST.stylePanel.find(
-        (field) => field.style === 'borderColor',
-      )?.allowGradient,
+      appearanceField(BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST, 'borderColor')?.allowGradient,
     ).toBeUndefined();
   });
 
@@ -288,11 +296,9 @@ describe('shape material visual capabilities', () => {
       styleModel({ fill: '#ff0000', borderWidth: 0, borderRadius: 12 }),
     );
     expect(style.borderRadius).toBe('50%');
-    expect(
-      BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST.stylePanel.some(
-        (field) => field.style === 'borderRadius',
-      ),
-    ).toBe(false);
+    expect(appearanceKeys(BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST).includes('borderRadius')).toBe(
+      false,
+    );
   });
 
   it('renders a gradient container background', () => {
@@ -361,7 +367,8 @@ describe('rule material', () => {
       ruleModel({ axis: 'horizontal' }, defaultStyle({ dash: 'wavy', opacity: 0.5 })),
     );
     expect(style.borderTop).toBe('2px solid #1f2a44');
-    expect(style.opacity).toBe('0.5');
+    // 不透明度是保留样式：由 Renderer 几何帧写到宿主元素，物料自身不再写（ADR-0099 §2.3）。
+    expect(style.opacity).toBeUndefined();
   });
 });
 

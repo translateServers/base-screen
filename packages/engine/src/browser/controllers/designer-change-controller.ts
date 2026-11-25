@@ -5,6 +5,7 @@ import type {
   ScreenTransactionProvenance,
 } from '@base-screen/core';
 import type { DesignerMetricName } from '../../common/observability/designer-metrics.js';
+import { pruneDesignerBlueprintEntities } from '../../common/operations/blueprint/designer-blueprint-graph.js';
 import type { BaseScreenDesignerChangeStateDetail } from '../../common/operations/change/designer-change-events.js';
 import {
   type DesignerChangeProposal,
@@ -499,17 +500,12 @@ function ghostSubset(proposal: DesignerChangeProposal): ScreenDocument {
   return {
     ...proposal.candidate,
     components: proposal.candidate.components.filter((component) => keep.has(component.id)),
-    blueprint: {
-      ...proposal.candidate.blueprint,
-      relations: proposal.candidate.blueprint.relations.filter((relation) => {
-        if (relation.source.kind === 'component' && !keep.has(relation.source.componentId)) {
-          return false;
-        }
-        if (relation.target.kind === 'component' && !keep.has(relation.target.componentId)) {
-          return false;
-        }
-        return true;
-      }),
-    },
+    blueprint: pruneDesignerBlueprintEntities(proposal.candidate.blueprint, {
+      componentIds: new Set(
+        proposal.candidate.components
+          .filter((component) => !keep.has(component.id))
+          .map((component) => component.id),
+      ),
+    }),
   };
 }

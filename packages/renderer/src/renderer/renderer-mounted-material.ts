@@ -5,7 +5,6 @@ import {
   applyMaterial,
   applyMaterialDisplay,
   applyMaterialFrame,
-  applyMaterialHostStyle,
 } from './renderer-material-dom.js';
 import type { RendererState } from './renderer-state.js';
 import type { AppliedModelKey, MountedMaterial, RenderCandidate } from './renderer-types.js';
@@ -16,6 +15,11 @@ import type { AppliedModelKey, MountedMaterial, RenderCandidate } from './render
  * 求值与 `element.model` 重赋值——未变组件不再触发物料的 `renderMaterial()`。
  * 请求与缓存已在 `DataSourceRuntime` 上按实例共享；数据状态由候选（读运行时）
  * 决定，映射变化只重跑本地投影，不碰任何请求。
+ *
+ * 只有显隐不同（切换画板、蓝图显隐）也不重写 model：display 不参与 model 求值。前提是上次
+ * 写入 model 时物料是可见的——隐藏期间写入的物料（如首屏就隐藏的页面组件）可能按 0 尺寸
+ * 排版，重新显示时仍要完整重写一次。`applied` 保持「上次写入 model 时」的签名不变，
+ * 因此 `applied.hidden` 始终表示最近一次写入时的显隐。
  */
 export function reconcileMountedMaterial(
   state: RendererState,
@@ -23,6 +27,7 @@ export function reconcileMountedMaterial(
   mounted: MountedMaterial,
   stackOrder: number,
   document: ScreenDocument,
+  opacity: number,
 ): void {
   mounted.stackOrder = stackOrder;
   mounted.projection.projectionKey = candidate.dataSource?.projectionKey;
@@ -31,13 +36,19 @@ export function reconcileMountedMaterial(
   if (
     mounted.applied !== undefined &&
     mounted.appliedModel !== undefined &&
-    sameAppliedModelKey(mounted.applied, applied)
+    (sameAppliedModelKey(mounted.applied, applied) || onlyDisplayDiffers(mounted.applied, applied))
   ) {
-    applyMaterialFrame(mounted.element, candidate.component, mounted.appliedModel, stackOrder);
-    applyMaterialDisplay(mounted.element, state.visibility.isHidden(candidate.component.id));
+    applyMaterialFrame(
+      mounted.element,
+      candidate.component,
+      mounted.appliedModel,
+      stackOrder,
+      opacity,
+    );
+    applyMaterialDisplay(mounted.element, applied.hidden);
     return;
   }
-  applyMountedModel(state, candidate, mounted, stackOrder, document);
+  applyMountedModel(state, candidate, mounted, stackOrder, document, opacity);
 }
 
 /**
@@ -50,6 +61,7 @@ export function applyMountedModel(
   mounted: MountedMaterial,
   stackOrder: number,
   document: ScreenDocument,
+  opacity: number,
 ): void {
   const model = resolveEffectiveModel(state, candidate, candidate.model.dataState, document);
   applyMaterial(
@@ -58,6 +70,7 @@ export function applyMountedModel(
     model,
     state.visibility.isHidden(candidate.component.id),
     stackOrder,
+    opacity,
   );
   mounted.applied = appliedModelKeyOf(state, candidate, stackOrder, document);
   mounted.appliedModel = model;
@@ -70,13 +83,15 @@ export function appliedModelKeyOf(
   document: ScreenDocument,
 ): AppliedModelKey {
   return {
-    component: candidate.component,
+    // 按宿主传入的组件判定：解析会把首次出现的引用克隆一份，下一次渲染又原样复用输入引用。
+    component: state.componentSources.get(candidate.component) ?? candidate.component,
     entry: candidate.entry,
     interactive: candidate.model.interactive,
     stackOrder,
     hidden: state.visibility.isHidden(candidate.component.id),
     dataEpoch: candidate.dataEpoch,
     theme: document.theme,
+    stateId: state.componentStates.resolve(state, candidate, candidate.model.dataState),
   };
 }
 
@@ -88,31 +103,41 @@ function sameAppliedModelKey(left: AppliedModelKey, right: AppliedModelKey): boo
     left.stackOrder === right.stackOrder &&
     left.hidden === right.hidden &&
     left.dataEpoch === right.dataEpoch &&
-    left.theme === right.theme
+    left.theme === right.theme &&
+    left.stateId === right.stateId
   );
 }
 
 /**
- * 宿主告警状态变化后的样式-only 重算：只重写 effective model 与宿主级保留样式，
- * 不碰几何、transform、display 与 zIndex，因此不会打断画布手势或造成布局抖动。
+ * 两份签名只差显隐，且上次写入 model 时物料可见：此时 model 输入与元素上生效的 model 相同，
+ * 改 display 就够了。上次写入时隐藏则返回 false，显示时走完整重写。
  *
- * `passThrough`、`filter` 等保留键由引擎写到宿主元素 CSS，物料自身不消费；只写 model
- * 会让 `element.model` 与真实 `pointerEvents` / `filter` 脱节，直到下一次完整渲染才追平。
- *
- * 刻意不更新 `mounted.applied`：本次重写不改任何守卫输入，下一次渲染守卫命中时
- * 保留（而不是覆盖回）这次端口刷新的结果；但会同步 `appliedModel`，守卫命中时的
- * 几何/显示帧要读它的翻转与透明度。
+ * 显隐来自组件 `status`（作者隐藏、设计器把画板外组件标成隐藏锁定）时组件引用也会变，
+ * 所以组件按「除 `status` 外逐字段同引用」比较——`status` 不进 model。
  */
-export function applyMountedConditionalStyle(
-  state: RendererState,
-  candidate: RenderCandidate,
-  mounted: MountedMaterial,
-  document: ScreenDocument,
-): void {
-  const model = resolveEffectiveModel(state, candidate, candidate.model.dataState, document);
-  mounted.element.model = model;
-  mounted.appliedModel = model;
-  applyMaterialHostStyle(mounted.element, model);
+function onlyDisplayDiffers(applied: AppliedModelKey, next: AppliedModelKey): boolean {
+  return (
+    !applied.hidden &&
+    next.hidden &&
+    sameComponentExceptStatus(applied.component, next.component) &&
+    sameAppliedModelKey(applied, { ...next, component: applied.component, hidden: false })
+  );
+}
+
+function sameComponentExceptStatus(
+  left: AppliedModelKey['component'],
+  right: AppliedModelKey['component'],
+): boolean {
+  if (left === right) return true;
+  const leftRecord = left as unknown as Readonly<Record<string, unknown>>;
+  const rightRecord = right as unknown as Readonly<Record<string, unknown>>;
+  const leftKeys = Object.keys(leftRecord);
+  if (leftKeys.length !== Object.keys(rightRecord).length) return false;
+  for (const key of leftKeys) {
+    if (key === 'status') continue;
+    if (!(key in rightRecord) || leftRecord[key] !== rightRecord[key]) return false;
+  }
+  return true;
 }
 
 export function handleMaterialEvent(

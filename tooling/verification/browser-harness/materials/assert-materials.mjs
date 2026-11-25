@@ -6,6 +6,14 @@ import { screenshotDirectory } from '../shared/constants.mjs';
 import { rectWithin } from '../shared/layout-assertions.mjs';
 
 // 与通用图表共享渲染器的图表家族；目录顺序与插件注册顺序一致。
+// plugin-materials 贡献的组合分片卡（ADR-0100），宿主分组把它放在「大屏」组的物料之后。
+const PLUGIN_FRAGMENT_CARDS = [
+  'fragment:base-screen.board.device-status-overview',
+  'fragment:base-screen.board.device-status-card',
+  'fragment:base-screen.board.device-status-panel',
+  'fragment:base-screen.board.title-bar',
+];
+
 const PLUGIN_CHART_FAMILY = [
   'plugin.chart.line',
   'plugin.chart.area',
@@ -25,7 +33,9 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
-    await page.goto(`${baseUrl}/?designer&material-group-stress`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}/?designer&verify&material-group-stress`, {
+      waitUntil: 'networkidle',
+    });
     const designer = page.locator('base-screen-designer');
     const canvas = await designer.locator('[data-canvas]').elementHandle();
     const materials = await designer.locator('[data-base-screen-component-id]').elementHandles();
@@ -61,7 +71,15 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
       ) {
         throw new Error(`MATERIAL_GROUP_RESPONSIVE_FAILED:${JSON.stringify({ width, before })}`);
       }
-      if (!compact && before.navigation.width !== 108) {
+      // 内联导航是独占首行的横向 chip 条（designer-base-material-groups.css）：它落在内容区里、
+      // 不再吃掉 108px 横向宽度，卡片区与内容区同宽。
+      if (
+        !compact &&
+        (before.navigation.left < before.content.left ||
+          before.navigation.right > before.content.right + 0.5 ||
+          before.navigation.bottom > before.grid.top + 0.5 ||
+          before.grid.width < before.content.width - 1)
+      ) {
         throw new Error(`MATERIAL_GROUP_COLUMN_WIDTH_FAILED:${JSON.stringify(before)}`);
       }
       if (compact) {
@@ -78,7 +96,10 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
         throw new Error('MATERIAL_GROUP_BRANCH_CLOSED');
       await designer.locator('[data-material-group="semantic-chart"]').click();
       const leaf = await measure(designer);
-      assertSameBox(before.grid, leaf.grid, 'MATERIAL_GROUP_SELECTION_REFLOW');
+      // 弹层模式选择不得改变卡片区；内联 chip 模式选中带子分组的根会多出一行 secondary chip，
+      // 卡片区只允许整体下移（左缘、宽度、底边不变）。
+      if (compact) assertSameBox(before.grid, leaf.grid, 'MATERIAL_GROUP_SELECTION_REFLOW');
+      else assertSameColumn(before.grid, leaf.grid, 'MATERIAL_GROUP_SELECTION_REFLOW');
       if (
         !leaf.overlayHidden ||
         leaf.visible.join(',') !== 'harness.semantic-chart' ||
@@ -244,6 +265,11 @@ async function resizePanel(page, designer, width) {
   await page.mouse.up();
 }
 
+function assertSameColumn(before, after, code) {
+  if (before.left !== after.left || before.width !== after.width || before.bottom !== after.bottom)
+    throw new Error(`${code}:${JSON.stringify({ before, after })}`);
+}
+
 function assertSameBox(before, after, code) {
   if (JSON.stringify(before) !== JSON.stringify(after))
     throw new Error(`${code}:${JSON.stringify({ before, after })}`);
@@ -275,14 +301,16 @@ function measure(designer) {
       visible: [...root.querySelectorAll('[data-material-card]:not([hidden])')].map(
         (card) => card.dataset.materialCard,
       ),
+      // 内联 chip 行（.material-group-inline 内的 roots / children）按设计横向滚动，不算溢出；
+      // 弹层里的 Miller 列与内容区、卡片区不允许横向溢出。
       horizontalOverflow: [
         '[data-material-library-content]',
         '[data-material-grid]',
-        '.material-group-roots',
-        '.material-group-children',
+        '.material-group-popover .material-group-roots',
+        '.material-group-popover .material-group-children',
       ].some((selector) => {
         const target = node(selector);
-        return target.clientWidth > 0 && target.scrollWidth > target.clientWidth;
+        return target !== null && target.clientWidth > 0 && target.scrollWidth > target.clientWidth;
       }),
       popupWithinBounds:
         popup.left >= Math.max(layout.left, 0) &&
@@ -440,10 +468,12 @@ export async function assertMaterialGroupUpdates(page, designer) {
   const count = () =>
     designer.locator('[data-material-group-current="library"] .material-group-count').textContent();
   // 分组计数按 canonical 物料类型算，卡片按条目算：两条 base.text 条目只贡献一个类型，
-  // 所以卡片数 = 类型数 + 1。目录新增物料时两处一起加一。
+  // 所以卡片数 = 类型数 + 1。目录新增物料时两处一起加一。这里的分组由类型生成、没有
+  // fragmentIds，所以分片卡不进分组计数，但仍出现在「全部」末尾（ADR-0100）。
   if (
     (await count()) !== String(expectedTypeCount) ||
-    (await designer.locator('[data-material-card]').count()) !== expectedTypeCount + 1
+    (await designer.locator('[data-material-card]').count()) !==
+      expectedTypeCount + 1 + PLUGIN_FRAGMENT_CARDS.length
   )
     throw new Error('MATERIAL_GROUP_TYPE_VS_ITEM_COUNT_FAILED');
   await designer.locator('[data-material-search]').fill('Alpha');
@@ -547,7 +577,10 @@ export async function assertMaterialGroupUsability(page, designer) {
   if (
     backBounds === null ||
     backBounds.height !== 28 ||
-    backBounds.width < secondaryBounds.width - 1 ||
+    // 内联 chip 行里「返回」是 28px 圆形 chip（designer-base-material-groups.css），落在 secondary 行内。
+    backBounds.width < 28 ||
+    backBounds.left < secondaryBounds.x - 1 ||
+    backBounds.left + backBounds.width > secondaryBounds.x + secondaryBounds.width + 1 ||
     !(await back.getAttribute('data-tip')).includes('数据可视化')
   ) {
     throw new Error('MATERIAL_GROUP_BACK_TARGET_FAILED');
@@ -577,18 +610,20 @@ export async function assertMaterialGroupUsability(page, designer) {
   await designer.locator('[data-material-search-clear]').waitFor({ state: 'visible' });
   await designer.locator('[data-material-library-reset]').click();
   await expectFocus(designer, '[data-material-search]');
-  const reset = await designer.evaluate((element) => {
+  const reset = await designer.evaluate((element, fragmentCards) => {
     const root = element.shadowRoot;
     return {
       query: root.querySelector('[data-material-search]').value,
       allGroups: root.querySelector('[data-material-group-all]').ariaPressed,
       allItems: root.querySelector('[data-material-filter="all"]').ariaPressed,
       visible: root.querySelectorAll('[data-material-card]:not([hidden])').length,
-      expected: element.catalog.list().filter((entry) => entry.manifest.libraryVisible !== false)
-        .length,
+      // 「全部」= 每个可见物料类型一张卡 + 插件分片卡（ADR-0100）。
+      expected:
+        element.catalog.list().filter((entry) => entry.manifest.libraryVisible !== false).length +
+        fragmentCards,
       emptyHidden: root.querySelector('[data-material-search-empty]').hidden,
     };
-  });
+  }, PLUGIN_FRAGMENT_CARDS.length);
   if (
     reset.query !== '' ||
     reset.allGroups !== 'true' ||
@@ -759,6 +794,10 @@ async function assertMaterialLibraryGrouping(page, designer) {
     'board.marquee',
     'board.pipeline',
     'board.status-grid',
+    'board.status-legend',
+    'board.title-decor',
+    'board.tabs',
+    ...PLUGIN_FRAGMENT_CARDS,
     'harness.react-button',
     'harness.vue-button',
     'harness.dataset-ranking',
@@ -959,6 +998,10 @@ async function assertMaterialLibraryGrouping(page, designer) {
         'board.marquee',
         'board.pipeline',
         'board.status-grid',
+        'board.status-legend',
+        'board.title-decor',
+        'board.tabs',
+        ...PLUGIN_FRAGMENT_CARDS,
         'base.text',
         'base.rectangle',
         'base.ellipse',
@@ -1434,7 +1477,7 @@ export async function assertImageDensitySize(browser, baseUrl) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
-    await page.goto(`${baseUrl}/?designer`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}/?designer&verify`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.baseScreenHarness?.designer?.document !== undefined);
     const designer = page.locator('base-screen-designer').first();
     expect(
@@ -1460,7 +1503,7 @@ export async function assertImageDensitySize(browser, baseUrl) {
             },
           ],
           variables: [],
-          blueprint: { relations: [] },
+          blueprint: { nodes: [], edges: [] },
         }).ok;
       }),
     ).toBe(true);
@@ -1573,9 +1616,10 @@ export async function assertAuthoringMaterialVisuals(page, designer) {
   await page.waitForFunction(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const panel = root.querySelector('[data-inspector-pane="appearance"]');
+    // 阴影分区默认收起（ADR-0099 §2.4）：收起的 <details> 内容不进 innerText，按 textContent 判断字段已声明。
     return (
-      panel?.innerText.includes('圆角') &&
-      panel.innerText.includes('阴影模糊') &&
+      panel?.textContent.includes('圆角') &&
+      panel.textContent.includes('阴影模糊') &&
       panel.querySelector(
         '[data-style="borderColor"][data-color-palette-field="mode"][value="linear-gradient"]',
       ) !== null

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>推送数据源 · Base Screen Harness</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --page-bg: #0b0f14;
+        --page-panel: #121820;
+        --page-border: #263140;
+        --page-fg: #e6edf6;
+        --page-muted: #94a3b8;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        padding: 16px;
+        background: var(--page-bg);
+        color: var(--page-fg);
+        font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      }
+
+      h1 { margin: 0 0 4px; font-size: 18px; }
+      h2 { margin: 0 0 8px; font-size: 14px; }
+
+      p {
+        margin: 0 0 12px;
+        max-width: 96ch;
+        color: var(--page-muted);
+      }
+
+      code {
+        padding: 1px 4px;
+        border-radius: 4px;
+        background: rgb(255 255 255 / 8%);
+        font: 12px/1.4 ui-monospace, Consolas, monospace;
+      }
+
+      section {
+        margin-bottom: 16px;
+        padding: 12px;
+        border: 1px solid var(--page-border);
+        border-radius: 10px;
+        background: var(--page-panel);
+      }
+
+      [data-stage] {
+        overflow: hidden;
+        border: 1px solid var(--page-border);
+        border-radius: 8px;
+        background: #05080c;
+      }
+
+      [data-stage] > base-screen-designer,
+      [data-stage] > base-screen-viewer {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      [data-stage="designer"] { height: 760px; }
+
+      [data-stage="viewer"] {
+        width: 640px;
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>推送数据源（ADR-0104）</h1>
+    <p>
+      宿主资源端口由页面自己实现：<code>subscribe</code> 只记录订阅，事件由
+      <code>window.basePushHarness.emit()</code> 按需投递。查看器订阅；设计器只拉取一次，
+      用来验证作者面的「实时推送」选项与门控。浏览器断言见 <code>dataset/assert-push.mjs</code>。
+    </p>
+    <section>
+      <h2>设计器（design 模式，不订阅）</h2>
+      <div data-stage="designer"></div>
+    </section>
+    <section>
+      <h2>查看器（viewer 模式，订阅）</h2>
+      <div data-stage="viewer"></div>
+    </section>
+    <script type="module" src="./push.ts"></script>
+  </body>
+</html>

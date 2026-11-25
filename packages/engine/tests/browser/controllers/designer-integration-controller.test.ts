@@ -5,7 +5,7 @@ import type {
 } from '@base-screen/plugin-core';
 import { describe, expect, it, vi } from 'vitest';
 import { DesignerIntegrationController } from '../../../src/browser/controllers/designer-integration-controller.js';
-import { relationsFromRules } from '../../__fixtures__/blueprint-relations.js';
+import { graphFromRules } from '../../__fixtures__/blueprint-graph.js';
 
 const document: ScreenDocument = {
   canvas: { width: 100, height: 100, backgroundColor: '#000000' },
@@ -26,7 +26,7 @@ const document: ScreenDocument = {
     },
   ],
   variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
-  blueprint: { relations: [] },
+  blueprint: { nodes: [], edges: [] },
 };
 
 function authority(...capabilities: string[]): BaseScreenRuntimeContributionIndex {
@@ -219,7 +219,7 @@ describe('catalog-driven summary', () => {
     const withRules: ScreenDocument = {
       ...document,
       blueprint: {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'r1',
             trigger: { type: 'material-event', componentId: 'button-1', eventName: 'click' },

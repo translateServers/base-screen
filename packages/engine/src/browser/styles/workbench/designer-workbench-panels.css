@@ -257,15 +257,19 @@
   justify-content: flex-start;
 }
 
-[data-inspector-filtered] {
-  display: none !important;
+/* 筛选标记由 designer-inspector-chrome-dom 在整个 root 上打：右侧属性面板与数据工作台
+   （位于 main.workspace，不在 .properties 内）都要隐藏被筛掉的字段与分组。 */
+.properties .inspector-pane [data-inspector-search-kind][data-inspector-filtered],
+.properties [data-inspector-search-kind][data-inspector-filtered],
+[data-data-workbench] [data-inspector-search-kind][data-inspector-filtered] {
+  display: none;
 }
 
 .properties[data-inspector-density="basic"]:not([data-inspector-searching])
   [data-inspector-advanced],
 [data-data-workbench][data-inspector-density="basic"]:not([data-inspector-searching])
   [data-inspector-advanced] {
-  display: none !important;
+  display: none;
 }
 
 .inspector-search-highlight {

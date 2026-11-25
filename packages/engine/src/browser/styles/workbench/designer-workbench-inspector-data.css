@@ -517,11 +517,28 @@
   margin-bottom: var(--designer-space-2);
 }
 
-/* 画布尺寸：W / H 一对输入等分控件列。 */
+/* 画布尺寸：常态只有一行下拉（读数即尺寸），W / H 只在「自定义」时作为展开面出现。 */
 .properties .designer-canvas-size-controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--designer-space-3);
+}
+
+.properties .designer-canvas-size-preset {
+  grid-column: 1 / -1;
+}
+
+/* 展开面与下拉同列、等分两栏；与下拉之间的 6px 来自上面字段行的 gap，
+   读起来是同一个控件的第二行，而不是另起一组字段。 */
+.properties .designer-canvas-size-custom {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--designer-space-3);
+}
+
+.properties .designer-canvas-size-custom[hidden] {
+  display: none;
 }
 
 /* 不透明度：几何沿用滑杆字段的公共规则（`.designer-field-control:has(> .designer-range)`），
@@ -531,37 +548,13 @@
   padding-right: calc(var(--designer-space-6) + var(--designer-space-1));
 }
 
-/* 缩放方式是六档分段控件：标签在上、整行等分（原型 .insp-field + .segmented）。 */
-.properties .designer-canvas-scale-field {
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-  gap: var(--designer-space-3);
-}
-
-.properties .designer-canvas-scale-field .designer-field-control,
-.properties .designer-canvas-scale-segmented {
+/* 缩放方式改成下拉后，原来的分段栈式布局（标签在上、整行等分）随之失效，
+   只剩「控件占满控件列」这一条仍然成立。 */
+.properties .designer-canvas-scale-field .designer-field-control {
   width: 100%;
 }
 
-/* 开关行：标签左、开关右，长标签换行时开关仍贴右缘。 */
-.properties .designer-canvas-setting-checkbox {
-  display: flex;
-  min-height: 32px;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--designer-space-4);
-  grid-template-columns: none;
-}
-
-.properties .designer-canvas-setting-checkbox .designer-field-label-text {
-  min-width: 0;
-  white-space: normal;
-}
-
-.properties .designer-canvas-setting-checkbox .designer-switch,
-.properties .designer-canvas-setting-checkbox .designer-field-message {
-  flex: none;
-}
+/* 页面配置的开关行不再另写一套布局：与组件检查器共用开关字段行（见 designer-workbench-inspector.css）。 */
 
 /* 背景填充复用检查器的统一颜色控件：标签在上、控件整行（与组件检查器 color 字段同构），
    三种模式 / 色标 / 角度中心 / 透明度全部由该控件自带的弹层与色标条承担。 */
@@ -1352,7 +1345,9 @@
    它不再是"一个句子的占位框"——「尚未请求」本身就是一条结论，下面那行参数是它的依据。 */
 .properties .designer-data-preview-empty {
   display: grid;
-  min-height: 140px;
+  /* 空态现在是图标 + 一句行动说明 + 一行参数摘要（重复的「尚未请求」标题已去掉），
+     140px 会在两段文字上下各留出一行空白；112 仍够居中，且不再把「高级设置」推下去。 */
+  min-height: 112px;
   place-items: center;
   /* 撤掉 workbench 数据编辑器的虚线占位框（那是工作台提示块的样式）。
      面板里的空态是一块安静的内容区，不是"还没做完的占位"。 */

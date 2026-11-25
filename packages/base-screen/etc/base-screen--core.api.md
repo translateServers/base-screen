@@ -34,7 +34,7 @@ export function collectScreenValueRefDependencies(refs: ScreenValueRef | null | 
 // @public (undocumented)
 export function commitScreenHistory(history: ScreenHistoryState, document: ScreenDocument, limit?: number, provenance?: ScreenTransactionProvenance): ScreenHistoryState;
 
-// @public (undocumented)
+// @public
 export function compileScreenBlueprint(document: ScreenDocument, capabilities?: ScreenBlueprintCapabilityIndex): ScreenParseResult<ScreenBlueprintPlan>;
 
 // @public (undocumented)
@@ -189,39 +189,150 @@ export type ScreenAxis = 'x' | 'y';
 // @public (undocumented)
 interface ScreenBlueprint {
     // (undocumented)
+    readonly edges: readonly ScreenBlueprintEdge[];
+    // (undocumented)
     readonly layout?: ScreenBlueprintLayout;
     // (undocumented)
-    readonly relations: readonly ScreenBlueprintRelation[];
+    readonly nodes: readonly ScreenBlueprintNode[];
 }
 
 // @public (undocumented)
-type ScreenBlueprintAction = ScreenBlueprintSetVariableAction | ScreenBlueprintRequestVariableAction | ScreenBlueprintRequestComponentDataAction | ScreenBlueprintEmitHostEventAction | ScreenBlueprintHostAction | ScreenBlueprintComponentVisibilityAction;
+type ScreenBlueprintAction = ScreenBlueprintComponentStateAction | ScreenBlueprintSetVariableAction | ScreenBlueprintRequestVariableAction | ScreenBlueprintRequestComponentDataAction | ScreenBlueprintEmitHostEventAction | ScreenBlueprintHostAction | ScreenBlueprintComponentVisibilityAction | ScreenBlueprintCanvasVisibilityAction | ScreenBlueprintPageNavigationAction;
 
 // @public (undocumented)
-export type ScreenBlueprintActionTrace = ScreenBlueprintSetVariableActionTrace | ScreenBlueprintRequestVariableActionTrace | ScreenBlueprintRequestComponentDataActionTrace | ScreenBlueprintEmitHostEventActionTrace | ScreenBlueprintHostActionTrace | ScreenBlueprintComponentVisibilityActionTrace;
+export type ScreenBlueprintActionTrace = ScreenBlueprintSetVariableActionTrace | ScreenBlueprintRequestVariableActionTrace | ScreenBlueprintRequestComponentDataActionTrace | ScreenBlueprintEmitHostEventActionTrace | ScreenBlueprintHostActionTrace | ScreenBlueprintComponentVisibilityActionTrace | ScreenBlueprintCanvasVisibilityActionTrace | ScreenBlueprintPageNavigationActionTrace | ScreenBlueprintComponentStateActionTrace;
+
+// @public (undocumented)
+export type ScreenBlueprintCanvasEffect = {
+    readonly type: 'canvas-visibility';
+    readonly canvasId: string;
+    readonly operation: ScreenBlueprintCanvasOperation;
+    readonly payload?: ScreenJsonValue;
+} | {
+    readonly type: 'page-navigation';
+    readonly operation: ScreenBlueprintPageNavigationOperation;
+};
 
 // @public
-interface ScreenBlueprintBehaviorRelation {
+export interface ScreenBlueprintCanvasEvent {
     // (undocumented)
-    readonly condition?: ScreenBlueprintCondition;
+    readonly canvasId: string;
     // (undocumented)
-    readonly effect: ScreenBlueprintRelationEffect;
+    readonly name: ScreenBlueprintCanvasEventName;
     // (undocumented)
-    readonly id: string;
+    readonly payload: ScreenJsonValue;
     // (undocumented)
-    readonly requiredCapabilities?: readonly string[];
+    readonly type: 'canvas-event';
+}
+
+// @public (undocumented)
+type ScreenBlueprintCanvasEventName = 'opened' | 'closed';
+
+// @public (undocumented)
+type ScreenBlueprintCanvasOperation = 'open' | 'close' | 'toggle';
+
+// @public
+interface ScreenBlueprintCanvasTrigger {
     // (undocumented)
-    readonly source: ScreenBlueprintRelationSource;
+    readonly canvasId: string;
     // (undocumented)
-    readonly target: ScreenBlueprintRelationTarget;
+    readonly eventName: ScreenBlueprintCanvasEventName;
     // (undocumented)
-    readonly type: 'behavior';
+    readonly type: 'canvas-event';
+}
+
+// @public
+interface ScreenBlueprintCanvasVisibilityAction {
+    // (undocumented)
+    readonly canvasId: string;
+    // (undocumented)
+    readonly operation: ScreenBlueprintCanvasOperation;
+    readonly payload?: ScreenBlueprintValueExpression;
+    // (undocumented)
+    readonly type: 'canvas-visibility';
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintCanvasVisibilityActionTrace {
+    // (undocumented)
+    readonly actionIndex: number;
+    // (undocumented)
+    readonly canvasId: string;
+    // (undocumented)
+    readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
+    // (undocumented)
+    readonly operation: ScreenBlueprintCanvasOperation;
+    // (undocumented)
+    readonly output: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'canvas-visibility';
 }
 
 // @public (undocumented)
 interface ScreenBlueprintCapabilityIndex {
     // (undocumented)
     readonly hasBlueprintCapability: (id: string) => boolean;
+}
+
+// @public (undocumented)
+interface ScreenBlueprintComponentNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly kind: 'component';
+}
+
+// @public
+interface ScreenBlueprintComponentStateAction {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly operation: 'set' | 'reset';
+    readonly stateId?: string;
+    // (undocumented)
+    readonly type: 'component-state';
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintComponentStateActionTrace {
+    // (undocumented)
+    readonly actionIndex: number;
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
+    // (undocumented)
+    readonly operation: 'set' | 'reset';
+    // (undocumented)
+    readonly output: ScreenJsonValue;
+    // (undocumented)
+    readonly stateId?: string;
+    // (undocumented)
+    readonly type: 'component-state';
+}
+
+// @public
+export interface ScreenBlueprintComponentStateEvent {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly name: 'state-changed';
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'component-state-changed';
+}
+
+// @public
+interface ScreenBlueprintComponentStateTrigger {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly eventName: 'state-changed';
+    // (undocumented)
+    readonly type: 'component-state-changed';
 }
 
 // @public (undocumented)
@@ -244,6 +355,7 @@ export interface ScreenBlueprintComponentVisibilityActionTrace {
     readonly componentId: string;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly operation: ScreenBlueprintComponentVisibilityAction['operation'];
     // (undocumented)
@@ -263,16 +375,35 @@ interface ScreenBlueprintCondition {
 }
 
 // @public (undocumented)
-export type ScreenBlueprintConditionTraceState = 'not-evaluated' | 'none' | 'passed' | 'failed';
+interface ScreenBlueprintConditionNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly condition: ScreenBlueprintCondition;
+    // (undocumented)
+    readonly kind: 'condition';
+    // (undocumented)
+    readonly name?: string;
+}
+
+// @public
+export interface ScreenBlueprintConditionTrace {
+    // (undocumented)
+    readonly edgeId: string;
+    // (undocumented)
+    readonly nodeId: string;
+    // (undocumented)
+    readonly passed: boolean;
+}
 
 // @public (undocumented)
 export interface ScreenBlueprintDispatchResult {
+    readonly canvasEffects: readonly ScreenBlueprintCanvasEffect[];
     // (undocumented)
     readonly componentDataRequests: readonly string[];
     // (undocumented)
     readonly hostActions: readonly ScreenBlueprintHostEvent[];
     // (undocumented)
     readonly hostEvents: readonly ScreenBlueprintHostEvent[];
+    readonly stateEffects: readonly ScreenBlueprintStateEffect[];
     // (undocumented)
     readonly variableRequests: readonly string[];
     // (undocumented)
@@ -280,6 +411,9 @@ export interface ScreenBlueprintDispatchResult {
     // (undocumented)
     readonly visibilityEffects: readonly ScreenBlueprintVisibilityEffect[];
 }
+
+// @public (undocumented)
+type ScreenBlueprintEdge = ScreenBlueprintFlowEdge | ScreenBlueprintSemanticEdge;
 
 // @public (undocumented)
 interface ScreenBlueprintEmitHostEventAction {
@@ -297,6 +431,7 @@ export interface ScreenBlueprintEmitHostEventActionTrace {
     readonly actionIndex: number;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly eventName: string;
     // (undocumented)
@@ -306,7 +441,28 @@ export interface ScreenBlueprintEmitHostEventActionTrace {
 }
 
 // @public (undocumented)
-export type ScreenBlueprintEvent = ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent | ScreenBlueprintLifecycleEvent | ScreenBlueprintTimerEvent;
+export type ScreenBlueprintEvent = ScreenBlueprintComponentStateEvent | ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent | ScreenBlueprintLifecycleEvent | ScreenBlueprintTimerEvent | ScreenBlueprintCanvasEvent | ScreenBlueprintPageChangedEvent;
+
+// @public
+interface ScreenBlueprintFlowEdge {
+    // (undocumented)
+    readonly from: ScreenBlueprintPortRef;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: 'flow';
+    // (undocumented)
+    readonly payload?: ScreenBlueprintValueExpression;
+    // (undocumented)
+    readonly requiredCapabilities?: readonly string[];
+    readonly stateId?: string;
+    // (undocumented)
+    readonly to: ScreenBlueprintPortRef;
+    // (undocumented)
+    readonly transition?: ScreenBlueprintVisibilityTransition;
+    // (undocumented)
+    readonly value?: ScreenBlueprintValueExpression;
+}
 
 // @public (undocumented)
 interface ScreenBlueprintHostAction {
@@ -326,6 +482,7 @@ export interface ScreenBlueprintHostActionTrace {
     readonly actionIndex: number;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly output: ScreenJsonValue;
     // (undocumented)
@@ -338,6 +495,12 @@ interface ScreenBlueprintHostEvent {
     readonly name: string;
     // (undocumented)
     readonly payload: ScreenJsonValue;
+}
+
+// @public (undocumented)
+interface ScreenBlueprintHostNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly kind: 'host';
 }
 
 // @public (undocumented)
@@ -380,12 +543,24 @@ interface ScreenBlueprintLifecycleEvent {
     readonly type: 'lifecycle';
 }
 
+// @public (undocumented)
+interface ScreenBlueprintLifecycleNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly kind: 'lifecycle';
+}
+
 // @public
 interface ScreenBlueprintLifecycleTrigger {
     // (undocumented)
     readonly eventName: 'ready';
     // (undocumented)
     readonly type: 'lifecycle';
+}
+
+// @public
+interface ScreenBlueprintMainCanvasNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly kind: 'main-canvas';
 }
 
 // @public (undocumented)
@@ -411,6 +586,60 @@ interface ScreenBlueprintMaterialEventTrigger {
 }
 
 // @public (undocumented)
+type ScreenBlueprintNode = ScreenBlueprintComponentNode | ScreenBlueprintVariableNode | ScreenBlueprintHostNode | ScreenBlueprintLifecycleNode | ScreenBlueprintTimerNode | ScreenBlueprintConditionNode | ScreenBlueprintSubCanvasNode | ScreenBlueprintMainCanvasNode;
+
+// @public (undocumented)
+interface ScreenBlueprintNodeBase {
+    readonly enabled?: false;
+    // (undocumented)
+    readonly id: string;
+}
+
+// @public
+export interface ScreenBlueprintPageChangedEvent {
+    // (undocumented)
+    readonly name: 'page-changed';
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'page-changed';
+}
+
+// @public
+interface ScreenBlueprintPageChangedTrigger {
+    // (undocumented)
+    readonly eventName: 'page-changed';
+    // (undocumented)
+    readonly type: 'page-changed';
+}
+
+// @public
+interface ScreenBlueprintPageNavigationAction {
+    // (undocumented)
+    readonly operation: ScreenBlueprintPageNavigationOperation;
+    // (undocumented)
+    readonly type: 'page-navigation';
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintPageNavigationActionTrace {
+    // (undocumented)
+    readonly actionIndex: number;
+    // (undocumented)
+    readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
+    // (undocumented)
+    readonly operation: ScreenBlueprintPageNavigationOperation;
+    // (undocumented)
+    readonly output: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'page-navigation';
+}
+
+// @public (undocumented)
+type ScreenBlueprintPageNavigationOperation = 'previous' | 'next' | 'back';
+
+// @public (undocumented)
 export interface ScreenBlueprintPlan {
     // (undocumented)
     readonly initialVariables: ScreenJsonObject;
@@ -419,70 +648,12 @@ export interface ScreenBlueprintPlan {
 }
 
 // @public (undocumented)
-type ScreenBlueprintRelation = ScreenBlueprintBehaviorRelation | ScreenBlueprintSemanticRelation;
-
-// @public (undocumented)
-type ScreenBlueprintRelationEffect = {
-    readonly type: 'component-visibility';
-    readonly operation: ScreenBlueprintVisibilityOperation;
-    readonly transition?: ScreenBlueprintVisibilityTransition;
-} | {
-    readonly type: 'request-component-data';
-} | {
-    readonly type: 'set-variable';
-    readonly value: ScreenBlueprintValueExpression;
-} | {
-    readonly type: 'request-variable';
-} | {
-    readonly type: 'emit-host-event';
-    readonly eventName: string;
-    readonly payload: ScreenBlueprintValueExpression;
-} | {
-    readonly type: 'host-action';
-    readonly actionId: string;
-    readonly payload: ScreenBlueprintValueExpression;
-};
-
-// @public (undocumented)
-type ScreenBlueprintRelationSource = {
-    readonly kind: 'component';
-    readonly componentId: string;
-    readonly event: {
-        readonly type: 'material-event';
-        readonly eventName: string;
-    };
-} | {
-    readonly kind: 'variable';
-    readonly variableId: string;
-    readonly event: {
-        readonly type: 'variable-event';
-        readonly eventName: 'data-updated' | 'request-state';
-    };
-} | {
-    readonly kind: 'lifecycle';
-    readonly event: {
-        readonly type: 'lifecycle';
-        readonly eventName: 'ready';
-    };
-} | {
-    readonly kind: 'timer';
-    readonly intervalSeconds: number;
-    readonly event: {
-        readonly type: 'timer';
-        readonly eventName: 'tick';
-    };
-};
-
-// @public (undocumented)
-type ScreenBlueprintRelationTarget = {
-    readonly kind: 'component';
-    readonly componentId: string;
-} | {
-    readonly kind: 'variable';
-    readonly variableId: string;
-} | {
-    readonly kind: 'host';
-};
+interface ScreenBlueprintPortRef {
+    // (undocumented)
+    readonly node: string;
+    // (undocumented)
+    readonly port: string;
+}
 
 // @public (undocumented)
 interface ScreenBlueprintRequestComponentDataAction {
@@ -500,6 +671,7 @@ interface ScreenBlueprintRequestComponentDataActionTrace {
     readonly componentId: string;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly output: ScreenJsonValue;
     // (undocumented)
@@ -520,6 +692,7 @@ interface ScreenBlueprintRequestVariableActionTrace {
     readonly actionIndex: number;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly output: ScreenJsonValue;
     // (undocumented)
@@ -528,28 +701,39 @@ interface ScreenBlueprintRequestVariableActionTrace {
     readonly variableId: string;
 }
 
-// @public
+// @public (undocumented)
 interface ScreenBlueprintRule {
-    // (undocumented)
-    readonly actions: readonly ScreenBlueprintAction[];
-    // (undocumented)
-    readonly condition?: ScreenBlueprintCondition;
-    // (undocumented)
     readonly id: string;
     // (undocumented)
-    readonly relationIds: readonly string[];
+    readonly nodeId: string;
     // (undocumented)
     readonly requiredCapabilities?: readonly string[];
     // (undocumented)
+    readonly steps: readonly ScreenBlueprintRuleStep[];
+    // (undocumented)
     readonly trigger: ScreenBlueprintTrigger;
 }
+
+// @public
+type ScreenBlueprintRuleStep = {
+    readonly type: 'action';
+    readonly edgeId: string;
+    readonly action: ScreenBlueprintAction;
+} | {
+    readonly type: 'condition';
+    readonly edgeId: string;
+    readonly nodeId: string;
+    readonly condition: ScreenBlueprintCondition;
+    readonly yes: readonly ScreenBlueprintRuleStep[];
+    readonly no: readonly ScreenBlueprintRuleStep[];
+};
 
 // @public (undocumented)
 export interface ScreenBlueprintRuleTrace {
     // (undocumented)
     readonly actions: readonly ScreenBlueprintActionTrace[];
-    // (undocumented)
-    readonly condition: ScreenBlueprintConditionTraceState;
+    readonly conditions: readonly ScreenBlueprintConditionTrace[];
+    readonly nodeId: string;
     // (undocumented)
     readonly ruleId: string;
     // (undocumented)
@@ -557,27 +741,25 @@ export interface ScreenBlueprintRuleTrace {
 }
 
 // @public
-interface ScreenBlueprintSemanticRelation {
+interface ScreenBlueprintSemanticEdge {
+    // (undocumented)
+    readonly from: {
+        readonly node: string;
+    };
     // (undocumented)
     readonly id: string;
     // (undocumented)
-    readonly role: ScreenBlueprintSemanticRelationRole;
+    readonly kind: 'semantic';
     // (undocumented)
-    readonly source: {
-        readonly kind: 'component';
-        readonly componentId: string;
+    readonly role: ScreenBlueprintSemanticRole;
+    // (undocumented)
+    readonly to: {
+        readonly node: string;
     };
-    // (undocumented)
-    readonly target: {
-        readonly kind: 'component';
-        readonly componentId: string;
-    };
-    // (undocumented)
-    readonly type: 'semantic';
 }
 
 // @public (undocumented)
-type ScreenBlueprintSemanticRelationRole = 'related' | 'detail' | 'group' | 'drill-down';
+type ScreenBlueprintSemanticRole = 'related' | 'detail' | 'group' | 'drill-down';
 
 // @public (undocumented)
 interface ScreenBlueprintSetVariableAction {
@@ -595,12 +777,30 @@ export interface ScreenBlueprintSetVariableActionTrace {
     readonly actionIndex: number;
     // (undocumented)
     readonly detached: ScreenJsonObject;
+    readonly edgeId: string;
     // (undocumented)
     readonly output: ScreenJsonValue;
     // (undocumented)
     readonly type: 'set-variable';
     // (undocumented)
     readonly variableId: string;
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintStateEffect {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly operation: 'set' | 'reset';
+    readonly stateId?: string;
+}
+
+// @public
+interface ScreenBlueprintSubCanvasNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly canvasId: string;
+    // (undocumented)
+    readonly kind: 'sub-canvas';
 }
 
 // @public
@@ -613,6 +813,16 @@ interface ScreenBlueprintTimerEvent {
     readonly payload: ScreenJsonValue;
     // (undocumented)
     readonly type: 'timer';
+}
+
+// @public (undocumented)
+interface ScreenBlueprintTimerNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly intervalSeconds: number;
+    // (undocumented)
+    readonly kind: 'timer';
+    // (undocumented)
+    readonly name?: string;
 }
 
 // @public
@@ -632,7 +842,7 @@ export interface ScreenBlueprintTraceResult extends ScreenBlueprintDispatchResul
 }
 
 // @public (undocumented)
-type ScreenBlueprintTrigger = ScreenBlueprintMaterialEventTrigger | ScreenBlueprintVariableEventTrigger | ScreenBlueprintLifecycleTrigger | ScreenBlueprintTimerTrigger;
+type ScreenBlueprintTrigger = ScreenBlueprintComponentStateTrigger | ScreenBlueprintMaterialEventTrigger | ScreenBlueprintVariableEventTrigger | ScreenBlueprintLifecycleTrigger | ScreenBlueprintTimerTrigger | ScreenBlueprintCanvasTrigger | ScreenBlueprintPageChangedTrigger;
 
 // @public (undocumented)
 type ScreenBlueprintValueExpression = {
@@ -655,7 +865,7 @@ type ScreenBlueprintValueExpression = {
 // @public (undocumented)
 interface ScreenBlueprintVariableEvent {
     // (undocumented)
-    readonly name: 'data-updated' | 'request-state';
+    readonly name: 'data-updated';
     // (undocumented)
     readonly payload: ScreenJsonValue;
     // (undocumented)
@@ -667,9 +877,17 @@ interface ScreenBlueprintVariableEvent {
 // @public (undocumented)
 interface ScreenBlueprintVariableEventTrigger {
     // (undocumented)
-    readonly eventName: 'data-updated' | 'request-state';
+    readonly eventName: 'data-updated';
     // (undocumented)
     readonly type: 'variable-event';
+    // (undocumented)
+    readonly variableId: string;
+}
+
+// @public (undocumented)
+interface ScreenBlueprintVariableNode extends ScreenBlueprintNodeBase {
+    // (undocumented)
+    readonly kind: 'variable';
     // (undocumented)
     readonly variableId: string;
 }
@@ -786,6 +1004,8 @@ type ScreenComponentDataSource = ScreenStaticDataSource | ScreenDatasetDataSourc
 
 // @public (undocumented)
 export interface ScreenComponentNode {
+    readonly belowSubCanvas?: true;
+    readonly canvasId?: string;
     readonly dataBinding?: ScreenDataBinding | null;
     readonly dataSource: ScreenComponentDataSource | null;
     readonly dataValue?: ScreenValueRef | null;
@@ -803,12 +1023,11 @@ export interface ScreenComponentNode {
     readonly rotation: number;
     // (undocumented)
     readonly size: ScreenSize;
+    readonly states?: ScreenComponentStates;
     // (undocumented)
     readonly status: ScreenComponentStatus;
     // (undocumented)
     readonly style: ScreenJsonObject;
-    // (undocumented)
-    readonly styleRules?: readonly ScreenComponentStyleRule[];
     // (undocumented)
     readonly type: string;
     // (undocumented)
@@ -817,6 +1036,7 @@ export interface ScreenComponentNode {
 
 // @public (undocumented)
 export interface ScreenComponentPatch {
+    readonly belowSubCanvas?: true | null;
     readonly dataBinding?: ScreenDataBinding | null;
     // (undocumented)
     readonly dataSource?: ScreenComponentDataSource | null;
@@ -831,13 +1051,76 @@ export interface ScreenComponentPatch {
     readonly rotation?: number;
     // (undocumented)
     readonly size?: ScreenSize;
+    readonly states?: ScreenComponentStates | null;
     // (undocumented)
     readonly status?: ScreenComponentStatus;
     // (undocumented)
     readonly style?: ScreenJsonObject;
-    readonly styleRules?: readonly ScreenComponentStyleRule[];
     // (undocumented)
     readonly zIndex?: number;
+}
+
+// @public
+interface ScreenComponentState {
+    readonly id: string;
+    // (undocumented)
+    readonly name: string;
+    readonly style: ScreenJsonObject;
+}
+
+// @public (undocumented)
+interface ScreenComponentStateCase {
+    // (undocumented)
+    readonly operator: ScreenComponentStateOperator;
+    // (undocumented)
+    readonly stateId: string;
+    readonly value?: ScreenJsonValue;
+}
+
+// @public (undocumented)
+type ScreenComponentStateInput = {
+    readonly kind: 'component-data';
+    readonly path: readonly string[];
+} | {
+    readonly kind: 'variable';
+    readonly variableId: string;
+    readonly path: readonly string[];
+} | {
+    readonly kind: 'data-source-field';
+    readonly dataSourceId: string;
+    readonly where?: ScreenComponentStateRowMatch;
+    readonly path: readonly string[];
+};
+
+// @public (undocumented)
+interface ScreenComponentStateJudge {
+    readonly cases: readonly ScreenComponentStateCase[];
+    // (undocumented)
+    readonly input: ScreenComponentStateInput;
+}
+
+// @public (undocumented)
+type ScreenComponentStateOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists';
+
+// @public
+interface ScreenComponentStateRowMatch {
+    // (undocumented)
+    readonly equals: {
+        readonly kind: 'literal';
+        readonly value: string | number | boolean;
+    } | {
+        readonly kind: 'variable';
+        readonly variableId: string;
+    };
+    // (undocumented)
+    readonly field: readonly string[];
+}
+
+// @public (undocumented)
+interface ScreenComponentStates {
+    // (undocumented)
+    readonly items: readonly ScreenComponentState[];
+    readonly judge?: ScreenComponentStateJudge;
 }
 
 // @public (undocumented)
@@ -847,29 +1130,6 @@ export interface ScreenComponentStatus {
     // (undocumented)
     readonly locked: boolean;
 }
-
-// @public (undocumented)
-interface ScreenComponentStyleRule {
-    // (undocumented)
-    readonly id: string;
-    // (undocumented)
-    readonly style: ScreenJsonObject;
-    // (undocumented)
-    readonly when: ScreenComponentStyleRuleCondition;
-}
-
-// @public (undocumented)
-interface ScreenComponentStyleRuleCondition {
-    // (undocumented)
-    readonly operator: ScreenComponentStyleRuleOperator;
-    // (undocumented)
-    readonly path: readonly string[];
-    // (undocumented)
-    readonly value?: ScreenJsonValue;
-}
-
-// @public (undocumented)
-type ScreenComponentStyleRuleOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists';
 
 // @public (undocumented)
 export class ScreenCoreInvariantError extends Error {
@@ -1036,6 +1296,8 @@ export interface ScreenDocument {
     // (undocumented)
     readonly components: readonly ScreenComponentNode[];
     readonly dataSources?: readonly ScreenDataSource[];
+    readonly startCanvasId?: string;
+    readonly subCanvases?: readonly ScreenSubCanvas[];
     readonly theme?: ScreenTheme;
     // (undocumented)
     readonly variables: readonly ScreenVariableEntry[];
@@ -1068,6 +1330,24 @@ export type ScreenDocumentCommand = {
 } | {
     readonly type: 'replace-variables';
     readonly variables: readonly ScreenVariableEntry[];
+}
+/**
+* 整体替换从画布集合（ADR-0109）；空数组删除字段。`startCanvasId`：缺省保持原值，`null` 删除。
+* 组件归属、起始页与蓝图引用由文档校验把关。
+*/
+| {
+    readonly type: 'replace-sub-canvases';
+    readonly subCanvases: readonly ScreenSubCanvas[];
+    readonly startCanvasId?: string | null;
+}
+/**
+* 把根组件移到另一块画布（`null` = 主画布，ADR-0109）：写 / 删 `canvasId`、移出主画布时去掉
+* `belowSubCanvas`、移入弹框时把位置夹进面板范围。子组件随根组件移动，不能单独移动。
+*/
+| {
+    readonly type: 'move-components';
+    readonly componentIds: readonly string[];
+    readonly canvasId: string | null;
 } | {
     readonly type: 'rename-variable';
     readonly variableId: string;
@@ -1184,6 +1464,16 @@ type ScreenJsonValue = null | boolean | number | string | readonly ScreenJsonVal
     readonly [key: string]: ScreenJsonValue;
 };
 
+// @public
+interface ScreenPageCanvas extends ScreenSubCanvasBase {
+    // (undocumented)
+    readonly background?: ScreenCanvasBackground;
+    // (undocumented)
+    readonly backgroundColor?: string;
+    // (undocumented)
+    readonly display: 'page';
+}
+
 // @public (undocumented)
 type ScreenParseResult<T> = {
     readonly ok: true;
@@ -1202,12 +1492,50 @@ export interface ScreenPoint {
     readonly y: number;
 }
 
+// @public
+type ScreenPopupAnchor = 'top-left' | 'top' | 'top-right' | 'left' | 'center' | 'right' | 'bottom-left' | 'bottom' | 'bottom-right';
+
+// @public
+interface ScreenPopupCanvas extends ScreenSubCanvasBase {
+    // (undocumented)
+    readonly background?: ScreenCanvasBackground;
+    // (undocumented)
+    readonly backgroundColor: string;
+    readonly borderRadius: number;
+    readonly closeOnEscape: boolean;
+    readonly closeOnMaskClick: boolean;
+    // (undocumented)
+    readonly display: 'popup';
+    // (undocumented)
+    readonly height: number;
+    readonly maskColor: string;
+    readonly placement?: ScreenPopupPlacement;
+    // (undocumented)
+    readonly width: number;
+}
+
+// @public (undocumented)
+interface ScreenPopupPlacement {
+    // (undocumented)
+    readonly anchor: ScreenPopupAnchor;
+    readonly offsetX: number;
+    // (undocumented)
+    readonly offsetY: number;
+}
+
 // @public (undocumented)
 export interface ScreenPosition {
     // (undocumented)
     readonly x: number;
     // (undocumented)
     readonly y: number;
+}
+
+// @public
+interface ScreenPushRetainPolicy {
+    readonly rows?: number;
+    readonly seconds?: number;
+    readonly timeField?: string;
 }
 
 // @public (undocumented)
@@ -1260,17 +1588,34 @@ export interface ScreenStaticVariable extends ScreenVariableBase {
     readonly type: 'static';
 }
 
+// @public
+type ScreenSubCanvas = ScreenPageCanvas | ScreenPopupCanvas;
+
+// @public (undocumented)
+interface ScreenSubCanvasBase {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly name: string;
+}
+
 // @public (undocumented)
 interface ScreenTheme {
     // (undocumented)
-    readonly palette: Readonly<Record<ScreenThemeSlot, string>>;
+    readonly palette: Readonly<Record<ScreenThemeBaseSlot, string>> & Readonly<Partial<Record<ScreenThemeStatusSlot, string>>>;
 }
+
+// @public
+type ScreenThemeBaseSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
 
 // @public
 type ScreenThemePatch = Readonly<Partial<Record<ScreenThemeSlot, string>>>;
 
+// @public (undocumented)
+type ScreenThemeSlot = ScreenThemeBaseSlot | ScreenThemeStatusSlot;
+
 // @public
-type ScreenThemeSlot = 'primary' | 'text' | 'textSecondary' | 'background' | 'accent' | 'accentSecondary';
+type ScreenThemeStatusSlot = 'danger' | 'warning' | 'info' | 'success';
 
 // @public (undocumented)
 export interface ScreenTransactionFailure {
@@ -1312,13 +1657,15 @@ export interface ScreenTransactionSuccess {
 
 // @public
 interface ScreenUpdatePolicy {
+    readonly fallbackIntervalSeconds?: number;
     readonly intervalSeconds?: number;
     // (undocumented)
     readonly mode: ScreenUpdatePolicyMode;
+    readonly retain?: ScreenPushRetainPolicy;
 }
 
 // @public (undocumented)
-type ScreenUpdatePolicyMode = 'once' | 'manual' | 'auto';
+type ScreenUpdatePolicyMode = 'once' | 'manual' | 'auto' | 'push';
 
 // @public (undocumented)
 interface ScreenUrlQueryVariable extends ScreenVariableBase {

@@ -4,19 +4,28 @@
 
 ```ts
 
-import type { ScreenDataBinding } from '@base-screen/contracts';
+import { ScreenBlueprintEdge } from '@base-screen/contracts';
+import { ScreenBlueprintNode } from '@base-screen/contracts';
+import { ScreenComponentDataSource } from '@base-screen/contracts';
+import { ScreenDataBinding } from '@base-screen/contracts';
 import { ScreenDatasetField } from '@base-screen/contracts';
 import type { ScreenDatasetValueType } from '@base-screen/contracts';
+import { ScreenDataSource } from '@base-screen/contracts';
 import type { ScreenDataSourceSource } from '@base-screen/contracts';
 import { ScreenDiagnostic } from '@base-screen/contracts';
 import type { ScreenDocument } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
 import { ScreenJsonValue } from '@base-screen/contracts';
+import type { ScreenLevelScale } from '@base-screen/contracts';
 import type { ScreenMaterialErrorCode } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
-import type { ScreenSize } from '@base-screen/contracts';
+import { ScreenPosition } from '@base-screen/contracts';
+import { ScreenSize } from '@base-screen/contracts';
+import type { ScreenSourceDelivery } from '@base-screen/contracts';
 import { ScreenTabularDataset } from '@base-screen/contracts';
-import type { ScreenValueRef } from '@base-screen/contracts';
+import { ScreenTheme } from '@base-screen/contracts';
+import type { ScreenThemeSlot } from '@base-screen/contracts';
+import { ScreenValueRef } from '@base-screen/contracts';
 
 // @public (undocumented)
 export const BASE_SCREEN_MATERIAL_EVENT: 'base-screen-material-event';
@@ -54,18 +63,15 @@ export interface BaseScreenChartSeries {
     readonly points: readonly BaseScreenChartPoint[];
 }
 
-// @public
-export interface BaseScreenConditionalStylePort {
+// @public (undocumented)
+export interface BaseScreenComponentFragmentInsertionIntent {
+    readonly anchor?: ScreenPosition;
     // (undocumented)
-    resolve(request: BaseScreenConditionalStyleRequest): ScreenJsonObject | undefined;
-}
-
-// @public
-export interface BaseScreenConditionalStyleRequest {
+    readonly blueprint?: BaseScreenFragmentBlueprint;
     // (undocumented)
-    readonly componentId: string;
-    // (undocumented)
-    readonly dataState: BaseScreenMaterialDataState;
+    readonly dataSources?: readonly BaseScreenFragmentDataSource[];
+    readonly nodes: readonly BaseScreenFragmentNode[];
+    readonly shell?: BaseScreenFragmentShell;
 }
 
 // @public
@@ -85,42 +91,80 @@ export interface BaseScreenDataField {
 export type BaseScreenDataValueType = 'string' | 'number' | 'boolean' | 'date';
 
 // @public
-export interface BaseScreenHostConditionalStyleAuthoringPort {
+export interface BaseScreenFragmentBlueprint {
     // (undocumented)
-    bindings(componentId: string): readonly BaseScreenHostConditionalStyleBinding[];
+    readonly edges: readonly ScreenBlueprintEdge[];
     // (undocumented)
-    save(componentId: string, bindings: readonly BaseScreenHostConditionalStyleBinding[]): Promise<ScreenParseResult<void>>;
-    // (undocumented)
-    readonly sources: readonly BaseScreenHostConditionalStyleSource[];
+    readonly nodes: readonly ScreenBlueprintNode[];
 }
 
 // @public
-export interface BaseScreenHostConditionalStyleBinding {
+export interface BaseScreenFragmentBody {
     // (undocumented)
-    readonly conditionId: string;
+    readonly blueprint?: BaseScreenFragmentBlueprint;
     // (undocumented)
-    readonly sourceId: string;
+    readonly dataSources?: readonly BaseScreenFragmentDataSource[];
     // (undocumented)
-    readonly style: ScreenJsonObject;
+    readonly nodes: readonly BaseScreenFragmentNode[];
+    // (undocumented)
+    readonly shell?: BaseScreenFragmentShell;
 }
 
 // @public
-export interface BaseScreenHostConditionalStyleCondition {
+export interface BaseScreenFragmentDataSource extends Omit<ScreenDataSource, 'id' | 'readOnly'> {
+    // (undocumented)
+    readonly key: string;
+}
+
+// @public
+export interface BaseScreenFragmentDefinition {
+    // (undocumented)
+    readonly blueprint?: BaseScreenFragmentBlueprint;
+    // (undocumented)
+    readonly category: string;
+    // (undocumented)
+    readonly cover?: string;
+    // (undocumented)
+    readonly dataSources?: readonly BaseScreenFragmentDataSource[];
     // (undocumented)
     readonly id: string;
     // (undocumented)
-    readonly label: string;
+    readonly keywords: readonly string[];
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly nodes: readonly BaseScreenFragmentNode[];
+    // (undocumented)
+    readonly shell?: BaseScreenFragmentShell;
+}
+
+// @public
+export interface BaseScreenFragmentEntry {
+    // (undocumented)
+    readonly key: string;
+    // (undocumented)
+    readonly materialType: string;
+    // (undocumented)
+    readonly name?: string;
+    // (undocumented)
+    readonly offset?: ScreenPosition;
+    readonly props?: ScreenJsonObject;
+    readonly rotation?: number;
+    // (undocumented)
+    readonly size?: ScreenSize;
+    readonly style?: ScreenJsonObject;
 }
 
 // @public (undocumented)
-export interface BaseScreenHostConditionalStyleSource {
-    // (undocumented)
-    readonly conditions: readonly BaseScreenHostConditionalStyleCondition[];
-    // (undocumented)
-    readonly id: string;
-    // (undocumented)
-    readonly label: string;
+export interface BaseScreenFragmentNode extends BaseScreenFragmentEntry {
+    readonly dataBinding?: ScreenDataBinding | null;
+    readonly dataSource?: ScreenComponentDataSource | null;
+    readonly dataValue?: ScreenValueRef | null;
+    readonly parent?: string;
 }
+
+// @public
+export type BaseScreenFragmentShell = BaseScreenFragmentEntry;
 
 // @public (undocumented)
 export interface BaseScreenMaterialArraySchema {
@@ -201,6 +245,7 @@ export type BaseScreenMaterialDataState = {
 } | {
     readonly status: 'ready';
     readonly value: ScreenJsonValue;
+    readonly stale?: true;
 } | {
     readonly status: 'error';
     readonly code: ScreenMaterialErrorCode;
@@ -223,6 +268,7 @@ export interface BaseScreenMaterialEditorCondition {
     readonly operator: BaseScreenMaterialEditorConditionOperator;
     // (undocumented)
     readonly path: readonly BaseScreenMaterialEditorPathSegment[];
+    readonly target?: 'props' | 'style';
     // (undocumented)
     readonly value?: ScreenJsonValue;
 }
@@ -231,7 +277,29 @@ export interface BaseScreenMaterialEditorCondition {
 export type BaseScreenMaterialEditorConditionOperator = 'eq' | 'neq' | 'exists' | 'not-exists' | 'in' | 'not-in';
 
 // @public (undocumented)
-export type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'segmented' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'stepper' | 'custom';
+export type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'segmented' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'stepper' | 'spacing' | 'custom';
+
+// @public
+export interface BaseScreenMaterialEditorControlInferenceInput {
+    // (undocumented)
+    readonly allowGradient?: boolean;
+    // (undocumented)
+    readonly max?: number;
+    // (undocumented)
+    readonly min?: number;
+    // (undocumented)
+    readonly path: readonly BaseScreenMaterialEditorPathSegment[];
+    // (undocumented)
+    readonly projection?: BaseScreenMaterialEditorProjection;
+    // (undocumented)
+    readonly step?: number;
+    // (undocumented)
+    readonly tagName?: string;
+    // (undocumented)
+    readonly target: BaseScreenMaterialEditorTarget;
+    // (undocumented)
+    readonly unit?: string;
+}
 
 // @public (undocumented)
 export interface BaseScreenMaterialEditorDescriptor {
@@ -243,6 +311,18 @@ export interface BaseScreenMaterialEditorDescriptor {
     readonly events?: readonly BaseScreenMaterialEventDescriptor[];
     // (undocumented)
     readonly interaction?: readonly BaseScreenMaterialEditorSection[];
+}
+
+// @public (undocumented)
+export interface BaseScreenMaterialEditorDescriptorInput {
+    // (undocumented)
+    readonly appearance?: readonly BaseScreenMaterialEditorSectionInput[];
+    // (undocumented)
+    readonly data?: readonly BaseScreenMaterialEditorSectionInput[];
+    // (undocumented)
+    readonly events?: readonly BaseScreenMaterialEventDescriptor[];
+    // (undocumented)
+    readonly interaction?: readonly BaseScreenMaterialEditorSectionInput[];
 }
 
 // @public (undocumented)
@@ -283,6 +363,12 @@ export interface BaseScreenMaterialEditorField {
     readonly when?: readonly BaseScreenMaterialEditorCondition[];
 }
 
+// @public
+export type BaseScreenMaterialEditorFieldInput = Omit<BaseScreenMaterialEditorField, 'control' | 'itemFields'> & {
+    readonly control?: BaseScreenMaterialEditorControl;
+    readonly itemFields?: readonly BaseScreenMaterialEditorFieldInput[];
+};
+
 // @public (undocumented)
 type BaseScreenMaterialEditorPathSegment = string | number;
 
@@ -303,6 +389,11 @@ export interface BaseScreenMaterialEditorSection {
     // (undocumented)
     readonly label: string;
 }
+
+// @public (undocumented)
+export type BaseScreenMaterialEditorSectionInput = Omit<BaseScreenMaterialEditorSection, 'fields'> & {
+    readonly fields: readonly BaseScreenMaterialEditorFieldInput[];
+};
 
 // @public (undocumented)
 export type BaseScreenMaterialEditorTarget = 'props' | 'style' | 'data' | 'interaction';
@@ -382,6 +473,7 @@ export interface BaseScreenMaterialManifest {
     readonly propertyPanel: readonly BaseScreenMaterialPropertyPanelField[];
     // (undocumented)
     readonly propsSchema: BaseScreenMaterialObjectSchema;
+    readonly statePresetKeys?: readonly string[];
     // (undocumented)
     readonly staticData?: BaseScreenMaterialStaticDataDescriptor;
     // (undocumented)
@@ -390,6 +482,7 @@ export interface BaseScreenMaterialManifest {
     readonly styleSchema: BaseScreenMaterialObjectSchema;
     // (undocumented)
     readonly tagName: string;
+    readonly themeStyle?: Readonly<Record<string, ScreenThemeSlot>>;
     // (undocumented)
     readonly type: string;
 }
@@ -580,7 +673,7 @@ export type BaseScreenPluginContribution = {
     readonly id: string;
     readonly name: string;
     readonly tagName: string;
-};
+} | BaseScreenPluginFragmentContribution;
 
 // @public (undocumented)
 export type BaseScreenPluginContributionHandlerField = 'commands' | 'blueprintActions' | 'dataProcessors';
@@ -607,10 +700,12 @@ export type BaseScreenPluginDataProcessorHandler = (value: ScreenJsonValue, conf
 export interface BaseScreenPluginDataResourceTypeContribution {
     // (undocumented)
     readonly configSchema: BaseScreenMaterialObjectSchema;
+    readonly delivery?: ScreenSourceDelivery;
     // (undocumented)
     readonly id: string;
     // (undocumented)
     readonly kind: 'dataResourceType';
+    readonly levelScales?: readonly ScreenLevelScale[];
     // (undocumented)
     readonly name: string;
     readonly queryScope?: 'resource';
@@ -630,6 +725,12 @@ export interface BaseScreenPluginDesignSnapshot {
     readonly focusedComponentId: string | null;
     // (undocumented)
     readonly selectedComponentIds: readonly string[];
+}
+
+// @public
+export interface BaseScreenPluginFragmentContribution extends BaseScreenFragmentDefinition {
+    // (undocumented)
+    readonly kind: 'fragment';
 }
 
 // @public
@@ -759,12 +860,14 @@ export interface BaseScreenPluginRuntime {
 export interface BaseScreenRuntimeContributionIndex {
     getBlueprintAction?(actionId: string): BaseScreenPluginBlueprintActionContribution | undefined;
     getDataProcessor?(processorId: string): BaseScreenPluginDataProcessorContribution | undefined;
+    getFragment?(fragmentId: string): BaseScreenPluginFragmentContribution | undefined;
     // (undocumented)
     getResourceType(resourceType: string): BaseScreenPluginDataResourceTypeContribution | undefined;
     // (undocumented)
     hasBlueprintCapability(capability: string): boolean;
     listBlueprintActions?(): readonly BaseScreenPluginBlueprintActionContribution[];
     listDataProcessors?(): readonly BaseScreenPluginDataProcessorContribution[];
+    listFragments?(): readonly BaseScreenPluginFragmentContribution[];
     listResourceTypes?(): readonly BaseScreenPluginDataResourceTypeContribution[];
 }
 
@@ -836,6 +939,12 @@ export function describeBaseScreenMaterialStyleForAi(manifest: BaseScreenMateria
 export function diffBaseScreenMaterialCatalogs(before: BaseScreenMaterialCatalog, after: BaseScreenMaterialCatalog): BaseScreenMaterialCatalogDiff;
 
 // @public
+export function inferBaseScreenMaterialEditorControl(field: BaseScreenMaterialEditorControlInferenceInput, schema: BaseScreenMaterialPropSchema | undefined): BaseScreenMaterialEditorControl | undefined;
+
+// @public
+export function isBaseScreenBoundedName(value: unknown, limit: number): value is string;
+
+// @public
 export function isValidCustomElementName(tagName: unknown): boolean;
 
 // @public
@@ -870,6 +979,12 @@ export const MAX_EDITOR_SECTIONS_PER_ZONE = 16;
 
 // @public (undocumented)
 export function parseBaseScreenChartData(input: unknown): ScreenParseResult<BaseScreenChartData>;
+
+// @public
+export function parseBaseScreenComponentFragmentInsertionIntent(input: unknown): ScreenParseResult<BaseScreenComponentFragmentInsertionIntent>;
+
+// @public
+export function parseBaseScreenFragmentDefinition(input: unknown): ScreenParseResult<BaseScreenFragmentDefinition>;
 
 // @public (undocumented)
 export function parseBaseScreenMaterialEditorDescriptor(input: unknown, propsSchema: BaseScreenMaterialObjectSchema | undefined, styleSchema: BaseScreenMaterialObjectSchema | undefined, manifestEvents: readonly string[] | undefined, dataBindingRoles: readonly {
@@ -934,6 +1049,9 @@ export interface PluginDesignReadPort {
 
 // @public
 export function readContributionHandlerRecord(input: ContributionHandlerRecordInput): ContributionHandlerRecordResult;
+
+// @public
+export function resolveBaseScreenMaterialDefaultStyle(manifest: Pick<BaseScreenMaterialManifest, 'defaultStyle' | 'themeStyle'>, theme: ScreenTheme | undefined): ScreenJsonObject;
 
 // @public (undocumented)
 export function resolveSchema(path: readonly (string | number)[], schema: BaseScreenMaterialObjectSchema): BaseScreenMaterialPropSchema | undefined;

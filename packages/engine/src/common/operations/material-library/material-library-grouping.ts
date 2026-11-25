@@ -1,5 +1,8 @@
-// 物料库分组契约：宿主声明的分组树（id/label/materialTypes/children）的
+// 物料库分组契约：宿主声明的分组树（id/label/materialTypes/fragmentIds/children）的
 // 失败关闭解析——含分组 id 模式、数量/深度/标签长度等上限校验。
+//
+// `fragmentIds`（ADR-0100）只做形状与唯一性校验，不对 catalog 校验：分片可能因试运行失败被
+// 隐藏、也可能由插件稍后贡献，引用一个当前不存在的分片 id 只是「这一格暂时为空」。
 
 import {
   isScreenMaterialType,
@@ -13,6 +16,8 @@ export interface BaseScreenMaterialLibraryGroup {
   readonly id: string;
   readonly label: string;
   readonly materialTypes?: readonly string[];
+  /** 归入该分组的组合分片 id（ADR-0100）；与物料按 category 混排，分组内排在物料之后。 */
+  readonly fragmentIds?: readonly string[];
   readonly children?: readonly BaseScreenMaterialLibraryGroup[];
 }
 
@@ -21,7 +26,8 @@ export interface BaseScreenMaterialLibraryGrouping {
 }
 
 const ROOT_FIELDS = new Set(['groups']);
-const GROUP_FIELDS = new Set(['id', 'label', 'materialTypes', 'children']);
+const GROUP_FIELDS = new Set(['id', 'label', 'materialTypes', 'fragmentIds', 'children']);
+const FRAGMENT_ID_PATTERN = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const GROUP_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
 const MAX_GROUPS = 128;
 const MAX_GROUP_DEPTH = 8;
@@ -31,6 +37,7 @@ const MAX_GROUP_MATERIAL_TYPES = 512;
 interface GroupParseState {
   readonly groupIds: Set<string>;
   readonly materialTypes: Set<string>;
+  readonly fragmentIds: Set<string>;
   groupCount: number;
   materialTypeCount: number;
 }
@@ -130,6 +137,49 @@ export function materialLibraryGroupMaterialTypes(
   return types;
 }
 
+/** 分组（含后代）声明的分片 id，按分组树先序与声明顺序。 */
+export function materialLibraryGroupFragmentIds(
+  grouping: BaseScreenMaterialLibraryGrouping,
+  groupId?: string,
+): readonly string[] {
+  const roots =
+    groupId === undefined
+      ? grouping.groups
+      : (() => {
+          const group = findMaterialLibraryGroup(grouping.groups, groupId);
+          return group === undefined ? [] : [group];
+        })();
+  const ids: string[] = [];
+  visitGroups(roots, [], (group) => ids.push(...(group.fragmentIds ?? [])));
+  return ids;
+}
+
+/** 分组（含后代）声明的卡片数：物料类型 + 分片 id。导航计数与卡片网格同口径。 */
+export function materialLibraryGroupEntryCount(
+  grouping: BaseScreenMaterialLibraryGrouping,
+  groupId?: string,
+): number {
+  return (
+    materialLibraryGroupMaterialTypes(grouping, groupId).length +
+    materialLibraryGroupFragmentIds(grouping, groupId).length
+  );
+}
+
+/** 分组树先序展开的每一格：卡片网格按这个顺序输出「本组物料 → 本组分片」。 */
+export function materialLibraryGroupCells(grouping: BaseScreenMaterialLibraryGrouping): readonly {
+  readonly materialTypes: readonly string[];
+  readonly fragmentIds: readonly string[];
+}[] {
+  const cells: { materialTypes: readonly string[]; fragmentIds: readonly string[] }[] = [];
+  visitGroups(grouping.groups, [], (group) =>
+    cells.push({
+      materialTypes: group.materialTypes ?? [],
+      fragmentIds: group.fragmentIds ?? [],
+    }),
+  );
+  return cells;
+}
+
 export function materialLibraryGroupPath(
   grouping: BaseScreenMaterialLibraryGrouping,
   groupId: string,
@@ -148,6 +198,7 @@ function createParseState(): GroupParseState {
   return {
     groupIds: new Set<string>(),
     materialTypes: new Set<string>(),
+    fragmentIds: new Set<string>(),
     groupCount: 0,
     materialTypeCount: 0,
   };
@@ -217,30 +268,41 @@ function parseGroup(
     value.materialTypes === undefined
       ? undefined
       : parseMaterialTypes(value.materialTypes, [...path, 'materialTypes'], state, diagnostics);
+  const fragmentIds =
+    value.fragmentIds === undefined
+      ? undefined
+      : parseFragmentIds(value.fragmentIds, [...path, 'fragmentIds'], state, diagnostics);
   const children =
     value.children === undefined
       ? undefined
       : parseGroups(value.children, [...path, 'children'], depth + 1, state, diagnostics);
 
-  if (materialTypes === undefined && children === undefined) {
+  if (materialTypes === undefined && fragmentIds === undefined && children === undefined) {
     diagnostics.push(
-      diagnostic(path, 'Material library group must contain materialTypes or children.'),
+      diagnostic(
+        path,
+        'Material library group must contain materialTypes, fragmentIds or children.',
+      ),
     );
   }
   if (
     id === undefined ||
     label === undefined ||
     (value.materialTypes !== undefined && materialTypes === undefined) ||
+    (value.fragmentIds !== undefined && fragmentIds === undefined) ||
     (value.children !== undefined && children === undefined)
   ) {
     return undefined;
   }
-  if (materialTypes === undefined && children === undefined) return undefined;
+  if (materialTypes === undefined && fragmentIds === undefined && children === undefined) {
+    return undefined;
+  }
 
   return Object.freeze({
     id,
     label,
     ...(materialTypes === undefined ? {} : { materialTypes }),
+    ...(fragmentIds === undefined ? {} : { fragmentIds }),
     ...(children === undefined ? {} : { children }),
   });
 }
@@ -319,6 +381,43 @@ function parseMaterialTypes(
     materialTypes.push(type);
   }
   return materialTypes.length === 0 ? undefined : Object.freeze(materialTypes);
+}
+
+function parseFragmentIds(
+  value: unknown,
+  path: readonly (string | number)[],
+  state: GroupParseState,
+  diagnostics: ScreenDiagnostic[],
+): readonly string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) {
+    diagnostics.push(
+      diagnostic(path, 'Material library group fragmentIds must be a non-empty array.'),
+    );
+    return undefined;
+  }
+  const fragmentIds: string[] = [];
+  for (const [index, id] of value.entries()) {
+    if (typeof id !== 'string' || !FRAGMENT_ID_PATTERN.test(id)) {
+      diagnostics.push(diagnostic([...path, index], 'Fragment id is invalid.'));
+      continue;
+    }
+    if (state.fragmentIds.has(id)) {
+      diagnostics.push(diagnostic([...path, index], 'Fragment id must appear in only one group.'));
+      continue;
+    }
+    state.fragmentIds.add(id);
+    if (state.fragmentIds.size > MAX_GROUP_MATERIAL_TYPES) {
+      diagnostics.push(
+        diagnostic(
+          path,
+          `Material library grouping supports at most ${MAX_GROUP_MATERIAL_TYPES} fragments.`,
+        ),
+      );
+      continue;
+    }
+    fragmentIds.push(id);
+  }
+  return fragmentIds.length === 0 ? undefined : Object.freeze(fragmentIds);
 }
 
 function findMaterialLibraryGroup(

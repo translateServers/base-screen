@@ -344,14 +344,18 @@
 /* 能力标记：已绑数据 / 已配交互。4px 圆点，宽度固定，出现或消失都不推动行内其他元素。 */
 .layer-select .layer-badge {
   flex: none;
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--designer-accent);
 }
 
+/* 交互标记是空心环：两个标记并排时先靠形状区分，再靠颜色。
+   纯色差（蓝/灰）对色觉差异用户等于没有区分，而且 4px 实心点在密集行里
+   看起来像渲染脏点——环至少能读出「这里有个标记」。 */
 .layer-select .layer-badge[data-layer-badge="event"] {
-  background: var(--designer-text-secondary);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--designer-text-secondary);
 }
 
 /* 诊断行：与名称文本左对齐（折叠位 18 + 图标 22 + 间距，合计 44）。 */

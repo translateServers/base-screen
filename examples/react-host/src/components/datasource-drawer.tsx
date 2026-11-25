@@ -10,6 +10,7 @@ import {
   type DatasourceDraft,
   type DatasourcePreviewResponse,
   type DatasourceTestResponse,
+  type DraftField,
   draftFromDetail,
   draftSignature,
   draftToConfig,
@@ -30,6 +31,7 @@ import {
   validateDraft,
 } from '../lib/datasource-model';
 import { formatDateTime } from '../lib/format';
+import { trapModalFocus } from '../lib/modal-focus';
 import { DiscardDialog, FieldChangeDialog } from './datasource-dialogs';
 import { showToast } from './toast';
 
@@ -67,12 +69,21 @@ export function DatasourceDrawer({
   const [test, setTest] = useState<DatasourceTestResponse | null>(null);
   const [preview, setPreview] = useState<DatasourcePreviewResponse | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  /** 本地校验失败时指向的控件；服务端错误不指向具体控件。 */
+  const [formErrorField, setFormErrorField] = useState<DraftField | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
   const [askDiscard, setAskDiscard] = useState(false);
   const [askFieldChange, setAskFieldChange] = useState(false);
   const autoPreviewDone = useRef(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  const formErrorRef = useRef<HTMLParagraphElement>(null);
+  const requestCloseRef = useRef<() => void>(() => {});
   /** 自动预览用的最新 runPreview（避免把它放进 effect 依赖导致每次渲染重跑）。 */
   const runPreviewRef = useRef<() => Promise<void>>(async () => {});
+
+  useEffect(() => {
+    if (formError !== null) formErrorRef.current?.focus({ preventScroll: true });
+  }, [formError]);
 
   const readOnly = detail?.type === 'builtin';
   const dirty = baseline !== '' && draftSignature(draft) !== baseline;
@@ -167,9 +178,11 @@ export function DatasourceDrawer({
     const check = validateDraft(draft);
     if (check.ok === false) {
       setFormError(check.message);
+      setFormErrorField(check.field ?? null);
       return false;
     }
     setFormError(null);
+    setFormErrorField(null);
     return true;
   };
 
@@ -266,6 +279,17 @@ export function DatasourceDrawer({
     }
     onClose();
   };
+  requestCloseRef.current = requestClose;
+  useEffect(
+    () =>
+      dialogRef.current === null
+        ? undefined
+        : trapModalFocus(dialogRef.current, {
+            initialFocus: '[data-ds-field="name"]',
+            onEscape: () => requestCloseRef.current(),
+          }),
+    [],
+  );
 
   const columnsOfTable = schema?.columns[draft.table] ?? [];
   const idPreview =
@@ -275,10 +299,12 @@ export function DatasourceDrawer({
     <>
       <div className="ds-overlay ds-overlay--right">
         <section
+          ref={dialogRef}
           className="ds-drawer"
           role="dialog"
           aria-modal="true"
           aria-label={editing ? '编辑数据源' : '新建数据源'}
+          aria-describedby={formError === null ? undefined : 'ds-form-error'}
           data-ds-form=""
         >
           <header className="ds-drawer__head">
@@ -302,6 +328,8 @@ export function DatasourceDrawer({
                     <input
                       className="field"
                       data-ds-field="name"
+                      aria-invalid={formErrorField === 'name'}
+                      aria-describedby={formErrorField === 'name' ? 'ds-form-error' : undefined}
                       value={draft.name}
                       maxLength={64}
                       onChange={(event) => patch({ name: event.target.value })}
@@ -352,19 +380,29 @@ export function DatasourceDrawer({
                     files={files}
                     schema={schema}
                     columnsOfTable={columnsOfTable}
+                    formErrorField={formErrorField}
                     patch={patch}
                     onReloadFiles={() => {
                       setFiles([]);
                     }}
                   />
                 ) : null}
-                {draft.type === 'rest' ? <RestSection draft={draft} patch={patch} /> : null}
+                {draft.type === 'rest' ? (
+                  <RestSection draft={draft} formErrorField={formErrorField} patch={patch} />
+                ) : null}
                 {draft.type === 'static' ? <StaticSection draft={draft} patch={patch} /> : null}
 
                 <ParamsSection draft={draft} patch={patch} />
 
                 {formError === null ? null : (
-                  <p className="ds-error" role="alert" data-ds-form-error="">
+                  <p
+                    ref={formErrorRef}
+                    id="ds-form-error"
+                    className="ds-error"
+                    role="alert"
+                    tabIndex={-1}
+                    data-ds-form-error=""
+                  >
                     {formError}
                   </p>
                 )}
@@ -503,6 +541,7 @@ function SqliteSection({
   files,
   schema,
   columnsOfTable,
+  formErrorField,
   patch,
   onReloadFiles,
 }: {
@@ -514,6 +553,7 @@ function SqliteSection({
     readonly declaredType: string;
     readonly supported: boolean;
   }[];
+  readonly formErrorField: DraftField | null;
   readonly patch: (partial: Partial<DatasourceDraft>) => void;
   readonly onReloadFiles: () => void;
 }): React.ReactElement {
@@ -526,6 +566,9 @@ function SqliteSection({
           <select
             className="field"
             data-ds-field="file"
+            aria-label="数据库文件"
+            aria-invalid={formErrorField === 'file'}
+            aria-describedby={formErrorField === 'file' ? 'ds-form-error' : undefined}
             value={draft.file}
             onChange={(event) =>
               patch({ file: event.target.value, table: '', columns: [], filters: [] })
@@ -547,16 +590,39 @@ function SqliteSection({
         ) : null}
       </div>
 
-      <div className="ds-tabs" role="tablist">
-        {(['table', 'sql'] as const).map((mode) => (
+      <div className="ds-tabs" role="tablist" aria-label="SQLite 查询方式">
+        {(['table', 'sql'] as const).map((mode, index) => (
           <button
             key={mode}
             type="button"
             role="tab"
+            id={`ds-sqlite-${mode}-tab`}
+            // 只有选中的标签页对应已渲染的面板：未选中的不写 aria-controls，避免指向不存在的 id。
+            aria-controls={draft.sqliteMode === mode ? `ds-sqlite-${mode}-panel` : undefined}
             aria-selected={draft.sqliteMode === mode}
+            tabIndex={draft.sqliteMode === mode ? 0 : -1}
             className={`button ds-tab${draft.sqliteMode === mode ? ' ds-tab--active' : ''}`}
             data-ds-mode={mode}
             onClick={() => patch({ sqliteMode: mode })}
+            onKeyDown={(event) => {
+              const next =
+                event.key === 'ArrowRight'
+                  ? (index + 1) % 2
+                  : event.key === 'ArrowLeft'
+                    ? (index + 1) % 2
+                    : event.key === 'Home'
+                      ? 0
+                      : event.key === 'End'
+                        ? 1
+                        : undefined;
+              if (next === undefined) return;
+              event.preventDefault();
+              const nextMode = next === 0 ? 'table' : 'sql';
+              patch({ sqliteMode: nextMode });
+              event.currentTarget.parentElement
+                ?.querySelector<HTMLButtonElement>(`[data-ds-mode="${nextMode}"]`)
+                ?.focus();
+            }}
           >
             {mode === 'table' ? '表模式' : 'SQL 模式'}
           </button>
@@ -564,12 +630,15 @@ function SqliteSection({
       </div>
 
       {draft.sqliteMode === 'table' ? (
-        <>
+        <div id="ds-sqlite-table-panel" role="tabpanel" aria-labelledby="ds-sqlite-table-tab">
           <div className="ds-field">
             <span>表 / 视图</span>
             <select
               className="field"
               data-ds-field="table"
+              aria-label="表或视图"
+              aria-invalid={formErrorField === 'table'}
+              aria-describedby={formErrorField === 'table' ? 'ds-form-error' : undefined}
               value={draft.table}
               onChange={(event) => patch({ table: event.target.value, columns: [], filters: [] })}
             >
@@ -635,6 +704,7 @@ function SqliteSection({
                     <td>
                       <select
                         className="field"
+                        aria-label={`过滤条件 ${index + 1} 的列`}
                         value={filter.column}
                         onChange={(event) => {
                           const next = [...draft.filters];
@@ -655,6 +725,7 @@ function SqliteSection({
                     <td>
                       <input
                         className="field"
+                        aria-label={`过滤条件 ${index + 1} 的参数名`}
                         value={filter.param}
                         onChange={(event) => {
                           const next = [...draft.filters];
@@ -687,22 +758,27 @@ function SqliteSection({
               {DATASOURCE_TEXT.addFilter}
             </button>
           </div>
-        </>
+        </div>
       ) : (
-        <div className="ds-field">
-          <span>SQL（单条 SELECT / WITH）</span>
-          <textarea
-            className="field ds-field__sql"
-            data-ds-field="sql"
-            value={draft.sql}
-            placeholder={SQL_TEMPLATE}
-            onChange={(event) => patch({ sql: event.target.value })}
-          />
-          <div className="ds-inline">
-            <span className="ds-hint">{DATASOURCE_TEXT.readonlyHint}</span>
-            <button type="button" className="button" onClick={() => patch({ sql: SQL_TEMPLATE })}>
-              插入模板
-            </button>
+        <div id="ds-sqlite-sql-panel" role="tabpanel" aria-labelledby="ds-sqlite-sql-tab">
+          <div className="ds-field">
+            <span>SQL（单条 SELECT / WITH）</span>
+            <textarea
+              className="field ds-field__sql"
+              data-ds-field="sql"
+              aria-label="SQL 语句"
+              aria-invalid={formErrorField === 'sql'}
+              aria-describedby={formErrorField === 'sql' ? 'ds-form-error' : undefined}
+              value={draft.sql}
+              placeholder={SQL_TEMPLATE}
+              onChange={(event) => patch({ sql: event.target.value })}
+            />
+            <div className="ds-inline">
+              <span className="ds-hint">{DATASOURCE_TEXT.readonlyHint}</span>
+              <button type="button" className="button" onClick={() => patch({ sql: SQL_TEMPLATE })}>
+                插入模板
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -712,9 +788,11 @@ function SqliteSection({
 
 function RestSection({
   draft,
+  formErrorField,
   patch,
 }: {
   readonly draft: DatasourceDraft;
+  readonly formErrorField: DraftField | null;
   readonly patch: (partial: Partial<DatasourceDraft>) => void;
 }): React.ReactElement {
   return (
@@ -725,6 +803,9 @@ function RestSection({
         <input
           className="field"
           data-ds-field="url"
+          aria-label="请求地址"
+          aria-invalid={formErrorField === 'url'}
+          aria-describedby={formErrorField === 'url' ? 'ds-form-error' : undefined}
           placeholder="http://127.0.0.1:3000/api/demo/press"
           value={draft.url}
           onChange={(event) => patch({ url: event.target.value })}
@@ -746,6 +827,7 @@ function RestSection({
                 <td>
                   <input
                     className="field"
+                    aria-label={`header ${index + 1} 名称`}
                     value={header.name}
                     onChange={(event) => {
                       const next = [...draft.headers];
@@ -758,6 +840,7 @@ function RestSection({
                   <input
                     className="field"
                     type="password"
+                    aria-label={`header ${index + 1} 的值`}
                     // 掩码占位：值永远留空，服务端把空串当作「保留原值」
                     placeholder={header.hasValue ? MASKED_SECRET : ''}
                     value={header.value}
@@ -814,6 +897,7 @@ function StaticSection({
             <span key={`column-${index}`} className="ds-col-input">
               <input
                 className="field"
+                aria-label={`第 ${index + 1} 列的名称`}
                 value={column}
                 onChange={(event) => {
                   const next = [...draft.staticColumns];
@@ -871,6 +955,7 @@ function StaticSection({
                   <td key={`cell-${rowIndex}-${columnIndex}`}>
                     <input
                       className="field"
+                      aria-label={`第 ${rowIndex + 1} 行第 ${columnIndex + 1} 列的值`}
                       value={row[columnIndex] ?? ''}
                       onChange={(event) => {
                         const rows = draft.staticRows.map((currentRow, index) =>
@@ -946,6 +1031,7 @@ function ParamsSection({
               <td>
                 <input
                   className="field"
+                  aria-label={`参数 ${index + 1} 的名称`}
                   value={parameter.name}
                   onChange={(event) => {
                     const next = [...draft.params];
@@ -957,6 +1043,7 @@ function ParamsSection({
               <td>
                 <input
                   className="field"
+                  aria-label={`参数 ${index + 1} 的标签`}
                   value={parameter.label}
                   onChange={(event) => {
                     const next = [...draft.params];
@@ -968,6 +1055,7 @@ function ParamsSection({
               <td>
                 <select
                   className="field"
+                  aria-label={`参数 ${index + 1} 的类型`}
                   value={parameter.valueType}
                   onChange={(event) => {
                     const next = [...draft.params];
@@ -985,6 +1073,7 @@ function ParamsSection({
               <td>
                 <input
                   type="checkbox"
+                  aria-label={`参数 ${index + 1} 是否必填`}
                   checked={parameter.required}
                   onChange={(event) => {
                     const next = [...draft.params];
@@ -996,6 +1085,7 @@ function ParamsSection({
               <td>
                 <input
                   className="field"
+                  aria-label={`参数 ${index + 1} 的默认值`}
                   value={parameter.defaultValue}
                   onChange={(event) => {
                     const next = [...draft.params];

@@ -220,6 +220,59 @@ describe('parseBaseScreenMaterialEditorDescriptor', () => {
     ).toMatchObject({ ok: false });
   });
 
+  it('accepts spacing only on an object with four numeric sides', () => {
+    const parse = (input: Record<string, unknown>, schema = propsSchema) =>
+      parseBaseScreenMaterialEditorDescriptor(input, schema, styleSchema, ['valueClick'], roles);
+    const paddingSchema = {
+      ...propsSchema,
+      properties: {
+        ...propsSchema.properties,
+        padding: {
+          kind: 'object' as const,
+          properties: {
+            top: { kind: 'number' as const },
+            right: { kind: 'number' as const },
+            bottom: { kind: 'number' as const },
+            left: { kind: 'number' as const },
+          },
+          required: ['top', 'right', 'bottom', 'left'],
+        },
+      },
+    };
+
+    const valid = descriptor();
+    firstField(valid, 0).control = 'spacing';
+    firstField(valid, 0).path = ['padding'];
+    expect(parse(valid, paddingSchema)).toMatchObject({ ok: true });
+
+    // 缺一条边：渲染期无从取值，失败关闭。
+    const missingSide = descriptor();
+    firstField(missingSide, 0).control = 'spacing';
+    firstField(missingSide, 0).path = ['padding'];
+    const threeSides = {
+      ...paddingSchema,
+      properties: {
+        ...paddingSchema.properties,
+        padding: {
+          kind: 'object' as const,
+          properties: {
+            top: { kind: 'number' as const },
+            right: { kind: 'number' as const },
+            bottom: { kind: 'number' as const },
+          },
+          required: ['top', 'right', 'bottom'],
+        },
+      },
+    };
+    expect(parse(missingSide, threeSides)).toMatchObject({ ok: false });
+
+    // 标量字段不是四条边。
+    const wrongKind = descriptor();
+    firstField(wrongKind, 0).control = 'spacing';
+    firstField(wrongKind, 0).path = ['value'];
+    expect(parse(wrongKind)).toMatchObject({ ok: false });
+  });
+
   it('accepts a stepper only on a bounded number field', () => {
     const valid = descriptor();
     firstField(valid, 0).control = 'stepper';
@@ -502,6 +555,38 @@ describe('parseBaseScreenMaterialEditorDescriptor', () => {
       roles,
     );
     expect(conditions.ok).toBe(false);
+  });
+
+  // ADR-0105 P1：style 字段可以依赖 props 开关，条件显式写出读哪一侧。
+  it('accepts a cross-target condition and rejects an unknown target', () => {
+    const input = descriptor();
+    firstField(input, 1).when = [{ target: 'style', path: ['color'], operator: 'exists' }];
+    const accepted = parseBaseScreenMaterialEditorDescriptor(
+      input,
+      propsSchema,
+      styleSchema,
+      ['valueClick'],
+      roles,
+    );
+    expect(accepted.ok).toBe(true);
+    if (accepted.ok) {
+      expect(accepted.value.appearance?.[0]?.fields[1]?.when).toEqual([
+        { target: 'style', path: ['color'], operator: 'exists' },
+      ]);
+    }
+
+    firstField(input, 1).when = [{ target: 'data', path: ['color'], operator: 'exists' }];
+    const rejected = parseBaseScreenMaterialEditorDescriptor(
+      input,
+      propsSchema,
+      styleSchema,
+      ['valueClick'],
+      roles,
+    );
+    expect(rejected.ok).toBe(false);
+    if (!rejected.ok) {
+      expect(rejected.diagnostics.some((d) => d.path.includes('target'))).toBe(true);
+    }
   });
 
   it('AE-DC-C03 rejects duplicate ids', () => {

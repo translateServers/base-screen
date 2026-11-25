@@ -25,16 +25,43 @@ import { readNumber, styleColor } from './json-values.js';
  * 它同时是本插件的检查器控件宿主：`borderStyle` 字段用 `control: 'custom'` 指向
  * 插件自己贡献的 `base-screen-board-border-picker`，用来验证"插件既能贡献物料、
  * 也能为物料贡献已授权的属性面板控件"这条组合路径。
+ *
+ * props / style 分界（ADR-0099 §2.2）：边框形态与角标尺寸是结构（props）；线宽、颜色是纯视觉量，
+ * 应能被告警条件样式改写（style）。线宽因此是 style 的 `strokeWidth`。
+ *
+ * 没有文字色：本物料不渲染文字，边框与角标都用 `borderColor` 显式着色
+ * （ADR-0099 第六批移除了无效的 `color`）。
+ *
+ * 2026-11-22（ADR-0101）：
+ * - **可以当卡片外壳**（`children: true`）：标题、读数作为子组件放进来，整张卡一起拖动；
+ *   组合分片也能用它做外壳。它不是组壳（`groupMaterialType`），几何不随子项派生。
+ * - **双色**：`accentColor` 给角标与发光，`borderColor` 给边线——大屏边框「四角亮、边线暗」的
+ *   常见做法。`accentColor` 不进 required：存量文档没有这个键，角标仍用 `borderColor`，
+ *   「四角括号」也仍然只画四角，渲染与改动前一致。
+ * - 新插入时角标色跟随文档主题的主体色（`themeStyle`）。
  */
 const BORDER_BOX_PROPS_SCHEMA = {
   kind: 'object',
   properties: {
     borderStyle: { kind: 'enum', values: [...BOARD_BORDER_STYLES] },
     bracketSize: { kind: 'number', minimum: 4, maximum: 72 },
-    lineWidth: { kind: 'number', minimum: 1, maximum: 8 },
   },
-  required: ['borderStyle', 'bracketSize', 'lineWidth'],
+  required: ['borderStyle', 'bracketSize'],
 } satisfies BaseScreenMaterialObjectSchema;
+
+const BORDER_BOX_STYLE_SCHEMA = {
+  kind: 'object',
+  properties: {
+    backgroundColor: { kind: 'string' },
+    borderColor: { kind: 'string' },
+    accentColor: { kind: 'string' },
+    // 不进 required：缺省按 2px 绘制，未写线宽的文档无需改写。
+    strokeWidth: { kind: 'number', minimum: 1, maximum: 8 },
+  },
+  required: ['backgroundColor', 'borderColor'],
+} satisfies BaseScreenMaterialObjectSchema;
+
+const DEFAULT_STROKE_WIDTH = 2;
 
 export const PLUGIN_BOARD_BORDER_BOX_MANIFEST: BaseScreenMaterialManifest = {
   type: PLUGIN_BOARD_BORDER_BOX_TYPE,
@@ -49,36 +76,22 @@ export const PLUGIN_BOARD_BORDER_BOX_MANIFEST: BaseScreenMaterialManifest = {
   defaultProps: {
     borderStyle: 'corner-brackets',
     bracketSize: 22,
-    lineWidth: 2,
   },
   defaultStyle: {
     backgroundColor: 'rgba(11,26,43,.55)',
-    color: BOARD_DEFAULT_SURFACE.color,
-    borderColor: BOARD_DEFAULT_SURFACE.accentColor,
+    borderColor: BOARD_DEFAULT_SURFACE.borderColor,
+    accentColor: BOARD_DEFAULT_SURFACE.accentColor,
+    strokeWidth: DEFAULT_STROKE_WIDTH,
   },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      borderColor: { kind: 'string' },
-    },
-    required: ['backgroundColor', 'borderColor'],
-  },
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
-    { style: 'borderColor', label: '边框色', control: 'color' },
-    { style: 'color', label: '文字色', control: 'color' },
-  ],
+  themeStyle: { accentColor: 'primary' },
+  styleSchema: BORDER_BOX_STYLE_SCHEMA,
+  stylePanel: [],
   propsSchema: BORDER_BOX_PROPS_SCHEMA,
-  propertyPanel: [
-    { prop: 'bracketSize', label: '角标大小', control: 'number' },
-    { prop: 'lineWidth', label: '线宽', control: 'number' },
-  ],
+  propertyPanel: [],
   events: [],
   // 装饰边框只是容器外观，不接数据：声明 static 会诱导用户在边框上挂数据集。
   dataCapabilities: [],
-  designCapabilities: { resize: true, rotate: true, children: false },
+  designCapabilities: { resize: true, rotate: true, children: true },
   editorDescriptor: parseBorderBoxEditorDescriptor(),
 };
 
@@ -103,23 +116,51 @@ function parseBorderBoxEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
               target: 'props',
               path: ['bracketSize'],
               label: '角标大小',
-              control: 'unit-number',
               unit: 'px',
             },
             {
-              id: 'lineWidth',
-              target: 'props',
-              path: ['lineWidth'],
+              id: 'strokeWidth',
+              target: 'style',
+              path: ['strokeWidth'],
               label: '线宽',
-              control: 'unit-number',
               unit: 'px',
+              min: 1,
+              max: 8,
+            },
+            {
+              id: 'borderColor',
+              target: 'style',
+              path: ['borderColor'],
+              label: '边框色',
+              control: 'color',
+            },
+            {
+              id: 'accentColor',
+              target: 'style',
+              path: ['accentColor'],
+              label: '角标色',
+              control: 'color',
+            },
+          ],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            {
+              id: 'backgroundColor',
+              target: 'style',
+              path: ['backgroundColor'],
+              label: '背景色',
+              control: 'color',
+              allowGradient: true,
             },
           ],
         },
       ],
     },
     BORDER_BOX_PROPS_SCHEMA,
-    undefined,
+    BORDER_BOX_STYLE_SCHEMA,
     undefined,
     undefined,
   );
@@ -138,11 +179,11 @@ export class PluginBoardBorderBoxElement extends BoardMaterialElement {
 
     // 边框不接数据，但仍可能是 dataset 之类的旧文档：一律按"无数据"渲染外观，
     // 不显示数据态占位，否则一个装饰元素会因为宿主给了数据集而变成错误提示。
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.boxSizing = 'border-box';
     this.style.overflow = 'hidden';
     this.style.backgroundColor = styleColor(model.style.backgroundColor, 'transparent');
-    this.style.color = styleColor(model.style.color, BOARD_DEFAULT_SURFACE.color);
     this.setAttribute('role', 'group');
     // a11y 名称取物料清单名，不来自文档：物料不再有标题字段。
     this.setAttribute('aria-label', PluginBoardBorderBoxElement.manifest.name);
@@ -150,23 +191,33 @@ export class PluginBoardBorderBoxElement extends BoardMaterialElement {
     const style = isBoardBorderStyle(model.props.borderStyle) ? model.props.borderStyle : 'plain';
     this.dataset.boardBorderStyle = style;
     const borderColor = styleColor(model.style.borderColor, BOARD_DEFAULT_SURFACE.accentColor);
-    const lineWidth = Math.max(1, Math.round(readNumber(model.props.lineWidth, 2)));
+    // 存量文档没有 accentColor：角标与边线同色，与改动前一致。
+    const accent =
+      typeof model.style.accentColor === 'string' ? model.style.accentColor : undefined;
+    const accentColor = styleColor(accent, borderColor);
+    const strokeWidth = readNumber(model.style.strokeWidth, DEFAULT_STROKE_WIDTH);
+    const lineWidth = Math.max(1, Math.round(strokeWidth));
     const bracketSize = Math.max(4, Math.round(readNumber(model.props.bracketSize, 22)));
 
     const doc = this.ownerDocument;
     const frame = doc.createElement('div');
     frame.dataset.boardBorderFrame = style;
-    frame.style.cssText = `position:relative;width:100%;height:100%;box-sizing:border-box;${borderCss(style, borderColor, lineWidth)}`;
+    frame.style.cssText = `position:relative;width:100%;height:100%;box-sizing:border-box;${borderCss(style, borderColor, lineWidth, accent === undefined ? undefined : accentColor)}`;
 
-    for (const corner of cornerGeometry(doc, style, bracketSize, lineWidth, borderColor)) {
+    for (const corner of cornerGeometry(doc, style, bracketSize, lineWidth, accentColor)) {
       frame.appendChild(corner);
     }
     this.replaceChildren(frame);
   }
 }
 
-/** 六种边框形态各自的内联 CSS。样式与几何一一对应，不做"凑数"的近似变体。 */
-function borderCss(style: string, color: string, width: number): string {
+/**
+ * 六种边框形态各自的内联 CSS。样式与几何一一对应，不做"凑数"的近似变体。
+ *
+ * `accent` 只在文档写了 `accentColor` 时传入：发光用强调色；「四角括号」在边线色之外补一圈
+ * 1 px 暗边线（双色），没有强调色时仍只画四角。
+ */
+function borderCss(style: string, color: string, width: number, accent?: string): string {
   switch (style) {
     case 'double-line':
       return `border:${width}px double ${color};`;
@@ -174,12 +225,14 @@ function borderCss(style: string, color: string, width: number): string {
       return `border:${width}px dashed ${color};`;
     case 'notch':
       return `border:${width}px solid ${color};clip-path:polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px);`;
-    case 'glow-corner':
-      return `border:${width}px solid ${color};box-shadow:0 0 14px ${hexAlpha(color, 0.45)},inset 0 0 22px ${hexAlpha(color, 0.18)};`;
+    case 'glow-corner': {
+      const glow = accent ?? color;
+      return `border:${width}px solid ${color};box-shadow:0 0 14px ${hexAlpha(glow, 0.45)},inset 0 0 22px ${hexAlpha(glow, 0.18)};`;
+    }
     // plain 与 corner-brackets 的可见边框由角标承担：corner-brackets 刻意不画整圈，
     // 否则四角括号会与整圈边框叠在一起，看起来像两条线。
     case 'corner-brackets':
-      return '';
+      return accent === undefined ? '' : `border:1px solid ${color};`;
     default:
       return `border:${width}px solid ${color};`;
   }

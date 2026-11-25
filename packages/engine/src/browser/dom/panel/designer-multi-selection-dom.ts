@@ -3,6 +3,7 @@ import type { ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { commonStyleFields } from '../../../common/operations/selection/designer-multi-selection-operations.js';
 import type { DesignerInspectorContext } from '../../../common/operations/style/designer-inspector.js';
+import { designerMaterialEditorKeys } from '../../../common/operations/style/designer-material-appearance.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerFieldElement } from '../designer-field-primitives.js';
 import { appendDesignerQuickStyle } from '../designer-quick-style-dom.js';
@@ -89,8 +90,8 @@ export function appendMultiSelectionControls(
   appendBatchQuickConfiguration(properties, context, interaction, catalog);
   appendBatchStyleControls(properties, context, document, interaction, catalog);
   const actions = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.groupActions);
+  // 编组、锁定 / 隐藏是多选的高频操作，基础可见（ADR-0102 §7）。
   actions.className += ' designer-inspector-batch-secondary-actions';
-  actions.dataset.inspectorAdvanced = 'true';
   appendActionButton(
     actions,
     DESIGNER_UI_TEXT.propertiesPanel.actionGroup,
@@ -111,7 +112,6 @@ function appendMultiSelectionStateActions(
 ): void {
   const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.selectionActions);
   section.className += ' designer-inspector-batch-secondary-actions';
-  section.dataset.inspectorAdvanced = 'true';
   const allLocked = context.components.every((component) => component.status.locked);
   const allHidden = context.components.every((component) => component.status.hidden);
   appendActionButton(
@@ -198,7 +198,7 @@ function appendBatchGeometryControls(
     disabled,
     hint,
   );
-  rotation.dataset.inspectorAdvanced = 'true';
+  rotation.classList.add('designer-inspector-batch-rotation');
 }
 
 function appendBatchQuickConfiguration(
@@ -247,8 +247,9 @@ function appendBatchReadOnlyInput(parent: HTMLElement, labelText: string): void 
     label: labelText,
   });
   const input = createDesignerInput(parent.ownerDocument, {
-    placeholder: DESIGNER_UI_TEXT.propertiesPanel.multipleValues,
-    ariaLabel: `${labelText}：${DESIGNER_UI_TEXT.propertiesPanel.multipleValues}`,
+    // 多选值不同只有一种说法（ADR-0102 §8）：与批量下拉、几何输入同为「混合」。
+    placeholder: DESIGNER_UI_TEXT.inspectorUi.mixed,
+    ariaLabel: `${labelText}：${DESIGNER_UI_TEXT.inspectorUi.mixed}`,
     disabled: true,
   });
   label.appendChild(input);
@@ -256,7 +257,7 @@ function appendBatchReadOnlyInput(parent: HTMLElement, labelText: string): void 
 }
 
 /**
- * 批量样式编辑区（ADR-0053 R2）：所有选中组件 stylePanel 字段的交集；
+ * 批量样式编辑区（ADR-0053 R2）：所有选中组件外观区 style 字段的交集；
  * 交集为空（混合类型）时只显示几何区。控件复用单选渲染（三段式调色板等）。
  */
 function appendBatchStyleControls(
@@ -285,29 +286,40 @@ function appendBatchStyleControls(
     : DESIGNER_UI_TEXT.propertiesPanel.batchActionsHint(context.summary.count);
   const style = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.unifiedStyle);
   style.className += ' designer-inspector-batch-unified-style';
+  const editorKeys = (item: { readonly type: string }) => {
+    const itemManifest = catalog?.get(item.type)?.manifest;
+    return itemManifest === undefined ? [] : designerMaterialEditorKeys(itemManifest, 'style');
+  };
   for (const field of fields) {
     const schema = manifest.styleSchema?.properties?.[field];
-    const panelField = (manifest.stylePanel ?? []).find((item) => item.style === field);
-    if (schema === undefined || panelField === undefined) continue;
+    const entry = designerMaterialEditorKeys(manifest, 'style').find((item) => item.key === field);
+    if (schema === undefined || entry === undefined) continue;
     appendBatchStyleControl(
       style,
-      panelField.label,
+      entry.field.label,
       field,
       focused.style[field],
       context.components.some(
         (item) => JSON.stringify(item.style[field]) !== JSON.stringify(focused.style[field]),
       ),
       schema,
-      panelField.control,
+      batchControl(entry.field.control),
       context.components.every((item) =>
-        (catalog?.get(item.type)?.manifest.stylePanel ?? []).some(
-          (candidate) => candidate.style === field && candidate.allowGradient === true,
+        editorKeys(item).some(
+          (candidate) => candidate.key === field && candidate.field.allowGradient === true,
         ),
       ),
       disabled,
       hint,
     );
   }
+}
+
+/** 批量控件只有五种形态：带量纲的数字与步进器都退成数字框，分段退成下拉。 */
+function batchControl(control: string): 'color' | 'boolean' | 'select' | 'number' | 'text' {
+  if (control === 'color' || control === 'boolean' || control === 'text') return control;
+  if (control === 'select' || control === 'segmented') return 'select';
+  return 'number';
 }
 
 function appendBatchUnifiedStyleEmpty(properties: HTMLElement): void {

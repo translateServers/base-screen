@@ -14,6 +14,7 @@ import { validateBlueprint } from './validate-blueprint.js';
 import { validateCanvas } from './validate-canvas.js';
 import { validateComponent } from './validate-component.js';
 import { validateDataSource } from './validate-data-source.js';
+import { validateSubCanvases } from './validate-sub-canvas.js';
 import type { DocumentDiagnosticPath } from './validate-support.js';
 import { validateTheme } from './validate-theme.js';
 import { validateVariable } from './validate-variable.js';
@@ -21,6 +22,8 @@ import { validateVariable } from './validate-variable.js';
 const DOCUMENT_ROOT_FIELDS = new Set([
   'canvas',
   'components',
+  'subCanvases',
+  'startCanvasId',
   'dataSources',
   'variables',
   'blueprint',
@@ -71,11 +74,26 @@ export function validateDocument(
   checkStrictObjectKeys(candidate, DOCUMENT_ROOT_FIELDS, at([]), collector, phase);
   // `dataSources` 是文档级集合，缺省即空集：解析结果始终携带数组，消费者无需再区分「缺失」。
   if (candidate.dataSources === undefined) candidate.dataSources = [];
-  if (candidate.canvas !== base?.canvas) validateCanvas(candidate.canvas, at, collector, phase);
+  // 没有 base 时每个字段都必须校验：`undefined !== base?.x` 在字段缺失时为假，会把缺失的
+  // canvas / blueprint 静默放进引用校验并在那里崩溃，而不是失败关闭。
+  if (base === undefined || candidate.canvas !== base.canvas) {
+    validateCanvas(candidate.canvas, at, collector, phase);
+  }
   validateComponents(candidate.components, sharedComponents, at, collector, phase);
+  if (base === undefined || candidate.subCanvases !== base.subCanvases) {
+    validateSubCanvases(candidate.subCanvases, at, collector, phase);
+  }
+  if (candidate.startCanvasId !== undefined && typeof candidate.startCanvasId !== 'string') {
+    collector.add(
+      'DOCUMENT_FIELD_INVALID',
+      at(['startCanvasId']),
+      phase,
+      'startCanvasId must be a sub canvas id.',
+    );
+  }
   validateDataSources(candidate.dataSources, sharedDataSources, at, collector, phase);
   validateVariables(candidate.variables, sharedVariables, at, collector, phase);
-  if (candidate.blueprint !== base?.blueprint) {
+  if (base === undefined || candidate.blueprint !== base.blueprint) {
     validateBlueprint(candidate.blueprint, at, collector, phase);
   }
   if (candidate.theme !== undefined && candidate.theme !== base?.theme) {

@@ -1,5 +1,9 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
-import { buildComponentIndex, getDescendantIds } from '@base-screen/core';
+import {
+  buildComponentIndex,
+  getDescendantIds,
+  isScreenComponentEffectivelyLocked,
+} from '@base-screen/core';
 
 // 选中组件（仅包含显式选中的 id，不展开子组件）。
 export function selectedComponents(
@@ -88,6 +92,26 @@ export function selectionTargetsInContext(
     }
   }
   return targets;
+}
+
+/**
+ * 「全选」的目标：当前编辑层级（画布根层，或正在编辑的组内）的全部直接成员，排除锁定组件。
+ *
+ * 不把子孙也选进来：组合 / 卡片插入后是父子结构，混选父子会让删除、移动、对齐这类「选区须同属
+ * 一个父级」的操作整体失效（Ctrl+A 后按 Delete 没反应）。锁定组件在画布上本来就点不中，
+ * 选进来同样会让这些操作失效。与 Figma 的 Ctrl+A 语义一致。
+ */
+export function selectAllTargetIds(
+  document: ScreenDocument,
+  editingParentId: string | null,
+): readonly string[] {
+  return document.components
+    .filter(
+      (component) =>
+        component.parentId === editingParentId &&
+        !isScreenComponentEffectivelyLocked(document, component.id),
+    )
+    .map((component) => component.id);
 }
 
 export function parentIdOf(document: ScreenDocument, componentId: string): string | null {

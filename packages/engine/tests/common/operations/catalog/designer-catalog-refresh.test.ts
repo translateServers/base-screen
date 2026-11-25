@@ -7,7 +7,7 @@ import {
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import { collectCatalogCompatibilityDiagnostics } from '../../../../src/common/operations/catalog/designer-catalog-refresh.js';
-import { relationsFromRules } from '../../../__fixtures__/blueprint-relations.js';
+import { graphFromRules } from '../../../__fixtures__/blueprint-graph.js';
 
 function manifest(overrides: Partial<BaseScreenMaterialManifest> = {}): BaseScreenMaterialManifest {
   return {
@@ -58,7 +58,7 @@ function component(id: string, parentId: string | null = null): ScreenComponentN
 
 function documentWith(
   components: readonly ScreenComponentNode[],
-  blueprint: ScreenDocument['blueprint'] = { relations: [] },
+  blueprint: ScreenDocument['blueprint'] = { nodes: [], edges: [] },
 ): ScreenDocument {
   return {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
@@ -92,7 +92,7 @@ describe('collectCatalogCompatibilityDiagnostics', () => {
   it('rejects a blueprint trigger whose material event was removed', () => {
     const diagnostics = collectCatalogCompatibilityDiagnostics(
       documentWith([component('card')], {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'r1',
             trigger: { type: 'material-event', componentId: 'card', eventName: 'click' },
@@ -112,20 +112,13 @@ describe('collectCatalogCompatibilityDiagnostics', () => {
 
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.code).toBe('PLUGIN_CORE_EVENT_PAYLOAD_INVALID');
-    expect(diagnostics[0]?.path).toEqual([
-      'blueprint',
-      'relations',
-      0,
-      'source',
-      'event',
-      'eventName',
-    ]);
+    expect(diagnostics[0]?.path).toEqual(['blueprint', 'edges', 0, 'from', 'port']);
   });
 
   it('accepts a changed material that keeps children and declared events', () => {
     const diagnostics = collectCatalogCompatibilityDiagnostics(
       documentWith([component('parent'), component('child', 'parent')], {
-        relations: relationsFromRules([
+        ...graphFromRules([
           {
             id: 'r1',
             trigger: { type: 'material-event', componentId: 'parent', eventName: 'click' },

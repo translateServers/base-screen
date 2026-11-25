@@ -8,7 +8,10 @@ import type {
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../../dom/designer-icons.js';
 import { escapeHtml } from './designer-blueprint-dom-helpers.js';
-import { renderDesignerBlueprintConfiguration } from './designer-blueprint-inspector-configuration.js';
+import {
+  hydrateDesignerBlueprintFieldRows,
+  renderDesignerBlueprintConfiguration,
+} from './designer-blueprint-inspector-configuration.js';
 
 export type DesignerBlueprintInspectorTab = 'configuration' | 'problems' | 'trace';
 
@@ -29,10 +32,11 @@ export function renderDesignerBlueprintInspector(
   catalog?: BaseScreenMaterialCatalog,
 ): void {
   if (container === undefined) return;
+  // 「配置」不挂计数：选中数量不是需要处理的事项，挂红点会被读成报错。
   const counts: Record<DesignerBlueprintInspectorTab, number> = {
-    configuration: selection === null ? 0 : 1,
+    configuration: 0,
     problems: diagnostics.length,
-    trace: trace?.executedEdgeIds.length ?? 0,
+    trace: trace?.steps.length ?? 0,
   };
   const heading = inspectorHeading(document, graph, selection, activeTab);
   container.innerHTML = `<div class="blueprint-inspector-shell">
@@ -42,10 +46,11 @@ export function renderDesignerBlueprintInspector(
         ${INSPECTOR_TABS.map((tab) => inspectorTab(tab, activeTab, counts[tab])).join('')}
       </div>
     </header>
-    <div class="blueprint-panel-scroll" id="designer-blueprint-inspector-${activeTab}-panel" role="tabpanel" aria-labelledby="designer-blueprint-inspector-${activeTab}-tab" tabindex="0" aria-live="polite">
+    <div class="blueprint-panel-scroll inspector-pane" data-blueprint-inspector-pane id="designer-blueprint-inspector-${activeTab}-panel" role="tabpanel" aria-labelledby="designer-blueprint-inspector-${activeTab}-tab" tabindex="0" aria-live="polite">
       ${inspectorPane(activeTab, document, graph, selection, diagnostics, trace, catalog)}
     </div>
   </div>`;
+  hydrateDesignerBlueprintFieldRows(container);
 }
 
 function inspectorPane(
@@ -79,81 +84,55 @@ function tracePane(trace: BaseScreenBlueprintCanvasTrace | null): string {
   if (trace === null) {
     return `<div class="designer-empty"><span class="designer-empty-icon" aria-hidden="true">${designerIcon('terminal')}</span><p class="designer-empty-title">${DESIGNER_UI_TEXT.blueprint.noTrace}</p><p class="designer-empty-hint">${DESIGNER_UI_TEXT.blueprint.noTraceHint}</p></div>`;
   }
-  return `<section class="blueprint-inspector-status" data-blueprint-trace>
-    <div class="blueprint-trace-summary">${DESIGNER_UI_TEXT.blueprint.traceSummary(trace.executedEdgeIds.length, trace.failedRuleIds.length)}</div>
-    <ol>${trace.lines
-      .slice(-20)
-      .map((line) => `<li>${escapeHtml(line)}</li>`)
+  const failedConditions = trace.steps.filter(
+    (step) => step.kind === 'condition' && step.passed === false,
+  ).length;
+  return `<section class="blueprint-inspector-status" data-blueprint-trace data-failed="${String(trace.failed)}">
+    <div class="blueprint-trace-summary">${DESIGNER_UI_TEXT.blueprint.traceSummary(trace.executedEdgeIds.length, failedConditions)}</div>
+    <ol class="blueprint-trace-steps">${trace.steps
+      .slice(0, 200)
+      .map(
+        (step) =>
+          // 带节点的步骤可点：选中并定位到该节点（检查器停留在「运行」页）。
+          `<li data-kind="${step.kind}"${step.passed === undefined ? '' : ` data-passed="${String(step.passed)}"`} style="--bp-trace-depth: ${Math.min(step.depth, 12)}">${
+            step.nodeId === undefined
+              ? escapeHtml(step.text)
+              : `<button type="button" class="blueprint-trace-step" data-blueprint-select-node="${escapeHtml(step.nodeId)}">${escapeHtml(step.text)}</button>`
+          }</li>`,
+      )
       .join('')}</ol>
+    <button type="button" class="designer-button" data-blueprint-clear-trace>${DESIGNER_UI_TEXT.blueprint.graph.simulation.clear}</button>
   </section>`;
 }
 
 function inspectorHeading(
-  document: ScreenDocument | undefined,
+  _document: ScreenDocument | undefined,
   graph: BaseScreenBlueprintCanvasGraph,
   selection: BaseScreenBlueprintCanvasSelection,
   activeTab: DesignerBlueprintInspectorTab,
 ): { readonly title: string; readonly detail: string } {
-  if (activeTab === 'problems') {
+  const text = DESIGNER_UI_TEXT.blueprint;
+  if (activeTab === 'problems') return { title: text.problemsTitle, detail: text.inspector };
+  if (activeTab === 'trace') return { title: text.traceTitle, detail: text.inspector };
+  const total = selection.nodes.length + selection.edges.length;
+  if (total === 0) return { title: text.inspector, detail: text.inspectorEmpty };
+  if (total > 1) {
     return {
-      title: DESIGNER_UI_TEXT.blueprint.problemsTitle,
-      detail: DESIGNER_UI_TEXT.blueprint.inspector,
+      title: text.selectionOverview,
+      detail: text.graph.multiSelection(selection.nodes.length, selection.edges.length),
     };
   }
-  if (activeTab === 'trace') {
-    return {
-      title: DESIGNER_UI_TEXT.blueprint.traceTitle,
-      detail: DESIGNER_UI_TEXT.blueprint.inspector,
-    };
+  const node = graph.nodes.find((candidate) => candidate.id === selection.nodes[0]);
+  if (node !== undefined) {
+    return { title: node.title, detail: `${node.id} | ${text.graph.nodeKinds[node.kind]}` };
   }
-  if (selection === null) {
-    return {
-      title: DESIGNER_UI_TEXT.blueprint.inspector,
-      detail: DESIGNER_UI_TEXT.blueprint.inspectorEmpty,
-    };
-  }
-  const node =
-    selection.kind === 'node'
-      ? graph.nodes.find((candidate) => candidate.id === selection.id)
-      : undefined;
-  if (node?.kind === 'component') {
-    return {
-      title: node.componentName ?? node.componentId ?? DESIGNER_UI_TEXT.blueprint.layers,
-      detail: node.materialType ?? DESIGNER_UI_TEXT.blueprint.selectionType.component,
-    };
-  }
-  if (node?.kind === 'host') {
-    return {
-      title: DESIGNER_UI_TEXT.blueprint.hostNode,
-      detail: DESIGNER_UI_TEXT.blueprint.hostNodeHint,
-    };
-  }
-  if (node?.kind === 'variable') {
-    return {
-      title: node.variableName ?? node.variableId ?? DESIGNER_UI_TEXT.blueprint.globalVariables,
-      detail:
-        node.variableType === undefined
-          ? DESIGNER_UI_TEXT.blueprint.globalVariables
-          : DESIGNER_UI_TEXT.blueprint.variableKind[node.variableType],
-    };
-  }
-  const edge = graph.edges.find((candidate) => candidate.id === selection.id);
-  const relation =
-    edge?.relationId === undefined
-      ? undefined
-      : document?.blueprint.relations.find((candidate) => candidate.id === edge.relationId);
+  const edge = graph.edges.find((candidate) => candidate.id === selection.edges[0]);
   return {
-    title: relation?.id ?? edge?.id ?? DESIGNER_UI_TEXT.blueprint.selectionType.edge,
+    title: edge?.label ?? text.selectionType.edge,
     detail:
-      edge?.kind === 'semantic'
-        ? DESIGNER_UI_TEXT.blueprint.semanticRoles[edge.semanticRole ?? 'related']
-        : edge?.kind === 'containment'
-          ? DESIGNER_UI_TEXT.blueprint.relationCategories.structure
-          : edge?.kind === 'dependency'
-            ? DESIGNER_UI_TEXT.blueprint.readLabel
-            : edge?.effectType === undefined
-              ? DESIGNER_UI_TEXT.blueprint.selectionType.edge
-              : DESIGNER_UI_TEXT.blueprint.relationEffects[edge.effectType],
+      edge === undefined
+        ? text.selectionType.edge
+        : `${edge.id} | ${text.graph.edgeCategories[edge.category]}`,
   };
 }
 
@@ -165,5 +144,5 @@ function inspectorTab(
   const label = DESIGNER_UI_TEXT.blueprint.inspectorTabs[tab];
   const icon: DesignerIconName =
     tab === 'configuration' ? 'sliders' : tab === 'problems' ? 'check' : 'terminal';
-  return `<button type="button" class="blueprint-inspector-mode" id="designer-blueprint-inspector-${tab}-tab" role="tab" aria-controls="designer-blueprint-inspector-${tab}-panel" aria-selected="${String(tab === activeTab)}" tabindex="${tab === activeTab ? 0 : -1}" data-blueprint-inspector-tab="${tab}" data-tip="${label}" aria-label="${label}"><span aria-hidden="true">${designerIcon(icon)}</span>${count === 0 ? '' : `<em>${count}</em>`}</button>`;
+  return `<button type="button" class="blueprint-inspector-mode" id="designer-blueprint-inspector-${tab}-tab" role="tab" aria-controls="designer-blueprint-inspector-${tab}-panel" aria-selected="${String(tab === activeTab)}" tabindex="${tab === activeTab ? 0 : -1}" data-blueprint-inspector-tab="${tab}" data-tip="${label}" aria-label="${label}"><span aria-hidden="true">${designerIcon(icon)}</span>${count === 0 ? '' : `<em data-tone="${tab === 'problems' ? 'danger' : 'neutral'}">${count}</em>`}</button>`;
 }

@@ -11,6 +11,7 @@ import {
   assertSizeEntry,
 } from './authoring/assert-inspector.mjs';
 import { assertInspectorDataTabCapability } from './authoring/assert-inspector-data-tab.mjs';
+import { assertInspectorFormConsistency } from './authoring/assert-inspector-form-consistency.mjs';
 import {
   assertAuthoringMarquee,
   assertAuthoringSelection,
@@ -47,6 +48,7 @@ import {
 } from './canvas/assert-canvas.mjs';
 import { assertDatasetAuthoring, assertDatasetSurface } from './dataset/assert-dataset.mjs';
 import { assertDatasetPanelInteraction } from './dataset/assert-dataset-panel.mjs';
+import { assertPushDataSources } from './dataset/assert-push.mjs';
 import { assertStaticSourceSwitch } from './dataset/assert-source-switch.mjs';
 import {
   assertBlueprintHostLeftPanelGroups,
@@ -122,8 +124,12 @@ export async function runBrowserHarness(serverPort) {
       await assertTextAutoWidth(browser, baseUrl);
       await assertImageDensitySize(browser, baseUrl);
       await assertInspectorDataTabCapability(browser, baseUrl);
+      // 检查器表单控件视觉一致性（ADR-0102）：同一控件类型在任何物料里外观必须相同。
+      await assertInspectorFormConsistency(browser, baseUrl);
       // 固定值 / 变量配置态回到来源浮层的那一行：没有它，这两类形态再也接不上数据集。
       await assertStaticSourceSwitch(browser, baseUrl);
+      // 推送数据源（ADR-0104）：独立页 push.html，宿主端口与事件全部由断言脚本控制。
+      await assertPushDataSources(browser, baseUrl);
       await assertAgentHostResourceProposal(baseUrl, browser);
       for (const viewport of [
         { width: 1024, height: 640 },
@@ -165,7 +171,7 @@ export async function runBrowserHarness(serverPort) {
         }
         await assertRuntimeData(page, viewer);
         await assertCanvasBasics(designer, page);
-        await page.goto(`${baseUrl}/?designer&hostCanvas`, { waitUntil: 'networkidle' });
+        await page.goto(`${baseUrl}/?designer&verify&hostCanvas`, { waitUntil: 'networkidle' });
         const authoringDesigner = page.locator('base-screen-designer');
         await assertAuthoringProject(authoringDesigner, page);
         await assertAuthoringMaterials(authoringDesigner, page);

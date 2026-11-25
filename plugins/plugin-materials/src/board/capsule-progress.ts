@@ -5,7 +5,11 @@ import {
   type BaseScreenMaterialManifest,
   type BaseScreenMaterialObjectSchema,
 } from '@base-screen/plugin-core';
-import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+import {
+  createBaseScreenNumberFormatConfig,
+  createMaterialDefinition,
+} from '@base-screen/plugin-sdk';
+import { parseBoardEditorDescriptor } from './board-editor.js';
 import { BoardMaterialElement, type BoardMaterialModel } from './board-element.js';
 import {
   PLUGIN_BOARD_CAPSULE_PROGRESS_TAG_NAME,
@@ -19,16 +23,37 @@ import { BOARD_SCALAR_VALUE_ADAPTER } from './scalar-adapter.js';
  *
  * 与水位图的分工：水位图强调「液面高度」这一连续量，胶囊池强调「分段刻度」——
  * 大屏上常用于一排并列的完成率/健康度指标。两者都只画读数本身，不内建标题。
+ *
+ * 发光是纯视觉效果，属于 style 的 `fillGlow`（ADR-0099 §2.2）：告警条件样式可以点亮或关掉它。
  */
+/** 读数格式走通用配置组（ADR-0102 §11）：小数位与其他数字类物料同键、同控件。 */
+const CAPSULE_PROGRESS_NUMBER_FORMAT = createBaseScreenNumberFormatConfig({
+  decimals: 1,
+  maxDecimals: 3,
+});
+
 const CAPSULE_PROGRESS_PROPS_SCHEMA = {
   kind: 'object',
   properties: {
     segments: { kind: 'number', minimum: 4, maximum: 60 },
     showValue: { kind: 'boolean' },
-    decimals: { kind: 'number', minimum: 0, maximum: 3 },
-    glow: { kind: 'boolean' },
+    ...CAPSULE_PROGRESS_NUMBER_FORMAT.properties,
   },
-  required: ['segments', 'showValue', 'decimals', 'glow'],
+  required: ['segments', 'showValue', ...CAPSULE_PROGRESS_NUMBER_FORMAT.required],
+} satisfies BaseScreenMaterialObjectSchema;
+
+const CAPSULE_PROGRESS_STYLE_SCHEMA = {
+  kind: 'object',
+  properties: {
+    backgroundColor: { kind: 'string' },
+    color: { kind: 'string' },
+    trackColor: { kind: 'string' },
+    fillColor: { kind: 'string' },
+    fontSize: { kind: 'number', minimum: 10, maximum: 72 },
+    // 不进 required：缺省为发光，未写该键的文档无需改写。
+    fillGlow: { kind: 'boolean' },
+  },
+  required: ['backgroundColor', 'color', 'trackColor', 'fillColor', 'fontSize'],
 } satisfies BaseScreenMaterialObjectSchema;
 
 export const PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST: BaseScreenMaterialManifest = {
@@ -41,8 +66,7 @@ export const PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST: BaseScreenMaterialManifest 
   defaultProps: {
     segments: 24,
     showValue: true,
-    decimals: 1,
-    glow: true,
+    ...CAPSULE_PROGRESS_NUMBER_FORMAT.defaults,
   },
   defaultData: 72.4,
   staticData: { kind: 'scalar', valueType: 'number' },
@@ -52,32 +76,58 @@ export const PLUGIN_BOARD_CAPSULE_PROGRESS_MANIFEST: BaseScreenMaterialManifest 
     trackColor: '#132f4c',
     fillColor: '#38bdf8',
     fontSize: 16,
+    fillGlow: true,
   },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      trackColor: { kind: 'string' },
-      fillColor: { kind: 'string' },
-      fontSize: { kind: 'number', minimum: 10, maximum: 72 },
-    },
-    required: ['backgroundColor', 'color', 'trackColor', 'fillColor', 'fontSize'],
-  },
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
-    { style: 'trackColor', label: '轨道色', control: 'color' },
-    { style: 'fillColor', label: '填充色', control: 'color' },
-    { style: 'color', label: '读数色', control: 'color' },
-    { style: 'fontSize', label: '读数字号', control: 'number' },
-  ],
+  styleSchema: CAPSULE_PROGRESS_STYLE_SCHEMA,
+  stylePanel: [],
   propsSchema: CAPSULE_PROGRESS_PROPS_SCHEMA,
-  propertyPanel: [
-    { prop: 'segments', label: '胶囊数量', control: 'number' },
-    { prop: 'showValue', label: '显示读数', control: 'boolean' },
-    { prop: 'decimals', label: '小数位', control: 'number' },
-    { prop: 'glow', label: '发光', control: 'boolean' },
-  ],
+  propertyPanel: [],
+  editorDescriptor: parseBoardEditorDescriptor(
+    'board.capsule-progress',
+    {
+      appearance: [
+        {
+          id: 'format',
+          label: '读数格式',
+          fields: [
+            { id: 'showValue', target: 'props', path: ['showValue'], label: '显示读数' },
+            ...CAPSULE_PROGRESS_NUMBER_FORMAT.fields,
+          ],
+        },
+        {
+          id: 'structure',
+          label: '结构',
+          fields: [{ id: 'segments', target: 'props', path: ['segments'], label: '胶囊数量' }],
+        },
+        {
+          id: 'text',
+          label: '文字',
+          fields: [
+            { id: 'color', target: 'style', path: ['color'], label: '读数色' },
+            { id: 'fontSize', target: 'style', path: ['fontSize'], label: '读数字号', unit: 'px' },
+          ],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            {
+              id: 'backgroundColor',
+              target: 'style',
+              path: ['backgroundColor'],
+              label: '背景色',
+              allowGradient: true,
+            },
+            { id: 'trackColor', target: 'style', path: ['trackColor'], label: '轨道色' },
+            { id: 'fillColor', target: 'style', path: ['fillColor'], label: '填充色' },
+            { id: 'fillGlow', target: 'style', path: ['fillGlow'], label: '启用发光' },
+          ],
+        },
+      ],
+    },
+    CAPSULE_PROGRESS_PROPS_SCHEMA,
+    CAPSULE_PROGRESS_STYLE_SCHEMA,
+  ),
   events: [],
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
   dataBinding: {
@@ -100,7 +150,9 @@ export class PluginBoardCapsuleProgressElement extends BoardMaterialElement {
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
 
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.overflow = 'hidden';
     this.style.boxSizing = 'border-box';
     this.style.backgroundColor = styleColor(model.style.backgroundColor, 'transparent');
@@ -128,7 +180,7 @@ export class PluginBoardCapsuleProgressElement extends BoardMaterialElement {
     const segments = Math.max(1, Math.min(60, Math.round(readNumber(model.props.segments, 24))));
     const activeCount = Math.min(segments, Math.round((percent / 100) * segments));
     const showValue = readBoolean(model.props.showValue, true);
-    const glow = readBoolean(model.props.glow, true);
+    const glow = readBoolean(model.style.fillGlow, true);
     const decimals = Math.max(0, Math.min(3, Math.round(readNumber(model.props.decimals, 1))));
 
     const root = doc.createElement('div');

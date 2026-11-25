@@ -12,6 +12,8 @@ const COMMAND_TYPES = new Set([
   'replace-blueprint',
   'replace-data-sources',
   'replace-variables',
+  'replace-sub-canvases',
+  'move-components',
   'rename-variable',
   'update-theme',
 ]);
@@ -25,8 +27,15 @@ const COMMAND_FIELDS: Readonly<Record<string, ReadonlySet<string>>> = {
   'replace-blueprint': new Set(['type', 'blueprint']),
   'replace-data-sources': new Set(['type', 'dataSources']),
   'replace-variables': new Set(['type', 'variables']),
+  'replace-sub-canvases': new Set(['type', 'subCanvases', 'startCanvasId']),
+  'move-components': new Set(['type', 'componentIds', 'canvasId']),
   'rename-variable': new Set(['type', 'variableId', 'nextName']),
   'update-theme': new Set(['type', 'patch']),
+};
+
+/** 可缺省的命令字段（其余字段必填）。 */
+const OPTIONAL_FIELDS: Readonly<Record<string, ReadonlySet<string>>> = {
+  'replace-sub-canvases': new Set(['startCanvasId']),
 };
 
 const MAX_COMMAND_BYTES = 256 * 1024;
@@ -61,6 +70,7 @@ export function parseScreenDocumentCommand(
     }
   }
   for (const field of allowed) {
+    if (OPTIONAL_FIELDS[type]?.has(field) === true) continue;
     if (!Object.hasOwn(parsed.value, field)) {
       return {
         ok: false,

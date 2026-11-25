@@ -15,12 +15,17 @@ import { parseScreenJsonValue } from '@base-screen/contracts';
 import {
   compileScreenBlueprint,
   dispatchScreenBlueprintEvent,
+  type ScreenBlueprintCanvasEffect,
   type ScreenBlueprintDispatchResult,
   type ScreenBlueprintEvent,
   type ScreenBlueprintPlan,
 } from '@base-screen/core';
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
-import type { BaseScreenMaterialEvent, BaseScreenRenderer } from '@base-screen/renderer';
+import type {
+  BaseScreenCanvasChange,
+  BaseScreenMaterialEvent,
+  BaseScreenRenderer,
+} from '@base-screen/renderer';
 import { readDesignerVariableViews } from '../../common/operations/designer-variable-view.js';
 import { DesignerBlueprintTimerScheduler } from './blueprint/designer-blueprint-timer-scheduler.js';
 import { DesignerCanvasVariableController } from './variables/designer-canvas-variable-controller.js';
@@ -32,6 +37,16 @@ export interface DesignerCanvasRuntimeControllerCallbacks {
   readonly getBlueprintHostActionPort: () => ScreenBlueprintHostActionPort | undefined;
   readonly emitBlueprintHostEvent: (event: ScreenBlueprintHostEvent) => void;
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
+  /**
+   * 设计态从画布预览（ADR-0108 §2.7、ADR-0109 §2.5）：每次分派后把从画布动作与当前变量交给预览层——
+   * 弹框在预览层打开，页面切到对应画板；缺省时这些动作在设计态被忽略。
+   */
+  readonly applyCanvasEffects?: (
+    effects: readonly ScreenBlueprintCanvasEffect[],
+    variables: ScreenJsonObject,
+  ) => void;
+  /** 文档重新渲染时复位弹框预览（与主画布显隐复位同口径）。 */
+  readonly resetPopups?: () => void;
 }
 
 /** Keeps the Designer canvas on the same document-variable path as Viewer. */
@@ -40,6 +55,9 @@ export class DesignerCanvasRuntimeController {
   #blueprintPlan: ScreenBlueprintPlan | undefined;
   #blueprintVariables: ScreenJsonObject | undefined;
   #lifecycleReadyFired = false;
+  /** 正在分派的事件深度；分派期间从画布开合产生的事件排队，结束后按深度 +1 再分派。 */
+  #dispatchDepth: number | undefined;
+  #pendingCanvasEvents: BaseScreenCanvasChange[] = [];
   readonly #variableListeners = new Map<string, Set<(value: ScreenJsonValue) => void>>();
   readonly #variables: DesignerCanvasVariableController;
   readonly #timers = new DesignerBlueprintTimerScheduler({
@@ -61,6 +79,7 @@ export class DesignerCanvasRuntimeController {
   render(document: ScreenDocument): ScreenParseResult<void> {
     this.#document = document;
     this.callbacks.getRenderer()?.resetBlueprintVisibility();
+    this.callbacks.resetPopups?.();
     this.compileBlueprint(document);
     const rendered = this.#variables.render(document, this.collectRuntimeVariables(document));
     // 就绪一次 per 文档装载：编辑重渲染不重复发射，装载/替换经 resetLifecycleReady 重新武装。
@@ -93,8 +112,21 @@ export class DesignerCanvasRuntimeController {
     this.#variables.refreshVariables(options);
   }
 
-  refreshConditionalStyles(componentIds?: readonly string[]): void {
-    this.callbacks.getRenderer()?.refreshConditionalStyles(componentIds);
+  /** 当前画布上的变量值（静态初值 + 蓝图写入）：参照底图等只读渲染与画布同口径取值。 */
+  readVariables(): ScreenJsonObject {
+    const document = this.#document;
+    return document === undefined ? {} : this.collectRuntimeVariables(document);
+  }
+
+  /** 画布按某状态预览组件（ADR-0110）：`default` 即恢复实时判定。设计态不发状态改变事件。 */
+  previewComponentState(componentId: string, stateId: string): void {
+    this.callbacks
+      .getRenderer()
+      ?.applyBlueprintStateEffects([
+        stateId === 'default'
+          ? { componentId, operation: 'reset' }
+          : { componentId, operation: 'set', stateId },
+      ]);
   }
 
   getVariable(id: string): ScreenVariableHandle | undefined {
@@ -122,6 +154,15 @@ export class DesignerCanvasRuntimeController {
         };
       },
     };
+  }
+
+  /** 预览里从画布真正打开 / 关闭、页面切换：分派对应事件（打开参数作为负载）。 */
+  handleCanvasChange(change: BaseScreenCanvasChange): void {
+    if (this.#dispatchDepth === undefined) {
+      this.handleBlueprintEvent(canvasBlueprintEvent(change));
+    } else {
+      this.#pendingCanvasEvents.push(change);
+    }
   }
 
   handleMaterialEvent(event: BaseScreenMaterialEvent): void {
@@ -160,6 +201,18 @@ export class DesignerCanvasRuntimeController {
       );
       if (diagnostics.length > 0) this.callbacks.emitDiagnostics(diagnostics);
     }
+    const outerDepth = this.#dispatchDepth;
+    this.#dispatchDepth = depth;
+    try {
+      this.callbacks.applyCanvasEffects?.(result.value.canvasEffects, {
+        ...(document === undefined ? {} : collectStaticVariables(document)),
+        ...result.value.variables,
+      });
+    } finally {
+      this.#dispatchDepth = outerDepth;
+    }
+    const canvasEvents = this.#pendingCanvasEvents;
+    this.#pendingCanvasEvents = [];
 
     for (const hostEvent of result.value.hostEvents) {
       try {
@@ -201,6 +254,9 @@ export class DesignerCanvasRuntimeController {
         depth + 1,
       );
     }
+    for (const change of canvasEvents) {
+      this.handleBlueprintEvent(canvasBlueprintEvent(change), depth + 1);
+    }
   }
 
   clear(): void {
@@ -212,6 +268,9 @@ export class DesignerCanvasRuntimeController {
     this.#variableListeners.clear();
     this.#variables.clear();
     this.callbacks.getRenderer()?.resetBlueprintVisibility();
+    this.callbacks.getRenderer()?.resetComponentStates();
+    this.callbacks.resetPopups?.();
+    this.#pendingCanvasEvents = [];
   }
 
   private compileBlueprint(document: ScreenDocument): void {
@@ -307,6 +366,26 @@ export class DesignerCanvasRuntimeController {
       { severity: 'error', code: 'PLUGIN_CORE_LIFECYCLE_INVALID', path: [], message },
     ]);
   }
+}
+
+/**
+ * 从画布事件的负载：「已打开」带打开参数（未写参数时为 null），「已关闭」恒为 null；
+ * 「页面已切换」带 `{ from, to }`。
+ */
+function canvasBlueprintEvent(change: BaseScreenCanvasChange): ScreenBlueprintEvent {
+  if (change.type === 'page-changed') {
+    return {
+      type: 'page-changed',
+      name: 'page-changed',
+      payload: { from: change.from, to: change.to },
+    };
+  }
+  return {
+    type: 'canvas-event',
+    canvasId: change.canvasId,
+    name: change.open ? 'opened' : 'closed',
+    payload: change.open ? (change.payload ?? null) : null,
+  };
 }
 
 function collectStaticVariables(document: ScreenDocument): ScreenJsonObject {

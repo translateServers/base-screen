@@ -1,126 +1,71 @@
-import type {
-  BaseScreenBlueprintCanvasCommand,
-  BaseScreenBlueprintCanvasCommandEventDetail,
-  BaseScreenBlueprintCanvasEdge,
-  BaseScreenBlueprintCanvasGraph,
-  BaseScreenBlueprintCanvasInsertNode,
-  BaseScreenBlueprintCanvasNode,
-  BaseScreenBlueprintCanvasSelection,
-  BaseScreenBlueprintCanvasState,
-  BaseScreenBlueprintCanvasStateEventDetail,
-} from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
+import type { ScreenBlueprintLayoutNode, ScreenJsonValue } from '@base-screen/contracts';
+import {
+  DESIGNER_BLUEPRINT_NODE_BODY_BOTTOM as BODY_BOTTOM,
+  DESIGNER_BLUEPRINT_NODE_BODY_TOP as BODY_TOP,
+  DESIGNER_BLUEPRINT_NODE_HEADER_HEIGHT as HEADER_HEIGHT,
+  DESIGNER_BLUEPRINT_NODE_MIN_HEIGHT as MIN_NODE_HEIGHT,
+  DESIGNER_BLUEPRINT_NODE_BORDER as NODE_BORDER,
+  DESIGNER_BLUEPRINT_NODE_GAP as NODE_GAP,
+  DESIGNER_BLUEPRINT_NODE_WIDTH as NODE_WIDTH,
+  DESIGNER_BLUEPRINT_NODE_ROW_HEIGHT as ROW_HEIGHT,
+  DESIGNER_BLUEPRINT_NODE_SNAP_DISTANCE as SNAP_DISTANCE,
+} from '../../../common/operations/blueprint/designer-blueprint-geometry.js';
 import {
   BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
   BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT,
   BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME,
+  type BaseScreenBlueprintCanvasCommand,
+  type BaseScreenBlueprintCanvasCommandEventDetail,
+  type BaseScreenBlueprintCanvasEdge,
+  type BaseScreenBlueprintCanvasInsertNode,
+  type BaseScreenBlueprintCanvasNode,
+  type BaseScreenBlueprintCanvasNodeKind,
+  type BaseScreenBlueprintCanvasPort,
+  type BaseScreenBlueprintCanvasSelection,
+  type BaseScreenBlueprintCanvasState,
+  type BaseScreenBlueprintCanvasStateEventDetail,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import type { DesignerIconName } from '../../dom/designer-icons.js';
-import { designerIcon } from '../../dom/designer-icons.js';
-import { enhanceDesignerSelect } from '../designer-select-dom.js';
-import {
-  createDesignerButton,
-  createDesignerIconButton,
-  createDesignerSelect,
-  createDesignerTextarea,
-} from '../designer-ui-primitives.js';
+import { adoptDesignerFormControls } from '../designer-form-controls-dom.js';
+import { type DesignerIconName, designerIcon } from '../designer-icons.js';
+import { escapeAttribute, escapeHtml } from './designer-blueprint-dom-helpers.js';
 
 /**
- * 引擎内置的蓝图中央画布（无宿主画布时的默认实现）。
+ * 引擎默认蓝图画布（ADR-0107 §2.6，视觉与手势参考 LIGHT CHASER 实测，见设计说明
+ * `blueprint-node-graph.md`）。
  *
- * 与宿主画布走完全相同的公开协议：消费 `base-screen-blueprint-canvas-state`，
- * 发出 `base-screen-blueprint-canvas-command`。语义图、canonical 编辑、历史与
- * 模拟结果均由引擎提供，这里只负责图形、手势和画布局部控件。
+ * 只经画布协议与工作台通信：收 `state` 事件渲染，发 `command` 事件请求修改；文档、历史与校验都不在这里。
+ * 拖动、框选、平移、缩放是本地交互态，松手后一次性以 `commit-layout` 提交位置。
  *
- * 样式在 `designer-workbench-blueprint-canvas*.css`（骨架 / 连线 / 节点 / 浮层），
- * 文案在 `designer-blueprint-ui-text.ts` 的 `canvasSurface` 段。
+ * 几何来自 `designer-blueprint-geometry.ts`：卡片宽 164、标题栏 44、内边距 12/13/13、
+ * 锚点行 27（先输出后输入，语义锚点单列一行）、圆点 12（命中 28）。
  */
 
-const NODE_WIDTH = 208;
-/** 节点卡片头部：与 --designer-row-height-comfortable 一致（见 -nodes.css）。 */
-const NODE_HEADER = 44;
-const PORT_ROW = 28;
-const SUBTITLE_HEIGHT = 21;
-const VARIABLE_VALUE_ROW = 40;
-const SUMMARY_ROW = 32;
-const NODE_BOTTOM_PADDING = 8;
-const HOST_NODE_HEIGHT = 96;
-const GRAPH_PADDING = 72;
-const COLUMN_STEP = 256;
-const SNAP = 8;
-const FIT_PADDING = 28;
-const SIMULATION_INSET = 150;
-const SIMULATION_BAR_INSET = 48;
-const ZOOM_MIN = 0.1;
-const ZOOM_MAX = 2;
-const ZOOM_STEPS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.84, 1, 1.25, 1.5, 2] as const;
-const SVG_NS = 'http://www.w3.org/2000/svg';
-const TRACE_LABEL_MIN_ZOOM = 0.62;
-// 图层固定按 2x 排版、再用 transform 缩放补偿：缩放只走合成，卡片/文字又不会按 1x 纹理拉伸。
-const LAYER_RASTER_ZOOM = 2;
+/** 锚点圆心压在卡片外缘上（连线直接接到卡片边，见 bp-port 样式的 --designer-blueprint-port-offset）。 */
+const PORT_EDGE_OFFSET = 0;
+const GRID = 8;
+const MENU_CLICK_TOLERANCE = 4;
+const MIN_ZOOM = 0.3;
+const MAX_ZOOM = 2;
+const TEXT = DESIGNER_UI_TEXT.blueprint.graph;
+const ADDABLE_KINDS: readonly Exclude<
+  BaseScreenBlueprintCanvasNodeKind,
+  'component' | 'variable' | 'sub-canvas' | 'main-canvas'
+>[] = ['lifecycle', 'timer', 'condition', 'host'];
+const KIND_ICONS: Readonly<Record<BaseScreenBlueprintCanvasNodeKind, DesignerIconName>> = {
+  component: 'cube',
+  variable: 'variable',
+  host: 'database',
+  lifecycle: 'play',
+  timer: 'activity',
+  condition: 'sliders',
+  'sub-canvas': 'copy',
+  'main-canvas': 'grid',
+};
 
-const text = DESIGNER_UI_TEXT.blueprint.canvasSurface;
-const blueprintText = DESIGNER_UI_TEXT.blueprint;
-
-interface CanvasPort {
-  readonly handle: string;
-  readonly label: string;
-  readonly y: number;
-  readonly available: boolean;
-  readonly requiredCapability?: string;
-  readonly dependency?: true;
-  readonly semantic?: true;
-  readonly containment?: true;
-}
-
-interface NodeGeometry {
-  readonly width: number;
-  readonly height: number;
-  readonly portStart: number;
-  readonly inputY: number;
-  readonly inputHandle?: 'relation:in' | 'condition:in' | 'action:in';
-  readonly outputs: readonly CanvasPort[];
-  readonly dependency: boolean;
-}
-
-interface DragState {
-  readonly nodeId: string;
-  readonly pointerId: number;
-  readonly startClientX: number;
-  readonly startClientY: number;
-  readonly startX: number;
-  readonly startY: number;
-  moved: boolean;
-}
-
-interface PanState {
-  readonly pointerId: number;
-  readonly startClientX: number;
-  readonly startClientY: number;
-  readonly startX: number;
-  readonly startY: number;
-  moved: boolean;
-}
-
-interface MarqueeState {
-  readonly pointerId: number;
-  readonly startClientX: number;
-  readonly startClientY: number;
-  readonly startLeft: number;
-  readonly startTop: number;
-  moved: boolean;
-}
-
-interface LinkState {
-  readonly nodeId: string;
-  readonly handle: string;
-  readonly pointerId: number;
-  target: Element | null;
-}
-
-interface ArmedSource {
-  readonly nodeId: string;
-  readonly handle: string;
+export interface DesignerBlueprintDefaultCanvasHandle {
+  readonly element: HTMLElement;
+  destroy(): void;
 }
 
 interface Point {
@@ -128,2445 +73,1405 @@ interface Point {
   readonly y: number;
 }
 
-interface ViewportValue {
-  readonly x: number;
-  readonly y: number;
-  readonly zoom: number;
+interface PortRef {
+  readonly node: string;
+  readonly port: string;
 }
 
-type CommandInput = BaseScreenBlueprintCanvasCommand extends infer Command
-  ? Command extends BaseScreenBlueprintCanvasCommand
-    ? Omit<Command, 'commandId' | 'generation' | 'documentRevision'>
-    : never
-  : never;
-
-export interface DesignerBlueprintDefaultCanvasHandle {
-  readonly element: HTMLElement;
-  destroy(): void;
-}
+type Drag =
+  | {
+      readonly type: 'pan' | 'context';
+      readonly startX: number;
+      readonly startY: number;
+      readonly viewX: number;
+      readonly viewY: number;
+      moved: boolean;
+      readonly target: Element | null;
+      readonly additive: boolean;
+    }
+  | {
+      readonly type: 'node';
+      readonly ids: readonly string[];
+      readonly origins: readonly Point[];
+      readonly startX: number;
+      readonly startY: number;
+      moved: boolean;
+    }
+  | {
+      readonly type: 'link';
+      readonly from: PortRef;
+      readonly direction: 'out' | 'in';
+      readonly anchor: Point;
+      snap: PortRef | undefined;
+    }
+  | {
+      readonly type: 'marquee';
+      readonly startX: number;
+      readonly startY: number;
+      readonly world: Point;
+      moved: boolean;
+      readonly additive: boolean;
+      readonly base: readonly string[];
+    };
 
 export function createDesignerBlueprintDefaultCanvas(
   ownerDocument: Document,
 ): DesignerBlueprintDefaultCanvasHandle {
-  const view = ownerDocument.defaultView;
-  const root = ownerDocument.createElement('div');
-  root.className = 'designer-blueprint-canvas';
-  root.dataset.designerBlueprintCanvas = 'true';
+  const canvas = new DefaultBlueprintCanvas(ownerDocument);
+  return { element: canvas.element, destroy: () => canvas.destroy() };
+}
 
-  const bar = ownerDocument.createElement('div');
-  bar.className = 'designer-blueprint-canvas-bar';
-  bar.setAttribute('role', 'toolbar');
-  bar.setAttribute('aria-label', text.toolbar);
+class DefaultBlueprintCanvas {
+  readonly element: HTMLElement;
+  readonly #document: Document;
+  readonly #stage: HTMLElement;
+  readonly #world: HTMLElement;
+  readonly #edges: SVGSVGElement;
+  readonly #nodes: HTMLElement;
+  readonly #labels: HTMLElement;
+  readonly #marquee: HTMLElement;
+  readonly #menu: HTMLElement;
+  readonly #toolbar: HTMLElement;
+  readonly #simulation: HTMLElement;
+  readonly #empty: HTMLElement;
+  #state: BaseScreenBlueprintCanvasState | undefined;
+  #view = { x: 40, y: 40, z: 1 };
+  #viewInitialized = false;
+  #positions = new Map<string, Point>();
+  #selection: BaseScreenBlueprintCanvasSelection = { nodes: [], edges: [] };
+  #drag: Drag | undefined;
+  #hoverEdge: string | undefined;
+  #renaming: string | undefined;
+  #showTrace = true;
+  /** 语义连线显隐是画布会话态（不进文档、不进历史）。 */
+  #showSemantic = true;
+  #simulationOpen = false;
+  #simulationTrigger: string | undefined;
+  #space = false;
+  #contextPoint: Point = { x: 0, y: 0 };
+  #lastViewRequest = -1;
+  #commandSeq = 0;
+  /**
+   * 上一次写入 DOM 的结构标记（不含选中 / 悬停这类会话态）。标记不变就不重建 DOM：
+   * 选中切换发生在 pointerdown 里，若此时整块重建，按下的元素被换掉，浏览器会丢掉这次
+   * click（双击也随之失效），悬停态与过渡动画也会重新开始，看起来就是卡一下。
+   */
+  #nodesMarkup = '';
+  #edgesMarkup = '';
+  #toolbarMarkup = '';
+  #simulationMarkup = '';
+  #tracedNodes: ReadonlySet<string> = new Set();
+  readonly #listeners: [EventTarget, string, EventListener, AddEventListenerOptions | undefined][] =
+    [];
 
-  const addAnchor = ownerDocument.createElement('span');
-  addAnchor.className = 'designer-blueprint-canvas-menu-anchor';
-  const addButton = textButton(ownerDocument, 'plus', text.addNode, 'add-node');
-  addButton.setAttribute('aria-haspopup', 'menu');
-  addButton.setAttribute('aria-expanded', 'false');
-  const addChevron = ownerDocument.createElement('span');
-  addChevron.className = 'designer-blueprint-canvas-bar-chevron';
-  addChevron.setAttribute('aria-hidden', 'true');
-  addChevron.innerHTML = designerIcon('arrow-down');
-  addButton.append(addChevron);
-  const addMenu = ownerDocument.createElement('div');
-  addMenu.className = 'designer-blueprint-canvas-menu';
-  addMenu.dataset.canvasMenu = 'add-node';
-  addMenu.setAttribute('role', 'menu');
-  addMenu.setAttribute('aria-label', text.addNodeMenu);
-  addMenu.hidden = true;
-  for (const [kind, label] of [['host', blueprintText.relationList.addHost]] as const) {
-    const item = createDesignerButton(ownerDocument, {
-      className: 'designer-blueprint-canvas-menu-item',
-      text: label,
-      variant: 'canvas-tool',
+  constructor(ownerDocument: Document) {
+    this.#document = ownerDocument;
+    const element = ownerDocument.createElement('div');
+    element.className = 'designer-blueprint-canvas';
+    element.tabIndex = 0;
+    element.setAttribute('role', 'application');
+    element.setAttribute('aria-label', DESIGNER_UI_TEXT.blueprint.canvas);
+    element.dataset.designerBlueprintCanvas = 'true';
+    element.innerHTML = `<div class="bp-toolbar" role="toolbar" aria-label="${escapeAttribute(DESIGNER_UI_TEXT.blueprint.localToolbar)}"></div>
+      <div class="bp-stage" data-bp-stage>
+        <div class="bp-world" data-bp-world>
+          <svg class="bp-edges" data-bp-edges aria-hidden="true"></svg>
+          <div class="bp-nodes" data-bp-nodes></div>
+          <div class="bp-labels" data-bp-labels></div>
+        </div>
+        <div class="bp-marquee" data-bp-marquee hidden></div>
+        <div class="bp-empty" data-bp-empty hidden></div>
+      </div>
+      <div class="bp-simulation" data-bp-simulation hidden></div>
+      <div class="designer-context-menu bp-context-menu" data-bp-menu role="menu" hidden tabindex="-1"></div>`;
+    this.element = element;
+    this.#toolbar = element.querySelector<HTMLElement>('.bp-toolbar')!;
+    this.#stage = element.querySelector<HTMLElement>('[data-bp-stage]')!;
+    this.#world = element.querySelector<HTMLElement>('[data-bp-world]')!;
+    this.#edges = element.querySelector<SVGSVGElement>('[data-bp-edges]')!;
+    this.#nodes = element.querySelector<HTMLElement>('[data-bp-nodes]')!;
+    this.#labels = element.querySelector<HTMLElement>('[data-bp-labels]')!;
+    this.#marquee = element.querySelector<HTMLElement>('[data-bp-marquee]')!;
+    this.#menu = element.querySelector<HTMLElement>('[data-bp-menu]')!;
+    this.#simulation = element.querySelector<HTMLElement>('[data-bp-simulation]')!;
+    this.#empty = element.querySelector<HTMLElement>('[data-bp-empty]')!;
+    this.listen(element, BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT, (event) =>
+      this.receive((event as CustomEvent<BaseScreenBlueprintCanvasStateEventDetail>).detail.state),
+    );
+    this.listen(this.#stage, 'pointerdown', (event) => this.onPointerDown(event as PointerEvent));
+    this.listen(this.#stage, 'pointermove', (event) => this.onPointerMove(event as PointerEvent));
+    this.listen(this.#stage, 'pointerup', (event) => this.onPointerUp(event as PointerEvent));
+    this.listen(this.#stage, 'pointercancel', () => this.cancelDrag());
+    this.listen(this.#stage, 'pointerleave', () => this.setHoverEdge(undefined));
+    this.listen(this.#stage, 'contextmenu', (event) => event.preventDefault());
+    this.listen(this.#stage, 'dblclick', (event) => this.onDoubleClick(event as MouseEvent));
+    this.listen(this.#stage, 'wheel', (event) => this.onWheel(event as WheelEvent), {
+      passive: false,
     });
-    item.dataset.canvasInsert = kind;
-    item.setAttribute('role', 'menuitem');
-    addMenu.append(item);
-  }
-  addAnchor.append(addButton, addMenu);
-
-  const layoutButton = textButton(ownerDocument, 'grid', blueprintText.autoLayout, 'auto-layout');
-  const problemsButton = createDesignerButton(ownerDocument, {
-    className: 'designer-blueprint-canvas-problems-button',
-    variant: 'canvas-tool',
-  });
-  problemsButton.dataset.canvasAction = 'problems';
-  problemsButton.dataset.state = 'ok';
-  problemsButton.setAttribute('aria-haspopup', 'dialog');
-  problemsButton.setAttribute('aria-expanded', 'false');
-  const problemsDot = ownerDocument.createElement('span');
-  problemsDot.className = 'designer-blueprint-canvas-problems-dot';
-  problemsDot.setAttribute('aria-hidden', 'true');
-  const problemsLabel = ownerDocument.createElement('span');
-  problemsLabel.className = 'designer-blueprint-canvas-bar-label';
-  problemsLabel.dataset.canvasProblemsLabel = 'true';
-  problemsButton.append(problemsDot, problemsLabel);
-
-  const traceButton = textButton(ownerDocument, 'activity', text.traceToggle, 'trace');
-  traceButton.setAttribute('aria-pressed', 'true');
-
-  const spacer = ownerDocument.createElement('span');
-  spacer.className = 'designer-blueprint-canvas-bar-spacer';
-  const zoomSeparator = ownerDocument.createElement('span');
-  zoomSeparator.className = 'designer-blueprint-canvas-bar-separator';
-  zoomSeparator.setAttribute('aria-hidden', 'true');
-  const simulationSeparator = ownerDocument.createElement('span');
-  simulationSeparator.className = 'designer-blueprint-canvas-bar-separator';
-  simulationSeparator.setAttribute('aria-hidden', 'true');
-
-  const zoomOut = iconButton(ownerDocument, 'minus', text.zoomOut, 'zoom-out');
-  const zoomValue = ownerDocument.createElement('span');
-  zoomValue.className = 'designer-blueprint-canvas-zoom';
-  zoomValue.dataset.canvasZoom = 'true';
-  zoomValue.setAttribute('role', 'status');
-  const zoomIn = iconButton(ownerDocument, 'plus', text.zoomIn, 'zoom-in');
-  const fitButton = iconButton(ownerDocument, 'fit', blueprintText.fit, 'fit');
-  const simulateButton = textButton(ownerDocument, 'play', text.simulatePanel, 'simulate');
-  simulateButton.setAttribute('aria-expanded', 'false');
-
-  bar.append(
-    addAnchor,
-    layoutButton,
-    problemsButton,
-    traceButton,
-    spacer,
-    zoomSeparator,
-    zoomOut,
-    zoomValue,
-    zoomIn,
-    fitButton,
-    simulationSeparator,
-    simulateButton,
-  );
-
-  const problems = ownerDocument.createElement('div');
-  problems.className = 'designer-blueprint-canvas-problems';
-  problems.dataset.canvasProblems = 'true';
-  problems.setAttribute('role', 'dialog');
-  problems.setAttribute('aria-label', blueprintText.problemsTitle);
-  problems.hidden = true;
-
-  const viewport = ownerDocument.createElement('div');
-  viewport.className = 'designer-blueprint-canvas-viewport';
-  viewport.dataset.canvasViewport = 'true';
-  viewport.tabIndex = 0;
-
-  const layers = ownerDocument.createElement('div');
-  layers.className = 'designer-blueprint-canvas-layers';
-  layers.style.setProperty('zoom', String(LAYER_RASTER_ZOOM));
-  const edges = ownerDocument.createElementNS(SVG_NS, 'svg');
-  edges.classList.add('designer-blueprint-canvas-edges');
-  const labels = ownerDocument.createElement('div');
-  labels.className = 'designer-blueprint-canvas-edge-labels';
-  layers.append(edges, labels);
-
-  const overlay = ownerDocument.createElementNS(SVG_NS, 'svg');
-  overlay.classList.add('designer-blueprint-canvas-overlay');
-  const preview = ownerDocument.createElementNS(SVG_NS, 'path');
-  preview.classList.add('designer-blueprint-canvas-link-preview');
-  preview.setAttribute('visibility', 'hidden');
-  overlay.append(preview);
-
-  const marqueeBox = ownerDocument.createElement('div');
-  marqueeBox.className = 'designer-blueprint-canvas-marquee';
-  marqueeBox.hidden = true;
-
-  const emptyCard = ownerDocument.createElement('section');
-  emptyCard.className = 'designer-blueprint-canvas-empty';
-  emptyCard.dataset.canvasEmpty = 'true';
-  emptyCard.hidden = true;
-  const emptyTitle = ownerDocument.createElement('h3');
-  emptyTitle.textContent = text.emptyTitle;
-  const emptyDescription = ownerDocument.createElement('p');
-  emptyDescription.textContent = text.emptyDescription;
-  const emptySteps = ownerDocument.createElement('ol');
-  for (const step of [text.emptyStepTrigger, text.emptyStepConnect, text.emptyStepExit]) {
-    const item = ownerDocument.createElement('li');
-    item.textContent = step;
-    emptySteps.append(item);
-  }
-  const emptyActions = ownerDocument.createElement('div');
-  emptyActions.className = 'designer-blueprint-canvas-empty-actions';
-  const emptyCreate = createDesignerButton(ownerDocument, {
-    className: 'designer-blueprint-canvas-empty-primary',
-    text: blueprintText.relationList.addHost,
-    variant: 'primary',
-  });
-  emptyCreate.dataset.canvasInsert = 'host';
-  const emptyHint = ownerDocument.createElement('span');
-  emptyHint.className = 'designer-blueprint-canvas-empty-hint';
-  emptyHint.textContent = text.emptyLibraryHint;
-  emptyActions.append(emptyCreate, emptyHint);
-  emptyCard.append(emptyTitle, emptyDescription, emptySteps, emptyActions);
-
-  const noEvents = ownerDocument.createElement('div');
-  noEvents.className = 'designer-blueprint-canvas-no-events';
-  noEvents.dataset.canvasNoEvents = 'true';
-  noEvents.hidden = true;
-  noEvents.setAttribute('role', 'status');
-  const noEventsTitle = ownerDocument.createElement('strong');
-  noEventsTitle.textContent = text.noEventsTitle;
-  const noEventsBody = ownerDocument.createElement('span');
-  noEventsBody.textContent = text.noEventsBody;
-  noEvents.append(noEventsTitle, noEventsBody);
-
-  const status = ownerDocument.createElement('div');
-  status.className = 'designer-blueprint-canvas-status';
-  status.dataset.canvasStatus = 'true';
-  status.setAttribute('role', 'status');
-  status.setAttribute('aria-live', 'polite');
-  status.hidden = true;
-
-  const simulationBar = ownerDocument.createElement('div');
-  simulationBar.className = 'designer-blueprint-canvas-simulation-bar';
-  simulationBar.dataset.canvasSimulationBar = 'true';
-  const simulationBarIcon = ownerDocument.createElement('span');
-  simulationBarIcon.className = 'designer-blueprint-canvas-simulation-bar-icon';
-  simulationBarIcon.setAttribute('aria-hidden', 'true');
-  simulationBarIcon.innerHTML = designerIcon('play');
-  const simulationBarLabel = ownerDocument.createElement('span');
-  simulationBarLabel.className = 'designer-blueprint-canvas-simulation-bar-label';
-  const simulationExpand = textButton(
-    ownerDocument,
-    'arrow-up',
-    text.expandSimulation,
-    'simulation-expand',
-  );
-  simulationExpand.dataset.density = 'tight';
-  simulationBar.append(simulationBarIcon, simulationBarLabel, simulationExpand);
-
-  const simulation = ownerDocument.createElement('section');
-  simulation.className = 'designer-blueprint-canvas-simulation';
-  simulation.dataset.canvasSimulation = 'true';
-  simulation.hidden = true;
-  simulation.setAttribute('aria-label', blueprintText.simulate);
-  const simulationHeader = ownerDocument.createElement('header');
-  simulationHeader.className = 'designer-blueprint-canvas-simulation-header';
-  const simulationTitle = ownerDocument.createElement('strong');
-  simulationTitle.textContent = text.simulationTitle;
-  const simulationClose = panelIconButton(
-    ownerDocument,
-    'close',
-    text.collapseSimulation,
-    'simulation-close',
-  );
-  simulationHeader.append(simulationTitle, simulationClose);
-
-  const simulationContent = ownerDocument.createElement('div');
-  simulationContent.className = 'designer-blueprint-canvas-simulation-content';
-  const simulationControls = ownerDocument.createElement('div');
-  simulationControls.className = 'designer-blueprint-canvas-simulation-controls';
-  const eventLabel = ownerDocument.createElement('div');
-  eventLabel.className = 'designer-blueprint-canvas-simulation-field';
-  const eventLabelText = ownerDocument.createElement('span');
-  eventLabelText.textContent = text.simulationEventLabel;
-  const eventSelect = createDesignerSelect(ownerDocument, {
-    ariaLabel: text.simulationEventLabel,
-    className: 'designer-blueprint-canvas-simulation-select',
-  });
-  eventSelect.dataset.canvasSimulationEvent = 'true';
-  const eventSelectControl = enhanceDesignerSelect(eventSelect);
-  eventSelectControl.trigger.dataset.density = 'compact';
-  eventLabel.append(eventLabelText, eventSelectControl.element);
-  const payloadLabel = ownerDocument.createElement('label');
-  payloadLabel.className = 'designer-blueprint-canvas-simulation-field';
-  const payloadLabelText = ownerDocument.createElement('span');
-  payloadLabelText.textContent = text.simulationPayloadLabel;
-  const payloadInput = createDesignerTextarea(ownerDocument, {
-    ariaLabel: text.simulationPayloadAria,
-    className: 'designer-blueprint-canvas-simulation-payload',
-    value: '{}',
-  });
-  payloadInput.dataset.canvasSimulationPayload = 'true';
-  payloadInput.spellcheck = false;
-  payloadLabel.append(payloadLabelText, payloadInput);
-
-  const simulationFooter = ownerDocument.createElement('div');
-  simulationFooter.className = 'designer-blueprint-canvas-simulation-footer';
-  const simulationStatus = ownerDocument.createElement('span');
-  simulationStatus.className = 'designer-blueprint-canvas-simulation-status';
-  simulationStatus.dataset.canvasSimulationStatus = 'true';
-  simulationStatus.setAttribute('role', 'status');
-  const runButton = createDesignerButton(ownerDocument, {
-    className: 'designer-blueprint-canvas-simulation-run',
-    text: text.simulationRun,
-    variant: 'primary',
-  });
-  runButton.dataset.canvasAction = 'simulation-run';
-  simulationFooter.append(simulationStatus, runButton);
-  simulationControls.append(eventLabel, payloadLabel, simulationFooter);
-
-  const tracePanel = ownerDocument.createElement('div');
-  tracePanel.className = 'designer-blueprint-canvas-simulation-trace';
-  const traceTitle = ownerDocument.createElement('h4');
-  traceTitle.textContent = text.simulationTraceTitle;
-  const traceList = ownerDocument.createElement('ol');
-  traceList.dataset.canvasTrace = 'true';
-  const traceEmpty = ownerDocument.createElement('p');
-  traceEmpty.className = 'designer-blueprint-canvas-simulation-trace-empty';
-  traceEmpty.textContent = text.simulationNoTrace;
-  tracePanel.append(traceTitle, traceList, traceEmpty);
-  simulationContent.append(simulationControls, tracePanel);
-  simulation.append(simulationHeader, simulationContent);
-
-  viewport.append(
-    layers,
-    overlay,
-    marqueeBox,
-    emptyCard,
-    noEvents,
-    problems,
-    simulationBar,
-    simulation,
-    status,
-  );
-  root.append(bar, viewport);
-
-  let state: BaseScreenBlueprintCanvasState | null = null;
-  let generation = -1;
-  let readySent = false;
-  let positions = new Map<string, Point>();
-  let viewportValue: ViewportValue = { x: 0, y: 0, zoom: 1 };
-  let lastSentViewportKey = '';
-  let lastAdoptedViewportKey = '';
-  let viewportsDirty = false;
-  let viewportCommitTimer: ReturnType<typeof setTimeout> | undefined;
-  let statusTimer: ReturnType<typeof setTimeout> | undefined;
-  let drag: DragState | null = null;
-  let pan: PanState | null = null;
-  let marquee: MarqueeState | null = null;
-  let spacePressed = false;
-  let link: LinkState | null = null;
-  let armed: ArmedSource | null = null;
-  let commandSequence = 0;
-  let lastFocusRequestId: number | undefined;
-  let sessionLayout = false;
-  let hydrated = false;
-  let lastEnginePositions = new Map<string, Point>();
-  let pendingInitialFit = false;
-  let initialFitDone = false;
-  let wasActive = false;
-  let traceVisible = true;
-  let simulationOpen = false;
-  let menuOpen = false;
-  let problemsOpen = false;
-  let lastRunCommandId = '';
-  let destroyed = false;
-
-  const resizeObserver =
-    typeof view?.ResizeObserver === 'function'
-      ? new view.ResizeObserver(() => {
-          if (pendingInitialFit) scheduleInitialFit();
-        })
-      : undefined;
-  resizeObserver?.observe(viewport);
-
-  function textButton(
-    doc: Document,
-    icon: DesignerIconName,
-    label: string,
-    action: string,
-  ): HTMLButtonElement {
-    const button = createDesignerButton(doc, {
-      ariaLabel: label,
-      className: 'designer-blueprint-canvas-bar-button',
-      tip: label,
-      variant: 'canvas-tool',
-    });
-    button.dataset.canvasAction = action;
-    button.insertAdjacentHTML('afterbegin', designerIcon(icon));
-    const labelElement = doc.createElement('span');
-    labelElement.className = 'designer-blueprint-canvas-bar-label';
-    labelElement.textContent = label;
-    button.append(labelElement);
-    return button;
-  }
-
-  function iconButton(
-    doc: Document,
-    icon: DesignerIconName,
-    label: string,
-    action: string,
-  ): HTMLButtonElement {
-    const button = createDesignerIconButton(doc, {
-      className: 'designer-blueprint-canvas-bar-button',
-      icon,
-      label,
-      variant: 'canvas-tool',
-    });
-    button.dataset.canvasAction = action;
-    return button;
-  }
-
-  function panelIconButton(
-    doc: Document,
-    icon: DesignerIconName,
-    label: string,
-    action: string,
-  ): HTMLButtonElement {
-    const button = createDesignerIconButton(doc, {
-      className: 'designer-blueprint-canvas-panel-icon',
-      icon,
-      label,
-    });
-    button.dataset.canvasAction = action;
-    return button;
-  }
-
-  function graph(): BaseScreenBlueprintCanvasGraph | null {
-    return state?.graph ?? null;
-  }
-
-  function geometryOf(node: BaseScreenBlueprintCanvasNode): NodeGeometry {
-    const summaryHeight = nodeSummaryText(node) === '' ? 0 : SUMMARY_ROW;
-    if (node.kind === 'component' || node.kind === 'variable') {
-      const valueHeight = node.kind === 'variable' ? VARIABLE_VALUE_ROW : 0;
-      const portStart = NODE_HEADER + SUBTITLE_HEIGHT + valueHeight;
-      const events = node.events ?? [];
-      const rows = Math.max(1, events.length);
-      const outputs: CanvasPort[] = events.map((event, index) => ({
-        handle: `event:${event.name}`,
-        label: event.label === '' ? event.name : event.label,
-        y: portStart + index * PORT_ROW + PORT_ROW / 2,
-        available: event.available,
-        ...(event.requiredCapability === undefined
-          ? {}
-          : { requiredCapability: event.requiredCapability }),
-      }));
-      let rowCount = rows;
-      if (node.kind === 'component') {
-        outputs.push({
-          handle: 'semantic:out',
-          label: blueprintText.relationCategories.semantic,
-          y: portStart + rowCount * PORT_ROW + PORT_ROW / 2,
-          available: true,
-          semantic: true,
-        });
-        rowCount += 1;
-        if (node.isContainer === true) {
-          outputs.push({
-            handle: 'containment:out',
-            label: blueprintText.relationList.containment,
-            y: portStart + rowCount * PORT_ROW + PORT_ROW / 2,
-            available: true,
-            containment: true,
-          });
-          rowCount += 1;
-        }
+    this.listen(this.#stage, 'dragover', (event) => this.onDragOver(event as DragEvent));
+    this.listen(this.#stage, 'drop', (event) => this.onDrop(event as DragEvent));
+    this.listen(element, 'keydown', (event) => this.onKeyDown(event as KeyboardEvent));
+    this.listen(element, 'keyup', (event) => {
+      if ((event as KeyboardEvent).code === 'Space') {
+        this.#space = false;
+        this.#stage.classList.remove('is-space');
       }
-      const height =
-        portStart +
-        rowCount * PORT_ROW +
-        (summaryHeight === 0 ? NODE_BOTTOM_PADDING : summaryHeight);
-      return {
-        width: NODE_WIDTH,
-        height,
-        portStart,
-        inputY: height / 2,
-        inputHandle: 'relation:in',
-        outputs,
-        dependency: node.kind === 'variable',
-      };
+    });
+    this.listen(this.#toolbar, 'click', (event) => this.onToolbarClick(event));
+    this.listen(this.#menu, 'click', (event) => this.onMenuClick(event));
+    this.listen(this.#simulation, 'click', (event) => this.onSimulationClick(event));
+    this.listen(this.#simulation, 'change', (event) => {
+      const select = (event.target as Element).closest<HTMLSelectElement>('[data-bp-sim-trigger]');
+      if (select !== null) this.#simulationTrigger = select.value;
+    });
+    this.listen(ownerDocument, 'pointerdown', (event) => {
+      if (!this.#menu.hidden && !event.composedPath().includes(this.#menu)) this.closeMenu();
+    });
+    this.renderToolbar();
+    this.applyView();
+    queueMicrotask(() => this.send({ type: 'ready' }));
+  }
+
+  destroy(): void {
+    for (const [target, type, listener, options] of this.#listeners) {
+      target.removeEventListener(type, listener, options);
     }
-    if (node.kind === 'lifecycle' || node.kind === 'timer') {
-      const portStart = NODE_HEADER + SUBTITLE_HEIGHT;
-      return {
-        width: NODE_WIDTH,
-        height: HOST_NODE_HEIGHT,
-        portStart,
-        inputY: HOST_NODE_HEIGHT / 2,
-        outputs: [
-          {
-            handle: node.kind === 'lifecycle' ? 'event:ready' : 'event:tick',
-            label:
-              node.kind === 'lifecycle'
-                ? blueprintText.lifecycleReadyEvent
-                : blueprintText.timerTickEvent,
-            y: portStart + PORT_ROW / 2,
-            available: true,
-          },
-        ],
-        dependency: false,
-      };
+    this.#listeners.length = 0;
+  }
+
+  private listen(
+    target: EventTarget,
+    type: string,
+    listener: EventListener,
+    options?: AddEventListenerOptions,
+  ): void {
+    target.addEventListener(type, listener, options);
+    this.#listeners.push([target, type, listener, options]);
+  }
+
+  // ── 协议 ──────────────────────────────────────────────────────────────
+
+  private receive(state: BaseScreenBlueprintCanvasState): void {
+    const previous = this.#state;
+    this.#state = state;
+    this.#selection = state.selection;
+    if (previous === undefined || previous.documentRevision !== state.documentRevision) {
+      this.#positions.clear();
     }
-    const height = HOST_NODE_HEIGHT;
-    return {
-      width: NODE_WIDTH,
-      height,
-      portStart: NODE_HEADER + SUBTITLE_HEIGHT,
-      inputY: height / 2,
-      inputHandle: 'relation:in',
-      outputs: [],
-      dependency: false,
-    };
+    if (!this.#viewInitialized && state.graph.viewport !== undefined) {
+      this.#view = {
+        x: state.graph.viewport.x,
+        y: state.graph.viewport.y,
+        z: clamp(state.graph.viewport.zoom, MIN_ZOOM, MAX_ZOOM),
+      };
+      this.#viewInitialized = true;
+    }
+    this.element.dataset.active = String(state.active);
+    this.render();
+    const request = state.viewRequest;
+    if (request !== undefined && request.id !== this.#lastViewRequest) {
+      this.#lastViewRequest = request.id;
+      if (request.type === 'fit') this.fit();
+      else if (request.type === 'auto-layout') this.autoLayout();
+      else if (request.targetId !== undefined) this.focus(request.targetId);
+    } else if (!this.#viewInitialized && state.graph.nodes.length > 0) {
+      this.#viewInitialized = true;
+      this.fit();
+    }
   }
 
-  function positionOf(node: BaseScreenBlueprintCanvasNode): Point {
-    return positions.get(node.id) ?? { x: node.x, y: node.y };
-  }
-
-  function snap(value: number): number {
-    return Math.round(value / SNAP) * SNAP;
-  }
-
-  function outputPortY(node: BaseScreenBlueprintCanvasNode, handle: string): number {
-    const geometry = geometryOf(node);
-    return geometry.outputs.find((port) => port.handle === handle)?.y ?? geometry.height / 2;
-  }
-
-  function inputPortY(node: BaseScreenBlueprintCanvasNode): number {
-    return geometryOf(node).inputY;
-  }
-
-  function nodeById(id: string): BaseScreenBlueprintCanvasNode | undefined {
-    return graph()?.nodes.find((node) => node.id === id);
-  }
-
-  function sendCommand(input: CommandInput): BaseScreenBlueprintCanvasCommand | undefined {
-    if (state === null) return undefined;
-    commandSequence += 1;
-    const command = {
-      ...input,
-      commandId: `designer-blueprint-${Date.now()}-${commandSequence}`,
-      generation: state.generation,
-      documentRevision: state.documentRevision,
+  private send(
+    command: DistributiveOmit<
+      BaseScreenBlueprintCanvasCommand,
+      'commandId' | 'generation' | 'documentRevision'
+    >,
+  ): void {
+    const state = this.#state;
+    const full = {
+      ...command,
+      commandId: `default-canvas-${++this.#commandSeq}`,
+      generation: state?.generation ?? 0,
+      documentRevision: state?.documentRevision ?? 0,
     } as BaseScreenBlueprintCanvasCommand;
-    root.dispatchEvent(
+    this.element.dispatchEvent(
       new CustomEvent<BaseScreenBlueprintCanvasCommandEventDetail>(
         BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
-        { bubbles: true, composed: true, detail: { command } },
+        { bubbles: true, composed: true, detail: { command: full } },
       ),
     );
-    return command;
   }
 
-  function setStatus(message: string, tone: 'info' | 'error' = 'info'): void {
-    status.textContent = message;
-    status.dataset.tone = tone;
-    status.hidden = false;
-    if (statusTimer !== undefined) clearTimeout(statusTimer);
-    statusTimer = setTimeout(() => {
-      status.hidden = true;
-      statusTimer = undefined;
-    }, 3200);
+  private select(selection: BaseScreenBlueprintCanvasSelection): void {
+    this.#selection = selection;
+    this.renderSelection();
+    this.send({ type: 'select', selection });
   }
 
-  function viewportKey(value: ViewportValue): string {
-    return `${value.x.toFixed(1)}:${value.y.toFixed(1)}:${value.zoom.toFixed(3)}`;
+  // ── 几何 ──────────────────────────────────────────────────────────────
+
+  private get graph(): BaseScreenBlueprintCanvasState['graph'] {
+    return this.#state?.graph ?? { nodes: [], edges: [] };
   }
 
-  function applyTransform(): void {
-    // 2x 排版 + 缩放补偿：屏幕位置 = 平移 + 图坐标 × zoom；translate 会被 CSS zoom 放大，故除以 2。
-    const scale = viewportValue.zoom / LAYER_RASTER_ZOOM;
-    layers.style.transform = `translate(${viewportValue.x / LAYER_RASTER_ZOOM}px, ${viewportValue.y / LAYER_RASTER_ZOOM}px) scale(${scale})`;
-    viewport.dataset.zoomFar = String(viewportValue.zoom < TRACE_LABEL_MIN_ZOOM);
-    const percent = Math.round(viewportValue.zoom * 100);
-    zoomValue.textContent = text.zoomValue(percent);
-    zoomValue.setAttribute('aria-label', text.zoomAria(percent));
+  private node(id: string): BaseScreenBlueprintCanvasNode | undefined {
+    return this.graph.nodes.find((node) => node.id === id);
   }
 
-  function scheduleViewportCommit(): void {
-    viewportsDirty = true;
-    if (viewportCommitTimer !== undefined) clearTimeout(viewportCommitTimer);
-    viewportCommitTimer = setTimeout(() => {
-      viewportCommitTimer = undefined;
-      commitViewport();
-    }, 280);
+  private position(node: BaseScreenBlueprintCanvasNode): Point {
+    return this.#positions.get(node.id) ?? { x: node.x, y: node.y };
   }
 
-  function commitViewport(): void {
-    if (viewportCommitTimer !== undefined) clearTimeout(viewportCommitTimer);
-    viewportCommitTimer = undefined;
-    viewportsDirty = false;
-    if (sessionLayout) return;
-    const viewport = {
-      x: Math.round(viewportValue.x),
-      y: Math.round(viewportValue.y),
-      zoom: Math.round(viewportValue.zoom * 1000) / 1000,
-    };
-    // 记录实际发送的取整值；否则回传状态会被当成外部变更再采纳一次，产生回跳。
-    lastSentViewportKey = viewportKey(viewport);
-    sendCommand({ type: 'commit-viewport', viewport });
-  }
-
-  function adoptViewport(next: ViewportValue | undefined): void {
-    if (next === undefined) return;
-    const key = viewportKey(next);
-    if (key === lastAdoptedViewportKey) return;
-    if (viewportsDirty || drag !== null || pan !== null || link !== null) return;
-    if (key !== viewportKey(viewportValue) && key !== lastSentViewportKey) {
-      viewportValue = { x: next.x, y: next.y, zoom: next.zoom };
-      lastAdoptedViewportKey = key;
-      applyTransform();
-      return;
-    }
-    lastAdoptedViewportKey = key;
-  }
-
-  function screenToGraph(clientX: number, clientY: number): Point {
-    const rect = viewport.getBoundingClientRect();
-    return {
-      x: (clientX - rect.left - viewportValue.x) / viewportValue.zoom,
-      y: (clientY - rect.top - viewportValue.y) / viewportValue.zoom,
-    };
-  }
-
-  interface EdgeRoute {
-    readonly path: string;
-    readonly start: Point;
-    readonly end: Point;
-    readonly beforeEnd: Point;
-    readonly label: Point;
-  }
-
-  function edgeRoute(edge: BaseScreenBlueprintCanvasEdge): EdgeRoute | null {
-    const source = nodeById(edge.source);
-    const target = nodeById(edge.target);
-    if (source === undefined || target === undefined) return null;
-    const sourceGeometry = geometryOf(source);
-    const sourcePosition = positionOf(source);
-    const targetPosition = positionOf(target);
-    const x1 = sourcePosition.x + sourceGeometry.width;
-    const y1 = sourcePosition.y + outputPortY(source, edge.sourceHandle);
-    const x2 = targetPosition.x;
-    const y2 = targetPosition.y + inputPortY(target);
-    const bottom = Math.max(
-      sourcePosition.y + sourceGeometry.height,
-      targetPosition.y + geometryOf(target).height,
-    );
-    const points = routePoints(edge.id, x1, y1, x2, y2, bottom);
-    return {
-      path: roundedPolylinePath(points, 12),
-      start: points[0] as Point,
-      end: points[points.length - 1] as Point,
-      beforeEnd: points[points.length - 2] as Point,
-      label: labelPointFor(points, edge.id),
-    };
-  }
-
-  function routePoints(
-    edgeId: string,
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    bottom: number,
-  ): Point[] {
-    const gap = x2 - x1;
-    const hash = hashOf(edgeId);
-    if (gap >= 48) {
-      const laneOffset = (hash % 4) * 6;
-      const lane = Math.min(x2 - 16, x1 + Math.min(120, Math.max(28, gap * 0.42)) + laneOffset);
-      return [
-        { x: x1, y: y1 },
-        { x: lane, y: y1 },
-        { x: lane, y: y2 },
-        { x: x2, y: y2 },
-      ];
-    }
-    const detour = bottom + 28 + (hash % 4) * 14;
-    return [
-      { x: x1, y: y1 },
-      { x: x1 + 24, y: y1 },
-      { x: x1 + 24, y: detour },
-      { x: x2 - 24, y: detour },
-      { x: x2 - 24, y: y2 },
-      { x: x2, y: y2 },
-    ];
-  }
-
-  function roundedPolylinePath(points: readonly Point[], radius: number): string {
-    const first = points[0] as Point;
-    let path = `M ${first.x} ${first.y}`;
-    for (let index = 1; index < points.length - 1; index += 1) {
-      const previous = points[index - 1] as Point;
-      const current = points[index] as Point;
-      const next = points[index + 1] as Point;
-      const incoming = distance(previous, current);
-      const outgoing = distance(current, next);
-      const limit = Math.min(radius, incoming / 2, outgoing / 2);
-      const start =
-        limit === 0
-          ? current
-          : {
-              x: current.x - ((current.x - previous.x) / incoming) * limit,
-              y: current.y - ((current.y - previous.y) / incoming) * limit,
-            };
-      const end =
-        limit === 0
-          ? current
-          : {
-              x: current.x + ((next.x - current.x) / outgoing) * limit,
-              y: current.y + ((next.y - current.y) / outgoing) * limit,
-            };
-      path += ` L ${start.x} ${start.y} Q ${current.x} ${current.y} ${end.x} ${end.y}`;
-    }
-    const last = points[points.length - 1] as Point;
-    return `${path} L ${last.x} ${last.y}`;
-  }
-
-  function arrowPath(end: Point, previous: Point): string {
-    const angle = Math.atan2(end.y - previous.y, end.x - previous.x);
-    const size = 7;
-    const halfWidth = 3.4;
-    const left = {
-      x: end.x - size * Math.cos(angle) + halfWidth * Math.sin(angle),
-      y: end.y - size * Math.sin(angle) - halfWidth * Math.cos(angle),
-    };
-    const right = {
-      x: end.x - size * Math.cos(angle) - halfWidth * Math.sin(angle),
-      y: end.y - size * Math.sin(angle) + halfWidth * Math.cos(angle),
-    };
-    return `M ${end.x} ${end.y} L ${left.x} ${left.y} L ${right.x} ${right.y} Z`;
-  }
-
-  function distance(a: Point, b: Point): number {
-    return Math.hypot(b.x - a.x, b.y - a.y);
-  }
-
-  function hashOf(value: string): number {
-    let hash = 0;
-    for (let index = 0; index < value.length; index += 1) {
-      hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-    }
-    return hash;
-  }
-
-  function labelPointFor(points: readonly Point[], edgeId: string): Point {
-    const hash = hashOf(edgeId);
-    if (points.length < 3) {
-      const start = points[0] as Point;
-      const end = points[points.length - 1] as Point;
-      return {
-        x: (start.x + end.x) / 2,
-        y: (start.y + end.y) / 2 - 12 - (hash % 4) * 3,
-      };
-    }
-    if (points.length === 4) {
-      const start = points[0] as Point;
-      const lane = points[1] as Point;
-      const endLane = points[2] as Point;
-      const end = points[3] as Point;
-      const firstLength = Math.abs(lane.x - start.x);
-      const secondLength = Math.abs(end.x - endLane.x);
-      if (firstLength >= secondLength) {
-        return {
-          x: (start.x + lane.x) / 2,
-          y: start.y - 11 - (hash % 4) * 3,
-        };
-      }
-      return {
-        x: (endLane.x + end.x) / 2,
-        y: end.y - 11 - (hash % 4) * 3,
-      };
-    }
-    const start = points[0] as Point;
-    const bottom = points[2] as Point;
-    const end = points[points.length - 1] as Point;
-    return {
-      x: (start.x + end.x) / 2,
-      y: bottom.y + 12 + (hash % 3) * 3,
-    };
-  }
-
-  function edgeIcon(edge: BaseScreenBlueprintCanvasEdge): DesignerIconName {
-    if (edge.kind === 'dependency') return 'eye';
-    if (edge.kind === 'semantic') return 'link';
-    if (edge.kind === 'containment') return 'group';
-    return 'activity';
-  }
-
-  function edgeLabel(edge: BaseScreenBlueprintCanvasEdge): string {
-    if (edge.kind === 'dependency') {
-      const source = nodeById(edge.source);
-      return text.edgeDependency(source?.variableName ?? source?.variableId ?? '');
-    }
-    if (edge.kind === 'containment') return blueprintText.relationList.containment;
-    if (edge.kind === 'semantic') {
-      return blueprintText.semanticRoles[edge.semanticRole ?? 'related'];
-    }
-    if (edge.kind === 'relation') {
-      if (edge.effectType === 'component-visibility') {
-        return `${edge.eventName ?? ''} · ${blueprintText.visibilityOperation[edge.operation ?? 'toggle']}`;
-      }
-      if (edge.effectType === 'set-variable') {
-        return blueprintText.setVariableAction(edge.variableId ?? '');
-      }
-      if (edge.effectType === 'request-variable') {
-        return `${blueprintText.relationEffects['request-variable']} ${edge.variableId ?? ''}`;
-      }
-      if (edge.effectType === 'request-component-data') {
-        return `${edge.eventName ?? ''} · ${blueprintText.relationEffects['request-component-data']}`;
-      }
-      if (edge.effectType === 'emit-host-event') {
-        return `${blueprintText.relationEffects['emit-host-event']} ${edge.eventName ?? ''}`;
-      }
-      if (edge.effectType === 'host-action') {
-        return `${blueprintText.relationEffects['host-action']} ${edge.actionId ?? ''}`;
-      }
-      return edge.eventName ?? '';
-    }
-    if (edge.operation !== undefined) return blueprintText.visibilityOperation[edge.operation];
-    if (edge.sourceHandle.startsWith('event:')) return edge.sourceHandle.slice('event:'.length);
-    return 'true';
-  }
-
-  function labelWidth(label: string): number {
-    let width = 28;
-    for (const character of label) {
-      width += /[\x00-\x7f]/.test(character) ? 6 : 10;
-    }
-    return Math.min(168, width);
-  }
-
-  function clearLabelPoint(
-    preferred: Point,
-    label: string,
-    rects: readonly { left: number; top: number; right: number; bottom: number }[],
-  ): Point {
-    const width = labelWidth(label);
-    const halfWidth = width / 2;
-    const halfHeight = 11;
-    const isClear = (point: Point): boolean =>
-      !rects.some(
-        (rect) =>
-          point.x - halfWidth < rect.right + 2 &&
-          point.x + halfWidth > rect.left - 2 &&
-          point.y - halfHeight < rect.bottom + 2 &&
-          point.y + halfHeight > rect.top - 2,
-      );
-    const candidates: Point[] = [
-      preferred,
-      { x: preferred.x, y: preferred.y - 24 },
-      { x: preferred.x, y: preferred.y - 46 },
-      { x: preferred.x, y: preferred.y + 24 },
-      { x: preferred.x, y: preferred.y + 46 },
-      { x: preferred.x - 72, y: preferred.y },
-      { x: preferred.x + 72, y: preferred.y },
-      { x: preferred.x - 72, y: preferred.y - 24 },
-      { x: preferred.x + 72, y: preferred.y - 24 },
-    ];
-    return candidates.find(isClear) ?? preferred;
-  }
-
-  function renderEdgesAndLabels(): void {
-    const current = graph();
-    edges.replaceChildren();
-    labels.replaceChildren();
-    if (current === null) return;
-
-    const traced = new Set(traceVisible ? (state?.trace?.executedEdgeIds ?? []) : []);
-    const failed = new Set(traceVisible ? (state?.trace?.failedRelationIds ?? []) : []);
-    const traceActive = traced.size > 0;
-    const placedLabels: Point[] = [];
-    const nodeRects = current.nodes.map((node) => {
-      const geometry = geometryOf(node);
-      const position = positionOf(node);
-      return {
-        left: position.x,
-        top: position.y,
-        right: position.x + geometry.width,
-        bottom: position.y + geometry.height,
-      };
-    });
-    for (const edge of current.edges) {
-      const route = edgeRoute(edge);
-      if (route === null) continue;
-      const selected = state?.selection?.kind === 'edge' && state.selection.id === edge.id;
-
-      const group = ownerDocument.createElementNS(SVG_NS, 'g');
-      group.classList.add('designer-blueprint-canvas-edge-group');
-      group.dataset.kind = edge.kind;
-      if (traceActive && traced.has(edge.id)) group.dataset.traced = 'true';
-      if (traceActive && edge.relationId !== undefined && failed.has(edge.relationId)) {
-        group.dataset.failed = 'true';
-      }
-      if (selected) group.dataset.selected = 'true';
-
-      const path = ownerDocument.createElementNS(SVG_NS, 'path');
-      path.classList.add('designer-blueprint-canvas-edge-line');
-      path.setAttribute('d', route.path);
-      group.append(path);
-
-      const caps = ownerDocument.createElementNS(SVG_NS, 'g');
-      caps.classList.add('designer-blueprint-canvas-edge-caps');
-      if (edge.kind === 'semantic') {
-        caps.append(circleAt(route.start, 2.6), circleAt(route.end, 2.6));
-      } else if (edge.kind === 'dependency') {
-        caps.append(circleAt(route.end, 2.6));
-      } else if (edge.kind === 'relation') {
-        const arrow = ownerDocument.createElementNS(SVG_NS, 'path');
-        arrow.setAttribute('d', arrowPath(route.end, route.beforeEnd));
-        caps.append(arrow);
-      }
-      group.append(caps);
-
-      const hit = ownerDocument.createElementNS(SVG_NS, 'path');
-      hit.classList.add('designer-blueprint-canvas-edge-hit');
-      hit.setAttribute('d', route.path);
-      hit.dataset.edgeId = edge.id;
-      hit.setAttribute('tabindex', '0');
-      hit.setAttribute('role', 'button');
-      const label = edgeLabel(edge);
-      hit.setAttribute('aria-label', text.edgeAria(label));
-      hit.addEventListener('pointerdown', (event) => {
-        event.stopPropagation();
-        selectFromPointer({ kind: 'edge', id: edge.id }, event);
-      });
-      hit.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          selectFromPointer({ kind: 'edge', id: edge.id }, event);
-        }
-      });
-      group.append(hit);
-      edges.append(group);
-
-      const showLabel =
-        label !== '' &&
-        (edge.kind !== 'dependency' || selected || (traceActive && traced.has(edge.id)));
-      if (showLabel) {
-        const labelElement = ownerDocument.createElement('span');
-        labelElement.className = 'designer-blueprint-canvas-edge-label';
-        labelElement.dataset.edgeLabel = edge.id;
-        labelElement.dataset.kind = edge.kind;
-        labelElement.setAttribute('role', 'button');
-        labelElement.setAttribute('tabindex', '0');
-        labelElement.setAttribute('aria-label', text.edgeAria(label));
-        if (selected) {
-          labelElement.dataset.selected = 'true';
-          labelElement.setAttribute('aria-current', 'true');
-        }
-        if (traceActive && traced.has(edge.id)) {
-          labelElement.dataset.traced = 'true';
-        }
-        const icon = ownerDocument.createElement('span');
-        icon.className = 'designer-blueprint-canvas-edge-label-icon';
-        icon.innerHTML = designerIcon(edgeIcon(edge));
-        const labelText = ownerDocument.createElement('span');
-        labelText.className = 'designer-blueprint-canvas-edge-label-text';
-        labelText.textContent = label;
-        labelElement.append(icon, labelText);
-        let labelPoint = clearLabelPoint(route.label, label, nodeRects);
-        while (
-          placedLabels.some(
-            (placed) =>
-              Math.abs(placed.x - labelPoint.x) < 96 && Math.abs(placed.y - labelPoint.y) < 16,
-          )
-        ) {
-          labelPoint = { x: labelPoint.x, y: labelPoint.y + 22 };
-        }
-        placedLabels.push(labelPoint);
-        labelElement.style.left = `${labelPoint.x}px`;
-        labelElement.style.top = `${labelPoint.y}px`;
-        labelElement.addEventListener('pointerdown', (event) => {
-          event.stopPropagation();
-          selectFromPointer({ kind: 'edge', id: edge.id }, event);
-        });
-        labelElement.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            selectFromPointer({ kind: 'edge', id: edge.id }, event);
-          }
-        });
-        labels.append(labelElement);
-      }
-    }
-  }
-
-  function circleAt(point: Point, radius: number): SVGCircleElement {
-    const circle = ownerDocument.createElementNS(SVG_NS, 'circle');
-    circle.setAttribute('cx', String(point.x));
-    circle.setAttribute('cy', String(point.y));
-    circle.setAttribute('r', String(radius));
-    return circle;
-  }
-  function renderGraph(): void {
-    const current = graph();
-    for (const node of layers.querySelectorAll('.designer-blueprint-canvas-node')) node.remove();
-    renderEdgesAndLabels();
-    if (current === null) return;
-    const trace = traceVisible ? state?.trace : null;
-    const tracedEdges = new Set(trace?.executedEdgeIds ?? []);
-    const tracedNodes = new Set<string>();
-    const failedNodes = new Set<string>();
-    for (const edge of current.edges) {
-      if (tracedEdges.has(edge.id)) {
-        tracedNodes.add(edge.source);
-        tracedNodes.add(edge.target);
-      }
-      if (
-        edge.relationId !== undefined &&
-        (trace?.failedRelationIds ?? []).includes(edge.relationId)
-      ) {
-        failedNodes.add(edge.target);
-      }
-    }
-
-    for (const node of current.nodes) {
-      const geometry = geometryOf(node);
-      const position = positionOf(node);
-      const card = ownerDocument.createElement('div');
-      card.className = 'designer-blueprint-canvas-node';
-      card.dataset.nodeId = node.id;
-      card.dataset.kind = node.kind;
-      card.style.left = `${position.x}px`;
-      card.style.top = `${position.y}px`;
-      card.style.width = `${geometry.width}px`;
-      card.style.height = `${geometry.height}px`;
-      card.tabIndex = 0;
-      card.setAttribute('role', 'button');
-      const kindLabel = text.nodeKind[node.kind];
-      const title = nodeTitle(node);
-      card.setAttribute('aria-label', `${kindLabel} ${title}`);
-      if (state?.selection?.kind === 'node' && state.selection.id === node.id) {
-        card.dataset.selected = 'true';
-      }
-      if (tracedEdges.size > 0 && tracedNodes.has(node.id)) card.dataset.traced = 'true';
-      if (failedNodes.has(node.id)) card.dataset.failed = 'true';
-
-      const header = ownerDocument.createElement('div');
-      header.className = 'designer-blueprint-canvas-node-header';
-      const kindBadge = ownerDocument.createElement('span');
-      kindBadge.className = 'designer-blueprint-canvas-node-icon';
-      kindBadge.innerHTML = designerIcon(nodeIconName(node));
-      const copy = ownerDocument.createElement('div');
-      copy.className = 'designer-blueprint-canvas-node-copy';
-      const kindElement = ownerDocument.createElement('span');
-      kindElement.className = 'designer-blueprint-canvas-node-kind';
-      kindElement.textContent = nodeKindLine(node);
-      const titleElement = ownerDocument.createElement('span');
-      titleElement.className = 'designer-blueprint-canvas-node-title';
-      titleElement.textContent = title;
-      copy.append(kindElement, titleElement);
-      header.append(kindBadge, copy);
-      if (node.kind !== 'variable') {
-        const outbound = node.outboundCount ?? 0;
-        const inbound = node.inboundCount ?? 0;
-        const counts = ownerDocument.createElement('span');
-        counts.className = 'designer-blueprint-canvas-node-relcount';
-        counts.title = text.relationCountTitle(outbound, inbound);
-        const out = ownerDocument.createElement('span');
-        out.textContent = `${text.relationCounts.out} `;
-        const outValue = ownerDocument.createElement('b');
-        outValue.textContent = String(outbound);
-        const inboundLabel = ownerDocument.createElement('span');
-        inboundLabel.textContent = ` ${text.relationCounts.in} `;
-        const inboundValue = ownerDocument.createElement('b');
-        inboundValue.textContent = String(inbound);
-        counts.append(out, outValue, inboundLabel, inboundValue);
-        header.append(counts);
-      }
-
-      const subtitle = ownerDocument.createElement('div');
-      subtitle.className = 'designer-blueprint-canvas-node-subtitle';
-      subtitle.textContent = nodeSubtitle(node);
-      let valueElement: HTMLElement | undefined;
-      if (node.kind === 'variable') {
-        valueElement = ownerDocument.createElement('div');
-        valueElement.className = 'designer-blueprint-canvas-node-value';
-        const valueLabel = ownerDocument.createElement('span');
-        valueLabel.textContent = `${text.variableValueLabel} `;
-        const value = ownerDocument.createElement('b');
-        value.textContent =
-          node.variableInitialValue === undefined
-            ? text.variableValueEmpty
-            : shortJson(node.variableInitialValue);
-        const stats = ownerDocument.createElement('span');
-        stats.textContent = text.variableCounts(node.writeCount ?? 0, node.readCount ?? 0);
-        valueElement.append(valueLabel, value, stats);
-      }
-      const summary = nodeSummaryText(node);
-      let summaryElement: HTMLElement | undefined;
-      if (summary !== '') {
-        summaryElement = ownerDocument.createElement('div');
-        summaryElement.className = 'designer-blueprint-canvas-node-summary';
-        summaryElement.textContent = summary;
-        summaryElement.style.bottom = '0';
-        summaryElement.style.height = `${SUMMARY_ROW}px`;
-      }
-
-      const ports = ownerDocument.createElement('div');
-      ports.className = 'designer-blueprint-canvas-ports';
-      ports.style.top = `${geometry.portStart}px`;
-      if (
-        node.kind === 'component' ||
-        node.kind === 'variable' ||
-        node.kind === 'lifecycle' ||
-        node.kind === 'timer'
-      ) {
-        const eventPorts = geometry.outputs.filter(
-          (port) => port.semantic !== true && port.containment !== true,
-        );
-        if (eventPorts.length === 0) {
-          const row = ownerDocument.createElement('div');
-          row.className = 'designer-blueprint-canvas-port-row';
-          row.dataset.available = 'false';
-          row.textContent = text.nodeNoEvents;
-          ports.append(row);
-        }
-        for (const port of eventPorts) {
-          ports.append(portRow(port));
-        }
-        for (const port of geometry.outputs.filter(
-          (port) => port.semantic === true || port.containment === true,
-        )) {
-          ports.append(portRow(port));
-        }
-      }
-
-      const input = ownerDocument.createElement('span');
-      input.className = 'designer-blueprint-canvas-port designer-blueprint-canvas-port-in';
-      input.dataset.nodeId = node.id;
-      input.dataset.armed = String(armed !== null && typeCanReceive(armed));
-      input.style.top = `${geometry.inputY}px`;
-      input.setAttribute('role', 'button');
-      input.setAttribute('tabindex', '0');
-      input.setAttribute('aria-label', text.inputPort);
-      input.addEventListener('pointerdown', (event) => onInputPointerDown(event));
-      input.addEventListener('keydown', (event) => {
-        if ((event.key === 'Enter' || event.key === ' ') && armed !== null) {
-          event.preventDefault();
-          event.stopPropagation();
-          completeConnection(armed.nodeId, armed.handle, input);
-          armed = null;
-        }
-      });
-
-      card.append(header, subtitle);
-      if (valueElement !== undefined) card.append(valueElement);
-      card.append(ports);
-      if (geometry.inputHandle !== undefined) {
-        input.dataset.inputHandle = geometry.inputHandle;
-        card.append(input);
-      }
-      for (const port of geometry.outputs) {
-        const output = ownerDocument.createElement('span');
-        output.className = 'designer-blueprint-canvas-port designer-blueprint-canvas-port-out';
-        output.dataset.outputHandle = port.handle;
-        output.dataset.nodeId = node.id;
-        output.dataset.available = String(port.available);
-        if (port.dependency === true) output.dataset.dependency = 'true';
-        if (port.semantic === true) output.dataset.semantic = 'true';
-        if (port.containment === true) output.dataset.containment = 'true';
-        output.style.top = `${port.y}px`;
-        output.setAttribute('role', 'button');
-        output.setAttribute('tabindex', '0');
-        const portLabel = `${port.label}`;
-        output.setAttribute(
-          'aria-label',
-          port.available ? portLabel : text.portUnavailableAria(portLabel),
-        );
-        if (!port.available) {
-          output.setAttribute('aria-disabled', 'true');
-          output.setAttribute(
-            'data-tip',
-            port.requiredCapability === undefined
-              ? text.portUnavailable
-              : text.portUnavailableCapability(port.requiredCapability),
-          );
-        }
-        if (port.dependency === true || port.containment === true) {
-          output.setAttribute('aria-disabled', 'true');
-          if (port.containment === true) {
-            output.setAttribute('data-tip', blueprintText.relationList.containmentHint);
-          }
-        } else {
-          output.addEventListener('pointerdown', (event) => onPortPointerDown(event, node, port));
-          output.addEventListener('keydown', (event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') return;
-            event.preventDefault();
-            event.stopPropagation();
-            if (!port.available) {
-              setStatus(text.statusPortUnavailable, 'error');
-              return;
-            }
-            armed = { nodeId: node.id, handle: port.handle };
-            renderGraph();
-          });
-        }
-        card.append(output);
-      }
-      if (summaryElement !== undefined) card.append(summaryElement);
-
-      card.addEventListener('pointerdown', (event) => onNodePointerDown(event, node));
-      card.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          select({ kind: 'node', id: node.id });
-        }
-      });
-      layers.append(card);
-    }
-  }
-
-  function portRow(port: CanvasPort): HTMLElement {
-    const row = ownerDocument.createElement('div');
-    row.className = 'designer-blueprint-canvas-port-row';
-    row.dataset.available = String(port.available);
-    if (port.dependency === true) row.dataset.dependency = 'true';
-    if (port.semantic === true) row.dataset.semantic = 'true';
-    if (port.containment === true) row.dataset.containment = 'true';
-    const name = ownerDocument.createElement('span');
-    name.className = 'designer-blueprint-canvas-port-name';
-    name.textContent = port.label;
-    const tag = ownerDocument.createElement('span');
-    tag.className = 'designer-blueprint-canvas-port-tag';
-    tag.textContent =
-      port.semantic === true
-        ? text.portTags.semantic
-        : port.containment === true
-          ? text.portTags.structure
-          : port.available
-            ? text.portTags.event
-            : text.portTags.unavailable;
-    row.append(name, tag);
-    if (port.available !== true) {
-      const lock = ownerDocument.createElement('span');
-      lock.className = 'designer-blueprint-canvas-port-lock';
-      lock.innerHTML = designerIcon('lock');
-      row.append(lock);
-    }
-    return row;
-  }
-
-  function typeCanReceive(source: ArmedSource): boolean {
-    const sourceNode = nodeById(source.nodeId);
-    return sourceNode !== undefined;
-  }
-
-  function nodeTitle(node: BaseScreenBlueprintCanvasNode): string {
-    if (node.kind === 'component') return node.componentName ?? node.componentId ?? node.id;
-    if (node.kind === 'variable') return node.variableName ?? node.variableId ?? node.id;
-    if (node.kind === 'host') return blueprintText.hostNode;
-    if (node.kind === 'lifecycle') return blueprintText.lifecycleNode;
-    if (node.kind === 'timer') {
-      return blueprintText.timerNode(node.intervalSeconds ?? 0);
-    }
-    return node.id;
-  }
-
-  function nodeKindLine(node: BaseScreenBlueprintCanvasNode): string {
-    if (node.kind === 'component') {
-      return text.nodeKindLine.component(node.materialType ?? text.nodeKind.component);
-    }
-    if (node.kind === 'variable') return text.nodeKindLine.variable;
-    if (node.kind === 'host') return text.nodeKindLine.host;
-    if (node.kind === 'lifecycle') return text.nodeKindLine.lifecycle;
-    if (node.kind === 'timer') {
-      return text.nodeKindLine.timer(node.intervalSeconds ?? 0);
-    }
-    return text.nodeKind[node.kind];
-  }
-
-  function nodeIconName(node: BaseScreenBlueprintCanvasNode): DesignerIconName {
-    if (node.kind === 'variable') return 'variable';
-    if (node.kind === 'host') return 'terminal';
-    if (node.kind === 'lifecycle') return 'activity';
-    if (node.kind === 'timer') return 'play';
-    if (node.isContainer === true) return 'group';
-    const material = node.materialType ?? '';
-    if (material.includes('chart')) return 'chart-line';
-    if (material.includes('table') || material.includes('ranking')) return 'table';
-    if (material.includes('text') || material.includes('title')) return 'type';
-    if (material.includes('image')) return 'image';
-    return 'shapes';
-  }
-
-  function nodeSubtitle(node: BaseScreenBlueprintCanvasNode): string {
-    if (node.kind === 'component') {
-      return text.nodeSubtitle.component(
-        node.materialType ?? text.nodeKind.component,
-        node.componentId ?? node.id,
-      );
-    }
-    if (node.kind === 'variable') {
-      return text.nodeSubtitle.variable(
-        node.variableType ?? text.nodeKind.variable,
-        node.variableId ?? node.id,
-      );
-    }
-    if (node.kind === 'host') {
-      return text.nodeSubtitle.host(node.exitCount ?? 0);
-    }
-    if (node.kind === 'lifecycle') {
-      return text.nodeSubtitle.lifecycle(node.outboundCount ?? 0);
-    }
-    if (node.kind === 'timer') {
-      return text.nodeSubtitle.timer(node.intervalSeconds ?? 0, node.outboundCount ?? 0);
-    }
-    return node.id;
-  }
-
-  function nodeSummaryText(node: BaseScreenBlueprintCanvasNode): string {
-    if (node.kind === 'component' && (node.childCount ?? 0) > 0) {
-      return `${blueprintText.structureTitle} · ${blueprintText.structure.children} ${node.childCount}`;
-    }
-    return '';
-  }
-
-  function shortJson(value: unknown): string {
-    try {
-      const textValue = JSON.stringify(value);
-      return textValue !== undefined && textValue.length > 22
-        ? `${textValue.slice(0, 21)}…`
-        : (textValue ?? '…');
-    } catch {
-      return '…';
-    }
-  }
-
-  function renderBar(): void {
-    const current = graph();
-    const diagnostics = state?.diagnostics ?? [];
-    const errors = diagnostics.filter((item) => item.severity === 'error');
-    problemsButton.dataset.state = errors.length === 0 ? 'ok' : 'error';
-    problemsLabel.textContent =
-      errors.length === 0 ? text.validationPassed : text.validationFailed(errors.length);
-    problemsButton.setAttribute('aria-label', text.validationAria(errors.length));
-    problemsButton.setAttribute('aria-expanded', String(problemsOpen));
-    layoutButton.disabled = (current?.nodes.length ?? 0) === 0;
-    traceButton.setAttribute('aria-pressed', String(traceVisible));
-    traceButton.dataset.active = String(traceVisible);
-    simulateButton.setAttribute('aria-expanded', String(simulationOpen));
-    simulateButton.dataset.active = String(simulationOpen);
-    simulationBar.hidden = simulationOpen;
-    simulation.hidden = !simulationOpen;
-    root.dataset.simulation = simulationOpen ? 'open' : 'closed';
-    const traceLines = state?.trace?.lines ?? [];
-    const barStatus =
-      traceLines.length > 0 ? (traceLines.at(-1) ?? text.simulationIdle) : text.simulationIdle;
-    simulationBarLabel.textContent = `${text.simulationTitle} · ${barStatus}`;
-  }
-
-  function renderEmpty(): void {
-    const empty = (graph()?.nodes.length ?? 0) === 0;
-    emptyCard.hidden = !empty;
-    if (empty) layoutButton.disabled = true;
-  }
-
-  function renderNoEvents(): void {
-    const current = graph();
-    const hasSource =
-      current?.nodes.some((node) => node.kind === 'component' || node.kind === 'variable') ?? false;
-    const hasAvailableEvent =
-      current?.nodes.some((node) => (node.events ?? []).some((event) => event.available)) ?? false;
-    noEvents.hidden = !(hasSource && !hasAvailableEvent);
-  }
-
-  function renderProblems(): void {
-    const diagnostics = state?.diagnostics ?? [];
-    problems.replaceChildren();
-    const header = ownerDocument.createElement('header');
-    const title = ownerDocument.createElement('strong');
-    title.textContent = blueprintText.problemsTitle;
-    const close = panelIconButton(
-      ownerDocument,
-      'close',
-      blueprintText.problemsTitle,
-      'problems-close',
-    );
-    header.append(title, close);
-    const list = ownerDocument.createElement('ul');
-    if (diagnostics.length === 0) {
-      const empty = ownerDocument.createElement('li');
-      empty.textContent = text.problemsEmpty;
-      list.append(empty);
-    } else {
-      for (const diagnostic of diagnostics) {
-        const item = ownerDocument.createElement('li');
-        item.dataset.severity = diagnostic.severity;
-        const message = ownerDocument.createElement('span');
-        message.textContent = diagnostic.message;
-        const code = ownerDocument.createElement('code');
-        code.textContent = diagnostic.code;
-        item.append(message, code);
-        list.append(item);
-      }
-    }
-    problems.append(header, list);
-    problems.hidden = !problemsOpen;
-    problemsButton.setAttribute('aria-expanded', String(problemsOpen));
-  }
-
-  function renderSimulationOptions(): void {
-    const previous = eventSelect.value;
-    const options: { value: string; label: string }[] = [];
-    for (const node of graph()?.nodes ?? []) {
-      if (node.kind !== 'component' && node.kind !== 'variable') continue;
-      for (const event of node.events ?? []) {
-        if (!event.available) continue;
-        options.push({
-          value: JSON.stringify({
-            componentId: node.componentId ?? node.variableId ?? node.id,
-            eventName: event.name,
-          }),
-          label: `${nodeTitle(node)} · ${event.name}`,
-        });
-      }
-    }
-    eventSelect.replaceChildren();
-    if (options.length === 0) {
-      const option = ownerDocument.createElement('option');
-      option.textContent = text.simulationNoEvent;
-      option.value = '';
-      eventSelect.append(option);
-      eventSelect.disabled = true;
-      eventSelectControl.refresh();
-      runButton.disabled = true;
-      return;
-    }
-    for (const option of options) {
-      const element = ownerDocument.createElement('option');
-      element.value = option.value;
-      element.textContent = option.label;
-      eventSelect.append(element);
-    }
-    eventSelect.disabled = false;
-    if (options.some((option) => option.value === previous)) {
-      eventSelect.value = previous;
-    } else if (previous !== '') {
-      eventSelect.value = options[0]?.value ?? '';
-    }
-    eventSelectControl.refresh();
-    runButton.disabled = eventSelect.value === '';
-  }
-
-  function renderSimulation(): void {
-    renderSimulationOptions();
-    const trace = state?.trace;
-    const failed = (trace?.failedRuleIds.length ?? 0) > 0;
-    const rejected =
-      state?.lastCommand?.commandId === lastRunCommandId && state.lastCommand.status === 'rejected';
-    if (trace === null || (trace?.lines.length ?? 0) === 0) {
-      simulationStatus.textContent = rejected
-        ? `${text.simulationRejected} · ${
-            state?.lastCommand?.diagnostics.map((item) => item.message).join('；') ||
-            blueprintText.invalidCommand
-          }`
-        : text.simulationIdle;
-      simulationStatus.dataset.tone = 'idle';
-    } else {
-      simulationStatus.textContent = failed ? text.simulationFailed : text.simulationSuccess;
-      simulationStatus.dataset.tone = failed ? 'error' : 'success';
-    }
-    traceList.replaceChildren();
-    traceEmpty.hidden = (trace?.lines.length ?? 0) > 0;
-    for (const line of trace?.lines ?? []) {
-      const item = ownerDocument.createElement('li');
-      item.textContent = line;
-      traceList.append(item);
-    }
-  }
-
-  function render(): void {
-    renderBar();
-    renderEmpty();
-    renderNoEvents();
-    renderProblems();
-    renderSimulation();
-    applyTransform();
-    renderGraph();
-  }
-
-  function select(selection: BaseScreenBlueprintCanvasSelection): void {
-    sendCommand({ type: 'select', selection });
-  }
-
-  function selectFromPointer(
-    selection: NonNullable<BaseScreenBlueprintCanvasSelection>,
-    event: { readonly ctrlKey: boolean; readonly metaKey: boolean },
-  ): void {
-    const current = state?.selection;
-    if (
-      (event.ctrlKey || event.metaKey) &&
-      current !== null &&
-      current !== undefined &&
-      current.kind === selection.kind &&
-      current.id === selection.id
-    ) {
-      select(null);
-      return;
-    }
-    select(selection);
-  }
-
-  function onNodePointerDown(event: PointerEvent, node: BaseScreenBlueprintCanvasNode): void {
-    if (event.button !== 0) return;
-    const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest('[data-output-handle], [data-input-handle], [data-canvas-menu]') != null) {
-      return;
-    }
-    event.stopPropagation();
-    const position = positionOf(node);
-    drag = {
-      nodeId: node.id,
-      pointerId: event.pointerId,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startX: position.x,
-      startY: position.y,
-      moved: false,
-    };
-    (event.currentTarget as Element).setPointerCapture(event.pointerId);
-    view?.addEventListener('pointermove', onNodePointerMove);
-    view?.addEventListener('pointerup', onNodePointerUp);
-    view?.addEventListener('pointercancel', onNodePointerUp);
-  }
-
-  function onNodePointerMove(event: PointerEvent): void {
-    if (drag === null || event.pointerId !== drag.pointerId) return;
-    const dx = (event.clientX - drag.startClientX) / viewportValue.zoom;
-    const dy = (event.clientY - drag.startClientY) / viewportValue.zoom;
-    if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 3) return;
-    drag.moved = true;
-    const next = { x: snap(drag.startX + dx), y: snap(drag.startY + dy) };
-    positions.set(drag.nodeId, next);
-    const card = layers.querySelector<HTMLElement>(`[data-node-id="${cssEscape(drag.nodeId)}"]`);
-    if (card !== null) {
-      card.style.left = `${next.x}px`;
-      card.style.top = `${next.y}px`;
-    }
-    renderEdgesOnly();
-  }
-
-  function onNodePointerUp(event: PointerEvent): void {
-    if (drag === null || event.pointerId !== drag.pointerId) return;
-    const finished = drag;
-    drag = null;
-    view?.removeEventListener('pointermove', onNodePointerMove);
-    view?.removeEventListener('pointerup', onNodePointerUp);
-    view?.removeEventListener('pointercancel', onNodePointerUp);
-    if (!finished.moved) {
-      selectFromPointer({ kind: 'node', id: finished.nodeId }, event);
-      return;
-    }
-    commitLayout();
-  }
-
-  function renderEdgesOnly(): void {
-    renderEdgesAndLabels();
-  }
-
-  function onPortPointerDown(
-    event: PointerEvent,
+  private rows(
     node: BaseScreenBlueprintCanvasNode,
-    port: CanvasPort,
-  ): void {
-    event.stopPropagation();
-    event.preventDefault();
-    if (!port.available) {
-      setStatus(text.statusPortUnavailable, 'error');
-      return;
-    }
-    link = {
-      nodeId: node.id,
-      handle: port.handle,
-      pointerId: event.pointerId,
-      target: null,
-    };
-    const rect = viewport.getBoundingClientRect();
-    const start = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    preview.setAttribute('d', `M ${start.x} ${start.y} L ${start.x} ${start.y}`);
-    preview.setAttribute('visibility', 'visible');
-    preview.dataset.startX = String(start.x);
-    preview.dataset.startY = String(start.y);
-    viewport.dataset.linking = 'true';
-    view?.addEventListener('pointermove', onLinkPointerMove);
-    view?.addEventListener('pointerup', onLinkPointerUp);
-    view?.addEventListener('pointercancel', onLinkPointerUp);
+  ): readonly (BaseScreenBlueprintCanvasPort | 'semantic')[] {
+    return [...node.outputs, ...node.inputs, ...(node.semantic ? (['semantic'] as const) : [])];
   }
 
-  function onLinkPointerMove(event: PointerEvent): void {
-    if (link === null || event.pointerId !== link.pointerId) return;
-    const startX = Number(preview.dataset.startX ?? '0');
-    const startY = Number(preview.dataset.startY ?? '0');
-    const rect = viewport.getBoundingClientRect();
-    const point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    preview.setAttribute('d', `M ${startX} ${startY} L ${point.x} ${point.y}`);
-    const hit = inputAt(event.clientX, event.clientY);
-    link = { ...link, target: hit };
-    for (const port of viewport.querySelectorAll<HTMLElement>('[data-input-handle]')) {
-      port.dataset.hover = String(hit !== null && port === hit);
-    }
-  }
-
-  function onLinkPointerUp(event: PointerEvent): void {
-    if (link === null || event.pointerId !== link.pointerId) return;
-    const finished = link;
-    link = null;
-    preview.setAttribute('visibility', 'hidden');
-    viewport.dataset.linking = 'false';
-    view?.removeEventListener('pointermove', onLinkPointerMove);
-    view?.removeEventListener('pointerup', onLinkPointerUp);
-    view?.removeEventListener('pointercancel', onLinkPointerUp);
-    for (const port of viewport.querySelectorAll<HTMLElement>('[data-input-handle]')) {
-      port.dataset.hover = 'false';
-    }
-    const hit = inputAt(event.clientX, event.clientY) ?? finished.target;
-    if (hit !== null) {
-      completeConnection(finished.nodeId, finished.handle, hit);
-      return;
-    }
-    armed = { nodeId: finished.nodeId, handle: finished.handle };
-    setStatus(text.statusArmed);
-    renderGraph();
-  }
-
-  function onInputPointerDown(event: PointerEvent): void {
-    event.stopPropagation();
-    if (armed === null) return;
-    event.preventDefault();
-    completeConnection(armed.nodeId, armed.handle, event.currentTarget as Element);
-    armed = null;
-  }
-
-  function completeConnection(sourceNodeId: string, sourceHandle: string, target: Element): void {
-    const input = target.closest<HTMLElement>('[data-input-handle]');
-    if (input === null) return;
-    const targetNodeId = input.dataset.nodeId;
-    const targetHandle = input.dataset.inputHandle;
-    if (targetNodeId === undefined || targetHandle === undefined) return;
-    if (targetNodeId === sourceNodeId) {
-      setStatus(text.statusSameNode, 'error');
-      return;
-    }
-    sendCommand({
-      type: 'connect',
-      sourceNodeId,
-      sourceHandle,
-      targetNodeId,
-      targetHandle,
-    });
-    armed = null;
-    renderGraph();
-  }
-
-  function inputAt(clientX: number, clientY: number): Element | null {
-    const rootNode = root.getRootNode() as Document | ShadowRoot;
-    const elementFromPoint = rootNode.elementFromPoint?.bind(rootNode);
-    const element = elementFromPoint?.(clientX, clientY) ?? null;
-    return element?.closest('[data-input-handle]') ?? null;
-  }
-
-  function commitLayout(): void {
-    const current = graph();
-    if (current === null) return;
-    const nodes = current.nodes.map((node) => {
-      const position = positionOf(node);
-      return {
-        id: node.id,
-        x: Math.round(position.x),
-        y: Math.round(position.y),
-        ...(node.collapsed === true ? { collapsed: true } : {}),
-      };
-    });
-    sessionLayout = false;
-    lastSentViewportKey = viewportKey(viewportValue);
-    sendCommand({
-      type: 'commit-layout',
-      nodes,
-      viewport: {
-        x: Math.round(viewportValue.x),
-        y: Math.round(viewportValue.y),
-        zoom: Math.round(viewportValue.zoom * 1000) / 1000,
-      },
-    });
-  }
-
-  function onBackgroundPointerDown(event: PointerEvent): void {
-    if (event.button !== 0) return;
-    const target = event.target instanceof Element ? event.target : null;
-    if (
-      target?.closest(
-        '.designer-blueprint-canvas-node, [data-edge-id], [data-canvas-empty], [data-canvas-simulation], [data-canvas-simulation-bar], [data-canvas-problems], [data-canvas-no-events]',
-      ) != null
-    ) {
-      return;
-    }
-    armed = null;
-    const rect = viewport.getBoundingClientRect();
-    marquee = {
-      pointerId: event.pointerId,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startLeft: event.clientX - rect.left,
-      startTop: event.clientY - rect.top,
-      moved: false,
-    };
-    viewport.setPointerCapture(event.pointerId);
-    view?.addEventListener('pointermove', onMarqueePointerMove);
-    view?.addEventListener('pointerup', onMarqueePointerUp);
-    view?.addEventListener('pointercancel', onMarqueePointerUp);
-  }
-
-  function onMarqueePointerMove(event: PointerEvent): void {
-    if (marquee === null || event.pointerId !== marquee.pointerId) return;
-    const rect = viewport.getBoundingClientRect();
-    const currentX = event.clientX - rect.left;
-    const currentY = event.clientY - rect.top;
-    const left = Math.min(marquee.startLeft, currentX);
-    const top = Math.min(marquee.startTop, currentY);
-    const width = Math.abs(currentX - marquee.startLeft);
-    const height = Math.abs(currentY - marquee.startTop);
-    if (!marquee.moved && width + height < 3) return;
-    marquee = { ...marquee, moved: true };
-    marqueeBox.hidden = false;
-    marqueeBox.style.left = `${left}px`;
-    marqueeBox.style.top = `${top}px`;
-    marqueeBox.style.width = `${width}px`;
-    marqueeBox.style.height = `${height}px`;
-  }
-
-  function onMarqueePointerUp(event: PointerEvent): void {
-    if (marquee === null || event.pointerId !== marquee.pointerId) return;
-    const finished = marquee;
-    marquee = null;
-    view?.removeEventListener('pointermove', onMarqueePointerMove);
-    view?.removeEventListener('pointerup', onMarqueePointerUp);
-    view?.removeEventListener('pointercancel', onMarqueePointerUp);
-    marqueeBox.hidden = true;
-    if (!finished.moved) {
-      select(null);
-      return;
-    }
-    const rect = viewport.getBoundingClientRect();
-    const left = Math.min(finished.startClientX, event.clientX) - rect.left;
-    const top = Math.min(finished.startClientY, event.clientY) - rect.top;
-    const right = Math.max(finished.startClientX, event.clientX) - rect.left;
-    const bottom = Math.max(finished.startClientY, event.clientY) - rect.top;
-    const nodeId = nodeWithLargestIntersection(left, top, right, bottom);
-    if (nodeId === undefined) {
-      select(null);
-      return;
-    }
-    selectFromPointer({ kind: 'node', id: nodeId }, event);
-  }
-
-  function nodeWithLargestIntersection(
-    left: number,
-    top: number,
-    right: number,
-    bottom: number,
-  ): string | undefined {
-    let bestId: string | undefined;
-    let bestArea = 0;
-    const rect = viewport.getBoundingClientRect();
-    for (const card of layers.querySelectorAll<HTMLElement>('.designer-blueprint-canvas-node')) {
-      const cardRect = card.getBoundingClientRect();
-      const cardLeft = cardRect.left - rect.left;
-      const cardTop = cardRect.top - rect.top;
-      const width = Math.max(
-        0,
-        Math.min(cardLeft + cardRect.width, right) - Math.max(cardLeft, left),
-      );
-      const height = Math.max(
-        0,
-        Math.min(cardTop + cardRect.height, bottom) - Math.max(cardTop, top),
-      );
-      const area = width * height;
-      if (area > bestArea && card.dataset.nodeId !== undefined) {
-        bestArea = area;
-        bestId = card.dataset.nodeId;
-      }
-    }
-    return bestId;
-  }
-
-  function startPan(event: PointerEvent): void {
-    pan = {
-      pointerId: event.pointerId,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startX: viewportValue.x,
-      startY: viewportValue.y,
-      moved: false,
-    };
-    viewport.dataset.panning = 'true';
-    viewport.setPointerCapture(event.pointerId);
-    view?.addEventListener('pointermove', onPanPointerMove);
-    view?.addEventListener('pointerup', onPanPointerUp);
-    view?.addEventListener('pointercancel', onPanPointerUp);
-  }
-
-  function onViewportCapturePointerDown(event: PointerEvent): void {
-    if (event.button !== 0 || !spacePressed) return;
-    const target = event.target instanceof Element ? event.target : null;
-    if (
-      target?.closest(
-        '[data-canvas-empty], [data-canvas-simulation], [data-canvas-simulation-bar], [data-canvas-problems], [data-canvas-no-events], [data-canvas-menu], [data-canvas-status]',
-      ) != null
-    ) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    armed = null;
-    startPan(event);
-  }
-
-  function onPanPointerMove(event: PointerEvent): void {
-    if (pan === null || event.pointerId !== pan.pointerId) return;
-    const dx = event.clientX - pan.startClientX;
-    const dy = event.clientY - pan.startClientY;
-    if (!pan.moved && Math.abs(dx) + Math.abs(dy) < 3) return;
-    pan = { ...pan, moved: true };
-    viewportValue = { ...viewportValue, x: pan.startX + dx, y: pan.startY + dy };
-    viewportsDirty = true;
-    applyTransform();
-  }
-
-  function onPanPointerUp(event: PointerEvent): void {
-    if (pan === null || event.pointerId !== pan.pointerId) return;
-    const finished = pan;
-    pan = null;
-    viewport.dataset.panning = 'false';
-    view?.removeEventListener('pointermove', onPanPointerMove);
-    view?.removeEventListener('pointerup', onPanPointerUp);
-    view?.removeEventListener('pointercancel', onPanPointerUp);
-    if (finished.moved) commitViewport();
-  }
-
-  function isEditableEventTarget(event: Event): boolean {
-    const target = event.composedPath()[0];
-    if (!(target instanceof HTMLElement)) return false;
-    return (
-      target.isContentEditable ||
-      target.closest('input, textarea, select, button, a, [contenteditable="true"]') !== null
+  private height(node: BaseScreenBlueprintCanvasNode): number {
+    return Math.max(
+      MIN_NODE_HEIGHT,
+      HEADER_HEIGHT + BODY_TOP + this.rows(node).length * ROW_HEIGHT + BODY_BOTTOM + NODE_BORDER,
     );
   }
 
-  function onWindowKeyDown(event: KeyboardEvent): void {
-    if (event.code !== 'Space' || isEditableEventTarget(event)) return;
-    if (state?.active !== true || root.getClientRects().length === 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-    spacePressed = true;
-    viewport.dataset.hand = 'true';
-  }
-
-  function onWindowKeyUp(event: KeyboardEvent): void {
-    if (event.code !== 'Space' || !spacePressed) return;
-    spacePressed = false;
-    viewport.dataset.hand = 'false';
-  }
-
-  function onWindowBlur(): void {
-    spacePressed = false;
-    viewport.dataset.hand = 'false';
-    if (pan === null) return;
-    viewport.dataset.panning = 'false';
-    pan = null;
-    view?.removeEventListener('pointermove', onPanPointerMove);
-    view?.removeEventListener('pointerup', onPanPointerUp);
-    view?.removeEventListener('pointercancel', onPanPointerUp);
-    viewportsDirty = true;
-  }
-
-  function onWheel(event: WheelEvent): void {
-    event.preventDefault();
-    if (event.ctrlKey || event.metaKey) {
-      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
-      const next = clampZoom(viewportValue.zoom * factor);
-      const point = screenToGraph(event.clientX, event.clientY);
-      const rect = viewport.getBoundingClientRect();
-      viewportValue = {
-        zoom: next,
-        x: event.clientX - rect.left - point.x * next,
-        y: event.clientY - rect.top - point.y * next,
-      };
-    } else {
-      const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 512 : 1;
-      const dx = (event.shiftKey ? event.deltaY : event.deltaX) * scale;
-      const dy = (event.shiftKey ? event.deltaX : event.deltaY) * scale;
-      viewportValue = {
-        ...viewportValue,
-        x: viewportValue.x - dx,
-        y: viewportValue.y - dy,
-      };
-    }
-    applyTransform();
-    scheduleViewportCommit();
-  }
-
-  function clampZoom(value: number): number {
-    return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(value * 1000) / 1000));
-  }
-
-  function stepZoom(direction: 1 | -1): void {
-    const current = viewportValue.zoom;
-    const next =
-      direction > 0
-        ? (ZOOM_STEPS.find((step) => step > current + 0.001) ?? ZOOM_MAX)
-        : ([...ZOOM_STEPS].reverse().find((step) => step < current - 0.001) ?? ZOOM_MIN);
-    zoomTo(clampZoom(next));
-  }
-
-  function zoomTo(next: number): void {
-    const rect = viewport.getBoundingClientRect();
-    const centerX = (rect.width / 2 - viewportValue.x) / viewportValue.zoom;
-    const centerY = (rect.height / 2 - viewportValue.y) / viewportValue.zoom;
-    viewportValue = {
-      zoom: next,
-      x: rect.width / 2 - centerX * next,
-      y: rect.height / 2 - centerY * next,
+  private portPoint(
+    node: BaseScreenBlueprintCanvasNode,
+    port: string,
+    direction: 'in' | 'out',
+  ): Point {
+    const rows = this.rows(node);
+    const index = Math.max(
+      0,
+      rows.findIndex((row) =>
+        port === 'semantic'
+          ? row === 'semantic'
+          : row !== 'semantic' && row.id === port && row.direction === direction,
+      ),
+    );
+    const origin = this.position(node);
+    return {
+      x:
+        direction === 'out'
+          ? origin.x + NODE_WIDTH + PORT_EDGE_OFFSET
+          : origin.x - PORT_EDGE_OFFSET,
+      y: origin.y + 1 + HEADER_HEIGHT + BODY_TOP + index * ROW_HEIGHT + ROW_HEIGHT / 2,
     };
-    applyTransform();
-    commitViewport();
   }
 
-  function fitView(
-    targets?: readonly BaseScreenBlueprintCanvasNode[],
-    commit = true,
-    extraBottom = 0,
-  ): void {
-    const current = graph();
-    if (current === null) return;
-    const nodes = targets ?? current.nodes;
-    if (nodes.length === 0) {
-      viewportValue = { x: 0, y: 0, zoom: 1 };
-      applyTransform();
-      if (commit) commitViewport();
+  private toWorld(clientX: number, clientY: number): Point {
+    const rect = this.#stage.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left - this.#view.x) / this.#view.z,
+      y: (clientY - rect.top - this.#view.y) / this.#view.z,
+    };
+  }
+
+  private visibleEdge(edge: BaseScreenBlueprintCanvasEdge): boolean {
+    return edge.kind !== 'semantic' || (this.#showSemantic && (this.#state?.showSemantic ?? true));
+  }
+
+  // ── 渲染 ──────────────────────────────────────────────────────────────
+
+  private render(): void {
+    this.renderNodes();
+    this.renderEdges();
+    this.renderToolbar();
+    this.renderSimulation();
+    const empty = this.graph.nodes.length === 0;
+    this.#empty.hidden = !empty;
+    if (empty) {
+      this.#empty.innerHTML = `<strong>${escapeHtml(DESIGNER_UI_TEXT.blueprint.directNodeHint)}</strong>`;
+    }
+  }
+
+  private renderNodes(): void {
+    const trace = this.#showTrace ? this.#state?.trace : null;
+    this.#tracedNodes = new Set(trace?.visitedNodeIds ?? []);
+    const connected = this.connectedPorts();
+    const categories = this.portCategories();
+    const markup = this.graph.nodes
+      .map((node) => {
+        const position = this.position(node);
+        const rows = this.rows(node)
+          .map((row) => {
+            if (row === 'semantic') {
+              const used = connected.has(`${node.id}\u0000semantic`);
+              return `<div class="bp-anchor bp-anchor-semantic"><span class="bp-port bp-port-semantic${used ? ' is-used' : ''}" data-bp-node="${escapeAttribute(node.id)}" data-bp-port="semantic" data-bp-dir="in"></span><span class="bp-anchor-label">${escapeHtml(TEXT.ports.semantic ?? '')}</span><span class="bp-port bp-port-semantic${used ? ' is-used' : ''}" data-bp-node="${escapeAttribute(node.id)}" data-bp-port="semantic" data-bp-dir="out"></span></div>`;
+            }
+            const tip =
+              row.unavailableReason === undefined ? row.id : `${row.id} · ${row.unavailableReason}`;
+            const category = categories.get(`${node.id}\u0000${row.direction}\u0000${row.id}`);
+            return `<div class="bp-anchor" data-dir="${row.direction}" data-available="${String(row.available)}" title="${escapeAttribute(tip)}"><span class="bp-port${row.connected ? ' is-used' : ''}" data-bp-node="${escapeAttribute(node.id)}" data-bp-port="${escapeAttribute(row.id)}" data-bp-dir="${row.direction}" data-available="${String(row.available)}"${category === undefined ? '' : ` data-category="${category}"`}></span><span class="bp-anchor-label">${escapeHtml(row.label)}</span></div>`;
+          })
+          .join('');
+        // 从画布按显示方式称呼（页面 / 弹框），图标也随之区分；锚点 id 不变（ADR-0109 D2）。
+        const kindName =
+          node.kind === 'sub-canvas' && node.canvasDisplay !== undefined
+            ? TEXT.subCanvasKinds[node.canvasDisplay]
+            : TEXT.nodeKinds[node.kind];
+        const kindIcon: DesignerIconName =
+          node.kind === 'sub-canvas' && node.canvasDisplay === 'page'
+            ? 'doc'
+            : KIND_ICONS[node.kind];
+        const title =
+          this.#renaming === node.id
+            ? `<input class="bp-rename" data-bp-rename-input value="${escapeAttribute(node.name ?? node.title)}" maxlength="64" aria-label="${escapeAttribute(TEXT.nodeName)}">`
+            : escapeHtml(node.title);
+        return `<div class="bp-node" data-bp-node-id="${escapeAttribute(node.id)}" data-kind="${node.kind}" data-enabled="${String(node.enabled)}" style="left:${position.x}px;top:${position.y}px;min-height:${this.height(node)}px" role="group" aria-label="${escapeAttribute(`${kindName} ${node.title}`)}">
+          <div class="bp-node-header" data-bp-drag="${escapeAttribute(node.id)}" title="${escapeAttribute(`${node.title} · ${node.subtitle}`)}"><span class="bp-node-icon" aria-hidden="true">${designerIcon(kindIcon)}</span><span class="bp-node-heading"><span class="bp-node-title" data-bp-rename="${escapeAttribute(node.id)}">${title}</span>${
+            // 类型名与标题相同（业务系统、实例就绪、未改名的条件判断）时不重复一行。
+            node.title === kindName
+              ? ''
+              : `<span class="bp-node-kind">${escapeHtml(kindName)}</span>`
+          }</span></div>
+          <div class="bp-node-content">${rows}</div>
+        </div>`;
+      })
+      .join('');
+    if (markup === this.#nodesMarkup) {
+      this.applyNodeState();
       return;
     }
-    let minX = Number.POSITIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
-    let maxY = Number.NEGATIVE_INFINITY;
-    for (const node of nodes) {
-      const position = positionOf(node);
-      const geometry = geometryOf(node);
-      minX = Math.min(minX, position.x);
-      minY = Math.min(minY, position.y);
-      maxX = Math.max(maxX, position.x + geometry.width);
-      maxY = Math.max(maxY, position.y + geometry.height);
-    }
-    const rect = viewport.getBoundingClientRect();
-    const width = Math.max(1, maxX - minX);
-    const height = Math.max(1, maxY - minY);
-    const availableWidth = Math.max(1, rect.width - FIT_PADDING * 2);
-    const availableHeight = Math.max(1, rect.height - FIT_PADDING * 2 - extraBottom);
-    const zoom = clampZoom(Math.min(1.15, availableWidth / width, availableHeight / height));
-    viewportValue = {
-      zoom,
-      x: (rect.width - width * zoom) / 2 - minX * zoom,
-      y: (rect.height - extraBottom - height * zoom) / 2 - minY * zoom,
-    };
-    applyTransform();
-    if (commit) commitViewport();
-  }
-
-  function autoLayout(): void {
-    const current = graph();
-    if (current === null || current.nodes.length === 0) return;
-    positions = computeAutoLayout(current.nodes);
-    sessionLayout = false;
-    renderGraph();
-    fitView(undefined, false, simulationOpen ? SIMULATION_INSET : SIMULATION_BAR_INSET);
-    commitLayout();
-    setStatus(text.statusLayoutApplied);
-  }
-
-  function computeAutoLayout(nodes: readonly BaseScreenBlueprintCanvasNode[]): Map<string, Point> {
-    const next = new Map<string, Point>();
-    const components = nodes.filter((node) => node.kind === 'component');
-    const variables = nodes.filter((node) => node.kind === 'variable');
-    const hosts = nodes.filter((node) => node.kind === 'host');
-    const currentEdges = graph()?.edges ?? [];
-    const readOnlyVariables = variables.filter(
-      (node) => !currentEdges.some((edge) => edge.target === node.id && edge.kind === 'relation'),
-    );
-    // 只被读取的变量排到组件左侧，读取依赖全部变成左→右；有写入时留在右侧承接写回。
-    const variablesOnLeft = variables.length > 0 && readOnlyVariables.length === variables.length;
-    // 336/336 面板下画布更窄：宽画布排三列组件，窄画布两列，避免 fit 缩到不可读。
-    const desiredColumns = viewport.clientWidth >= 900 ? 3 : 2;
-    const columns = Math.max(1, Math.min(components.length, desiredColumns));
-    const componentRowStep = Math.max(0, ...components.map((node) => geometryOf(node).height)) + 28;
-    const depth = relationDepths(nodes);
-    const ordered = [...components].sort((left, right) => {
-      const delta = (depth.get(left.id) ?? 0) - (depth.get(right.id) ?? 0);
-      return delta === 0 ? 0 : delta;
-    });
-    const componentBaseX = GRAPH_PADDING + (variablesOnLeft ? COLUMN_STEP : 0);
-    const rows = Math.max(1, Math.ceil(ordered.length / columns));
-    ordered.forEach((node, index) => {
-      const column = Math.floor(index / rows);
-      const row = index % rows;
-      next.set(node.id, {
-        x: componentBaseX + column * COLUMN_STEP,
-        y: GRAPH_PADDING + row * componentRowStep,
+    this.#nodesMarkup = markup;
+    this.#nodes.innerHTML = markup;
+    this.applyNodeState();
+    const input = this.#nodes.querySelector<HTMLInputElement>('[data-bp-rename-input]');
+    if (input !== null) {
+      input.focus();
+      input.select();
+      input.addEventListener('pointerdown', (event) => event.stopPropagation());
+      input.addEventListener('keydown', (event) => {
+        event.stopPropagation();
+        if (event.key === 'Enter') input.blur();
+        if (event.key === 'Escape') {
+          this.#renaming = undefined;
+          this.renderNodes();
+        }
       });
-    });
-    const rightmostColumnX = componentBaseX + Math.max(0, columns - 1) * COLUMN_STEP;
-    const componentBottom = (columnX: number): number =>
-      ordered.reduce((bottom, node) => {
-        const point = next.get(node.id);
-        return point !== undefined && point.x === columnX
-          ? Math.max(bottom, point.y + geometryOf(node).height)
-          : bottom;
-      }, GRAPH_PADDING);
-    let variableRightCursor = GRAPH_PADDING;
-    if (variablesOnLeft) {
-      let cursor = GRAPH_PADDING;
-      for (const node of readOnlyVariables) {
-        next.set(node.id, { x: GRAPH_PADDING, y: cursor });
-        cursor += geometryOf(node).height + 20;
-      }
-    } else {
-      const variableX = componentBaseX + columns * COLUMN_STEP;
-      for (const node of variables) {
-        next.set(node.id, { x: variableX, y: variableRightCursor });
-        variableRightCursor += geometryOf(node).height + 20;
-      }
+      input.addEventListener('blur', () => this.finishRename(input.value));
     }
-    const hostX = componentBaseX + columns * COLUMN_STEP;
-    let hostY = variablesOnLeft ? GRAPH_PADDING : variableRightCursor;
-    if (variablesOnLeft && hosts.length > 0) {
-      hostY = Math.max(GRAPH_PADDING, componentBottom(rightmostColumnX));
-    }
-    for (const node of hosts) {
-      next.set(node.id, { x: hostX, y: hostY });
-      hostY += geometryOf(node).height + 24;
-    }
-    return next;
   }
 
-  function relationDepths(nodes: readonly BaseScreenBlueprintCanvasNode[]): Map<string, number> {
-    const depths = new Map<string, number>(nodes.map((node) => [node.id, 0] as const));
-    const relations = (graph()?.edges ?? []).filter(
-      (edge) => edge.kind === 'relation' || edge.kind === 'semantic',
+  private connectedPorts(): ReadonlySet<string> {
+    const set = new Set<string>();
+    for (const edge of this.graph.edges) {
+      if (edge.kind === 'semantic') {
+        set.add(`${edge.source}\u0000semantic`);
+        set.add(`${edge.target}\u0000semantic`);
+      }
+    }
+    return set;
+  }
+
+  /** 锚点 → 第一条接上它的连线类别：接上连线的锚点染成连线同色。 */
+  private portCategories(): ReadonlyMap<string, string> {
+    const map = new Map<string, string>();
+    for (const edge of this.graph.edges) {
+      if (edge.kind === 'semantic') continue;
+      const out = `${edge.source}\u0000out\u0000${edge.sourcePort}`;
+      const input = `${edge.target}\u0000in\u0000${edge.targetPort}`;
+      if (!map.has(out)) map.set(out, edge.category);
+      if (!map.has(input)) map.set(input, edge.category);
+    }
+    return map;
+  }
+
+  private renderEdges(ghost?: { readonly from: Point; readonly to: Point }): void {
+    const trace = this.#showTrace ? this.#state?.trace : null;
+    const traced = new Set(trace?.executedEdgeIds ?? []);
+    let paths = '';
+    let labels = '';
+    for (const edge of this.graph.edges) {
+      if (!this.visibleEdge(edge)) continue;
+      const source = this.node(edge.source);
+      const target = this.node(edge.target);
+      if (source === undefined || target === undefined) continue;
+      const curve = bezier(
+        this.portPoint(source, edge.sourcePort, 'out'),
+        this.portPoint(target, edge.targetPort, 'in'),
+      );
+      // 选中 / 悬停不进标记，由 applyEdgeState 切换类名。
+      const classes = [
+        'bp-edge',
+        `is-${edge.kind}`,
+        edge.active ? '' : 'is-off',
+        traced.has(edge.id) ? 'is-traced' : '',
+      ]
+        .filter((name) => name !== '')
+        .join(' ');
+      // 主线 / 轨迹流动虚线 / 方向箭头 / 命中区；中性灰，选中链路与轨迹换强调色（见连线样式）。
+      paths += `<g class="${classes}" data-bp-edge-group="${escapeAttribute(edge.id)}" data-bp-edge-source="${escapeAttribute(edge.source)}" data-bp-edge-target="${escapeAttribute(edge.target)}" data-category="${edge.category}"><path class="bp-edge-line" d="${curve.d}"/><path class="bp-edge-flow" d="${curve.d}"/><path class="bp-edge-arrow" d="M-4.5,-4 L4,0 L-4.5,4 L-2.5,0 Z" transform="translate(${curve.mid.x} ${curve.mid.y}) rotate(${curve.angle})"/><path class="bp-edge-hit" data-bp-edge="${escapeAttribute(edge.id)}" d="${curve.d}"/></g>`;
+      const order =
+        edge.order !== undefined && (edge.siblingCount ?? 1) > 1 ? `#${edge.order} ` : '';
+      labels += `<div class="bp-edge-label" data-bp-edge-label="${escapeAttribute(edge.id)}" data-category="${edge.category}" style="left:${curve.mid.x}px;top:${curve.mid.y}px">${escapeHtml(order + edge.label)}</div>`;
+    }
+    if (ghost !== undefined) {
+      paths += `<path class="bp-edge-ghost" d="${bezier(ghost.from, ghost.to).d}"/><circle class="bp-edge-ghost-end" cx="${ghost.to.x}" cy="${ghost.to.y}" r="4"/>`;
+    }
+    const markup = `${paths}\u0000${labels}`;
+    if (markup !== this.#edgesMarkup) {
+      this.#edgesMarkup = markup;
+      this.#edges.innerHTML = paths;
+      this.#labels.innerHTML = labels;
+    }
+    this.applyEdgeState();
+  }
+
+  /** 选中态只改属性：节点 / 连线的 DOM 保持不动（见 #nodesMarkup 注释）。 */
+  private renderSelection(): void {
+    this.applyNodeState();
+    this.applyEdgeState();
+  }
+
+  /**
+   * 聚焦：有选中时，与选中节点 / 连线直接相连的节点与连线保持原样，其余淡出，
+   * 选中链路上的连线显示流动方向。只改属性，不重建 DOM。
+   */
+  private focusSets(): {
+    readonly nodes: ReadonlySet<string>;
+    readonly edges: ReadonlySet<string>;
+  } {
+    const selectedNodes = new Set(this.#selection.nodes);
+    const selectedEdges = new Set(this.#selection.edges);
+    const nodes = new Set<string>();
+    const edges = new Set<string>();
+    for (const edge of this.graph.edges) {
+      if (!this.visibleEdge(edge)) continue;
+      if (
+        selectedEdges.has(edge.id) ||
+        selectedNodes.has(edge.source) ||
+        selectedNodes.has(edge.target)
+      ) {
+        edges.add(edge.id);
+        nodes.add(edge.source);
+        nodes.add(edge.target);
+      }
+    }
+    return { nodes, edges };
+  }
+
+  private applyFocus(): void {
+    const total = this.#selection.nodes.length + this.#selection.edges.length;
+    this.#stage.dataset.focus = String(total > 0);
+  }
+
+  private applyNodeState(): void {
+    this.applyFocus();
+    const related = this.focusSets().nodes;
+    for (const element of this.#nodes.querySelectorAll<HTMLElement>('[data-bp-node-id]')) {
+      const id = element.dataset.bpNodeId ?? '';
+      const selected = this.#selection.nodes.includes(id);
+      element.dataset.selected = String(selected);
+      element.dataset.related = String(!selected && related.has(id));
+      element.dataset.traced = String(this.#tracedNodes.has(id) && !selected);
+    }
+  }
+
+  private applyEdgeState(): void {
+    this.applyFocus();
+    const selected = new Set(this.#selection.edges);
+    const related = this.focusSets().edges;
+    for (const group of this.#edges.querySelectorAll<SVGGElement>('[data-bp-edge-group]')) {
+      const id = group.dataset.bpEdgeGroup ?? '';
+      group.classList.toggle('is-selected', selected.has(id));
+      group.classList.toggle('is-related', related.has(id));
+      group.classList.toggle('is-hover', id === this.#hoverEdge);
+    }
+    for (const label of this.#labels.querySelectorAll<HTMLElement>('[data-bp-edge-label]')) {
+      const id = label.dataset.bpEdgeLabel ?? '';
+      label.classList.toggle('is-selected', selected.has(id));
+      label.classList.toggle('is-visible', id === this.#hoverEdge);
+    }
+  }
+
+  private setHoverEdge(id: string | undefined): void {
+    if (this.#hoverEdge === id) return;
+    this.#hoverEdge = id;
+    for (const group of this.#edges.querySelectorAll<SVGGElement>('[data-bp-edge-group]')) {
+      group.classList.toggle('is-hover', group.dataset.bpEdgeGroup === id);
+    }
+    for (const label of this.#labels.querySelectorAll<HTMLElement>('[data-bp-edge-label]')) {
+      label.classList.toggle('is-visible', label.dataset.bpEdgeLabel === id);
+    }
+  }
+
+  private renderToolbar(): void {
+    const state = this.#state;
+    const toolbar = DESIGNER_UI_TEXT.blueprint.graph.toolbar;
+    const button = (action: string, icon: DesignerIconName, label: string, extra = '') =>
+      `<button type="button" class="designer-control designer-button bp-tool" data-bp-tool="${action}" aria-label="${escapeAttribute(label)}" data-tip="${escapeAttribute(label)}"${extra}>${designerIcon(icon)}</button>`;
+    const errors = state?.diagnostics.filter((item) => item.severity === 'error').length ?? 0;
+    const markup = `<div class="bp-tool-group">
+        <button type="button" class="designer-control designer-button bp-tool bp-tool-wide" data-bp-tool="add" aria-haspopup="menu" aria-label="${escapeAttribute(toolbar.addNode)}" data-tip="${escapeAttribute(toolbar.addNode)}">${designerIcon('plus')}<span>${escapeHtml(toolbar.addNode)}</span></button>
+        ${button('auto-layout', 'grid', toolbar.autoLayout)}
+      </div>
+      <div class="bp-tool-group">
+        ${button('undo', 'undo', DESIGNER_UI_TEXT.blueprint.graph.toolbar.undo, state?.canUndo === true ? '' : ' disabled')}
+        ${button('redo', 'redo', DESIGNER_UI_TEXT.blueprint.graph.toolbar.redo, state?.canRedo === true ? '' : ' disabled')}
+      </div>
+      <div class="bp-tool-group">
+        ${button('semantic', 'link', toolbar.semantic, ` aria-pressed="${String(this.#showSemantic)}"`)}
+        ${button('trace', 'activity', toolbar.highlightTrace, ` aria-pressed="${String(this.#showTrace)}"`)}
+        <span class="bp-tool-status" data-state="${errors === 0 ? 'ok' : 'error'}" aria-live="polite">${designerIcon(errors === 0 ? 'check-circle' : 'x-circle')}<span>${escapeHtml(errors === 0 ? DESIGNER_UI_TEXT.blueprint.problemsHealthy : `${DESIGNER_UI_TEXT.blueprint.problemsTitle} ${errors}`)}</span></span>
+      </div>
+      <div class="bp-tool-group bp-tool-group-end">
+        ${button('zoom-out', 'zoom-out', toolbar.zoomOut)}
+        <span class="bp-zoom-value" data-bp-zoom>${Math.round(this.#view.z * 100)}%</span>
+        ${button('zoom-in', 'zoom-in', toolbar.zoomIn)}
+        ${button('fit', 'fit', toolbar.fit)}
+        <button type="button" class="designer-control designer-button bp-tool bp-tool-wide" data-bp-tool="simulate" data-variant="${this.#simulationOpen ? 'primary' : 'neutral'}" aria-pressed="${String(this.#simulationOpen)}" aria-label="${escapeAttribute(toolbar.simulate)}" data-tip="${escapeAttribute(toolbar.simulate)}">${designerIcon('play')}<span>${escapeHtml(toolbar.simulate)}</span></button>
+      </div>`;
+    // 结构没变就不重建：按住工具栏按钮时被换掉同样会丢 click。
+    if (markup === this.#toolbarMarkup) return;
+    this.#toolbarMarkup = markup;
+    this.#toolbar.innerHTML = markup;
+    adoptDesignerFormControls(this.#toolbar);
+  }
+
+  private renderSimulation(): void {
+    this.#simulation.hidden = !this.#simulationOpen;
+    if (!this.#simulationOpen) {
+      this.#simulationMarkup = '';
+      return;
+    }
+    const text = TEXT.simulation;
+    const triggers = this.#state?.simulationTriggers ?? [];
+    const key = (trigger: { nodeId: string; port: string }) =>
+      `${trigger.nodeId}\u0000${trigger.port}`;
+    if (
+      this.#simulationTrigger === undefined ||
+      !triggers.some((trigger) => key(trigger) === this.#simulationTrigger)
+    ) {
+      this.#simulationTrigger = triggers[0] === undefined ? undefined : key(triggers[0]);
+    }
+    const existing = this.#simulation.querySelector<HTMLTextAreaElement>('[data-bp-sim-payload]');
+    const payload = existing?.value ?? '{}';
+    const markup =
+      triggers.length === 0
+        ? `<p class="bp-simulation-empty">${escapeHtml(text.noTriggers)}</p>`
+        : `<label class="designer-field"><span class="designer-field-label">${escapeHtml(text.trigger)}</span><select class="designer-control designer-select" data-bp-sim-trigger>${triggers
+            .map(
+              (trigger) =>
+                `<option value="${escapeAttribute(key(trigger))}"${key(trigger) === this.#simulationTrigger ? ' selected' : ''}>${escapeHtml(trigger.label)}</option>`,
+            )
+            .join('')}</select></label>
+          <label class="designer-field bp-simulation-payload"><span class="designer-field-label">${escapeHtml(text.payload)}</span><textarea class="designer-control designer-input" data-bp-sim-payload rows="2" spellcheck="false">${escapeHtml(payload)}</textarea></label>
+          <div class="bp-simulation-actions">
+            <button type="button" class="designer-control designer-button" data-variant="primary" data-bp-sim="run">${designerIcon('play')}<span>${escapeHtml(text.run)}</span></button>
+            <button type="button" class="designer-control designer-button" data-bp-sim="clear"${this.#state?.trace === null ? ' disabled' : ''}>${escapeHtml(text.clear)}</button>
+          </div>
+          <p class="bp-simulation-message" data-bp-sim-message aria-live="polite"></p>`;
+    if (markup === this.#simulationMarkup) return;
+    this.#simulationMarkup = markup;
+    this.#simulation.innerHTML = markup;
+    adoptDesignerFormControls(this.#simulation);
+  }
+
+  private applyView(): void {
+    this.#world.style.transform = `translate(${this.#view.x}px, ${this.#view.y}px) scale(${this.#view.z})`;
+    // 只移动点阵层（见 .bp-stage 背景注释）；光晕层固定。
+    this.#stage.style.setProperty('--bp-pan-x', `${this.#view.x}px`);
+    this.#stage.style.setProperty('--bp-pan-y', `${this.#view.y}px`);
+    this.#stage.style.setProperty('--bp-zoom', String(this.#view.z));
+    this.#stage.dataset.zoomFar = String(this.#view.z < 0.6);
+    const zoom = this.#toolbar.querySelector<HTMLElement>('[data-bp-zoom]');
+    if (zoom !== null) zoom.textContent = `${Math.round(this.#view.z * 100)}%`;
+  }
+
+  private zoomAt(factor: number, x: number, y: number): void {
+    const zoom = clamp(this.#view.z * factor, MIN_ZOOM, MAX_ZOOM);
+    const ratio = zoom / this.#view.z;
+    this.#view = { x: x - (x - this.#view.x) * ratio, y: y - (y - this.#view.y) * ratio, z: zoom };
+    this.applyView();
+  }
+
+  private fit(): void {
+    const nodes = this.graph.nodes;
+    const rect = this.#stage.getBoundingClientRect();
+    if (nodes.length === 0 || rect.width === 0 || rect.height === 0) return;
+    const boxes = nodes.map((node) => ({ ...this.position(node), h: this.height(node) }));
+    const x0 = Math.min(...boxes.map((box) => box.x));
+    const y0 = Math.min(...boxes.map((box) => box.y));
+    const x1 = Math.max(...boxes.map((box) => box.x + NODE_WIDTH));
+    const y1 = Math.max(...boxes.map((box) => box.y + box.h));
+    const pad = 32;
+    const zoom = clamp(
+      Math.min((rect.width - pad * 2) / (x1 - x0), (rect.height - pad * 2) / (y1 - y0)),
+      MIN_ZOOM,
+      1.1,
     );
-    const limit = Math.min(nodes.length, 8);
-    for (let pass = 0; pass < limit; pass += 1) {
+    this.#view = {
+      z: zoom,
+      x: pad + (rect.width - pad * 2 - (x1 - x0) * zoom) / 2 - x0 * zoom,
+      y: pad + (rect.height - pad * 2 - (y1 - y0) * zoom) / 2 - y0 * zoom,
+    };
+    this.applyView();
+  }
+
+  private focus(targetId: string): void {
+    const node = this.node(targetId);
+    const edge = this.graph.edges.find((candidate) => candidate.id === targetId);
+    const anchor = node ?? (edge === undefined ? undefined : this.node(edge.source));
+    if (anchor === undefined) return;
+    const rect = this.#stage.getBoundingClientRect();
+    const position = this.position(anchor);
+    this.#view = {
+      ...this.#view,
+      x: rect.width / 2 - (position.x + NODE_WIDTH / 2) * this.#view.z,
+      y: rect.height / 2 - (position.y + this.height(anchor) / 2) * this.#view.z,
+    };
+    this.applyView();
+    const element = this.#nodes.querySelector<HTMLElement>(
+      `[data-bp-node-id="${cssEscape(anchor.id)}"]`,
+    );
+    element?.classList.add('is-flash');
+    setTimeout(() => element?.classList.remove('is-flash'), 600);
+  }
+
+  /** 按 flow 连线分层：列 = 最长上游路径，列内按当前纵坐标排序后等距堆叠。 */
+  private autoLayout(): void {
+    const nodes = this.graph.nodes;
+    const depth = new Map(nodes.map((node) => [node.id, 0]));
+    for (let pass = 0; pass < nodes.length; pass++) {
       let changed = false;
-      for (const edge of relations) {
-        const source = depths.get(edge.source);
-        const target = depths.get(edge.target);
-        if (source === undefined || target === undefined) continue;
-        const candidate = source + 1;
-        if (candidate > target && candidate < limit) {
-          depths.set(edge.target, candidate);
+      for (const edge of this.graph.edges) {
+        if (edge.kind !== 'flow') continue;
+        const next = Math.min((depth.get(edge.source) ?? 0) + 1, 24);
+        if (next > (depth.get(edge.target) ?? 0)) {
+          depth.set(edge.target, next);
           changed = true;
         }
       }
       if (!changed) break;
     }
-    return depths;
-  }
-
-  function columnOf(node: BaseScreenBlueprintCanvasNode | undefined): number {
-    if (node === undefined) return 0;
-    return node.kind === 'host' ? 2 : 0;
-  }
-
-  function placeNewNode(node: BaseScreenBlueprintCanvasNode | undefined): Point {
-    const column = columnOf(node);
-    const x = GRAPH_PADDING + column * COLUMN_STEP;
-    let bottom = 0;
-    for (const candidate of graph()?.nodes ?? []) {
-      if (candidate.id === node?.id) continue;
-      const position = positionOf(candidate);
-      if (Math.abs(position.x - x) > COLUMN_STEP / 2) continue;
-      bottom = Math.max(bottom, position.y + geometryOf(candidate).height);
+    const columns = new Map<number, BaseScreenBlueprintCanvasNode[]>();
+    for (const node of nodes) {
+      const column = depth.get(node.id) ?? 0;
+      const list = columns.get(column) ?? [];
+      list.push(node);
+      columns.set(column, list);
     }
-    return {
-      x,
-      y: bottom === 0 ? GRAPH_PADDING : bottom + 48,
+    for (const [column, list] of columns) {
+      let y = 24;
+      list.sort((left, right) => this.position(left).y - this.position(right).y);
+      for (const node of list) {
+        this.#positions.set(node.id, { x: 40 + column * 248, y });
+        y += this.height(node) + NODE_GAP;
+      }
+    }
+    this.render();
+    this.fit();
+    this.commitLayout();
+  }
+
+  private commitLayout(): void {
+    const nodes: ScreenBlueprintLayoutNode[] = this.graph.nodes.map((node) => {
+      const position = this.position(node);
+      return { id: node.id, x: Math.round(position.x), y: Math.round(position.y) };
+    });
+    this.send({
+      type: 'commit-layout',
+      nodes,
+      viewport: {
+        x: Math.round(this.#view.x),
+        y: Math.round(this.#view.y),
+        zoom: Math.round(this.#view.z * 1000) / 1000,
+      },
+    });
+  }
+
+  // ── 手势 ──────────────────────────────────────────────────────────────
+
+  private onPointerDown(event: PointerEvent): void {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest('[data-bp-rename-input]') !== null && target !== null) return;
+    this.element.focus({ preventScroll: true });
+    this.closeMenu();
+    const port = target?.closest<HTMLElement>('[data-bp-port]') ?? null;
+    const edgeHit = target?.closest<SVGElement>('[data-bp-edge]') ?? null;
+    const nodeElement = target?.closest<HTMLElement>('[data-bp-node-id]') ?? null;
+    const additive = event.ctrlKey || event.metaKey || event.shiftKey;
+    if (event.button === 2) {
+      this.#drag = {
+        type: 'context',
+        startX: event.clientX,
+        startY: event.clientY,
+        viewX: this.#view.x,
+        viewY: this.#view.y,
+        moved: false,
+        target,
+        additive,
+      };
+      this.#stage.setPointerCapture(event.pointerId);
+      return;
+    }
+    if (this.#space || event.button === 1) {
+      this.#drag = {
+        type: 'pan',
+        startX: event.clientX,
+        startY: event.clientY,
+        viewX: this.#view.x,
+        viewY: this.#view.y,
+        moved: false,
+        target,
+        additive,
+      };
+      this.#stage.classList.add('is-panning');
+      this.#stage.setPointerCapture(event.pointerId);
+      return;
+    }
+    if (event.button !== 0) return;
+    if (port !== null) {
+      const node = this.node(port.dataset.bpNode ?? '');
+      const portId = port.dataset.bpPort;
+      const direction = port.dataset.bpDir === 'in' ? 'in' : 'out';
+      if (node !== undefined && portId !== undefined && port.dataset.available !== 'false') {
+        const from = { node: node.id, port: portId };
+        this.#drag = {
+          type: 'link',
+          from,
+          direction,
+          anchor: this.portPoint(node, portId, direction),
+          snap: undefined,
+        };
+        this.#stage.classList.add('is-connecting');
+        this.markConnectable(from, direction);
+        this.#stage.setPointerCapture(event.pointerId);
+        return;
+      }
+    }
+    if (nodeElement !== null) {
+      const id = nodeElement.dataset.bpNodeId ?? '';
+      if (additive) {
+        const nodes = this.#selection.nodes.includes(id)
+          ? this.#selection.nodes.filter((candidate) => candidate !== id)
+          : [...this.#selection.nodes, id];
+        this.select({ nodes, edges: this.#selection.edges });
+        return;
+      }
+      if (!this.#selection.nodes.includes(id)) this.select({ nodes: [id], edges: [] });
+      const ids = this.#selection.nodes;
+      this.#drag = {
+        type: 'node',
+        ids,
+        origins: ids.map((nodeId) => {
+          const node = this.node(nodeId);
+          return node === undefined ? { x: 0, y: 0 } : this.position(node);
+        }),
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+      };
+      this.#stage.setPointerCapture(event.pointerId);
+      return;
+    }
+    if (edgeHit !== null) {
+      const id = edgeHit.dataset.bpEdge ?? '';
+      this.select(
+        additive
+          ? {
+              nodes: this.#selection.nodes,
+              edges: this.#selection.edges.includes(id)
+                ? this.#selection.edges.filter((candidate) => candidate !== id)
+                : [...this.#selection.edges, id],
+            }
+          : { nodes: [], edges: [id] },
+      );
+      return;
+    }
+    this.#drag = {
+      type: 'marquee',
+      startX: event.clientX,
+      startY: event.clientY,
+      world: this.toWorld(event.clientX, event.clientY),
+      moved: false,
+      additive,
+      base: this.#selection.nodes,
     };
+    this.#stage.setPointerCapture(event.pointerId);
   }
 
-  function scheduleInitialFit(): void {
-    pendingInitialFit = true;
-    const frame =
-      view?.requestAnimationFrame ??
-      ((callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0));
-    frame(() => {
-      if (!pendingInitialFit || destroyed) return;
-      const current = graph();
-      if (current === null || current.nodes.length === 0) return;
-      const rect = viewport.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-      pendingInitialFit = false;
-      initialFitDone = true;
-      fitView(current.nodes, false, simulationOpen ? SIMULATION_INSET : SIMULATION_BAR_INSET);
+  private onPointerMove(event: PointerEvent): void {
+    const drag = this.#drag;
+    if (drag === undefined) {
+      const hit = (event.target as Element | null)?.closest<SVGElement>('[data-bp-edge]');
+      this.setHoverEdge(hit?.dataset.bpEdge);
+      return;
+    }
+    if (drag.type === 'pan' || drag.type === 'context') {
+      const dx = event.clientX - drag.startX;
+      const dy = event.clientY - drag.startY;
+      if (!drag.moved && dx * dx + dy * dy < MENU_CLICK_TOLERANCE * MENU_CLICK_TOLERANCE) return;
+      drag.moved = true;
+      this.#stage.classList.add('is-panning');
+      this.#view = { ...this.#view, x: drag.viewX + dx, y: drag.viewY + dy };
+      this.applyView();
+      return;
+    }
+    if (drag.type === 'node') {
+      const dx = (event.clientX - drag.startX) / this.#view.z;
+      const dy = (event.clientY - drag.startY) / this.#view.z;
+      if (!drag.moved && Math.abs(dx) + Math.abs(dy) <= 2) return;
+      drag.moved = true;
+      drag.ids.forEach((id, index) => {
+        const origin = drag.origins[index] ?? { x: 0, y: 0 };
+        const next = {
+          x: Math.round((origin.x + dx) / GRID) * GRID,
+          y: Math.round((origin.y + dy) / GRID) * GRID,
+        };
+        this.#positions.set(id, next);
+        const element = this.#nodes.querySelector<HTMLElement>(
+          `[data-bp-node-id="${cssEscape(id)}"]`,
+        );
+        if (element !== null) {
+          element.style.left = `${next.x}px`;
+          element.style.top = `${next.y}px`;
+        }
+      });
+      // 拖动直接改了节点 DOM：作废结构标记，下一次 renderNodes 一定按当前位置重写。
+      this.#nodesMarkup = '';
+      this.renderEdges();
+      return;
+    }
+    if (drag.type === 'link') {
+      const wanted = drag.direction === 'out' ? 'in' : 'out';
+      let best: HTMLElement | undefined;
+      let bestDistance = SNAP_DISTANCE * SNAP_DISTANCE;
+      for (const port of this.#nodes.querySelectorAll<HTMLElement>(
+        `[data-bp-dir="${wanted}"]:not(.is-blocked)`,
+      )) {
+        const rect = port.getBoundingClientRect();
+        const distance =
+          (rect.left + rect.width / 2 - event.clientX) ** 2 +
+          (rect.top + rect.height / 2 - event.clientY) ** 2;
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = port;
+        }
+      }
+      for (const port of this.#nodes.querySelectorAll('.is-snap')) port.classList.remove('is-snap');
+      best?.classList.add('is-snap');
+      drag.snap =
+        best === undefined
+          ? undefined
+          : { node: best.dataset.bpNode ?? '', port: best.dataset.bpPort ?? '' };
+      const snapNode = drag.snap === undefined ? undefined : this.node(drag.snap.node);
+      const end =
+        snapNode === undefined || drag.snap === undefined
+          ? this.toWorld(event.clientX, event.clientY)
+          : this.portPoint(snapNode, drag.snap.port, wanted);
+      this.renderEdges(
+        drag.direction === 'out' ? { from: drag.anchor, to: end } : { from: end, to: drag.anchor },
+      );
+      return;
+    }
+    if (drag.type !== 'marquee') return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (!drag.moved && dx * dx + dy * dy < 16) return;
+    drag.moved = true;
+    const rect = this.#stage.getBoundingClientRect();
+    this.#marquee.hidden = false;
+    Object.assign(this.#marquee.style, {
+      left: `${Math.min(event.clientX, drag.startX) - rect.left}px`,
+      top: `${Math.min(event.clientY, drag.startY) - rect.top}px`,
+      width: `${Math.abs(dx)}px`,
+      height: `${Math.abs(dy)}px`,
     });
+    const point = this.toWorld(event.clientX, event.clientY);
+    const x0 = Math.min(point.x, drag.world.x);
+    const x1 = Math.max(point.x, drag.world.x);
+    const y0 = Math.min(point.y, drag.world.y);
+    const y1 = Math.max(point.y, drag.world.y);
+    const hits = this.graph.nodes
+      .filter((node) => {
+        const position = this.position(node);
+        return (
+          position.x < x1 &&
+          position.x + NODE_WIDTH > x0 &&
+          position.y < y1 &&
+          position.y + this.height(node) > y0
+        );
+      })
+      .map((node) => node.id);
+    this.#selection = {
+      nodes: drag.additive ? [...new Set([...drag.base, ...hits])] : hits,
+      edges: [],
+    };
+    this.renderSelection();
   }
 
-  function onInsert(): void {
-    sendCommand({ type: 'insert-node', kind: 'host' });
-    closeMenu();
+  private onPointerUp(event: PointerEvent): void {
+    const drag = this.#drag;
+    this.#drag = undefined;
+    this.#stage.classList.remove('is-panning');
+    if (drag === undefined) return;
+    if (drag.type === 'context') {
+      if (!drag.moved) this.openMenu(event.clientX, event.clientY, drag.target, drag.additive);
+      return;
+    }
+    if (drag.type === 'link') {
+      this.#stage.classList.remove('is-connecting');
+      for (const port of this.#nodes.querySelectorAll('.is-blocked, .is-snap')) {
+        port.classList.remove('is-blocked', 'is-snap');
+      }
+      const target = drag.snap;
+      if (target !== undefined) {
+        const [from, to] = drag.direction === 'out' ? [drag.from, target] : [target, drag.from];
+        this.send({ type: 'connect', from, to });
+      }
+      this.renderEdges();
+      return;
+    }
+    if (drag.type === 'node') {
+      if (drag.moved) this.commitLayout();
+      return;
+    }
+    if (drag.type === 'marquee') {
+      this.#marquee.hidden = true;
+      if (!drag.moved) {
+        if (!drag.additive) this.select({ nodes: [], edges: [] });
+      } else {
+        this.select(this.#selection);
+      }
+    }
   }
 
-  function runSimulation(): void {
-    if (eventSelect.value === '') {
-      setStatus(text.statusNoSimulationEvent, 'error');
-      return;
-    }
-    let trigger: { componentId?: unknown; eventName?: unknown };
-    try {
-      trigger = JSON.parse(eventSelect.value) as { componentId?: unknown; eventName?: unknown };
-    } catch {
-      setStatus(text.statusSimulationEventStale, 'error');
-      return;
-    }
-    if (typeof trigger.componentId !== 'string' || typeof trigger.eventName !== 'string') return;
-    let payload: unknown;
-    try {
-      payload = JSON.parse(payloadInput.value);
-    } catch {
-      setStatus(text.statusSimulationPayloadInvalid, 'error');
-      return;
-    }
-    const command = sendCommand({
-      type: 'run-simulation',
-      componentId: trigger.componentId,
-      eventName: trigger.eventName,
-      payload: payload as never,
-    });
-    if (command !== undefined) lastRunCommandId = command.commandId;
+  private cancelDrag(): void {
+    this.#drag = undefined;
+    this.#marquee.hidden = true;
+    this.#stage.classList.remove('is-panning', 'is-connecting');
+    this.renderEdges();
   }
 
-  function onDrop(event: DragEvent): void {
-    const transfer = event.dataTransfer;
-    if (transfer === null) return;
-    const raw = transfer.getData(BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME);
-    if (raw === '') return;
+  /** 连线拖动时把不能接受的锚点淡显（方向不符、同节点、语义 / flow 不匹配、不可用）。 */
+  private markConnectable(from: PortRef, direction: 'in' | 'out'): void {
+    const wanted = direction === 'out' ? 'in' : 'out';
+    const semantic = from.port === 'semantic';
+    for (const port of this.#nodes.querySelectorAll<HTMLElement>('[data-bp-port]')) {
+      const blocked =
+        port.dataset.bpDir !== wanted ||
+        port.dataset.bpNode === from.node ||
+        (port.dataset.bpPort === 'semantic') !== semantic ||
+        port.dataset.available === 'false';
+      port.classList.toggle('is-blocked', blocked);
+    }
+  }
+
+  private onDoubleClick(event: MouseEvent): void {
+    const target = this.#document
+      .elementFromPoint?.(event.clientX, event.clientY)
+      ?.closest<HTMLElement>('[data-bp-rename]');
+    const id =
+      target?.dataset.bpRename ??
+      (event.target as Element | null)?.closest<HTMLElement>('[data-bp-rename]')?.dataset.bpRename;
+    if (id !== undefined) {
+      event.preventDefault();
+      this.startRename(id);
+    }
+  }
+
+  private onWheel(event: WheelEvent): void {
+    event.preventDefault();
+    if (event.ctrlKey || event.metaKey) {
+      const rect = this.#stage.getBoundingClientRect();
+      this.zoomAt(
+        event.deltaY < 0 ? 1.1 : 1 / 1.1,
+        event.clientX - rect.left,
+        event.clientY - rect.top,
+      );
+      return;
+    }
+    this.#view = {
+      ...this.#view,
+      x: this.#view.x - (event.shiftKey ? event.deltaY : event.deltaX),
+      y: this.#view.y - (event.shiftKey ? 0 : event.deltaY),
+    };
+    this.applyView();
+  }
+
+  private onDragOver(event: DragEvent): void {
+    if (event.dataTransfer?.types.includes(BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME) !== true) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }
+
+  private onDrop(event: DragEvent): void {
+    const raw = event.dataTransfer?.getData(BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME);
+    if (raw === undefined || raw === '') return;
     event.preventDefault();
     let payload: BaseScreenBlueprintCanvasInsertNode;
     try {
       payload = JSON.parse(raw) as BaseScreenBlueprintCanvasInsertNode;
     } catch {
-      setStatus(text.statusDropInvalid, 'error');
       return;
     }
-    const point = screenToGraph(event.clientX, event.clientY);
-    sendCommand({
-      ...payload,
+    const point = this.toWorld(event.clientX, event.clientY);
+    this.send({
       type: 'insert-node',
-      position: { x: snap(point.x), y: snap(point.y) },
-    } as CommandInput);
+      ...payload,
+      position: {
+        x: Math.round(point.x - NODE_WIDTH / 2),
+        y: Math.round(point.y - HEADER_HEIGHT / 2),
+      },
+    } as never);
   }
 
-  function onKeyDown(event: KeyboardEvent): void {
+  private onKeyDown(event: KeyboardEvent): void {
+    if ((event.target as Element | null)?.closest('input, textarea, select') !== null) return;
+    const mod = event.ctrlKey || event.metaKey;
+    if (event.code === 'Space') {
+      this.#space = true;
+      this.#stage.classList.add('is-space');
+      event.preventDefault();
+      return;
+    }
     if (event.key === 'Escape') {
-      if (menuOpen) {
-        closeMenu();
-        return;
-      }
-      if (problemsOpen) {
-        problemsOpen = false;
-        renderProblems();
-        return;
-      }
-      if (simulationOpen) {
-        closeSimulation();
-        fitView(undefined, false);
-        return;
-      }
-      if (armed !== null) {
-        armed = null;
-        renderGraph();
-        return;
-      }
-      if (state?.selection !== null && state?.selection !== undefined) {
-        select(null);
-        return;
-      }
+      if (!this.#menu.hidden) this.closeMenu();
+      else this.select({ nodes: [], edges: [] });
       return;
     }
-    if (event.key === '0' && (event.ctrlKey || event.metaKey)) {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (this.#selection.nodes.length + this.#selection.edges.length === 0) return;
       event.preventDefault();
-      fitView(undefined, true, simulationOpen ? SIMULATION_INSET : SIMULATION_BAR_INSET);
+      this.send({ type: 'delete-selection', selection: this.#selection });
       return;
     }
-    if (event.key !== 'Delete' && event.key !== 'Backspace') return;
-    if (state?.selection === null || state?.selection === undefined) return;
-    const target = event.target;
-    if (
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLSelectElement ||
-      target instanceof HTMLTextAreaElement
-    ) {
+    if (event.key === 'F2' && this.#selection.nodes.length === 1) {
+      event.preventDefault();
+      this.startRename(this.#selection.nodes[0] ?? '');
       return;
     }
-    event.preventDefault();
-    sendCommand({ type: 'delete-selection', selection: state.selection });
+    if (!mod) return;
+    const key = event.key.toLowerCase();
+    if (key === 'a') {
+      event.preventDefault();
+      this.select({ nodes: this.graph.nodes.map((node) => node.id), edges: [] });
+    } else if (key === 'd') {
+      event.preventDefault();
+      if (this.#selection.nodes.length > 0) {
+        this.send({ type: 'duplicate-nodes', nodeIds: this.#selection.nodes });
+      }
+    } else if (key === '0') {
+      event.preventDefault();
+      this.fit();
+    } else if (key === 'z') {
+      event.preventDefault();
+      this.send({ type: event.shiftKey ? 'history-redo' : 'history-undo' });
+    } else if (key === 'y') {
+      event.preventDefault();
+      this.send({ type: 'history-redo' });
+    }
   }
 
-  function onCanvasState(event: Event): void {
-    const detail = (event as CustomEvent<BaseScreenBlueprintCanvasStateEventDetail>).detail;
-    if (detail === null || typeof detail !== 'object' || detail.state === undefined) return;
-    const next = detail.state;
-    const generationChanged = next.generation !== generation;
-    state = next;
-    if (generationChanged) {
-      generation = next.generation;
-      readySent = false;
-      armed = null;
-      viewportValue = next.graph.viewport ?? { x: 0, y: 0, zoom: 1 };
-      lastAdoptedViewportKey = viewportKey(viewportValue);
-      lastSentViewportKey = '';
-      viewportsDirty = false;
-      lastEnginePositions = new Map(
-        next.graph.nodes.map((node) => [node.id, { x: node.x, y: node.y }]),
-      );
-      sessionLayout = next.graph.viewport === undefined;
-      positions = sessionLayout
-        ? computeAutoLayout(next.graph.nodes)
-        : new Map(lastEnginePositions);
-      hydrated = next.graph.nodes.length > 0;
-      initialFitDone = false;
-      pendingInitialFit = false;
-      lastRunCommandId = '';
-      closeSimulation(false);
-      scheduleInitialFit();
+  private startRename(id: string): void {
+    const node = this.node(id);
+    if (node === undefined || !node.renamable) return;
+    this.#renaming = id;
+    this.renderNodes();
+  }
+
+  private finishRename(value: string): void {
+    const id = this.#renaming;
+    this.#renaming = undefined;
+    const node = id === undefined ? undefined : this.node(id);
+    if (node !== undefined) {
+      const name = value.trim();
+      if (name !== (node.name ?? '') && name !== node.title) {
+        this.send({
+          type: 'update-node',
+          nodeIds: [node.id],
+          update: { type: 'name', name: name === '' ? null : name },
+        });
+      }
     }
-    if (!generationChanged) {
-      const engineNext = new Map(
-        next.graph.nodes.map((node) => [node.id, { x: node.x, y: node.y }]),
+    this.renderNodes();
+  }
+
+  // ── 工具栏 / 右键菜单 / 模拟 ─────────────────────────────────────────
+
+  private onToolbarClick(event: Event): void {
+    const tool = (event.target as Element).closest<HTMLButtonElement>('[data-bp-tool]');
+    if (tool === null || tool.disabled) return;
+    const rect = this.#stage.getBoundingClientRect();
+    switch (tool.dataset.bpTool) {
+      case 'add': {
+        const box = tool.getBoundingClientRect();
+        this.#contextPoint = this.toWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        this.openAddMenu(box.left, box.bottom + 4);
+        break;
+      }
+      case 'auto-layout':
+        this.autoLayout();
+        break;
+      case 'undo':
+        this.send({ type: 'history-undo' });
+        break;
+      case 'redo':
+        this.send({ type: 'history-redo' });
+        break;
+      case 'semantic':
+        this.#showSemantic = !this.#showSemantic;
+        this.render();
+        break;
+      case 'trace':
+        this.#showTrace = !this.#showTrace;
+        this.render();
+        break;
+      case 'zoom-in':
+        this.zoomAt(1.1, rect.width / 2, rect.height / 2);
+        break;
+      case 'zoom-out':
+        this.zoomAt(1 / 1.1, rect.width / 2, rect.height / 2);
+        break;
+      case 'fit':
+        this.fit();
+        break;
+      case 'simulate':
+        this.#simulationOpen = !this.#simulationOpen;
+        this.renderToolbar();
+        this.renderSimulation();
+        break;
+    }
+  }
+
+  private onSimulationClick(event: Event): void {
+    const action = (event.target as Element).closest<HTMLButtonElement>('[data-bp-sim]')?.dataset
+      .bpSim;
+    if (action === 'clear') {
+      this.send({ type: 'clear-simulation' });
+      return;
+    }
+    if (action !== 'run' || this.#simulationTrigger === undefined) return;
+    const [nodeId, port] = this.#simulationTrigger.split('\u0000');
+    const textarea = this.#simulation.querySelector<HTMLTextAreaElement>('[data-bp-sim-payload]');
+    let payload: ScreenJsonValue;
+    try {
+      payload = JSON.parse(textarea?.value.trim() || 'null') as ScreenJsonValue;
+    } catch {
+      const message = this.#simulation.querySelector<HTMLElement>('[data-bp-sim-message]');
+      if (message !== null) message.textContent = TEXT.simulation.invalidPayload;
+      return;
+    }
+    if (nodeId !== undefined && port !== undefined)
+      this.send({ type: 'run-simulation', nodeId, port, payload });
+  }
+
+  private menuItem(
+    action: string,
+    icon: DesignerIconName,
+    label: string,
+    options: { readonly kbd?: string; readonly danger?: boolean; readonly disabled?: boolean } = {},
+  ): string {
+    return `<button type="button" class="designer-control designer-button designer-menu-item" role="menuitem" data-bp-menu-action="${escapeAttribute(action)}"${options.danger === true ? ' data-menu-tone="danger"' : ''}${options.disabled === true ? ' disabled' : ''}><span class="menu-item-icon" aria-hidden="true">${designerIcon(icon)}</span><span class="menu-item-label">${escapeHtml(label)}</span>${options.kbd === undefined ? '' : `<kbd>${escapeHtml(options.kbd)}</kbd>`}</button>`;
+  }
+
+  private addItems(): string {
+    const present = new Set(this.graph.nodes.map((node) => node.kind));
+    return ADDABLE_KINDS.map((kind) =>
+      this.menuItem(`add:${kind}`, KIND_ICONS[kind], TEXT.nodeKinds[kind], {
+        disabled: (kind === 'host' || kind === 'lifecycle') && present.has(kind),
+      }),
+    ).join('');
+  }
+
+  /**
+   * 右键菜单（内容参考 LIGHT CHASER，样式用设计器 `.designer-context-menu`）：
+   * 有选中时置顶删除，其后节点操作；最后是「在此处新增节点」与全选 / 自动布局 / 适应画布。
+   */
+  private openMenu(
+    clientX: number,
+    clientY: number,
+    target: Element | null,
+    additive: boolean,
+  ): void {
+    const nodeElement = target?.closest<HTMLElement>('[data-bp-node-id]') ?? null;
+    const edgeHit = target?.closest<SVGElement>('[data-bp-edge]') ?? null;
+    if (nodeElement !== null) {
+      const id = nodeElement.dataset.bpNodeId ?? '';
+      if (!this.#selection.nodes.includes(id)) this.select({ nodes: [id], edges: [] });
+    } else if (edgeHit !== null) {
+      const id = edgeHit.dataset.bpEdge ?? '';
+      if (!this.#selection.edges.includes(id)) this.select({ nodes: [], edges: [id] });
+    } else if (!additive && this.#selection.nodes.length + this.#selection.edges.length > 0) {
+      this.select({ nodes: [], edges: [] });
+    }
+    this.#contextPoint = this.toWorld(clientX, clientY);
+    const menu = TEXT.menu;
+    const nodes = this.#selection.nodes.map((id) => this.node(id)).filter(isDefined);
+    const single = nodes.length === 1 ? nodes[0] : undefined;
+    let html = '';
+    if (nodes.length > 1) {
+      html += `<div class="designer-context-menu-heading"><span class="designer-context-menu-heading-icon" aria-hidden="true">${designerIcon('select-all')}</span><span class="designer-context-menu-heading-label">${escapeHtml(TEXT.multiSelection(nodes.length, this.#selection.edges.length))}</span></div>`;
+    }
+    if (nodes.length > 0) {
+      const anyEnabled = nodes.some((node) => node.enabled);
+      html += this.menuItem('delete', 'trash', menu.delete, { kbd: 'Delete', danger: true });
+      if (single !== undefined) {
+        html += this.menuItem('rename', 'pencil', menu.rename, {
+          kbd: 'F2',
+          disabled: !single.renamable,
+        });
+      }
+      html += this.menuItem('duplicate', 'duplicate', menu.duplicate, {
+        kbd: 'Ctrl D',
+        disabled: !nodes.some((node) => node.duplicable),
+      });
+      html += this.menuItem(
+        anyEnabled ? 'disable' : 'enable',
+        anyEnabled ? 'eye-off' : 'eye',
+        anyEnabled ? menu.disable : menu.enable,
       );
-      if (drag === null) {
-        if (!hydrated && engineNext.size > 0) {
-          sessionLayout = next.graph.viewport === undefined;
-          positions = sessionLayout ? computeAutoLayout(next.graph.nodes) : new Map(engineNext);
-          hydrated = true;
-          scheduleInitialFit();
-        } else if (hydrated) {
-          for (const [id, position] of engineNext) {
-            const previous = lastEnginePositions.get(id);
-            if (previous === undefined && sessionLayout) {
-              positions.set(
-                id,
-                placeNewNode(nodeById(id) ?? next.graph.nodes.find((item) => item.id === id)),
-              );
-            } else if (
-              previous === undefined ||
-              previous.x !== position.x ||
-              previous.y !== position.y
-            ) {
-              positions.set(id, position);
-            }
-          }
-          for (const id of [...positions.keys()]) {
-            if (!engineNext.has(id)) positions.delete(id);
-          }
+      const triggers = (this.#state?.simulationTriggers ?? []).filter(
+        (trigger) => single !== undefined && trigger.nodeId === single.id,
+      );
+      if (single !== undefined && triggers.length > 0) {
+        html += this.menuItem('simulate', 'play', menu.simulateFrom);
+      }
+      html += '<div class="designer-menu-separator" role="separator"></div>';
+    } else if (this.#selection.edges.length > 0) {
+      html += this.menuItem('delete', 'trash', menu.deleteEdge, { kbd: 'Delete', danger: true });
+      html += '<div class="designer-menu-separator" role="separator"></div>';
+    }
+    html += `<div class="designer-menu-section-label">${escapeHtml(menu.addHere)}</div>`;
+    html += this.addItems();
+    html += '<div class="designer-menu-separator" role="separator"></div>';
+    html += this.menuItem('select-all', 'select-all', menu.selectAll, { kbd: 'Ctrl A' });
+    html += this.menuItem('auto-layout', 'grid', menu.autoLayout);
+    html += this.menuItem('fit', 'fit', menu.fit, { kbd: 'Ctrl 0' });
+    this.showMenu(html, clientX, clientY);
+  }
+
+  private openAddMenu(clientX: number, clientY: number): void {
+    this.showMenu(
+      `<div class="designer-menu-section-label">${escapeHtml(TEXT.toolbar.addNode)}</div>${this.addItems()}`,
+      clientX,
+      clientY,
+    );
+  }
+
+  private showMenu(html: string, clientX: number, clientY: number): void {
+    this.#menu.innerHTML = html;
+    adoptDesignerFormControls(this.#menu);
+    this.#menu.hidden = false;
+    const host = this.element.getBoundingClientRect();
+    this.#menu.style.left = '0px';
+    this.#menu.style.top = '0px';
+    let x = clientX - host.left;
+    let y = clientY - host.top;
+    const width = this.#menu.offsetWidth;
+    const height = this.#menu.offsetHeight;
+    if (x + width > host.width - 8) x = Math.max(8, x - width);
+    if (y + height > host.height - 8) y = Math.max(8, host.height - 8 - height);
+    this.#menu.style.left = `${x}px`;
+    this.#menu.style.top = `${y}px`;
+    this.#menu.focus({ preventScroll: true });
+  }
+
+  private closeMenu(): void {
+    this.#menu.hidden = true;
+    this.#menu.innerHTML = '';
+  }
+
+  private onMenuClick(event: Event): void {
+    const item = (event.target as Element).closest<HTMLButtonElement>('[data-bp-menu-action]');
+    if (item === null || item.disabled) return;
+    const action = item.dataset.bpMenuAction ?? '';
+    this.closeMenu();
+    const nodes = this.#selection.nodes;
+    if (action.startsWith('add:')) {
+      const kind = action.slice('add:'.length);
+      if (kind === 'host' || kind === 'lifecycle' || kind === 'timer' || kind === 'condition') {
+        this.send({
+          type: 'insert-node',
+          kind,
+          position: {
+            x: Math.round(this.#contextPoint.x),
+            y: Math.round(this.#contextPoint.y),
+          },
+        });
+      }
+      return;
+    }
+    switch (action) {
+      case 'delete':
+        this.send({ type: 'delete-selection', selection: this.#selection });
+        break;
+      case 'rename':
+        if (nodes[0] !== undefined) this.startRename(nodes[0]);
+        break;
+      case 'duplicate':
+        this.send({ type: 'duplicate-nodes', nodeIds: nodes });
+        break;
+      case 'disable':
+      case 'enable':
+        this.send({
+          type: 'update-node',
+          nodeIds: nodes,
+          update: { type: 'enabled', enabled: action === 'enable' },
+        });
+        break;
+      case 'simulate': {
+        const trigger = (this.#state?.simulationTriggers ?? []).find(
+          (candidate) => candidate.nodeId === nodes[0],
+        );
+        if (trigger !== undefined) {
+          this.#simulationTrigger = `${trigger.nodeId}\u0000${trigger.port}`;
+          this.#simulationOpen = true;
+          this.renderToolbar();
+          this.renderSimulation();
         }
+        break;
       }
-      lastEnginePositions = engineNext;
-      if (next.graph.nodes.length === 0) hydrated = false;
-    }
-    if (!generationChanged) adoptViewport(next.graph.viewport);
-    if (next.active && !wasActive && !initialFitDone) scheduleInitialFit();
-    wasActive = next.active;
-    render();
-    if (!readySent) {
-      readySent = true;
-      sendCommand({ type: 'ready' });
-    }
-    if (next.viewRequest !== undefined && next.viewRequest.id !== lastFocusRequestId) {
-      lastFocusRequestId = next.viewRequest.id;
-      focusNode(next.viewRequest.targetId);
+      case 'select-all':
+        this.select({ nodes: this.graph.nodes.map((node) => node.id), edges: [] });
+        break;
+      case 'auto-layout':
+        this.autoLayout();
+        break;
+      case 'fit':
+        this.fit();
+        break;
     }
   }
+}
 
-  function focusNode(targetId: string): void {
-    const node = nodeById(targetId);
-    if (node === undefined) return;
-    const position = positionOf(node);
-    const geometry = geometryOf(node);
-    const rect = viewport.getBoundingClientRect();
-    viewportValue = {
-      ...viewportValue,
-      x: rect.width / 2 - (position.x + geometry.width / 2) * viewportValue.zoom,
-      y:
-        rect.height / 2 -
-        (simulationOpen ? SIMULATION_INSET : SIMULATION_BAR_INSET) / 2 -
-        (position.y + geometry.height / 2) * viewportValue.zoom,
-    };
-    applyTransform();
-  }
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
-  function closeMenu(): void {
-    if (!menuOpen) return;
-    menuOpen = false;
-    addMenu.hidden = true;
-    addButton.setAttribute('aria-expanded', 'false');
-    addAnchor.classList.remove('is-open');
-  }
-
-  function openMenu(): void {
-    menuOpen = true;
-    addMenu.hidden = false;
-    addButton.setAttribute('aria-expanded', 'true');
-    addAnchor.classList.add('is-open');
-    (addMenu.querySelector('button') as HTMLButtonElement | null)?.focus();
-  }
-
-  function openSimulation(): void {
-    if (simulationOpen) return;
-    simulationOpen = true;
-    renderBar();
-    renderSimulation();
-    eventSelect.focus();
-  }
-
-  function closeSimulation(focusBar = true): void {
-    if (!simulationOpen) return;
-    simulationOpen = false;
-    renderBar();
-    renderSimulation();
-    if (focusBar) simulateButton.focus();
-  }
-
-  function toggleProblems(): void {
-    problemsOpen = !problemsOpen;
-    renderProblems();
-  }
-
-  addButton.addEventListener('click', () => {
-    if (menuOpen) closeMenu();
-    else openMenu();
-  });
-  bar.addEventListener('click', (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (target === null) return;
-    const insert = target.closest<HTMLElement>('[data-canvas-insert]')?.dataset.canvasInsert;
-    if (insert === 'host') {
-      onInsert();
-      return;
-    }
-    const action = target.closest<HTMLElement>('[data-canvas-action]')?.dataset.canvasAction;
-    if (action === undefined) return;
-    if (action === 'auto-layout') {
-      autoLayout();
-      return;
-    }
-    if (action === 'problems') {
-      toggleProblems();
-      return;
-    }
-    if (action === 'trace') {
-      if (state?.trace === null || state?.trace === undefined) {
-        setStatus(text.statusTraceUnavailable);
-        return;
-      }
-      traceVisible = !traceVisible;
-      renderBar();
-      renderGraph();
-      return;
-    }
-    if (action === 'zoom-in') {
-      stepZoom(1);
-      return;
-    }
-    if (action === 'zoom-out') {
-      stepZoom(-1);
-      return;
-    }
-    if (action === 'fit') {
-      fitView(undefined, true, simulationOpen ? SIMULATION_INSET : SIMULATION_BAR_INSET);
-      return;
-    }
-    if (action === 'simulate') {
-      if (simulationOpen) closeSimulation();
-      else openSimulation();
-    }
-  });
-  emptyCard.addEventListener('click', (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest<HTMLElement>('[data-canvas-insert]')?.dataset.canvasInsert === 'host') {
-      onInsert();
-    }
-  });
-  problems.addEventListener('click', (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest('[data-canvas-action="problems-close"]') !== null) {
-      problemsOpen = false;
-      renderProblems();
-    }
-  });
-  simulation.addEventListener('click', (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest('[data-canvas-action="simulation-run"]') !== null) {
-      runSimulation();
-      return;
-    }
-    if (target?.closest('[data-canvas-action="simulation-close"]') !== null) {
-      closeSimulation();
-    }
-  });
-  simulationExpand.addEventListener('click', openSimulation);
-  eventSelect.addEventListener('change', () => {
-    runButton.disabled = eventSelect.value === '';
-  });
-
-  root.addEventListener('pointerdown', (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (
-      menuOpen &&
-      target?.closest('[data-canvas-menu]') === null &&
-      target?.closest('[data-canvas-action="add-node"]') === null
-    ) {
-      closeMenu();
-    }
-    if (
-      problemsOpen &&
-      target?.closest('[data-canvas-problems]') === null &&
-      target?.closest('[data-canvas-action="problems"]') === null
-    ) {
-      problemsOpen = false;
-      renderProblems();
-    }
-  });
-  viewport.addEventListener('pointerdown', onViewportCapturePointerDown, true);
-  viewport.addEventListener('pointerdown', onBackgroundPointerDown);
-  viewport.addEventListener('wheel', onWheel, { passive: false });
-  viewport.addEventListener('dragover', (event) => {
-    if (
-      Array.from(event.dataTransfer?.types ?? []).includes(BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME)
-    ) {
-      event.preventDefault();
-      if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'copy';
-    }
-  });
-  viewport.addEventListener('drop', onDrop);
-  root.addEventListener('keydown', onKeyDown);
-  root.addEventListener(BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT, onCanvasState);
-  view?.addEventListener('keydown', onWindowKeyDown, true);
-  view?.addEventListener('keyup', onWindowKeyUp, true);
-  view?.addEventListener('blur', onWindowBlur);
-
-  applyTransform();
-  renderBar();
-
+function bezier(
+  from: Point,
+  to: Point,
+): { readonly d: string; readonly mid: Point; readonly angle: number } {
+  const dx = Math.abs(to.x - from.x);
+  const k = to.x < from.x ? 0.8 : 0.5;
+  const c1 = { x: from.x + dx * k, y: from.y };
+  const c2 = { x: to.x - dx * k, y: to.y };
+  const t = 0.5;
+  const mt = 1 - t;
+  const mid = {
+    x: mt ** 3 * from.x + 3 * mt * mt * t * c1.x + 3 * mt * t * t * c2.x + t ** 3 * to.x,
+    y: mt ** 3 * from.y + 3 * mt * mt * t * c1.y + 3 * mt * t * t * c2.y + t ** 3 * to.y,
+  };
+  // 中点切线方向：箭头沿线指向目标锚点。
+  const tx = 3 * mt * mt * (c1.x - from.x) + 6 * mt * t * (c2.x - c1.x) + 3 * t * t * (to.x - c2.x);
+  const ty = 3 * mt * mt * (c1.y - from.y) + 6 * mt * t * (c2.y - c1.y) + 3 * t * t * (to.y - c2.y);
   return {
-    element: root,
-    destroy(): void {
-      destroyed = true;
-      resizeObserver?.disconnect();
-      if (viewportCommitTimer !== undefined) clearTimeout(viewportCommitTimer);
-      if (statusTimer !== undefined) clearTimeout(statusTimer);
-      view?.removeEventListener('pointermove', onNodePointerMove);
-      view?.removeEventListener('pointerup', onNodePointerUp);
-      view?.removeEventListener('pointercancel', onNodePointerUp);
-      view?.removeEventListener('pointermove', onLinkPointerMove);
-      view?.removeEventListener('pointerup', onLinkPointerUp);
-      view?.removeEventListener('pointercancel', onLinkPointerUp);
-      view?.removeEventListener('pointermove', onPanPointerMove);
-      view?.removeEventListener('pointerup', onPanPointerUp);
-      view?.removeEventListener('pointercancel', onPanPointerUp);
-      view?.removeEventListener('pointermove', onMarqueePointerMove);
-      view?.removeEventListener('pointerup', onMarqueePointerUp);
-      view?.removeEventListener('pointercancel', onMarqueePointerUp);
-      view?.removeEventListener('keydown', onWindowKeyDown, true);
-      view?.removeEventListener('keyup', onWindowKeyUp, true);
-      view?.removeEventListener('blur', onWindowBlur);
-    },
+    d: `M${from.x},${from.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${to.x},${to.y}`,
+    mid,
+    angle: Math.round((Math.atan2(ty, tx) * 180) / Math.PI),
   };
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function isDefined<T>(value: T | undefined): value is T {
+  return value !== undefined;
+}
+
 function cssEscape(value: string): string {
-  const escape = globalThis.CSS?.escape;
-  return typeof escape === 'function' ? escape(value) : value.replace(/["\\]/g, '\\$&');
+  return typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+    ? CSS.escape(value)
+    : value.replace(/["\\]/g, '\\$&');
 }

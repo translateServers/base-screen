@@ -72,7 +72,7 @@ function documentWith(
     components,
     variables,
     dataSources,
-    blueprint: { relations: [] },
+    blueprint: { nodes: [], edges: [] },
   };
 }
 
@@ -227,23 +227,23 @@ describe('变量派生（T02c-2）', () => {
       ],
       [instance('derived-instance')],
     );
-    const rule = (variableId: string) => ({
-      type: 'behavior' as const,
+    const setEdge = (variableId: string) => ({
+      kind: 'flow' as const,
       id: `set-${variableId}`,
-      source: {
-        kind: 'component' as const,
-        componentId: 'trigger',
-        event: { type: 'material-event' as const, eventName: 'change' },
-      },
-      target: { kind: 'variable' as const, variableId },
-      effect: {
-        type: 'set-variable' as const,
-        value: { kind: 'literal' as const, value: 'written' },
-      },
+      from: { node: 'component:trigger', port: 'event:change' },
+      to: { node: `variable:${variableId}`, port: 'set' },
+      value: { kind: 'literal' as const, value: 'written' },
     });
     const withRules: ScreenDocument = {
       ...screen,
-      blueprint: { relations: [rule('legacy'), rule('derived')] },
+      blueprint: {
+        nodes: [
+          { kind: 'component', id: 'component:trigger', componentId: 'trigger' },
+          { kind: 'variable', id: 'variable:legacy', variableId: 'legacy' },
+          { kind: 'variable', id: 'variable:derived', variableId: 'derived' },
+        ],
+        edges: [setEdge('legacy'), setEdge('derived')],
+      },
     };
     const { viewer, mount } = await createViewerHarness({
       catalog: createHostResourceCatalog(['change'], ['variable']),

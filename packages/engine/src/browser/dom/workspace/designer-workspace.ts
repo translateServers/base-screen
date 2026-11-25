@@ -1,5 +1,6 @@
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import { DESIGNER_OPERATION_TEXT } from '../../../common/operations/designer-operation-registry.js';
+import type { BaseScreenResolvedFragmentLibraryItem } from '../../../common/operations/material-library/material-library-fragments.js';
 import type { BaseScreenMaterialLibraryGrouping } from '../../../common/operations/material-library/material-library-grouping.js';
 import type { BaseScreenResolvedMaterialLibraryItem } from '../../../common/operations/material-library/material-library-items.js';
 import type { BaseScreenMaterialLibraryState } from '../../../common/operations/material-library/material-library-state.js';
@@ -31,11 +32,12 @@ export function createDesignerWorkspace(
   materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping,
   leftPanelGroups?: readonly BaseScreenDesignerLeftPanelGroup[],
   deferMaterialLibrary = false,
+  fragments: readonly BaseScreenResolvedFragmentLibraryItem[] = [],
 ): HTMLElement {
   const visibleMaterials = visibleLibraryMaterials(materials);
   const layout = ownerDocument.createElement('section');
   layout.className = 'designer';
-  layout.innerHTML = designerWorkspaceMarkup(visibleMaterials.length);
+  layout.innerHTML = designerWorkspaceMarkup(visibleMaterials.length + fragments.length);
 
   // Nebula 布局：单条顶栏（品牌+保存状态｜工具簇+撤销重做｜动作组+缩放+菜单），顶栏与状态栏全宽，画布与左右面板并排。
   // 顶栏与状态栏从 workspace 内移动到 grid 顶层，使其各自占据整行。
@@ -123,7 +125,13 @@ export function createDesignerWorkspace(
 
   renderDesignerLeftPanelGroups(layout, leftPanelGroups);
   if (!deferMaterialLibrary) {
-    populateMaterialLibrary(layout, materials, materialLibraryState, materialLibraryGrouping);
+    populateMaterialLibrary(
+      layout,
+      materials,
+      materialLibraryState,
+      materialLibraryGrouping,
+      fragments,
+    );
   }
   for (const tool of DESIGNER_TOOLS) {
     const control = layout.querySelector<HTMLButtonElement>(`[data-tool="${tool.id}"]`)!;

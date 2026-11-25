@@ -5,6 +5,16 @@ vi.hoisted(() => {
   (globalThis as { HTMLElement?: unknown }).HTMLElement ??= class {};
 });
 
+import {
+  BASE_SCREEN_CHART_MATERIAL_MANIFEST,
+  BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST,
+  BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
+  BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
+  BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
+  BASE_SCREEN_RULE_MATERIAL_MANIFEST,
+  BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
+  BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+} from '../packages/material/src/index.js';
 import { PLUGIN_BOARD_BORDER_BOX_MANIFEST } from '../plugins/plugin-materials/src/board/border-box.js';
 import { PLUGIN_ECHARTS_MATERIAL_MANIFESTS } from '../plugins/plugin-materials/src/echarts/manifest.js';
 import { harnessInspectorDemoMaterialManifest } from '../tooling/verification/browser-harness/inspector-control-fixture.js';
@@ -27,6 +37,15 @@ const BASELINE: Readonly<Record<string, number>> = {
 };
 
 const MANIFESTS = [
+  // 官方物料（ADR-0099 §2.4 迁移到描述符）同样受预算约束。
+  BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+  BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
+  BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
+  BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST,
+  BASE_SCREEN_RULE_MATERIAL_MANIFEST,
+  BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
+  BASE_SCREEN_CHART_MATERIAL_MANIFEST,
+  BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
   ...PLUGIN_ECHARTS_MATERIAL_MANIFESTS,
   PLUGIN_BOARD_BORDER_BOX_MANIFEST,
   harnessInspectorDemoMaterialManifest,

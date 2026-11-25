@@ -1,9 +1,14 @@
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
+  fragmentWireframeMarkup,
   materialCoverFit,
+  orderedMaterialLibraryCards,
   populateMaterialLibrary,
 } from '../../../../src/browser/dom/material-library/designer-material-library-dom.js';
+import type { BaseScreenResolvedFragmentLibraryItem } from '../../../../src/common/operations/material-library/material-library-fragments.js';
+import { parseBaseScreenMaterialLibraryGrouping } from '../../../../src/common/operations/material-library/material-library-grouping.js';
+import { DESIGNER_UI_TEXT } from '../../../../src/common/ui-text/designer-ui-text.js';
 
 // 假 DOM：与 designer-material-library-group-dom.test.ts 同款风格，覆盖
 // createMaterialCard 所需节点 API，不引入 jsdom。
@@ -330,5 +335,93 @@ describe('material cover adaptive fit on load', () => {
     image.emit('load');
     expect(thumb.dataset.materialCoverLoaded).toBe('true');
     expect(thumb.dataset.materialCoverFit).toBeUndefined();
+  });
+});
+
+function fragmentItem(id: string, category = 'Test'): BaseScreenResolvedFragmentLibraryItem {
+  return {
+    id,
+    key: `fragment:${id}`,
+    fragment: {
+      id,
+      name: `Fragment ${id}`,
+      category,
+      keywords: [],
+      nodes: [{ key: 'title', materialType: 'base.text' }],
+    },
+    materialTypes: ['base.container', 'base.text'],
+    wireframe: {
+      width: 200,
+      height: 100,
+      boxes: [
+        { x: 0, y: 0, width: 200, height: 100, shell: true },
+        { x: 10, y: 10, width: 80, height: 20, shell: false },
+      ],
+    },
+  };
+}
+
+function withCategory(type: string, category: string): BaseScreenMaterialCatalogEntry {
+  const base = entry(type);
+  return { ...base, manifest: { ...base.manifest, category } };
+}
+
+describe('material library fragment cards (ADR-0100)', () => {
+  it('renders a fragment card with its own identity, the fragment badge and a wireframe cover', () => {
+    const { grid, layout } = createLayout();
+    populateMaterialLibrary(layout, [], undefined, undefined, [fragmentItem('acme.kpi')]);
+
+    const wrap = grid.children[0]!;
+    expect(wrap.dataset.materialCard).toBe('fragment:acme.kpi');
+    expect(wrap.dataset.materialFragmentCard).toBe('acme.kpi');
+    expect(wrap.dataset.materialFragmentTypes).toBe('base.container base.text');
+    expect(wrap.dataset.materialType).toBeUndefined();
+    const card = wrap.children[0]!;
+    expect(card.dataset.materialFragment).toBe('acme.kpi');
+    expect(card.dataset.materialType).toBeUndefined();
+    const thumb = card.children[0]!;
+    expect(thumb.innerHTML).toContain('material-fragment-wireframe');
+    expect(thumb.innerHTML).toContain('data-wire="shell"');
+    const badge = thumb.children.find((child) => child.dataset.materialBadge === 'fragment');
+    expect(badge?.textContent).toBe(DESIGNER_UI_TEXT.materialFragment);
+    expect(wrap.children[1]!.dataset.materialFavorite).toBe('fragment:acme.kpi');
+  });
+
+  it('mixes fragments into the catalog order by category when the host has no grouping', () => {
+    const cards = orderedMaterialLibraryCards(
+      [entry('base.a'), withCategory('base.b', 'Other')],
+      [fragmentItem('f.test', 'Test'), fragmentItem('f.new', 'New')],
+      undefined,
+    );
+    expect(cards.map((card) => card.item.id)).toEqual(['base.a', 'f.test', 'base.b', 'f.new']);
+  });
+
+  it('follows the host grouping and keeps unreferenced fragments visible at the end', () => {
+    const grouping = parseBaseScreenMaterialLibraryGrouping({
+      groups: [
+        { id: 'a', label: 'A', materialTypes: ['base.b'], fragmentIds: ['f.test', 'f.hidden'] },
+        { id: 'b', label: 'B', materialTypes: ['base.a'] },
+      ],
+    });
+    expect(grouping.ok).toBe(true);
+    if (!grouping.ok) return;
+    const cards = orderedMaterialLibraryCards(
+      [entry('base.a'), entry('base.b')],
+      [fragmentItem('f.test'), fragmentItem('f.new')],
+      grouping.value,
+    );
+    expect(cards.map((card) => `${card.kind}:${card.item.id}`)).toEqual([
+      'material:base.b',
+      'fragment:f.test',
+      'material:base.a',
+      'fragment:f.new',
+    ]);
+  });
+
+  it('draws the wireframe with currentColor only and a padded view box', () => {
+    const markup = fragmentWireframeMarkup(fragmentItem('acme.kpi').wireframe);
+    expect(markup).toContain('viewBox="-8 -8 216 116"');
+    expect(markup.match(/<rect /g)).toHaveLength(2);
+    expect(markup).not.toMatch(/#[0-9a-f]{3,8}/i);
   });
 });

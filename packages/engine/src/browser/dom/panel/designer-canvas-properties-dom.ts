@@ -1,11 +1,20 @@
-import type { ScreenDocument } from '@base-screen/contracts';
-import { SCREEN_THEME_SLOTS } from '@base-screen/contracts';
+import type {
+  ScreenDocument,
+  ScreenPopupCanvas,
+  ScreenSubCanvas,
+  ScreenThemeSlot,
+} from '@base-screen/contracts';
+import {
+  readScreenThemeColor,
+  SCREEN_POPUP_ANCHORS,
+  SCREEN_THEME_SLOTS,
+} from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
 import {
   appendDesignerRangeField,
-  createDesignerFieldElement,
   createDesignerFieldRow,
+  createDesignerSwitchField,
   type DesignerFieldRow,
   type DesignerFieldRowOptions,
 } from '../designer-field-primitives.js';
@@ -14,9 +23,7 @@ import {
   appendDesignerFieldMessage,
   createDesignerButton,
   createDesignerInput,
-  createDesignerSegmented,
   createDesignerSelect,
-  createDesignerSwitch,
 } from '../designer-ui-primitives.js';
 import {
   canvasBackgroundPaletteValue,
@@ -24,6 +31,7 @@ import {
   type DesignerCanvasScaleMode,
   SCREEN_THEME_AUTHORING_DEFAULT_PALETTE,
 } from './designer-canvas-transactions.js';
+import { appendDesignerColorGroup } from './designer-color-group-dom.js';
 import { appendSection } from './designer-panel-primitives.js';
 
 /**
@@ -36,20 +44,52 @@ export function appendCanvasControls(
   document: ScreenDocument,
   hostResourceSelectionButtonVisible: boolean,
   canvasPresentation: DesignerCanvasPresentationSettings,
+  subCanvas?: ScreenSubCanvas,
+  startPageId?: string | null,
 ): void {
-  const canvasSection = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.canvas);
+  // 编辑从画布时（ADR-0109），「画布」各段作用于该从画布：先给从画布专属设置；页面尺寸恒随主画布，
+  // 不给尺寸行；背景图与主题只属于主画布，整段不出现。
+  if (subCanvas !== undefined) appendSubCanvasSection(parent, subCanvas, startPageId ?? null);
+  // 首屏只展开「画布」：尺寸、不透明度、缩放方式、两个开关是高频设置；
+  // 背景填充与背景图片属于低频配置，折叠后首屏少 4 个控件，需要时一点即开。
+  // 每段都带稳定 key，折叠偏好按段记忆，不会因为插分区而串位。
+  const canvasSection = appendSection(
+    parent,
+    DESIGNER_UI_TEXT.propertiesPanel.canvas,
+    false,
+    true,
+    'canvas',
+  );
   canvasSection.className += ' designer-canvas-section';
-  appendCanvasSizeField(canvasSection, document);
+  if (subCanvas?.display !== 'page') appendCanvasSizeField(canvasSection, document);
   appendCanvasOpacityField(canvasSection, canvasPresentation);
   appendCanvasScaleField(canvasSection, canvasPresentation);
+
+  // 两个开关是渲染行为开关而不是画布尺寸的一部分：它们一年改不了几次，
+  // 却原来和尺寸/缩放挤在同一屏。独立成段并收起后，首屏只剩三个高频字段。
+  const behaviorSection = appendSection(
+    parent,
+    DESIGNER_UI_TEXT.propertiesPanel.canvasBehaviorSection,
+    false,
+    false,
+    'canvas-behavior',
+    DESIGNER_UI_TEXT.propertiesPanel.canvasBehaviorSummary(
+      canvasPresentation.backgroundAutoFill
+        ? DESIGNER_UI_TEXT.propertiesPanel.canvasSwitchOn
+        : DESIGNER_UI_TEXT.propertiesPanel.canvasSwitchOff,
+      canvasPresentation.disableComponentLoading
+        ? DESIGNER_UI_TEXT.propertiesPanel.canvasSwitchOff
+        : DESIGNER_UI_TEXT.propertiesPanel.canvasSwitchOn,
+    ),
+  );
   appendCanvasSwitchField(
-    canvasSection,
+    behaviorSection,
     DESIGNER_UI_TEXT.propertiesPanel.canvasBackgroundAutoFill,
     'backgroundAutoFill',
     canvasPresentation.backgroundAutoFill,
   );
   appendCanvasSwitchField(
-    canvasSection,
+    behaviorSection,
     DESIGNER_UI_TEXT.propertiesPanel.canvasDisableLoading,
     'disableComponentLoading',
     canvasPresentation.disableComponentLoading,
@@ -58,11 +98,25 @@ export function appendCanvasControls(
   const backgroundSection = appendSection(
     parent,
     DESIGNER_UI_TEXT.propertiesPanel.canvasBackgroundSection,
+    false,
+    false,
+    'canvas-background',
+    canvasBackgroundPaletteValue(document),
   );
   backgroundSection.className += ' designer-canvas-background-section';
   appendCanvasBackgroundField(backgroundSection, document);
 
-  const imageSection = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.canvasImageSection);
+  if (subCanvas !== undefined) return;
+  const imageSection = appendSection(
+    parent,
+    DESIGNER_UI_TEXT.propertiesPanel.canvasImageSection,
+    false,
+    false,
+    'canvas-image',
+    document.canvas.backgroundImage == null
+      ? DESIGNER_UI_TEXT.propertiesPanel.canvasSummaryUnset
+      : DESIGNER_UI_TEXT.propertiesPanel.canvasSummarySet,
+  );
   imageSection.className += ' designer-canvas-image-section';
   appendCanvasBackgroundImageControls(imageSection, document, hostResourceSelectionButtonVisible);
 
@@ -70,28 +124,250 @@ export function appendCanvasControls(
 }
 
 /**
- * 文档级主题色板（ADR-0098）：六个语义槽各复用统一颜色控件，默认折叠。
- * 标记挂调色板根节点（色标增删会重建控件列表），提交走 update-theme 整副色板。
+ * 从画布设置（ADR-0109）：名称、显示方式；页面给自定义背景与起始页，弹框给遮罩、圆角、位置、
+ * 关闭方式；最后是复制与删除。由画板控制器经 `data-sub-canvas-*` / `data-popup-*` 提交到完整文档。
+ */
+function appendSubCanvasSection(
+  parent: HTMLElement,
+  subCanvas: ScreenSubCanvas,
+  startPageId: string | null,
+): void {
+  const text = DESIGNER_UI_TEXT.artboard;
+  const ownerDocument = parent.ownerDocument;
+  const section = appendSection(parent, text.subCanvasSection, false, true, 'sub-canvas');
+  section.className += ' designer-sub-canvas-section';
+  section.dataset.subCanvasId = subCanvas.id;
+
+  const name = createCanvasFieldRow(ownerDocument, { label: text.name });
+  const nameInput = createDesignerInput(ownerDocument, {
+    ariaLabel: text.name,
+    value: subCanvas.name,
+  });
+  nameInput.dataset.subCanvasProperty = 'name';
+  nameInput.setAttribute('autocomplete', 'off');
+  nameInput.setAttribute('spellcheck', 'false');
+  name.control.appendChild(nameInput);
+  appendDesignerFieldMessage(name.field, nameInput, 'sub-canvas-name');
+  section.appendChild(name.field);
+
+  const display = createCanvasFieldRow(ownerDocument, {
+    label: text.display,
+    controlClassName: 'designer-sub-canvas-display',
+  });
+  display.control.setAttribute('role', 'radiogroup');
+  display.control.setAttribute('aria-label', text.display);
+  for (const [value, label] of [
+    ['page', text.displayPage],
+    ['popup', text.displayPopup],
+  ] as const) {
+    const button = createDesignerButton(ownerDocument, {
+      text: label,
+      className: 'designer-sub-canvas-display-option',
+      pressed: subCanvas.display === value,
+    });
+    button.setAttribute('role', 'radio');
+    button.setAttribute('aria-checked', String(subCanvas.display === value));
+    button.dataset.subCanvasDisplay = value;
+    display.control.appendChild(button);
+  }
+  section.appendChild(display.field);
+
+  if (subCanvas.display === 'page') {
+    const custom = subCanvas.backgroundColor !== undefined || subCanvas.background !== undefined;
+    const { field: backgroundField, input: backgroundInput } = createDesignerSwitchField(
+      ownerDocument,
+      { label: text.customBackground, checked: custom },
+    );
+    backgroundInput.dataset.subCanvasProperty = 'customBackground';
+    appendDesignerFieldMessage(backgroundField, backgroundInput, 'sub-canvas-background');
+    section.appendChild(backgroundField);
+    const start = createCanvasFieldRow(ownerDocument, { label: text.startPage });
+    if (subCanvas.id === startPageId) {
+      const chip = ownerDocument.createElement('span');
+      chip.className = 'designer-sub-canvas-start';
+      chip.textContent = text.startPageCurrent;
+      start.control.appendChild(chip);
+    } else {
+      const button = createDesignerButton(ownerDocument, { text: text.setStartPage });
+      button.dataset.subCanvasAction = 'set-start';
+      start.control.appendChild(button);
+    }
+    section.appendChild(start.field);
+  } else {
+    appendPopupFields(section, subCanvas);
+  }
+
+  const actions = createCanvasFieldRow(ownerDocument, {
+    label: text.actions,
+    controlClassName: 'designer-sub-canvas-actions',
+  });
+  const duplicate = createDesignerButton(ownerDocument, { text: text.duplicate });
+  duplicate.dataset.subCanvasAction = 'duplicate';
+  const remove = createDesignerButton(ownerDocument, {
+    text: text.deleteSubCanvas,
+    variant: 'danger',
+    className: 'designer-sub-canvas-delete',
+  });
+  remove.dataset.subCanvasAction = 'delete';
+  actions.control.append(duplicate, remove);
+  section.appendChild(actions.field);
+}
+
+/** 弹框专属设置：遮罩、圆角、位置、点遮罩关闭与 Esc 关闭（ADR-0108 §2.3–§2.6 沿用）。 */
+function appendPopupFields(section: HTMLElement, popup: ScreenPopupCanvas): void {
+  const text = DESIGNER_UI_TEXT.artboard;
+  const ownerDocument = section.ownerDocument;
+  const mask = createDesignerFieldRow(ownerDocument, {
+    label: text.popupMask,
+    tagName: 'span',
+    stacked: true,
+  });
+  const palette = createDesignerColorPalette(ownerDocument, popup.maskColor, 'popup:mask', {
+    allowGradient: false,
+  });
+  palette.element.dataset.popupProperty = 'maskColor';
+  mask.control.appendChild(palette.element);
+  appendDesignerFieldMessage(mask.field, palette.controls[0]!, 'popup-mask');
+  section.appendChild(mask.field);
+
+  const radius = createCanvasFieldRow(ownerDocument, { label: text.popupRadius });
+  const { range, number } = appendDesignerRangeField(radius.control, {
+    ariaLabel: text.popupRadius,
+    min: 0,
+    max: 48,
+    step: 1,
+    value: String(popup.borderRadius),
+    numberClassName: 'designer-field-range-value',
+    numberSymbol: 'px',
+  });
+  range.dataset.popupProperty = 'borderRadius';
+  number.dataset.popupProperty = 'borderRadius';
+  appendDesignerFieldMessage(radius.field, number, 'popup-radius');
+  section.appendChild(radius.field);
+
+  appendPopupPlacementFields(section, popup);
+
+  const { field: closeField, input: closeInput } = createDesignerSwitchField(ownerDocument, {
+    label: text.popupCloseOnMask,
+    checked: popup.closeOnMaskClick,
+  });
+  closeInput.dataset.popupProperty = 'closeOnMaskClick';
+  appendDesignerFieldMessage(closeField, closeInput, 'popup-close-on-mask');
+  section.appendChild(closeField);
+
+  const { field: escapeField, input: escapeInput } = createDesignerSwitchField(ownerDocument, {
+    label: text.popupCloseOnEscape,
+    checked: popup.closeOnEscape,
+  });
+  escapeInput.dataset.popupProperty = 'closeOnEscape';
+  appendDesignerFieldMessage(escapeField, escapeInput, 'popup-close-on-escape');
+  section.appendChild(escapeField);
+}
+
+/**
+ * 弹框位置（ADR-0108 §2.6）：九宫格锚点 + X / Y 偏移。锚点用 3×3 图钉按钮（同对齐控件的按下态），
+ * 偏移沿用画布几何输入的「符号内嵌在右缘」写法。
+ */
+function appendPopupPlacementFields(section: HTMLElement, popup: ScreenPopupCanvas): void {
+  const text = DESIGNER_UI_TEXT.artboard;
+  const ownerDocument = section.ownerDocument;
+  const placement = popup.placement ?? { anchor: 'center', offsetX: 0, offsetY: 0 };
+  const anchorRow = createCanvasFieldRow(ownerDocument, {
+    label: text.popupAnchor,
+    controlClassName: 'designer-popup-anchor-grid',
+  });
+  anchorRow.control.setAttribute('role', 'radiogroup');
+  anchorRow.control.setAttribute('aria-label', text.popupAnchor);
+  for (const anchor of SCREEN_POPUP_ANCHORS) {
+    const button = createDesignerButton(ownerDocument, {
+      className: 'designer-popup-anchor',
+      ariaLabel: text.anchors[anchor],
+      tip: text.anchors[anchor],
+      pressed: anchor === placement.anchor,
+    });
+    button.setAttribute('role', 'radio');
+    button.setAttribute('aria-checked', String(anchor === placement.anchor));
+    button.dataset.popupAnchor = anchor;
+    anchorRow.control.appendChild(button);
+  }
+  section.appendChild(anchorRow.field);
+
+  const offsetRow = createCanvasFieldRow(ownerDocument, {
+    label: text.popupOffset,
+    className: 'designer-canvas-size-field',
+    controlClassName: 'designer-canvas-size-controls',
+  });
+  for (const [axis, symbol, value, label] of [
+    ['offsetX', 'X', placement.offsetX, text.popupOffsetX],
+    ['offsetY', 'Y', placement.offsetY, text.popupOffsetY],
+  ] as const) {
+    const field = ownerDocument.createElement('label');
+    field.className = 'designer-geo-field';
+    field.dataset.symbol = symbol;
+    const input = createDesignerInput(ownerDocument, {
+      appearance: 'number',
+      ariaLabel: label,
+      value: String(value),
+      step: 1,
+    });
+    input.dataset.popupProperty = axis;
+    field.appendChild(input);
+    offsetRow.control.appendChild(field);
+  }
+  section.appendChild(offsetRow.field);
+}
+
+/**
+ * 文档级主题色板（ADR-0098）与状态色位（ADR-0110 §2.6.4），默认折叠。
+ * 与组件外观区同一套色板组（色卡 + 一个编辑器，见 `designer-color-group-dom`）：基础色位一组、
+ * 状态色位一组。标记挂调色板根节点（色标增删会重建控件列表），提交走 update-theme 整副色板。
  */
 function appendCanvasThemeSection(parent: HTMLElement, document: ScreenDocument): void {
   const section = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.theme, true, false);
-  for (const slot of SCREEN_THEME_SLOTS) {
-    const { field, control } = createDesignerFieldRow(parent.ownerDocument, {
-      label: DESIGNER_UI_TEXT.propertiesPanel.themeSlots[slot],
-      tagName: 'span',
-      stacked: true,
+  const statusIndex = SCREEN_THEME_SLOTS.indexOf('danger');
+  const groups = [
+    { key: 'base', slots: SCREEN_THEME_SLOTS.slice(0, statusIndex) },
+    { key: 'status', slots: SCREEN_THEME_SLOTS.slice(statusIndex) },
+  ];
+  for (const group of groups) {
+    if (group.key === 'status') {
+      // 状态色位：组件状态与等级着色共用，改一处全屏一起变。
+      const heading = parent.ownerDocument.createElement('p');
+      heading.className = 'designer-inspector-subheading';
+      heading.textContent = DESIGNER_UI_TEXT.propertiesPanel.themeStatusSlots;
+      section.appendChild(heading);
+    }
+    appendDesignerColorGroup(section, {
+      groupKey: `canvas:theme:${group.key}`,
+      entries: group.slots.map((slot) => ({
+        key: slot,
+        label: DESIGNER_UI_TEXT.propertiesPanel.themeSlots[slot],
+        value: themeSlotColor(document, slot),
+      })),
+      renderField: (container, entry) => {
+        const slot = entry.key as ScreenThemeSlot;
+        const { field, control } = createDesignerFieldRow(parent.ownerDocument, {
+          label: entry.label,
+          tagName: 'span',
+          stacked: true,
+        });
+        const palette = createDesignerColorPalette(
+          parent.ownerDocument,
+          themeSlotColor(document, slot),
+          `canvas:theme:${slot}`,
+          { allowGradient: false },
+        );
+        palette.element.dataset.canvasProperty = `theme.${slot}`;
+        control.appendChild(palette.element);
+        appendDesignerFieldMessage(field, palette.controls[0]!, `canvas-theme-${slot}`);
+        container.appendChild(field);
+      },
     });
-    const palette = createDesignerColorPalette(
-      parent.ownerDocument,
-      document.theme?.palette[slot] ?? SCREEN_THEME_AUTHORING_DEFAULT_PALETTE[slot],
-      `canvas:theme:${slot}`,
-      { allowGradient: false },
-    );
-    palette.element.dataset.canvasProperty = `theme.${slot}`;
-    control.appendChild(palette.element);
-    appendDesignerFieldMessage(field, palette.controls[0]!, `canvas-theme-${slot}`);
-    section.appendChild(field);
   }
+}
+
+function themeSlotColor(document: ScreenDocument, slot: ScreenThemeSlot): string {
+  return readScreenThemeColor(document.theme, slot) ?? SCREEN_THEME_AUTHORING_DEFAULT_PALETTE[slot];
 }
 
 /** 几何输入：符号内嵌在输入框右缘（与组件几何网格同形），免去 W / H 这类前置小标题。 */
@@ -132,14 +408,67 @@ function createCanvasFieldRow(
   return createDesignerFieldRow(ownerDocument, { ...options, tagName: 'div' });
 }
 
+/**
+ * 常用画布尺寸。键对应文案表 `canvasSizePresetNames`。
+ *
+ * 常态只有一个下拉：命中预设时它就是整行读数（名称 + 分辨率），宽高不再重复占一行；
+ * 只有落到「自定义」时才在原地展开 W / H。改完任一边即离开预设，尺寸再次命中预设时收回。
+ */
+export const DESIGNER_CANVAS_SIZE_PRESETS = [
+  ['fhd', 1920, 1080],
+  ['qhd', 2560, 1440],
+  ['uhd', 3840, 2160],
+  ['hd', 1280, 720],
+  ['laptop', 1366, 768],
+  ['standard', 1024, 768],
+  ['portrait', 1080, 1920],
+  ['dual', 3840, 1080],
+  ['triple', 5760, 1080],
+] as const;
+
+export const DESIGNER_CANVAS_SIZE_CUSTOM = 'custom';
+
 function appendCanvasSizeField(parent: HTMLElement, document: ScreenDocument): void {
-  const { field, control } = createCanvasFieldRow(parent.ownerDocument, {
+  const ownerDocument = parent.ownerDocument;
+  const { field, control } = createCanvasFieldRow(ownerDocument, {
     label: DESIGNER_UI_TEXT.propertiesPanel.canvasDimensions,
     className: 'designer-canvas-size-field',
     controlClassName: 'designer-canvas-size-controls',
   });
+  const matched = DESIGNER_CANVAS_SIZE_PRESETS.find(
+    ([, presetWidth, presetHeight]) =>
+      presetWidth === document.canvas.width && presetHeight === document.canvas.height,
+  );
+  const names = DESIGNER_UI_TEXT.propertiesPanel.canvasSizePresetNames;
+  const select = createDesignerSelect(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.canvasSizePreset,
+    options: [
+      ...DESIGNER_CANVAS_SIZE_PRESETS.map(([key, presetWidth, presetHeight]) => ({
+        value: `${presetWidth}x${presetHeight}`,
+        label: names[key],
+        detail: DESIGNER_UI_TEXT.propertiesPanel.canvasSizeReading(presetWidth, presetHeight),
+      })),
+      {
+        value: DESIGNER_CANVAS_SIZE_CUSTOM,
+        label: DESIGNER_UI_TEXT.propertiesPanel.canvasSizeCustom,
+      },
+    ],
+    value: matched === undefined ? DESIGNER_CANVAS_SIZE_CUSTOM : `${matched[1]}x${matched[2]}`,
+  });
+  // 走 canvasProperty 通道：选中预设一次提交宽高；选「自定义」不提交，直接在下方输入。
+  select.dataset.canvasProperty = 'size';
+  const preset = enhanceDesignerSelect(select).element;
+  preset.classList.add('designer-canvas-size-preset');
+  control.appendChild(preset);
+
+  // W / H 是「自定义」的展开面，不是常驻第二行：命中预设时整行只有一个下拉，
+  // 省掉一组与下拉读数重复的数字，面板首屏也少一行。
+  const custom = ownerDocument.createElement('div');
+  custom.className = 'designer-canvas-size-custom';
+  custom.hidden = matched !== undefined;
+  control.appendChild(custom);
   createCanvasGeoInput(
-    control,
+    custom,
     'W',
     'width',
     document.canvas.width,
@@ -147,7 +476,7 @@ function appendCanvasSizeField(parent: HTMLElement, document: ScreenDocument): v
     { min: 1, step: 1 },
   );
   const height = createCanvasGeoInput(
-    control,
+    custom,
     'H',
     'height',
     document.canvas.height,
@@ -155,6 +484,16 @@ function appendCanvasSizeField(parent: HTMLElement, document: ScreenDocument): v
     { min: 1, step: 1 },
   );
   appendDesignerFieldMessage(field, height, 'canvas-height');
+  // 选「自定义」时事务层不提交（宽高由输入框各自提交），这里只负责把展开面放出来；
+  // 选回预设先收起，等提交后整栏重渲染，再以预设读数落定。焦点留在触发器上——
+  // 与原生 select 一致，键盘用户下一跳（Tab）自然落进 W。
+  select.addEventListener('change', (event) => {
+    const customMode = select.value === DESIGNER_CANVAS_SIZE_CUSTOM;
+    custom.hidden = !customMode;
+    // 「自定义」只是展开输入面，不是一次文档提交：拦住冒泡，否则事务层会把它当成
+    // 无效草稿并弹出「操作未完成」。
+    if (customMode) event.stopPropagation();
+  });
   parent.appendChild(field);
 }
 
@@ -186,7 +525,10 @@ function appendCanvasOpacityField(
   parent.appendChild(field);
 }
 
-/** 六档缩放方式：分段控件顶满一行，标签在上（原型 .insp-field），避免标签列挤掉档位文案。 */
+/**
+ * 六档缩放方式：用下拉而不是 3×2 分段。它是低频设置，六个按钮常驻会占掉两行、
+ * 把下面的字段整体往下推；下拉常态只占一行，标签也回到与其他字段一致的左列。
+ */
 function appendCanvasScaleField(
   parent: HTMLElement,
   settings: DesignerCanvasPresentationSettings,
@@ -194,7 +536,6 @@ function appendCanvasScaleField(
   const ownerDocument = parent.ownerDocument;
   const { field, control } = createCanvasFieldRow(ownerDocument, {
     label: DESIGNER_UI_TEXT.propertiesPanel.canvasScaleMode,
-    stacked: true,
     className: 'designer-canvas-scale-field',
   });
   const scaleOptions: readonly [DesignerCanvasScaleMode, string][] = [
@@ -205,18 +546,15 @@ function appendCanvasScaleField(
     ['original', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleOriginal],
     ['none', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleNone],
   ];
-  const { element: options } = createDesignerSegmented(ownerDocument, {
+  const select = createDesignerSelect(ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.canvasScaleMode,
-    className: 'designer-canvas-scale-segmented',
-    selected: settings.scaleMode,
-    options: scaleOptions.map(([value, label]) => ({
-      value,
-      label,
-      tip: label,
-      dataset: { canvasSetting: 'scaleMode', canvasSettingValue: value },
-    })),
+    options: scaleOptions.map(([value, label]) => ({ value, label })),
+    value: settings.scaleMode,
   });
-  control.appendChild(options);
+  // 走 canvasSetting 通道：change 冒泡到 surface router，由属性面板控制器提交。
+  select.dataset.canvasSetting = 'scaleMode';
+  control.appendChild(enhanceDesignerSelect(select).element);
+  appendDesignerFieldMessage(field, select, 'canvas-scale-mode');
   parent.appendChild(field);
 }
 
@@ -227,18 +565,14 @@ function appendCanvasSwitchField(
   checked: boolean,
 ): void {
   const ownerDocument = parent.ownerDocument;
-  // 开关行：标签左、开关右（原型 .toggle-row），长标签换行时开关仍贴右缘。
-  const field = createDesignerFieldElement(ownerDocument, {
+  // 开关行：与组件检查器的布尔字段同一个原语（ADR-0102 §5）。
+  const { field, input } = createDesignerSwitchField(ownerDocument, {
     label: labelText,
+    checked,
     className: 'designer-canvas-setting-checkbox',
   });
-  const input = createDesignerSwitch(ownerDocument, {
-    ariaLabel: labelText,
-    checked,
-    value: String(checked),
-  });
+  input.value = String(checked);
   input.dataset.canvasSetting = setting;
-  field.appendChild(input);
   appendDesignerFieldMessage(field, input, `canvas-${setting}`);
   parent.appendChild(field);
 }

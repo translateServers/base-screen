@@ -6,39 +6,58 @@ import type {
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { BaseScreenOfficialMaterialElement } from './base-material.js';
+import { propField, styleField, withOfficialEditorDescriptor } from './editor-descriptor.js';
 
-export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
-  type: 'base.image',
-  tagName: 'base-screen-image',
-  name: '图片',
-  category: '基础',
-  keywords: ['图片', '图像'],
-  defaultSize: { width: 240, height: 160 },
-  defaultProps: {},
-  defaultData: '',
-  staticData: { kind: 'scalar', valueType: 'string' },
-  defaultStyle: { objectFit: 'contain', opacity: 1, flipX: false, flipY: false },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      objectFit: { kind: 'enum', values: ['contain', 'cover', 'fill'] },
-      opacity: { kind: 'number', minimum: 0, maximum: 1 },
-      flipX: { kind: 'boolean' },
-      flipY: { kind: 'boolean' },
+export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
+  withOfficialEditorDescriptor(
+    {
+      type: 'base.image',
+      tagName: 'base-screen-image',
+      name: '图片',
+      category: '基础',
+      keywords: ['图片', '图像'],
+      defaultSize: { width: 240, height: 160 },
+      defaultProps: { alt: '' },
+      defaultData: '',
+      staticData: { kind: 'scalar', valueType: 'string' },
+      defaultStyle: { objectFit: 'contain', opacity: 1, flipX: false, flipY: false },
+      styleSchema: {
+        kind: 'object',
+        properties: {
+          objectFit: { kind: 'enum', values: ['contain', 'cover', 'fill'] },
+          opacity: { kind: 'number', minimum: 0, maximum: 1 },
+          flipX: { kind: 'boolean' },
+          flipY: { kind: 'boolean' },
+        },
+        required: ['objectFit', 'opacity'],
+      },
+      stylePanel: [],
+      propsSchema: {
+        kind: 'object',
+        properties: { alt: { kind: 'string' } },
+        required: [],
+      },
+      propertyPanel: [],
+      events: [],
+      dataCapabilities: ['static', 'host-resource', 'variable'],
+      hostResourceSelection: true,
+      designCapabilities: { resize: true, rotate: true, children: false },
     },
-    required: ['objectFit', 'opacity'],
-  },
-  stylePanel: [
-    { style: 'objectFit', label: '适应方式', control: 'select' },
-    { style: 'opacity', label: '不透明度', control: 'number' },
-  ],
-  propsSchema: { kind: 'object', properties: {}, required: [] },
-  propertyPanel: [],
-  events: [],
-  dataCapabilities: ['static', 'host-resource', 'variable'],
-  hostResourceSelection: true,
-  designCapabilities: { resize: true, rotate: true, children: false },
-};
+    {
+      appearance: [
+        {
+          id: 'structure',
+          label: '结构',
+          fields: [
+            styleField('objectFit', '适应方式', 'select'),
+            propField('alt', '替代文本', 'text', {
+              help: '描述图片传达的信息；留空按装饰图片处理。',
+            }),
+          ],
+        },
+      ],
+    },
+  );
 
 export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialElement {
   static readonly manifest = BASE_SCREEN_IMAGE_MATERIAL_MANIFEST;
@@ -51,9 +70,9 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
     this.replaceChildren();
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.overflow = 'hidden';
-    this.style.opacity = typeof model.style.opacity === 'number' ? String(model.style.opacity) : '';
     if (model.dataState.status !== 'ready') {
       this.renderDataState(model.dataState, { label: '图片加载中' });
       return;
@@ -71,7 +90,7 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
       return;
     }
     const image = this.ownerDocument.createElement('img');
-    image.alt = '';
+    image.alt = typeof model.props.alt === 'string' ? model.props.alt : '';
     image.style.width = '100%';
     image.style.height = '100%';
     image.style.objectFit =

@@ -11,7 +11,7 @@ import {
 /**
  * 文本物料排版能力（ADR-0047）：
  * - Manifest：水平/垂直对齐分离、字间距、行间距为可选 styleSchema 字段，defaultStyle 同步，
- *   stylePanel 顺序与标签正确，manifest 校验通过；增量补充：绝对行高 `lineHeight`
+ *   外观字段顺序与标签正确，manifest 校验通过；增量补充：绝对行高 `lineHeight`
  *   与行间距并存（行高 = 绝对基准，行间距 = 叠加增量，缺省退回 字号 + 行间距 零回归）；
  * - 渲染：垂直对齐经内层 flex wrapper 实现（元素自身保持 display: block，与 renderer
  *   可见性契约兼容），letterSpacing、lineSpacing（增量：行高 = 字号 + 行间距）、
@@ -106,6 +106,12 @@ function modelWithStyle(style: BaseScreenMaterialModel['style']): BaseScreenMate
   };
 }
 
+function textAppearanceFields() {
+  return (BASE_SCREEN_TEXT_MATERIAL_MANIFEST.editorDescriptor?.appearance ?? []).flatMap(
+    (section) => section.fields,
+  );
+}
+
 describe('text material typography (ADR-0047)', () => {
   it('declares a single dataset value role for every canonical scalar field type', () => {
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.dataBinding).toEqual({
@@ -167,8 +173,8 @@ describe('text material typography (ADR-0047)', () => {
 
   it('keeps automatic width opt-in and restores numeric geometry when disabled', () => {
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.propsSchema.required).not.toContain('autoWidth');
-    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.propertyPanel).toContainEqual({
-      prop: 'autoWidth',
+    expect(textAppearanceFields().find((field) => field.path[0] === 'autoWidth')).toMatchObject({
+      target: 'props',
       label: '自适应宽度',
       control: 'boolean',
     });
@@ -248,8 +254,9 @@ describe('text material typography (ADR-0047)', () => {
     });
   });
 
-  it('orders stylePanel fields and labels with horizontal/vertical alignment separated', () => {
-    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.stylePanel.map((field) => field.style)).toEqual([
+  it('orders text fields and labels with horizontal/vertical alignment separated', () => {
+    const fields = textAppearanceFields().filter((field) => field.target === 'style');
+    expect(fields.map((field) => field.path[0])).toEqual([
       'color',
       'fontSize',
       'fontWeight',
@@ -259,7 +266,7 @@ describe('text material typography (ADR-0047)', () => {
       'lineHeight',
       'lineSpacing',
     ]);
-    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.stylePanel.map((field) => field.label)).toEqual([
+    expect(fields.map((field) => field.label)).toEqual([
       '颜色',
       '字号',
       '字重',
@@ -269,11 +276,12 @@ describe('text material typography (ADR-0047)', () => {
       '行高',
       '行间距',
     ]);
-    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.stylePanel.map((field) => field.control)).toEqual([
+    // 三档水平对齐是图标分段，其余枚举是下拉（ADR-0102 §4）。
+    expect(fields.map((field) => field.control)).toEqual([
       'color',
       'number',
       'select',
-      'select',
+      'segmented',
       'select',
       'number',
       'number',

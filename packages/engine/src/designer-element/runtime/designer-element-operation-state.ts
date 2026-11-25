@@ -31,6 +31,9 @@ export function initializeDesignerElementOperations(
     hasClipboard: () => state.panelController.hasClipboard,
     canGroup: () => state.panelController.canGroup,
     canUngroup: () => state.panelController.canUngroup,
+    isFragmentSaveAvailable: () => state.fragmentSaveAction,
+    canSaveFragment: () => state.runtime.canRequestFragmentSave(element),
+    requestFragmentSave: () => state.runtime.requestFragmentSave(element),
     canAlign: () => state.panelController.canAlign,
     canDistribute: () => state.panelController.canDistribute,
     canEnterGroupEditing: () => state.gestureController.canEnterGroupEditingContext(),
@@ -49,6 +52,7 @@ export function initializeDesignerElementOperations(
     group: () => element.group(),
     ungroup: () => element.ungroup(),
     enterGroupEditing: () => state.gestureController.enterGroupEditingContext(),
+    getGroupEditingParentId: () => state.gestureController.groupEditingParentId,
     exitGroupEditing: () => state.gestureController.exitGroupEditingContext(),
     align: (alignment) => element.align(alignment),
     distribute: (distribution) => element.distribute(distribution),
@@ -70,6 +74,7 @@ export function initializeDesignerElementOperations(
     setActiveTool: (tool) => state.viewportController.setActiveTool(tool),
     cancelGesture: () => state.runtime.cancelGesture(element),
     canMutateSelection: () => state.selectionActions.canMutate(),
+    canDeleteSelection: () => state.selectionActions.canDelete(),
     canEditPosition: () => state.coordinateEntryController.canOpen(),
     canEditSize: () => state.sizeEntryController.canOpen(),
     canSelectLayer: (direction) => state.layersController.canStepSelection(direction),
@@ -152,6 +157,8 @@ export function initializeDesignerElementOperations(
     getSelectedComponentIds: () => state.session.interaction.selectedComponentIds,
     getOperationState: (id) => state.operations.getState(id, undefined),
     getPluginCommandItems: (menu) => state.runtime.listPluginCommandItems(element, menu),
+    getCanvasMenuSection: (componentIds) =>
+      state.artboardController.contextMenuSection(componentIds),
   });
   state.surfaceRouter = new DesignerSurfaceRouter();
 }

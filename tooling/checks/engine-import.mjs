@@ -259,7 +259,6 @@ const COMMON_SUBLAYERS = [
   ['operations', ['project', 'tools']],
   // operations 的纯逻辑子层单独登记：它们只依赖外部包，彼此不互相引用。
   ['operations/change', []],
-  ['operations/scene', []],
   ['operations/display', []],
   ['operations/intent', []],
   ['observability', []],

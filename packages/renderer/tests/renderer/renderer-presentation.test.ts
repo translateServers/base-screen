@@ -47,6 +47,52 @@ describe('BaseScreenRenderer material presentation styles', () => {
     expect(root.children[0]?.style.opacity).toBe('1');
   });
 
+  it('composes container opacity into child component elements', () => {
+    const { root, renderer } = rendererWithRoot();
+    const shell = { ...component('shell', 0), style: { opacity: 0.5 } };
+    const child = { ...component('child', 1, 'shell'), style: { opacity: 0.8 } };
+    const result = renderer.render(document([shell, child]));
+
+    expect(result.ok).toBe(true);
+    expect(root.children[0]?.dataset.baseScreenComponentId).toBe('shell');
+    expect(root.children[0]?.style.opacity).toBe('0.5');
+    expect(root.children[1]?.dataset.baseScreenComponentId).toBe('child');
+    expect(root.children[1]?.style.opacity).toBe('0.4');
+  });
+
+  it('refreshes descendant opacity when an ancestor container changes in a later render', () => {
+    const { root, renderer } = rendererWithRoot();
+    const child = component('child', 1, 'shell');
+    const renderWith = (opacity: number) =>
+      renderer.render(document([{ ...component('shell', 0), style: { opacity } }, child]));
+
+    expect(renderWith(0.2).ok).toBe(true);
+    const childElement = root.children[1];
+    expect(childElement?.style.opacity).toBe('0.2');
+
+    expect(renderWith(0.6).ok).toBe(true);
+    expect(root.children[1]).toBe(childElement);
+    expect(childElement?.style.opacity).toBe('0.6');
+  });
+
+  it('propagates an ancestor container state opacity to its document descendants', () => {
+    const { root, renderer } = rendererWithRoot();
+    const shell = {
+      ...component('shell', 0),
+      style: { opacity: 0.5 },
+      states: { items: [{ id: 'dim', name: '暗', style: { opacity: 0.25 } }] },
+    };
+    expect(renderer.render(document([shell, component('child', 1, 'shell')])).ok).toBe(true);
+    expect(root.children[0]?.style.opacity).toBe('0.5');
+    expect(root.children[1]?.style.opacity).toBe('0.5');
+
+    renderer.applyBlueprintStateEffects([
+      { componentId: 'shell', operation: 'set', stateId: 'dim' },
+    ]);
+    expect(root.children[0]?.style.opacity).toBe('0.25');
+    expect(root.children[1]?.style.opacity).toBe('0.25');
+  });
+
   it('applies reserved behavior and filter keys without material declarations', () => {
     const { root, renderer } = rendererWithRoot();
     const result = renderer.render(
@@ -67,11 +113,35 @@ describe('BaseScreenRenderer material presentation styles', () => {
 
     expect(result.ok).toBe(true);
     const style = root.children[0]!.style;
-    expect(style.pointerEvents).toBe('none');
+    // 设计态（未开「事件」）不穿透：否则设计器点不中这个组件。
+    expect(style.pointerEvents).toBe('');
     expect(style.cursor).toBe('pointer');
     expect(style.clipPath).toBe('inset(0)');
     expect(style.mixBlendMode).toBe('screen');
     expect(style.filter).toBe('blur(2px) hue-rotate(90deg)');
+  });
+
+  it('applies pass-through only at runtime or with designer events enabled', () => {
+    const passThrough = { ...component('overlay', 0), style: { passThrough: true } };
+    const { root, renderer } = rendererWithRoot();
+    expect(renderer.render(document([passThrough])).ok).toBe(true);
+    expect(root.children[0]!.style.pointerEvents).toBe('');
+    expect(renderer.setInteractive(true).ok).toBe(true);
+    expect(root.children[0]!.style.pointerEvents).toBe('none');
+    expect(renderer.setInteractive(false).ok).toBe(true);
+    expect(root.children[0]!.style.pointerEvents).toBe('');
+
+    const viewerRoot = new FakeRoot();
+    const viewer = createBaseScreenRenderer({
+      root: viewerRoot as unknown as HTMLElement,
+      catalog: createCatalog(),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+    expect(viewer.render(document([passThrough])).ok).toBe(true);
+    expect(viewerRoot.children[0]!.style.pointerEvents).toBe('none');
   });
 
   it('leaves behavior and filter CSS untouched when the keys are absent', () => {

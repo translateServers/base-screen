@@ -362,3 +362,73 @@ describe('per-mode draft retention', () => {
     expect((evicted.element as unknown as FakeElement).dataset.colorPaletteSelectedStop).toBe('0');
   });
 });
+
+describe('theme slot references (ADR-0098)', () => {
+  const slots = [
+    { slot: 'primary', label: '主体色', color: '#38bdf8', group: 'theme' as const },
+    { slot: 'danger', label: '危险', color: '#f5222d', group: 'status' as const },
+  ];
+  const themeButton = (element: FakeElement, slot: string) =>
+    descendants(element).find((item) => item.dataset.colorPaletteThemeSlot === slot)!;
+  const triggerText = (element: FakeElement) =>
+    descendants(element).find((item) => item.dataset.colorPaletteTriggerValue !== undefined)
+      ?.textContent;
+
+  it('shows a theme reference by its resolved colour and slot name and reads it back', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      'theme:danger',
+      'theme-ref',
+      { themeSlots: slots },
+    );
+    const element = palette.element as unknown as FakeElement;
+    expect(byField(element, 'solid')?.value).toBe('#f5222d');
+    expect(triggerText(element)).toBe('状态色 · 危险');
+    expect(
+      descendants(element)
+        .filter((item) => item.dataset.colorPaletteThemeGroup !== undefined)
+        .map((item) => item.dataset.colorPaletteThemeGroup),
+    ).toEqual(['theme', 'status']);
+    expect(themeButton(element, 'danger').attributes.get('aria-pressed')).toBe('true');
+    expect(readDesignerColorPaletteValue(palette.controls[0]!)).toBe('theme:danger');
+  });
+
+  it('writes a reference when a theme swatch is picked and drops it after a manual edit', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#112233',
+      'theme-pick',
+      { themeSlots: slots },
+    );
+    const element = palette.element as unknown as FakeElement;
+    let committed: string | undefined;
+    element.addEventListener('change', (event) => {
+      committed = readDesignerColorPaletteValue(event.target);
+    });
+    themeButton(element, 'primary').dispatchEvent(new Event('click', { bubbles: true }));
+    expect(committed).toBe('theme:primary');
+    expect(readDesignerColorPaletteValue(palette.controls[0]!)).toBe('theme:primary');
+    expect(triggerText(element)).toBe('主题色 · 主体色');
+
+    const value = byField(element, 'solid-value')!;
+    value.value = '#00ff00';
+    value.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(readDesignerColorPaletteValue(value)).toBe('#00ff00');
+    expect(triggerText(element)).toBe('#00FF00');
+  });
+
+  it('keeps plain colours without theme slots', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      'theme:danger',
+    );
+    const element = palette.element as unknown as FakeElement;
+    expect(
+      descendants(element).some((item) => item.dataset.colorPaletteThemeSlot !== undefined),
+    ).toBe(false);
+    expect(readDesignerColorPaletteValue(palette.controls[0]!)).toBe('#000000');
+  });
+});

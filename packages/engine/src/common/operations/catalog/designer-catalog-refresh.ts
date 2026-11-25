@@ -1,14 +1,31 @@
-import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
+import {
+  readScreenBlueprintEventPort,
+  type ScreenDiagnostic,
+  type ScreenDocument,
+} from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialCatalogDiff,
 } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialLibraryGrouping } from '../material-library/material-library-grouping.js';
 
 /** `refreshCatalog` 的公共结果：只报告 type，不携带 Manifest 或 constructor。 */
 export interface BaseScreenMaterialCatalogRefreshResult {
   readonly added: readonly string[];
   readonly changed: readonly string[];
   readonly removed: readonly string[];
+}
+
+/**
+ * `refreshCatalog` 的可选项（base-screen-docs ADR-0105 §4 范式改进 P2）。
+ *
+ * 宿主配置了物料库分组时，分组必须覆盖每个可见物料、且不能引用不存在或已下架的类型——
+ * 新增 / 下架在线物料时，旧分组对新 catalog 必然不成立，而先改分组又会对旧 catalog 不成立。
+ * 因此分组随 catalog 一起交换：`materialLibraryGrouping` 按**新** catalog 校验，与 catalog
+ * 同一次全有或全无；省略时沿用当前分组（仍须对新 catalog 成立）。
+ */
+export interface BaseScreenMaterialCatalogRefreshOptions {
+  readonly materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping;
 }
 
 /**
@@ -41,19 +58,28 @@ export function collectCatalogCompatibilityDiagnostics(
   }
 
   const componentsById = new Map(document.components.map((component) => [component.id, component]));
-  const relations = document.blueprint.relations;
-  for (let relationIndex = 0; relationIndex < relations.length; relationIndex++) {
-    const relation = relations[relationIndex]!;
-    if (relation.type !== 'behavior' || relation.source.kind !== 'component') continue;
-    const source = relation.source;
+  const nodes = new Map(document.blueprint.nodes.map((node) => [node.id, node]));
+  const edges = document.blueprint.edges;
+  for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex++) {
+    const edge = edges[edgeIndex]!;
+    if (edge.kind !== 'flow') continue;
+    const source = nodes.get(edge.from.node);
+    if (source?.kind !== 'component') continue;
     const component = componentsById.get(source.componentId);
     if (component === undefined || !changedTypes.has(component.type)) continue;
     const entry = catalog.get(component.type);
-    if (entry === undefined || entry.manifest.events.includes(source.event.eventName)) continue;
+    const eventName = readScreenBlueprintEventPort(edge.from.port);
+    if (
+      entry === undefined ||
+      eventName === undefined ||
+      entry.manifest.events.includes(eventName)
+    ) {
+      continue;
+    }
     diagnostics.push({
       severity: 'error',
       code: 'PLUGIN_CORE_EVENT_PAYLOAD_INVALID',
-      path: ['blueprint', 'relations', relationIndex, 'source', 'event', 'eventName'],
+      path: ['blueprint', 'edges', edgeIndex, 'from', 'port'],
       message: 'Blueprint references an event that is no longer declared by the material.',
     });
   }

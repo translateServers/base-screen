@@ -1,6 +1,11 @@
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
+import type {
+  BaseScreenFragmentWireframe,
+  BaseScreenResolvedFragmentLibraryItem,
+} from '../../../common/operations/material-library/material-library-fragments.js';
 import {
   type BaseScreenMaterialLibraryGrouping,
+  materialLibraryGroupCells,
   materialLibraryGroupMaterialTypes,
 } from '../../../common/operations/material-library/material-library-grouping.js';
 import type { BaseScreenResolvedMaterialLibraryItem } from '../../../common/operations/material-library/material-library-items.js';
@@ -31,10 +36,14 @@ const MATERIAL_CATEGORY_COLLATOR = new Intl.Collator('zh-Hans');
 
 export function materialLibraryCategories(
   materials: readonly MaterialLibraryRenderable[],
+  fragments: readonly BaseScreenResolvedFragmentLibraryItem[] = [],
 ): readonly string[] {
-  return [...new Set(materials.map((entry) => entry.manifest.category))].sort((left, right) =>
-    MATERIAL_CATEGORY_COLLATOR.compare(left, right),
-  );
+  return [
+    ...new Set([
+      ...materials.map((entry) => entry.manifest.category),
+      ...fragments.map((entry) => entry.fragment.category),
+    ]),
+  ].sort((left, right) => MATERIAL_CATEGORY_COLLATOR.compare(left, right));
 }
 
 // 目录状态到有界宿主动作的映射（ADR-0031）：面板只发事件，不做联网。
@@ -125,23 +134,85 @@ export function orderedMaterialLibraryMaterials(
   return materialLibraryGroupMaterialTypes(grouping).flatMap((type) => byType.get(type) ?? []);
 }
 
+export type MaterialLibraryCard =
+  | { readonly kind: 'material'; readonly item: BaseScreenResolvedMaterialLibraryItem }
+  | { readonly kind: 'fragment'; readonly item: BaseScreenResolvedFragmentLibraryItem };
+
+/**
+ * 物料与组合分片混排（ADR-0100 决议 3）：
+ * - 无宿主分组时按 category 混排——分片紧跟同 category 的最后一张物料卡，没有同类物料时排到末尾；
+ * - 有宿主分组时按分组树先序输出「本组物料 → 本组分片」，未被任何分组引用的分片排到末尾，
+ *   保证插件新增的分片在「全部」视图里总能被看到，而不是因宿主分组没跟上就消失。
+ */
+export function orderedMaterialLibraryCards(
+  materials: readonly MaterialLibraryRenderable[],
+  fragments: readonly BaseScreenResolvedFragmentLibraryItem[],
+  grouping: BaseScreenMaterialLibraryGrouping | undefined,
+): readonly MaterialLibraryCard[] {
+  const visible = visibleLibraryMaterials(materials);
+  if (grouping === undefined) {
+    const cards = visible.map((item): MaterialLibraryCard => ({ kind: 'material', item }));
+    for (const fragment of fragments) {
+      let index = -1;
+      for (const [position, card] of cards.entries()) {
+        const category =
+          card.kind === 'material' ? card.item.manifest.category : card.item.fragment.category;
+        if (category === fragment.fragment.category) index = position;
+      }
+      const card: MaterialLibraryCard = { kind: 'fragment', item: fragment };
+      if (index === -1) cards.push(card);
+      else cards.splice(index + 1, 0, card);
+    }
+    return cards;
+  }
+  const byType = new Map<string, BaseScreenResolvedMaterialLibraryItem[]>();
+  for (const item of visible) {
+    const bucket = byType.get(item.materialType) ?? [];
+    bucket.push(item);
+    byType.set(item.materialType, bucket);
+  }
+  const byFragmentId = new Map(fragments.map((fragment) => [fragment.id, fragment]));
+  const placed = new Set<string>();
+  const cards: MaterialLibraryCard[] = [];
+  for (const cell of materialLibraryGroupCells(grouping)) {
+    for (const type of cell.materialTypes) {
+      for (const item of byType.get(type) ?? []) cards.push({ kind: 'material', item });
+    }
+    for (const id of cell.fragmentIds) {
+      const fragment = byFragmentId.get(id);
+      if (fragment === undefined || placed.has(id)) continue;
+      placed.add(id);
+      cards.push({ kind: 'fragment', item: fragment });
+    }
+  }
+  for (const fragment of fragments) {
+    if (!placed.has(fragment.id)) cards.push({ kind: 'fragment', item: fragment });
+  }
+  return cards;
+}
+
 // 填充物料库：卡片网格、兼容分类 chips、宿主分组导航、面板数量徽标与目录状态投影一次完成。
 export function populateMaterialLibrary(
   layout: ParentNode,
   materials: readonly MaterialLibraryRenderable[],
   materialLibraryState?: BaseScreenMaterialLibraryState,
   materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping,
+  fragments: readonly BaseScreenResolvedFragmentLibraryItem[] = [],
 ): void {
   const visible = visibleLibraryMaterials(materials);
-  const ordered = orderedMaterialLibraryMaterials(materials, materialLibraryGrouping);
+  const ordered = orderedMaterialLibraryCards(materials, fragments, materialLibraryGrouping);
   const grid = layout.querySelector<HTMLElement>('[data-material-grid]');
   if (grid !== null) {
     grid.replaceChildren();
-    for (const entry of ordered) {
-      grid.appendChild(createMaterialCard(grid.ownerDocument, entry));
+    for (const card of ordered) {
+      grid.appendChild(
+        card.kind === 'material'
+          ? createMaterialCard(grid.ownerDocument, card.item)
+          : createFragmentCard(grid.ownerDocument, card.item),
+      );
     }
   }
-  const categories = materialLibraryCategories(visible);
+  const categories = materialLibraryCategories(visible, fragments);
   const categoryRail = layout.querySelector<HTMLElement>('[data-material-categories]');
   if (categoryRail !== null) {
     categoryRail.replaceChildren();
@@ -169,9 +240,10 @@ export function populateMaterialLibrary(
   }
   const count = layout.querySelector<HTMLElement>('[data-material-count]');
   if (count !== null) {
-    count.textContent = String(visible.length);
-    count.ariaLabel = DESIGNER_UI_TEXT.leftPanelCount(DESIGNER_UI_TEXT.materials, visible.length);
-    count.dataset.materialTotal = String(visible.length);
+    const total = visible.length + fragments.length;
+    count.textContent = String(total);
+    count.ariaLabel = DESIGNER_UI_TEXT.leftPanelCount(DESIGNER_UI_TEXT.materials, total);
+    count.dataset.materialTotal = String(total);
   }
   renderMaterialLibraryState(layout, materialLibraryState);
 }
@@ -183,7 +255,7 @@ export function renderMaterialLibraryState(
   for (const card of layout.querySelectorAll<HTMLElement>('[data-material-card]')) {
     card.removeAttribute('data-material-draft');
     card.removeAttribute('data-material-unavailable');
-    const button = card.querySelector<HTMLButtonElement>('[data-material-type]');
+    const button = materialCardControl(card);
     if (button !== null) {
       button.disabled = false;
       button.draggable = true;
@@ -196,12 +268,17 @@ export function renderMaterialLibraryState(
   const draftTypes = new Set(state.draftTypes ?? []);
   const unavailableTypes = new Set(state.unavailableTypes ?? []);
   for (const card of layout.querySelectorAll<HTMLElement>('[data-material-card]')) {
+    // 分片卡片不是草稿，但任一组成物料不可用时整片不可插入。
+    const fragmentTypes = card.dataset.materialFragmentTypes;
     const type = card.dataset.materialType ?? '';
-    const draft = draftTypes.has(type);
-    const unavailable = unavailableTypes.has(type);
+    const draft = fragmentTypes === undefined && draftTypes.has(type);
+    const unavailable =
+      fragmentTypes === undefined
+        ? unavailableTypes.has(type)
+        : fragmentTypes.split(' ').some((fragmentType) => unavailableTypes.has(fragmentType));
     card.toggleAttribute('data-material-draft', draft);
     card.toggleAttribute('data-material-unavailable', unavailable);
-    const button = card.querySelector<HTMLButtonElement>('[data-material-type]');
+    const button = materialCardControl(card);
     if (button !== null) {
       button.disabled = unavailable;
       button.draggable = !unavailable;
@@ -264,6 +341,98 @@ function createMaterialCard(
   favorite.dataset.materialFavorite = entry.id;
   wrap.append(card, favorite);
   return wrap;
+}
+
+/** 卡片主按钮：物料卡用 `data-material-type`，分片卡用 `data-material-fragment`。 */
+function materialCardControl(card: HTMLElement): HTMLButtonElement | null {
+  return (
+    card.querySelector<HTMLButtonElement>('[data-material-type]') ??
+    card.querySelector<HTMLButtonElement>('[data-material-fragment]')
+  );
+}
+
+// 分片卡片（ADR-0100 决议 2/3）：与物料卡同构（缩略图 + 名称 + 悬浮收藏），角标「组合」区分；
+// 未给封面时按试运行几何画示意线框，给了封面则封面叠在线框之上（失败时线框兜底）。
+function createFragmentCard(
+  ownerDocument: Document,
+  entry: BaseScreenResolvedFragmentLibraryItem,
+): HTMLElement {
+  const { fragment } = entry;
+  const wrap = ownerDocument.createElement('div');
+  wrap.className = 'material-card-wrap';
+  wrap.dataset.materialCard = entry.key;
+  wrap.dataset.materialFragmentCard = entry.id;
+  wrap.dataset.materialCategory = fragment.category;
+  wrap.dataset.materialFragmentTypes = entry.materialTypes.join(' ');
+  const card = createDesignerButton(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.addMaterialFragment(fragment.name),
+    className: 'material-card',
+  });
+  card.dataset.materialFragment = entry.id;
+  card.setAttribute('data-tip', entry.id);
+  card.draggable = true;
+  const thumb = ownerDocument.createElement('span');
+  thumb.className = 'material-thumb';
+  thumb.setAttribute('aria-hidden', 'true');
+  thumb.style.setProperty('--material-hue', String(materialCategoryHue(fragment.category)));
+  thumb.innerHTML = fragmentWireframeMarkup(entry.wireframe);
+  if (fragment.cover !== undefined) {
+    thumb.appendChild(createMaterialCoverImage(ownerDocument, fragment.cover, thumb));
+  }
+  createDesignerBadge(thumb, {
+    text: DESIGNER_UI_TEXT.materialFragment,
+    tone: 'accent',
+    className: 'material-badge',
+    dataset: { materialBadge: 'fragment' },
+  });
+  const meta = ownerDocument.createElement('span');
+  meta.className = 'material-card-meta';
+  const name = ownerDocument.createElement('span');
+  name.className = 'material-name';
+  name.textContent = fragment.name;
+  const type = ownerDocument.createElement('span');
+  type.className = 'material-type';
+  type.textContent = entry.id;
+  type.setAttribute('data-tip', entry.id);
+  meta.append(name, type);
+  card.append(thumb, meta);
+  const favorite = createDesignerIconButton(ownerDocument, {
+    className: 'material-favorite',
+    icon: 'star',
+    label: DESIGNER_UI_TEXT.favoriteMaterial(fragment.name),
+    pressed: false,
+  });
+  favorite.dataset.materialFavorite = entry.key;
+  wrap.append(card, favorite);
+  return wrap;
+}
+
+// 示意线框：只用 currentColor 描边/半透明填充，颜色随缩略图色相与主题走，不写任何颜色字面量。
+// 外壳只描边，其余节点半透明填充；non-scaling-stroke 让大尺寸分片缩进缩略图后线宽不变。
+export function fragmentWireframeMarkup(wireframe: BaseScreenFragmentWireframe): string {
+  const pad = Math.max(wireframe.width, wireframe.height) * 0.04;
+  const viewBox = [-pad, -pad, wireframe.width + pad * 2, wireframe.height + pad * 2]
+    .map(formatWireNumber)
+    .join(' ');
+  const radius = formatWireNumber(Math.min(wireframe.width, wireframe.height) * 0.03);
+  const boxes = wireframe.boxes
+    .map(
+      (box) =>
+        `<rect x="${formatWireNumber(box.x)}" y="${formatWireNumber(box.y)}" ` +
+        `width="${formatWireNumber(box.width)}" height="${formatWireNumber(box.height)}" ` +
+        `rx="${radius}" vector-effect="non-scaling-stroke" ` +
+        (box.shell ? 'data-wire="shell"' : 'data-wire="node"') +
+        '/>',
+    )
+    .join('');
+  return (
+    `<svg class="material-fragment-wireframe" viewBox="${viewBox}" ` +
+    `preserveAspectRatio="xMidYMid meet" aria-hidden="true">${boxes}</svg>`
+  );
+}
+
+function formatWireNumber(value: number): string {
+  return String(Math.round(value * 100) / 100);
 }
 
 function normalizeLibraryItem(

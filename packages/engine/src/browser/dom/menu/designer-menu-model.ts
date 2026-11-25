@@ -11,6 +11,8 @@ export interface DesignerMenuControllerCallbacks {
   readonly getPluginCommandItems?: (
     menu: BaseScreenPluginContextMenu,
   ) => readonly DesignerPluginCommandItem[];
+  /** 组件右键菜单里的画布段（ADR-0109「移到…」「置于从画布下方」）；返回空串表示不出现。 */
+  readonly getCanvasMenuSection?: (componentIds: readonly string[]) => string;
 }
 
 export interface DesignerOperationStateShape {
@@ -54,6 +56,7 @@ export const DESIGNER_CONTEXT_MENU = {
     'separator',
     'group',
     'ungroup',
+    'save-as-fragment',
     {
       label: DESIGNER_UI_TEXT.layer,
       entries: [
@@ -74,6 +77,7 @@ export const DESIGNER_CONTEXT_MENU = {
     'separator',
     'group',
     'ungroup',
+    'save-as-fragment',
     {
       label: DESIGNER_UI_TEXT.arrange,
       entries: [

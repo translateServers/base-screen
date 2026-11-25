@@ -40,7 +40,7 @@ describe('renderer theme reference resolution', () => {
     }
   });
 
-  it('resolves references coming from the conditional style port', () => {
+  it('resolves status slots to built-in defaults without a palette', () => {
     const root = new FakeRoot();
     const renderer = createBaseScreenRenderer({
       root: root as unknown as HTMLElement,
@@ -49,17 +49,15 @@ describe('renderer theme reference resolution', () => {
       interactive: false,
       onMaterialEvent: undefined,
       resourcePort: undefined,
-      conditionalStylePort: { resolve: () => ({ color: 'theme:accent' }) },
     });
-    const result = renderer.render({
-      ...document([{ ...component('ported', 0), style: { color: '#ffffff' } }]),
-      theme: { palette },
-    });
+    const result = renderer.render(
+      document([{ ...component('alarm', 0), style: { color: 'theme:danger' } }]),
+    );
     expect(result.ok).toBe(true);
-    expect(root.children[0]?.model?.style.color).toBe('#555555');
+    expect(root.children[0]?.model?.style.color).toBe('#f5222d');
   });
 
-  it('resolves references inside conditional style rules', () => {
+  it('resolves references inside component states', () => {
     const root = new FakeRoot();
     const renderer = createBaseScreenRenderer({
       root: root as unknown as HTMLElement,
@@ -72,15 +70,15 @@ describe('renderer theme reference resolution', () => {
     const result = renderer.render({
       ...document([
         {
-          ...component('ruled', 0, null, { type: 'static', value: 5 }),
+          ...component('stated', 0, null, { type: 'static', value: 5 }),
           style: { color: '#ffffff' },
-          styleRules: [
-            {
-              id: 'rule-1',
-              when: { path: [], operator: 'gt', value: 0 },
-              style: { color: 'theme:accent' },
+          states: {
+            items: [{ id: 'hot', name: '高', style: { color: 'theme:accent' } }],
+            judge: {
+              input: { kind: 'component-data', path: [] },
+              cases: [{ operator: 'gt', value: 0, stateId: 'hot' }],
             },
-          ],
+          },
         },
       ]),
       theme: { palette },

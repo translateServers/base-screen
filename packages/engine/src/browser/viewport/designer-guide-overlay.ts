@@ -169,6 +169,7 @@ function setCanvasOverlayScale(container: HTMLElement, zoom: number): void {
     '--designer-overlay-hit-size': 9,
     '--designer-overlay-label-offset': 5,
     '--designer-overlay-line-height': 14,
+    '--designer-overlay-marker-size': 6,
     '--designer-overlay-pixel': 1,
   } as const;
   // This layer owns its inline scale declarations; replace them atomically, only on zoom changes.

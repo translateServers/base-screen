@@ -2,8 +2,11 @@ import type {
   ScreenDiagnostic,
   ScreenDocument,
   ScreenHostResourcePort,
+  ScreenJsonValue,
+  ScreenLevelScale,
   ScreenParseResult,
   ScreenSize,
+  ScreenSubCanvas,
 } from '@base-screen/contracts';
 import type {
   ScreenDocumentCommand,
@@ -12,21 +15,30 @@ import type {
   ScreenInteractionState,
 } from '@base-screen/core';
 import type {
-  BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginInspectorControlCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
+import type { BaseScreenResolvedFragmentLibraryItem } from '../../../common/operations/material-library/material-library-fragments.js';
 import type { BaseScreenMaterialLibraryGrouping } from '../../../common/operations/material-library/material-library-grouping.js';
 import type { BaseScreenResolvedMaterialLibraryItem } from '../../../common/operations/material-library/material-library-items.js';
 import type { DesignerDescriptorDatasetFields } from '../../dom/descriptor/designer-descriptor-dom.js';
 import type { DesignerCanvasPresentationSettings } from '../../dom/panel/designer-panel-dom.js';
+import type { DesignerComponentStateEditing } from './designer-component-states-controller.js';
 
 export interface DesignerPanelControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
   readonly getMaterialLibraryItems?: () => readonly BaseScreenResolvedMaterialLibraryItem[];
   readonly getMaterialLibraryGrouping?: () => BaseScreenMaterialLibraryGrouping | undefined;
+  /** 物料库中通过 catalog 试运行的组合分片（ADR-0100）。缺省即物料库没有分片卡片。 */
+  readonly getMaterialLibraryFragments?: () => readonly BaseScreenResolvedFragmentLibraryItem[];
+  /** 把一份分片插到可见画布中心；失败诊断由实现方上报，成功后整片成为选中项。 */
+  readonly insertMaterialLibraryFragment?: (fragmentId: string) => void;
   readonly getDocument: () => ScreenDocument | undefined;
+  /** 当前画板是从画布时返回它（ADR-0109）；检查器据此在画布段之前给出从画布设置。 */
+  readonly getArtboardSubCanvas?: () => ScreenSubCanvas | undefined;
+  /** 起始页 id（页面设置里标出「当前起始页」）。 */
+  readonly getStartPageId?: () => string | null;
   /**
    * 设计器表面是否存在非折叠文本选区：有选区时复制快捷键必须让位给浏览器原生复制，
    * 否则面板/只读文本选中后按 Ctrl+C 会被"复制选中组件"吞掉。
@@ -39,12 +51,16 @@ export interface DesignerPanelControllerCallbacks {
   readonly getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[];
   /** 授权目录：custom 控件只能从这里取构造函数。缺省即不渲染任何自定义控件。 */
   readonly getInspectorControls?: () => BaseScreenPluginInspectorControlCatalog | undefined;
-  /** 宿主条件样式作者口：缺省即不渲染宿主条件样式段。 */
-  readonly getHostConditionalStyleAuthoring?: () =>
-    | BaseScreenHostConditionalStyleAuthoringPort
-    | undefined;
-  /** 宿主绑定保存成功后重算指定组件的条件样式。 */
-  readonly refreshConditionalStyles?: (componentIds: readonly string[]) => void;
+  /** 检查器「正在编辑哪个状态」的会话记忆（ADR-0110）。 */
+  readonly componentStateEditing?: DesignerComponentStateEditing;
+  /** 画布按某状态预览组件；`default` 即恢复实时判定。 */
+  readonly previewComponentState?: (componentId: string, stateId: string) => void;
+  /** 画布上的实时判定（生效状态与取值）。 */
+  readonly readComponentStateRuntime?: (
+    componentId: string,
+  ) => { readonly stateId: string; readonly value?: ScreenJsonValue } | undefined;
+  /** 数据源实例对应的宿主分级表（资源类型 / 来源目录项声明，ADR-0110 §2.6.2）。 */
+  readonly readLevelScales?: (dataSourceId: string) => readonly ScreenLevelScale[] | undefined;
   readonly getGroupMaterialType: () => string | undefined;
   readonly getInteraction: () => ScreenInteractionState;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;

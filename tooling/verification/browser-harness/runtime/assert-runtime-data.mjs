@@ -52,7 +52,7 @@ export async function assertRuntimeData(page, viewer) {
       `BROWSER_HARNESS_VARIABLE_TYPE_EXAMPLES_FAILED:${JSON.stringify(variableExamples)}`,
     );
   }
-  // 条件样式规则（ADR-0058）：阈值双向穿越——命中变红加粗、回落恢复基础样式。
+  // 组件状态（ADR-0110）：阈值双向穿越——命中切到「预警」变红加粗、回落恢复默认外观。
   await viewer.locator('[data-base-screen-component-id=metric-warning]').waitFor();
   const metricStyle = () =>
     page.evaluate(
@@ -93,126 +93,6 @@ export async function assertRuntimeData(page, viewer) {
   if (restoredStyle.color !== '#9fb1c9' || restoredStyle.fontWeight !== '400') {
     throw new Error('BROWSER_HARNESS_STYLE_RULE_RESTORE_FAILED');
   }
-  // 条件样式端口（ADR-0059）：同一指标驱动宿主端口映射——命中变橙加粗、回落恢复，
-  // 文档对 port-warning 零告警知识（无 styleRules）。
-  const portStyle = () =>
-    page.evaluate(
-      () =>
-        window.baseScreenHarness.viewer.shadowRoot.querySelector(
-          '[data-base-screen-component-id=port-warning]',
-        ).model.style,
-    );
-  const designerPortStyle = () =>
-    page.evaluate(
-      () =>
-        window.baseScreenHarness.designer.shadowRoot.querySelector(
-          '[data-base-screen-component-id=port-warning]',
-        ).model.style,
-    );
-  await page.waitForFunction(() =>
-    [window.baseScreenHarness.viewer, window.baseScreenHarness.designer].every(
-      (element) =>
-        element.shadowRoot.querySelector('[data-base-screen-component-id=port-warning]')?.model
-          .dataState.status === 'ready',
-    ),
-  );
-  const portBase = await portStyle();
-  const designerPortBase = await designerPortStyle();
-  if (
-    portBase.color !== '#9fb1c9' ||
-    portBase.fontWeight !== '400' ||
-    designerPortBase.color !== '#9fb1c9' ||
-    designerPortBase.fontWeight !== '400'
-  ) {
-    throw new Error('BROWSER_HARNESS_STYLE_PORT_BASE_FAILED');
-  }
-  await page.evaluate(() => window.baseScreenHarness.setMetricValue(160));
-  await page.waitForFunction(() =>
-    [window.baseScreenHarness.viewer, window.baseScreenHarness.designer].every(
-      (element) =>
-        element.shadowRoot.querySelector('[data-base-screen-component-id=port-warning]')?.model
-          .style.color === '#ffa940',
-    ),
-  );
-  const portWarned = await portStyle();
-  const designerPortWarned = await designerPortStyle();
-  if (
-    portWarned.color !== '#ffa940' ||
-    portWarned.fontWeight !== '700' ||
-    designerPortWarned.color !== '#ffa940' ||
-    designerPortWarned.fontWeight !== '700'
-  ) {
-    throw new Error('BROWSER_HARNESS_STYLE_PORT_TRIGGER_FAILED');
-  }
-  await page.evaluate(() => window.baseScreenHarness.setMetricValue(20));
-  await page.waitForFunction(() =>
-    [window.baseScreenHarness.viewer, window.baseScreenHarness.designer].every(
-      (element) =>
-        element.shadowRoot.querySelector('[data-base-screen-component-id=port-warning]')?.model
-          .style.color === '#9fb1c9',
-    ),
-  );
-  const portRestored = await portStyle();
-  const designerPortRestored = await designerPortStyle();
-  if (
-    portRestored.color !== '#9fb1c9' ||
-    portRestored.fontWeight !== '400' ||
-    designerPortRestored.color !== '#9fb1c9' ||
-    designerPortRestored.fontWeight !== '400'
-  ) {
-    throw new Error('BROWSER_HARNESS_STYLE_PORT_RESTORE_FAILED');
-  }
-  // 宿主推送告警：数据值与请求都不变，只调用 refreshConditionalStyles 重算样式。
-  const requestCountBeforePush = await page.evaluate(
-    () => window.baseScreenHarness.datasetRequests.length,
-  );
-  const documentStyleBeforePush = await page.evaluate(
-    () =>
-      window.baseScreenHarness.designer.document.components.find(
-        (component) => component.id === 'port-warning',
-      ).style,
-  );
-  await page.evaluate(() => window.baseScreenHarness.setHostAlarm(true));
-  await page.waitForFunction(() =>
-    [window.baseScreenHarness.viewer, window.baseScreenHarness.designer].every(
-      (element) =>
-        element.shadowRoot.querySelector('[data-base-screen-component-id=port-warning]')?.model
-          .style.color === '#f5222d',
-    ),
-  );
-  const portPushed = await portStyle();
-  const designerPortPushed = await designerPortStyle();
-  if (
-    portPushed.color !== '#f5222d' ||
-    portPushed.fontWeight !== '700' ||
-    designerPortPushed.color !== '#f5222d' ||
-    designerPortPushed.fontWeight !== '700'
-  ) {
-    throw new Error('BROWSER_HARNESS_STYLE_PORT_PUSH_FAILED');
-  }
-  const pushedState = await page.evaluate(() => ({
-    value: window.baseScreenHarness.viewer.shadowRoot.querySelector(
-      '[data-base-screen-component-id=port-warning]',
-    )?.model.dataState.value,
-    requests: window.baseScreenHarness.datasetRequests.length,
-    style: window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'port-warning',
-    ).style,
-  }));
-  if (pushedState.value !== 20 || pushedState.requests !== requestCountBeforePush) {
-    throw new Error('BROWSER_HARNESS_STYLE_PORT_PUSH_MUTATED_DATA_FAILED');
-  }
-  if (JSON.stringify(pushedState.style) !== JSON.stringify(documentStyleBeforePush)) {
-    throw new Error('BROWSER_HARNESS_STYLE_PORT_PUSH_MUTATED_DOCUMENT_FAILED');
-  }
-  await page.evaluate(() => window.baseScreenHarness.setHostAlarm(false));
-  await page.waitForFunction(() =>
-    [window.baseScreenHarness.viewer, window.baseScreenHarness.designer].every(
-      (element) =>
-        element.shadowRoot.querySelector('[data-base-screen-component-id=port-warning]')?.model
-          .style.color === '#9fb1c9',
-    ),
-  );
   await page.evaluate(() => window.baseScreenHarness.createDatasetDemo());
   const datasetDemo = page.locator('base-screen-viewer[data-dataset-demo]');
   await datasetDemo.locator('[data-base-screen-component-id=table-demo]').waitFor();

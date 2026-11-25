@@ -38,6 +38,17 @@ export function validateConditions(
       continue;
     }
     validateKnown(condition, CONDITION_KNOWN, conditionPath, collector);
+    if (
+      condition.target !== undefined &&
+      condition.target !== 'props' &&
+      condition.target !== 'style'
+    ) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        [...conditionPath, 'target'],
+        'Field condition target must be props or style.',
+      );
+    }
     isPath(condition.path, MAX_EDITOR_PATH_DEPTH, conditionPath, collector);
     const operator = condition.operator;
     if (typeof operator !== 'string' || !CONDITION_OPERATORS.has(operator)) {

@@ -10,8 +10,7 @@ import type {
   ScreenProjectSnapshotPort,
 } from '@base-screen/contracts';
 import type {
-  BaseScreenConditionalStylePort,
-  BaseScreenHostConditionalStyleAuthoringPort,
+  BaseScreenFragmentDefinition,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
   BaseScreenPluginInspectorControlCatalog,
@@ -34,6 +33,11 @@ export interface BaseScreenDesignerConfiguration {
   readonly materialLibraryState?: BaseScreenMaterialLibraryState;
   readonly materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping;
   readonly materialLibraryItems?: readonly BaseScreenMaterialLibraryItem[];
+  /**
+   * 宿主组合分片（ADR-0100）：与插件 `fragment` 贡献一起出现在物料库，插入即展开为普通组件。
+   * 与 `materialLibraryItems` 相互独立——后者须覆盖全部可见物料，分片不受这条约束。
+   */
+  readonly materialLibraryFragments?: readonly BaseScreenFragmentDefinition[];
   readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
   readonly pluginCatalog?: BaseScreenPluginCatalog;
   readonly pluginPanels?: BaseScreenPluginPanelCatalog;
@@ -45,13 +49,6 @@ export interface BaseScreenDesignerConfiguration {
   readonly designerHostAdapter?: ScreenDesignerHostAdapter;
   readonly resourcePort?: ScreenHostResourcePort;
   readonly hostCatalogPort?: ScreenHostCatalogPort;
-  /** ADR-0059 宿主条件样式端口：configure-only（Renderer 创建时捕获，设计态画布同路径预览）。 */
-  readonly conditionalStylePort?: BaseScreenConditionalStylePort;
-  /**
-   * 宿主条件样式的作者口：引擎在组件检查器渲染通用表单，宿主提供条件源、当前绑定与持久化。
-   * 与 `conditionalStylePort` 配对使用；未提供时不渲染任何宿主作者面。
-   */
-  readonly hostConditionalStyleAuthoring?: BaseScreenHostConditionalStyleAuthoringPort;
   readonly datasetPort?: ScreenHostDatasetPort;
   readonly projectCatalogPort?: ScreenProjectCatalogPort;
   readonly projectPreviewPort?: ScreenProjectPreviewPort;
@@ -66,4 +63,9 @@ export interface BaseScreenDesignerConfiguration {
    * 仅声明 host-resource 表示物料能消费宿主资源（读数、图表等），不显示选择入口。
    */
   readonly hostResourceSelectionButton?: boolean;
+  /**
+   * 提供「存为组合」操作（ADR-0100）：选中组件后在右键菜单与命令面板出现，提取成功即派发
+   * `base-screen-fragment-save-request`。宿主负责命名、归类与存储；未开启时操作不出现。
+   */
+  readonly fragmentSaveAction?: boolean;
 }

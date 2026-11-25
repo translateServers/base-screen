@@ -1,3 +1,14 @@
+// 分片形状契约的唯一所有者是 plugin-core（ADR-0100）；engine 公共面继续转发，宿主导入路径不变。
+export {
+  type BaseScreenComponentFragmentInsertionIntent,
+  type BaseScreenFragmentBlueprint,
+  type BaseScreenFragmentBody,
+  type BaseScreenFragmentDataSource,
+  type BaseScreenFragmentDefinition,
+  type BaseScreenFragmentNode,
+  type BaseScreenFragmentShell,
+  parseBaseScreenComponentFragmentInsertionIntent,
+} from '@base-screen/plugin-core';
 export {
   BASE_SCREEN_METRIC_EVENT,
   type BaseScreenMetricEventDetail,
@@ -15,15 +26,19 @@ export {
   type BaseScreenBlueprintCanvasCommandEventDetail,
   type BaseScreenBlueprintCanvasCommandResult,
   type BaseScreenBlueprintCanvasEdge,
-  type BaseScreenBlueprintCanvasEventOption,
+  type BaseScreenBlueprintCanvasEdgeCategory,
   type BaseScreenBlueprintCanvasGraph,
   type BaseScreenBlueprintCanvasInsertNode,
   type BaseScreenBlueprintCanvasNode,
   type BaseScreenBlueprintCanvasNodePosition,
+  type BaseScreenBlueprintCanvasNodeUpdate,
+  type BaseScreenBlueprintCanvasPort,
   type BaseScreenBlueprintCanvasSelection,
+  type BaseScreenBlueprintCanvasSimulationTrigger,
   type BaseScreenBlueprintCanvasState,
   type BaseScreenBlueprintCanvasStateEventDetail,
   type BaseScreenBlueprintCanvasTrace,
+  type BaseScreenBlueprintCanvasTraceStep,
   type BaseScreenDesignerSetWorkbenchModeOptions,
   type BaseScreenDesignerWorkbenchFocus,
   type BaseScreenDesignerWorkbenchMode,
@@ -36,7 +51,10 @@ export {
   type BaseScreenCanvasPresentationChangeEventDetail,
   type BaseScreenCanvasScaleMode,
 } from '../common/operations/canvas/canvas-presentation.js';
-export type { BaseScreenMaterialCatalogRefreshResult } from '../common/operations/catalog/designer-catalog-refresh.js';
+export type {
+  BaseScreenMaterialCatalogRefreshOptions,
+  BaseScreenMaterialCatalogRefreshResult,
+} from '../common/operations/catalog/designer-catalog-refresh.js';
 export {
   BASE_SCREEN_CHANGE_STATE_EVENT,
   type BaseScreenDesignerChangeProposalSummary,
@@ -83,11 +101,10 @@ export {
   parseBaseScreenComponentInsertionIntent,
 } from '../common/operations/material-component/material-component.js';
 export {
-  type BaseScreenComponentFragmentInsertionIntent,
-  type BaseScreenFragmentNode,
-  type BaseScreenFragmentShell,
-  parseBaseScreenComponentFragmentInsertionIntent,
-} from '../common/operations/material-component/material-component-fragment.js';
+  BASE_SCREEN_FRAGMENT_SAVE_REQUEST_EVENT,
+  type BaseScreenFragmentSaveRequestEventDetail,
+} from '../common/operations/material-component/material-component-fragment-extract.js';
+export { parseBaseScreenMaterialLibraryFragments } from '../common/operations/material-library/material-library-fragments.js';
 export {
   type BaseScreenMaterialLibraryGroup,
   type BaseScreenMaterialLibraryGrouping,
@@ -106,17 +123,6 @@ export {
   parseBaseScreenMaterialLibraryState,
 } from '../common/operations/material-library/material-library-state.js';
 export {
-  BASE_SCREEN_SCENE_CHANGE_EVENT,
-  type BaseScreenSceneChangeDetail,
-  type DesignerSceneDescriptor,
-  type DesignerSceneHandler,
-  type DesignerScenePlan,
-  type DesignerScenePrepareResult,
-  type DesignerScenePreview,
-  type DesignerSceneRequest,
-  prepareDesignerScenePreview,
-} from '../common/operations/scene/designer-scene.js';
-export {
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS,
   BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX,
@@ -130,8 +136,3 @@ export {
   BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT,
   type BaseScreenDesignerBackRequestEventDetail,
 } from '../common/operations/workbench/designer-navigation.js';
-export {
-  BASE_SCREEN_GUARD_CHANGE_EVENT,
-  type DesignerContrastIssue,
-  type DesignerGuardSnapshot,
-} from '../common/validation/designer-guard.js';

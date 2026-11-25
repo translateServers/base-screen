@@ -1,5 +1,6 @@
-/* 引擎内置蓝图中央画布的骨架：40px 画布条 + 无限点阵画布。节点、连线与浮层
-   分别在同目录的 -nodes / -edges / -overlays 文件里，沿用同一套 token。 */
+/* 引擎默认蓝图画布骨架（ADR-0107 §2.6）：工具条 + 无限点阵舞台 + 底部模拟条。
+   节点、连线与浮层分别在同目录的 -nodes / -edges / -overlays 文件里；
+   颜色全部取 designer-tokens.css 的 --designer-blueprint-* 令牌（LIGHT CHASER 实测值）。 */
 .designer-blueprint-canvas {
   position: absolute;
   inset: 0;
@@ -12,201 +13,194 @@
   background: var(--designer-surface-canvas);
   font: var(--designer-font-small);
   user-select: none;
-  container-type: inline-size;
+  outline: none;
+  container: bp-canvas / inline-size;
 }
 
-.designer-blueprint-canvas[hidden] {
-  display: none;
-}
-
+.designer-blueprint-canvas[hidden],
 .designer-blueprint-canvas [hidden] {
   display: none;
 }
 
-/* 画布条：与设计视图的工作区工具条同高、同底色、同一条下缘发丝线。 */
-.designer-blueprint-canvas-bar {
+/* 自带 display 的浮层（空态提示、模拟条）选择器同为两级，样式文件又排在后面，
+   上面那条会被它们的 display 盖掉：这里多一级专门把 hidden 收回来。 */
+.designer-blueprint-canvas .bp-empty[hidden],
+.designer-blueprint-canvas .bp-simulation[hidden] {
+  display: none;
+}
+
+.designer-blueprint-canvas .bp-toolbar {
   position: relative;
   z-index: var(--designer-z-workspace-overlay);
   display: flex;
   flex: none;
-  box-sizing: border-box;
   align-items: center;
   gap: var(--designer-space-5);
+  box-sizing: border-box;
   height: var(--designer-column-header-height);
   padding: 0 var(--designer-space-5);
+  /* 窄画布下仍可横向滚动兜底，但不画滚动条：一条 8px 滚动条压在 40px 工具栏底边上像裂缝。
+     宽度不够时先由下方容器查询收起文字与分组间距。 */
   overflow-x: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
   background: var(--designer-surface-raised);
   box-shadow: 0 1px 0 var(--designer-border-subtle);
 }
 
-.designer-blueprint-canvas-bar .designer-blueprint-canvas-bar-chevron {
-  display: inline-flex;
-  width: 12px;
-  height: 12px;
-  margin-left: 1px;
-}
-
-.designer-blueprint-canvas-bar .designer-blueprint-canvas-bar-chevron svg {
-  width: 12px;
-  height: 12px;
-}
-
-.designer-blueprint-canvas-bar-spacer {
-  flex: 1 1 auto;
-}
-
-.designer-blueprint-canvas-bar-separator {
+.designer-blueprint-canvas .bp-tool-group {
+  display: flex;
   flex: none;
-  width: 1px;
-  height: 22px;
-  background: var(--designer-border-subtle);
+  align-items: center;
+  gap: var(--designer-space-2);
 }
 
-.designer-blueprint-canvas-bar-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.designer-blueprint-canvas .bp-tool-group + .bp-tool-group {
+  padding-left: var(--designer-space-5);
+  box-shadow: inset 1px 0 0 var(--designer-border-subtle);
 }
 
-.designer-blueprint-canvas-problems-button {
-  border-radius: var(--designer-radius-pill);
+.designer-blueprint-canvas .bp-tool-group-end {
+  margin-left: auto;
+}
+
+.designer-blueprint-canvas .bp-tool {
+  min-width: var(--designer-control-height-compact);
+  height: var(--designer-control-height-compact);
+  padding: 0 var(--designer-space-3);
+}
+
+.designer-blueprint-canvas .bp-tool-wide {
+  gap: var(--designer-space-2);
   padding: 0 var(--designer-space-4);
 }
 
-.designer-blueprint-canvas-menu-anchor {
-  position: relative;
+.designer-blueprint-canvas .bp-tool[aria-pressed="true"] {
+  color: var(--designer-accent-text);
+  background: var(--designer-accent-surface);
+}
+
+.designer-blueprint-canvas .bp-tool svg {
+  width: var(--designer-icon-size-sm);
+  height: var(--designer-icon-size-sm);
+}
+
+.designer-blueprint-canvas .bp-tool-status {
   display: inline-flex;
-}
-
-.designer-blueprint-canvas-menu {
-  position: absolute;
-  top: calc(100% + var(--designer-space-2));
-  left: 0;
-  z-index: var(--designer-z-popover);
-  display: grid;
-  min-width: 168px;
-  padding: var(--designer-space-2);
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-5);
-  background: var(--designer-surface-overlay);
-  box-shadow: var(--designer-shadow-overlay);
-}
-
-.designer-blueprint-canvas-menu-item {
-  justify-content: flex-start;
-  width: 100%;
-  height: var(--designer-control-height-compact);
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-sm);
-  box-shadow: none;
-}
-
-.designer-blueprint-canvas-menu-item:hover {
-  color: var(--designer-text-primary);
-  background: var(--designer-surface-control-hover);
-}
-
-.designer-blueprint-canvas-problems-dot {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--designer-success);
-}
-
-.designer-blueprint-canvas-problems-button[data-state="error"]
-  .designer-blueprint-canvas-problems-dot {
-  background: var(--designer-warning);
-}
-
-/* 缩放读数：与设计视图工作区工具条里的 .zoom-value 同尺寸、同字体。 */
-.designer-blueprint-canvas-zoom {
-  box-sizing: border-box;
-  display: inline-flex;
-  flex: 0 0 48px;
-  width: 48px;
-  height: var(--designer-control-height-compact);
   align-items: center;
-  justify-content: center;
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-numeric);
-  font-size: var(--designer-font-size-sm);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
+  gap: var(--designer-space-2);
+  color: var(--designer-success);
   white-space: nowrap;
 }
 
-/* 画布表面：与设计视口共用同一份点阵 + 顶部光晕 token。 */
-.designer-blueprint-canvas-viewport {
+.designer-blueprint-canvas .bp-tool-status[data-state="error"] {
+  color: var(--designer-danger);
+}
+
+.designer-blueprint-canvas .bp-tool-status svg {
+  width: var(--designer-icon-size-xs);
+  height: var(--designer-icon-size-xs);
+}
+
+.designer-blueprint-canvas .bp-zoom-value {
+  min-width: 42px;
+  font: var(--designer-font-numeric);
+  text-align: center;
+}
+
+.designer-blueprint-canvas .bp-stage {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  cursor: default;
-  touch-action: none;
   background-color: var(--designer-surface-canvas);
+  /* 两层背景：点阵随平移 / 缩放走（--bp-pan-*、--bp-zoom 由画布写入），顶部光晕固定在视口、
+     不平铺。若把平移写进整个 background-position，100% 尺寸的光晕层会跟着位移并重复平铺，
+     画面中间就会出现一道硬接缝。 */
   background-image: var(--designer-canvas-surface-image);
-  background-size: var(--designer-canvas-surface-size);
-  outline: none;
+  background-size:
+    calc(var(--designer-canvas-grid-size) * var(--bp-zoom, 1))
+    calc(var(--designer-canvas-grid-size) * var(--bp-zoom, 1)),
+    100% 100%;
+  background-position:
+    var(--bp-pan-x, 0) var(--bp-pan-y, 0),
+    0 0;
+  background-repeat: repeat, no-repeat;
+  touch-action: none;
 }
 
-.designer-blueprint-canvas-viewport[data-hand="true"] {
+.designer-blueprint-canvas .bp-stage.is-space {
   cursor: grab;
 }
 
-.designer-blueprint-canvas-viewport[data-panning="true"] {
+.designer-blueprint-canvas .bp-stage.is-panning {
   cursor: grabbing;
 }
 
-.designer-blueprint-canvas-viewport[data-linking="true"] {
-  cursor: crosshair;
-}
-
-/* 键盘焦点与设计视口一致：内描边，不用外轮廓，避免在贴边画布上被裁掉。 */
-.designer-blueprint-canvas-viewport:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
-}
-
-.designer-blueprint-canvas-layers {
+.designer-blueprint-canvas .bp-world {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 0;
   transform-origin: 0 0;
 }
 
-.designer-blueprint-canvas-marquee {
-  position: absolute;
-  z-index: var(--designer-z-workspace-overlay);
-  border: 1px solid var(--designer-accent);
-  background: color-mix(in srgb, var(--designer-accent) 14%, transparent);
-  pointer-events: none;
+.designer-blueprint-canvas .bp-simulation {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: var(--designer-space-5);
+  padding: var(--designer-space-4) var(--designer-space-5);
+  background: var(--designer-surface-raised);
+  box-shadow: 0 -1px 0 var(--designer-border-subtle);
 }
 
-/* 抓手势只属于画布背景：画布内的浮层、抽屉与空态不继承 grab。 */
-.designer-blueprint-canvas-simulation-bar,
-.designer-blueprint-canvas-simulation,
-.designer-blueprint-canvas-problems,
-.designer-blueprint-canvas-empty,
-.designer-blueprint-canvas-no-events,
-.designer-blueprint-canvas-status,
-.designer-blueprint-canvas-edge-labels {
-  cursor: default;
+.designer-blueprint-canvas .bp-simulation .designer-field {
+  min-width: 200px;
 }
 
-/* 窄容器：只留图标，缩放数值让位。 */
-@container (max-width: 640px) {
-  .designer-blueprint-canvas-bar-label {
+.designer-blueprint-canvas .bp-simulation-payload {
+  flex: 1 1 auto;
+}
+
+.designer-blueprint-canvas .bp-simulation-payload textarea {
+  width: 100%;
+  min-height: 34px;
+  resize: vertical;
+  font: var(--designer-font-numeric);
+}
+
+.designer-blueprint-canvas .bp-simulation-actions {
+  display: flex;
+  gap: var(--designer-space-2);
+}
+
+.designer-blueprint-canvas .bp-simulation-empty,
+.designer-blueprint-canvas .bp-simulation-message {
+  margin: 0;
+  color: var(--designer-text-muted);
+}
+
+.designer-blueprint-canvas .bp-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 窄画布（左右栏展开、窗口不宽）：带字按钮只留图标，校验状态只留图标，分组间距收紧。
+   文字仍在 aria-label / data-tip 里。 */
+@container bp-canvas (width < 720px) {
+  .designer-blueprint-canvas .bp-toolbar {
+    gap: var(--designer-space-3);
+    padding: 0 var(--designer-space-3);
+  }
+
+  .designer-blueprint-canvas .bp-tool-group + .bp-tool-group {
+    padding-left: var(--designer-space-3);
+  }
+
+  .designer-blueprint-canvas .bp-tool-wide > span,
+  .designer-blueprint-canvas .bp-tool-status > span {
     display: none;
   }
 
-  .designer-blueprint-canvas-bar {
-    gap: var(--designer-space-1);
-    padding: 0 var(--designer-space-4);
-  }
-}
-
-@container (max-width: 470px) {
-  .designer-blueprint-canvas-zoom {
-    display: none;
+  .designer-blueprint-canvas .bp-tool-wide {
+    padding: 0 var(--designer-space-3);
   }
 }

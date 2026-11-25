@@ -4,8 +4,13 @@ import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialConstructor,
   type BaseScreenMaterialManifest,
+  type BaseScreenMaterialObjectSchema,
 } from '@base-screen/plugin-core';
-import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+import {
+  createBaseScreenNumberFormatConfig,
+  createMaterialDefinition,
+} from '@base-screen/plugin-sdk';
+import { parseBoardEditorDescriptor } from './board-editor.js';
 import { BoardMaterialElement, type BoardMaterialModel } from './board-element.js';
 import { PLUGIN_BOARD_DIGITAL_FLOP_TAG_NAME, PLUGIN_BOARD_DIGITAL_FLOP_TYPE } from './identity.js';
 import { readBoolean, readNumber, readString, styleColor } from './json-values.js';
@@ -18,6 +23,44 @@ import { BOARD_SCALAR_VALUE_ADAPTER } from './scalar-adapter.js';
  * 翻动。这里刻意只依赖原生 DOM 与 Web Animations，不打包任何动画库：这类组件的
  * 视觉差异来自排版与动效细节，不需要第三方运行时。
  */
+/**
+ * 读数格式走通用配置组（ADR-0102 §11）：前缀、单位、小数位、千分位与其他数字类物料同键、同控件。
+ * `prefix` / `unit` 是读数本身的构成（货币符号、单位），不是说明文字，故留在物料里。
+ */
+const DIGITAL_FLOP_NUMBER_FORMAT = createBaseScreenNumberFormatConfig({
+  prefix: true,
+  unit: true,
+  decimals: 0,
+  maxDecimals: 6,
+  thousandsSeparator: true,
+});
+
+/** 格外文字（前缀 / 单位 / 千分位）默认色：压在默认深底 #0b1a2b 上。 */
+export const DIGITAL_FLOP_DEFAULT_LABEL_COLOR = '#e6f1ff';
+
+const DIGITAL_FLOP_PROPS_SCHEMA = {
+  kind: 'object',
+  properties: {
+    ...DIGITAL_FLOP_NUMBER_FORMAT.properties,
+    flipAnimation: { kind: 'boolean' },
+  },
+  required: [...DIGITAL_FLOP_NUMBER_FORMAT.required],
+} satisfies BaseScreenMaterialObjectSchema;
+
+const DIGITAL_FLOP_STYLE_SCHEMA = {
+  kind: 'object',
+  properties: {
+    backgroundColor: { kind: 'string' },
+    color: { kind: 'string' },
+    accentColor: { kind: 'string' },
+    // 前缀 / 单位 / 千分位落在背景上而不是格底上，需要独立于「数字色」的颜色。
+    // 存量文档没有这个键：不进 required，渲染退回默认浅色。
+    labelColor: { kind: 'string' },
+    fontSize: { kind: 'number', minimum: 12, maximum: 200 },
+  },
+  required: ['backgroundColor', 'color', 'accentColor', 'fontSize'],
+} satisfies BaseScreenMaterialObjectSchema;
+
 export const PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
   type: PLUGIN_BOARD_DIGITAL_FLOP_TYPE,
   tagName: PLUGIN_BOARD_DIGITAL_FLOP_TAG_NAME,
@@ -27,56 +70,69 @@ export const PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
   defaultSize: { width: 320, height: 120 },
   // 原子化：这个物料只负责「把一个数按位翻牌显示」。标题属于说明文字，应由文档层
   // 另放 `base.text` 组合，组件内建会让它无法独立排版、也无法在无标题场景复用。
-  // `prefix`/`suffix` 不是说明文字而是读数本身的构成（货币符号、单位），故保留。
   defaultProps: {
-    prefix: '',
-    suffix: '',
-    decimals: 0,
-    thousandsSeparator: true,
+    ...DIGITAL_FLOP_NUMBER_FORMAT.defaults,
     flipAnimation: true,
   },
   defaultData: 128_430,
   staticData: { kind: 'scalar', valueType: 'number' },
   defaultStyle: {
     backgroundColor: '#0b1a2b',
-    color: '#e6f1ff',
+    color: '#04182a',
     accentColor: '#38bdf8',
+    labelColor: DIGITAL_FLOP_DEFAULT_LABEL_COLOR,
     fontSize: 48,
   },
-  styleSchema: {
-    kind: 'object',
-    properties: {
-      backgroundColor: { kind: 'string' },
-      color: { kind: 'string' },
-      accentColor: { kind: 'string' },
-      fontSize: { kind: 'number', minimum: 12, maximum: 200 },
+  styleSchema: DIGITAL_FLOP_STYLE_SCHEMA,
+  stylePanel: [],
+  propsSchema: DIGITAL_FLOP_PROPS_SCHEMA,
+  propertyPanel: [],
+  editorDescriptor: parseBoardEditorDescriptor(
+    'board.digital-flop',
+    {
+      appearance: [
+        { id: 'format', label: '读数格式', fields: DIGITAL_FLOP_NUMBER_FORMAT.fields },
+        {
+          id: 'text',
+          label: '文字',
+          fields: [
+            { id: 'color', target: 'style', path: ['color'], label: '数字色' },
+            { id: 'labelColor', target: 'style', path: ['labelColor'], label: '前缀/单位色' },
+            { id: 'fontSize', target: 'style', path: ['fontSize'], label: '数字字号', unit: 'px' },
+          ],
+        },
+        {
+          id: 'surface',
+          label: '填充与描边',
+          fields: [
+            {
+              id: 'backgroundColor',
+              target: 'style',
+              path: ['backgroundColor'],
+              label: '背景色',
+              allowGradient: true,
+            },
+            { id: 'accentColor', target: 'style', path: ['accentColor'], label: '格底色' },
+          ],
+        },
+        {
+          id: 'motion',
+          label: '动效',
+          advanced: true,
+          fields: [
+            {
+              id: 'flipAnimation',
+              target: 'props',
+              path: ['flipAnimation'],
+              label: '启用翻牌动画',
+            },
+          ],
+        },
+      ],
     },
-    required: ['backgroundColor', 'color', 'accentColor', 'fontSize'],
-  },
-  stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
-    { style: 'color', label: '数字色', control: 'color' },
-    { style: 'accentColor', label: '格底色', control: 'color' },
-    { style: 'fontSize', label: '数字字号', control: 'number' },
-  ],
-  propsSchema: {
-    kind: 'object',
-    properties: {
-      prefix: { kind: 'string', maxLength: 16 },
-      suffix: { kind: 'string', maxLength: 16 },
-      decimals: { kind: 'number', minimum: 0, maximum: 6 },
-      thousandsSeparator: { kind: 'boolean' },
-      flipAnimation: { kind: 'boolean' },
-    },
-    required: ['decimals', 'thousandsSeparator'],
-  },
-  propertyPanel: [
-    { prop: 'prefix', label: '前缀', control: 'text' },
-    { prop: 'suffix', label: '后缀', control: 'text' },
-    { prop: 'decimals', label: '小数位', control: 'number' },
-    { prop: 'thousandsSeparator', label: '千分位', control: 'boolean' },
-    { prop: 'flipAnimation', label: '翻牌动画', control: 'boolean' },
-  ],
+    DIGITAL_FLOP_PROPS_SCHEMA,
+    DIGITAL_FLOP_STYLE_SCHEMA,
+  ),
   events: ['valueClick'],
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
   dataBinding: {
@@ -100,19 +156,27 @@ export class PluginBoardDigitalFlopElement extends BoardMaterialElement {
   constructor() {
     super();
     this.addEventListener('click', this.#handleClick);
+    this.addEventListener('keydown', this.#handleKeyDown);
   }
 
   protected renderMaterial(): void {
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
 
-    this.style.display = 'block';
+    // 显隐归渲染器（组件隐藏、画板外组件、蓝图显隐都写 display:none），这里不能覆盖成 block。
+
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.overflow = 'hidden';
     this.style.backgroundColor = styleColor(model.style.backgroundColor, '#0b1a2b');
-    this.style.color = styleColor(model.style.color, '#e6f1ff');
-    this.setAttribute('role', 'group');
-    // a11y 名称取物料清单名，不来自文档：物料不再有标题字段。
+    // 宿主字色由格外文字（前缀、单位、千分位）继承，它们压在背景上：不能用格内的「数字色」。
+    this.style.color = styleColor(model.style.labelColor, DIGITAL_FLOP_DEFAULT_LABEL_COLOR);
+    this.setAttribute('role', model.interactive ? 'button' : 'group');
+    // a11y 名称以物料清单名打底（物料不再有标题字段）；读数就绪后补上读数，见下方。
     this.setAttribute('aria-label', PluginBoardDigitalFlopElement.manifest.name);
+    // 设计态不可聚焦：tabIndex=-1 仍会被鼠标点中获得焦点，必须移除属性。
+    // 不写 aria-keyshortcuts：button 角色本身就意味着 Enter / 空格，那个属性是给快捷键用的。
+    if (model.interactive) this.tabIndex = 0;
+    else this.removeAttribute('tabindex');
 
     if (model.dataState.status !== 'ready') {
       this.#lastText = undefined;
@@ -123,6 +187,9 @@ export class PluginBoardDigitalFlopElement extends BoardMaterialElement {
     const text = formatNumericText(model);
     const animated = this.#lastText !== undefined && this.#lastText !== text;
     this.#lastText = text;
+    // role=button 时子节点对读屏是展示性的，读数必须进可访问名称，否则只会读出「数字翻牌器」。
+    const reading = `${readString(model.props.prefix)}${text}${readString(model.props.unit)}`;
+    this.setAttribute('aria-label', `${PluginBoardDigitalFlopElement.manifest.name}：${reading}`);
     this.#paint(text, model, animated);
   }
 
@@ -143,8 +210,8 @@ export class PluginBoardDigitalFlopElement extends BoardMaterialElement {
     for (const [index, character] of [...text].entries()) {
       row.appendChild(this.#cell(character, index, model, animated));
     }
-    const suffix = readString(model.props.suffix);
-    if (suffix !== '') row.appendChild(this.#affix(suffix, model));
+    const unit = readString(model.props.unit);
+    if (unit !== '') row.appendChild(this.#affix(unit, model));
 
     container.appendChild(row);
     // 收尾统一走 `commit()`：它就位画面、标记「已成功渲染过」，并清掉降级角标。
@@ -173,8 +240,15 @@ export class PluginBoardDigitalFlopElement extends BoardMaterialElement {
     cell.textContent = character;
     // 格宽用 em 固定，字号变化时整排一起缩放；transform/opacity 之外的属性不参与动画，
     // 因此翻牌不会触发相邻格重排（样式稳定性：不得抖动）。
-    cell.style.cssText = `display:flex;align-items:center;justify-content:center;width:.74em;height:1.24em;font-size:${fontSize}px;line-height:1;border-radius:.08em;background:${styleColor(model.style.accentColor, '#38bdf8')};color:${styleColor(model.style.color, '#e6f1ff')};box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);`;
-    if (animated && readBoolean(model.props.flipAnimation, true) && model.interactive) {
+    cell.style.cssText = `display:flex;align-items:center;justify-content:center;width:.74em;height:1.24em;font-size:${fontSize}px;line-height:1;border-radius:.08em;background:${styleColor(model.style.accentColor, '#38bdf8')};color:${styleColor(model.style.color, '#04182a')};box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);`;
+    const reduceMotion =
+      doc.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches ?? false;
+    if (
+      animated &&
+      readBoolean(model.props.flipAnimation, true) &&
+      model.interactive &&
+      !reduceMotion
+    ) {
       cell.animate(
         [
           { transform: 'translateY(-38%)', opacity: 0.25 },
@@ -196,7 +270,15 @@ export class PluginBoardDigitalFlopElement extends BoardMaterialElement {
 
   disconnectedCallback(): void {
     this.removeEventListener('click', this.#handleClick);
+    this.removeEventListener('keydown', this.#handleKeyDown);
   }
+
+  readonly #handleKeyDown = (event: KeyboardEvent): void => {
+    if (this.materialModel?.interactive !== true) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    this.#handleClick();
+  };
 
   readonly #handleClick = (): void => {
     const model = this.materialModel;

@@ -41,6 +41,8 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
     expect(Object.keys(propertiesOf(schema))).toEqual([
       'canvas',
       'components',
+      'subCanvases',
+      'startCanvasId',
       'dataSources',
       'variables',
       'blueprint',
@@ -147,12 +149,12 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
 
   it('expresses Blueprint condition and expression limits', () => {
     const blueprint = propertiesOf(schema).blueprint as Record<string, unknown>;
-    const relations = propertiesOf(blueprint).relations as { items: { oneOf: unknown[] } };
-    const behavior = relations.items.oneOf.find(
+    const nodes = propertiesOf(blueprint).nodes as { items: { oneOf: unknown[] } };
+    const conditionNode = nodes.items.oneOf.find(
       (branch) =>
-        (propertiesOf(branch).type as { const?: string } | undefined)?.const === 'behavior',
+        (propertiesOf(branch).kind as { const?: string } | undefined)?.const === 'condition',
     ) as Record<string, unknown>;
-    const condition = propertiesOf(behavior).condition as { allOf: unknown[] };
+    const condition = propertiesOf(conditionNode).condition as { allOf: unknown[] };
     expect(condition.allOf).toEqual([
       {
         if: { properties: { operator: { const: 'exists' } }, required: ['operator'] },
@@ -175,5 +177,35 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
     const serialized = JSON.stringify(SCREEN_DOCUMENT_JSON_SCHEMA);
     expect(serialized).not.toContain('__zod');
     expect(serialized).not.toContain('$type');
+  });
+});
+
+describe('SCREEN_DOCUMENT_JSON_SCHEMA push update policy (ADR-0104)', () => {
+  const dataSource = (propertiesOf(schema).dataSources as { items: Record<string, unknown> }).items;
+  const updatePolicy = propertiesOf(dataSource).updatePolicy as Record<string, unknown>;
+
+  it('lists push as a mode and declares push-only fields', () => {
+    const fields = propertiesOf(updatePolicy);
+    expect((fields.mode as { enum: unknown[] }).enum).toEqual(['once', 'manual', 'auto', 'push']);
+    expect(Object.keys(fields)).toEqual([
+      'mode',
+      'intervalSeconds',
+      'fallbackIntervalSeconds',
+      'retain',
+    ]);
+    const retain = fields.retain as Record<string, unknown>;
+    expect(retain.additionalProperties).toBe(false);
+    expect(retain.dependentRequired).toEqual({ seconds: ['timeField'], timeField: ['seconds'] });
+  });
+
+  it('forbids push-only fields outside push and push on url-query sources', () => {
+    expect(updatePolicy.allOf).toHaveLength(2);
+    expect((updatePolicy.allOf as unknown[])[1]).toEqual({
+      if: { properties: { mode: { const: 'push' } }, required: ['mode'] },
+      else: {
+        not: { anyOf: [{ required: ['fallbackIntervalSeconds'] }, { required: ['retain'] }] },
+      },
+    });
+    expect(dataSource.allOf).toHaveLength(1);
   });
 });

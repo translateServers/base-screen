@@ -52,7 +52,7 @@ describe('DesignerWorkbenchController canvas state', () => {
     expect(workbench.guides.children).toHaveLength(0);
   });
 
-  it('R2 does not render snap overlays when stacked component boundaries already coincide', () => {
+  it('R2 renders every boundary an unmoved selection already shares with a stacked component', () => {
     const workbench = createWorkbench();
     const components = workbench.document.components as unknown as Array<
       ScreenDocument['components'][number]
@@ -71,10 +71,16 @@ describe('DesignerWorkbenchController canvas state', () => {
       snappedX: 130,
       snappedY: 166,
     });
-    expect(preview.guides).toBeUndefined();
+    // Left, centre and right lines plus the shared horizontal edge; no measurement for a 0 gap.
+    expect(preview.guides?.x?.map((line) => line.value)).toEqual([130, 180, 230]);
+    expect(preview.guides?.y?.map((line) => line.value)).toEqual([166]);
 
     workbench.controller.renderSnapPreview(preview);
-    expect(workbench.guides.children).toHaveLength(0);
+    expect(workbench.guides.children).toHaveLength(4);
+    expect(
+      workbench.guides.children.every((child) => child.className.includes('canvas-guide-snap')),
+    ).toBe(true);
+    expect(workbench.guides.children[0]?.children).toHaveLength(3);
   });
 
   it('R2 renders alignment-rail measurements only for a moving preview without changing snap candidates', () => {
@@ -96,37 +102,77 @@ describe('DesignerWorkbenchController canvas state', () => {
       workbench.guides.children.filter((child) => child.className === 'canvas-measurement'),
     ).toHaveLength(0);
 
+    // Offsets away from any equal spacing, so the alignment-rail gaps are what is shown. The
+    // lower rows (407..527) are beyond the snap reach, so their 59px gap is no longer marked.
     const preview = workbench.controller.snapSelectionOffset(
       { left: 0, right: 200, top: 146, bottom: 180 },
-      { x: 0, y: 0 },
+      { x: 0, y: 10 },
       ['c1'],
     );
-    expect(preview.measurements?.[0]).toMatchObject({ axis: 'y', distance: 46 });
+    expect(preview.measurements?.[0]).toMatchObject({ axis: 'y', distance: 56 });
     workbench.controller.renderSnapPreview(preview);
     let measurements = workbench.guides.children.filter(
       (child) => child.className === 'canvas-measurement',
     );
-    expect(measurements).toHaveLength(7);
+    expect(measurements).toHaveLength(4);
     expect(measurements[0]?.dataset.axis).toBe('y');
-    expect(measurements[0]?.children[0]?.textContent).toBe('46');
-    expect((measurements[0]?.style as unknown as CSSStyleDeclaration).height).toBe('46px');
+    expect(measurements[0]?.children[0]?.textContent).toBe('56');
+    expect((measurements[0]?.style as unknown as CSSStyleDeclaration).height).toBe('56px');
 
     const movedPreview = workbench.controller.snapSelectionOffset(
       { left: 0, right: 200, top: 146, bottom: 180 },
-      { x: 0, y: 4 },
+      { x: 0, y: 14 },
       ['c1'],
     );
-    expect(movedPreview.measurements?.[0]).toMatchObject({ axis: 'y', distance: 50 });
+    expect(movedPreview.measurements?.[0]).toMatchObject({ axis: 'y', distance: 60 });
     workbench.controller.renderSnapPreview(movedPreview);
     measurements = workbench.guides.children.filter(
       (child) => child.className === 'canvas-measurement',
     );
-    expect(measurements[0]?.children[0]?.textContent).toBe('50');
+    expect(measurements[0]?.children[0]?.textContent).toBe('60');
 
     workbench.controller.renderSnapPreview(undefined);
     expect(
       workbench.guides.children.filter((child) => child.className === 'canvas-measurement'),
     ).toHaveLength(0);
+  });
+
+  it('R2 centres a dragged selection between neighbours and shows only the equal gaps', () => {
+    const workbench = createWorkbench();
+    const components = workbench.document.components as unknown as Array<
+      ScreenDocument['components'][number]
+    >;
+    components.push(
+      measurementComponent('top', 0, 0, 260, 100),
+      measurementComponent('c1', 0, 146, 200, 34),
+      measurementComponent('upper-left', 0, 228, 100, 120),
+      measurementComponent('upper-right', 100, 228, 100, 120),
+      measurementComponent('lower-left', 0, 407, 100, 120),
+      measurementComponent('lower-right', 100, 407, 100, 120),
+    );
+    workbench.controller.initialize();
+
+    // Centre 163 is 1px from the middle of the 100..228 gap: equal spacing pulls it to 164.
+    const preview = workbench.controller.snapSelectionOffset(
+      { left: 0, right: 200, top: 146, bottom: 180 },
+      { x: 0, y: 0 },
+      ['c1'],
+    );
+    expect(preview).toMatchObject({ x: 0, y: 1 });
+    // Equal gaps replace the alignment-rail chain (no 59 between the lower rows).
+    expect(preview.measurements).toEqual([
+      { axis: 'y', distance: 47, from: 181, to: 228, position: 50, kind: 'equal' },
+      { axis: 'y', distance: 47, from: 100, to: 147, position: 100, kind: 'equal' },
+      { axis: 'y', distance: 47, from: 181, to: 228, position: 150, kind: 'equal' },
+    ]);
+    workbench.controller.renderSnapPreview(preview);
+    const measurements = workbench.guides.children.filter((child) =>
+      child.className.startsWith('canvas-measurement'),
+    );
+    expect(measurements.map((child) => child.className)).toEqual(
+      Array(3).fill('canvas-measurement canvas-measurement-equal'),
+    );
+    expect(measurements.map((child) => child.children[0]?.textContent)).toEqual(['47', '47', '47']);
   });
 
   it('R2 clears transient snap overlays when snapping or border guides are toggled', () => {
@@ -246,7 +292,7 @@ describe('DesignerWorkbenchController snap session', () => {
       canvas: { width: 800, height: 600, backgroundColor: '#000000' },
       components: [componentNode('a', left), componentNode('b', 300)],
       variables: [],
-      blueprint: { relations: [] },
+      blueprint: { nodes: [], edges: [] },
     };
   }
 

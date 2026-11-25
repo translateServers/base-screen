@@ -18,6 +18,9 @@ function readSource(file: string): string {
 const canvas = readSource(
   '../../../../src/browser/dom/blueprint/designer-blueprint-default-canvas.ts',
 );
+const geometry = readSource(
+  '../../../../src/common/operations/blueprint/designer-blueprint-geometry.ts',
+);
 const panel = readSource(
   '../../../../src/browser/controllers/blueprint/designer-blueprint-workbench-panel.ts',
 );
@@ -47,9 +50,13 @@ describe('engine default blueprint canvas', () => {
       "'connect'",
       "'delete-selection'",
       "'insert-node'",
+      "'update-node'",
+      "'duplicate-nodes'",
       "'commit-layout'",
-      "'commit-viewport'",
       "'run-simulation'",
+      "'clear-simulation'",
+      "'history-undo'",
+      "'history-redo'",
     ]) {
       expect(canvas).toContain(`type: ${command}`);
     }
@@ -57,7 +64,7 @@ describe('engine default blueprint canvas', () => {
 
   it('stays an engine surface and never claims the host slot', () => {
     expect(canvas).not.toContain('BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT');
-    expect(canvas).toContain("root.dataset.designerBlueprintCanvas = 'true'");
+    expect(canvas).toContain("dataset.designerBlueprintCanvas = 'true'");
     expect(css).toContain('.designer-blueprint-canvas {');
   });
 
@@ -68,13 +75,27 @@ describe('engine default blueprint canvas', () => {
     expect(panel).toContain('fallback.hidden = assigned !== undefined');
   });
 
-  it('keeps the 24px port hit area, far-zoom labels and shared canvas grid tokens', () => {
-    expect(nodesCss).toMatch(
-      /\.designer-blueprint-canvas-port\s*\{[^}]*width: 24px;[^}]*height: 24px;/s,
-    );
+  it('keeps the LIGHT CHASER card geometry, 28px port hit area and shared grid tokens', () => {
+    expect(canvas).toContain('designer-blueprint-geometry.js');
+    expect(geometry).toContain('DESIGNER_BLUEPRINT_NODE_WIDTH = 164');
+    expect(geometry).toContain('DESIGNER_BLUEPRINT_NODE_ROW_HEIGHT = 27');
+    expect(geometry).toContain('DESIGNER_BLUEPRINT_NODE_SNAP_DISTANCE = 28');
+    expect(nodesCss).toMatch(/\.bp-port::before\s*\{[^}]*width: 28px;[^}]*height: 28px;/s);
     expect(css).toContain('background-image: var(--designer-canvas-surface-image);');
-    expect(css).toContain('background-size: var(--designer-canvas-surface-size);');
-    expect(edgesCss).toContain('.designer-blueprint-canvas-viewport[data-zoom-far="true"]');
+    // 点阵随平移缩放，光晕层固定不平铺：平移只写 --bp-pan-*，不写整个 background-position。
+    expect(css).toContain('background-repeat: repeat, no-repeat;');
+    expect(css).toContain('var(--bp-pan-x, 0) var(--bp-pan-y, 0)');
+    expect(canvas).not.toContain('style.backgroundPosition');
+    expect(edgesCss).toContain('--designer-blueprint-edge');
+  });
+
+  it('builds the context menu from the shared designer menu styles', () => {
+    expect(canvas).toContain('designer-context-menu');
+    expect(canvas).toContain('designer-menu-item');
+    // 行结构与顶栏菜单同源：图标 / 标签 / 快捷键三列，危险项用共享的 data-menu-tone。
+    expect(canvas).toContain('class="menu-item-icon"');
+    expect(canvas).toContain('class="menu-item-label"');
+    expect(canvas).toContain('data-menu-tone="danger"');
   });
 
   it('keeps the no-host fallback hidden behind the shared slot-ready state', () => {

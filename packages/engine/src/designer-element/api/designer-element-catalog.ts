@@ -1,9 +1,15 @@
 import type { ScreenDiagnostic, ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { diffBaseScreenMaterialCatalogs } from '@base-screen/plugin-core';
-import type { BaseScreenMaterialCatalogRefreshResult } from '../../common/operations/catalog/designer-catalog-refresh.js';
+import type {
+  BaseScreenMaterialCatalogRefreshOptions,
+  BaseScreenMaterialCatalogRefreshResult,
+} from '../../common/operations/catalog/designer-catalog-refresh.js';
 import { collectCatalogCompatibilityDiagnostics } from '../../common/operations/catalog/designer-catalog-refresh.js';
-import { validateBaseScreenMaterialLibraryGroupingForCatalog } from '../../common/operations/material-library/material-library-grouping.js';
+import {
+  parseBaseScreenMaterialLibraryGrouping,
+  validateBaseScreenMaterialLibraryGroupingForCatalog,
+} from '../../common/operations/material-library/material-library-grouping.js';
 import { resolveBaseScreenMaterialLibraryItems } from '../../common/operations/material-library/material-library-items.js';
 import { isBaseScreenMaterialCatalog } from '../runtime/designer-element-guards.js';
 import type { DesignerElementHost } from '../runtime/designer-element-host.js';
@@ -16,11 +22,13 @@ import {
  * 初始化后更新物料目录的唯一入口（ADR-0090）。
  *
  * 全有或全无：先校验 catalog、物料库分组/条目、当前文档与 Blueprint，再交换目录并重渲染；
- * 任一步失败保持 catalog、文档、DOM、历史与数据源状态不变。
+ * 任一步失败保持 catalog、分组、文档、DOM、历史与数据源状态不变。给出 `materialLibraryGrouping`
+ * 时分组随 catalog 一起交换（ADR-0105 P2）。
  */
 export function refreshCatalog(
   element: DesignerElementHost,
   catalog: BaseScreenMaterialCatalog,
+  options: BaseScreenMaterialCatalogRefreshOptions = {},
 ): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult> {
   const state = getDesignerElementState(element);
   if (state.catalog === undefined) {
@@ -34,11 +42,14 @@ export function refreshCatalog(
   }
 
   const diff = diffBaseScreenMaterialCatalogs(state.catalog, catalog);
-  if (state.materialLibraryGrouping !== undefined) {
-    const grouping = validateBaseScreenMaterialLibraryGroupingForCatalog(
-      state.materialLibraryGrouping,
-      catalog,
-    );
+  let nextGrouping = state.materialLibraryGrouping;
+  if (options.materialLibraryGrouping !== undefined) {
+    const parsed = parseBaseScreenMaterialLibraryGrouping(options.materialLibraryGrouping);
+    if (!parsed.ok) return { ok: false, diagnostics: parsed.diagnostics };
+    nextGrouping = parsed.value;
+  }
+  if (nextGrouping !== undefined) {
+    const grouping = validateBaseScreenMaterialLibraryGroupingForCatalog(nextGrouping, catalog);
     if (!grouping.ok) return { ok: false, diagnostics: grouping.diagnostics };
   }
   const resolvedItems = resolveBaseScreenMaterialLibraryItems(catalog, state.materialLibraryItems);
@@ -61,27 +72,44 @@ export function refreshCatalog(
 
   const previousCatalog = state.catalog;
   const previousResolvedItems = state.resolvedMaterialLibraryItems;
+  const previousGrouping = state.materialLibraryGrouping;
+  const groupingChanged = nextGrouping !== previousGrouping;
   state.catalog = catalog;
   state.resolvedMaterialLibraryItems = resolvedItems.value;
+  state.materialLibraryGrouping = nextGrouping;
 
   if (document === undefined || renderer === undefined) {
-    state.runtime.renderMaterialLibraryItems(element);
+    renderLibrary(state, element, groupingChanged);
     return success(diff);
   }
 
+  const restore = (): void => {
+    state.materialLibraryGrouping = previousGrouping;
+    restoreCatalog(state, element, previousCatalog, previousResolvedItems, document);
+    if (groupingChanged) state.runtime.renderMaterialLibraryGrouping(element);
+  };
   const catalogResult = renderer.setCatalog(catalog);
   if (!catalogResult.ok) {
-    restoreCatalog(state, element, previousCatalog, previousResolvedItems, document);
+    restore();
     return { ok: false, diagnostics: catalogResult.diagnostics };
   }
   const rendered = state.canvasRuntimeController.render(document);
   if (!rendered.ok) {
-    restoreCatalog(state, element, previousCatalog, previousResolvedItems, document);
+    restore();
     return { ok: false, diagnostics: rendered.diagnostics };
   }
-  state.runtime.renderMaterialLibraryItems(element);
+  renderLibrary(state, element, groupingChanged);
   state.runtime.renderInteraction(element);
   return success(diff);
+}
+
+function renderLibrary(
+  state: DesignerElementState,
+  element: DesignerElementHost,
+  groupingChanged: boolean,
+): void {
+  if (groupingChanged) state.runtime.renderMaterialLibraryGrouping(element);
+  state.runtime.renderMaterialLibraryItems(element);
 }
 
 function restoreCatalog(

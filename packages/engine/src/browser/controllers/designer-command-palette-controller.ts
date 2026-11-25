@@ -15,6 +15,8 @@ export interface DesignerCommandPaletteEntry {
   readonly disabled?: boolean;
   readonly materialType?: string;
   readonly materialItemId?: string;
+  /** 组合分片（ADR-0100）：点击后由物料库面板按分片 id 整片插入。 */
+  readonly materialFragmentId?: string;
   readonly componentId?: string;
   readonly operationId?: keyof typeof DESIGNER_OPERATION_TEXT;
   readonly pluginCommandId?: string;
@@ -219,6 +221,24 @@ export class DesignerCommandPaletteController {
     if (root === null) return [];
     const materials = [...root.querySelectorAll<HTMLElement>('[data-material-card]')].flatMap(
       (card): DesignerCommandPaletteEntry[] => {
+        const fragmentId = card.dataset.materialFragmentCard;
+        if (fragmentId !== undefined) {
+          const fragmentControl = card.querySelector<HTMLButtonElement>('[data-material-fragment]');
+          if (fragmentControl === null) return [];
+          const label =
+            card.querySelector<HTMLElement>('.material-name')?.textContent?.trim() || fragmentId;
+          return [
+            {
+              kind: 'material',
+              label,
+              detail: DESIGNER_UI_TEXT.commandPalette.fragmentDetail(fragmentId),
+              searchText:
+                `${label} ${fragmentId} ${DESIGNER_UI_TEXT.materialFragment}`.toLocaleLowerCase(),
+              disabled: fragmentControl.disabled,
+              materialFragmentId: fragmentId,
+            },
+          ];
+        }
         const control = card.querySelector<HTMLButtonElement>('[data-material-type]');
         const materialType = card.dataset.materialType ?? control?.dataset.materialType;
         if (control === null || materialType === undefined) return [];
@@ -296,38 +316,33 @@ export class DesignerCommandPaletteController {
         blueprintTargetId: `component:${component.id}`,
       }),
     );
-    const relations = document.blueprint.relations.map(
-      (relation, index): DesignerCommandPaletteEntry => {
-        const source =
-          relation.type === 'semantic'
-            ? relation.source.componentId
-            : relation.source.kind === 'component'
-              ? relation.source.componentId
-              : relation.source.kind === 'variable'
-                ? relation.source.variableId
-                : relation.source.kind === 'lifecycle'
-                  ? 'lifecycle'
-                  : 'timer';
-        const target =
-          relation.type === 'semantic'
-            ? relation.target.componentId
-            : relation.target.kind === 'component'
-              ? relation.target.componentId
-              : relation.target.kind === 'variable'
-                ? relation.target.variableId
-                : 'host';
-        const label = DESIGNER_UI_TEXT.blueprint.relationSummary(index + 1);
-        return {
-          kind: 'blueprint',
-          label,
-          detail: `${source} → ${target}`,
-          searchText:
-            `${label} ${source} ${target} ${relation.type === 'behavior' ? relation.effect.type : relation.role}`.toLocaleLowerCase(),
-          blueprintTargetId:
-            relation.type === 'semantic' ? `semantic:${relation.id}` : `relation:${relation.id}`,
-        };
-      },
-    );
+    const nodeTitles = new Map<string, string>();
+    for (const node of document.blueprint.nodes) {
+      nodeTitles.set(
+        node.id,
+        node.kind === 'component'
+          ? (document.components.find((component) => component.id === node.componentId)?.name ??
+              node.componentId)
+          : node.kind === 'variable'
+            ? node.variableId
+            : node.kind === 'timer' || node.kind === 'condition'
+              ? (node.name ?? DESIGNER_UI_TEXT.blueprint.graph.nodeKinds[node.kind])
+              : DESIGNER_UI_TEXT.blueprint.graph.nodeKinds[node.kind],
+      );
+    }
+    const relations = document.blueprint.edges.map((edge, index): DesignerCommandPaletteEntry => {
+      const source = nodeTitles.get(edge.from.node) ?? edge.from.node;
+      const target = nodeTitles.get(edge.to.node) ?? edge.to.node;
+      const label = DESIGNER_UI_TEXT.blueprint.relationSummary(index + 1);
+      const detail = edge.kind === 'flow' ? `${edge.from.port} → ${edge.to.port}` : edge.role;
+      return {
+        kind: 'blueprint',
+        label,
+        detail: `${source} → ${target}`,
+        searchText: `${label} ${source} ${target} ${detail}`.toLocaleLowerCase(),
+        blueprintTargetId: `edge:${edge.id}`,
+      };
+    });
     return [...components, ...relations];
   }
 
@@ -356,6 +371,9 @@ export class DesignerCommandPaletteController {
     button.append(glyph, text, kind);
     if (entry.materialType !== undefined) button.dataset.materialType = entry.materialType;
     if (entry.materialItemId !== undefined) button.dataset.materialItemId = entry.materialItemId;
+    if (entry.materialFragmentId !== undefined) {
+      button.dataset.materialFragment = entry.materialFragmentId;
+    }
     if (entry.componentId !== undefined) button.dataset.layerSelect = entry.componentId;
     if (entry.operationId !== undefined) button.dataset.action = entry.operationId;
     if (entry.pluginCommandId !== undefined) button.dataset.pluginCommand = entry.pluginCommandId;

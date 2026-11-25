@@ -10,8 +10,7 @@ import {
   type ScreenParseResult,
   type ScreenPosition,
 } from '@base-screen/contracts';
-import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
-import { isBoundedName } from '../designer-name-validation.js';
+import { type BaseScreenMaterialManifest, isBaseScreenBoundedName } from '@base-screen/plugin-core';
 import {
   clipMaterialPositionToCanvas,
   createMaterialComponent,
@@ -58,7 +57,10 @@ export function parseBaseScreenHostResourceAuthoringIntent(
       ['materialType'],
     );
   }
-  if (input.name !== undefined && !isBoundedName(input.name, MAX_HOST_RESOURCE_NAME_CODE_POINTS)) {
+  if (
+    input.name !== undefined &&
+    !isBaseScreenBoundedName(input.name, MAX_HOST_RESOURCE_NAME_CODE_POINTS)
+  ) {
     return failure(
       'AUTHORING_PAYLOAD_INVALID',
       `Host resource name must contain 1 to ${MAX_HOST_RESOURCE_NAME_CODE_POINTS} code points without control characters.`,

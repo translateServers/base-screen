@@ -21,8 +21,9 @@ import type {
 } from '@base-screen/contracts';
 import { type ScreenDocumentCommand, type ScreenDocumentTransaction } from '@base-screen/core';
 import type {
-  BaseScreenConditionalStylePort,
-  BaseScreenHostConditionalStyleAuthoringPort,
+  BaseScreenComponentFragmentInsertionIntent,
+  BaseScreenFragmentBody,
+  BaseScreenFragmentDefinition,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
   BaseScreenRuntimeContributionIndex,
@@ -32,7 +33,10 @@ import type {
   BaseScreenDesignerSetWorkbenchModeOptions,
   BaseScreenDesignerWorkbenchMode,
 } from '../../common/operations/blueprint/designer-blueprint-protocol.js';
-import type { BaseScreenMaterialCatalogRefreshResult } from '../../common/operations/catalog/designer-catalog-refresh.js';
+import type {
+  BaseScreenMaterialCatalogRefreshOptions,
+  BaseScreenMaterialCatalogRefreshResult,
+} from '../../common/operations/catalog/designer-catalog-refresh.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
@@ -43,7 +47,6 @@ import type {
   BaseScreenHostResourceSelectionTarget,
 } from '../../common/operations/host-resource/host-resource-selection.js';
 import type { BaseScreenComponentInsertionIntent } from '../../common/operations/material-component/material-component.js';
-import type { BaseScreenComponentFragmentInsertionIntent } from '../../common/operations/material-component/material-component-fragment.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../../common/operations/material-library/material-library-grouping.js';
 import { type BaseScreenMaterialLibraryItem } from '../../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../../common/operations/material-library/material-library-state.js';
@@ -58,20 +61,20 @@ export interface DesignerElementHost extends HTMLElement {
   materialLibraryState: BaseScreenMaterialLibraryState | undefined;
   materialLibraryGrouping: BaseScreenMaterialLibraryGrouping | undefined;
   materialLibraryItems: readonly BaseScreenMaterialLibraryItem[] | undefined;
+  materialLibraryFragments: readonly BaseScreenFragmentDefinition[] | undefined;
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   pluginCatalog: BaseScreenPluginCatalog | undefined;
   pluginCommandPort: PluginCommandPort | undefined;
   readonly previewHandler: ((document: ScreenDocument) => boolean) | undefined;
   readonly backButton: boolean;
   readonly hostResourceSelectionButton: boolean;
+  readonly fragmentSaveAction: boolean;
   projectAdapter: ScreenProjectAdapter | undefined;
   toolMaterialTypes: DesignerToolMaterialTypes | undefined;
   groupMaterialType: string | undefined;
   resourcePort: ScreenHostResourcePort | undefined;
   designerHostAdapter: ScreenDesignerHostAdapter | undefined;
   hostCatalogPort: ScreenHostCatalogPort | undefined;
-  conditionalStylePort: BaseScreenConditionalStylePort | undefined;
-  hostConditionalStyleAuthoring: BaseScreenHostConditionalStyleAuthoringPort | undefined;
   datasetPort: ScreenHostDatasetPort | undefined;
   projectCatalogPort: ScreenProjectCatalogPort | undefined;
   projectPreviewPort: ScreenProjectPreviewPort | undefined;
@@ -82,6 +85,7 @@ export interface DesignerElementHost extends HTMLElement {
   configure(configuration: BaseScreenDesignerConfiguration): ScreenParseResult<null>;
   refreshCatalog(
     catalog: BaseScreenMaterialCatalog,
+    options?: BaseScreenMaterialCatalogRefreshOptions,
   ): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult>;
   setWorkbenchMode(
     mode: BaseScreenDesignerWorkbenchMode,
@@ -98,6 +102,9 @@ export interface DesignerElementHost extends HTMLElement {
     intent: BaseScreenHostResourceAuthoringIntent,
   ): ScreenParseResult<ScreenDocument>;
   insertComponent(intent: BaseScreenComponentInsertionIntent): ScreenParseResult<ScreenDocument>;
+  createComponentFragment(
+    componentIds?: readonly string[],
+  ): ScreenParseResult<BaseScreenFragmentBody>;
   insertComponentFragment(
     intent: BaseScreenComponentFragmentInsertionIntent,
   ): ScreenParseResult<ScreenDocument>;
@@ -155,7 +162,6 @@ export interface DesignerElementHost extends HTMLElement {
   restoreSnapshot(snapshotId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   refreshData(componentId?: string): void;
   refreshVariables(options?: ScreenVariableRefreshOptions): void;
-  refreshConditionalStyles(componentIds?: readonly string[]): void;
   getVariable(id: string): import('@base-screen/contracts').ScreenVariableHandle | undefined;
   save(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   publish(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;

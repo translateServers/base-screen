@@ -1,5 +1,5 @@
-import type { ScreenComponentNode } from '@base-screen/contracts';
-import { derivedDataSourceId } from '@base-screen/contracts';
+import type { ScreenComponentNode, ScreenValueRef } from '@base-screen/contracts';
+import { derivedDataSourceId, readScreenDocumentDataSources } from '@base-screen/contracts';
 import { materialSupportsHostResourceSelection } from '../../../common/operations/host-resource/host-resource-selection.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { syncDataPanelNotice } from '../../dom/dataset/designer-data-panel-notice.js';
@@ -31,6 +31,7 @@ import {
   syncInlineDataPanelActions,
 } from '../../dom/dataset/designer-dataset-primitives.js';
 import type {
+  DesignerDataSourcePushDelivery,
   DesignerDataSurface,
   DesignerHostLinkView,
 } from '../../dom/dataset/designer-dataset-types.js';
@@ -443,8 +444,48 @@ function createDatasetPanelOptions(
     preview: context.state.preview,
     activeStep: context.state.activeStep,
     authoring: context.state.authoring,
+    ...(() => {
+      const pushDelivery = readDesignerPushDelivery(context, dataValue);
+      return pushDelivery === undefined ? {} : { pushDelivery };
+    })(),
     ...overlayOptions(context),
   };
+}
+
+/**
+ * 当前实例来源能否推送（ADR-0104 §2.3，作者面门控）。
+ *
+ * - `host-resource`：资源类型贡献声明了 `delivery.push`，且宿主资源端口实现了 `subscribe`；
+ * - `host-catalog`：宿主目录端口实现了 `subscribe`（目录项级 `delivery` 由宿主在描述里给出，
+ *   设计器拿不到描述时按端口能力放行，运行时仍会在不支持时回退或报错）；
+ * - `dataset` / `url-query`：不支持（数据集推送在第二阶段）。
+ *
+ * 只读文档实例：草稿实例尚未落库，没有可推送的来源可判。
+ * 写回事务（`designer-update-policy-authoring.ts`）与面板渲染共用这一处判定。
+ */
+export function readDesignerPushDelivery(
+  context: DesignerDatasetControllerContext,
+  dataValue: ScreenValueRef | null,
+): DesignerDataSourcePushDelivery | undefined {
+  if (dataValue?.kind !== 'data-source-field') return undefined;
+  const document = context.callbacks.getDocument();
+  if (document === undefined) return undefined;
+  const instance = readScreenDocumentDataSources(document).find(
+    (candidate) => candidate.id === dataValue.dataSourceId,
+  );
+  const source = instance?.source;
+  if (source?.kind === 'host-resource') {
+    const push = context.callbacks.getRuntimeContributions()?.getResourceType(source.resourceType)
+      ?.delivery?.push;
+    if (push === undefined) return undefined;
+    if (typeof context.callbacks.getResourcePort()?.subscribe !== 'function') return undefined;
+    return { append: push.append === true };
+  }
+  if (source?.kind === 'host-catalog') {
+    if (typeof context.callbacks.getHostCatalogPort?.()?.subscribe !== 'function') return undefined;
+    return { append: false };
+  }
+  return undefined;
 }
 
 /**

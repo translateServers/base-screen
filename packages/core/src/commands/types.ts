@@ -4,8 +4,8 @@ import type {
   ScreenCanvasBackgroundImageFit,
   ScreenComponentDataSource,
   ScreenComponentNode,
+  ScreenComponentStates,
   ScreenComponentStatus,
-  ScreenComponentStyleRule,
   ScreenDataBinding,
   ScreenDataSource,
   ScreenDiagnostic,
@@ -13,6 +13,7 @@ import type {
   ScreenJsonObject,
   ScreenPosition,
   ScreenSize,
+  ScreenSubCanvas,
   ScreenThemeSlot,
   ScreenValueRef,
   ScreenVariableEntry,
@@ -51,6 +52,24 @@ export type ScreenDocumentCommand =
       readonly dataSources: readonly ScreenDataSource[];
     }
   | { readonly type: 'replace-variables'; readonly variables: readonly ScreenVariableEntry[] }
+  /**
+   * 整体替换从画布集合（ADR-0109）；空数组删除字段。`startCanvasId`：缺省保持原值，`null` 删除。
+   * 组件归属、起始页与蓝图引用由文档校验把关。
+   */
+  | {
+      readonly type: 'replace-sub-canvases';
+      readonly subCanvases: readonly ScreenSubCanvas[];
+      readonly startCanvasId?: string | null;
+    }
+  /**
+   * 把根组件移到另一块画布（`null` = 主画布，ADR-0109）：写 / 删 `canvasId`、移出主画布时去掉
+   * `belowSubCanvas`、移入弹框时把位置夹进面板范围。子组件随根组件移动，不能单独移动。
+   */
+  | {
+      readonly type: 'move-components';
+      readonly componentIds: readonly string[];
+      readonly canvasId: string | null;
+    }
   | {
       readonly type: 'rename-variable';
       readonly variableId: string;
@@ -70,13 +89,15 @@ export interface ScreenComponentPatch {
   readonly status?: ScreenComponentStatus;
   readonly props?: ScreenJsonObject;
   readonly style?: ScreenJsonObject;
-  /** 条件样式规则整体替换（ADR-0058）：传完整新数组，空数组清除全部规则。 */
-  readonly styleRules?: readonly ScreenComponentStyleRule[];
+  /** 组件状态整体替换（ADR-0110）；`null` = 去掉全部状态。 */
+  readonly states?: ScreenComponentStates | null;
   readonly dataSource?: ScreenComponentDataSource | null;
   /** 取值引用；`null` = 不取值。 */
   readonly dataValue?: ScreenValueRef | null;
   /** 字段映射；`null` = 不做字段映射。 */
   readonly dataBinding?: ScreenDataBinding | null;
+  /** 置于从画布下方（只对主画布根组件有效）；`null` = 去掉。 */
+  readonly belowSubCanvas?: true | null;
 }
 
 export type ScreenCommandResult =

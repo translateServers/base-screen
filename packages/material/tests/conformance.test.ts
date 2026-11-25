@@ -6,6 +6,7 @@ import {
   BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
+  BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
   BaseScreenChartMaterialElement,
   BaseScreenTableMaterialElement,
 } from '../src/index.js';
@@ -48,6 +49,7 @@ function elementWith(
       style: {},
       textContent: '',
       setAttribute: () => {},
+      appendChild: () => {},
       attachShadow: () => ({ append: () => {} }),
     }),
     createElementNS: () => ({
@@ -87,6 +89,12 @@ function model(
             }
           : { status },
   };
+}
+
+function chartAppearanceField(key: string) {
+  return (BASE_SCREEN_CHART_MATERIAL_MANIFEST.editorDescriptor?.appearance ?? [])
+    .flatMap((section) => section.fields)
+    .find((field) => field.path[0] === key);
 }
 
 describe('official material conformance (DRH-R7)', () => {
@@ -135,6 +143,11 @@ describe('official material conformance (DRH-R7)', () => {
     expect(BASE_SCREEN_CHART_MATERIAL_MANIFEST.dataCapabilities).not.toContain('host-resource');
   });
 
+  it('the text material reads host resources for live readings', () => {
+    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.dataCapabilities).toContain('host-resource');
+    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.hostResourceSelection).not.toBe(true);
+  });
+
   it('only the image material opts into host resource selection', () => {
     expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.hostResourceSelection).toBe(true);
     expect(BASE_SCREEN_TABLE_MATERIAL_MANIFEST.hostResourceSelection).not.toBe(true);
@@ -150,14 +163,7 @@ describe('official material conformance (DRH-R7)', () => {
       expect(element.style.backgroundColor).toBe('transparent');
     }
 
-    expect(
-      BASE_SCREEN_CHART_MATERIAL_MANIFEST.stylePanel.find(
-        (field) => field.style === 'backgroundColor',
-      )?.allowGradient,
-    ).toBe(true);
-    expect(
-      BASE_SCREEN_CHART_MATERIAL_MANIFEST.stylePanel.find((field) => field.style === 'gridColor')
-        ?.allowGradient,
-    ).toBeUndefined();
+    expect(chartAppearanceField('backgroundColor')?.allowGradient).toBe(true);
+    expect(chartAppearanceField('gridColor')?.allowGradient).toBeUndefined();
   });
 });

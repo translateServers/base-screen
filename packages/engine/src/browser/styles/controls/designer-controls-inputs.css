@@ -84,10 +84,11 @@
   font-size: var(--designer-font-size-sm);
 }
 
-/* 右栏检查器：批次几何输入为紧凑档，几何网格输入给符号留出内距。 */
+/* 右栏检查器：批量几何与几何网格与其他数字框同高（ADR-0102 §3.2：检查器只有一档控件高度）；
+   几何网格输入给内嵌符号留出右内距。 */
 .designer-inspector-batch-field-row-controls .designer-input {
-  height: var(--designer-control-height-compact);
-  padding: 0 calc(var(--designer-space-3) + 1px);
+  height: var(--designer-control-height);
+  padding: 0 var(--designer-control-padding-inline);
 }
 
 .designer-inspector-batch-readonly .designer-input:disabled {
@@ -96,7 +97,7 @@
 }
 
 .designer-inspector-geometry-grid [data-property-symbol] .designer-input {
-  height: var(--designer-control-height-compact);
+  height: var(--designer-control-height);
   padding-right: calc(var(--designer-space-7) + 1px);
   color: var(--designer-text-primary);
   font-size: var(--designer-font-size-base);
@@ -401,6 +402,13 @@
   box-shadow: 0 0 0 2px var(--designer-focus-ring);
 }
 
+/* 值位是外壳里的可编辑区，不是独立控件：`.designer-control:focus`（0,2,0）会压过
+   `.designer-stepper-value`（0,1,0），聚焦时外壳与值位各画一圈 2px 蓝环，看起来像
+   输入框套输入框。这里用外层类把环收回外壳一次，值位只留文本光标。 */
+.designer-stepper .designer-stepper-value:focus {
+  box-shadow: none;
+}
+
 .designer-stepper-button {
   display: grid;
   width: 34px;
@@ -424,9 +432,34 @@
   border-left: 1px solid var(--designer-border-subtle);
 }
 
+/* 两端按钮的悬停/按下底色贴住外壳圆角：按钮是矩形，方形底色会在 6px 圆角处露出直角。 */
+.designer-stepper-button:first-child {
+  border-radius: var(--designer-radius-3) 0 0 var(--designer-radius-3);
+}
+
+.designer-stepper-button:last-child {
+  border-radius: 0 var(--designer-radius-3) var(--designer-radius-3) 0;
+}
+
 .designer-stepper-button:hover:not(:disabled) {
   background-color: var(--designer-surface-control-hover);
   color: var(--designer-text-primary);
+}
+
+/* 按下比悬停再深一档：30px 高的图标按钮只靠光标位置说明「点到了」。 */
+.designer-stepper-button:active:not(:disabled) {
+  background-color: var(--designer-surface-control-active);
+}
+
+/* 键盘焦点落在 − / + 上时，环只画在按钮内侧，外壳退回静态描边：
+   两者同时画会并成一道 6px 的粗蓝边，看起来像按钮被粘在了边框上。 */
+.designer-stepper:has(> .designer-stepper-button:focus-visible) {
+  box-shadow: var(--designer-elev-ring);
+}
+
+.designer-stepper-button:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -2px;
 }
 
 .designer-stepper-button:disabled {
@@ -447,7 +480,8 @@
   background: transparent;
   box-shadow: none;
   color: var(--designer-text-primary);
-  font: 500 var(--designer-font-size-base) / 1 var(--designer-font-family-mono);
+  /* 数字字体与其他数字框一致（ADR-0102 §3.4）；居中是步进器唯一的例外：值夹在 − / + 之间。 */
+  font: inherit;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -491,7 +525,8 @@
   min-width: 0;
   flex: 1;
   height: 100%;
-  padding: 0 var(--designer-space-2);
+  /* 文字起点与普通输入框同一条竖线（9px），后缀一侧留 4px。 */
+  padding: 0 var(--designer-space-2) 0 var(--designer-control-padding-inline);
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -505,13 +540,14 @@
   outline: none;
 }
 
+/* 后缀与几何符号、四边距单位同一档：11px 等宽、弱文字色（ADR-0102 §3.4）。 */
 .designer-unit-input-suffix {
   display: grid;
   flex: none;
   place-items: center;
-  padding-right: var(--designer-space-3);
+  padding-right: var(--designer-space-4);
   color: var(--designer-text-muted);
-  font: var(--designer-font-numeric);
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-family-mono);
   pointer-events: none;
 }
 
@@ -572,11 +608,35 @@
   box-shadow: 0 0 0 2px var(--designer-focus-ring);
 }
 
+/* 触发器读数分两级：名称占剩余宽度并可截断，次级读数（尺寸）靠右、用弱化数字字形，
+   读作「名称 …… 具体尺寸」。原生选项文本仍只有名称，读屏语义不跟着排版走。 */
 .designer-select-value {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--designer-space-4);
+  overflow: hidden;
+}
+
+.designer-select-value-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.designer-select-value-detail {
+  display: none;
+  flex: none;
+  margin-left: auto;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+}
+
+.designer-select-value[data-detail="true"] .designer-select-value-detail {
+  display: block;
 }
 
 .designer-select-value[data-placeholder="true"] {
@@ -664,6 +724,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 选项的次级读数与触发器同源：名称在左，尺寸靠右，勾选仍占最后一列。 */
+.designer-select-option-detail {
+  flex: none;
+  margin-left: auto;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
 }
 
 .designer-select-option:not(:disabled):hover,

@@ -10,8 +10,7 @@ import type {
   ScreenProjectSnapshotPort,
 } from '@base-screen/contracts';
 import type {
-  BaseScreenConditionalStylePort,
-  BaseScreenHostConditionalStyleAuthoringPort,
+  BaseScreenFragmentDefinition,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
   BaseScreenPluginInspectorControlCatalog,
@@ -22,21 +21,23 @@ import type {
 import { type BaseScreenRenderer } from '@base-screen/renderer';
 import { DesignerBlueprintWorkbenchController } from '../../browser/controllers/blueprint/designer-blueprint-workbench-controller.js';
 import type { DesignerDatasetPanelController } from '../../browser/controllers/dataset/designer-dataset-panel-controller.js';
+import { DesignerArtboardController } from '../../browser/controllers/designer-artboard-controller.js';
 import type { DesignerAutoWidthController } from '../../browser/controllers/designer-auto-width-controller.js';
 import { DesignerCanvasRuntimeController } from '../../browser/controllers/designer-canvas-runtime-controller.js';
 import { DesignerChangeController } from '../../browser/controllers/designer-change-controller.js';
 import { DesignerCommandPaletteController } from '../../browser/controllers/designer-command-palette-controller.js';
 import { DesignerErrorConsoleController } from '../../browser/controllers/designer-error-console-controller.js';
-import { DesignerGuardController } from '../../browser/controllers/designer-guard-controller.js';
 import { DesignerImportController } from '../../browser/controllers/designer-import-controller.js';
 import { DesignerIntegrationController } from '../../browser/controllers/designer-integration-controller.js';
 import { DesignerIntentChoiceController } from '../../browser/controllers/designer-intent-choice-controller.js';
 import { DesignerIntentController } from '../../browser/controllers/designer-intent-controller.js';
 import { DesignerLeftPanelGroupEventController } from '../../browser/controllers/designer-left-panel-group-events.js';
 import { DesignerNotificationController } from '../../browser/controllers/designer-notification-controller.js';
+import type { DesignerPagePreviewController } from '../../browser/controllers/designer-page-preview-controller.js';
+import type { DesignerPopupPreviewController } from '../../browser/controllers/designer-popup-preview-controller.js';
 import { DesignerPresentationLockController } from '../../browser/controllers/designer-presentation-lock-controller.js';
 import { DesignerPreviewController } from '../../browser/controllers/designer-preview-controller.js';
-import { DesignerSceneController } from '../../browser/controllers/designer-scene-controller.js';
+import type { DesignerReferenceLayerController } from '../../browser/controllers/designer-reference-layer-controller.js';
 import { DesignerScrollContinuityController } from '../../browser/controllers/designer-scroll-continuity-controller.js';
 import { DesignerSizeTierController } from '../../browser/controllers/designer-size-tier-controller.js';
 import { DesignerTargetDisplayController } from '../../browser/controllers/designer-target-display-controller.js';
@@ -48,6 +49,7 @@ import { DesignerCoordinateEntryController } from '../../browser/controllers/ent
 import { DesignerSizeEntryController } from '../../browser/controllers/entry/designer-size-entry-controller.js';
 import { DesignerGestureController } from '../../browser/controllers/gesture/designer-gesture-controller.js';
 import { DesignerLayersController } from '../../browser/controllers/layers/designer-layers-controller.js';
+import { DesignerComponentStateEditing } from '../../browser/controllers/panel/designer-component-states-controller.js';
 import { DesignerPanelController } from '../../browser/controllers/panel/designer-panel-controller.js';
 import { DesignerProjectFeedbackController } from '../../browser/controllers/project/designer-project-feedback-controller.js';
 import { DesignerProjectWorkspaceController } from '../../browser/controllers/project/designer-project-workspace-controller.js';
@@ -72,7 +74,6 @@ import {
   type BaseScreenResolvedMaterialLibraryItem,
 } from '../../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../../common/operations/material-library/material-library-state.js';
-import type { DesignerSceneDescriptor } from '../../common/operations/scene/designer-scene.js';
 import { DesignerSelectionActions } from '../../common/operations/selection/designer-selection-actions.js';
 import { type BaseScreenDesignerLeftPanelGroup } from '../../common/operations/workbench/designer-left-panel-groups.js';
 import { DesignerProjectGateway } from '../../common/project/designer-project-gateway.js';
@@ -94,6 +95,8 @@ export interface DesignerElementState {
   materialLibraryState: BaseScreenMaterialLibraryState | undefined;
   materialLibraryGrouping: BaseScreenMaterialLibraryGrouping | undefined;
   materialLibraryItems: readonly BaseScreenMaterialLibraryItem[] | undefined;
+  /** 宿主声明的组合分片（ADR-0100）；与插件 fragment 贡献一起在物料库里试运行后展示。 */
+  materialLibraryFragments: readonly BaseScreenFragmentDefinition[] | undefined;
   resolvedMaterialLibraryItems: readonly BaseScreenResolvedMaterialLibraryItem[];
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   pluginCatalog: BaseScreenPluginCatalog | undefined;
@@ -102,8 +105,8 @@ export interface DesignerElementState {
   pluginCommandPort: PluginCommandPort | undefined;
   resourcePort: ScreenHostResourcePort | undefined;
   hostCatalogPort: ScreenHostCatalogPort | undefined;
-  conditionalStylePort: BaseScreenConditionalStylePort | undefined;
-  hostConditionalStyleAuthoring: BaseScreenHostConditionalStyleAuthoringPort | undefined;
+  /** 检查器「正在编辑哪个状态」的会话记忆（ADR-0110）。 */
+  componentStateEditing: DesignerComponentStateEditing;
   datasetPort: ScreenHostDatasetPort | undefined;
   designerHostAdapter: ScreenDesignerHostAdapter | undefined;
   projectCatalogPort: ScreenProjectCatalogPort | undefined;
@@ -114,6 +117,8 @@ export interface DesignerElementState {
   previewHandler: ((document: ScreenDocument) => boolean) | undefined;
   backButton: boolean;
   hostResourceSelectionButton: boolean;
+  /** 是否提供「存为组合」操作（ADR-0100 第二阶段）；宿主监听保存请求事件时开启。 */
+  fragmentSaveAction: boolean;
   renderer: BaseScreenRenderer | undefined;
   /** 曾以骨架形态先挂载：完整初始化时把面板内容与画布渲染拆到后续帧。 */
   skeletonShown: boolean;
@@ -164,15 +169,19 @@ export interface DesignerElementState {
   notificationController: DesignerNotificationController;
   topbarController: DesignerTopbarController;
   errorConsoleController: DesignerErrorConsoleController;
-  guardController: DesignerGuardController;
   changeController: DesignerChangeController;
-  sceneController: DesignerSceneController;
-  /** 宿主定义的场景目录：引擎不保存场景内容，只保留身份与展示名。 */
-  sceneCatalog: readonly DesignerSceneDescriptor[] | undefined;
   intentController: DesignerIntentController;
   /** 指代歧义的点选会话：候选进画布多选，用户点选后把选择交回平台。 */
   intentChoiceController: DesignerIntentChoiceController;
   targetDisplayController: DesignerTargetDisplayController;
+  /** 主画布 / 从画布画板切换（ADR-0109 画布标签条）。 */
+  artboardController: DesignerArtboardController;
+  /** 设计态弹框预览（ADR-0108 §2.7）：状态栏「事件」开着时呈现蓝图打开的弹框。 */
+  popupPreviewController: DesignerPopupPreviewController;
+  /** 设计态切页（ADR-0109 §2.5）：「事件」开着时蓝图打开页面即切到该页画板。 */
+  pagePreviewController: DesignerPagePreviewController;
+  /** 参照底图（ADR-0109 §2.5）：编辑页面时半透明垫主画布，编辑主画布时垫最近的页面。 */
+  referenceLayerController: DesignerReferenceLayerController;
   presentationLockController: DesignerPresentationLockController;
   scrollContinuityController: DesignerScrollContinuityController;
   canvasRuntimeController: DesignerCanvasRuntimeController;
@@ -217,6 +226,7 @@ export function createDesignerElementState(
   state.resolvedMaterialLibraryItems = [];
   state.backButton = false;
   state.hostResourceSelectionButton = false;
+  state.fragmentSaveAction = false;
   state.skeletonShown = false;
   state.skeletonTimeout = undefined;
   state.deferredPanelHydration = false;
@@ -242,11 +252,11 @@ export function createDesignerElementState(
   state.tooltipController = new DesignerTooltipController();
   state.notificationController = new DesignerNotificationController();
   state.errorConsoleController = new DesignerErrorConsoleController();
-  state.guardController = new DesignerGuardController();
   state.changeController = new DesignerChangeController();
-  state.sceneController = new DesignerSceneController();
   state.intentController = new DesignerIntentController();
   state.targetDisplayController = new DesignerTargetDisplayController();
+  state.artboardController = new DesignerArtboardController();
+  state.componentStateEditing = new DesignerComponentStateEditing();
   state.presentationLockController = new DesignerPresentationLockController();
   state.scrollContinuityController = new DesignerScrollContinuityController();
   state.sizeTierController = new DesignerSizeTierController();

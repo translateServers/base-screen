@@ -1,6 +1,8 @@
 import {
   isScreenComponentId,
   isScreenVariableName,
+  listScreenLevelScaleIssues,
+  listScreenSourceDeliveryIssues,
   type ScreenDiagnostic,
   type ScreenJsonObject,
   type ScreenJsonValue,
@@ -11,6 +13,7 @@ import {
   type BaseScreenPluginManifest,
 } from './contracts.js';
 import type { PluginDiagnosticCollector } from './diagnostics.js';
+import { parseBaseScreenFragmentDefinition } from './fragment/fragment.js';
 import {
   isValidCustomElementName,
   validateBaseScreenMaterialIdentity,
@@ -122,7 +125,7 @@ export const CONTRIBUTION_KIND_DESCRIPTORS: readonly ContributionKindDescriptor[
   {
     kind: 'dataResourceType',
     requiredFields: ['kind', 'id', 'name', 'configSchema'],
-    optionalFields: ['queryScope'],
+    optionalFields: ['queryScope', 'delivery', 'levelScales'],
     identifierFields: ['id'],
     hasDisplayName: true,
     identityField: 'id',
@@ -149,6 +152,24 @@ export const CONTRIBUTION_KIND_DESCRIPTORS: readonly ContributionKindDescriptor[
           [...path, 'queryScope'],
           'Resource queryScope must be the literal "resource" when declared.',
         );
+      }
+      if (contribution.levelScales !== undefined) {
+        for (const issue of listScreenLevelScaleIssues(contribution.levelScales)) {
+          collector.add(
+            'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+            [...path, 'levelScales', ...issue.path],
+            issue.message,
+          );
+        }
+      }
+      if (contribution.delivery !== undefined) {
+        for (const issue of listScreenSourceDeliveryIssues(contribution.delivery)) {
+          collector.add(
+            'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+            [...path, 'delivery', ...issue.path],
+            issue.message,
+          );
+        }
       }
     },
   },
@@ -233,7 +254,40 @@ export const CONTRIBUTION_KIND_DESCRIPTORS: readonly ContributionKindDescriptor[
       validateTagName(contribution.tagName, path, collector, 'Inspector control');
     },
   },
+  {
+    // ADR-0100：分片定义本身就是清单数据。id 词法、名称与组合形状只有一份规则——
+    // `parseBaseScreenFragmentDefinition`；这里不再另走 identifier / displayName 通用校验，
+    // 否则同一字段会按两套规则各报一次。字段白名单仍由通用的 exact-object 校验负责。
+    kind: 'fragment',
+    requiredFields: ['kind', 'id', 'name', 'category', 'keywords', 'nodes'],
+    optionalFields: ['cover', 'shell'],
+    identifierFields: [],
+    hasDisplayName: false,
+    identityField: 'id',
+    identityPrefix: 'fragment',
+    validate(contribution, path, collector) {
+      const definition: Record<string, unknown> = {};
+      for (const field of FRAGMENT_DEFINITION_FIELDS) {
+        if (contribution[field] !== undefined) definition[field] = contribution[field];
+      }
+      const parsed = parseBaseScreenFragmentDefinition(definition);
+      if (parsed.ok) return;
+      for (const diagnostic of parsed.diagnostics) {
+        collector.add(diagnostic.code, [...path, ...diagnostic.path], diagnostic.message);
+      }
+    },
+  },
 ]);
+
+const FRAGMENT_DEFINITION_FIELDS = [
+  'id',
+  'name',
+  'category',
+  'keywords',
+  'cover',
+  'shell',
+  'nodes',
+] as const;
 
 const DESCRIPTORS_BY_KIND = new Map<BaseScreenPluginContributionKind, ContributionKindDescriptor>(
   CONTRIBUTION_KIND_DESCRIPTORS.map((descriptor) => [descriptor.kind, descriptor]),

@@ -2,13 +2,13 @@ import type { BaseScreenMaterialObjectSchema } from '../contracts.js';
 import { PluginDiagnosticCollector } from '../diagnostics.js';
 import { validateConditions } from './editor-descriptor-conditions.js';
 import {
+  resolveFieldControl,
   validateColorGradientCapability,
   validateCustomControlBinding,
   validateItemFields,
 } from './editor-descriptor-items.js';
 import {
   ARRAY_CONTROLS,
-  EDITOR_CONTROLS,
   FIELD_KNOWN,
   MAX_EDITOR_FIELD_KEYWORDS,
   MAX_EDITOR_FIELDS_PER_SECTION,
@@ -190,15 +190,9 @@ function validateField(
   const rawPath = value.path;
   const fieldPath = isPath(rawPath, MAX_EDITOR_PATH_DEPTH, path, collector) ? rawPath : undefined;
   if (fieldPath === undefined) return;
-  const control = value.control;
-  if (typeof control !== 'string' || !EDITOR_CONTROLS.has(control)) {
-    collector.add(
-      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      [...path, 'control'],
-      'Editor control is unsupported.',
-    );
-    return;
-  }
+  const schema = schemaForTarget(target, projection, propsSchema, styleSchema);
+  const control = resolveFieldControl(value, target, fieldPath, schema, path, collector);
+  if (control === undefined) return;
   validateColorGradientCapability(value.allowGradient, control, path, collector);
   validateCustomControlBinding(value.tagName, control, target, path, collector);
   if (!isDisplayString(value.label, 256)) {
@@ -274,7 +268,6 @@ function validateField(
     );
   }
   validateConditions(value.when, [...path, 'when'], collector);
-  const schema = schemaForTarget(target, projection, propsSchema, styleSchema);
   validateFieldPath(target, fieldPath, schema, dataBindingRoles, collector, path);
   validateControlForSchema(target, control, fieldPath, schema, collector, path);
   if (ARRAY_CONTROLS.has(control)) {

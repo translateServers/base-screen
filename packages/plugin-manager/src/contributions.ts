@@ -3,6 +3,7 @@ import type {
   BaseScreenPluginCatalog,
   BaseScreenPluginDataProcessorContribution,
   BaseScreenPluginDataResourceTypeContribution,
+  BaseScreenPluginFragmentContribution,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { type ContributionIndexBuckets, indexContribution } from './contribution-kind-plan.js';
@@ -15,6 +16,7 @@ export function createRuntimeContributionIndex(
     blueprintActions: new Map<string, BaseScreenPluginBlueprintActionContribution>(),
     dataProcessors: new Map<string, BaseScreenPluginDataProcessorContribution>(),
     blueprintCapabilities: new Set<string>(),
+    fragments: new Map<string, BaseScreenPluginFragmentContribution>(),
   };
   for (const plugin of plugins.list()) {
     for (const contribution of plugin.contributions) {
@@ -23,6 +25,7 @@ export function createRuntimeContributionIndex(
     }
   }
   const { resourceTypes, blueprintActions, dataProcessors, blueprintCapabilities } = buckets;
+  const { fragments } = buckets;
   const resourceTypeList: readonly BaseScreenPluginDataResourceTypeContribution[] = Object.freeze(
     [...resourceTypes.values()].sort((first, second) => first.id.localeCompare(second.id)),
   );
@@ -32,6 +35,8 @@ export function createRuntimeContributionIndex(
   const dataProcessorList: readonly BaseScreenPluginDataProcessorContribution[] = Object.freeze(
     [...dataProcessors.values()].sort((first, second) => first.id.localeCompare(second.id)),
   );
+  // 分片保留插件声明顺序（不按 id 排序）：物料库按插件作者给的顺序展示推荐组合。
+  const fragmentList = Object.freeze([...fragments.values()]);
   return Object.freeze({
     getResourceType(resourceType: string) {
       return resourceTypes.get(resourceType);
@@ -53,6 +58,12 @@ export function createRuntimeContributionIndex(
     },
     listDataProcessors() {
       return dataProcessorList;
+    },
+    getFragment(fragmentId: string) {
+      return fragments.get(fragmentId);
+    },
+    listFragments() {
+      return fragmentList;
     },
   });
 }
