@@ -24,6 +24,7 @@ import { ScreenDatasetField } from '@base-screen/contracts';
 import { ScreenDatasetValueType } from '@base-screen/contracts';
 import type { ScreenDataSource } from '@base-screen/contracts';
 import { ScreenDiagnostic } from '@base-screen/contracts';
+import type { ScreenDiagnosticSeverity } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
 import { ScreenHostResourceParameter } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
@@ -34,6 +35,7 @@ import { ScreenSize } from '@base-screen/contracts';
 import { ScreenStaticDataSource } from '@base-screen/contracts';
 import { ScreenStaticVariable } from '@base-screen/contracts';
 import type { ScreenSubCanvas } from '@base-screen/contracts';
+import type { ScreenTargetDisplayProfile } from '@base-screen/contracts';
 import type { ScreenThemeSlot } from '@base-screen/contracts';
 import { ScreenValueRef } from '@base-screen/contracts';
 import { ScreenVariable } from '@base-screen/contracts';
@@ -44,6 +46,9 @@ export function applyScreenDocumentCommand(document: ScreenDocument, command: Sc
 
 // @public (undocumented)
 export function applyScreenDocumentTransaction(document: ScreenDocument, transaction: ScreenDocumentTransaction): ScreenTransactionResult;
+
+// @public
+export function auditScreenLayout(document: ScreenDocument, options?: ScreenLayoutAuditOptions): readonly ScreenDiagnostic[];
 
 // @public
 export function blend(from: RgbColor, to: RgbColor, amount: number): RgbColor;
@@ -88,6 +93,9 @@ export function componentsReferencingDataSources(document: ScreenDocument, dataS
 
 // @public
 export function compositeOver(top: RgbColor, alpha: number, bottom: RgbColor): RgbColor;
+
+// @public
+export function computeMinimumLegibleFontPx(profile: ScreenTargetDisplayProfile): number | null;
 
 // @public
 export function contrastRatio(a: RgbColor, b: RgbColor): number;
@@ -193,6 +201,9 @@ export function relativeLuminance(color: RgbColor): number;
 
 // @public (undocumented)
 export function removeScreenJsonArrayItem(root: ScreenJsonObject, path: readonly (string | number)[], index: number): ScreenJsonObject | undefined;
+
+// @public
+export function resolveScreenFontFloorPx(canvasWidth: number, targetDisplay?: ScreenTargetDisplayProfile): number;
 
 // @public
 export function revertScreenHistory(history: ScreenHistoryState, targetIndex: number): ScreenHistoryState;
@@ -788,6 +799,13 @@ export interface ScreenInteractionState {
 }
 
 export { ScreenJsonObject }
+
+// @public (undocumented)
+export interface ScreenLayoutAuditOptions {
+    readonly componentIds?: readonly string[];
+    readonly severity?: ScreenDiagnosticSeverity;
+    readonly targetDisplay?: ScreenTargetDisplayProfile;
+}
 
 // @public (undocumented)
 export interface ScreenPoint {

@@ -140,4 +140,9 @@ export type { ScreenViewportAction, ScreenViewportState } from './state/viewport
 export { reduceScreenViewport } from './state/viewport.js';
 export * from './validation/contrast.js';
 export { ScreenCoreInvariantError } from './validation/invariant-error.js';
+export {
+  auditScreenLayout,
+  type ScreenLayoutAuditOptions,
+} from './validation/layout-audit.js';
+export { computeMinimumLegibleFontPx, resolveScreenFontFloorPx } from './validation/legibility.js';
 export { validateScreenDocumentSemantics } from './validation/validate-semantics.js';

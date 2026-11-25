@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from '@playwright/test';
+import { loadScreenApis } from '../screen-mcp-server/apis.mjs';
 
 const DEFAULT_VIEWPORT = { width: 1920, height: 1080 };
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -21,11 +22,14 @@ export async function probeScreenPage({
   viewport = DEFAULT_VIEWPORT,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   minContrast = 4.5,
-  minFontPx = 0,
+  minFontPx,
   browser: providedBrowser,
 } = {}) {
   if (typeof url !== 'string' || url.length === 0)
     throw new Error('--url requires a viewer page URL.');
+  // 字号下限默认开启（ADR-0112 §2.2），与生成回环的静态审计 auditScreenLayout 同一口径：
+  // 1920 宽 16px，按视口宽度等比换算。显式传 0 才关闭。
+  const fontFloor = minFontPx ?? (await loadScreenApis()).resolveScreenFontFloorPx(viewport.width);
   const browser = providedBrowser ?? (await chromium.launch());
   const page = await browser.newPage({ viewport });
   try {
@@ -74,7 +78,7 @@ export async function probeScreenPage({
     const a11y = await page.evaluate(auditTextAccessibility, {
       pngBase64: screenshot.toString('base64'),
       normalThreshold: minContrast,
-      fontFloor: minFontPx,
+      fontFloor,
     });
     return { url, viewport, perf: { timeToViewerMs, ...rendered }, a11y };
   } finally {

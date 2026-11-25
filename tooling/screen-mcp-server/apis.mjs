@@ -26,6 +26,8 @@ const CORE_EXPORTS = [
   'suggestReadableColor',
   'formatCssColor',
   'diffScreenDocuments',
+  'auditScreenLayout',
+  'resolveScreenFontFloorPx',
 ];
 
 export async function loadScreenApis() {

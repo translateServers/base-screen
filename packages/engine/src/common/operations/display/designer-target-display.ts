@@ -1,4 +1,8 @@
 import type { ScreenTargetDisplayProfile } from '@base-screen/contracts';
+import { computeMinimumLegibleFontPx } from '@base-screen/core';
+
+// 换算已下沉 core（ADR-0112 §2.2）：生成产物的硬校验与目标屏面板共用同一份口径。
+export { computeMinimumLegibleFontPx };
 
 export type DesignerDisplayOverlayKind = 'safe-area' | 'seam' | 'distance';
 
@@ -22,14 +26,6 @@ export interface DesignerDisplayOverlay {
 }
 
 const HAIRLINE = 1;
-
-/**
- * 可读性下限的判定依据：字高（cap height）不小于观距的 1/200；
- * 字号（em）约等于字高的 1.5 倍。两个常量集中在这里，测试逐值比对，
- * 不散落在文案或宿主代码里。
- */
-const LEGIBLE_CAP_TO_DISTANCE = 1 / 200;
-const FONT_SIZE_TO_CAP = 1.5;
 
 export interface DesignerDisplayPhysicalSize {
   readonly widthMm: number;
@@ -86,17 +82,6 @@ export function computeAngularSize(
     horizontalDeg: toDegrees(2 * Math.atan(physical.widthMm / 2 / distanceMm)),
     verticalDeg: toDegrees(2 * Math.atan(physical.heightMm / 2 / distanceMm)),
   };
-}
-
-/** 最小可读字号：观距决定字高，点间距把毫米换回逻辑像素。 */
-export function computeMinimumLegibleFontPx(profile: ScreenTargetDisplayProfile): number | null {
-  const distanceM = profile.viewingDistanceM;
-  const pitch = profile.pixelPitchMm;
-  if (distanceM === undefined || !(distanceM > 0) || pitch === undefined || !(pitch > 0)) {
-    return null;
-  }
-  const capMm = distanceM * 1000 * LEGIBLE_CAP_TO_DISTANCE;
-  return (capMm * FONT_SIZE_TO_CAP) / pitch;
 }
 
 /**

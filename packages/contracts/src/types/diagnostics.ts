@@ -105,7 +105,11 @@ export type ScreenDiagnosticCode =
   | 'CHANGE_PROPOSAL_EMPTY'
   | 'CHANGE_PROPOSAL_NO_EFFECT'
   | 'CHANGE_DRAFT_PENDING'
-  | 'CHANGE_PREVIEW_UNAVAILABLE';
+  | 'CHANGE_PREVIEW_UNAVAILABLE'
+  | 'LAYOUT_FONT_TOO_SMALL'
+  | 'LAYOUT_OUT_OF_BOUNDS'
+  | 'LAYOUT_OVERLAP'
+  | 'LAYOUT_CONTRAST_LOW';
 
 export interface ScreenDiagnostic {
   readonly severity: ScreenDiagnosticSeverity;
