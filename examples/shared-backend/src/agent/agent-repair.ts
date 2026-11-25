@@ -58,6 +58,56 @@ const LAYOUT_HINTS: Readonly<Record<string, string>> = {
   LAYOUT_CONTRAST_LOW: '文字与背景对比不足：换一种风格预设（style）。',
 };
 
+/** 前端修复请求的上限：原文按模型一轮输出的量级收口，诊断与契约上限一致。 */
+const MAX_REPAIR_OUTPUT_CHARS = 64_000;
+const REPAIR_PATH = /^(?:|title|subtitle|kpis\[[0-4]\]|blocks\[[0-3]\])$/;
+const REPAIR_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
+
+export interface AgentRepairRequest {
+  readonly output: string;
+  readonly issues: readonly AgentRepairIssue[];
+}
+
+/**
+ * 读前端发来的修复请求（ADR-0112 §2.1.6）。fail-closed：形状不对返回 null，由调用方报 400。
+ *
+ * 前端只能给码与 IR 路径；修改建议一律由这里按码生成，不把前端文本原样塞进提示词。
+ */
+export function readRepairRequest(input: unknown): AgentRepairRequest | null {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return null;
+  const record = input as Record<string, unknown>;
+  const output = record.output;
+  const issues = record.issues;
+  if (
+    typeof output !== 'string' ||
+    output.trim() === '' ||
+    output.length > MAX_REPAIR_OUTPUT_CHARS
+  ) {
+    return null;
+  }
+  if (!Array.isArray(issues) || issues.length === 0 || issues.length > MAX_REPAIR_ISSUES) {
+    return null;
+  }
+  const read: AgentRepairIssue[] = [];
+  for (const item of issues) {
+    if (typeof item !== 'object' || item === null) return null;
+    const { code, path } = item as Record<string, unknown>;
+    if (typeof code !== 'string' || !REPAIR_CODE.test(code)) return null;
+    if (typeof path !== 'string' || !REPAIR_PATH.test(path)) return null;
+    read.push({ code, path, hint: hintFor(code) });
+  }
+  return { output, issues: read };
+}
+
+function hintFor(code: string): string {
+  return (
+    LAYOUT_HINTS[code] ??
+    BLOCK_HINTS[code] ??
+    KPI_HINTS[code] ??
+    '宿主校验没有通过这一处，请按系统提示的结构与约束重写它。'
+  );
+}
+
 export function blockIssue(code: string, index: number): AgentRepairIssue {
   return {
     code,

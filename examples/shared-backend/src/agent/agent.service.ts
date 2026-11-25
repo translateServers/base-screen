@@ -38,11 +38,13 @@ import {
   AGENT_MAX_REPAIR_ROUNDS,
   type AgentParseIssues,
   type AgentRepairIssue,
+  type AgentRepairRequest,
   blockIssue,
   buildRepairPrompt,
   createParseIssues,
   issueBlockIndexes,
   kpiIssue,
+  readRepairRequest,
   repairKey,
   rootIssue,
 } from './agent-repair';
@@ -86,6 +88,14 @@ export interface AgentCandidateResult {
   readonly failure?: string;
   /** 修复回环实际用掉的修复轮数（ADR-0112 §2.1）；首轮即通过时省略。 */
   readonly repairRounds?: number;
+  /**
+   * 修复上下文（ADR-0112 §2.1.6）：模型最后一轮的原文，与「组件 id → IR 路径」来源表。
+   * 前端审计或引擎拒绝时，把诊断按来源表翻成 IR 路径，连同原文回传请求一次修复。
+   */
+  readonly repairContext?: {
+    readonly output: string;
+    readonly sources: Readonly<Record<string, string>>;
+  };
 }
 
 export interface AgentGenerateResult extends Omit<AgentCandidateResult, 'name' | 'document'> {
@@ -243,8 +253,17 @@ export class AgentService {
     catalog?: unknown;
     references?: readonly Record<string, unknown>[];
     signal?: AbortSignal;
+    /** 前端校验或引擎拒绝后的一次修复（ADR-0112 §2.1.6）。 */
+    repair?: unknown;
   }): Promise<AgentCandidateResult> {
     const topic = input.topic.trim();
+    const repair = input.repair === undefined ? undefined : readRepairRequest(input.repair);
+    if (repair === null) {
+      throw new BadRequestException({
+        error: 'AGENT_REPAIR_INVALID',
+        message: '修复请求需要上一轮输出与按 IR 路径整理的诊断。',
+      });
+    }
     const clientCatalog = this.resolveCatalog(input.catalog);
     let assetCatalogWarning: string | undefined;
     let availableAssets: AgentCatalog['assets'] = [];
@@ -272,6 +291,7 @@ export class AgentService {
     // 解析期的降级（裁行、丢块、丢参数）与编译期的降级合并成一份，供宿主如实展示。
     const parseWarnings: string[] = [];
     let repairRounds = 0;
+    let lastOutput: string | undefined;
 
     if (settings !== null) {
       const outcome = await this.generateWithRepair({
@@ -280,6 +300,7 @@ export class AgentService {
         system: buildCatalogSystemPrompt(catalog, references.prompt),
         user: buildAgentUserPrompt(topic),
         catalog,
+        ...(repair === undefined ? {} : { repair }),
         ...(input.signal === undefined ? {} : { signal: input.signal }),
       });
       if (outcome.kind === 'transport') {
@@ -298,6 +319,7 @@ export class AgentService {
         mode = 'llm';
         parseWarnings.push(...outcome.warnings);
         repairRounds = outcome.repairRounds;
+        lastOutput = outcome.output;
       }
     } else {
       failure = 'AGENT_NOT_CONFIGURED';
@@ -342,6 +364,10 @@ export class AgentService {
       ...(warnings.length === 0 ? {} : { warnings }),
       ...(failure === undefined ? {} : { failure }),
       ...(repairRounds === 0 ? {} : { repairRounds }),
+      // 只有模型产物才带修复上下文：前端审计或引擎拒绝时凭它请求一次修复（§2.1.6）。
+      ...(lastOutput === undefined
+        ? {}
+        : { repairContext: { output: lastOutput, sources: composed.value.sources } }),
     };
   }
 
@@ -359,6 +385,11 @@ export class AgentService {
     readonly user: string;
     readonly catalog: AgentCatalog;
     readonly signal?: AbortSignal;
+    /**
+     * 从前端的修复请求起步：首轮就把上一轮原文与诊断作为后续对话发出，并计作一轮修复，
+     * 所以这条路径最多再多一次内部修复，总调用次数仍有上限。
+     */
+    readonly repair?: AgentRepairRequest;
   }): Promise<
     | { readonly kind: 'transport'; readonly failure: string }
     | {
@@ -371,11 +402,19 @@ export class AgentService {
         readonly spec: AgentScreenSpec;
         readonly warnings: readonly string[];
         readonly repairRounds: number;
+        readonly output: string;
       }
   > {
-    const followUp: AgentChatMessage[] = [];
-    let previousKey: string | undefined;
-    let repairRounds = 0;
+    const followUp: AgentChatMessage[] =
+      input.repair === undefined
+        ? []
+        : [
+            { role: 'assistant', content: input.repair.output },
+            { role: 'user', content: buildRepairPrompt(input.repair.issues) },
+          ];
+    let previousKey: string | undefined =
+      input.repair === undefined ? undefined : repairKey(input.repair.issues);
+    let repairRounds = input.repair === undefined ? 0 : 1;
     for (;;) {
       const result = await requestAgentCompletion(
         input.settings,
@@ -407,7 +446,7 @@ export class AgentService {
         issues.push(rootIssue('AGENT_BLOCKS_ALL_INVALID', 'blocks 至少要有一块可用的内容。'));
       }
       if (issues.length === 0 && parsed !== null) {
-        return { kind: 'ok', spec: parsed, warnings, repairRounds };
+        return { kind: 'ok', spec: parsed, warnings, repairRounds, output: result.text };
       }
 
       const key = repairKey(issues);
@@ -424,6 +463,7 @@ export class AgentService {
             // 指标的问题已在解析时记成各自的警告；只有真去掉了块才再报「去块」。
             warnings: droppedBlocks.size > 0 ? [...warnings, 'AGENT_BLOCKS_DROPPED'] : warnings,
             repairRounds,
+            output: result.text,
           };
         }
         this.logger.warn(`agent repair exhausted after ${repairRounds} rounds: ${key}`);

@@ -46,6 +46,7 @@ export class AgentController {
       screenId: dto.screenId,
       ...(dto.catalog === undefined ? {} : { catalog: dto.catalog }),
       ...(dto.references === undefined ? {} : { references: dto.references }),
+      ...(dto.repair === undefined ? {} : { repair: dto.repair }),
     });
   }
 

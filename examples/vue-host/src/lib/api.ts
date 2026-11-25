@@ -66,6 +66,24 @@ export interface AgentCandidateShape {
   /** 非阻断降级：屏仍然产出，但要如实告诉用户哪几处被裁/被跳过。 */
   readonly warnings?: readonly AgentWarningShape[];
   readonly failure?: string;
+  /** 修复回环用掉的修复轮数；首轮即通过时省略。 */
+  readonly repairRounds?: number;
+  /**
+   * 修复上下文（ADR-0112 §2.1.6）：模型最后一轮原文与「组件 id → IR 路径」来源表。
+   * 只有模型产物才有；宿主审计或引擎拒绝时凭它请求一次修复。
+   */
+  readonly repairContext?: AgentRepairContextShape;
+}
+
+export interface AgentRepairContextShape {
+  readonly output: string;
+  readonly sources: Readonly<Record<string, string>>;
+}
+
+/** 宿主回传的修复请求：只给诊断码与 IR 路径，修改建议由后端按码生成。 */
+export interface AgentRepairRequestShape {
+  readonly output: string;
+  readonly issues: readonly { readonly code: string; readonly path: string }[];
 }
 
 /**
@@ -376,6 +394,7 @@ export const api = {
     catalog: AgentCatalogShape | undefined,
     references?: readonly ScreenIntentReference[],
     signal?: AbortSignal,
+    repair?: AgentRepairRequestShape,
   ): Promise<ApiResult<AgentCandidateShape>> =>
     request('/agent/candidate', {
       method: 'POST',
@@ -384,6 +403,7 @@ export const api = {
         screenId,
         ...(catalog === undefined ? {} : { catalog }),
         ...(references === undefined || references.length === 0 ? {} : { references }),
+        ...(repair === undefined ? {} : { repair }),
       },
       ...(signal === undefined ? {} : { signal }),
     }),

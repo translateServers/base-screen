@@ -663,6 +663,115 @@ describe('host intent candidate safety', () => {
     expect(proposal?.rationale).toContain('模型输出未通过校验');
   });
 
+  describe('host audit and one repair round (ADR-0112 §2.1.6)', () => {
+    /** 一份字号 12px 的模型候选：canonical 合法，但过不了生成产物的版面审计。 */
+    function tinyDocument(): ScreenDocument {
+      const base = componentDocument();
+      return {
+        ...base,
+        components: base.components.map((component) => ({
+          ...component,
+          id: 'agent-kpi-0',
+          style: { ...component.style, fontSize: 12 },
+        })),
+      };
+    }
+
+    function llmActResponse(candidate: ScreenDocument): Response {
+      return Response.json({
+        kind: 'generate_screen',
+        routedBy: 'rule',
+        name: '作战室',
+        document: candidate,
+        mode: 'llm',
+        imageCount: 0,
+        catalogSource: 'client',
+        materials: [],
+        repairContext: { output: '{"draft":1}', sources: { 'agent-kpi-0': 'kpis[0]' } },
+      });
+    }
+
+    it('audits the candidate, asks for one repair with IR paths, then submits the repair', async () => {
+      vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+      const fetch = vi
+        .fn()
+        .mockResolvedValueOnce(llmActResponse(tinyDocument()))
+        .mockResolvedValueOnce(
+          Response.json({
+            name: '作战室',
+            document: componentDocument(),
+            mode: 'llm',
+            imageCount: 0,
+            materials: [],
+          }),
+        );
+      vi.stubGlobal('fetch', fetch);
+      const element = designer();
+
+      const result = await handler(element)(request);
+
+      expect(result.ok).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(fetch.mock.calls[1]?.[0]).toBe('http://api.test/agent/candidate');
+      const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+      expect(body.repair).toEqual({
+        output: '{"draft":1}',
+        issues: [{ code: 'LAYOUT_FONT_TOO_SMALL', path: 'kpis[0]' }],
+      });
+      // 没过审计的那份从未进草案：只提交了修复后的一份。
+      expect(element.submitChangeProposal).toHaveBeenCalledOnce();
+    });
+
+    it('stops after one repair when the repaired candidate still fails', async () => {
+      vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+      const fetch = vi
+        .fn()
+        .mockResolvedValueOnce(llmActResponse(tinyDocument()))
+        .mockResolvedValueOnce(llmActResponse(tinyDocument()));
+      vi.stubGlobal('fetch', fetch);
+      const element = designer();
+
+      const result = await handler(element)(request);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error('unreachable');
+      expect(result.reason).toContain('版面校验');
+      expect(result.diagnostics.map((item) => item.code)).toContain('LAYOUT_FONT_TOO_SMALL');
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(element.submitChangeProposal).not.toHaveBeenCalled();
+    });
+
+    it('does not ask for a repair without a model repair context', async () => {
+      vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+      const fetch = vi.fn(async () => screenActResponse(tinyDocument()));
+      vi.stubGlobal('fetch', fetch);
+
+      const result = await handler(designer())(request);
+
+      expect(result.ok).toBe(false);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it('does not ask the model to repair proposal-state rejections', async () => {
+      vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+      const fetch = vi.fn(async () => llmActResponse(componentDocument()));
+      vi.stubGlobal('fetch', fetch);
+      const element = designer();
+      element.submitChangeProposal.mockReturnValue({
+        ok: false,
+        diagnostics: [
+          { severity: 'error', code: 'CHANGE_DRAFT_PENDING', path: [], message: 'pending' },
+        ],
+        value: {},
+      } as never);
+
+      const result = await handler(element)(request);
+
+      expect(result.ok).toBe(false);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+  });
+
   it('reports engine rejection without claiming success', async () => {
     vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
     vi.stubGlobal(
