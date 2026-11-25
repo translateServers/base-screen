@@ -1,5 +1,6 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import {
   type AgentActResult,
   type AgentCandidateResult,
@@ -19,8 +20,9 @@ export class AgentController {
 
   @Post('act')
   @ApiOperation({ summary: '把一句话路由成动作并执行：生成整屏 / 改组件 / 改画布 / 明确不支持' })
-  async act(@Body() dto: AgentActDto): Promise<AgentActResult> {
+  async act(@Body() dto: AgentActDto, @Req() request?: Request): Promise<AgentActResult> {
     return this.agent.act({
+      signal: clientSignal(request),
       text: dto.text,
       scope: dto.scope,
       ...(dto.componentIds === undefined ? {} : { componentIds: dto.componentIds }),
@@ -34,8 +36,12 @@ export class AgentController {
   }
   @Post('candidate')
   @ApiOperation({ summary: '生成整屏候选文档，不创建或更新大屏' })
-  async candidate(@Body() dto: AgentCandidateDto): Promise<AgentCandidateResult> {
+  async candidate(
+    @Body() dto: AgentCandidateDto,
+    @Req() request?: Request,
+  ): Promise<AgentCandidateResult> {
     return this.agent.generateCandidate({
+      signal: clientSignal(request),
       topic: dto.topic,
       screenId: dto.screenId,
       ...(dto.catalog === undefined ? {} : { catalog: dto.catalog }),
@@ -45,8 +51,12 @@ export class AgentController {
 
   @Post('edit')
   @ApiOperation({ summary: '为选中组件生成候选修改 patch，不写入文档' })
-  async edit(@Body() dto: AgentComponentEditDto): Promise<AgentComponentEditResult> {
+  async edit(
+    @Body() dto: AgentComponentEditDto,
+    @Req() request?: Request,
+  ): Promise<AgentComponentEditResult> {
     return this.agent.editComponents({
+      signal: clientSignal(request),
       instruction: dto.instruction,
       components: dto.components,
     });
@@ -61,4 +71,17 @@ export class AgentController {
       ...(dto.catalog === undefined ? {} : { catalog: dto.catalog }),
     });
   }
+}
+
+/**
+ * 前端断开即中止上游模型请求（ADR-0112 §2.6）：宿主取消时会 abort 自己的 fetch，连接随之关闭。
+ * 看响应的 `close` 而不是请求的：Node 16 起请求体读完就会触发请求的 `close`，那不是断开。
+ */
+function clientSignal(request: Request | undefined): AbortSignal {
+  const controller = new AbortController();
+  const response = request?.res;
+  response?.on('close', () => {
+    if (!response.writableFinished) controller.abort();
+  });
+  return controller.signal;
 }

@@ -46,6 +46,8 @@ export interface ComposeResult {
   readonly materials: readonly string[];
   /** 降级发生的块（例如列满足不了物料的绑定角色），屏仍然产出，但要如实说明。 */
   readonly warnings: readonly ComposeDiagnostic[];
+  /** 组件 id → IR 路径（`title` / `kpis[1]` / `blocks[2]`；编译器自有内容为空串）。 */
+  readonly sources: Readonly<Record<string, string>>;
 }
 
 export type ComposeOutcome =
@@ -122,6 +124,12 @@ export function composeScreenDocument(input: {
   const palette = (input.style ?? STYLE_PRESETS[DEFAULT_STYLE_PRESET]).palette;
   const sink: Sink = { diagnostics: [], warnings: [], dataSources: [] };
   const components: Component[] = [];
+  // 来源表（ADR-0112 §2.1）：组件 id → IR 路径。修复回环靠它把文档诊断翻译回模型能看懂的位置。
+  const sources: Record<string, string> = {};
+  let source = '';
+  const setSource = (path: string): void => {
+    source = path;
+  };
   const used = new Set<string>();
   let z = 1;
   let imageCount = 0;
@@ -141,8 +149,10 @@ export function composeScreenDocument(input: {
       dataBinding?: Record<string, unknown>;
     } = {},
   ): void => {
+    const id = `agent-${slug(name)}-${components.length}`;
+    sources[id] = source;
     components.push({
-      id: `agent-${slug(name)}-${components.length}`,
+      id,
       type: material.type,
       name,
       parentId: null,
@@ -186,6 +196,7 @@ export function composeScreenDocument(input: {
     push(surfaceMaterial, name, box, { style: { fill: palette.card, ...(style ?? {}) } });
   };
 
+  setSource('title');
   pushText(
     '标题',
     spec.title,
@@ -195,6 +206,7 @@ export function composeScreenDocument(input: {
       fontWeight: '700',
     },
   );
+  setSource('subtitle');
   pushText(
     '副标题',
     spec.subtitle,
@@ -202,7 +214,12 @@ export function composeScreenDocument(input: {
     { fontSize: 20, color: palette.muted },
   );
 
-  composeKpis(spec, { pushSurface, pushText }, palette, tintedSurfaceStyle(palette.card));
+  composeKpis(
+    spec,
+    { pushSurface, pushText, setSource },
+    palette,
+    tintedSurfaceStyle(palette.card),
+  );
 
   const blocks = spec.blocks ?? [];
   const rows = packRows(blocks);
@@ -221,6 +238,7 @@ export function composeScreenDocument(input: {
       let offset = 0;
       row.forEach((block, blockIndex) => {
         const span = spans[blockIndex] ?? clamp(block.span, 1, COLUMNS);
+        setSource(`blocks[${blocks.indexOf(block)}]`);
         compileBlock(
           block,
           {
@@ -244,11 +262,14 @@ export function composeScreenDocument(input: {
       : spec.mode === 'deterministic'
         ? '确定性兜底 · 未调用模型'
         : '';
+  // 页脚是编译器自己的内容，不属于 IR 的任何位置。
+  setSource('');
   pushText(
     '页脚',
     `生成自示例智能体${modeLabel === '' ? '' : ` · ${modeLabel}`} · 组件目录来自宿主设计器（${catalog.materials.length} 种可用物料）`,
     { x: MARGIN, y: FOOTER_Y, width: 1600, height: FOOTER_HEIGHT },
-    { fontSize: 14, color: palette.footer },
+    // 1920 宽画布的可读下限是 16px（core `resolveScreenFontFloorPx`）；编译器自己写的字号不能低于它。
+    { fontSize: 16, color: palette.footer },
   );
 
   if (sink.diagnostics.length > 0) return { ok: false, diagnostics: sink.diagnostics };
@@ -271,6 +292,7 @@ export function composeScreenDocument(input: {
       imageCount,
       materials: [...used],
       warnings: sink.warnings,
+      sources,
       document: {
         canvas: { width: WIDTH, height: HEIGHT, backgroundColor: palette.canvas },
         components,
@@ -287,6 +309,7 @@ function composeKpis(
   context: {
     pushSurface: (name: string, box: Box, style?: Record<string, JsonValue>) => void;
     pushText: (name: string, value: string, box: Box, token?: TextToken) => void;
+    setSource: (path: string) => void;
   },
   palette: StylePalette,
   cardStyle: Record<string, JsonValue>,
@@ -296,6 +319,7 @@ function composeKpis(
   const width = Math.floor((WIDTH - MARGIN * 2 - GAP * (kpis.length - 1)) / kpis.length);
   kpis.forEach((kpi, index) => {
     const x = MARGIN + index * (width + GAP);
+    context.setSource(`kpis[${index}]`);
     context.pushSurface('指标卡', { x, y: KPI_Y, width, height: KPI_HEIGHT }, cardStyle);
     context.pushText(
       '指标名',
@@ -367,7 +391,7 @@ function compileBlock(
   const titleIsBody = isTextBlock && textValue !== '' && block.title.trim() === textValue;
   const hasTitle = block.title.trim() !== '' && !titleIsBody;
   const hasNote = hasTitle && (block.note ?? '').trim() !== '';
-  const headerHeight = hasTitle ? (hasNote ? 62 : 36) : 0;
+  const headerHeight = hasTitle ? (hasNote ? 64 : 36) : 0;
 
   if (hasTitle) {
     // 标题与卡片左边缘对齐（卡片由 inset 内缩 16，标题不再额外偏移），整列看起来是一条竖线。
@@ -381,8 +405,8 @@ function compileBlock(
       context.pushText(
         '块说明',
         block.note ?? '',
-        { x: box.x, y: box.y + 30, width: box.width, height: 22 },
-        { fontSize: 14, color: context.palette.muted },
+        { x: box.x, y: box.y + 30, width: box.width, height: 24 },
+        { fontSize: 16, color: context.palette.muted },
       );
     }
   }

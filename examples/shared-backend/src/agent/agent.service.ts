@@ -19,7 +19,12 @@ import {
   pickAssetMaterial,
   pickTextMaterial,
 } from './agent-catalog';
-import { requestAgentCompletion, resolveAgentLlmSettings } from './agent-client';
+import {
+  type AgentChatMessage,
+  type AgentLlmSettings,
+  requestAgentCompletion,
+  resolveAgentLlmSettings,
+} from './agent-client';
 import {
   AGENT_COMPONENT_EDIT_SYSTEM_PROMPT,
   type AgentComponentPatch,
@@ -29,6 +34,17 @@ import {
   readEditableComponents,
 } from './agent-component-edit';
 import { type ComposeReferences, composeScreenDocument } from './agent-compose';
+import {
+  AGENT_MAX_REPAIR_ROUNDS,
+  type AgentParseIssues,
+  type AgentRepairIssue,
+  blockIssue,
+  buildRepairPrompt,
+  createParseIssues,
+  issueBlockIndexes,
+  repairKey,
+  rootIssue,
+} from './agent-repair';
 import {
   type AgentIntentScope,
   type AgentRoutedBy,
@@ -65,6 +81,8 @@ export interface AgentCandidateResult {
   /** 非阻断降级（裁行、丢块、丢参数），屏仍产出；宿主据此在提案理由里如实说明。 */
   readonly warnings?: readonly AgentWarning[];
   readonly failure?: string;
+  /** 修复回环实际用掉的修复轮数（ADR-0112 §2.1）；首轮即通过时省略。 */
+  readonly repairRounds?: number;
 }
 
 export interface AgentGenerateResult extends Omit<AgentCandidateResult, 'name' | 'document'> {
@@ -91,6 +109,8 @@ export interface AgentActInput {
   readonly canvas?: unknown;
   /** 当前屏摘要，只用于路由提示词；同样在路由侧收窄。 */
   readonly context?: unknown;
+  /** 前端断开即中止上游模型请求。 */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -132,6 +152,7 @@ export class AgentService {
     topic: string;
     name?: string;
     catalog?: unknown;
+    signal?: AbortSignal;
   }): Promise<AgentGenerateResult> {
     const candidate = await this.generateCandidate(input);
     const created = await this.screens.create(input.name?.trim() || candidate.name);
@@ -218,6 +239,7 @@ export class AgentService {
     screenId?: string;
     catalog?: unknown;
     references?: readonly Record<string, unknown>[];
+    signal?: AbortSignal;
   }): Promise<AgentCandidateResult> {
     const topic = input.topic.trim();
     const clientCatalog = this.resolveCatalog(input.catalog);
@@ -246,35 +268,33 @@ export class AgentService {
     let failure: string | undefined;
     // 解析期的降级（裁行、丢块、丢参数）与编译期的降级合并成一份，供宿主如实展示。
     const parseWarnings: string[] = [];
+    let repairRounds = 0;
 
     if (settings !== null) {
-      const result = await requestAgentCompletion(
+      const outcome = await this.generateWithRepair({
         settings,
         // 目录随请求到来，所以提示词也是按目录现生成的：宿主装了新物料，下一句话就能用上。
-        buildCatalogSystemPrompt(catalog, references.prompt),
-        buildAgentUserPrompt(topic),
-        this.logger,
-      );
-      if (result.ok && result.text !== undefined) {
-        const parsed = parseCatalogSpec(result.text, catalog, parseWarnings);
-        if (parsed === null) {
-          failure = 'AGENT_SPEC_INVALID';
-          this.logger.warn('agent spec rejected by validation');
-        } else if ((parsed.blocks ?? []).length === 0) {
-          // 文档结构合法但一块都用不了：保留模型给的标题与 KPI，布局退回确定性块。
-          // 直接整屏换成模板会把"某一块的错"放大成"整屏都不是你的内容"。
-          const fallback = deterministicSpec(topic, catalog, references.compose);
-          spec = { ...parsed, blocks: fallback.blocks ?? [] };
-          mode = 'deterministic';
-          failure = 'AGENT_BLOCKS_ALL_INVALID';
-          parseWarnings.push('AGENT_BLOCKS_ALL_INVALID');
-          this.logger.warn('agent spec has no usable blocks; fell back to deterministic layout');
-        } else {
-          spec = parsed;
-          mode = 'llm';
-        }
+        system: buildCatalogSystemPrompt(catalog, references.prompt),
+        user: buildAgentUserPrompt(topic),
+        catalog,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      });
+      if (outcome.kind === 'transport') {
+        failure = outcome.failure;
+      } else if (outcome.kind === 'exhausted') {
+        // 修不好且没有可交的块（或整份 / 文档级出错）：不交候选，也不再退回确定性布局冒充产出
+        // （ADR-0112 §2.1.5）。把最后一轮诊断如实交给宿主。
+        throw new UnprocessableEntityException({
+          error: outcome.issues[0]?.code ?? 'AGENT_SPEC_INVALID',
+          message: '模型输出经修复仍未通过校验，本次没有生成候选。',
+          diagnostics: outcome.issues,
+          repairRounds: outcome.repairRounds,
+        });
       } else {
-        failure = result.failure ?? 'AGENT_FAILED';
+        spec = outcome.spec;
+        mode = 'llm';
+        parseWarnings.push(...outcome.warnings);
+        repairRounds = outcome.repairRounds;
       }
     } else {
       failure = 'AGENT_NOT_CONFIGURED';
@@ -318,7 +338,101 @@ export class AgentService {
       materials: composed.value.materials,
       ...(warnings.length === 0 ? {} : { warnings }),
       ...(failure === undefined ? {} : { failure }),
+      ...(repairRounds === 0 ? {} : { repairRounds }),
     };
+  }
+
+  /**
+   * 生成 → 校验 → 修复回环（ADR-0112 §2.1）。
+   *
+   * 每轮：调用模型 → 宽容解析 IR → 收集诊断。没有诊断就交出；有诊断就把上一轮原文与诊断清单
+   * 作为后续对话发回去修，最多修 2 轮；同一组诊断连续两轮不变就提前停。修不完时只有块级问题
+   * （坏块已在解析时去掉、其余块可用）就交出其余块并告警；整份不可用或没有任何可用块则交给
+   * 调用方报失败。传输层失败（超时、HTTP 错误）不进回环：重试由客户端负责（§2.6）。
+   */
+  private async generateWithRepair(input: {
+    readonly settings: AgentLlmSettings;
+    readonly system: string;
+    readonly user: string;
+    readonly catalog: AgentCatalog;
+    readonly signal?: AbortSignal;
+  }): Promise<
+    | { readonly kind: 'transport'; readonly failure: string }
+    | {
+        readonly kind: 'exhausted';
+        readonly issues: readonly AgentRepairIssue[];
+        readonly repairRounds: number;
+      }
+    | {
+        readonly kind: 'ok';
+        readonly spec: AgentScreenSpec;
+        readonly warnings: readonly string[];
+        readonly repairRounds: number;
+      }
+  > {
+    const followUp: AgentChatMessage[] = [];
+    let previousKey: string | undefined;
+    let repairRounds = 0;
+    for (;;) {
+      const result = await requestAgentCompletion(
+        input.settings,
+        input.system,
+        input.user,
+        this.logger,
+        {
+          retry: true,
+          followUp,
+          ...(input.signal === undefined ? {} : { signal: input.signal }),
+        },
+      );
+      if (!result.ok || result.text === undefined) {
+        return { kind: 'transport', failure: result.failure ?? 'AGENT_FAILED' };
+      }
+      const warnings: string[] = [];
+      const collected = createParseIssues();
+      const parsed = parseCatalogSpec(result.text, input.catalog, warnings, collected);
+      const issues: AgentRepairIssue[] =
+        parsed === null
+          ? [
+              rootIssue(
+                'AGENT_SPEC_INVALID',
+                '输出必须是一个 JSON 对象，包含非空的 title、subtitle、至少 1 条 kpis 与 blocks 数组。',
+              ),
+            ]
+          : [...collected.issues];
+      if (parsed !== null && parsed.blocks.length === 0 && issues.length === 0) {
+        issues.push(rootIssue('AGENT_BLOCKS_ALL_INVALID', 'blocks 至少要有一块可用的内容。'));
+      }
+      if (issues.length === 0 && parsed !== null) {
+        return { kind: 'ok', spec: parsed, warnings, repairRounds };
+      }
+
+      const key = repairKey(issues);
+      const exhausted = repairRounds >= AGENT_MAX_REPAIR_ROUNDS || key === previousKey;
+      if (exhausted) {
+        const { documentLevel } = issueBlockIndexes(issues);
+        if (parsed !== null && !documentLevel && parsed.blocks.length > 0) {
+          this.logger.warn(
+            `agent repair exhausted; delivering ${parsed.blocks.length} usable blocks`,
+          );
+          return {
+            kind: 'ok',
+            spec: parsed,
+            warnings: [...warnings, 'AGENT_BLOCKS_DROPPED'],
+            repairRounds,
+          };
+        }
+        this.logger.warn(`agent repair exhausted after ${repairRounds} rounds: ${key}`);
+        return { kind: 'exhausted', issues, repairRounds };
+      }
+      previousKey = key;
+      repairRounds += 1;
+      this.logger.warn(`agent output needs repair (round ${repairRounds}): ${key}`);
+      followUp.push(
+        { role: 'assistant', content: result.text },
+        { role: 'user', content: buildRepairPrompt(issues) },
+      );
+    }
   }
 
   /**
@@ -341,6 +455,7 @@ export class AgentService {
   async editComponents(input: {
     instruction: string;
     components: readonly unknown[];
+    signal?: AbortSignal;
   }): Promise<AgentComponentEditResult> {
     const components = readEditableComponents(input.components);
     const instruction = input.instruction.trim();
@@ -372,6 +487,7 @@ export class AgentService {
         AGENT_COMPONENT_EDIT_SYSTEM_PROMPT,
         buildAgentComponentUserPrompt(instruction, components),
         this.logger,
+        { retry: true, ...(input.signal === undefined ? {} : { signal: input.signal }) },
       );
       if (result.ok && result.text !== undefined) {
         const parsed = parseAgentComponentEditSpec(result.text, components);
@@ -439,6 +555,7 @@ export class AgentService {
       ...(input.canvas === undefined ? {} : { canvasState: input.canvas }),
       settings: resolveAgentLlmSettings(this.config),
       logger: this.logger,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
     });
 
     if (decision.action === 'generate_screen') {
@@ -447,12 +564,17 @@ export class AgentService {
         ...(input.screenId === undefined ? {} : { screenId: input.screenId }),
         ...(input.catalog === undefined ? {} : { catalog: input.catalog }),
         ...(input.references === undefined ? {} : { references: input.references }),
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
       });
       return { kind: 'generate_screen', routedBy: decision.routedBy, ...candidate };
     }
 
     if (decision.action === 'edit_components') {
-      const edit = await this.editComponents({ instruction: text, components });
+      const edit = await this.editComponents({
+        instruction: text,
+        components,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      });
       return { kind: 'edit_components', routedBy: decision.routedBy, ...edit };
     }
 
@@ -567,6 +689,7 @@ export function parseCatalogSpec(
   text: string,
   catalog: AgentCatalog,
   warnings: string[] = [],
+  issues?: AgentParseIssues,
 ): AgentScreenSpec | null {
   const cleaned = text
     .trim()
@@ -611,7 +734,7 @@ export function parseCatalogSpec(
     subtitle: subtitle.slice(0, 40),
     ...(typeof record.style === 'string' ? { style: record.style.trim() } : {}),
     kpis,
-    blocks: readBlocks(record.blocks, catalog, warnings),
+    blocks: readBlocks(record.blocks, catalog, warnings, issues),
   };
 }
 
@@ -626,18 +749,28 @@ function readBlocks(
   value: readonly unknown[],
   catalog: AgentCatalog,
   warnings: string[],
+  issues?: AgentParseIssues,
 ): AgentBlock[] {
   const blocks: AgentBlock[] = [];
-  for (const item of value.slice(0, 4)) {
+  // 被丢弃的块记成修复诊断（路径指回模型原文的第几块）；保留下来的块记下原始下标。
+  const drop = (code: string, index: number) => {
+    warnings.push(code);
+    issues?.issues.push(blockIssue(code, index));
+  };
+  const keep = (block: AgentBlock, index: number) => {
+    blocks.push(block);
+    issues?.blockIndexes.push(index);
+  };
+  for (const [index, item] of value.slice(0, 4).entries()) {
     const block = asRecord(item);
     if (block === null) {
-      warnings.push('AGENT_BLOCK_INVALID');
+      drop('AGENT_BLOCK_INVALID', index);
       continue;
     }
     const type = typeof block.type === 'string' ? block.type.trim() : '';
     const material = catalog.materials.find((candidate) => candidate.type === type);
     if (type === '' || material === undefined) {
-      warnings.push('AGENT_BLOCK_TYPE_UNKNOWN');
+      drop('AGENT_BLOCK_TYPE_UNKNOWN', index);
       continue;
     }
 
@@ -669,15 +802,15 @@ function readBlocks(
       // 这里只收下 id，认不认得出这个数据集由编译器按本轮引用判断（认不出会记警告并回落表格）。
       const datasetId = typeof block.datasetId === 'string' ? block.datasetId.trim() : '';
       if (datasetId !== '') {
-        blocks.push({ ...base, datasetId });
+        keep({ ...base, datasetId }, index);
         continue;
       }
       const table = readBlockTable(block.table, warnings);
       if (table === null) {
-        warnings.push('AGENT_BLOCK_DATA_MISSING');
+        drop('AGENT_BLOCK_DATA_MISSING', index);
         continue;
       }
-      blocks.push({ ...base, table });
+      keep({ ...base, table }, index);
       continue;
     }
     if (material.data === 'scalar') {
@@ -685,24 +818,24 @@ function readBlocks(
       const assetId = typeof block.assetId === 'string' ? block.assetId.trim() : '';
       if (assetId !== '') {
         if (!material.asset || !catalog.assets.some((asset) => asset.id === assetId)) {
-          warnings.push('AGENT_ASSET_UNKNOWN');
+          drop('AGENT_ASSET_UNKNOWN', index);
           continue;
         }
-        blocks.push({ ...base, assetId });
+        keep({ ...base, assetId }, index);
         continue;
       }
       if (text === '') {
-        warnings.push('AGENT_BLOCK_DATA_MISSING');
+        drop('AGENT_BLOCK_DATA_MISSING', index);
         continue;
       }
       if (text.length > 160) {
         text = text.slice(0, 160);
         warnings.push('AGENT_BLOCK_TEXT_TRIMMED');
       }
-      blocks.push({ ...base, text });
+      keep({ ...base, text }, index);
       continue;
     }
-    blocks.push(base);
+    keep(base, index);
   }
   return blocks;
 }
@@ -848,6 +981,7 @@ export const WARNING_MESSAGES: Readonly<Record<string, string>> = {
   AGENT_BLOCK_BINDING_UNSATISFIED: '有模块的列不满足绑定角色，已退化为无数据',
   AGENT_DATASET_UNKNOWN: '引用的数据集不在本轮上下文里，已改用示例数据',
   AGENT_BLOCKS_ALL_INVALID: '模型给的分块都不可用，已改用确定性布局',
+  AGENT_BLOCKS_DROPPED: '有模块经修复仍不可用，已去掉，其余照常交出',
   AGENT_ASSET_CATALOG_UNAVAILABLE: '素材目录不可用，本次未使用宿主图片',
 };
 

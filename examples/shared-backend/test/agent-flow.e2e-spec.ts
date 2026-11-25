@@ -175,13 +175,37 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
   });
 
   describe('模型失败时的降级（mode 如实标注，且仍产出合法文档）', () => {
-    it('模型输出不是 JSON：失败码 AGENT_SPEC_INVALID，退回确定性布局', async () => {
+    it('模型输出不是 JSON：修复一轮仍不变就停，422 且不落库（ADR-0112 §2.1）', async () => {
       stub.setResponder(() => chatText('这不是 JSON'));
-      const body = await generateAndTrack('畸形输出');
+      const before = await request(server()).get('/api/screens').expect(200);
+      const response = await request(server())
+        .post('/api/agent/generate')
+        .send({ topic: '畸形输出' })
+        .expect(422);
 
-      expect(body.mode).toBe('deterministic');
-      expect(body.failure).toBe('AGENT_SPEC_INVALID');
-      expect(body.screen.revision).toBe(2);
+      expect(response.body.error).toBe('AGENT_SPEC_INVALID');
+      // 首轮 + 一次修复：第二轮诊断与第一轮相同，提前停。
+      expect(stub.calls).toHaveLength(2);
+      const after = await request(server()).get('/api/screens').expect(200);
+      expect((after.body.screens as unknown[]).length).toBe(
+        (before.body.screens as unknown[]).length,
+      );
+    });
+
+    it('修复回环：首轮畸形、修复后合法，交出模型产物', async () => {
+      stub.setResponder((_call, index) =>
+        index === 0 ? chatText('这不是 JSON') : chatText(JSON.stringify(VALID_SPEC)),
+      );
+      const body = await generateAndTrack('修复成功');
+
+      expect(body.mode).toBe('llm');
+      expect(body.failure).toBeUndefined();
+      expect(stub.calls).toHaveLength(2);
+      // 修复轮只追加「上一轮原文 + 诊断」，不重发上下文之外的东西。
+      const messages = stub.calls[1]?.body.messages as { role: string; content: string }[];
+      expect(messages.map((item) => item.role)).toEqual(['system', 'user', 'assistant', 'user']);
+      expect(messages[2]?.content).toBe('这不是 JSON');
+      expect(messages[3]?.content).toContain('AGENT_SPEC_INVALID');
     });
 
     it('模型 HTTP 500：失败码 AGENT_HTTP_500，不伪装成模型产物', async () => {
@@ -190,6 +214,29 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
 
       expect(body.mode).toBe('deterministic');
       expect(body.failure).toBe('AGENT_HTTP_500');
+      // 5xx 可恢复：退避后重试一次，仍失败才放弃（ADR-0112 §2.6）。
+      expect(stub.calls).toHaveLength(2);
+    });
+
+    it('模型 429 后恢复：重试一次即拿到产物', async () => {
+      stub.setResponder((_call, index) =>
+        index === 0
+          ? { kind: 'json', status: 429, body: { error: 'rate limited' } }
+          : chatText(JSON.stringify(VALID_SPEC)),
+      );
+      const body = await generateAndTrack('限流恢复');
+
+      expect(body.mode).toBe('llm');
+      expect(body.failure).toBeUndefined();
+      expect(stub.calls).toHaveLength(2);
+    });
+
+    it('模型 400：不重试，交给上层如实标注', async () => {
+      stub.setResponder(() => ({ kind: 'json', status: 400, body: { error: 'bad request' } }));
+      const body = await generateAndTrack('请求有误');
+
+      expect(body.failure).toBe('AGENT_HTTP_400');
+      expect(stub.calls).toHaveLength(1);
     });
 
     it('模型返回空内容：失败码 AGENT_EMPTY_RESPONSE', async () => {
@@ -225,9 +272,9 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
 
       // 标题不再被截成「……：支」这种按词中间切断的形态。
       expect(texts).toContain(topic);
-    });
+    }, 20_000);
 
-    it('模型超时（客户端 1.5s 中止）：失败码 AGENT_TIMEOUT，且请求没有挂死', async () => {
+    it('模型空闲超时（客户端 1.5s 中止）：重试一次后报 AGENT_TIMEOUT，请求没有挂死', async () => {
       stub.setResponder(() => ({ kind: 'hang' }));
       const startedAt = Date.now();
       const body = await generateAndTrack('超时兜底');
@@ -235,9 +282,10 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
 
       expect(body.mode).toBe('deterministic');
       expect(body.failure).toBe('AGENT_TIMEOUT');
-      // 超时设为 1.5s：应明显早于默认 60s 返回，也不应早于超时时长太多。
-      expect(elapsed).toBeGreaterThanOrEqual(1_000);
-      expect(elapsed).toBeLessThan(10_000);
+      // 两次 1.5s 空闲超时加 1s 退避：明显早于旧的 60s 总时长，也不早于两次超时之和。
+      expect(stub.calls).toHaveLength(2);
+      expect(elapsed).toBeGreaterThanOrEqual(3_000);
+      expect(elapsed).toBeLessThan(12_000);
     }, 20_000);
 
     it('模型连接被断开：失败码 AGENT_UNREACHABLE（与超时区分）', async () => {
@@ -248,19 +296,35 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
       expect(body.failure).toBe('AGENT_UNREACHABLE');
     });
 
-    it('所有块都不可用：保留模型标题，布局退回确定性块并告警', async () => {
+    it('所有块都不可用且修不好：422，诊断指回模型原文的块', async () => {
       const allBadBlocks = {
         ...VALID_SPEC,
         blocks: [{ type: 'no.such.material', title: 'x', span: 2 }],
       };
       stub.setResponder(() => chatText(JSON.stringify(allBadBlocks)));
-      const body = await generateAndTrack('全部块无效');
+      const response = await request(server())
+        .post('/api/agent/generate')
+        .send({ topic: '全部块无效' })
+        .expect(422);
 
-      expect(body.mode).toBe('deterministic');
-      expect(body.failure).toBe('AGENT_BLOCKS_ALL_INVALID');
-      expect(body.screen.name).toBe(VALID_SPEC.title);
+      expect(response.body.error).toBe('AGENT_BLOCK_TYPE_UNKNOWN');
+      expect(response.body.diagnostics).toEqual([
+        expect.objectContaining({ code: 'AGENT_BLOCK_TYPE_UNKNOWN', path: 'blocks[0]' }),
+      ]);
+    });
+
+    it('部分块修不好：去掉坏块，其余照常交出并告警', async () => {
+      const partlyBad = {
+        ...VALID_SPEC,
+        blocks: [...VALID_SPEC.blocks, { type: 'no.such.material', title: 'x', span: 1 }],
+      };
+      stub.setResponder(() => chatText(JSON.stringify(partlyBad)));
+      const body = await generateAndTrack('部分块无效');
+
+      expect(body.mode).toBe('llm');
+      expect(stub.calls).toHaveLength(2);
       expect(
-        body.warnings?.some((item: { code: string }) => item.code === 'AGENT_BLOCKS_ALL_INVALID'),
+        body.warnings?.some((item: { code: string }) => item.code === 'AGENT_BLOCKS_DROPPED'),
       ).toBe(true);
     });
 

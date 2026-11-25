@@ -211,6 +211,8 @@ export interface RouteAgentActionInput {
   /** 没配置模型时传 null：规则仍然生效，长尾直接 unsupported。 */
   readonly settings: AgentLlmSettings | null;
   readonly logger: Logger;
+  /** 前端断开即中止上游请求；路由不重试。 */
+  readonly signal?: AbortSignal;
 }
 
 export async function routeAgentAction(input: RouteAgentActionInput): Promise<AgentRouteDecision> {
@@ -271,6 +273,7 @@ async function routeWithModel(
     { ...input.settings, timeoutMs: AGENT_ROUTE_TIMEOUT_MS },
     { system, user, tools, maxTokens: 300 },
     input.logger,
+    input.signal === undefined ? {} : { signal: input.signal },
   );
 
   const fromTool = readToolDecision(toolResult.toolCall, input.scope);
@@ -317,6 +320,7 @@ async function routeWithJsonPrompt(
 {"action":"unsupported","reason":"not_implemented","suggestion":"先选中组件再改文案"}。`,
     buildRouteUserPrompt(input.text, input.scope, input.digest),
     input.logger,
+    input.signal === undefined ? {} : { signal: input.signal },
   );
   if (!result.ok || result.text === undefined) return null;
   return readTextDecision(result.text, input.scope);

@@ -4,7 +4,7 @@ import { Logger } from '@nestjs/common';
  * 模型调用的统一入口。
  *
  * 两件事在这里收口，避免各调用点各写一份：
- * - 配置与超时的读取（`resolveAgentLlmSettings`）：超时必须在每次请求时从 ConfigService 读，
+ * - 配置与超时的读取（`resolveAgentLlmSettings`）：超时（空闲时长）必须在每次请求时从 ConfigService 读，
  *   不能在模块加载时读 `process.env`——`.env.local` 由 ConfigModule 更晚加载，模块级常量拿不到。
  * - 两种请求形态：JSON 产物（整屏 IR / 组件补丁）与工具调用（动作路由）。
  */
@@ -12,7 +12,7 @@ export interface AgentLlmSettings {
   readonly baseUrl: string;
   readonly apiKey: string;
   readonly model: string;
-  /** 本次请求的超时；路由用短超时，生成用长超时。 */
+  /** 空闲超时：两段输出之间最多等多久；路由用短超时。 */
   readonly timeoutMs: number;
 }
 
@@ -40,15 +40,39 @@ export interface AgentToolResult {
   readonly failure?: string;
 }
 
-const DEFAULT_TIMEOUT_MS = 60_000;
+/**
+ * 空闲超时（ADR-0112 §2.6）：两段输出之间最多等多久，而不是整次请求的总时长。
+ * 生成一屏可能要一分多钟，但只要上游还在吐字就不该放弃；真正挂住的连接 20 秒内就能发现。
+ */
+const DEFAULT_TIMEOUT_MS = 20_000;
 
 /** 路由只需要几百 token，等满生成超时没有意义。 */
 export const AGENT_ROUTE_TIMEOUT_MS = 8_000;
 
+/** 可恢复失败的重试退避。 */
+const RETRY_BACKOFF_MS = 1_000;
+
+export interface AgentChatMessage {
+  readonly role: 'system' | 'user' | 'assistant';
+  readonly content: string;
+}
+
+export interface AgentRequestOptions {
+  /** 调用方的取消信号：前端断开或用户取消时中止上游请求，不重试，失败码 `AGENT_CANCELLED`。 */
+  readonly signal?: AbortSignal;
+  /**
+   * 可恢复失败（空闲超时、429、5xx）退避 1 秒后重试一次（ADR-0112 §2.6）。
+   * 只给生成与组件修改用；路由的预算本来就短，失败了交给规则兜底。
+   */
+  readonly retry?: boolean;
+  /** 接在 system / user 之后的对话轮次：修复回环把上一轮产物与诊断作为后续消息发回。 */
+  readonly followUp?: readonly AgentChatMessage[];
+}
+
 /**
  * 读模型配置；缺任意一项就返回 null（视为未配置）。
  *
- * `overrides.timeoutMs` 给路由用：路由只需要几百 token，不该等满 60s。
+ * `overrides.timeoutMs` 给路由用：路由只需要几百 token，不该等满生成的空闲超时。
  */
 export function resolveAgentLlmSettings(
   source: AgentLlmConfigSource,
@@ -66,7 +90,7 @@ export function resolveAgentLlmSettings(
 }
 
 /**
- * OpenAI 兼容的最小客户端：一次请求、超时即放弃、不流式。
+ * OpenAI 兼容的最小客户端：JSON 产物形态。
  * 密钥只在后端进程内使用，不进日志、不进响应。
  */
 export async function requestAgentCompletion(
@@ -74,18 +98,12 @@ export async function requestAgentCompletion(
   system: string,
   user: string,
   logger: Logger,
+  options: AgentRequestOptions = {},
 ): Promise<AgentClientResult> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.timeoutMs);
-  const startedAt = Date.now();
-  try {
-    const response = await fetch(`${trimBaseUrl(config.baseUrl)}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify({
+  return withRetry(options, logger, async () => {
+    const reply = await postChat(
+      config,
+      {
         model: config.model,
         temperature: 0.4,
         stream: false,
@@ -93,38 +111,23 @@ export async function requestAgentCompletion(
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
+          ...(options.followUp ?? []),
         ],
-      }),
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      logger.warn(
-        `agent request failed: status=${response.status} elapsed=${Date.now() - startedAt}ms`,
-      );
-      return { ok: false, failure: `AGENT_HTTP_${response.status}` };
-    }
-    const payload = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
+      },
+      logger,
+      'agent request',
+      options.signal,
+    );
+    if (!reply.ok) return { ok: false, failure: reply.failure };
+    const payload = reply.payload as { choices?: { message?: { content?: string } }[] };
     const text = payload.choices?.[0]?.message?.content;
     if (typeof text !== 'string' || text.trim() === '') {
-      logger.warn(`agent response empty: elapsed=${Date.now() - startedAt}ms`);
+      logger.warn(`agent response empty: elapsed=${reply.elapsedMs}ms`);
       return { ok: false, failure: 'AGENT_EMPTY_RESPONSE' };
     }
-    logger.log(`agent request ok: elapsed=${Date.now() - startedAt}ms chars=${text.length}`);
+    logger.log(`agent request ok: elapsed=${reply.elapsedMs}ms chars=${text.length}`);
     return { ok: true, text };
-  } catch (error) {
-    logger.warn(
-      `agent request error: ${error instanceof Error ? error.name : 'unknown'} elapsed=${Date.now() - startedAt}ms`,
-    );
-    // 超时与网络错误分开报：前者是「再等一会儿可能就好了」，后者才是真的连不上。
-    // 不用 `instanceof Error`：fetch 抛出的 AbortError 可能来自另一个 realm（如测试沙箱），
-    // 那样 instanceof 为 false，超时会被误报成 AGENT_UNREACHABLE。按 name 判断与 realm 无关。
-    const timedOut = isAbortError(error);
-    return { ok: false, failure: timedOut ? 'AGENT_TIMEOUT' : 'AGENT_UNREACHABLE' };
-  } finally {
-    clearTimeout(timer);
-  }
+  });
 }
 
 /**
@@ -141,18 +144,12 @@ export async function requestAgentToolCall(
     readonly maxTokens?: number;
   },
   logger: Logger,
+  options: AgentRequestOptions = {},
 ): Promise<AgentToolResult> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.timeoutMs);
-  const startedAt = Date.now();
-  try {
-    const response = await fetch(`${trimBaseUrl(config.baseUrl)}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify({
+  return withRetry(options, logger, async () => {
+    const reply = await postChat(
+      config,
+      {
         model: config.model,
         temperature: 0,
         stream: false,
@@ -164,16 +161,13 @@ export async function requestAgentToolCall(
           { role: 'system', content: input.system },
           { role: 'user', content: input.user },
         ],
-      }),
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      logger.warn(
-        `agent tool request failed: status=${response.status} elapsed=${Date.now() - startedAt}ms`,
-      );
-      return { ok: false, failure: `AGENT_HTTP_${response.status}` };
-    }
-    const payload = (await response.json()) as {
+      },
+      logger,
+      'agent tool request',
+      options.signal,
+    );
+    if (!reply.ok) return { ok: false, failure: reply.failure };
+    const payload = reply.payload as {
       choices?: {
         message?: {
           content?: string;
@@ -184,29 +178,127 @@ export async function requestAgentToolCall(
     const message = payload.choices?.[0]?.message;
     const call = message?.tool_calls?.[0]?.function;
     if (typeof call?.name === 'string' && call.name !== '') {
-      logger.log(`agent tool call: name=${call.name} elapsed=${Date.now() - startedAt}ms`);
-      return {
-        ok: true,
-        toolCall: { name: call.name, arguments: call.arguments ?? '{}' },
-      };
+      logger.log(`agent tool call: name=${call.name} elapsed=${reply.elapsedMs}ms`);
+      return { ok: true, toolCall: { name: call.name, arguments: call.arguments ?? '{}' } };
     }
     if (typeof message?.content === 'string' && message.content.trim() !== '') {
-      logger.log(`agent tool call fell back to content: elapsed=${Date.now() - startedAt}ms`);
+      logger.log(`agent tool call fell back to content: elapsed=${reply.elapsedMs}ms`);
       return { ok: true, text: message.content };
     }
-    logger.warn(`agent tool response empty: elapsed=${Date.now() - startedAt}ms`);
+    logger.warn(`agent tool response empty: elapsed=${reply.elapsedMs}ms`);
     return { ok: false, failure: 'AGENT_EMPTY_RESPONSE' };
+  });
+}
+
+type ChatReply =
+  | { readonly ok: true; readonly payload: unknown; readonly elapsedMs: number }
+  | { readonly ok: false; readonly failure: string };
+
+/**
+ * 一次 chat/completions 往返：空闲计时在拿到响应头和每收到一段响应体时重置；
+ * 调用方的 signal 中止时报 `AGENT_CANCELLED`，与空闲超时 `AGENT_TIMEOUT` 区分。
+ */
+async function postChat(
+  config: AgentLlmSettings,
+  body: Record<string, unknown>,
+  logger: Logger,
+  label: string,
+  signal: AbortSignal | undefined,
+): Promise<ChatReply> {
+  if (signal?.aborted) return { ok: false, failure: 'AGENT_CANCELLED' };
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = () => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), config.timeoutMs);
+  };
+  const cancel = () => controller.abort();
+  signal?.addEventListener('abort', cancel, { once: true });
+  const startedAt = Date.now();
+  arm();
+  try {
+    const response = await fetch(`${trimBaseUrl(config.baseUrl)}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    arm();
+    if (!response.ok) {
+      logger.warn(`${label} failed: status=${response.status} elapsed=${Date.now() - startedAt}ms`);
+      await response.body?.cancel().catch(() => undefined);
+      return { ok: false, failure: `AGENT_HTTP_${response.status}` };
+    }
+    const text = await readBody(response, arm);
+    return { ok: true, payload: JSON.parse(text) as unknown, elapsedMs: Date.now() - startedAt };
   } catch (error) {
     logger.warn(
-      `agent tool request error: ${error instanceof Error ? error.name : 'unknown'} elapsed=${Date.now() - startedAt}ms`,
+      `${label} error: ${error instanceof Error ? error.name : 'unknown'} elapsed=${Date.now() - startedAt}ms`,
     );
+    if (signal?.aborted) return { ok: false, failure: 'AGENT_CANCELLED' };
+    // 超时与网络错误分开报：前者是「再等一会儿可能就好了」，后者才是真的连不上。
     // 不用 `instanceof Error`：fetch 抛出的 AbortError 可能来自另一个 realm（如测试沙箱），
     // 那样 instanceof 为 false，超时会被误报成 AGENT_UNREACHABLE。按 name 判断与 realm 无关。
-    const timedOut = isAbortError(error);
-    return { ok: false, failure: timedOut ? 'AGENT_TIMEOUT' : 'AGENT_UNREACHABLE' };
+    if (isAbortError(error)) return { ok: false, failure: 'AGENT_TIMEOUT' };
+    return { ok: false, failure: 'AGENT_UNREACHABLE' };
   } finally {
-    clearTimeout(timer);
+    if (timer !== undefined) clearTimeout(timer);
+    signal?.removeEventListener('abort', cancel);
   }
+}
+
+/** 逐段读响应体，每段到达都重置空闲计时。 */
+async function readBody(response: Response, onChunk: () => void): Promise<string> {
+  const reader = response.body?.getReader();
+  if (reader === undefined) return response.text();
+  const decoder = new TextDecoder();
+  let text = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    onChunk();
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+/** 只对可恢复失败重试一次（ADR-0112 §2.6）：空闲超时、429、5xx。400、解析失败交给修复回环。 */
+export function isRetryableAgentFailure(failure: string | undefined): boolean {
+  if (failure === 'AGENT_TIMEOUT' || failure === 'AGENT_HTTP_429') return true;
+  return failure !== undefined && /^AGENT_HTTP_5\d\d$/.test(failure);
+}
+
+async function withRetry<T extends { readonly ok: boolean; readonly failure?: string }>(
+  options: AgentRequestOptions,
+  logger: Logger,
+  run: () => Promise<T>,
+): Promise<T> {
+  const first = await run();
+  if (first.ok || options.retry !== true || !isRetryableAgentFailure(first.failure)) return first;
+  if (!(await sleep(RETRY_BACKOFF_MS, options.signal))) {
+    return { ok: false, failure: 'AGENT_CANCELLED' } as unknown as T;
+  }
+  logger.warn(`agent request retry after ${first.failure}`);
+  return run();
+}
+
+/** 可取消的等待；被取消时返回 false。 */
+function sleep(ms: number, signal: AbortSignal | undefined): Promise<boolean> {
+  if (signal?.aborted) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve(true);
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 /** 只看 `name`：跨 realm 的错误对象 `instanceof Error` 为 false，但 `name` 仍然可靠。 */

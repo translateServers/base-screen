@@ -139,11 +139,17 @@ describe('agent candidate and persisted generation', () => {
   });
 
   it('rejects an asset ID not present in the authorized screen asset list', async () => {
-    jest.mocked(requestAgentCompletion).mockReset();
-    jest.mocked(requestAgentCompletion).mockResolvedValueOnce({
-      ok: true,
-      text: blocksJson([{ type: 'base.image', title: '现场', span: 1, assetId: 'a-forged' }]),
-    });
+    jest
+      .mocked(requestAgentCompletion)
+      .mockReset()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: blocksJson([{ type: 'base.image', title: '现场', span: 1, assetId: 'a-forged' }]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: blocksJson([{ type: 'base.image', title: '现场', span: 1, assetId: 'a-server' }]),
+      });
     const { service } = setup(
       {
         AGENT_LLM_BASE_URL: 'https://model.test',
@@ -161,11 +167,13 @@ describe('agent candidate and persisted generation', () => {
       },
     });
 
-    // 伪造素材只丢该块，不再整份拒绝；布局退回确定性块，文档里只会出现服务端授权的素材。
-    expect(candidate.failure).toBe('AGENT_BLOCKS_ALL_INVALID');
-    expect(candidate.imageCount).toBe(1);
+    // 伪造素材进修复回环：诊断指回那一块，模型改用服务端授权的素材后交出（ADR-0112 §2.1）。
+    const repair = jest.mocked(requestAgentCompletion).mock.calls[1]?.[4]?.followUp ?? [];
+    expect(repair[1]?.content).toContain('blocks[0] · AGENT_ASSET_UNKNOWN');
+    expect(candidate).toMatchObject({ mode: 'llm', repairRounds: 1, imageCount: 1 });
     expect(JSON.stringify(candidate.document)).toContain('a-server');
     expect(JSON.stringify(candidate.document)).not.toContain('a-forged');
+    jest.mocked(requestAgentCompletion).mockReset();
   });
 
   it('generates a layout without images when the screen asset catalog is unavailable', async () => {
@@ -189,85 +197,143 @@ describe('agent candidate and persisted generation', () => {
     expect(JSON.stringify(candidate.document)).not.toContain('a-forged');
   });
 
-  it.each(['llm', 'invalid', 'failure'] as const)(
-    'does not persist the %s candidate path',
-    async (path) => {
-      const valid = blocksJson([
-        { type: 'base.chart', title: '近三日趋势', span: 2, table: TREND_TABLE },
-        { type: 'base.text', title: '要点', span: 1, text: '甲\n乙\n丙' },
-      ]);
-      jest
-        .mocked(requestAgentCompletion)
-        .mockResolvedValueOnce(
-          path === 'failure'
-            ? { ok: false, failure: 'AGENT_TIMEOUT' }
-            : { ok: true, text: path === 'llm' ? valid : '{}' },
-        );
-      const { service, screens } = setup({
-        AGENT_LLM_BASE_URL: 'https://model.test',
-        AGENT_LLM_API_KEY: 'test',
-        AGENT_LLM_MODEL: 'test',
-      });
-      const candidate = await service.generateCandidate({ topic: '渠道经营' });
+  const LLM_CONFIG = {
+    AGENT_LLM_BASE_URL: 'https://model.test',
+    AGENT_LLM_API_KEY: 'test',
+    AGENT_LLM_MODEL: 'test',
+  };
 
-      expect(candidate.mode).toBe(path === 'llm' ? 'llm' : 'deterministic');
-      expect(candidate.failure).toBe(
-        path === 'llm' ? undefined : path === 'invalid' ? 'AGENT_SPEC_INVALID' : 'AGENT_TIMEOUT',
+  it.each(['llm', 'failure'] as const)('does not persist the %s candidate path', async (path) => {
+    const valid = blocksJson([
+      { type: 'base.chart', title: '近三日趋势', span: 2, table: TREND_TABLE },
+      { type: 'base.text', title: '要点', span: 1, text: '甲\n乙\n丙' },
+    ]);
+    jest
+      .mocked(requestAgentCompletion)
+      .mockReset()
+      .mockResolvedValueOnce(
+        path === 'failure' ? { ok: false, failure: 'AGENT_TIMEOUT' } : { ok: true, text: valid },
       );
-      expect(screens.create).not.toHaveBeenCalled();
-      expect(screens.update).not.toHaveBeenCalled();
-    },
-  );
+    const { service, screens } = setup(LLM_CONFIG);
+    const candidate = await service.generateCandidate({ topic: '渠道经营' });
 
-  it('falls back to the deterministic layout when the model produced no usable block', async () => {
-    jest.mocked(requestAgentCompletion).mockResolvedValueOnce({
-      ok: true,
-      text: JSON.stringify({
-        title: '渠道经营',
-        subtitle: '按周汇总的渠道口径',
-        kpis: [{ label: '总量', value: '28.6 万' }],
-        blocks: [{ type: 'base.heatmap', title: '热力', span: 1 }],
-      }),
-    });
-    const { service } = setup({
-      AGENT_LLM_BASE_URL: 'https://model.test',
-      AGENT_LLM_API_KEY: 'test',
-      AGENT_LLM_MODEL: 'test',
-    });
-
-    const candidate = await service.generateCandidate({
-      topic: '渠道经营',
-      catalog: TEST_CATALOG,
-    });
-
-    // 块全丢时不能整屏作废：标题与 KPI 保留模型的，布局退回确定性块，并如实标注原因。
-    expect(candidate.mode).toBe('deterministic');
-    expect(candidate.failure).toBe('AGENT_BLOCKS_ALL_INVALID');
-    expect(candidate.warnings?.map((item) => item.code)).toContain('AGENT_BLOCKS_ALL_INVALID');
-    expect(candidate.name).toBe('渠道经营');
-    expect(
-      Array.isArray(candidate.document.components) && candidate.document.components.length > 0,
-    ).toBe(true);
+    expect(candidate.mode).toBe(path === 'llm' ? 'llm' : 'deterministic');
+    expect(candidate.failure).toBe(path === 'llm' ? undefined : 'AGENT_TIMEOUT');
+    expect(screens.create).not.toHaveBeenCalled();
+    expect(screens.update).not.toHaveBeenCalled();
   });
 
-  it('模型只给 panels 时候选标注 AGENT_SPEC_INVALID 并退回确定性布局', async () => {
-    jest.mocked(requestAgentCompletion).mockResolvedValueOnce({
-      ok: true,
-      text: JSON.stringify({
-        title: '渠道经营',
-        subtitle: '按周汇总的渠道口径',
-        kpis: [{ label: '总量', value: '28.6 万' }],
-        panels: [{ kind: 'list', title: '要点', items: ['甲', '乙', '丙'] }],
-      }),
+  describe('generate → validate → repair loop (ADR-0112 §2.1)', () => {
+    afterEach(() => {
+      jest.mocked(requestAgentCompletion).mockReset();
     });
-    const { service } = setup({
-      AGENT_LLM_BASE_URL: 'https://model.test',
-      AGENT_LLM_API_KEY: 'test',
-      AGENT_LLM_MODEL: 'test',
+
+    const unusable = JSON.stringify({
+      title: '渠道经营',
+      subtitle: '按周汇总的渠道口径',
+      kpis: [{ label: '总量', value: '28.6 万' }],
+      blocks: [{ type: 'base.heatmap', title: '热力', span: 1 }],
     });
-    const candidate = await service.generateCandidate({ topic: '渠道经营', catalog: TEST_CATALOG });
-    expect(candidate.mode).toBe('deterministic');
-    expect(candidate.failure).toBe('AGENT_SPEC_INVALID');
+    // 惰性构造：TREND_TABLE 在文件后部声明，describe 回调执行时还未初始化。
+    const usable = () =>
+      blocksJson([{ type: 'base.chart', title: '近三日趋势', span: 2, table: TREND_TABLE }]);
+
+    it('rejects an invalid spec with diagnostics instead of a deterministic stand-in', async () => {
+      jest.mocked(requestAgentCompletion).mockReset().mockResolvedValue({ ok: true, text: '{}' });
+      const { service, screens } = setup(LLM_CONFIG);
+
+      await expect(service.generateCandidate({ topic: '渠道经营' })).rejects.toMatchObject({
+        response: {
+          error: 'AGENT_SPEC_INVALID',
+          diagnostics: [expect.objectContaining({ code: 'AGENT_SPEC_INVALID', path: '' })],
+        },
+      });
+      // 首轮 + 一次修复：诊断不变就提前停，不用满 2 轮。
+      expect(requestAgentCompletion).toHaveBeenCalledTimes(2);
+      expect(screens.create).not.toHaveBeenCalled();
+    });
+
+    it('sends the previous output and the diagnostics back, then accepts the repair', async () => {
+      jest
+        .mocked(requestAgentCompletion)
+        .mockReset()
+        .mockResolvedValueOnce({ ok: true, text: unusable })
+        .mockResolvedValueOnce({ ok: true, text: usable() });
+      const { service } = setup(LLM_CONFIG);
+      const candidate = await service.generateCandidate({
+        topic: '渠道经营',
+        catalog: TEST_CATALOG,
+      });
+
+      expect(candidate).toMatchObject({ mode: 'llm', repairRounds: 1 });
+      expect(candidate.failure).toBeUndefined();
+      const followUp = jest.mocked(requestAgentCompletion).mock.calls[1]?.[4]?.followUp ?? [];
+      expect(followUp.map((item) => item.role)).toEqual(['assistant', 'user']);
+      expect(followUp[0]?.content).toBe(unusable);
+      expect(followUp[1]?.content).toContain('blocks[0] · AGENT_BLOCK_TYPE_UNKNOWN');
+    });
+
+    it('stops after two repair rounds when the diagnostics keep changing', async () => {
+      const variants = ['{}', unusable, '这不是 JSON'];
+      jest
+        .mocked(requestAgentCompletion)
+        .mockReset()
+        .mockImplementation(async () => ({ ok: true, text: variants.shift() ?? '{}' }));
+      const { service } = setup(LLM_CONFIG);
+
+      await expect(
+        service.generateCandidate({ topic: '渠道经营', catalog: TEST_CATALOG }),
+      ).rejects.toMatchObject({ response: { repairRounds: 2 } });
+      expect(requestAgentCompletion).toHaveBeenCalledTimes(3);
+    });
+
+    it('drops blocks that stay broken and delivers the rest with a warning', async () => {
+      const partly = blocksJson([
+        { type: 'base.chart', title: '近三日趋势', span: 2, table: TREND_TABLE },
+        { type: 'base.heatmap', title: '热力', span: 1 },
+      ]);
+      jest.mocked(requestAgentCompletion).mockReset().mockResolvedValue({ ok: true, text: partly });
+      const { service } = setup(LLM_CONFIG);
+      const candidate = await service.generateCandidate({
+        topic: '渠道经营',
+        catalog: TEST_CATALOG,
+      });
+
+      expect(candidate.mode).toBe('llm');
+      expect(candidate.warnings?.map((item) => item.code)).toContain('AGENT_BLOCKS_DROPPED');
+      expect(requestAgentCompletion).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not enter the loop on transport failures', async () => {
+      jest
+        .mocked(requestAgentCompletion)
+        .mockReset()
+        .mockResolvedValue({ ok: false, failure: 'AGENT_HTTP_400' });
+      const { service } = setup(LLM_CONFIG);
+      const candidate = await service.generateCandidate({ topic: '渠道经营' });
+
+      expect(candidate.failure).toBe('AGENT_HTTP_400');
+      expect(requestAgentCompletion).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('模型只给 panels 时按非法 spec 进修复回环，修不好就 422', async () => {
+    jest
+      .mocked(requestAgentCompletion)
+      .mockReset()
+      .mockResolvedValue({
+        ok: true,
+        text: JSON.stringify({
+          title: '渠道经营',
+          subtitle: '按周汇总的渠道口径',
+          kpis: [{ label: '总量', value: '28.6 万' }],
+          panels: [{ kind: 'list', title: '要点', items: ['甲', '乙', '丙'] }],
+        }),
+      });
+    const { service } = setup(LLM_CONFIG);
+    await expect(
+      service.generateCandidate({ topic: '渠道经营', catalog: TEST_CATALOG }),
+    ).rejects.toMatchObject({ response: { error: 'AGENT_SPEC_INVALID' } });
   });
 
   it.each([undefined, '  自定义名称  ', '   '])(
