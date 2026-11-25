@@ -109,7 +109,8 @@ export type ScreenDiagnosticCode =
   | 'LAYOUT_FONT_TOO_SMALL'
   | 'LAYOUT_OUT_OF_BOUNDS'
   | 'LAYOUT_OVERLAP'
-  | 'LAYOUT_CONTRAST_LOW';
+  | 'LAYOUT_CONTRAST_LOW'
+  | 'PUBLISH_SAMPLE_DATA_PRESENT';
 
 export interface ScreenDiagnostic {
   readonly severity: ScreenDiagnosticSeverity;

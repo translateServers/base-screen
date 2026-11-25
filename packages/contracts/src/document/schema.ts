@@ -215,7 +215,7 @@ const identifierCodeSchema = z
 
 /** 取值引用的三个 kind：判别键固定为 `kind`，每个分支字段白名单独立。 */
 export const valueRefSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('inline'), value: z.any() }),
+  z.strictObject({ kind: z.literal('inline'), value: z.any(), sample: z.literal(true).optional() }),
   z.strictObject({
     kind: z.literal('variable'),
     variableId: z.string().regex(COMPONENT_ID_REGEXP),

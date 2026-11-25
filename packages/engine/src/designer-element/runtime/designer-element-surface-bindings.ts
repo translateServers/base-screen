@@ -4,6 +4,7 @@ import {
   isTextAreaDraft,
 } from '../../browser/dom/designer-surface-router.js';
 import { hasDesignerTextSelection } from '../../browser/dom/designer-text-selection.js';
+import { onSampleStatusClick } from './designer-element-sample-data.js';
 import type { DesignerElementHost, DesignerElementState } from './designer-element-state.js';
 
 export function initializeDesignerElementSurfaceBindings(
@@ -42,6 +43,7 @@ export function initializeDesignerElementSurfaceBindings(
       (target) => state.runtime.executeToolFromTarget(element, target as Element),
       (target) => state.runtime.executeOperationFromTarget(element, target as Element),
       (target) => state.runtime.onStatusZoomPreset(element, target as Element),
+      (target) => onSampleStatusClick(element, target as Element),
       (target) => state.importController.onClick(target as Element),
       (target) => state.projectFeedbackController.onClick(target as Element),
       (target) => state.projectWorkspaceController.onClick(target as Element),

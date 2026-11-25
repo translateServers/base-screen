@@ -734,7 +734,11 @@
                         "type": "string",
                         "const": "inline"
                       },
-                      "value": {}
+                      "value": {},
+                      "sample": {
+                        "type": "boolean",
+                        "const": true
+                      }
                     },
                     "required": ["kind", "value"],
                     "additionalProperties": false
@@ -1289,7 +1293,11 @@
                       "type": "string",
                       "const": "inline"
                     },
-                    "value": {}
+                    "value": {},
+                    "sample": {
+                      "type": "boolean",
+                      "const": true
+                    }
                   },
                   "required": ["kind", "value"],
                   "additionalProperties": false
@@ -1604,7 +1612,11 @@
                         "type": "string",
                         "const": "inline"
                       },
-                      "value": {}
+                      "value": {},
+                      "sample": {
+                        "type": "boolean",
+                        "const": true
+                      }
                     },
                     "required": ["kind", "value"],
                     "additionalProperties": false

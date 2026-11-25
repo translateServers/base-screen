@@ -4,6 +4,7 @@ import {
   type ScreenProjectEnvelope,
   serializeScreenDocument,
 } from '@base-screen/contracts';
+import { listSampleValueRefs } from '@base-screen/core';
 import { publishScreenProject, saveScreenProject } from './project-adapter-invocation.js';
 import {
   completeScreenProjectOperation,
@@ -73,6 +74,18 @@ export function publishScreenProjectFromState(
   }
   if (state.dirty) {
     return Promise.resolve(failScreenProject('PROJECT_DIRTY', 'Save changes before publishing.'));
+  }
+  // 示例数据不进发布物（ADR-0112 §2.3）：不调宿主发布端口，也不开「强制发布」口子。
+  // 要发布，先把这些取值绑定到数据集，或显式保留为常量。
+  const document = state.options.getDocument();
+  const samples = document === undefined ? [] : listSampleValueRefs(document);
+  if (samples.length > 0) {
+    return Promise.resolve(
+      failScreenProject(
+        'PUBLISH_SAMPLE_DATA_PRESENT',
+        `${samples.length} sample data value(s) must be bound to data or kept as constants before publishing.`,
+      ),
+    );
   }
   state.lastOperation = { type: 'publish' };
   return enqueueScreenProjectMutation(state, 'publish', async (pending) => {

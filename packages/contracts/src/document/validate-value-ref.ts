@@ -13,7 +13,7 @@ import type { DocumentDiagnosticPath } from './validate-support.js';
 const COMPONENT_ID_REGEXP = new RegExp(COMPONENT_ID_PATTERN);
 const VALUE_REF_PATH_SEGMENT_REGEXP = new RegExp(VALUE_REF_PATH_SEGMENT_PATTERN);
 
-const INLINE_FIELDS = new Set(['kind', 'value']);
+const INLINE_FIELDS = new Set(['kind', 'value', 'sample']);
 const VARIABLE_FIELDS = new Set(['kind', 'variableId']);
 const DATA_SOURCE_FIELD_FIELDS = new Set(['kind', 'dataSourceId', 'path']);
 
@@ -118,6 +118,16 @@ function validateInlineRef(
       at([...baseSegments, 'value']),
       phase,
       'Inline value reference requires a value field.',
+    );
+    return false;
+  }
+  // 示例数据标记只有一种写法：缺省是普通常量，出现就必须是 `true`（ADR-0112 §2.3）。
+  if ('sample' in ref && ref.sample !== true) {
+    collector.add(
+      FIRST_DIAGNOSTIC,
+      at([...baseSegments, 'sample']),
+      phase,
+      'Inline value reference sample marker must be true when present.',
     );
     return false;
   }

@@ -68,6 +68,36 @@
   white-space: nowrap;
 }
 
+/* 示例数据（ADR-0112 §2.3）：计数即「下一处」入口；选中示例数据时多一个「保留为常量」。 */
+.status-sample {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+}
+
+.status-sample[hidden],
+.status-sample-keep[hidden] {
+  display: none;
+}
+
+.status-sample-next,
+.status-sample-keep {
+  min-height: 24px;
+  padding: 1px var(--designer-space-2);
+  border: 0;
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-warning-surface);
+  color: var(--designer-warning);
+  font: var(--designer-font-small);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.status-sample-keep {
+  background: transparent;
+  color: var(--designer-text-primary);
+}
+
 .status-toggle {
   display: inline-flex;
   min-height: 24px;

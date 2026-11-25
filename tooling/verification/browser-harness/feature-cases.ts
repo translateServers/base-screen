@@ -158,6 +158,24 @@ async function applyAgentProposalReview(designer: BaseScreenDesignerElement): Pr
   await painted();
 }
 
+async function applyAgentSampleData(designer: BaseScreenDesignerElement): Promise<void> {
+  setHostShellVisible(false);
+  designer.setWorkbenchMode('canvas');
+  // 两处示例数据（ADR-0112 §2.3）：标题与副标题的取值换成带 `sample: true` 的常量。
+  const result = designer.executeTransaction({
+    commands: ['title', 'subtitle'].map((id) => ({
+      type: 'update-components' as const,
+      componentIds: [id],
+      patch: {
+        dataSource: null,
+        dataValue: { kind: 'inline' as const, value: `示例 · ${id}`, sample: true as const },
+      },
+    })),
+  });
+  if (!result.ok) throw new Error('Sample data fixture was rejected.');
+  await painted();
+}
+
 async function applyMaterialGroups(designer: BaseScreenDesignerElement): Promise<void> {
   await applyCanvas(designer);
 }
@@ -519,6 +537,7 @@ const CASE_APPLIERS = {
   canvas: applyCanvas,
   'agent-host-resource': applyAgentHostResource,
   'agent-proposal-review': applyAgentProposalReview,
+  'agent-sample-data': applyAgentSampleData,
   'material-groups': applyMaterialGroups,
   'plugin-command': applyPluginCommand,
   'plugin-panel': applyPluginPanel,

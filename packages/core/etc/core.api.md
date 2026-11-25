@@ -24,6 +24,7 @@ import { ScreenDatasetField } from '@base-screen/contracts';
 import { ScreenDatasetValueType } from '@base-screen/contracts';
 import type { ScreenDataSource } from '@base-screen/contracts';
 import { ScreenDiagnostic } from '@base-screen/contracts';
+import type { ScreenDiagnosticPath } from '@base-screen/contracts';
 import type { ScreenDiagnosticSeverity } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
 import { ScreenHostResourceParameter } from '@base-screen/contracts';
@@ -162,6 +163,9 @@ export function isScreenComponentEffectivelyHidden(document: ScreenDocument, com
 
 // @public (undocumented)
 export function isScreenComponentEffectivelyLocked(document: ScreenDocument, componentId: string): boolean;
+
+// @public
+export function listSampleValueRefs(document: ScreenDocument): readonly ScreenSampleValueRef[];
 
 // @public
 export function minimumContrastRatio(fontSizePx: number, fontWeight: number): number;
@@ -827,6 +831,24 @@ export interface ScreenRect {
     readonly x: number;
     // (undocumented)
     readonly y: number;
+}
+
+// @public
+export interface ScreenSampleValueRef {
+    // (undocumented)
+    readonly owner: {
+        readonly kind: 'component';
+        readonly id: string;
+    } | {
+        readonly kind: 'data-source-param';
+        readonly id: string;
+        readonly param: string;
+    } | {
+        readonly kind: 'variable';
+        readonly id: string;
+    };
+    // (undocumented)
+    readonly path: ScreenDiagnosticPath;
 }
 
 export { ScreenSize }

@@ -184,6 +184,17 @@ export const FEATURE_CASE_CATALOG = [
     stressGrouping: false,
   },
   {
+    id: 'agent-sample-data',
+    title: '智能体示例数据',
+    summary: '两处带示例标记的取值：画布徽标、状态栏计数与定位、保留为常量。',
+    lookAt: '组件左上角的「示例数据」徽标，状态栏「示例数据 2 处」，选中后的「保留为常量」。',
+    packages: ['contracts', 'core', 'engine'],
+    focused:
+      'pnpm --filter @base-screen/engine exec vitest run tests/common/project/project-controller.test.ts',
+    verify: 'pnpm verify:browser',
+    stressGrouping: false,
+  },
+  {
     id: 'composite-insertion',
     title: '组合插入',
     summary: '一次 insertComponentFragment 建出容器 + 标题 + 分隔线 + 读数四件套。',

@@ -637,6 +637,15 @@ export const DESIGNER_UI_TEXT = {
   selectedSingle: '已选中 1 个组件',
   selectedCount: (count: number) => `已选中 ${count} 个组件`,
   componentCount: (count: number) => `${count} 个组件`,
+  // 智能体生成的示例数据（ADR-0112 §2.3）：画布徽标、状态栏计数与「保留为常量」。
+  sampleData: {
+    badge: '示例数据',
+    count: (count: number) => `示例数据 ${count} 处`,
+    locateTip: '逐个定位示例数据；发布前要绑定数据集或保留为常量',
+    keep: '保留为常量',
+    keepTip: '去掉选中组件的示例数据标记，值不变',
+    keepHistory: '示例数据保留为常量',
+  },
   groupEditingPath: (path: string) => `组内：${path}`,
   notifications: '操作通知',
   errorConsole: {
@@ -1439,6 +1448,7 @@ export const DESIGNER_UI_TEXT = {
     projectAborted: '项目操作已取消。',
     projectDirty: '请先保存项目。',
     projectPublishUnavailable: '当前项目不能发布。',
+    publishSampleData: '还有智能体生成的示例数据，发布前请绑定数据集或保留为常量。',
     blueprintCapabilityUnavailable: '当前素材不支持蓝图。',
     hostResourceUnavailable: '资源数据不可用。',
     commandTargetLocked: '选中组件已锁定。',
@@ -1600,6 +1610,8 @@ export function designerDiagnosticSummary(code: ScreenDiagnostic['code']): strin
       return DESIGNER_UI_TEXT.diagnostics.projectDirty;
     case 'PROJECT_PUBLISH_UNAVAILABLE':
       return DESIGNER_UI_TEXT.diagnostics.projectPublishUnavailable;
+    case 'PUBLISH_SAMPLE_DATA_PRESENT':
+      return DESIGNER_UI_TEXT.diagnostics.publishSampleData;
     case 'BLUEPRINT_CAPABILITY_UNAVAILABLE':
       return DESIGNER_UI_TEXT.diagnostics.blueprintCapabilityUnavailable;
     case 'HOST_RESOURCE_TIMEOUT':

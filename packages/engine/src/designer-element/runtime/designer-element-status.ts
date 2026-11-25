@@ -15,6 +15,7 @@ import {
   projectPhaseLabel,
   saveStatusSpinnerGlyph,
 } from './designer-element-guards.js';
+import { renderSampleStatus } from './designer-element-sample-data.js';
 import { type DesignerElementHost, getDesignerElementState } from './designer-element-state.js';
 
 export function renderProjectStatus(element: DesignerElementHost): void {
@@ -101,6 +102,7 @@ export function renderStatusBar(element: DesignerElementHost): void {
         : document.components.length;
     components.textContent = DESIGNER_UI_TEXT.componentCount(count);
   }
+  renderSampleStatus(element);
 }
 
 export function renderTopbarSaveStatus(element: DesignerElementHost): void {

@@ -794,6 +794,24 @@
   white-space: nowrap;
 }
 
+/* 示例数据徽标：会话叠加层，跟随内容层组件左上角；不接收指针事件，不进渲染器与发布物。 */
+.canvas-sample-marks {
+  position: absolute;
+  inset: 0;
+  z-index: var(--designer-z-canvas-guide);
+  pointer-events: none;
+}
+
+.canvas-sample-badge {
+  position: absolute;
+  padding: 0 var(--designer-space-1);
+  border-radius: var(--designer-radius-1);
+  background: var(--designer-warning-surface);
+  color: var(--designer-warning);
+  font: var(--designer-font-small);
+  white-space: nowrap;
+}
+
 /* 草案条：声明「未写入」，采纳/放弃与查看旧版都从这里进出。 */
 .designer-draft-bar {
   position: absolute;

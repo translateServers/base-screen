@@ -251,6 +251,11 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         </div>
         <div class="statusbar-group statusbar-end">
           <span class="status-components" data-status-components></span>
+          <span class="status-sample" data-status-sample hidden>
+            <span class="status-divider" aria-hidden="true"></span>
+            <button type="button" class="status-sample-next" data-sample-action="next" data-tip="${DESIGNER_UI_TEXT.sampleData.locateTip}"></button>
+            <button type="button" class="status-sample-keep" data-sample-action="keep" data-tip="${DESIGNER_UI_TEXT.sampleData.keepTip}" hidden>${DESIGNER_UI_TEXT.sampleData.keep}</button>
+          </span>
           <span class="status-divider" aria-hidden="true"></span>
           <span class="status-canvas" data-status-canvas aria-label="${DESIGNER_UI_TEXT.canvasSize}"></span>
           <span class="status-divider" aria-hidden="true"></span>

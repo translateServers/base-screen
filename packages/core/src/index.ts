@@ -64,6 +64,7 @@ export {
   validateScreenDataBinding,
   validateScreenHostResourceBinding,
 } from './data/host-dataset.js';
+export { listSampleValueRefs, type ScreenSampleValueRef } from './data/sample-values.js';
 export type {
   ScreenValueRefDependencies,
   ScreenValueRefEnvironment,

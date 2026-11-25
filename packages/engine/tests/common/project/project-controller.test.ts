@@ -334,6 +334,45 @@ describe('ScreenProjectController', () => {
     expect(session.instance.project?.revision).toBe('rev-3');
   });
 
+  it('blocks publishing while agent sample data remains (ADR-0112 §2.3)', async () => {
+    const published = vi.fn(async () => success(envelope('rev-3')));
+    const withSample: ScreenDocument = {
+      ...document(),
+      components: [
+        {
+          id: 'agent-kpi',
+          type: 'base.text',
+          name: '指标值',
+          parentId: null,
+          position: { x: 0, y: 0 },
+          size: { width: 100, height: 40 },
+          rotation: 0,
+          zIndex: 0,
+          status: { locked: false, hidden: false },
+          props: {},
+          style: {},
+          dataSource: null,
+          dataValue: { kind: 'inline', value: '28.6 万', sample: true },
+        },
+      ],
+    };
+    const session = controller(
+      adapter({
+        capabilities: { publish: true },
+        publish: published,
+        load: vi.fn(async () => success(envelope('rev-1', withSample))),
+      }),
+    );
+    await session.instance.load('project-1');
+    expect(session.instance.dirty).toBe(false);
+
+    await expect(session.instance.publish()).resolves.toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'PUBLISH_SAMPLE_DATA_PRESENT', path: [] }],
+    });
+    expect(published).not.toHaveBeenCalled();
+  });
+
   it('does not run a queued mutation after its submitted revision is superseded', async () => {
     let resolvePublish: ((result: ScreenParseResult<ScreenProjectEnvelope>) => void) | undefined;
     const projectAdapter = adapter({

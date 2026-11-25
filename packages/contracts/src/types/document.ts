@@ -112,12 +112,13 @@ export type ScreenComponentDataSource =
 /**
  * 取值引用：全文档唯一的「接值」表述，JSON-safe。
  *
- * - `inline`：常量值，已由解析器校验为 canonical JSON。
+ * - `inline`：常量值，已由解析器校验为 canonical JSON。`sample: true` 标记它是智能体编出来的
+ *   示例数据（ADR-0112 §2.3）：设计器显示徽标、发布前拦截；手工输入的常量永远不带这个标记。
  * - `variable`：读一个变量的当前值；变量自身的 `value` 不得为 `variable`（禁止别名链）。
  * - `data-source-field`：读一个数据源实例结果的字段投影；`path` 为空表示取整个结果。
  */
 export type ScreenValueRef =
-  | { readonly kind: 'inline'; readonly value: ScreenJsonValue }
+  | { readonly kind: 'inline'; readonly value: ScreenJsonValue; readonly sample?: true }
   | { readonly kind: 'variable'; readonly variableId: string }
   | {
       readonly kind: 'data-source-field';

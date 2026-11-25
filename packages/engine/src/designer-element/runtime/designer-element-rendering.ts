@@ -24,6 +24,7 @@ import {
 } from '../../common/operations/material-library/material-library-state.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { getDesignerGeometryDocument } from './designer-element-geometry.js';
+import { renderSampleMarks } from './designer-element-sample-data.js';
 import { cancelDesignerSkeletonTimeout } from './designer-element-skeleton.js';
 import {
   type DesignerElementHost,
@@ -323,6 +324,7 @@ export function renderDocument(
     elementState.runtime.syncCanvasFrameSize(element, document);
     elementState.previewController.sync(document);
     elementState.targetDisplayController.setDocument(document);
+    renderSampleMarks(element, document);
     // 首个文档首次落定：画布尺寸此时才是准的，按它决定要不要退到「适应窗口」。
     // 只做一次——之后的文档变更（改属性、加组件、切场景）都不许动用户当前的缩放。
     // 首次渲染发生在 shadow DOM 刚 replaceChildren 之后，此时视窗还没布局
