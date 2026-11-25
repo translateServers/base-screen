@@ -602,8 +602,6 @@ export const DESIGNER_UI_TEXT = {
   nativeEvent: '事件',
   zoomRatio: '缩放比例',
   canvasSize: '画布尺寸',
-  canvasHint: '点击选中；Ctrl 连选；空白拖拽框选，Alt 完整包含',
-  canvasHintDismiss: '隐藏操作提示',
   nothingSelected: '未选中组件',
   selectedComponent: (name: string, type: string) => `选中：${name} · ${type}`,
   selectionTag: (name: string, type: string) => `${name} · ${type}`,

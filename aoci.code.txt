@@ -968,7 +968,6 @@ designer-value-ref-summary-dom.ts[FG4T]: F:取值引用的徽标加名称摘要�
 designer-value-ref-types.ts[FG5M]: F:取值选择器的文案类型与候选构造 | R:- | A:- | S:文案包必须整包传入防止加键后静默失效；删除目标的引用用稳定兜底标签不暴露内部 id
 
 ===/<repository>/packages/engine/src/browser/dom/workspace/===
-designer-canvas-hint-dom.ts[FG4T]: F:画布操作提示的关闭与本地持久化 | R:- | A:- | S:关闭是单向作者偏好存 localStorage；存储不可用时读按未关闭写失败只丢持久化
 designer-workspace-markup.ts[FG7L]: F:设计器工作区完整 HTML 标记模板 | R:code:packages/engine/src/browser/dom/workspace/designer-workspace-template.ts | A:- | S:物料骨架占位上限六张；含蓝图画布 slot 与命令面板帮助对话框错误控制台等 ARIA 结构；面板把手是 role=separator
 designer-workspace-skeleton.ts[FG4T]: F:设计器首帧加载骨架标记与构造 | R:code:packages/engine/src/browser/dom/workspace/designer-workspace-markup.ts | A:- | S:复用栅格与面板宽度使替换不产生尺寸位移；占位块 aria-hidden
 designer-workspace-template.ts[FG6M]: F:工作区按钮坐标缩放与菜单行模板集 | R:code:packages/engine/src/browser/dom/menu/designer-menu-icons.ts | A:- | S:顶栏下拉与右键共用菜单行模板；带文案按钮用独立布局避免图标文字堆叠

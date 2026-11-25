@@ -216,11 +216,6 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             <div class="canvas-guides" data-canvas-guides></div>
             <div class="canvas-popup-preview" data-popup-preview-layer hidden><div class="canvas-popup-preview-root" data-popup-preview-root></div></div>
           </div>
-          <div class="canvas-hint" data-canvas-hint>
-            <span class="canvas-hint-glyph" aria-hidden="true">${designerIcon('pointer')}</span>
-            <span class="canvas-hint-text">${DESIGNER_UI_TEXT.canvasHint}</span>
-            <button type="button" class="designer-control designer-button designer-icon-button canvas-hint-dismiss" data-variant="ghost" data-canvas-hint-dismiss data-tip="${DESIGNER_UI_TEXT.canvasHintDismiss}" aria-label="${DESIGNER_UI_TEXT.canvasHintDismiss}">${designerIcon('close')}</button>
-          </div>
           <form class="designer-coordinate-entry" data-coordinate-entry role="dialog" aria-modal="false" aria-label="${DESIGNER_UI_TEXT.coordinateEntry.title}" autocomplete="off" novalidate hidden>
             ${coordinateEntryField('x')}
             ${coordinateEntryField('y')}

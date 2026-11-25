@@ -733,7 +733,6 @@
 .designer[data-presentation-locked="true"] .workspace-local-toolbar,
 .designer[data-presentation-locked="true"] .ruler-corner,
 .designer[data-presentation-locked="true"] .ruler,
-.designer[data-presentation-locked="true"] .canvas-hint,
 .designer[data-presentation-locked="true"] [data-selection],
 .designer[data-presentation-locked="true"] [data-marquee],
 .designer[data-presentation-locked="true"] [data-canvas-guides],
@@ -1424,7 +1423,6 @@
 .designer[data-review-mode="true"] .designer-intent,
 .designer[data-review-mode="true"] .workspace-local-toolbar,
 .designer[data-review-mode="true"] .draft-actions,
-.designer[data-review-mode="true"] .canvas-hint,
 .designer[data-review-mode="true"] [data-selection],
 .designer[data-review-mode="true"] [data-marquee] {
   display: none;

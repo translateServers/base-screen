@@ -186,61 +186,6 @@
   white-space: nowrap;
 }
 
-/* 画布操作提示：视口下沿居中，挂在 .canvas 之外因此不随缩放；
-   本体 pointer-events 关闭以免挡住画布命中，只放开关闭按钮。 */
-.canvas-hint {
-  position: absolute;
-  bottom: var(--designer-space-5);
-  left: 50%;
-  z-index: var(--designer-z-workspace-overlay);
-  display: inline-flex;
-  max-width: min(84%, 480px);
-  align-items: center;
-  gap: var(--designer-space-2);
-  padding: calc(var(--designer-space-2) + 1px) var(--designer-space-4);
-  border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-pill);
-  background: color-mix(in srgb, var(--designer-surface-overlay) 92%, transparent);
-  box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
-  /* 提示条是新用户看到的第一句话，不该用最低一档的 muted：
-     原先它与悬浮面合成后只有 4.44（深）/ 4.31（浅），12px 正文差一口气。
-     升到 secondary 后两种主题都 ≥6.5，且仍明显弱于面板标题。 */
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  pointer-events: none;
-  translate: -50% 0;
-}
-
-.canvas-hint[hidden] {
-  display: none;
-}
-
-.canvas-hint-glyph {
-  display: inline-flex;
-  flex: 0 0 auto;
-}
-
-.canvas-hint-glyph svg {
-  width: 12px;
-  height: 12px;
-  fill: none;
-  stroke: currentColor;
-}
-
-.canvas-hint-text {
-  min-width: 0;
-}
-
-.canvas-hint-dismiss {
-  flex: 0 0 auto;
-  pointer-events: auto;
-}
-
-.canvas-hint-dismiss svg {
-  width: 12px;
-  height: 12px;
-}
-
 .canvas-guides {
   position: absolute;
   inset: 0;
@@ -1066,12 +1011,6 @@
 
 .designer-canvas-tabs:empty {
   display: none;
-}
-
-/* 有标签条时，画布底部的首次提示上移到标签条之上，二者不叠在一起。
-   36px = 26px 标签 + 2×4px 内距 + 2×1px 描边，改内距或标签高度时同步这里。 */
-.canvas-stage:has(> .designer-canvas-tabs:not(:empty)) .canvas-hint {
-  bottom: calc(var(--designer-space-3) + 36px + var(--designer-space-3));
 }
 
 .designer-canvas-tabs-list {
