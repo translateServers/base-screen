@@ -254,8 +254,11 @@ export async function assertDatasetAuthoring(designer, page) {
   // ---- 参数位的取值选择器：形态切换 → 草稿 → 应用后文档 params ----
   // 形态由行内「固定值 / 变量」两段开关表达；picker 只列变量。每一跳都断到可核对的值：
   // 变量芯片形态、内联编辑器在否、应用后文档里 params.region 的 kind/variableId/值。
-  const regionTrigger = dataPanel.locator('[data-value-ref-trigger="parameter:region"]');
-  await regionTrigger.click();
+  // 上一条断言把 region 切成了「固定值」；点「变量」段位会直接打开只列变量的浮层
+  // （形态在选中变量之后才落定，触发器此时仍是隐藏的）。
+  await dataPanel
+    .locator('[data-dataset-parameter-row="region"] [data-dataset-parameter-mode="variable"]')
+    .click();
   const pickerOpen = await designer.evaluate((element) => {
     const root = element.shadowRoot;
     const host = root.querySelector('[data-designer-overlay-host]');
@@ -1066,7 +1069,9 @@ export async function assertDatasetSurface(designer, page) {
     };
   });
   if (
-    descriptorSurface.parameterPickerCount !== 3 ||
+    // 参数位的形态由行内两段开关表达（3 行 × 2 段），picker 只出现在「变量」形态上：
+    // 夹具里只有 region 是变量，另外两个是字面量，因此 picker 恰好 1 个。
+    descriptorSurface.parameterPickerCount !== 1 ||
     descriptorSurface.parameterRowCount !== 3 ||
     descriptorSurface.parameterCount < 2 ||
     descriptorSurface.parameterModeOptionCount !== descriptorSurface.parameterRowCount * 2 ||
@@ -1165,14 +1170,16 @@ export async function assertDatasetSurface(designer, page) {
     const trigger = panel.querySelector('[data-value-ref-trigger="parameter:region"]');
     const inline = panel.querySelector('[data-value-ref-inline="parameter:region"]');
     return {
-      badge: trigger?.querySelector('[data-value-ref-badge]')?.dataset.valueRefBadge,
+      // 形态由行内两段开关表达：切到「固定值」后变量触发器不再渲染，
+      // 内联编辑器接管同一个 `data-dataset-parameter` 锚点。
+      triggerGone: trigger === null,
       inlineEditable: inline instanceof HTMLInputElement,
       legacyAliasOnSameControl: panel.querySelector('[data-dataset-parameter="region"]') === inline,
       popoverGone: panel.closest('.designer')?.querySelector('[data-value-ref-popover]') === null,
     };
   });
   if (
-    switchedToInline.badge !== 'inline' ||
+    !switchedToInline.triggerGone ||
     !switchedToInline.inlineEditable ||
     !switchedToInline.legacyAliasOnSameControl ||
     !switchedToInline.popoverGone

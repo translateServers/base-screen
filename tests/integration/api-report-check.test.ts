@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { apiReportBaseName, collectApiEntrypoints } from '../../tooling/build/api-reports.mjs';
 import {
+  consumedChangesetPackages,
   missingChangesetPackages,
   parseChangesetPackages,
   requiredChangesetPackages,
@@ -60,5 +61,20 @@ describe('API report checks', () => {
     expect([
       ...requiredChangesetPackages(['packages/retired-package/etc/retired-package.api.md']),
     ]).toEqual([]);
+  });
+
+  it('counts a consumed changeset only when the package version actually moved', () => {
+    const source = "---\n'@base-screen/engine': minor\nbase-screen: minor\n---\n\n说明\n";
+
+    // 发布提交：`changeset version` 删掉 changeset 的同时抬高版本 —— 声明已折进版本号。
+    expect([...consumedChangesetPackages(source, () => true)]).toEqual([
+      '@base-screen/engine',
+      'base-screen',
+    ]);
+    // 普通 PR 删掉 changeset 但没有版本变化 —— 不能靠删文件绕过门禁。
+    expect([...consumedChangesetPackages(source, () => false)]).toEqual([]);
+    expect([...consumedChangesetPackages(source, (name) => name === 'base-screen')]).toEqual([
+      'base-screen',
+    ]);
   });
 });

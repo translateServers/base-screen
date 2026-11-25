@@ -193,6 +193,19 @@ async function assertNestedMenuFlyout(designer, page) {
 }
 
 // ---- 源模块：assert-authoring-project.mjs ----
+/**
+ * 点击顶栏保存。
+ *
+ * 降级兜底（`.small-screen-warning`）里也有一枚 `data-action="project-save"`；它始终在
+ * shadow DOM 里（只是随兜底一起隐藏），只按 data-tip / data-action 匹配会命中两枚，
+ * Playwright strict mode 直接报歧义。限定在 `.designer-topbar` 内才是唯一的顶栏保存。
+ */
+async function clickTopbarSave(designer) {
+  await designer
+    .locator('.designer-topbar .topbar-text-button[data-action="project-save"]')
+    .click();
+}
+
 export async function assertAuthoringProject(authoringDesigner, page) {
   // ?designer 页面的 designer 初始化是异步的（custom element upgrade + load）：
   // 等待 publish 按钮的操作渲染完成（hidden 由 renderOperationControls 设置），
@@ -205,7 +218,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
   if (!(await authoringDesigner.locator('[data-action="project-publish"]').isHidden())) {
     throw new Error('BROWSER_HARNESS_PUBLISH_CAPABILITY_FAILED');
   }
-  await authoringDesigner.locator('[data-tip^="\u4fdd\u5b58\u9879\u76ee"]').click();
+  await clickTopbarSave(authoringDesigner);
   await page.waitForFunction(() => window.baseScreenHarness.getEnvelope().revision === '2');
   const saved = await page.evaluate(() => ({
     revision: window.baseScreenHarness.getEnvelope().revision,
@@ -233,7 +246,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
     if (!result.ok) throw new Error('BROWSER_HARNESS_LOCAL_EDIT_FAILED');
     failNextSave('PROJECT_CONFLICT');
   });
-  await authoringDesigner.locator('[data-tip^="\u4fdd\u5b58\u9879\u76ee"]').click();
+  await clickTopbarSave(authoringDesigner);
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
@@ -264,7 +277,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
     throw new Error('BROWSER_HARNESS_CONFLICT_CONTINUE_FAILED');
   }
   await page.evaluate(() => window.baseScreenHarness.failNextSave('PROJECT_CONFLICT'));
-  await authoringDesigner.locator('[data-tip^="\u4fdd\u5b58\u9879\u76ee"]').click();
+  await clickTopbarSave(authoringDesigner);
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
@@ -300,7 +313,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
     if (!result.ok) throw new Error('BROWSER_HARNESS_RETRY_EDIT_FAILED');
     failNextSave('PROJECT_UNAVAILABLE');
   });
-  await authoringDesigner.locator('[data-tip^="\u4fdd\u5b58\u9879\u76ee"]').click();
+  await clickTopbarSave(authoringDesigner);
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
@@ -323,13 +336,18 @@ export async function assertAuthoringProject(authoringDesigner, page) {
 
 // ---- 源模块：assert-authoring-materials.mjs ----
 export async function assertAuthoringMaterials(authoringDesigner, page) {
+  // 期望数量跟着夹具走：harness 文档增删组件时，这里只回答「插入后多了几个」。
+  const componentsBefore = await page.evaluate(
+    () => window.baseScreenHarness.designer.document.components.length,
+  );
   await authoringDesigner.locator('[data-tip^="\u6587\u672c"]').click();
   const canvas = authoringDesigner.locator('[data-canvas]');
   const canvasBox = await canvas.boundingBox();
   if (canvasBox === null) throw new Error('BROWSER_HARNESS_CANVAS_MISSING');
   await authoringDesigner.locator('[data-material-type="base.text"] .material-name').click();
   await page.waitForFunction(
-    () => window.baseScreenHarness.designer.document.components.length === 10,
+    (expected) => window.baseScreenHarness.designer.document.components.length === expected,
+    componentsBefore + 1,
   );
   await authoringDesigner.locator('[data-tip^="\u77e9\u5f62"]').click();
   const activeTool = await authoringDesigner.locator('[data-status-tool]').textContent();
@@ -341,7 +359,8 @@ export async function assertAuthoringMaterials(authoringDesigner, page) {
   }
   await authoringDesigner.locator('[data-material-type="base.rectangle"] .material-name').click();
   await page.waitForFunction(
-    () => window.baseScreenHarness.designer.document.components.length === 11,
+    (expected) => window.baseScreenHarness.designer.document.components.length === expected,
+    componentsBefore + 2,
   );
   const rectangle = authoringDesigner.locator('[data-base-screen-component-id^="base-rectangle-"]');
   if (
@@ -456,11 +475,14 @@ export async function assertAuthoringMaterials(authoringDesigner, page) {
     throw new Error('BROWSER_HARNESS_CONTAINER_MATERIAL_FAILED');
   }
   await authoringDesigner.locator('[data-panel-tab="materials"]').click();
+  const componentsBeforePalette = await page.evaluate(
+    () => window.baseScreenHarness.designer.document.components.length,
+  );
   await authoringDesigner.locator('[data-material-type="base.text"] .material-name').click();
   const materialPaletteCount = await page.evaluate(
     () => window.baseScreenHarness.designer.document.components.length,
   );
-  if (materialPaletteCount !== 15) {
+  if (materialPaletteCount !== componentsBeforePalette + 1) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_PALETTE_DELEGATION_FAILED: ${materialPaletteCount}`);
   }
   if ((await authoringDesigner.locator('[data-create-preview]').count()) !== 0) {
