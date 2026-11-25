@@ -250,7 +250,7 @@ function canvasGroup(model: DesignerBlueprintLibraryModel, query: string): strin
     readonly id: string;
     readonly name: string;
     readonly detail: string;
-    readonly icon: 'grid' | 'rect' | 'copy';
+    readonly icon: 'grid' | 'doc' | 'copy';
     readonly kind: 'main-canvas' | 'sub-canvas';
   }[] = [
     ...(hasPages
@@ -271,7 +271,7 @@ function canvasGroup(model: DesignerBlueprintLibraryModel, query: string): strin
         canvas.display === 'page'
           ? TEXT.pageSize
           : `${TEXT.graph.subCanvasKinds.popup} · ${TEXT.popupSize(canvas.width, canvas.height)}`,
-      icon: canvas.display === 'page' ? ('rect' as const) : ('copy' as const),
+      icon: canvas.display === 'page' ? ('doc' as const) : ('copy' as const),
       kind: 'sub-canvas' as const,
     })),
   ].filter(

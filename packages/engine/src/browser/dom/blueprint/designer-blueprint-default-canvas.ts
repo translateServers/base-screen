@@ -411,7 +411,7 @@ class DefaultBlueprintCanvas {
             : TEXT.nodeKinds[node.kind];
         const kindIcon: DesignerIconName =
           node.kind === 'sub-canvas' && node.canvasDisplay === 'page'
-            ? 'rect'
+            ? 'doc'
             : KIND_ICONS[node.kind];
         const title =
           this.#renaming === node.id

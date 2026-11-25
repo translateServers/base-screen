@@ -1043,8 +1043,11 @@
 }
 
 /* ── 画布标签条（ADR-0109 §2.5）───────────────────────────────────────────
-   画布底部浮起一条「主画布 | 页面… | 弹框…」：选中标签用控件按下态 + 底部强调色条，起始页带星标；
-   「+」新建页面 / 弹框（菜单挂在工作区上，贴按钮向上展开），末尾是参照底图开关。 */
+   画布底部浮起一条「主画布 | 页面… | 弹框…」：选中只用一个信号——控件按下底 + 内发丝描边，
+   强调色只留在图标上；起始页带星标；「+」新建页面 / 弹框（菜单挂在工作区上，贴按钮向上展开），
+   末尾是参照底图开关。
+   选择器统一带 .designer-canvas-tabs 前缀：控件层的 `[data-variant="ghost"]` 特异性是 (0,2,0)，
+   直接写 .designer-canvas-tab 会被它压掉字色（未选中曾被渲染成与选中态同亮度的白字）。 */
 .designer-canvas-tabs {
   position: absolute;
   bottom: var(--designer-space-3);
@@ -1053,8 +1056,8 @@
   display: flex;
   max-width: calc(100% - var(--designer-ruler-size) - var(--designer-space-6));
   align-items: center;
-  gap: var(--designer-space-1);
-  padding: var(--designer-space-1);
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-2);
   border: 1px solid var(--designer-border-default);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-overlay);
@@ -1065,7 +1068,8 @@
   display: none;
 }
 
-/* 有标签条时，画布底部的首次提示上移到标签条之上，二者不叠在一起。 */
+/* 有标签条时，画布底部的首次提示上移到标签条之上，二者不叠在一起。
+   36px = 26px 标签 + 2×4px 内距 + 2×1px 描边，改内距或标签高度时同步这里。 */
 .canvas-stage:has(> .designer-canvas-tabs:not(:empty)) .canvas-hint {
   bottom: calc(var(--designer-space-3) + 36px + var(--designer-space-3));
 }
@@ -1076,6 +1080,7 @@
   align-items: center;
   gap: var(--designer-space-1);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
 
@@ -1083,24 +1088,70 @@
   display: none;
 }
 
-.designer-canvas-tab {
+/* 溢出提示：滚动条已隐藏，用一端 / 两端的渐隐说明「还有标签在可视区外」。
+   纯 CSS 判不出溢出方向，取值由控制器按 scrollLeft 写进 data-overflow（'' / start / end / both）。
+   遮罩按 alpha 通道生效，`black` 只是不透明占位，与主题色无关。 */
+.designer-canvas-tabs-list[data-overflow="end"] {
+  mask-image: linear-gradient(to right, black calc(100% - 16px), transparent);
+}
+
+.designer-canvas-tabs-list[data-overflow="start"] {
+  mask-image: linear-gradient(to left, black calc(100% - 16px), transparent);
+}
+
+.designer-canvas-tabs-list[data-overflow="both"] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--designer-space-6),
+    black calc(100% - var(--designer-space-6)),
+    transparent
+  );
+}
+
+.designer-canvas-tabs .designer-canvas-tab {
   position: relative;
   display: inline-flex;
   max-width: 180px;
-  height: 28px;
+  height: 26px;
   min-height: 0;
   flex: 0 0 auto;
   align-items: center;
-  gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-3);
+  gap: var(--designer-space-3);
+  padding: 0 var(--designer-space-4);
+  border-radius: var(--designer-radius-2);
   color: var(--designer-text-secondary);
+  /* 字重全态统一：切换标签不能改字宽，否则整条标签会跟着重排（不得抖动的硬约束）。 */
   font: var(--designer-font-small);
+  font-weight: 500;
+}
+
+/* 画布条内的按钮都在横向滚动容器里，外扩的焦点环会被裁掉，改为内嵌。 */
+.designer-canvas-tabs .designer-canvas-tab:focus-visible,
+.designer-canvas-tabs .designer-canvas-tabs-add:focus-visible,
+.designer-canvas-tabs .designer-canvas-tabs-reference:focus-visible {
+  outline-offset: -2px;
+}
+
+/* 标签条内的按钮都不吃「悬停加 1px 外环」的输入控件反应（.designer-control:hover）：
+   外环比选中态的底色更亮，悬停会看起来像被选中。这里悬停只给软底，选中态才带内环。
+   特异性锚点是根上的 [data-canvas-tabs]：工作台层不允许沿用控件类名做外观覆盖
+   （designer-styles 门禁的 CONTROL_APPEARANCE 指标），只能靠根属性把权重抬过 (0,4,0)。 */
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tab:hover:not([aria-selected="true"]) {
+  background: var(--designer-surface-control-hover);
+  box-shadow: none;
+  color: var(--designer-text-primary);
 }
 
 .designer-canvas-tab-icon {
   display: inline-flex;
   flex: 0 0 auto;
   color: var(--designer-text-muted);
+}
+
+.designer-canvas-tab-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
 .designer-canvas-tab-name {
@@ -1121,66 +1172,89 @@
   height: 12px;
 }
 
-.designer-canvas-tab[aria-selected="true"] {
+/* 选中：底色 + 内发丝描边。悬停不再改变选中态底色，避免「悬停后分不清选的是哪个」。 */
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tab[aria-selected="true"],
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tab[aria-selected="true"]:hover {
   background: var(--designer-surface-control-active);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
   color: var(--designer-text-primary);
-  font-weight: 600;
 }
 
-.designer-canvas-tab[aria-selected="true"] .designer-canvas-tab-icon {
+.designer-canvas-tabs .designer-canvas-tab[aria-selected="true"] .designer-canvas-tab-icon {
   color: var(--designer-accent);
 }
 
-.designer-canvas-tab[aria-selected="true"]::after {
-  position: absolute;
-  right: var(--designer-space-3);
-  bottom: 0;
-  left: var(--designer-space-3);
-  height: 2px;
-  border-radius: var(--designer-radius-pill);
-  background: var(--designer-accent);
-  content: "";
+.designer-canvas-tabs .designer-canvas-tabs-add {
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  flex: 0 0 auto;
+  border-radius: var(--designer-radius-2);
+  color: var(--designer-text-muted);
 }
 
-.designer-canvas-tabs-add {
-  flex: 0 0 auto;
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tabs-add:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  box-shadow: none;
+  color: var(--designer-text-primary);
 }
+
 /* 原地改名：标签换成同高的输入框，宽度随标签上限。 */
 .designer-canvas-tab-renaming {
   padding-right: var(--designer-space-1);
 }
 .designer-canvas-tab-rename {
   width: 120px;
-  height: 22px;
+  height: 20px;
   min-height: 0;
   padding: 0 var(--designer-space-2);
+  border-radius: var(--designer-radius-2);
   font: var(--designer-font-small);
 }
 
 .designer-canvas-tabs-divider {
   width: 1px;
-  height: 16px;
+  height: 14px;
   flex: 0 0 auto;
   background: var(--designer-border-default);
 }
 
-.designer-canvas-tabs-reference {
+.designer-canvas-tabs .designer-canvas-tabs-reference {
   display: inline-flex;
-  height: 28px;
+  height: 26px;
   min-height: 0;
   flex: 0 0 auto;
   align-items: center;
-  gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-3);
+  gap: var(--designer-space-3);
+  padding: 0 var(--designer-space-4);
+  border-radius: var(--designer-radius-2);
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
+  font-weight: 500;
 }
 
-.designer-canvas-tabs-reference[aria-pressed="true"] {
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tabs-reference:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  box-shadow: none;
   color: var(--designer-text-primary);
 }
 
-.designer-canvas-tabs-reference[aria-pressed="true"] svg {
+/* 参照底图是辅助视图开关，不是主操作：开启时只把图标和文字转成强调色，不铺整块强调底，
+   否则右端的色块会比「当前编辑哪个画布」更抢眼。 */
+.designer-canvas-tabs[data-canvas-tabs] .designer-canvas-tabs-reference[aria-pressed="true"] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-accent-text);
+}
+
+.designer-canvas-tabs[data-canvas-tabs]
+  .designer-canvas-tabs-reference[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-accent-text);
+}
+
+.designer-canvas-tabs .designer-canvas-tabs-reference[aria-pressed="true"] svg {
   color: var(--designer-accent);
 }
 

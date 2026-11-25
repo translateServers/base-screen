@@ -56,9 +56,24 @@ const DEFAULT_POPUP = {
 
 const ICON: Record<'main' | 'page' | 'popup', DesignerIconName> = {
   main: 'grid',
-  page: 'rect',
+  page: 'doc',
   popup: 'copy',
 };
+
+/**
+ * 标签条的可滚动方向：两端各留 1px 余量，小数像素下「刚好放下」不会被误判成溢出。
+ * 值同时是 CSS 里 `[data-overflow]` 的取值，控制器据此决定哪一侧做渐隐。
+ */
+export function canvasTabsOverflow(
+  scrollLeft: number,
+  clientWidth: number,
+  scrollWidth: number,
+): '' | 'start' | 'end' | 'both' {
+  const start = scrollLeft > 1;
+  const end = scrollLeft + clientWidth < scrollWidth - 1;
+  if (start && end) return 'both';
+  return start ? 'start' : end ? 'end' : '';
+}
 
 /**
  * 画布标签条（ADR-0109 §2.5）：画布底部「主画布 | 页面… | 弹框…」，点击切换编辑画板，
@@ -78,15 +93,29 @@ export class DesignerArtboardController {
   #reference = true;
   /** 最近编辑的页面：编辑主画布时作参照底图。 */
   #lastPage: string | null = null;
+  /** 标签条尺寸观测：溢出方向要在尺寸变化后重算。 */
+  #stripObserver: ResizeObserver | undefined;
 
   connect(strip: HTMLElement, menu: HTMLElement, host: HTMLElement): void {
     this.#strip = strip;
     this.#menu = menu;
     this.#host = host;
+    strip.addEventListener('wheel', this.#onStripWheel, { passive: false });
+    // scroll 不冒泡：用捕获阶段监听列表自身的横向滚动，列表节点被重建也仍然有效。
+    strip.addEventListener('scroll', this.#onStripScroll, true);
+    this.#stripObserver?.disconnect();
+    if (typeof ResizeObserver === 'function') {
+      this.#stripObserver = new ResizeObserver(() => this.#syncTabOverflow());
+      this.#stripObserver.observe(strip);
+    }
     this.render();
   }
 
   release(): void {
+    this.#strip?.removeEventListener('wheel', this.#onStripWheel);
+    this.#strip?.removeEventListener('scroll', this.#onStripScroll, true);
+    this.#stripObserver?.disconnect();
+    this.#stripObserver = undefined;
     this.#strip = undefined;
     this.#menu = undefined;
     this.#host = undefined;
@@ -608,10 +637,17 @@ export class DesignerArtboardController {
         : ''
     }`;
     if (strip.dataset.markup !== markup) {
+      // innerHTML 会重建列表节点，滚动位置随之归零：切换画布时要先把位置接回来，
+      // 否则选中的标签一变，整条就被弹回最左。
+      const scrollLeft = strip.querySelector<HTMLElement>('.designer-canvas-tabs-list')?.scrollLeft;
       strip.dataset.markup = markup;
       strip.innerHTML = markup;
       adoptDesignerFormControls(strip);
+      const list = this.#tabList();
+      if (list !== null && scrollLeft !== undefined) list.scrollLeft = scrollLeft;
+      this.#revealTab(artboard);
     }
+    this.#syncTabOverflow();
   }
 
   #popupChange(
@@ -776,6 +812,61 @@ export class DesignerArtboardController {
 
   #tabButton(id: string): HTMLElement | null | undefined {
     return this.#strip?.querySelector<HTMLElement>(`[data-artboard-select="${CSS.escape(id)}"]`);
+  }
+
+  #tabList(): HTMLElement | null {
+    return this.#strip?.querySelector<HTMLElement>('.designer-canvas-tabs-list') ?? null;
+  }
+
+  /**
+   * 滚轮横滚标签条：竖滚轮（含触控板双指）直接当横向滚动用，撞到两端就不再吞事件，
+   * 让画布缩放 / 页面滚动照常接手。
+   */
+  #onStripWheel = (event: WheelEvent): void => {
+    if (event.defaultPrevented) return;
+    const list = this.#tabList();
+    if (list === null) return;
+    const max = list.scrollWidth - list.clientWidth;
+    if (max <= 0) return;
+    const raw = event.deltaX === 0 ? event.deltaY : event.deltaX;
+    if (raw === 0) return;
+    // deltaMode：0 像素、1 行、2 页。行按 16px 估算，页按可视宽度。
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? list.clientWidth : 1;
+    const next = Math.min(Math.max(list.scrollLeft + raw * unit, 0), max);
+    if (next === list.scrollLeft) return;
+    list.scrollLeft = next;
+    event.preventDefault();
+    this.#syncTabOverflow();
+  };
+
+  #onStripScroll = (): void => {
+    this.#syncTabOverflow();
+  };
+
+  /** 只在溢出方向真正变化时才写 DOM 属性，滚动过程中不产生无意义的样式失效。 */
+  #syncTabOverflow(): void {
+    const list = this.#tabList();
+    if (list === null) return;
+    const state = canvasTabsOverflow(list.scrollLeft, list.clientWidth, list.scrollWidth);
+    if (state === '') {
+      if (list.dataset.overflow !== undefined) delete list.dataset.overflow;
+      return;
+    }
+    if (list.dataset.overflow !== state) list.dataset.overflow = state;
+  }
+
+  /**
+   * 把当前画布的标签滚进可视区。已可见时不调整，避免每次重渲染都把用户的横向滚动位置拽回去。
+   */
+  #revealTab(artboard: DesignerArtboardId): void {
+    const list = this.#tabList();
+    const tab = this.#tabButton(artboard ?? '');
+    if (list === null || tab === null || tab === undefined) return;
+    const listRect = list.getBoundingClientRect();
+    const tabRect = tab.getBoundingClientRect();
+    if (tabRect.width === 0) return;
+    if (tabRect.left < listRect.left) list.scrollLeft -= listRect.left - tabRect.left;
+    else if (tabRect.right > listRect.right) list.scrollLeft += tabRect.right - listRect.right;
   }
 
   #currentPopup(): ScreenPopupCanvas | undefined {
