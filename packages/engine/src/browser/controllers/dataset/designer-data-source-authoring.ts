@@ -50,6 +50,13 @@ export interface AuthoringDatasetSource {
   readonly instance: ScreenDataSource | undefined;
 }
 
+/** 数据面板读取用的宿主资源来源：与 `AuthoringDatasetSource` 对称，只补新形态。 */
+export interface AuthoringHostResourceSource {
+  readonly source: Extract<ScreenComponentDataSource, { readonly type: 'host-resource' }>;
+  readonly instanceId: string;
+  readonly instance: ScreenDataSource;
+}
+
 /**
  * 把组件当前的 dataset 绑定投影成数据面板可读的 legacy 形状。
  *
@@ -79,6 +86,46 @@ export function readAuthoringDatasetSource(
     source: {
       type: 'dataset',
       datasetId: instance.source.datasetId,
+      params,
+      binding: readScreenComponentDataBinding(component),
+    },
+    instanceId: instance.id,
+    instance,
+  };
+}
+
+/**
+ * 把组件当前的 host-resource 绑定投影成数据面板可读的 legacy 形状。
+ *
+ * 与 `readAuthoringDatasetSource` 对称：新形态（`dataValue` + `document.dataSources`）只在这里
+ * 翻译成旧形状，供面板判定 mode 与渲染实例摘要；任何写回都走新形态事务。legacy 组件本身
+ * 就由 `component.dataSource` 表达，不需要这条投影，返回 `null`。
+ *
+ * 没有这条投影时，新形态的 host-resource 引用会落到 `mode = 'none'`：面板把已经配置好的
+ * 组件显示成「未选择数据来源」，实例事实与「在工作台修改」入口一起消失。
+ */
+export function readAuthoringHostResourceSource(
+  document: ScreenDocument | undefined,
+  component: ScreenDocument['components'][number] | undefined,
+): AuthoringHostResourceSource | null {
+  if (component === undefined || document === undefined) return null;
+  if (component.dataSource?.type === 'host-resource') return null;
+  const value = readScreenComponentValueRef(component);
+  if (value === null || value.kind !== 'data-source-field') return null;
+  const instance = readScreenDocumentDataSources(document).find(
+    (candidate) => candidate.id === value.dataSourceId,
+  );
+  if (instance === undefined || instance.source.kind !== 'host-resource') return null;
+  const params: Record<string, ScreenHostResourceParameter> = {};
+  for (const [name, ref] of Object.entries(instance.params)) {
+    const legacy = valueRefToHostResourceParameter(ref);
+    if (legacy !== undefined) params[name] = legacy;
+  }
+  return {
+    source: {
+      type: 'host-resource',
+      resourceType: instance.source.resourceType,
+      resourceId: instance.source.resourceId,
       params,
       binding: readScreenComponentDataBinding(component),
     },

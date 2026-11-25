@@ -366,6 +366,23 @@ function createDatasetPanelOptions(
   const component = context.currentComponent();
   const draftSelection = draftSelectionOf(context);
   const dataValue = readDesignerEffectiveValueRef(component, draftSelection);
+  const document = context.callbacks.getDocument();
+  const instanceId = dataValue?.kind === 'data-source-field' ? dataValue.dataSourceId : undefined;
+  const documentInstance =
+    document === undefined || instanceId === undefined
+      ? undefined
+      : readScreenDocumentDataSources(document).find((candidate) => candidate.id === instanceId);
+  // 实例摘要要能覆盖新形态：`dataValue` 指向文档级 host-resource 实例时，`component.dataSource`
+  // 是 null，只看 legacy 字段会让摘要退化成「由宿主管理」，丢失资源类型与 id。
+  const hostResource =
+    source?.type === 'host-resource'
+      ? { resourceType: source.resourceType, resourceId: source.resourceId }
+      : documentInstance?.source.kind === 'host-resource'
+        ? {
+            resourceType: documentInstance.source.resourceType,
+            resourceId: documentInstance.source.resourceId,
+          }
+        : undefined;
   return {
     panel,
     surface,
@@ -399,9 +416,7 @@ function createDatasetPanelOptions(
     mode: context.state.mode,
     availableModes: availableModes(context),
     dataState: deriveDesignerDataState(dataStateInput(context)),
-    ...(source?.type === 'host-resource'
-      ? { hostResource: { resourceType: source.resourceType, resourceId: source.resourceId } }
-      : {}),
+    ...(hostResource === undefined ? {} : { hostResource }),
     variableSourceId:
       source?.type === 'variable' ? source.variableId : context.state.variableSourceId,
     staticDraft: context.state.staticDraft,
@@ -545,11 +560,14 @@ function renderDataWorkbench(
   // 工作台与内联面板是同一份数据的两个投影：挂在工作台里的取值选择器同样要显式销毁。
   disposeDatasetSections(host);
   host.replaceChildren();
-  if (
-    !context.state.workbenchOpen ||
-    options.mode !== 'dataset' ||
-    options.descriptor === undefined
-  ) {
+  // 工作台是实例级字段（更新策略等）的唯一编辑入口，因此不能只对 dataset 开放：
+  // host-resource 实例同样有手动 / 轮询 / 推送策略，且它没有数据集描述符——
+  // 旧判据把它一并挡在门外，检查器里的「全屏编辑」点了没有任何反应。
+  const workbenchAvailable =
+    options.mode === 'dataset'
+      ? options.descriptor !== undefined
+      : options.mode === 'host-resource';
+  if (!context.state.workbenchOpen || !workbenchAvailable) {
     host.hidden = true;
     host.removeAttribute('role');
     host.removeAttribute('aria-modal');
