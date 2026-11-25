@@ -146,12 +146,37 @@ export async function assertAuthoringSelection(page, designer) {
     (count) => window.baseScreenHarness.designer.document.components.length === count,
     countBeforePaste,
   );
-  await page.keyboard.press(`${modifier}+a`);
-  await page.waitForFunction(
-    (count) =>
-      window.__browserHarnessSelectionEvents.at(-1)?.selectedComponentIds?.length === count,
-    countBeforePaste,
+  // Ctrl/Cmd+A 是「选中当前层级」（ADR：select-all-current-level）：只选根级组件，
+  // 容器/组合内的子组件不在选区里。因此期望值必须按 parentId === null 计数。
+  const rootCount = await page.evaluate(
+    () =>
+      window.baseScreenHarness.designer.document.components.filter(
+        (component) => component.parentId === null,
+      ).length,
   );
+  await page.keyboard.press(`${modifier}+a`);
+  await page
+    .waitForFunction(
+      (count) =>
+        window.__browserHarnessSelectionEvents.at(-1)?.selectedComponentIds?.length === count,
+      rootCount,
+    )
+    .catch(async () => {
+      const state = await page.evaluate(() => ({
+        selected:
+          window.__browserHarnessSelectionEvents.at(-1)?.selectedComponentIds?.length ?? null,
+        components: window.baseScreenHarness.designer.document.components.length,
+        roots: window.baseScreenHarness.designer.document.components.filter(
+          (component) => component.parentId === null,
+        ).length,
+      }));
+      throw new Error(
+        `BROWSER_HARNESS_SELECT_ALL_FAILED:${JSON.stringify({
+          expected: rootCount,
+          ...state,
+        })}`,
+      );
+    });
   await page.keyboard.press('Escape');
   await page.waitForFunction(
     () => window.__browserHarnessSelectionEvents.at(-1)?.selectedComponentIds?.length === 0,
@@ -437,6 +462,12 @@ export async function assertAuthoringMarquee(page, designer) {
     }),
   );
   const batchFontSizeControl = designer.locator('[data-multi-property="style:fontSize"]');
+  // 「统一样式」是原生折叠分区：批量宽度在几何区（默认展开），字号在样式区，
+  // 未展开时控件在 DOM 里但不可见。先展开再填，与用户的真实路径一致。
+  await batchFontSizeControl.evaluate((element) => {
+    const details = element.closest('details');
+    if (details !== null) details.open = true;
+  });
   await batchFontSizeControl.fill('26');
   await batchFontSizeControl.dispatchEvent('change');
   await page.waitForFunction(() =>

@@ -21,6 +21,7 @@ import {
   designerDataSourceModes,
   hostResourceParameterToValueRef,
   readAuthoringDatasetSource,
+  readAuthoringHostResourceSource,
   readDesignerDatasetParameter,
   setDesignerDatasetParameter,
   toggleDesignerDatasetBindingField,
@@ -255,8 +256,9 @@ export function syncDraftToFocusedComponent(
   const focusedId = component?.id ?? null;
   const document = context.callbacks.getDocument();
   const authoringSource = readAuthoringDatasetSource(document, component);
-  const source = authoringSource?.source ?? component?.dataSource;
-  const instanceId = authoringSource?.instanceId ?? null;
+  const authoringHostResource = readAuthoringHostResourceSource(document, component);
+  const source = authoringSource?.source ?? authoringHostResource?.source ?? component?.dataSource;
+  const instanceId = authoringSource?.instanceId ?? authoringHostResource?.instanceId ?? null;
   if (
     focusedId === context.state.focusedComponentId &&
     sameJsonValue(source, context.state.syncedDataSource) &&

@@ -468,6 +468,44 @@ describe('DesignerDatasetController', () => {
     });
   });
 
+  it('新形态 host-resource 引用按 host-resource 模式进入作者面', () => {
+    const liveDocument: ScreenDocument = {
+      ...baseDocument,
+      components: [
+        {
+          ...baseDocument.components[0]!,
+          dataSource: null,
+          dataValue: { kind: 'data-source-field', dataSourceId: 'live', path: [] },
+        },
+      ],
+      dataSources: [
+        {
+          id: 'live',
+          name: 'live',
+          source: { kind: 'host-resource', resourceType: 'demo_metric', resourceId: 'oee' },
+          params: {},
+          updatePolicy: { mode: 'push', fallbackIntervalSeconds: 1 },
+        },
+      ],
+    };
+    const controller = createController({
+      descriptor,
+      dataCapabilities: ['static', 'dataset', 'host-resource'],
+      getDocument: () => liveDocument,
+    });
+
+    controller.render(undefined);
+
+    // `component.dataSource` 是 null，只有 `dataValue` 指向 host-resource 实例。
+    // 早期实现只看 legacy 字段，会把它判成 'none'：面板显示「未选择数据来源」，
+    // 实例事实与工作台入口一起消失（推送作者面因此不可达）。
+    expect(controller.mode).toBe('host-resource');
+    expect(controller.authoring).toMatchObject({
+      refreshStrategy: 'push',
+      pushFallbackInterval: 1,
+    });
+  });
+
   it('keeps inline and read-only instances out of the document and explains why', () => {
     let currentDocument: ScreenDocument = {
       ...baseDocument,
@@ -820,6 +858,7 @@ class FakeSelect {
 
 function createController(overrides: {
   readonly descriptor: ScreenDatasetDefinition;
+  readonly dataCapabilities?: readonly ('static' | 'variable' | 'dataset' | 'host-resource')[];
   readonly roles?: readonly ScreenDataBindingRole[];
   readonly executeTransaction?: (
     transaction: ScreenDocumentTransaction,
@@ -842,7 +881,7 @@ function createController(overrides: {
 }): DesignerDatasetController {
   const entry = {
     manifest: {
-      dataCapabilities: ['static', 'dataset'],
+      dataCapabilities: overrides.dataCapabilities ?? ['static', 'dataset'],
       dataBinding: {
         roles: overrides.roles ?? [
           {

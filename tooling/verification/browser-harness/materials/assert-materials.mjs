@@ -695,6 +695,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
         const navigation = root.querySelector('[data-material-groups]');
         const heading = navigation?.querySelector('.material-group-back');
         const roots = navigation?.querySelector('.material-group-roots');
+        const secondary = navigation?.querySelector('.material-group-secondary');
         const children = navigation?.querySelector('.material-group-children');
         const group = navigation?.querySelector('[data-material-group]');
         const glyph = group?.querySelector('.material-group-glyph svg');
@@ -720,6 +721,9 @@ async function assertMaterialLibraryGrouping(page, designer) {
           rootLabelDisplay: getComputedStyle(group.querySelector('.material-group-label')).display,
           rootTitle: group?.getAttribute('data-tip'),
           childrenHeight: children?.getBoundingClientRect().height,
+          // 目录是平铺分组时没有子分组，二级列整体隐藏（group-dom 的 `secondary.hidden`）。
+          // 此时子列高度为 0 是设计行为，不是布局塌陷。
+          secondaryHidden: secondary?.hidden === true,
           countWidth: count?.getBoundingClientRect().width,
           groupDisplay:
             group === null || group === undefined ? '' : getComputedStyle(group).display,
@@ -807,18 +811,25 @@ async function assertMaterialLibraryGrouping(page, designer) {
     !rootState.categoriesHidden ||
     rootState.groups.join(',') !== 'foundation,data,board,bridges,best-practices' ||
     rootState.cards.join(',') !== expectedCards.join(',') ||
-    rootState.visual.navigationHeight < 150 ||
-    rootState.visual.navigationWidth !== (compact ? 286 : 108) ||
+    // 两种真实布局：宽面板是内联 chip（占满面板宽度、显示标签），窄面板是工具栏触发器
+    // 打开的弹层（固定 286px、roots 收成 32px 图标列）。旧的 108px rail 已不存在。
+    (compact && rootState.visual.navigationWidth !== 286) ||
+    (!compact && rootState.visual.navigationWidth < 200) ||
     rootState.visual.headingHeight !== 0 ||
-    rootState.visual.rootsWidth !== 32 ||
+    (compact
+      ? rootState.visual.rootsWidth !== 32
+      : rootState.visual.rootsWidth !== rootState.visual.navigationWidth) ||
     rootState.visual.rootHeight !== 28 ||
     rootState.visual.rootGlyphWidth !== 16 ||
-    rootState.visual.rootLabelDisplay !== 'none' ||
+    rootState.visual.rootLabelDisplay !== (compact ? 'none' : 'block') ||
     rootState.visual.rootTitle !== '基础（5 个素材）' ||
-    rootState.visual.childrenHeight !== rootState.visual.navigationHeight ||
-    rootState.visual.countWidth !== (compact ? 24 : 0) ||
+    (!rootState.visual.secondaryHidden &&
+      rootState.visual.childrenHeight !== rootState.visual.navigationHeight) ||
+    (rootState.visual.secondaryHidden && rootState.visual.childrenHeight !== 0) ||
+    (!rootState.visual.secondaryHidden && rootState.visual.countWidth !== (compact ? 24 : 0)) ||
     rootState.visual.groupDisplay !== 'flex' ||
-    rootState.visual.countDisplay !== (compact ? 'grid' : 'none') ||
+    rootState.visual.countDisplay !== (compact ? 'grid' : 'block') ||
+    (compact ? rootState.visual.navigationHeight < 150 : rootState.visual.navigationHeight < 28) ||
     rootState.visual.selectedFilterBackground === '' ||
     rootState.visual.selectedFilterBackground === rootState.visual.unselectedFilterBackground ||
     // 卡片继承 .designer-button 的控件高度下限（控件基座 30px）。
@@ -885,7 +896,9 @@ async function assertMaterialLibraryGrouping(page, designer) {
         ...PLUGIN_CHART_FAMILY,
         'base.table',
       ].join(',') ||
-    dataGroup.gridTop !== rootState.gridTop
+    // 弹层模式下网格被覆盖，不该位移；内联模式选中分组会长出二级 chip 行，网格随之下移
+    // 一行，这是状态切换驱动的几何变化（不是抖动），只对弹层断言「网格不动」。
+    (compact && dataGroup.gridTop !== rootState.gridTop)
   ) {
     throw new Error(
       `BROWSER_HARNESS_MATERIAL_GROUPING_DATA_FAILED:${JSON.stringify({ dataGroup, rootGridTop: rootState.gridTop })}`,

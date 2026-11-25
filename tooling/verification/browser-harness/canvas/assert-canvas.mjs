@@ -186,6 +186,9 @@ export async function assertCanvasBasics(designer, page) {
   // 工作台模式往返会改变画布偏移，Alt 拖拽前重新捕获标题位置，避免使用过期坐标。
   const altBox = await title.boundingBox();
   if (altBox === null) throw new Error('BROWSER_HARNESS_TITLE_MISSING');
+  const countBeforeAlt = await page.evaluate(
+    () => window.baseScreenHarness.designer.document.components.length,
+  );
   await page.keyboard.down('Alt');
   await page.mouse.move(altBox.x + 20, altBox.y + 20);
   await page.mouse.down();
@@ -199,7 +202,7 @@ export async function assertCanvasBasics(designer, page) {
     ).position,
   }));
   if (
-    duplicate.count !== 10 ||
+    duplicate.count !== countBeforeAlt + 1 ||
     duplicate.original.x !== before.x ||
     duplicate.original.y !== before.y
   ) {
@@ -208,6 +211,7 @@ export async function assertCanvasBasics(designer, page) {
         duplicate,
         before,
         altBox,
+        countBeforeAlt,
       })}`,
     );
   }

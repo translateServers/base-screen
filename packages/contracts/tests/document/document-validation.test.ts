@@ -335,6 +335,8 @@ describe('parseScreenDocument validation', () => {
     }
   });
 
+  // 构造 1 万组件 × 60 字面量（约 54MB JSON）本身就要秒级；默认 5s 在 CI 上会先于
+  // 断言超时（实测 5.5s）。这里显式放宽，判据仍是 DOCUMENT_LIMIT_EXCEEDED。
   it('enforces the total canonical byte budget', () => {
     const components: Array<Record<string, unknown>> = [];
     for (let index = 0; index < 10_000; index++) {
@@ -351,7 +353,7 @@ describe('parseScreenDocument validation', () => {
         result.diagnostics.some((diagnostic) => diagnostic.code === 'DOCUMENT_LIMIT_EXCEEDED'),
       ).toBe(true);
     }
-  });
+  }, 30_000);
 
   it('orders diagnostics deterministically by path', () => {
     const input = document({

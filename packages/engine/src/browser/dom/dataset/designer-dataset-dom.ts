@@ -177,7 +177,9 @@ export function renderDesignerDatasetWorkbench(
   // 工作台不渲染 `value` 段：它的取值方式由顶部 5 步导航表达（`[data-workbench-step]`）。
   // 目录与配置共用一个 `source` 段（两者互斥），与检查器完全同源。
   editor.appendChild(requireSection('source', options));
-  if (options.descriptor !== undefined) {
+  // 数据集有描述符才有映射 / 变换步骤；host-resource 没有描述符，但更新策略（authoring）
+  // 仍是实例级字段，必须出现在工作台里——它是检查器只读事实唯一的「在别处修改」落点。
+  if (options.descriptor !== undefined || options.mode === 'host-resource') {
     editor.append(
       requireSection('authoring', options),
       renderWorkbenchNotice(

@@ -29,11 +29,24 @@ export async function openViewport({ baseUrl, browser, viewport }) {
   }
   const designer = page.locator('base-screen-designer');
   const viewer = page.locator('base-screen-viewer').first();
+  // 期望值取自文档本身，不写死数量：harness 文档增删组件时，这条 smoke 判据仍然只回答
+  // 「每个组件都渲染出来了吗」，不会因为夹具演进变成一条必然过期的断言。
+  const expectedComponents = await page.evaluate(
+    () => window.baseScreenHarness.designer.document?.components.length ?? 0,
+  );
   const materialCount = await designer.locator('[data-base-screen-component-id]').count();
   const viewerMaterialCount = await viewer.locator('[data-base-screen-component-id]').count();
   const screenshot = await page.screenshot();
-  if (materialCount !== 9 || viewerMaterialCount !== 9 || screenshot.byteLength < 10_000) {
-    throw new Error(`BROWSER_HARNESS_RENDER_FAILED: ${viewport.width}x${viewport.height}`);
+  if (
+    expectedComponents === 0 ||
+    materialCount !== expectedComponents ||
+    viewerMaterialCount !== expectedComponents ||
+    screenshot.byteLength < 10_000
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_RENDER_FAILED: ${viewport.width}x${viewport.height}` +
+        ` (expected=${expectedComponents}, designer=${materialCount}, viewer=${viewerMaterialCount}, screenshot=${screenshot.byteLength}B)`,
+    );
   }
   await page.waitForFunction(() => {
     const viewer = document.querySelector('base-screen-viewer');

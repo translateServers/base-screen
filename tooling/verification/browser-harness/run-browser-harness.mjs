@@ -139,7 +139,12 @@ export async function runBrowserHarness(serverPort) {
         { width: 390, height: 844 },
       ]) {
         const { designer, page, viewer } = await openViewport({ baseUrl, browser, viewport });
-        if (viewport.width <= 800) {
+        // 尺寸档由 ResizeObserver 在下一帧写入；等它落定再决定是否跑桌面基线。
+        await page.waitForFunction(
+          () => document.querySelector('base-screen-designer')?.dataset.sizeTier !== undefined,
+        );
+        const tier = await designer.getAttribute('data-size-tier');
+        if (viewport.width <= 800 || tier === 'degraded') {
           await page.close();
           continue;
         }

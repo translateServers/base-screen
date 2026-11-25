@@ -237,6 +237,15 @@ export function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): H
             options.hostResource.resourceId,
           );
     content.append(renderValueSection(options), summary);
+    // 段集合与其它模式同一份：`requiredDataSections` 只认 effective value，不看 mode。
+    // 这里若只画摘要，下一次 `syncDatasetSections` 会把缺的 source / preview / authoring
+    // 补进来，而首帧没有它们——同一份面板的两次渲染结构不一致。authoring 段同时承担
+    // 实例级更新策略的「只读事实 + 在工作台修改」入口（ADR-0104），host-resource 实例
+    // 同样有手动 / 轮询 / 推送策略，不能省。
+    for (const key of requiredDataSections(options)) {
+      if (key === 'value') continue;
+      content.appendChild(dataSection(key, options));
+    }
     const selection = renderHostResourceSelectionAction(options);
     if (selection !== undefined) content.appendChild(selection);
     section.appendChild(content);
