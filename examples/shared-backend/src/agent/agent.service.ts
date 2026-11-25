@@ -42,6 +42,7 @@ import {
   buildRepairPrompt,
   createParseIssues,
   issueBlockIndexes,
+  kpiIssue,
   repairKey,
   rootIssue,
 } from './agent-repair';
@@ -56,6 +57,8 @@ import {
   type AgentBlock,
   type AgentBlockColumn,
   type AgentBlockTable,
+  type AgentKpi,
+  type AgentKpiDelta,
   type AgentScreenSpec,
   buildAgentUserPrompt,
   buildCatalogSystemPrompt,
@@ -410,7 +413,7 @@ export class AgentService {
       const key = repairKey(issues);
       const exhausted = repairRounds >= AGENT_MAX_REPAIR_ROUNDS || key === previousKey;
       if (exhausted) {
-        const { documentLevel } = issueBlockIndexes(issues);
+        const { blocks: droppedBlocks, documentLevel } = issueBlockIndexes(issues);
         if (parsed !== null && !documentLevel && parsed.blocks.length > 0) {
           this.logger.warn(
             `agent repair exhausted; delivering ${parsed.blocks.length} usable blocks`,
@@ -418,7 +421,8 @@ export class AgentService {
           return {
             kind: 'ok',
             spec: parsed,
-            warnings: [...warnings, 'AGENT_BLOCKS_DROPPED'],
+            // 指标的问题已在解析时记成各自的警告；只有真去掉了块才再报「去块」。
+            warnings: droppedBlocks.size > 0 ? [...warnings, 'AGENT_BLOCKS_DROPPED'] : warnings,
             repairRounds,
           };
         }
@@ -591,9 +595,6 @@ export class AgentService {
   }
 }
 
-/** 兜底数值占位：明确表示「没有数据」，不是 0，也不是随机数。 */
-const PENDING_VALUE = '—';
-
 /**
  * 没配模型或模型输出不可用时的兜底：只给版式与占位，不给任何数字。
  *
@@ -612,10 +613,11 @@ function deterministicSpec(
     title: subject,
     subtitle: '未生成数据 · 等待模型或数据源',
     kpis: [
-      { label: '总量', value: PENDING_VALUE },
-      { label: '周转', value: PENDING_VALUE },
-      { label: '缺货', value: PENDING_VALUE },
-      { label: '在途', value: PENDING_VALUE },
+      // 没有数据：value 为 null，编译器画占位「—」，不是 0，也不是随机数。
+      { label: '总量', value: null },
+      { label: '周转', value: null },
+      { label: '缺货', value: null },
+      { label: '在途', value: null },
     ],
     blocks: deterministicBlocks(catalog, references) ?? [],
   };
@@ -708,18 +710,7 @@ export function parseCatalogSpec(
   const subtitle = typeof record.subtitle === 'string' ? record.subtitle.trim() : '';
   if (title === '' || subtitle === '') return null;
   if (!Array.isArray(record.kpis)) return null;
-  const kpis = record.kpis
-    .slice(0, 5)
-    .map((item) => {
-      if (typeof item !== 'object' || item === null) return null;
-      const kpi = item as Record<string, unknown>;
-      const label = typeof kpi.label === 'string' ? kpi.label.trim() : '';
-      const value = typeof kpi.value === 'string' ? kpi.value.trim() : '';
-      if (label === '' || value === '') return null;
-      const delta = typeof kpi.delta === 'string' ? kpi.delta.trim() : undefined;
-      return { label, value, ...(delta === undefined || delta === '' ? {} : { delta }) };
-    })
-    .filter((item): item is { label: string; value: string; delta?: string } => item !== null);
+  const kpis = readKpis(record.kpis, warnings, issues);
   // 从 3 条放宽到 1 条：少一条 KPI 不值得把整屏作废，排版会按实际数量分栏。
   if (kpis.length < 1) return null;
 
@@ -736,6 +727,66 @@ export function parseCatalogSpec(
     kpis,
     blocks: readBlocks(record.blocks, catalog, warnings, issues),
   };
+}
+
+const KPI_DELTA_UNITS = new Set(['percent', 'point', 'absolute']);
+const KPI_DIRECTIONS = new Set(['up-good', 'down-good', 'neutral']);
+
+/**
+ * 指标逐条校验（ADR-0112 §2.4）：数值必须是有限数字，单位与格式化交给编译器。
+ * 不合格的一条丢掉并记修复诊断；增减量写错只丢增减量，不丢指标本身。
+ */
+function readKpis(
+  value: readonly unknown[],
+  warnings: string[],
+  issues?: AgentParseIssues,
+): AgentKpi[] {
+  const kpis: AgentKpi[] = [];
+  for (const [index, item] of value.slice(0, 5).entries()) {
+    const kpi = asRecord(item);
+    const label = typeof kpi?.label === 'string' ? kpi.label.trim() : '';
+    const raw = kpi?.value;
+    if (kpi === null || label === '' || typeof raw !== 'number' || !Number.isFinite(raw)) {
+      warnings.push('AGENT_KPI_INVALID');
+      issues?.issues.push(kpiIssue('AGENT_KPI_INVALID', index));
+      continue;
+    }
+    const unit = typeof kpi.unit === 'string' ? kpi.unit.trim().slice(0, 6) : '';
+    const precision =
+      typeof kpi.precision === 'number' && Number.isInteger(kpi.precision)
+        ? Math.min(3, Math.max(0, kpi.precision))
+        : undefined;
+    const delta = asRecord(kpi.delta);
+    const deltaValue = delta?.value;
+    const validDelta =
+      delta !== null &&
+      typeof deltaValue === 'number' &&
+      Number.isFinite(deltaValue) &&
+      typeof delta.unit === 'string' &&
+      KPI_DELTA_UNITS.has(delta.unit) &&
+      typeof delta.direction === 'string' &&
+      KPI_DIRECTIONS.has(delta.direction);
+    if (kpi.delta !== undefined && !validDelta) {
+      warnings.push('AGENT_KPI_DELTA_DROPPED');
+      issues?.issues.push(kpiIssue('AGENT_KPI_DELTA_DROPPED', index));
+    }
+    kpis.push({
+      label: label.slice(0, 12),
+      value: raw,
+      ...(unit === '' ? {} : { unit }),
+      ...(precision === undefined ? {} : { precision }),
+      ...(validDelta
+        ? {
+            delta: {
+              value: deltaValue,
+              unit: delta.unit as AgentKpiDelta['unit'],
+              direction: delta.direction as AgentKpiDelta['direction'],
+            },
+          }
+        : {}),
+    });
+  }
+  return kpis;
 }
 
 /**
@@ -982,6 +1033,8 @@ export const WARNING_MESSAGES: Readonly<Record<string, string>> = {
   AGENT_DATASET_UNKNOWN: '引用的数据集不在本轮上下文里，已改用示例数据',
   AGENT_BLOCKS_ALL_INVALID: '模型给的分块都不可用，已改用确定性布局',
   AGENT_BLOCKS_DROPPED: '有模块经修复仍不可用，已去掉，其余照常交出',
+  AGENT_KPI_INVALID: '有指标数值不合格，已去掉',
+  AGENT_KPI_DELTA_DROPPED: '有指标的增减量不合格，已只保留数值',
   AGENT_ASSET_CATALOG_UNAVAILABLE: '素材目录不可用，本次未使用宿主图片',
 };
 

@@ -66,6 +66,20 @@ export function blockIssue(code: string, index: number): AgentRepairIssue {
   };
 }
 
+const KPI_HINTS: Readonly<Record<string, string>> = {
+  AGENT_KPI_INVALID: 'label 必须非空，value 必须是数字（不写单位与「万」，单位放 unit）。',
+  AGENT_KPI_DELTA_DROPPED:
+    'delta 写成 { value: 数字, unit: percent | point | absolute, direction: up-good | down-good | neutral }。',
+};
+
+export function kpiIssue(code: string, index: number): AgentRepairIssue {
+  return {
+    code,
+    path: `kpis[${index}]`,
+    hint: KPI_HINTS[code] ?? '这条指标不可用，请按系统提示的结构重写。',
+  };
+}
+
 export function rootIssue(code: string, hint: string): AgentRepairIssue {
   return { code, path: '', hint };
 }
@@ -100,7 +114,10 @@ export function repairKey(issues: readonly AgentRepairIssue[]): string {
     .join('|');
 }
 
-/** 被诊断点名的块（原始下标）；没有点名到具体块的诊断视为文档级。 */
+/**
+ * 被诊断点名的块（原始下标）。点名到块或指标的诊断都可以「去掉那一项」收尾；
+ * 其余（IR 根、标题等）视为文档级。
+ */
 export function issueBlockIndexes(issues: readonly AgentRepairIssue[]): {
   readonly blocks: ReadonlySet<number>;
   readonly documentLevel: boolean;
@@ -109,8 +126,8 @@ export function issueBlockIndexes(issues: readonly AgentRepairIssue[]): {
   let documentLevel = false;
   for (const issue of issues) {
     const match = /^blocks\[(\d+)\]/.exec(issue.path);
-    if (match === null) documentLevel = true;
-    else blocks.add(Number(match[1]));
+    if (match !== null) blocks.add(Number(match[1]));
+    else if (!/^kpis\[\d+\]/.test(issue.path)) documentLevel = true;
   }
   return { blocks, documentLevel };
 }

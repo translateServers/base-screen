@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { FALLBACK_AGENT_CATALOG } from '../../examples/shared-backend/src/agent/agent-catalog';
 import { composeScreenDocument } from '../../examples/shared-backend/src/agent/agent-compose';
 import type { AgentScreenSpec } from '../../examples/shared-backend/src/agent/agent-spec';
+// 根级测试没有依赖 core 包：按源码路径导入（与导入示例后端源码同法）。
+import { auditScreenLayout } from '../../packages/core/src/index.js';
 
 /**
  * 智能体链路的契约层：编译器产物必须通过 canonical 契约解析器。
@@ -16,9 +18,19 @@ const SPEC: AgentScreenSpec = {
   title: '华东仓网库存水位',
   subtitle: '口径：周末快照',
   kpis: [
-    { label: '总库存', value: '28.6 万件', delta: '+4.2%' },
-    { label: '周转天数', value: '23.7 天', delta: '-1.1%' },
-    { label: '缺货仓', value: '15 家' },
+    {
+      label: '总库存',
+      value: 286000,
+      unit: '件',
+      delta: { value: 4.2, unit: 'percent', direction: 'neutral' },
+    },
+    {
+      label: '周转天数',
+      value: 23.7,
+      unit: '天',
+      delta: { value: -1.1, unit: 'percent', direction: 'down-good' },
+    },
+    { label: '缺货仓', value: 15, unit: '家' },
   ],
   blocks: [
     {
@@ -89,6 +101,14 @@ describe('agent flow contract: compiled output is canonical', () => {
     expect(chart?.dataValue?.kind).toBe('inline');
   });
 
+  it('编译器自有的版面通过生成产物的硬校验（ADR-0112 §2.2）', () => {
+    const { document } = composeOk(SPEC);
+    const parsed = parseScreenDocument(document);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(auditScreenLayout(parsed.value)).toEqual([]);
+  });
+
   it('编译是确定的：同一 spec 两次编译得到完全相同的文档', () => {
     const first = composeOk(SPEC).document;
     const second = composeOk(SPEC).document;
@@ -120,7 +140,7 @@ describe('agent flow contract: compiled output is canonical', () => {
     const fallback: AgentScreenSpec = {
       title: '示例大屏',
       subtitle: '示例智能体的确定性兜底 · 未调用模型',
-      kpis: [{ label: '总量', value: '35.5 万' }],
+      kpis: [{ label: '总量', value: null }],
       blocks: [],
       mode: 'deterministic',
     };

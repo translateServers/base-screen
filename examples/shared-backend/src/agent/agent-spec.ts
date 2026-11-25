@@ -7,10 +7,27 @@
 import type { AgentCatalog } from './agent-catalog';
 import { renderCatalogPrompt } from './agent-catalog';
 import { STYLE_PRESET_IDS, STYLE_PRESETS } from './agent-style';
+/**
+ * 指标（ADR-0112 §2.4）：模型只给结构化数值，格式化与配色归编译器。
+ *
+ * `value` 为 null 表示没有数据（确定性兜底的占位），编译器画「—」而不是 0。
+ */
 export interface AgentKpi {
   readonly label: string;
-  readonly value: string;
-  readonly delta?: string;
+  readonly value: number | null;
+  /** 「%」「万元」「人次」；不含数量级，万 / 亿由编译器折算。 */
+  readonly unit?: string;
+  /** 小数位 0–3；缺省时由编译器按数量级决定。 */
+  readonly precision?: number;
+  readonly delta?: AgentKpiDelta;
+}
+
+export interface AgentKpiDelta {
+  readonly value: number;
+  /** `percent` 百分比变化；`point` 百分点；`absolute` 与指标同单位的绝对变化。 */
+  readonly unit: 'percent' | 'point' | 'absolute';
+  /** 增减的好坏：`up-good` 增为好，`down-good` 减为好，`neutral` 不着好坏色。 */
+  readonly direction: 'up-good' | 'down-good' | 'neutral';
 }
 
 /** 表格载荷：模型给的是「列 + 行」，绑定角色由编译器按目录里的 roles 分配。 */
@@ -123,7 +140,7 @@ ${renderCatalogPrompt(catalog)}${renderReferencesPrompt(references)}
   "title": "大屏标题，12 字以内",
   "subtitle": "一句口径说明，20 字以内",
   "style": "从下列风格中选一个 id，按主题气质选：${STYLE_PRESET_IDS.map((id) => `${id}=${STYLE_PRESETS[id].label}`).join('；')}",
-  "kpis": [{ "label": "指标名", "value": "数值", "delta": "+4.2%" }],
+  "kpis": [{ "label": "指标名", "value": 286000, "unit": "件", "delta": { "value": 4.2, "unit": "percent", "direction": "up-good" } }],
   "blocks": [
     {
       "type": "上面列出的某个 type",
@@ -139,7 +156,9 @@ ${renderCatalogPrompt(catalog)}${renderReferencesPrompt(references)}
 }
 
 约束：
-- kpis 3 到 5 个，value 必须带单位或百分号，delta 可省略。
+- kpis 3 到 5 个：value 只写数字（不写单位、不写「万」、不加千分位），unit 写单位（如 %、元、件，可省略），precision 可省略；
+  delta 可省略，给了就写 value（数字，减少为负数）、unit（percent 百分比 / point 百分点 / absolute 绝对值）
+  与 direction（up-good 增长是好事 / down-good 下降是好事，如成本、故障 / neutral 无好坏，如库存、温度）。
 - blocks 3 到 4 个，覆盖「趋势 / 结构 / 明细」；用户要求结论或要点时，用一个文字类块承载，不要塞进 note。
 - span 取 1 到 4，表示在四列栅格里占几列。数据型组件 span 取 2 到 4（一列宽约 430px，放不下多列表头会挤成一团）；
   文字与素材类块 span 取 1 到 2。同一行 span 之和要凑满 4（4、2+2、3+1），不要留下半行空位。

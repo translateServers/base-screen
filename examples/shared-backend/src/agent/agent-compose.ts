@@ -6,7 +6,13 @@ import {
   pickSurfaceMaterial,
   pickTextMaterial,
 } from './agent-catalog';
-import type { AgentBlock, AgentBlockTable, AgentScreenSpec } from './agent-spec';
+import type {
+  AgentBlock,
+  AgentBlockTable,
+  AgentKpi,
+  AgentKpiDelta,
+  AgentScreenSpec,
+} from './agent-spec';
 import {
   DEFAULT_STYLE_PRESET,
   STYLE_PRESETS,
@@ -173,12 +179,18 @@ export function composeScreenDocument(input: {
     used.add(material.type);
   };
 
-  const pushText = (name: string, value: string, box: Box, token: TextToken = {}): void => {
+  const pushText = (
+    name: string,
+    value: string,
+    box: Box,
+    token: TextToken = {},
+    sample = false,
+  ): void => {
     if (textMaterial === undefined || value === '') return;
     // 未指定颜色的文字用预设主文字色；否则会落回目录物料的写死默认值，整屏文字色就不随风格变了。
     push(textMaterial, name, box, {
       style: tokenStyle(textMaterial, { color: palette.text, ...token }),
-      dataValue: { kind: 'inline', value },
+      dataValue: sample ? { kind: 'inline', value, sample: true } : { kind: 'inline', value },
     });
   };
 
@@ -308,7 +320,7 @@ function composeKpis(
   spec: AgentScreenSpec,
   context: {
     pushSurface: (name: string, box: Box, style?: Record<string, JsonValue>) => void;
-    pushText: (name: string, value: string, box: Box, token?: TextToken) => void;
+    pushText: (name: string, value: string, box: Box, token?: TextToken, sample?: boolean) => void;
     setSource: (path: string) => void;
   },
   palette: StylePalette,
@@ -327,21 +339,93 @@ function composeKpis(
       { x: x + 20, y: KPI_Y + 18, width: width - 40, height: 26 },
       { fontSize: 18, color: palette.muted },
     );
+    // 模型给的指标值是示例数据；兜底的占位（value 为 null）不是数，不打标记。
     context.pushText(
       '指标值',
-      kpi.value,
+      formatKpiValue(kpi),
       { x: x + 20, y: KPI_Y + 50, width: width - 40, height: 54 },
       { fontSize: 42, fontWeight: '700', color: palette.text },
+      spec.mode === 'llm' && kpi.value !== null,
     );
-    if (kpi.delta !== undefined && kpi.delta !== '') {
+    if (kpi.delta !== undefined) {
       context.pushText(
         '同比',
-        kpi.delta,
+        formatKpiDelta(kpi),
         { x: x + 20, y: KPI_Y + 108, width: width - 40, height: 24 },
-        { fontSize: 16, color: palette.accent },
+        { fontSize: 16, color: deltaColor(kpi.delta, palette) },
       );
     }
   });
+}
+
+/** 没有数据时的占位。 */
+const KPI_PENDING = '—';
+
+/**
+ * 指标数值的统一格式（ADR-0112 §2.4）：万 / 亿折算、千分位、小数位、单位间距都在这里，
+ * 模型只给数字。百分号紧贴数字，其余单位与数字之间留一个空格（「28.6 万件」「23.7 天」「92.5%」）。
+ */
+export function formatKpiValue(kpi: AgentKpi): string {
+  if (kpi.value === null) return KPI_PENDING;
+  const unit = kpi.unit ?? '';
+  const magnitude = Math.abs(kpi.value);
+  const [scaled, scale] =
+    unit === '%'
+      ? [kpi.value, '']
+      : magnitude >= 1e8
+        ? [kpi.value / 1e8, '亿']
+        : magnitude >= 1e4
+          ? [kpi.value / 1e4, '万']
+          : [kpi.value, ''];
+  const digits =
+    kpi.precision ??
+    (scale !== '' ? 1 : Number.isInteger(scaled) ? 0 : Math.min(2, decimals(scaled)));
+  const number = groupThousands(scaled.toFixed(digits));
+  if (unit === '%') return `${number}%`;
+  const suffix = `${scale}${unit}`;
+  return suffix === '' ? number : `${number} ${suffix}`;
+}
+
+/** 增减量：带正负号；百分比紧贴「%」，百分点写「个百分点」，绝对值沿用指标单位。 */
+export function formatKpiDelta(kpi: AgentKpi): string {
+  const delta = kpi.delta;
+  if (delta === undefined) return '';
+  const sign = delta.value > 0 ? '+' : delta.value < 0 ? '-' : '';
+  const magnitude = Math.abs(delta.value);
+  if (delta.unit === 'percent') return `${sign}${trimZeros(magnitude.toFixed(1))}%`;
+  if (delta.unit === 'point') return `${sign}${trimZeros(magnitude.toFixed(1))} 个百分点`;
+  const absolute = formatKpiValue({
+    label: kpi.label,
+    value: magnitude,
+    ...(kpi.unit === undefined ? {} : { unit: kpi.unit }),
+  });
+  return `${sign}${absolute}`;
+}
+
+/**
+ * 增减量的颜色只取主题状态色位（ADR-0110 的 `theme:<slot>`），不写固定色值：
+ * 增为好且在增、减为好且在减 → success；反过来 → danger；neutral 或没变化 → 次要文字色。
+ */
+function deltaColor(delta: AgentKpiDelta, palette: StylePalette): string {
+  if (delta.direction === 'neutral' || delta.value === 0) return palette.muted;
+  const good = (delta.direction === 'up-good') === delta.value > 0;
+  return good ? 'theme:success' : 'theme:danger';
+}
+
+function decimals(value: number): number {
+  const text = String(value);
+  const dot = text.indexOf('.');
+  return dot < 0 ? 0 : text.length - dot - 1;
+}
+
+function trimZeros(text: string): string {
+  return text.includes('.') ? text.replace(/\.?0+$/, '') : text;
+}
+
+function groupThousands(text: string): string {
+  const [integer, fraction] = text.split('.');
+  const grouped = (integer ?? '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return fraction === undefined ? grouped : `${grouped}.${fraction}`;
 }
 
 function compileBlock(
@@ -503,7 +587,8 @@ function resolveBlockPayload(
       return {};
     }
     return {
-      dataValue: { kind: 'inline', value: toDataSet(table) },
+      // 模型给的表格是示例数据，不是真实数据：带上标记，设计器显示徽标、发布前拦截（ADR-0112 §2.3）。
+      dataValue: { kind: 'inline', value: toDataSet(table), sample: true },
       dataBinding: { fields: binding },
     };
   }

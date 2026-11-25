@@ -25,9 +25,19 @@ const VALID_SPEC = {
   title: '华东仓网库存水位',
   subtitle: '口径：周末快照，按仓库汇总',
   kpis: [
-    { label: '总库存', value: '28.6 万件', delta: '+4.2%' },
-    { label: '周转天数', value: '23.7 天', delta: '-1.1%' },
-    { label: '缺货仓', value: '15 家' },
+    {
+      label: '总库存',
+      value: 286000,
+      unit: '件',
+      delta: { value: 4.2, unit: 'percent', direction: 'neutral' },
+    },
+    {
+      label: '周转天数',
+      value: 23.7,
+      unit: '天',
+      delta: { value: -1.1, unit: 'percent', direction: 'down-good' },
+    },
+    { label: '缺货仓', value: 15, unit: '家' },
   ],
   blocks: [
     {

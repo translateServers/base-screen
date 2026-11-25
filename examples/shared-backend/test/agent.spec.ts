@@ -3,6 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AgentController } from '../src/agent/agent.controller';
 import { AgentService, parseCatalogSpec } from '../src/agent/agent.service';
+import { createParseIssues } from '../src/agent/agent-repair';
 
 const datasetsStub = {
   describe: async () => ({ fields: [] }),
@@ -19,7 +20,7 @@ import {
   deterministicComponentEdit,
   parseAgentComponentEditSpec,
 } from '../src/agent/agent-component-edit';
-import { composeScreenDocument } from '../src/agent/agent-compose';
+import { composeScreenDocument, formatKpiDelta, formatKpiValue } from '../src/agent/agent-compose';
 import type { AgentScreenSpec } from '../src/agent/agent-spec';
 import { AgentCandidateDto } from '../src/agent/dto/agent-candidate.dto';
 import { AgentComponentEditDto } from '../src/agent/dto/agent-component-edit.dto';
@@ -231,7 +232,7 @@ describe('agent candidate and persisted generation', () => {
     const unusable = JSON.stringify({
       title: '渠道经营',
       subtitle: '按周汇总的渠道口径',
-      kpis: [{ label: '总量', value: '28.6 万' }],
+      kpis: [{ label: '总量', value: 286000 }],
       blocks: [{ type: 'base.heatmap', title: '热力', span: 1 }],
     });
     // 惰性构造：TREND_TABLE 在文件后部声明，describe 回调执行时还未初始化。
@@ -326,7 +327,7 @@ describe('agent candidate and persisted generation', () => {
         text: JSON.stringify({
           title: '渠道经营',
           subtitle: '按周汇总的渠道口径',
-          kpis: [{ label: '总量', value: '28.6 万' }],
+          kpis: [{ label: '总量', value: 286000 }],
           panels: [{ kind: 'list', title: '要点', items: ['甲', '乙', '丙'] }],
         }),
       });
@@ -540,9 +541,9 @@ function blocksJson(blocks: readonly Record<string, unknown>[]): string {
     title: '华东渠道周会',
     subtitle: '按周汇总的渠道经营口径',
     kpis: [
-      { label: '总量', value: '28.6 万' },
-      { label: '周转', value: '31.4 天' },
-      { label: '缺货', value: '12 家' },
+      { label: '总量', value: 286000 },
+      { label: '周转', value: 31.4, unit: '天' },
+      { label: '缺货', value: 12, unit: '家' },
     ],
     blocks,
   });
@@ -693,10 +694,91 @@ describe('目录驱动的解析与编译', () => {
         ],
         rows: TREND_TABLE.rows,
       },
+      // 模型给的表格是示例数据（ADR-0112 §2.3）。
+      sample: true,
     });
     // dimension 取非数值列，measures 取数值列——角色 id 来自目录，不是写死的 type。
     expect(chart.dataBinding).toEqual({ fields: { dimension: ['day'], measures: ['amount'] } });
     expect(document.dataSources).toBeUndefined();
+  });
+
+  it('指标数值统一由编译器格式化（ADR-0112 §2.4）', () => {
+    expect(formatKpiValue({ label: '库存', value: 286000, unit: '件' })).toBe('28.6 万件');
+    expect(formatKpiValue({ label: '营收', value: 325000000, unit: '元' })).toBe('3.3 亿元');
+    expect(formatKpiValue({ label: '周转', value: 23.7, unit: '天' })).toBe('23.7 天');
+    expect(formatKpiValue({ label: '水位', value: 92.5, unit: '%' })).toBe('92.5%');
+    expect(formatKpiValue({ label: '单价', value: 1359, unit: '元' })).toBe('1,359 元');
+    expect(formatKpiValue({ label: '精度', value: 1359, unit: '元', precision: 2 })).toBe(
+      '1,359.00 元',
+    );
+    expect(formatKpiValue({ label: '缺数', value: null })).toBe('—');
+    const kpi = { label: '同比', value: 1, unit: '件' };
+    expect(
+      formatKpiDelta({ ...kpi, delta: { value: 4.2, unit: 'percent', direction: 'up-good' } }),
+    ).toBe('+4.2%');
+    expect(
+      formatKpiDelta({ ...kpi, delta: { value: -1.1, unit: 'point', direction: 'up-good' } }),
+    ).toBe('-1.1 个百分点');
+    expect(
+      formatKpiDelta({ ...kpi, delta: { value: 12000, unit: 'absolute', direction: 'neutral' } }),
+    ).toBe('+1.2 万件');
+  });
+
+  it('增减量按好坏取主题状态色位，不写固定色值', () => {
+    const colorOf = (direction: 'up-good' | 'down-good' | 'neutral', value: number) => {
+      const document = composeOk({
+        title: '指标',
+        subtitle: '口径',
+        kpis: [{ label: '量', value: 10, delta: { value, unit: 'percent', direction } }],
+        blocks: [],
+      });
+      return nodesOf(document).find((node) => node.name === '同比')?.style.color;
+    };
+    expect(colorOf('up-good', 3)).toBe('theme:success');
+    expect(colorOf('up-good', -3)).toBe('theme:danger');
+    expect(colorOf('down-good', -3)).toBe('theme:success');
+    expect(colorOf('down-good', 3)).toBe('theme:danger');
+    expect(colorOf('neutral', 3)).not.toMatch(/^theme:(success|danger)$/);
+  });
+
+  it('指标数值写成字符串时进修复：诊断指回那一条', () => {
+    const issues = createParseIssues();
+    const spec = parseCatalogSpec(
+      JSON.stringify({
+        title: '华东渠道周会',
+        subtitle: '按周汇总',
+        kpis: [
+          { label: '总量', value: '28.6 万' },
+          { label: '周转', value: 31.4, unit: '天' },
+        ],
+        blocks: [{ type: 'base.chart', title: '趋势', span: 2, table: TREND_TABLE }],
+      }),
+      TEST_CATALOG,
+      [],
+      issues,
+    );
+    expect(spec?.kpis).toEqual([{ label: '周转', value: 31.4, unit: '天' }]);
+    expect(issues.issues).toEqual([
+      expect.objectContaining({ code: 'AGENT_KPI_INVALID', path: 'kpis[0]' }),
+    ]);
+  });
+
+  it('模型给的指标值标为示例数据，标题与兜底占位不标', () => {
+    const spec = parseCatalogSpec(
+      blocksJson([{ type: 'base.chart', title: '近三日趋势', span: 2, table: TREND_TABLE }]),
+      TEST_CATALOG,
+    );
+    const llm = composeOk({ ...(spec as AgentScreenSpec), mode: 'llm' });
+    const values = nodesOf(llm).filter((node) => node.name === '指标值');
+    expect(values.length).toBeGreaterThan(0);
+    for (const node of values) expect(node.dataValue).toMatchObject({ sample: true });
+    const title = nodesOf(llm).find((node) => node.name === '标题');
+    expect(title?.dataValue).not.toHaveProperty('sample');
+
+    const fallback = composeOk({ ...(spec as AgentScreenSpec), mode: 'deterministic' });
+    for (const node of nodesOf(fallback).filter((item) => item.name === '指标值')) {
+      expect(node.dataValue).not.toHaveProperty('sample');
+    }
   });
 
   it('图片用素材身份：文档里只有 resourceId，没有 URL', () => {
@@ -886,9 +968,9 @@ describe('目录驱动的解析与编译', () => {
         title: '华东十月销售总览',
         subtitle: '10月1日至31日，金额单位万元',
         kpis: [
-          { label: '销售额', value: '3860 万元' },
-          { label: '订单量', value: '2.84 万单' },
-          { label: '客单价', value: '1359 元' },
+          { label: '销售额', value: 3860, unit: '万元' },
+          { label: '订单量', value: 28400, unit: '单' },
+          { label: '客单价', value: 1359, unit: '元' },
         ],
         blocks: [],
       },
@@ -1009,7 +1091,7 @@ describe('目录驱动的解析与编译', () => {
     const panelsOnly = JSON.stringify({
       title: '华东渠道周会',
       subtitle: '按周汇总的渠道经营口径',
-      kpis: [{ label: '总量', value: '28.6 万' }],
+      kpis: [{ label: '总量', value: 286000 }],
       panels: [{ kind: 'list', title: '要点', items: ['甲', '乙', '丙'] }],
     });
     expect(parseCatalogSpec(panelsOnly, TEST_CATALOG)).toBeNull();
@@ -1019,7 +1101,7 @@ describe('目录驱动的解析与编译', () => {
     const mixed = JSON.stringify({
       title: '华东渠道周会',
       subtitle: '按周汇总的渠道经营口径',
-      kpis: [{ label: '总量', value: '28.6 万' }],
+      kpis: [{ label: '总量', value: 286000 }],
       blocks: [{ type: 'base.chart', title: '趋势', span: 2, table: TREND_TABLE }],
       panels: [{ kind: 'list', title: '要点', items: ['甲', '乙', '丙'] }],
     });
