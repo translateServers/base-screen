@@ -6,8 +6,8 @@ import type { BaseScreenMaterialEditorField } from './editor-descriptor-model.js
 /**
  * 把物料的 styleSchema 派生成带注释的 TS interface 文本，供宿主塞进智能体提示词。
  *
- * 竞品（LIGHT CHASER `getAiStylePromptTs`）的关键不是自然语言描述，而是「模型看到的
- * 就是 schema 本身」：字段名、嵌套路径、枚举与范围都来自声明，模型无从编造。本函数
+ * 关键不是自然语言描述，而是「模型看到的就是 schema 本身」：字段名、嵌套路径、枚举与
+ * 范围都来自声明，模型无从编造。本函数
  * 只做确定性投影，不新增 manifest 字段——注释里的中文名取自 editorDescriptor 的
  * label/help（按 path 匹配），约束取自 schema 自身。
  *

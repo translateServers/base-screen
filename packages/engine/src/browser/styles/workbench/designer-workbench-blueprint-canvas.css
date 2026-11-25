@@ -1,6 +1,6 @@
 /* 引擎默认蓝图画布骨架（ADR-0107 §2.6）：工具条 + 无限点阵舞台 + 底部模拟条。
    节点、连线与浮层分别在同目录的 -nodes / -edges / -overlays 文件里；
-   颜色全部取 designer-tokens.css 的 --designer-blueprint-* 令牌（LIGHT CHASER 实测值）。 */
+   颜色全部取 designer-tokens.css 的 --designer-blueprint-* 令牌。 */
 .designer-blueprint-canvas {
   position: absolute;
   inset: 0;

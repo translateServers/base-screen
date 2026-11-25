@@ -37,7 +37,7 @@ const TRANSITIONS = ['appear', 'fade', 'slide-up'] as const;
 const ROLES = ['related', 'detail', 'group', 'drill-down'] as const;
 
 /**
- * 右侧检查器「配置」页（ADR-0107 §2.6，内容参考 LIGHT CHASER，外观沿用设计视图检查器）：
+ * 右侧检查器「配置」页（ADR-0107 §2.6，外观沿用设计视图检查器）：
  * 名称 + id | 类型 在检查器头部；下方是标准折叠分区（`designer-inspector-section`）与
  * 标签列 + 控件列字段行（`designer-field`），不另造一套表单外观。
  * 单个节点 → 锚点信息 / 基础配置 / 节点配置 / 上下游连线；

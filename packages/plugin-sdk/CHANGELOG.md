@@ -1,5 +1,75 @@
 # @base-screen/plugin-sdk
 
+## 0.2.0
+
+### Minor Changes
+
+- 9eec106: 在线作者面（base-screen-docs ADR-0105）：
+
+  - 物料规格 `BaseScreenMaterialSpec` 与 `parseBaseScreenMaterialSpec` / `compileBaseScreenMaterialSpec`：字段按分区声明（分区决定 props / style 与检查器分段），控件由推导决定，读数格式走配置组，数据形状为无 / 单值 / 多行（按角色）；派生 `createBaseScreenMaterialSpecDataAdapter`、`normalizeBaseScreenMaterialSpecValue`、`createBaseScreenMaterialSpecSampleDataset`。
+  - 渲染函数物料：`createBaseScreenRenderedMaterialPresenter`、`createBaseScreenRenderedMaterialElement`、`createBaseScreenSpecMaterialDefinition`、`formatBaseScreenMaterialNumber`。骨架统一四态、重绘与失败隔离，作者只写数据就绪时的绘制。
+  - 体检：`auditBaseScreenMaterialSpec`（原子判定、门禁规则、表单审计与渲染代码静态检查）、`auditBaseScreenFragment`（组合 F 规则），结论类型 `BaseScreenAuthoringFinding` 与 `sortBaseScreenAuthoringFindings` / `hasBaseScreenAuthoringErrors`。
+  - 样式键词典运行时副本 `BASE_SCREEN_STYLE_KEY_DICTIONARY` / `BASE_SCREEN_REGISTERED_STYLE_KEYS` / `BASE_SCREEN_DESCRIPTIVE_TEXT_KEYS`；词典新增趋势语义色 `positiveColor` / `negativeColor`。
+  - 读数格式配置组的 `prefix` / `unit` 接受字符串作为默认值。
+
+- 7b9d601: 组合分片正式化第一阶段（ADR-0100）：
+
+  - `plugin-core` 成为分片形状契约的唯一所有者：新增 `BaseScreenFragmentDefinition`（物料库展示信息 + 外壳 / 节点组合）、
+    `parseBaseScreenFragmentDefinition` 与 `isBaseScreenBoundedName`；`parseBaseScreenComponentFragmentInsertionIntent`
+    及 `BaseScreenComponentFragmentInsertionIntent` / `BaseScreenFragmentNode` / `BaseScreenFragmentShell` / `BaseScreenFragmentEntry`
+    从 engine 迁入。engine 公共面继续转发这些名称，宿主的导入路径与插入行为不变；节点 `size` 无效时的诊断路径修正为
+    `['nodes', <index>, 'size']`。
+  - 新增插件贡献类型 `fragment`（`BaseScreenPluginFragmentContribution`，身份串 `fragment:<id>`）：分片定义直接写进插件清单，
+    不需要能力授权。`plugin-manager` 把它投影进运行时贡献索引，新增可选的 `getFragment` / `listFragments`（按插件声明顺序）。
+  - `plugin-sdk` 新增 `defineBaseScreenFragment()`，失败关闭地校验并返回冻结的 `fragment` 贡献。
+
+  物料库展示、catalog 一致性试运行与示例分片属于第一阶段后半段，尚未包含在本次变更中。
+
+- cbb7022: 检查器「基础 / 全量」三层规则（base-screen-docs ADR-0102 §7.1）。
+
+  - 基础模式只隐藏整段的效果类设置（滤镜、物料的「动效」分区）；层级、多选的编组 / 锁定 / 隐藏 / 旋转改为基础可见。
+  - 基础模式面板底部显示「已隐藏 N 项 · 显示全量」，点击切到全量。
+  - 「高级」不再用作名称：右栏页签改名「交互」，数据页「高级设置」改名「处理与刷新」，搜索结果角标改为「仅全量」。
+  - `auditBaseScreenMaterialEditorForm` 新增 R15：字段不能单独标 `advanced`；物料分区里只有「动效」（`motion`）仅全量可见且必须标 `advanced`。
+  - `board.pipeline` 的连接线色与粗细移入默认收起的「连接线」分区。
+
+- 7b9d601: 检查器配置表单范式（base-screen-docs ADR-0102 D1–D3）。
+
+  - **控件按语义推导**：描述符字段的 `control` 可以省略，解析时按字段语义补齐（新导出
+    `inferBaseScreenMaterialEditorControl`）：小整数计数（props、无单位、跨度 ≤ 24）→ 步进器，有界数值 → 滑杆 + 读数
+    （有 `unit` 时读数内嵌单位），无界带单位 → 带单位数字，`color` / `xxxColor` 键 → 取色器，left/center/right → 图标分段。
+    `parseBaseScreenMaterialEditorDescriptor` 与 `parseBaseScreenMaterialManifest` 返回规范化后的描述符。新增作者输入类型
+    `BaseScreenMaterialEditorFieldInput` / `BaseScreenMaterialEditorSectionInput` / `BaseScreenMaterialEditorDescriptorInput`。
+  - **描述符是唯一表单来源**：检查器只有描述符一条渲染路径；扁平 `propertyPanel` / `stylePanel` 由引擎转换成「内容 / 样式」
+    两个描述符分区后渲染。提交门禁、多选批量、条件样式、宿主条件样式都改读同一份外观字段表。色板组（连续 ≥ 3 个颜色字段合成色卡带）
+    从扁平分支移到描述符渲染器，所有物料的颜色分区都会出现。
+    仓库内官方物料、大屏物料与图表的扁平面板全部清空。
+  - **通用配置组**（plugin-sdk）：`createBaseScreenNumberFormatConfig`（前缀、单位、小数位、显示千分位）、
+    `createBaseScreenChartTitleConfig`、`createBaseScreenChartLegendConfig`、`mergeBaseScreenMaterialConfigGroups`。
+    翻牌器、胶囊进度、水位图与 11 个图表改用配置组。
+  - **范式审计**（plugin-sdk）：`auditBaseScreenMaterialEditorForm(manifest)` 返回 R9 / R11–R14 违规清单（可见字段预算、
+    控件与推导一致、不再写扁平面板、标签文案、配置组键一致）；物料包测试对每个 manifest 断言为空。
+  - **文档键变更**：`board.digital-flop` 的 `props.suffix` 改名为 `props.unit`。开关标签改为正向表述（「显示图例」
+    「显示提示框」「显示千分位」「启用发光」等），「填充」改为「填充色」。
+
+### Patch Changes
+
+- Updated dependencies [591d730]
+- Updated dependencies [314eda0]
+- Updated dependencies [c27b41a]
+- Updated dependencies [1b328e6]
+- Updated dependencies [7b9d601]
+- Updated dependencies [7b9d601]
+- Updated dependencies [7b9d601]
+- Updated dependencies [591d730]
+- Updated dependencies [7b9d601]
+- Updated dependencies [aa547bf]
+- Updated dependencies [c213715]
+- Updated dependencies [6405a3d]
+- Updated dependencies [c213715]
+  - @base-screen/contracts@0.2.0
+  - @base-screen/plugin-core@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes
@@ -374,6 +444,7 @@
 - Updated dependencies [2dc2b3e]
 - Updated dependencies [14fc8cd]
 - Updated dependencies [81c3cea]
+
   - @base-screen/contracts@0.1.0
   - @base-screen/plugin-core@0.1.0
 

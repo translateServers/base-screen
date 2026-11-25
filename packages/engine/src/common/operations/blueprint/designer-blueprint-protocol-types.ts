@@ -75,7 +75,7 @@ export interface BaseScreenBlueprintCanvasNode {
   readonly title: string;
   readonly subtitle: string;
   readonly enabled: boolean;
-  /** 先输出后输入（LIGHT CHASER 卡片顺序）；语义锚点单列。 */
+  /** 锚点行先输出后输入；语义锚点单列。 */
   readonly outputs: readonly BaseScreenBlueprintCanvasPort[];
   readonly inputs: readonly BaseScreenBlueprintCanvasPort[];
   readonly semantic: boolean;

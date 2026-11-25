@@ -31,8 +31,7 @@ import { type DesignerIconName, designerIcon } from '../designer-icons.js';
 import { escapeAttribute, escapeHtml } from './designer-blueprint-dom-helpers.js';
 
 /**
- * 引擎默认蓝图画布（ADR-0107 §2.6，视觉与手势参考 LIGHT CHASER 实测，见设计说明
- * `blueprint-node-graph.md`）。
+ * 引擎默认蓝图画布（ADR-0107 §2.6，视觉与手势见设计说明 `blueprint-node-graph.md`）。
  *
  * 只经画布协议与工作台通信：收 `state` 事件渲染，发 `command` 事件请求修改；文档、历史与校验都不在这里。
  * 拖动、框选、平移、缩放是本地交互态，松手后一次性以 `commit-layout` 提交位置。
@@ -1276,7 +1275,7 @@ class DefaultBlueprintCanvas {
   }
 
   /**
-   * 右键菜单（内容参考 LIGHT CHASER，样式用设计器 `.designer-context-menu`）：
+   * 右键菜单（样式用设计器 `.designer-context-menu`）：
    * 有选中时置顶删除，其后节点操作；最后是「在此处新增节点」与全选 / 自动布局 / 适应画布。
    */
   private openMenu(

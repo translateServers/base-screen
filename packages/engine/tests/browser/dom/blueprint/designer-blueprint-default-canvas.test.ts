@@ -75,7 +75,7 @@ describe('engine default blueprint canvas', () => {
     expect(panel).toContain('fallback.hidden = assigned !== undefined');
   });
 
-  it('keeps the LIGHT CHASER card geometry, 28px port hit area and shared grid tokens', () => {
+  it('keeps the 164px card geometry, 28px port hit area and shared grid tokens', () => {
     expect(canvas).toContain('designer-blueprint-geometry.js');
     expect(geometry).toContain('DESIGNER_BLUEPRINT_NODE_WIDTH = 164');
     expect(geometry).toContain('DESIGNER_BLUEPRINT_NODE_ROW_HEIGHT = 27');

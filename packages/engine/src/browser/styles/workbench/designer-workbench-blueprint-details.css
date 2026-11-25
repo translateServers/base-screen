@@ -627,7 +627,7 @@
   list-style: none;
 }
 
-/* 锚点行：方向徽标 + 名称 + 锚点 id（LIGHT CHASER 节点配置面板的锚点信息）。 */
+/* 锚点行：方向徽标 + 名称 + 锚点 id。 */
 .blueprint-anchor {
   min-width: 0;
   display: grid;

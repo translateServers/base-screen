@@ -1,5 +1,90 @@
 # @base-screen/sdk
 
+## 0.2.0
+
+### Minor Changes
+
+- aa547bf: 长连接数据源契约（ADR-0104 切片 1）。只有契约与校验，运行时订阅在后续切片实现。
+
+  - 文档：`updatePolicy.mode` 新增 `'push'`，可带 `fallbackIntervalSeconds`（断线回退轮询，1..86400 秒）
+    与 `retain: { rows?, seconds?, timeField? }`（保留窗口；`seconds` 与 `timeField` 必须成对）。这两个字段只属于 `push`；
+    `url-query` 来源禁止 `push`。JSON Schema 同步更新。旧版本解析器会拒绝含 `push` 的文档。
+  - 宿主端口：`ScreenHostResourcePort` 与 `ScreenHostCatalogPort` 新增可选 `subscribe(request, sink, { signal, context?, retain? })`，
+    同步返回 `ScreenParseResult<null>`；新类型 `ScreenSourcePushEvent`（`snapshot` / `append` / `invalidate` /
+    `status` / `heartbeat`）、`ScreenPushCursor`、`ScreenSourceConnectionStatus`、`ScreenSourcePushSink`、
+    `ScreenHostSubscribeOptions`、`ScreenHostCatalogSubscribeRequest`。`validateScreenDesignerHostAdapter`
+    要求出现的 `subscribe` 必须是函数。
+  - 能力声明：资源类型贡献 `dataResourceType.delivery` 与 `ScreenHostCatalogDescriptor.delivery`
+    （`{ push?: { append?, inactivityTimeoutSeconds? } }`），新导出 `listScreenSourceDeliveryIssues`、
+    `normalizeScreenSourceDelivery`、`supportsScreenSourcePush`。
+  - 物料数据状态 `ready` 分支新增可选 `stale?: true`；执行触发器新增 `'push'`；观察事件新增
+    `subscribed` / `unsubscribed` / `pushed` / `connection` / `resync` 及可选 `cursor`、`connection` 字段。
+  - engine：数据源实例视图的 `updatePolicy` 改用契约类型 `ScreenUpdatePolicy`。
+
+- 15666a6: `refreshCatalog(catalog, { materialLibraryGrouping })`：配置了物料库分组的宿主新增或下架物料时，分组随 catalog 一起交换并按新 catalog 校验，二者同一次全有或全无；新增公共类型 `BaseScreenMaterialCatalogRefreshOptions`（base-screen-docs ADR-0105 P2）。
+- 9831915: 移除设计器的对比度守卫：底栏「对比度」条目与详情弹层、画布文本对比度测量与修复预览一并删除。公开 API 去掉
+  `BASE_SCREEN_GUARD_CHANGE_EVENT`（`base-screen-guard-change` 事件不再派发）、`DesignerGuardSnapshot`、
+  `DesignerContrastIssue`；度量事件名去掉 `guard_fail`、`fix_preview`、`fix_apply`。core 的对比度计算函数保留
+  （大屏截图探针与示例后端仍在使用）。
+- 591d730: 移除场景切换（ADR-0092 §4，2026-11-23）。
+
+  **破坏性变更**
+
+  - 设计器元素删除 `setSceneCatalog()`、`setSceneHandler()`、`setActiveScene()`、`activeSceneId`、`sceneAvailable`。
+  - 删除 `base-screen-scene-change` 事件与 `BASE_SCREEN_SCENE_CHANGE_EVENT`、`BaseScreenSceneChangeDetail`、
+    `DesignerSceneDescriptor`、`DesignerSceneHandler`、`DesignerScenePlan`、`DesignerScenePrepareResult`、
+    `DesignerScenePreview`、`DesignerSceneRequest`、`prepareDesignerScenePreview`。
+  - 左栏顶部场景区与画布「场景预览 · 未写入」条随之移除；度量事件不再有 `scene_preview` / `scene_apply`。
+
+  同屏内容切换请改用弹框画板（ADR-0108）或蓝图显隐与变量。
+
+### Patch Changes
+
+- Updated dependencies [4f0656c]
+- Updated dependencies [591d730]
+- Updated dependencies [fc7c4d1]
+- Updated dependencies [18e00e8]
+- Updated dependencies [e2d7c76]
+- Updated dependencies [329b175]
+- Updated dependencies [d161254]
+- Updated dependencies [314eda0]
+- Updated dependencies [9eec106]
+- Updated dependencies [fe97e39]
+- Updated dependencies [c27b41a]
+- Updated dependencies [8c0cb72]
+- Updated dependencies [1b328e6]
+- Updated dependencies [7b9d601]
+- Updated dependencies [8c0cb72]
+- Updated dependencies [8c0cb72]
+- Updated dependencies [7b9d601]
+- Updated dependencies [f1242c4]
+- Updated dependencies [cbb7022]
+- Updated dependencies [8b54fd9]
+- Updated dependencies [7b9d601]
+- Updated dependencies [8c0cb72]
+- Updated dependencies [591d730]
+- Updated dependencies [7b9d601]
+- Updated dependencies [620c2b7]
+- Updated dependencies [aa547bf]
+- Updated dependencies [15666a6]
+- Updated dependencies [d7c48f6]
+- Updated dependencies [15666a6]
+- Updated dependencies [9831915]
+- Updated dependencies [591d730]
+- Updated dependencies [c213715]
+- Updated dependencies [8c0cb72]
+- Updated dependencies [6405a3d]
+- Updated dependencies [591d730]
+- Updated dependencies [c213715]
+  - @base-screen/engine@0.2.0
+  - @base-screen/renderer@0.2.0
+  - @base-screen/contracts@0.2.0
+  - @base-screen/core@0.2.0
+  - @base-screen/plugin-core@0.2.0
+  - @base-screen/material@0.2.0
+  - @base-screen/plugin-sdk@0.2.0
+  - @base-screen/plugin-manager@0.2.0
+
 ## 0.1.1
 
 ### Patch Changes
