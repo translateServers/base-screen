@@ -68,18 +68,24 @@ function diffComponent(
   after: ScreenDocument['components'][number],
 ): readonly ScreenDiffEntry[] {
   const entries: ScreenDiffEntry[] = [];
+  compareValue('type', before.type, after.type, entries);
   compareValue('name', before.name, after.name, entries);
+  compareValue('parentId', before.parentId, after.parentId, entries);
   compareValue('position.x', before.position.x, after.position.x, entries);
   compareValue('position.y', before.position.y, after.position.y, entries);
   compareValue('size.width', before.size.width, after.size.width, entries);
   compareValue('size.height', before.size.height, after.size.height, entries);
   compareValue('rotation', before.rotation, after.rotation, entries);
   compareValue('zIndex', before.zIndex, after.zIndex, entries);
+  compareValue('status', before.status, after.status, entries);
   diffObject('props', before.props, after.props, entries);
   diffObject('style', before.style, after.style, entries);
   compareValue('dataValue', before.dataValue ?? null, after.dataValue ?? null, entries);
   compareValue('dataSource', before.dataSource ?? null, after.dataSource ?? null, entries);
+  compareValue('dataBinding', before.dataBinding ?? null, after.dataBinding ?? null, entries);
   compareValue('states', before.states ?? null, after.states ?? null, entries);
+  compareValue('canvasId', before.canvasId, after.canvasId, entries);
+  compareValue('belowSubCanvas', before.belowSubCanvas, after.belowSubCanvas, entries);
   return entries;
 }
 

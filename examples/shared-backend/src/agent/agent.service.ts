@@ -40,8 +40,6 @@ import {
   type AgentBlock,
   type AgentBlockColumn,
   type AgentBlockTable,
-  type AgentChartPoint,
-  type AgentPanel,
   type AgentScreenSpec,
   buildAgentUserPrompt,
   buildCatalogSystemPrompt,
@@ -564,10 +562,7 @@ function pickTabularMaterial(catalog: AgentCatalog): AgentCatalogMaterial | unde
   return withRoles.find((material) => material.category.includes('数据')) ?? withRoles[0];
 }
 
-/**
- * 解析模型输出。优先读 v2 的 `blocks`（目录驱动）；仍收到 v1 的 `panels` 时按目录折算成块，
- * 保证旧客户端/旧模型的输出不会因为升级而直接报错。
- */
+/** 解析模型输出：只认目录驱动的 `blocks`。 */
 export function parseCatalogSpec(
   text: string,
   catalog: AgentCatalog,
@@ -605,30 +600,23 @@ export function parseCatalogSpec(
   // 从 3 条放宽到 1 条：少一条 KPI 不值得把整屏作废，排版会按实际数量分栏。
   if (kpis.length < 1) return null;
 
-  if (Array.isArray(record.blocks)) {
-    // 块全被丢掉时仍返回 spec（blocks 为空）：调用方要区分"文档非法"与"没有可用块"，
-    // 后者应该保留标题/KPI 再补确定性布局，而不是整屏作废。
-    return {
-      title: title.slice(0, 20),
-      subtitle: subtitle.slice(0, 40),
-      ...(typeof record.style === 'string' ? { style: record.style.trim() } : {}),
-      kpis,
-      blocks: readBlocks(record.blocks, catalog, warnings),
-    };
+  // `blocks` 是唯一的块形态（ADR-0111 §2.6）：缺它，或同时出现自有 `panels` 键，都是非法 spec。
+  if (!Array.isArray(record.blocks) || Object.prototype.hasOwnProperty.call(record, 'panels')) {
+    return null;
   }
-
-  if (Array.isArray(record.panels)) {
-    const panels = readPanels(record.panels);
-    if (panels === null) return null;
-    const blocks = panelsToBlocks(panels, catalog);
-    if (blocks === null) return null;
-    return { title: title.slice(0, 20), subtitle: subtitle.slice(0, 40), kpis, blocks };
-  }
-  return null;
+  // 块全被丢掉时仍返回 spec（blocks 为空）：调用方要区分"文档非法"与"没有可用块"，
+  // 后者应该保留标题/KPI 再补确定性布局，而不是整屏作废。
+  return {
+    title: title.slice(0, 20),
+    subtitle: subtitle.slice(0, 40),
+    ...(typeof record.style === 'string' ? { style: record.style.trim() } : {}),
+    kpis,
+    blocks: readBlocks(record.blocks, catalog, warnings),
+  };
 }
 
 /**
- * v2 块逐项校验。
+ * 块逐项校验。
  *
  * 原则：**单块瑕疵只降级该块**，不做整份拒绝——整份拒绝的代价是整屏掉进模板，
  * 用户已经排好的内容全没了。只有"一条块都用不了"才交给调用方退回确定性布局。
@@ -871,115 +859,4 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
-}
-
-/** v1 面板（chart / list / image）按目录折算成块；目录缺对应物料时该面板不出现。 */
-function panelsToBlocks(panels: readonly AgentPanel[], catalog: AgentCatalog): AgentBlock[] | null {
-  const chart = pickTabularMaterial(catalog);
-  const text = pickTextMaterial(catalog);
-  const asset = pickAssetMaterial(catalog);
-  const blocks: AgentBlock[] = [];
-  for (const panel of panels) {
-    if (panel.kind === 'chart' && chart !== undefined) {
-      blocks.push({
-        type: chart.type,
-        title: panel.title,
-        ...(panel.note === undefined ? {} : { note: panel.note }),
-        span: 2,
-        table: {
-          columns: [
-            { id: 'label', label: '维度', type: 'string' },
-            { id: 'value', label: '数值', type: 'number' },
-          ],
-          rows: panel.points.map((point) => ({ label: point.label, value: point.value })),
-        },
-      });
-      continue;
-    }
-    if (panel.kind === 'list' && text !== undefined) {
-      blocks.push({
-        type: text.type,
-        title: panel.title,
-        ...(panel.note === undefined ? {} : { note: panel.note }),
-        span: 1,
-        text: panel.items.map((item) => `· ${item}`).join('\n'),
-      });
-      continue;
-    }
-    if (panel.kind === 'image' && asset !== undefined) {
-      const firstAsset = catalog.assets[0];
-      if (firstAsset === undefined) continue;
-      blocks.push({
-        type: asset.type,
-        title: panel.title,
-        ...(panel.note === undefined ? {} : { note: panel.note }),
-        span: 1,
-        assetId: firstAsset.id,
-      });
-    }
-  }
-  return blocks.length === 0 ? null : blocks;
-}
-
-/** 面板逐项校验：图必须有 5–7 个点，清单必须有 3–5 条，缺一个就整份拒绝。 */
-function readPanels(value: readonly unknown[]): readonly AgentPanel[] | null {
-  const panels: AgentPanel[] = [];
-  for (const item of value.slice(0, 4)) {
-    if (typeof item !== 'object' || item === null) return null;
-    const panel = item as Record<string, unknown>;
-    const kind = panel.kind;
-    const title = typeof panel.title === 'string' ? panel.title.trim() : '';
-    if (title === '') return null;
-    const note = typeof panel.note === 'string' ? panel.note.trim() : '';
-    const base = { title: title.slice(0, 20), ...(note === '' ? {} : { note: note.slice(0, 40) }) };
-    if (kind === 'chart') {
-      const points = readChartPoints(panel.points);
-      if (points === null) return null;
-      panels.push({ kind, ...base, points });
-      continue;
-    }
-    if (kind === 'list') {
-      const items = readListItems(panel.items);
-      if (items === null) return null;
-      panels.push({ kind, ...base, items });
-      continue;
-    }
-    if (kind === 'image') {
-      const imageUrl = typeof panel.imageUrl === 'string' ? panel.imageUrl.trim() : '';
-      panels.push({
-        kind,
-        ...base,
-        ...(imageUrl.startsWith('https://') ? { imageUrl } : {}),
-      });
-      continue;
-    }
-    return null;
-  }
-  return panels;
-}
-
-function readChartPoints(value: unknown): readonly AgentChartPoint[] | null {
-  if (!Array.isArray(value)) return null;
-  const parsed = value.slice(0, 7).map((item): AgentChartPoint | null => {
-    if (typeof item !== 'object' || item === null) return null;
-    const point = item as Record<string, unknown>;
-    const label = typeof point.label === 'string' ? point.label.trim() : '';
-    const raw = point.value;
-    if (label === '' || label.length > 8) return null;
-    if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) return null;
-    return { label, value: raw };
-  });
-  const points = parsed.filter((point): point is AgentChartPoint => point !== null);
-  if (points.length !== parsed.length) return null;
-  if (points.length < 5) return null;
-  // 全零的柱形看不出任何信息，等同于没给数据。
-  if (points.every((point) => point.value === 0)) return null;
-  return points;
-}
-
-function readListItems(value: unknown): readonly string[] | null {
-  if (!Array.isArray(value)) return null;
-  const items = value.slice(0, 5).map((item) => (typeof item === 'string' ? item.trim() : ''));
-  if (items.some((item) => item === '' || item.length > 24)) return null;
-  return items.length >= 3 ? items : null;
 }

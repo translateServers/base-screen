@@ -1,4 +1,8 @@
-import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
+import {
+  type ScreenDiagnostic,
+  type ScreenDocument,
+  screenJsonEquals,
+} from '@base-screen/contracts';
 import {
   applyScreenDocumentTransaction,
   type ScreenDiffRow as DesignerChangeDiffRow,
@@ -63,7 +67,13 @@ export interface DesignerChangeUnit {
   readonly presentation?: DesignerChangeUnitPresentation;
 }
 
-/** 只用于展示的提案单元语义；不参与命令分组或采纳计算。 */
+/**
+ * 提案单元的组合语义。
+ *
+ * `whole-screen-replacement`：整屏替换（删除全部未锁定组件并新增一组组件）。识别到它时整份提案
+ * 只有这一个单元，只能整体采纳或放弃——单独采纳其中的「删除」会把文档拆成只剩锁定组件，
+ * 而画布上仍是完整草案（ADR-0111 §2.1）。
+ */
 export interface DesignerChangeUnitPresentation {
   readonly kind: 'whole-screen-replacement';
   readonly addedCount: number;
@@ -89,7 +99,16 @@ export function prepareDesignerChangeProposal(
   id: string,
 ): DesignerChangeProposalResult {
   if (input.commands.length === 0) {
-    return { ok: false, reason: 'empty', diagnostics: [] };
+    return {
+      ok: false,
+      reason: 'empty',
+      diagnostics: [
+        changeDiagnostic(
+          'CHANGE_PROPOSAL_EMPTY',
+          'Change proposal must contain at least one command.',
+        ),
+      ],
+    };
   }
   const provenance: ScreenTransactionProvenance = {
     source: 'agent',
@@ -101,11 +120,17 @@ export function prepareDesignerChangeProposal(
   });
   if (!result.ok) return { ok: false, reason: 'invalid', diagnostics: result.diagnostics };
   const diff = diffScreenDocuments(document, result.document);
-  // 只有组件级 diff 是不够的：`diffScreenDocuments` 按组件 id 对齐，纯画布变更（背景色/背景图/
-  // 尺寸）在它眼里是「没有差异」，于是「把背景改成天蓝色」这类提案会被判空直接拒掉。
-  // 画布、变量、蓝图的变化在这里单独补一次判定。
-  if (diff.length === 0 && !hasDocumentLevelChange(document, result.document)) {
-    return { ok: false, reason: 'empty', diagnostics: [] };
+  if (screenJsonEquals(document, result.document)) {
+    return {
+      ok: false,
+      reason: 'empty',
+      diagnostics: [
+        changeDiagnostic(
+          'CHANGE_PROPOSAL_NO_EFFECT',
+          'Change proposal commands are valid but leave the document unchanged.',
+        ),
+      ],
+    };
   }
   return {
     ok: true,
@@ -116,13 +141,21 @@ export function prepareDesignerChangeProposal(
       scope: input.scope,
       commands: input.commands,
       candidate: result.document,
-      affectedComponentIds: diff.map((row) => row.componentId),
+      affectedComponentIds: result.changedComponentIds,
       diff,
       units: buildUnits(document, input.commands, diff),
       provenance,
       ...(input.origin === undefined ? {} : { origin: input.origin }),
     },
   };
+}
+
+/** 提案层自己的拒绝原因（ADR-0111 §2.4）：文档根路径、error 级；命令非法时透传事务诊断。 */
+export function changeDiagnostic(
+  code: Extract<ScreenDiagnostic['code'], `CHANGE_${string}`>,
+  message: string,
+): ScreenDiagnostic {
+  return { severity: 'error', code, path: [], message };
 }
 
 /** 取选定单元的原始命令，保持提交时的顺序。 */
@@ -139,15 +172,26 @@ export function commandsForUnits(
   return proposal.commands.filter((_, index) => indexes.has(index));
 }
 
-/** 按单元拆分提案命令；任何单元无法独立成立时退回单一单元（整批采纳）。 */
+/**
+ * 按单元拆分提案命令；任何单元无法独立成立时退回单一单元（整批采纳）。
+ * 整屏替换不拆：整份提案就是一个单元（ADR-0111 §2.1）。
+ */
 function buildUnits(
   document: ScreenDocument,
   commands: readonly ScreenDocumentCommand[],
   diff: readonly DesignerChangeDiffRow[],
 ): readonly DesignerChangeUnit[] {
+  const replacement = wholeScreenReplacement(document, commands, diff);
+  if (replacement !== undefined) {
+    return [
+      {
+        ...wholeUnit(commands, diff),
+        presentation: { kind: 'whole-screen-replacement', addedCount: replacement.addedCount },
+      },
+    ];
+  }
   const componentCommands = commands.map((command) => componentTargets(command));
   const groups = groupComponentTargets(componentCommands);
-  const replacement = wholeScreenReplacement(document, commands, diff);
   const names = new Map(document.components.map((component) => [component.id, component.name]));
   for (const command of commands) {
     if (command.type === 'add-component') names.set(command.component.id, command.component.name);
@@ -166,24 +210,12 @@ function buildUnits(
     if (rows.length === 0) return [wholeUnit(commands, diff)];
     for (const row of rows) covered.add(row.componentId);
     const commandIndexes = [...group.indexes].sort((a, b) => a - b);
-    const isWholeScreenRemoval =
-      replacement !== undefined &&
-      rows.some((row) => row.kind === 'removed') &&
-      commandIndexes.some((index) => replacement.removeCommandIndexes.has(index));
     units.push({
       id: root,
       label: unitLabel(group.componentIds, names),
       kind: unitKind(rows),
       commandIndexes,
       diff: rows,
-      ...(isWholeScreenRemoval
-        ? {
-            presentation: {
-              kind: 'whole-screen-replacement' as const,
-              addedCount: replacement.addedCount,
-            },
-          }
-        : {}),
     });
   }
 
@@ -207,19 +239,14 @@ function buildUnits(
 }
 
 /**
- * 整屏替换只在展示层识别的组合语义：先清空全部未锁定组件，再新增一组组件。
+ * 整屏替换的识别：先清空全部未锁定组件，再新增至少一个组件。
  * 锁定组件不属于被替换集合，但会保留下来，不影响识别。
  */
 function wholeScreenReplacement(
   document: ScreenDocument,
   commands: readonly ScreenDocumentCommand[],
   diff: readonly DesignerChangeDiffRow[],
-):
-  | {
-      readonly removeCommandIndexes: ReadonlySet<number>;
-      readonly addedCount: number;
-    }
-  | undefined {
+): { readonly addedCount: number } | undefined {
   const unlockedIds = new Set(
     document.components
       .filter((component) => !component.status.locked)
@@ -228,26 +255,15 @@ function wholeScreenReplacement(
   if (unlockedIds.size === 0) return undefined;
   const addedCount = diff.filter((row) => row.kind === 'added').length;
   if (addedCount === 0) return undefined;
-  const removeCommandIndexes = new Set<number>();
-  commands.forEach((command, index) => {
-    if (command.type !== 'remove-components') return;
-    if (sameIds(unlockedIds, command.componentIds)) removeCommandIndexes.add(index);
-  });
-  return removeCommandIndexes.size === 0 ? undefined : { removeCommandIndexes, addedCount };
+  const removesAllUnlocked = commands.some(
+    (command) => command.type === 'remove-components' && sameIds(unlockedIds, command.componentIds),
+  );
+  return removesAllUnlocked ? { addedCount } : undefined;
 }
 
 function sameIds(expected: ReadonlySet<string>, actual: readonly string[]): boolean {
   const actualIds = new Set(actual);
   return actualIds.size === expected.size && [...expected].every((id) => actualIds.has(id));
-}
-
-/** 组件 diff 覆盖不到的区域：画布、变量、蓝图。字段顺序由 contracts 固定，可直接比较序列化结果。 */
-function hasDocumentLevelChange(before: ScreenDocument, after: ScreenDocument): boolean {
-  return (
-    JSON.stringify(before.canvas) !== JSON.stringify(after.canvas) ||
-    JSON.stringify(before.variables) !== JSON.stringify(after.variables) ||
-    JSON.stringify(before.blueprint) !== JSON.stringify(after.blueprint)
-  );
 }
 
 function wholeUnit(

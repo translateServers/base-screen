@@ -4,6 +4,7 @@ import {
   summarizeChangeProposal,
 } from '../../common/operations/change/designer-change-events.js';
 import {
+  changeDiagnostic,
   type DesignerChangeProposalInput,
   prepareDesignerChangeProposal,
 } from '../../common/operations/change/designer-change-proposal.js';
@@ -19,6 +20,9 @@ export type { BaseScreenDesignerChangeProposalSummary };
  *
  * 提案在这里**不写入文档**；采纳是独立的一步（UI 或宿主调用），写入时作为一次
  * 普通事务提交。宿主负责产出提案内容，引擎不调用模型。
+ *
+ * 不变式（ADR-0111 §2.4）：返回 `ok: false` 时至少带一条诊断——命令非法透传事务诊断，
+ * 其余拒绝原因用 `CHANGE_*`，宿主与模型据此修复，不必猜。
  */
 export function submitChangeProposal(
   element: DesignerElementHost,
@@ -26,13 +30,35 @@ export function submitChangeProposal(
 ): ScreenParseResult<BaseScreenDesignerChangeProposalSummary> {
   const elementState = getDesignerElementState(element);
   const document = elementState.session.document;
-  if (document === undefined) return { ok: false, diagnostics: [] };
+  if (document === undefined) {
+    return {
+      ok: false,
+      diagnostics: [
+        changeDiagnostic('CHANGE_DOCUMENT_UNAVAILABLE', 'Designer has no document loaded.'),
+      ],
+    };
+  }
   elementState.changeGeneration += 1;
   const id = `change-${elementState.changeGeneration}`;
   const prepared = prepareDesignerChangeProposal(document, input, id);
   if (!prepared.ok) return { ok: false, diagnostics: prepared.diagnostics };
-  if (!elementState.changeController.submit(prepared.value, input)) {
-    return { ok: false, diagnostics: [] };
+  const controller = elementState.changeController;
+  const draftPending = controller.pending !== undefined;
+  if (!controller.submit(prepared.value, input)) {
+    return {
+      ok: false,
+      diagnostics: [
+        draftPending
+          ? changeDiagnostic(
+              'CHANGE_DRAFT_PENDING',
+              'A pending change proposal must be adopted or discarded first.',
+            )
+          : changeDiagnostic(
+              'CHANGE_PREVIEW_UNAVAILABLE',
+              'Change proposal preview could not be mounted.',
+            ),
+      ],
+    };
   }
   return {
     ok: true,

@@ -172,7 +172,49 @@ describe('host intent component edits', () => {
       {
         type: 'update-components',
         componentIds: ['title'],
-        patch: { dataValue: { kind: 'inline', value: '今晚开抢' } },
+        patch: {
+          dataValue: { kind: 'inline', value: '今晚开抢' },
+          dataSource: null,
+        },
+      },
+    ]);
+  });
+
+  it('converts a legacy static text value to canonical inline data', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          summary: '标题已更新',
+          patches: [{ componentId: 'title', text: '今晚开抢' }],
+          mode: 'deterministic',
+        }),
+      ),
+    );
+    const legacy = componentDocument();
+    legacy.components[0] = {
+      ...legacy.components[0]!,
+      dataSource: { type: 'static', value: '旧标题' },
+      dataValue: null,
+    };
+    const element = designer(legacy);
+
+    const result = await handler(element)({
+      instanceId: 'instance-test',
+      text: '把标题改成今晚开抢',
+      scope: { kind: 'components', componentIds: ['title'] },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(element.submitChangeProposal.mock.calls[0]?.[0]?.commands).toEqual([
+      {
+        type: 'update-components',
+        componentIds: ['title'],
+        patch: {
+          dataValue: { kind: 'inline', value: '今晚开抢' },
+          dataSource: null,
+        },
       },
     ]);
   });

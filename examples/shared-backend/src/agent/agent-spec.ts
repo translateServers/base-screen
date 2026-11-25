@@ -13,38 +13,6 @@ export interface AgentKpi {
   readonly delta?: string;
 }
 
-/** 图表的一个数据点：柱高按同一面板内的最大值归一，单位写在面板 `note` 里。 */
-export interface AgentChartPoint {
-  readonly label: string;
-  readonly value: number;
-}
-
-interface AgentPanelBase {
-  readonly title: string;
-  readonly note?: string;
-}
-
-/** 图表面板：`points` 是模型给出的数据，编译器不补任何预设柱值。 */
-export interface AgentChartPanel extends AgentPanelBase {
-  readonly kind: 'chart';
-  readonly points: readonly AgentChartPoint[];
-}
-
-/** 清单面板：`items` 是模型给出的明细，编译器不补任何预设文案。 */
-export interface AgentListPanel extends AgentPanelBase {
-  readonly kind: 'list';
-  readonly items: readonly string[];
-}
-
-/** 图片面板：宿主要按标题取图，不要求模型给数据。 */
-export interface AgentImagePanel extends AgentPanelBase {
-  readonly kind: 'image';
-  /** 模型给的配图；留空时由编译器按标题生成一个稳定的图片地址。 */
-  readonly imageUrl?: string;
-}
-
-export type AgentPanel = AgentChartPanel | AgentListPanel | AgentImagePanel;
-
 /** 表格载荷：模型给的是「列 + 行」，绑定角色由编译器按目录里的 roles 分配。 */
 export interface AgentBlockColumn {
   readonly id: string;
@@ -60,8 +28,8 @@ export interface AgentBlockTable {
 /**
  * 目录驱动的图块：`type` 必须是宿主目录里真实存在的物料。
  *
- * 与 v1 的 `panels`（chart / list / image 三种写死形态）相比，这里不再替模型决定
- * 「用什么组件」——模型从目录里挑，编译器只负责把它变成合法文档。
+ * 不替模型决定「用什么组件」——模型从目录里挑，编译器只负责把它变成合法文档。
+ * 这是唯一的块形态（ADR-0111 §2.6）：模型输出其他结构一律按非法 spec 处理。
  */
 export interface AgentBlock {
   readonly type: string;
@@ -83,10 +51,8 @@ export interface AgentScreenSpec {
   /** 模型选择的风格预设 id（见 agent-style.ts）；缺省或非法时由编译前回退到默认预设。 */
   readonly style?: string;
   readonly kpis: readonly AgentKpi[];
-  /** v1：写死的三种面板形态；仅当模型仍输出旧结构时使用。 */
-  readonly panels?: readonly AgentPanel[];
-  /** v2：目录驱动的图块。 */
-  readonly blocks?: readonly AgentBlock[];
+  /** 目录驱动的图块。 */
+  readonly blocks: readonly AgentBlock[];
   /** 由调用方补充：模型与耗时，用于界面上如实标注。 */
   readonly mode?: 'llm' | 'deterministic';
 }
@@ -96,10 +62,10 @@ export function buildAgentUserPrompt(topic: string): string {
 }
 
 /**
- * v2 系统提示词：组件清单来自宿主目录，不再由后端写死。
+ * 系统提示词：组件清单来自宿主目录，不由后端写死。
  *
- * 保留原 v1 提示词的「只输出 JSON / 数字要能对上 / 简体中文」这些纪律，把
- * 「哪些组件能用」整段换成目录摘要；模型不再自己描述柱高与清单，而是给表格数据。
+ * 纪律是「只输出 JSON / 数字要能对上 / 简体中文」；「哪些组件能用」整段来自目录摘要，
+ * 模型不描述柱高与清单，而是给表格数据。
  */
 export interface AgentPromptReferences {
   readonly assets: readonly { readonly id: string; readonly name: string }[];

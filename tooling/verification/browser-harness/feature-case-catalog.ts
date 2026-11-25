@@ -173,6 +173,17 @@ export const FEATURE_CASE_CATALOG = [
     stressGrouping: false,
   },
   {
+    id: 'agent-proposal-review',
+    title: '智能体提案评审',
+    summary: '单组件字号草案、旧版切换与整屏原子采纳的专项验收画面。',
+    lookAt: '草案条、隐藏的旧标题、完整显示的新标题，以及变更页签的只读清单。',
+    packages: ['contracts', 'engine', 'renderer'],
+    focused:
+      'pnpm --filter @base-screen/engine exec vitest run tests/common/operations/change/designer-change-proposal.test.ts tests/browser/controllers/designer-change-controller.test.ts tests/browser/dom/change/designer-change-dom.test.ts tests/designer-element/api/designer-element-change.test.ts',
+    verify: 'pnpm verify:browser',
+    stressGrouping: false,
+  },
+  {
     id: 'composite-insertion',
     title: '组合插入',
     summary: '一次 insertComponentFragment 建出容器 + 标题 + 分隔线 + 读数四件套。',

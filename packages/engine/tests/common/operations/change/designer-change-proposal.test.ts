@@ -1,4 +1,4 @@
-import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
+import type { ScreenComponentNode, ScreenDataSource, ScreenDocument } from '@base-screen/contracts';
 import { describe, expect, it } from 'vitest';
 import { summarizeChangeProposal } from '../../../../src/common/operations/change/designer-change-events.js';
 import {
@@ -92,7 +92,11 @@ describe('prepareDesignerChangeProposal', () => {
       { title: '空提案', rationale: '', scope: '', commands: [] },
       'change-1',
     );
-    expect(result).toMatchObject({ ok: false, reason: 'empty' });
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'empty',
+      diagnostics: [{ severity: 'error', code: 'CHANGE_PROPOSAL_EMPTY', path: [] }],
+    });
   });
 
   it('rejects an invalid command with its diagnostics', () => {
@@ -129,7 +133,11 @@ describe('prepareDesignerChangeProposal', () => {
       },
       'change-1',
     );
-    expect(result).toMatchObject({ ok: false, reason: 'empty' });
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'empty',
+      diagnostics: [{ code: 'CHANGE_PROPOSAL_NO_EFFECT' }],
+    });
   });
 
   it('accepts a canvas-only change as a document-level unit', () => {
@@ -154,6 +162,51 @@ describe('prepareDesignerChangeProposal', () => {
     expect(result.value.candidate.components).toEqual(screenDocument().components);
   });
 
+  it('accepts a data-source-only change and marks its dependent component as affected', () => {
+    const source: ScreenDataSource = {
+      id: 'sales',
+      name: '销售数据',
+      source: { kind: 'dataset', datasetId: 'sales' },
+      params: {},
+    };
+    const document: ScreenDocument = {
+      ...screenDocument([
+        textComponent({
+          dataSource: null,
+          dataValue: { kind: 'data-source-field', dataSourceId: 'sales', path: [] },
+          dataBinding: { fields: { value: ['amount'] } },
+        }),
+      ]),
+      dataSources: [source],
+    };
+    const result = prepareDesignerChangeProposal(
+      document,
+      {
+        title: '切换销售区域',
+        rationale: '只改数据源参数',
+        scope: '数据源',
+        commands: [
+          {
+            type: 'replace-data-sources',
+            dataSources: [
+              {
+                ...source,
+                params: { region: { kind: 'inline', value: 'east' } },
+              },
+            ],
+          },
+        ],
+      },
+      'change-data-source',
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.diff).toEqual([]);
+    expect(result.value.affectedComponentIds).toEqual(['title']);
+    expect(result.value.units).toMatchObject([{ id: 'document', kind: 'document' }]);
+  });
+
   it('still rejects a canvas command that changes nothing', () => {
     const result = prepareDesignerChangeProposal(
       screenDocument(),
@@ -165,7 +218,11 @@ describe('prepareDesignerChangeProposal', () => {
       },
       'change-canvas-same',
     );
-    expect(result).toMatchObject({ ok: false, reason: 'empty' });
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'empty',
+      diagnostics: [{ code: 'CHANGE_PROPOSAL_NO_EFFECT' }],
+    });
   });
 });
 
@@ -190,6 +247,27 @@ describe('diffScreenDocuments', () => {
       kind: 'removed',
       entries: [],
     });
+  });
+
+  it('reports hierarchy, status, binding, and canvas ownership changes', () => {
+    const before = screenDocument();
+    const after = screenDocument([
+      textComponent({
+        parentId: 'group',
+        status: { locked: true, hidden: true },
+        dataBinding: { fields: { value: ['amount'] } },
+        canvasId: 'popup',
+        belowSubCanvas: true,
+      }),
+    ]);
+
+    expect(diffScreenDocuments(before, after)[0]?.entries.map((entry) => entry.path)).toEqual([
+      'parentId',
+      'status',
+      'dataBinding',
+      'canvasId',
+      'belowSubCanvas',
+    ]);
   });
 
   it('expands geometry and nested style keys', () => {
@@ -332,22 +410,31 @@ describe('whole-screen replacement presentation', () => {
   const newTitle = textComponent({ id: 'new-title', name: '新标题' });
   const newKpi = textComponent({ id: 'new-kpi', name: '新指标' });
 
-  it('marks a full replacement and keeps its component count and independent units', () => {
+  it('keeps a full replacement as one indivisible unit (ADR-0111 §2.1)', () => {
     const commands = [
+      { type: 'update-canvas', patch: { backgroundColor: '#0b1020' } },
       { type: 'remove-components', componentIds: ['old-title', 'old-kpi'] },
       { type: 'add-component', component: newTitle },
       { type: 'add-component', component: newKpi },
     ] as const;
     const proposal = preparedProposal(screenDocument([oldTitle, oldKpi]), commands);
-    const removalUnit = proposal.units.find((unit) => unit.presentation !== undefined);
 
-    expect(removalUnit).toMatchObject({
-      id: 'old-title',
+    // 单独采纳「删除」会把文档拆到只剩锁定组件，所以整屏替换只能整体采纳或放弃。
+    expect(proposal.units).toHaveLength(1);
+    expect(proposal.units[0]).toMatchObject({
+      id: 'all',
+      commandIndexes: [0, 1, 2, 3],
       presentation: { kind: 'whole-screen-replacement', addedCount: 2 },
     });
-    expect(proposal.units).toHaveLength(3);
-    expect(commandsForUnits(proposal, ['old-title'])).toEqual([commands[0]]);
-    expect(commandsForUnits(proposal, ['new-title'])).toEqual([commands[1]]);
+    expect(proposal.units[0]?.diff.map((row) => [row.componentId, row.kind])).toEqual(
+      expect.arrayContaining([
+        ['old-title', 'removed'],
+        ['old-kpi', 'removed'],
+        ['new-title', 'added'],
+        ['new-kpi', 'added'],
+      ]),
+    );
+    expect(commandsForUnits(proposal, ['all'])).toEqual(commands);
   });
 
   it('does not mark ordinary updates, additions, or partial removals', () => {
@@ -413,7 +500,8 @@ describe('whole-screen replacement presentation', () => {
     ]);
     const summary = summarizeChangeProposal(proposal);
 
-    expect(summary.units.find((unit) => unit.id === 'old-title')).toMatchObject({
+    expect(summary.units).toHaveLength(1);
+    expect(summary.units[0]).toMatchObject({
       presentation: { kind: 'whole-screen-replacement', addedCount: 1 },
     });
   });

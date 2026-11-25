@@ -1,4 +1,4 @@
-import type { ScreenIntentScope } from '@base-screen/contracts';
+import { isScreenComponentId, type ScreenIntentScope } from '@base-screen/contracts';
 import type { ScreenHistoryNode } from '@base-screen/core';
 import type {
   DesignerChangeProposal,
@@ -30,7 +30,7 @@ export function draftBarMarkup(
   const text = DESIGNER_UI_TEXT.change;
   return `<span class="draft-state">
       <span class="draft-dot" aria-hidden="true"></span>
-      <span class="draft-label">${text.draftLabel}</span>
+      <span class="draft-label">${comparing ? text.viewingOldLabel : text.draftLabel}</span>
     </span>
     <span class="draft-summary">
       <span class="draft-title" title="${escapeHtml(proposal.title)}">${escapeHtml(proposal.title)}</span>
@@ -128,7 +128,7 @@ export function changePaneMarkup(
     </details>
     <section class="change-panel-section">
       <h3 class="change-panel-heading-text">${text.diffLabel}</h3>
-      <ul class="change-diff-list">${units.map((unit) => unitMarkup(unit, reviewing, feedback)).join('')}</ul>
+      <ul class="change-diff-list">${units.map((unit) => unitMarkup(unit, reviewing, feedback, proposal.commands)).join('')}</ul>
     </section>
     ${historyMarkup(history)}
     <footer class="change-panel-actions">
@@ -139,7 +139,15 @@ export function changePaneMarkup(
       }</span>
       <span class="change-panel-action-buttons">${
         reviewing
-          ? `<button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>`
+          ? confirmAll
+            ? `<button type="button" class="designer-control designer-button" data-change-action="cancel-adopt-all">${text.cancelAdoptAll}</button>
+               <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="adopt">${text.confirmAdoptAll}</button>`
+            : `<button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>${
+                units.length === 1 && units[0]?.presentation?.kind === 'whole-screen-replacement'
+                  ? `<button type="button" class="designer-control designer-button" data-change-action="discard">${text.discard}</button>
+                     <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>`
+                  : ''
+              }`
           : confirmAll
             ? `<button type="button" class="designer-control designer-button" data-change-action="cancel-adopt-all">${text.cancelAdoptAll}</button>
              <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="adopt">${text.confirmAdoptAll}</button>`
@@ -273,16 +281,45 @@ function unitMarkup(
   unit: DesignerChangeUnit,
   reviewing = false,
   feedback?: DesignerChangeFeedback,
+  commands: DesignerChangeProposal['commands'] = [],
 ): string {
   const text = DESIGNER_UI_TEXT.change;
   const label = unit.label === '' ? text.unitDocument : unit.label;
-  const heading =
-    unit.presentation?.kind === 'whole-screen-replacement'
-      ? text.wholeScreenReplacement(unit.presentation.addedCount)
-      : unit.kind === 'removed'
-        ? text.removedUnit
-        : label;
-  const entries = unit.diff
+  const wholeScreen = unit.presentation?.kind === 'whole-screen-replacement';
+  const heading = wholeScreen
+    ? text.wholeScreenReplacement(unit.presentation?.addedCount ?? 0)
+    : unit.kind === 'removed'
+      ? text.removedUnit
+      : label;
+  // 整屏替换只能整体采纳或放弃（ADR-0111 §2.1）：单元内只读列出新增 / 移除 / 画布与数据源，
+  // 不给逐项按钮，采纳走底部「全部采纳」的二次确认。
+  const entries = wholeScreen
+    ? wholeScreenEntries(
+        unit,
+        commands.filter((_, index) => unit.commandIndexes.includes(index)),
+      )
+    : diffEntries(unit);
+  const actions = wholeScreen
+    ? `<p class="change-panel-hint" data-change-whole-screen-hint>${text.wholeScreenHint}</p>`
+    : `<div class="change-unit-actions">
+        <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="reject-unit" data-change-unit="${escapeHtml(unit.id)}">${reviewing ? DESIGNER_UI_TEXT.review.reject : text.rejectUnit}</button>
+        <button type="button" class="designer-control designer-button" data-change-action="adopt-unit" data-change-unit="${escapeHtml(unit.id)}">${reviewing ? DESIGNER_UI_TEXT.review.approve : text.adoptUnit}</button>
+      </div>`;
+  return `<li class="change-diff-row" data-change-unit-row="${escapeHtml(unit.id)}" data-kind="${unit.kind}">
+      <div class="change-diff-head">
+        <span class="change-diff-name">${escapeHtml(heading)}</span>
+        <span class="change-diff-kind">${wholeScreen ? text.wholeScreenKind : text.unitKind[unit.kind]}</span>
+      </div>
+      <ul class="change-diff-entries">${entries}</ul>
+      ${feedback?.kind === 'adopt-failed' && feedback.unitId === unit.id ? feedbackMarkup(feedback) : ''}
+      ${actions}
+    </li>`;
+}
+
+/** 普通单元：新增 / 删除整行，修改按字段展开。 */
+function diffEntries(unit: DesignerChangeUnit): string {
+  const text = DESIGNER_UI_TEXT.change;
+  return unit.diff
     .map((row) => {
       if (row.kind !== 'changed') {
         const single = row.kind === 'added' ? text.added : text.removed;
@@ -300,18 +337,56 @@ function unitMarkup(
         .join('');
     })
     .join('');
-  return `<li class="change-diff-row" data-change-unit-row="${escapeHtml(unit.id)}" data-kind="${unit.kind}">
-      <div class="change-diff-head">
-        <span class="change-diff-name">${escapeHtml(heading)}</span>
-        <span class="change-diff-kind">${text.unitKind[unit.kind]}</span>
-      </div>
-      <ul class="change-diff-entries">${entries}</ul>
-      ${feedback?.kind === 'adopt-failed' && feedback.unitId === unit.id ? feedbackMarkup(feedback) : ''}
-      <div class="change-unit-actions">
-        <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="reject-unit" data-change-unit="${escapeHtml(unit.id)}">${reviewing ? DESIGNER_UI_TEXT.review.reject : text.rejectUnit}</button>
-        <button type="button" class="designer-control designer-button" data-change-action="adopt-unit" data-change-unit="${escapeHtml(unit.id)}">${reviewing ? DESIGNER_UI_TEXT.review.approve : text.adoptUnit}</button>
-      </div>
-    </li>`;
+}
+
+/** 整屏替换单元的只读清单：新增 / 移除 / 画布与数据源三组。 */
+function wholeScreenEntries(
+  unit: DesignerChangeUnit,
+  commands: DesignerChangeProposal['commands'],
+): string {
+  const text = DESIGNER_UI_TEXT.change;
+  const added: string[] = [];
+  const removed: string[] = [];
+  for (const row of unit.diff) {
+    if (row.kind === 'added') added.push(row.componentName);
+    if (row.kind === 'removed') removed.push(row.componentName);
+  }
+  const documentLabels = new Set<string>();
+  for (const command of commands) {
+    if (command.type === 'update-canvas') {
+      documentLabels.add(text.wholeScreenDocumentLabels.canvas);
+    }
+    if (command.type === 'replace-data-sources') {
+      documentLabels.add(text.wholeScreenDocumentLabels.dataSources);
+    }
+  }
+  const documentNames = [...documentLabels];
+  const groups = [
+    {
+      kind: 'added',
+      label: text.wholeScreenGroup.added(added.length),
+      names: added,
+    },
+    {
+      kind: 'removed',
+      label: text.wholeScreenGroup.removed(removed.length),
+      names: removed,
+    },
+    {
+      kind: 'document',
+      label: text.wholeScreenGroup.document,
+      names: documentNames,
+    },
+  ];
+  return groups
+    .map(
+      ({ kind, label, names }) =>
+        `<li class="change-diff-entry" data-change-whole-screen-group="${kind}">
+          <span class="change-diff-path">${label}</span>
+          <span class="change-diff-after">${escapeHtml(names.length === 0 ? text.wholeScreenEmpty : text.wholeScreenNames(names))}</span>
+        </li>`,
+    )
+    .join('');
 }
 
 export function renderDraftBar(
@@ -322,6 +397,90 @@ export function renderDraftBar(
 ): void {
   bar.innerHTML = draftBarMarkup(proposal, comparing, paneOpen);
   adoptDesignerFormControls(bar);
+}
+
+/** 草案期间的会话标记（ADR-0111 §2.2）：只改显示，不写文档、不进历史、不影响导出与渲染器。 */
+export interface DesignerChangeMarks {
+  /** 内容层中被修改或被移除的旧组件：隐藏，几何不变、不占命中。 */
+  readonly supersededIds: readonly string[];
+  /** 被移除的旧组件：在草案层原位画虚线轮廓与「将移除」标记。 */
+  readonly removedIds: readonly string[];
+  /** 子集草案里只为定位而挂、本身未受影响的祖先：在草案层隐藏。 */
+  readonly ghostHiddenIds: readonly string[];
+}
+
+/**
+ * 把标记写进草案层：一个 style 节点承载两条隐藏规则（按组件 id 选择，渲染器重建元素后依然生效），
+ * 一个轮廓层承载移除标记。`marks` 为空时全部撤掉。
+ */
+export function renderChangeMarks(
+  ghost: HTMLElement,
+  marks: DesignerChangeMarks | undefined,
+): void {
+  let style = ghost.querySelector<HTMLStyleElement>('style[data-change-marks-style]');
+  let layer = ghost.querySelector<HTMLElement>('[data-canvas-ghost-marks]');
+  if (marks === undefined) {
+    if (style !== null) style.textContent = '';
+    layer?.replaceChildren();
+    return;
+  }
+  const doc = ghost.ownerDocument;
+  if (style === null) {
+    style = doc.createElement('style');
+    style.dataset.changeMarksStyle = '';
+    ghost.prepend(style);
+  }
+  if (layer === null) {
+    layer = doc.createElement('div');
+    layer.className = 'canvas-ghost-marks';
+    layer.dataset.canvasGhostMarks = '';
+    ghost.append(layer);
+  }
+  style.textContent = [
+    hiddenComponentsRule('.canvas-content', marks.supersededIds),
+    hiddenComponentsRule('.canvas-ghost-root', marks.ghostHiddenIds),
+  ].join('');
+  const content = ghost.parentElement?.querySelector<HTMLElement>('[data-canvas-content]');
+  layer.replaceChildren(
+    ...marks.removedIds.flatMap((id) => {
+      if (!isScreenComponentId(id)) return [];
+      const source = content?.querySelector<HTMLElement>(`[data-base-screen-component-id="${id}"]`);
+      return source === null || source === undefined ? [] : [removalMark(doc, source)];
+    }),
+  );
+}
+
+function hiddenComponentsRule(scope: string, ids: readonly string[]): string {
+  const selectors = ids
+    .filter((id) => isScreenComponentId(id))
+    .map((id) => `${scope} [data-base-screen-component-id="${id}"]`);
+  return selectors.length === 0 ? '' : `${selectors.join(',')}{visibility:hidden}`;
+}
+
+/** 轮廓沿用内容层元素的几何帧（left / top / width / height / transform），与旧组件像素对齐。 */
+function removalMark(doc: Document, source: HTMLElement): HTMLElement {
+  const mark = doc.createElement('div');
+  mark.className = 'change-removal-mark';
+  const frame = source.style;
+  mark.style.left = frame.left;
+  mark.style.top = frame.top;
+  mark.style.width = frame.width;
+  mark.style.height = frame.height;
+  mark.style.transform = frame.transform;
+  mark.style.transformOrigin = frame.transformOrigin;
+  const label = doc.createElement('span');
+  label.className = 'change-removal-mark-label';
+  label.textContent = DESIGNER_UI_TEXT.change.removalMark;
+  mark.append(label);
+  return mark;
+}
+
+/** 子集草案不画画布背景：未受影响的组件与旧画布底色要透过草案层可见。 */
+export function clearGhostCanvasBackground(ghost: HTMLElement | undefined): void {
+  const root = ghost?.querySelector<HTMLElement>('[data-canvas-ghost-root]');
+  if (root === null || root === undefined) return;
+  root.style.backgroundColor = '';
+  root.style.backgroundImage = '';
 }
 
 export function renderChangePane(

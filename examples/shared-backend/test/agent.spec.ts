@@ -192,12 +192,9 @@ describe('agent candidate and persisted generation', () => {
   it.each(['llm', 'invalid', 'failure'] as const)(
     'does not persist the %s candidate path',
     async (path) => {
-      const valid = modelJson([
-        specPanel('chart', {
-          points: [1, 2, 3, 4, 5].map((value) => ({ label: String(value), value })),
-        }),
-        specPanel('list', { items: ['甲', '乙', '丙'] }),
-        { kind: 'image', title: '现场图' },
+      const valid = blocksJson([
+        { type: 'base.chart', title: '近三日趋势', span: 2, table: TREND_TABLE },
+        { type: 'base.text', title: '要点', span: 1, text: '甲\n乙\n丙' },
       ]);
       jest
         .mocked(requestAgentCompletion)
@@ -253,6 +250,26 @@ describe('agent candidate and persisted generation', () => {
     ).toBe(true);
   });
 
+  it('模型只给 panels 时候选标注 AGENT_SPEC_INVALID 并退回确定性布局', async () => {
+    jest.mocked(requestAgentCompletion).mockResolvedValueOnce({
+      ok: true,
+      text: JSON.stringify({
+        title: '渠道经营',
+        subtitle: '按周汇总的渠道口径',
+        kpis: [{ label: '总量', value: '28.6 万' }],
+        panels: [{ kind: 'list', title: '要点', items: ['甲', '乙', '丙'] }],
+      }),
+    });
+    const { service } = setup({
+      AGENT_LLM_BASE_URL: 'https://model.test',
+      AGENT_LLM_API_KEY: 'test',
+      AGENT_LLM_MODEL: 'test',
+    });
+    const candidate = await service.generateCandidate({ topic: '渠道经营', catalog: TEST_CATALOG });
+    expect(candidate.mode).toBe('deterministic');
+    expect(candidate.failure).toBe('AGENT_SPEC_INVALID');
+  });
+
   it.each([undefined, '  自定义名称  ', '   '])(
     'keeps persisted generate naming and revision behavior for %s',
     async (name) => {
@@ -286,23 +303,6 @@ describe('agent candidate and persisted generation', () => {
  * 「一线渠道库存 6.2 万吨」，是这条链路曾经的真实缺陷：模型确实被调用了，用户看到的
  * 却还是同一份模板数据，而且从 `mode: 'llm'` 上看不出任何异常。
  */
-
-function specPanel(kind: 'chart' | 'list', data: Record<string, unknown>): Record<string, unknown> {
-  return { kind, title: `${kind} 面板`, note: '单位：万元', ...data };
-}
-
-function modelJson(panels: readonly Record<string, unknown>[]): string {
-  return JSON.stringify({
-    title: '华东渠道周会',
-    subtitle: '按周汇总的渠道经营口径',
-    kpis: [
-      { label: '总量', value: '28.6 万' },
-      { label: '周转', value: '31.4 天' },
-      { label: '缺货', value: '12 家' },
-    ],
-    panels,
-  });
-}
 
 const TEST_CATALOG: AgentCatalog = {
   source: 'client',
@@ -939,22 +939,25 @@ describe('目录驱动的解析与编译', () => {
     expect(nodesOf(composed.value.document).some((node) => node.name === '现场')).toBe(false);
   });
 
-  it('v1 panels 仍被接受，并按目录折算成块（兼容旧输出）', () => {
-    const spec = parseCatalogSpec(
-      modelJson([
-        specPanel('chart', {
-          points: [1, 2, 3, 4, 5].map((value) => ({ label: String(value), value })),
-        }),
-        specPanel('list', { items: ['华东缺货 12 家', '在途 4.1 万件', '周转 31 天'] }),
-      ]),
-      TEST_CATALOG,
-    );
-    expect(spec).not.toBeNull();
-    expect(spec?.blocks?.map((block) => block.type)).toEqual(['base.chart', 'base.text']);
-    const document = composeOk(spec as AgentScreenSpec);
-    expect(findNode(document, 'base.chart').dataBinding).toEqual({
-      fields: { dimension: ['label'], measures: ['value'] },
+  it('只给 panels 等其他结构的输出按非法 spec 拒绝（ADR-0111 §2.6）', () => {
+    const panelsOnly = JSON.stringify({
+      title: '华东渠道周会',
+      subtitle: '按周汇总的渠道经营口径',
+      kpis: [{ label: '总量', value: '28.6 万' }],
+      panels: [{ kind: 'list', title: '要点', items: ['甲', '乙', '丙'] }],
     });
+    expect(parseCatalogSpec(panelsOnly, TEST_CATALOG)).toBeNull();
+  });
+
+  it('同时给出 blocks 与 panels 时仍按非法 spec 拒绝', () => {
+    const mixed = JSON.stringify({
+      title: '华东渠道周会',
+      subtitle: '按周汇总的渠道经营口径',
+      kpis: [{ label: '总量', value: '28.6 万' }],
+      blocks: [{ type: 'base.chart', title: '趋势', span: 2, table: TREND_TABLE }],
+      panels: [{ kind: 'list', title: '要点', items: ['甲', '乙', '丙'] }],
+    });
+    expect(parseCatalogSpec(mixed, TEST_CATALOG)).toBeNull();
   });
 });
 

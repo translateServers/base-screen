@@ -1,5 +1,6 @@
 import { withViteBrowser } from '../browser-verification.mjs';
 import { assertAgentHostResourceProposal } from './agent/assert-agent-host-resource-proposal.mjs';
+import { assertAgentProposalReview } from './agent/assert-agent-proposal-review.mjs';
 import { assertCompositeInsertion } from './authoring/assert-composite-insertion.mjs';
 import {
   assertAuthoringImportAndInspector,
@@ -131,6 +132,7 @@ export async function runBrowserHarness(serverPort) {
       // 推送数据源（ADR-0104）：独立页 push.html，宿主端口与事件全部由断言脚本控制。
       await assertPushDataSources(browser, baseUrl);
       await assertAgentHostResourceProposal(baseUrl, browser);
+      await assertAgentProposalReview(baseUrl, browser);
       for (const viewport of [
         { width: 1024, height: 640 },
         { width: 1366, height: 768 },

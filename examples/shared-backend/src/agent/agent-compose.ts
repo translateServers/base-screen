@@ -177,7 +177,7 @@ export function composeScreenDocument(input: {
    *
    * 画布背景不铺组件——`canvas.backgroundColor` / `backgroundImage` 本身就是 canonical 配置
    * （设计器「画布 › 背景填充 / 背景图片」直接改它），再铺一块 1920×1080 的矩形等于同一件事
-   * 做两遍：多一个挡在最底层、容易误选的假组件，导出体积也白涨。v1 编译器铺这层是为了兜底
+   * 做两遍：多一个挡在最底层、容易误选的假组件，导出体积也白涨。早期编译器铺这层是为了兜底
    * 各宿主的画布底色；画布背景进契约之后它就是纯冗余（也正是它把椭圆 bug 放大成了整屏）。
    */
   const pushSurface = (name: string, box: Box, style?: Record<string, JsonValue>): void => {

@@ -367,10 +367,12 @@ function compileComponentCommands(
       const text = patch.text.trim();
       if (component.dataValue?.kind === 'inline') {
         next.dataValue = { kind: 'inline', value: text };
+        next.dataSource = null;
       } else if (typeof component.props.text === 'string') {
         next.props = { ...component.props, text };
       } else if (component.dataSource?.type === 'static') {
-        next.dataSource = { ...component.dataSource, value: text };
+        next.dataValue = { kind: 'inline', value: text };
+        next.dataSource = null;
       } else {
         return undefined;
       }

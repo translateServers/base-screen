@@ -626,6 +626,18 @@
   overflow-wrap: anywhere;
 }
 
+/* 整屏替换的只读清单是「分组名 + 组件名列表」，不是「旧值 → 新值」：两段各占整行，
+   用正文字体与 1.4 行高——数值字体的行高是 1，中文名单折行时上下行会叠在一起。 */
+.change-diff-entry[data-change-whole-screen-group] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--designer-space-1);
+  font: var(--designer-font-small);
+}
+
+.change-diff-entry[data-change-whole-screen-group] > * {
+  grid-column: 1 / -1;
+}
+
 .change-panel-actions {
   display: flex;
   flex-direction: column;

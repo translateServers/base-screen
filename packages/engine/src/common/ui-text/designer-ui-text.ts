@@ -273,17 +273,45 @@ export const DESIGNER_UI_TEXT = {
     removed: '删除此旧组件',
     removedUnit: '删除旧组件',
     wholeScreenReplacement: (count: number) => `整屏替换 · ${count} 个组件`,
+    // 整屏替换只能整体采纳或放弃（ADR-0111 §2.1），单元内只读列出组件。
+    wholeScreenHint: '整屏替换不能拆开采纳：请用底部「全部采纳」或「放弃」整体处理。',
+    wholeScreenGroup: {
+      added: (count: number) => `新增 ${count}`,
+      removed: (count: number) => `移除 ${count}`,
+      document: '画布与数据源',
+    },
+    wholeScreenEmpty: '无',
+    wholeScreenDocumentLabels: {
+      canvas: '画布',
+      dataSources: '数据源',
+    },
+    // 整屏替换单元的徽标：它既删也加，不是「新增」。
+    wholeScreenKind: '替换',
+    // 数字与量词用不换行空格连起来，窄栏里不会断成「等 8 / 个」。
+    wholeScreenNames: (names: readonly string[]) =>
+      names.length <= 6
+        ? names.join('、')
+        : `${names.slice(0, 6).join('、')} 等\u00a0${names.length}\u00a0个`,
+    // 草案期间被移除的旧组件留轮廓（ADR-0111 §2.2）；「查看旧版」时草案条改说当前看的是旧版。
+    removalMark: '将移除',
+    viewingOldLabel: '旧版 · 当前文档',
     diffPath: {
+      type: '物料类型',
       name: '名称',
+      parentId: '父组件',
       positionX: 'X',
       positionY: 'Y',
       sizeWidth: '宽度',
       sizeHeight: '高度',
       rotation: '旋转',
       zIndex: '层级',
+      status: '锁定与隐藏',
       dataValue: '数据取值',
       dataSource: '数据源',
+      dataBinding: '字段绑定',
       states: '组件状态',
+      canvasId: '所属画板',
+      belowSubCanvas: '置于页面下方',
       prop: (key: string) => `属性 · ${key}`,
       style: (key: string) => `样式 · ${key}`,
       propKeys: {
@@ -341,8 +369,9 @@ export const DESIGNER_UI_TEXT = {
       document: '文档级',
     },
     remainingUnits: (count: number) => `剩余 ${count} 项`,
-    compare: '对比旧版',
-    exitCompare: '退出对比',
+    // 两态切换（ADR-0111 §2.3）：看原文档 / 回到草案；不是并排对比。
+    compare: '查看旧版',
+    exitCompare: '返回草案',
     close: '关闭',
     draftAria: (title: string, count: number) => `草案未写入：${title}，影响 ${count} 个组件`,
     // 历史段：指针式回退，节点不删除。

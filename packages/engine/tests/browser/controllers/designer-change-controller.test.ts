@@ -1,7 +1,10 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
 import { applyScreenDocumentTransaction, type ScreenHistoryNode } from '@base-screen/core';
 import { describe, expect, it, vi } from 'vitest';
-import { DesignerChangeController } from '../../../src/browser/controllers/designer-change-controller.js';
+import {
+  DesignerChangeController,
+  designerChangeMarks,
+} from '../../../src/browser/controllers/designer-change-controller.js';
 import {
   type DesignerChangeProposalInput,
   prepareDesignerChangeProposal,
@@ -10,7 +13,12 @@ import {
 class FakeElement {
   innerHTML = '';
   hidden = false;
+  className = '';
+  textContent = '';
+  readonly parentElement = null;
   readonly dataset: Record<string, string> = {};
+  readonly style: Record<string, string> = {};
+  readonly ownerDocument = { createElement: () => new FakeElement() };
   querySelector(): null {
     return null;
   }
@@ -20,6 +28,9 @@ class FakeElement {
   closest(): null {
     return null;
   }
+  prepend(): void {}
+  append(): void {}
+  replaceChildren(): void {}
 }
 
 function component(id: string): ScreenComponentNode {
@@ -227,5 +238,90 @@ describe('designer change controller', () => {
     click('0');
     expect(revert).toHaveBeenCalledExactlyOnceWith(0);
     expect(h.metric).toHaveBeenCalledExactlyOnceWith('revert');
+  });
+});
+
+describe('designer change marks (ADR-0111 §2.2)', () => {
+  function screen(components: readonly ScreenComponentNode[]): ScreenDocument {
+    return {
+      canvas: { width: 960, height: 540, backgroundColor: '#ffffff' },
+      components: [...components],
+      variables: [],
+      blueprint: { nodes: [], edges: [] },
+      dataSources: [
+        {
+          id: 'orders',
+          name: 'orders',
+          source: { kind: 'dataset', datasetId: 'orders' },
+          params: {},
+        },
+      ],
+    };
+  }
+
+  function prepared(document: ScreenDocument, input: DesignerChangeProposalInput) {
+    const result = prepareDesignerChangeProposal(document, input, 'marks');
+    if (!result.ok) throw new Error('Invalid fixture');
+    return result.value;
+  }
+
+  it('hides components that only read a changed data source', () => {
+    const reader: ScreenComponentNode = {
+      ...component('reader'),
+      dataValue: { kind: 'data-source-field', dataSourceId: 'orders', path: [] },
+    };
+    const document = screen([reader, component('plain')]);
+    const proposal = prepared(document, {
+      title: '换数据源',
+      rationale: '',
+      scope: '数据',
+      commands: [
+        {
+          type: 'replace-data-sources',
+          dataSources: [
+            {
+              id: 'orders',
+              name: 'orders',
+              source: { kind: 'dataset', datasetId: 'orders-v2' },
+              params: {},
+            },
+          ],
+        },
+      ],
+    });
+
+    // 组件 diff 里没有它，但草案层会按新值重画，旧组件必须让位。
+    expect(proposal.diff.some((row) => row.componentId === 'reader')).toBe(false);
+    expect(designerChangeMarks(proposal, false).supersededIds).toEqual(['reader']);
+  });
+
+  it('outlines removals but not during a whole-screen replacement', () => {
+    const document = screen([component('a'), component('b')]);
+    const removal = prepared(document, {
+      title: '删 a',
+      rationale: '',
+      scope: '组件',
+      commands: [{ type: 'remove-components', componentIds: ['a'] }],
+    });
+    expect(designerChangeMarks(removal, false)).toMatchObject({
+      supersededIds: ['a'],
+      removedIds: ['a'],
+    });
+
+    const replacement = prepared(document, {
+      title: '整屏替换',
+      rationale: '',
+      scope: '整屏',
+      commands: [
+        { type: 'remove-components', componentIds: ['a', 'b'] },
+        { type: 'add-component', component: component('c') },
+      ],
+    });
+    expect(replacement.units[0]?.presentation?.kind).toBe('whole-screen-replacement');
+    const marks = designerChangeMarks(replacement, true);
+    // 旧组件照样隐藏，新增的不在隐藏名单里；轮廓不画，免得压住新版面。
+    expect([...marks.supersededIds].sort()).toEqual(['a', 'b']);
+    expect(marks.removedIds).toEqual([]);
+    expect(marks.ghostHiddenIds).toEqual([]);
   });
 });

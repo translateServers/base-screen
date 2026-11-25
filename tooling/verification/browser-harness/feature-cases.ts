@@ -128,6 +128,36 @@ async function applyAgentHostResource(designer: BaseScreenDesignerElement): Prom
   clickShadow(designer, '[data-right-pane-tab="intent"]');
   await painted();
 }
+async function applyAgentProposalReview(designer: BaseScreenDesignerElement): Promise<void> {
+  setHostShellVisible(false);
+  designer.setWorkbenchMode('canvas');
+  const title = designer.document?.components.find((component) => component.id === 'title');
+  if (title === undefined) return;
+  const submitted = designer.submitChangeProposal({
+    title: '阶段0验收：标题字号',
+    rationale: '旧标题让位，新标题按新字号完整显示（盒子随字号放大）。',
+    scope: '组件',
+    origin: { author: 'Stage 0 QA' },
+    commands: [
+      {
+        type: 'update-components',
+        componentIds: ['title'],
+        // 42px → 64px：宽度按同一比例放大（500 → 762），高度只放到一行 64px 所需（87），
+        // 不压到下方 y=172 的副标题。
+        patch: {
+          size: {
+            width: Math.ceil((title.size.width * 64) / 42),
+            height: Math.max(title.size.height, Math.ceil(64 * 1.35)),
+          },
+          style: { ...title.style, fontSize: 64 },
+        },
+      },
+    ],
+  });
+  if (!submitted.ok) throw new Error('Stage 0 proposal fixture was rejected.');
+  await painted();
+}
+
 async function applyMaterialGroups(designer: BaseScreenDesignerElement): Promise<void> {
   await applyCanvas(designer);
 }
@@ -488,6 +518,7 @@ async function applyCompositeInsertion(designer: BaseScreenDesignerElement): Pro
 const CASE_APPLIERS = {
   canvas: applyCanvas,
   'agent-host-resource': applyAgentHostResource,
+  'agent-proposal-review': applyAgentProposalReview,
   'material-groups': applyMaterialGroups,
   'plugin-command': applyPluginCommand,
   'plugin-panel': applyPluginPanel,

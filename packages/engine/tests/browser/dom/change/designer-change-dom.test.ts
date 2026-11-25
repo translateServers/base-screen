@@ -345,6 +345,87 @@ describe('change diff presentation', () => {
     );
     expect(replacementHtml).toContain('整屏替换 · 12 个组件');
     expect(replacementHtml).not.toContain('背景、标题 等 74 个');
+    // 整屏替换只能整体采纳或放弃（ADR-0111 §2.1）：只读分组清单，没有逐项按钮。
+    expect(replacementHtml).toContain('data-change-whole-screen-group="added"');
+    expect(replacementHtml).toContain('新增 0');
+    expect(replacementHtml).toContain('data-change-whole-screen-group="removed"');
+    expect(replacementHtml).toContain('移除 1');
+    expect(replacementHtml).toContain('旧组件');
+    expect(replacementHtml).toContain('data-change-whole-screen-group="document"');
+    expect(replacementHtml).toContain('画布与数据源');
+    expect(replacementHtml).not.toContain('data-change-whole-screen-group="changed"');
+    expect(replacementHtml).toContain('data-change-whole-screen-hint');
+    expect(replacementHtml).not.toContain('data-change-action="adopt-unit"');
+    expect(replacementHtml).not.toContain('data-change-action="reject-unit"');
+    expect(replacementHtml).toContain('data-change-action="request-adopt-all"');
+    // 徽标说「替换」而不是按 diff 推出来的「删除」/「新增」。
+    expect(replacementHtml).toContain('<span class="change-diff-kind">替换</span>');
+  });
+
+  it('keeps the overflow count of a whole-screen list on one line', () => {
+    const names = Array.from({ length: 8 }, (_, index) => `旧${index + 1}`);
+    const html = changePaneMarkup(
+      proposal(undefined, {
+        units: [
+          {
+            id: 'all',
+            label: '',
+            kind: 'removed',
+            commandIndexes: [0],
+            diff: names.map((name) => ({
+              componentId: name,
+              componentName: name,
+              kind: 'removed' as const,
+              entries: [],
+            })),
+            presentation: { kind: 'whole-screen-replacement', addedCount: 1 },
+          },
+        ],
+      }),
+      false,
+    );
+    expect(html).toContain('等\u00a08\u00a0个');
+  });
+
+  it('keeps whole-screen adoption and discard available in review mode', () => {
+    const whole = proposal(undefined, {
+      commands: [
+        { type: 'update-canvas', patch: { backgroundColor: '#101820' } },
+        { type: 'replace-data-sources', dataSources: [] },
+      ],
+      units: [
+        {
+          id: 'all',
+          label: '',
+          kind: 'changed',
+          commandIndexes: [0, 1],
+          diff: [
+            { componentId: 'old', componentName: '旧组件', kind: 'removed', entries: [] },
+            { componentId: 'new', componentName: '新组件', kind: 'added', entries: [] },
+          ],
+          presentation: { kind: 'whole-screen-replacement', addedCount: 1 },
+        },
+      ],
+    });
+    const review = { reviewing: true, meta: {}, total: 1 };
+    const html = changePaneMarkup(whole, false, review);
+
+    expect(html).toContain('data-change-action="discard"');
+    expect(html).toContain('data-change-action="request-adopt-all"');
+    expect(html).not.toContain('data-change-action="adopt-unit"');
+    expect(html).not.toContain('data-change-action="reject-unit"');
+    expect(html).toContain('画布、数据源');
+
+    const confirming = changePaneMarkup(whole, true, review);
+    expect(confirming).toContain('data-change-action="cancel-adopt-all"');
+    expect(confirming).toContain('data-change-action="adopt"');
+    expect(confirming).toContain('确认全部采纳');
+  });
+
+  it('labels the draft bar as the old version while viewing it', () => {
+    expect(draftBarMarkup(proposal(), true)).toContain('旧版 · 当前文档');
+    expect(draftBarMarkup(proposal(), true)).toContain('返回草案');
+    expect(draftBarMarkup(proposal(), false)).toContain('查看旧版');
   });
 
   it('marks long values without rendering truncated JSON', () => {

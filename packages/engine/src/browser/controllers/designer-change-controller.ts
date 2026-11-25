@@ -14,8 +14,11 @@ import {
 } from '../../common/operations/change/designer-change-proposal.js';
 import type { DesignerReviewMeta } from '../../common/operations/change/designer-review.js';
 import {
+  clearGhostCanvasBackground,
   type DesignerChangeFeedback,
+  type DesignerChangeMarks,
   renderChangeCount,
+  renderChangeMarks,
   renderChangePane,
   renderDraftBar,
 } from '../dom/change/designer-change-dom.js';
@@ -58,6 +61,8 @@ export class DesignerChangeController {
   #review: DesignerReviewMeta | undefined;
   #reviewTotal = 0;
   #comparing = false;
+  /** 草案层挂的是整份候选（画布级变化或子集挂载失败时），还是只挂受影响组件。 */
+  #ghostFull = false;
   #confirmAll = false;
   #feedback: DesignerChangeFeedback | undefined;
   #ghostHandlers: DesignerChangeGhostHandlers | undefined;
@@ -360,12 +365,30 @@ export class DesignerChangeController {
   }
 
   private mountGhost(proposal: DesignerChangeProposal): boolean {
-    if (this.#ghostHandlers === undefined) return false;
+    const handlers = this.#ghostHandlers;
+    if (handlers === undefined) return false;
+    // 草案层不透明（ADR-0111 §2.2）。画布级变化（背景、尺寸）只能整份预览：子集草案不画
+    // 画布背景，铺在旧画布上看不出新背景。其余情况只挂受影响组件，未受影响的组件照常可见。
+    const current = this.#getDocument?.();
+    const canvasChanged =
+      current === undefined ||
+      JSON.stringify(current.canvas) !== JSON.stringify(proposal.candidate.canvas);
+    if (!canvasChanged && handlers.render(ghostSubset(proposal))) {
+      this.#ghostFull = false;
+      clearGhostCanvasBackground(this.#ghost);
+      return true;
+    }
     // 子集更快更干净，但引用完整性（蓝图关系）可能让渲染失败：失败就退回整份候选。
-    return (
-      this.#ghostHandlers.render(ghostSubset(proposal)) ||
-      this.#ghostHandlers.render(proposal.candidate)
-    );
+    this.#ghostFull = handlers.render(proposal.candidate);
+    return this.#ghostFull;
+  }
+
+  /**
+   * 草案期间的会话标记：受影响的旧组件在内容层隐藏（几何不变，不占命中），被移除的留轮廓；
+   * 子集草案里只为定位而挂的未受影响祖先在草案层隐藏，避免它的底色盖住旧画布上的兄弟组件。
+   */
+  private changeMarks(proposal: DesignerChangeProposal): DesignerChangeMarks {
+    return designerChangeMarks(proposal, this.#ghostFull);
   }
 
   /** 用剩余命令重新编译；失效时移除幽灵层，但保留明确的就地反馈。 */
@@ -459,7 +482,13 @@ export class DesignerChangeController {
         bar.querySelector<HTMLButtonElement>(`[data-change-action="${focusAction}"]`)?.focus();
       }
     }
-    if (ghost !== undefined) ghost.hidden = proposal === undefined || this.#comparing;
+    if (ghost !== undefined) {
+      // 「查看旧版」时草案层与全部标记一起撤掉，画布只显示原文档（ADR-0111 §2.3）。
+      const marks =
+        proposal !== undefined && !this.#comparing ? this.changeMarks(proposal) : undefined;
+      ghost.hidden = marks === undefined;
+      renderChangeMarks(ghost, marks);
+    }
     if (pane === undefined) return;
     const showPane = this.#paneMode === 'intent';
     pane.hidden = !showPane;
@@ -488,15 +517,7 @@ export class DesignerChangeController {
  * 再走一遍，既产生重复请求，也让草案里出现与画布不一致的占位文案。
  */
 function ghostSubset(proposal: DesignerChangeProposal): ScreenDocument {
-  const byId = new Map(proposal.candidate.components.map((component) => [component.id, component]));
-  const keep = new Set<string>();
-  for (const componentId of proposal.affectedComponentIds) {
-    let current = byId.get(componentId);
-    while (current !== undefined && !keep.has(current.id)) {
-      keep.add(current.id);
-      current = current.parentId === null ? undefined : byId.get(current.parentId);
-    }
-  }
+  const keep = ghostKeepIds(proposal);
   return {
     ...proposal.candidate,
     components: proposal.candidate.components.filter((component) => keep.has(component.id)),
@@ -508,4 +529,51 @@ function ghostSubset(proposal: DesignerChangeProposal): ScreenDocument {
       ),
     }),
   };
+}
+
+/**
+ * 草案期间的会话标记（ADR-0111 §2.2）。
+ *
+ * 隐藏范围取 `affectedComponentIds` 而不是组件 diff：只改数据源时，读它的组件在 diff 里没有行，
+ * 但草案层会按新值重画它们，旧组件不隐藏就又叠画了。新增组件在内容层本来就没有，不用隐藏。
+ * 整屏替换不画逐组件轮廓：几乎每个旧组件都被移除，轮廓会铺满并压住新版面；被移除的组件
+ * 已在提案区的只读清单里逐个列出。
+ */
+export function designerChangeMarks(
+  proposal: DesignerChangeProposal,
+  ghostFull: boolean,
+): DesignerChangeMarks {
+  const added = new Set(
+    proposal.diff.filter((row) => row.kind === 'added').map((row) => row.componentId),
+  );
+  const wholeScreen = proposal.units.some(
+    (unit) => unit.presentation?.kind === 'whole-screen-replacement',
+  );
+  return {
+    supersededIds: proposal.affectedComponentIds.filter((id) => !added.has(id)),
+    removedIds: wholeScreen
+      ? []
+      : proposal.diff.filter((row) => row.kind === 'removed').map((row) => row.componentId),
+    ghostHiddenIds: ghostFull ? [] : ghostAncestorIds(proposal),
+  };
+}
+
+/** 子集草案要挂的组件：受影响组件及其祖先。 */
+function ghostKeepIds(proposal: DesignerChangeProposal): ReadonlySet<string> {
+  const byId = new Map(proposal.candidate.components.map((component) => [component.id, component]));
+  const keep = new Set<string>();
+  for (const componentId of proposal.affectedComponentIds) {
+    let current = byId.get(componentId);
+    while (current !== undefined && !keep.has(current.id)) {
+      keep.add(current.id);
+      current = current.parentId === null ? undefined : byId.get(current.parentId);
+    }
+  }
+  return keep;
+}
+
+/** 只为定位而挂进子集草案、本身未受影响的祖先。 */
+function ghostAncestorIds(proposal: DesignerChangeProposal): readonly string[] {
+  const affected = new Set(proposal.affectedComponentIds);
+  return [...ghostKeepIds(proposal)].filter((id) => !affected.has(id));
 }

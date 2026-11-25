@@ -753,13 +753,13 @@
   margin: 0;
 }
 
-/* 幽灵草案层：与内容层同尺寸叠加，只做展示，不接收指针事件。 */
+/* 幽灵草案层：与内容层同尺寸叠加，只做展示，不接收指针事件。不透明（ADR-0111 §2.2）：
+   受影响的旧组件由会话标记在内容层隐藏，新内容按真实外观显示，不再与旧内容叠画。 */
 .canvas-ghost {
   position: absolute;
   inset: 0;
   overflow: clip;
   border-radius: inherit;
-  opacity: 0.72;
   pointer-events: none;
 }
 
@@ -768,7 +768,33 @@
   height: 100%;
 }
 
-/* 草案条：声明「未写入」，采纳/放弃与对比旧版都从这里进出。 */
+/* 被移除的旧组件：原位虚线轮廓 + 「将移除」标记，几何由脚本沿用内容层元素的帧。 */
+.canvas-ghost-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.change-removal-mark {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed var(--designer-danger);
+  border-radius: var(--designer-radius-1);
+}
+
+.change-removal-mark-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0 var(--designer-space-1);
+  border-radius: var(--designer-radius-1);
+  background: var(--designer-danger-surface);
+  color: var(--designer-danger-text);
+  font: var(--designer-font-small);
+  white-space: nowrap;
+}
+
+/* 草案条：声明「未写入」，采纳/放弃与查看旧版都从这里进出。 */
 .designer-draft-bar {
   position: absolute;
   top: var(--designer-space-4);
