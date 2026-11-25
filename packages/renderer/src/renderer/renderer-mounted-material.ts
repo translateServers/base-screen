@@ -15,6 +15,11 @@ import type { AppliedModelKey, MountedMaterial, RenderCandidate } from './render
  * 求值与 `element.model` 重赋值——未变组件不再触发物料的 `renderMaterial()`。
  * 请求与缓存已在 `DataSourceRuntime` 上按实例共享；数据状态由候选（读运行时）
  * 决定，映射变化只重跑本地投影，不碰任何请求。
+ *
+ * 只有显隐不同（切换画板、蓝图显隐）也不重写 model：display 不参与 model 求值。前提是上次
+ * 写入 model 时物料是可见的——隐藏期间写入的物料（如首屏就隐藏的页面组件）可能按 0 尺寸
+ * 排版，重新显示时仍要完整重写一次。`applied` 保持「上次写入 model 时」的签名不变，
+ * 因此 `applied.hidden` 始终表示最近一次写入时的显隐。
  */
 export function reconcileMountedMaterial(
   state: RendererState,
@@ -31,7 +36,7 @@ export function reconcileMountedMaterial(
   if (
     mounted.applied !== undefined &&
     mounted.appliedModel !== undefined &&
-    sameAppliedModelKey(mounted.applied, applied)
+    (sameAppliedModelKey(mounted.applied, applied) || onlyDisplayDiffers(mounted.applied, applied))
   ) {
     applyMaterialFrame(
       mounted.element,
@@ -40,7 +45,7 @@ export function reconcileMountedMaterial(
       stackOrder,
       opacity,
     );
-    applyMaterialDisplay(mounted.element, state.visibility.isHidden(candidate.component.id));
+    applyMaterialDisplay(mounted.element, applied.hidden);
     return;
   }
   applyMountedModel(state, candidate, mounted, stackOrder, document, opacity);
@@ -78,7 +83,8 @@ export function appliedModelKeyOf(
   document: ScreenDocument,
 ): AppliedModelKey {
   return {
-    component: candidate.component,
+    // 按宿主传入的组件判定：解析会把首次出现的引用克隆一份，下一次渲染又原样复用输入引用。
+    component: state.componentSources.get(candidate.component) ?? candidate.component,
     entry: candidate.entry,
     interactive: candidate.model.interactive,
     stackOrder,
@@ -100,6 +106,38 @@ function sameAppliedModelKey(left: AppliedModelKey, right: AppliedModelKey): boo
     left.theme === right.theme &&
     left.stateId === right.stateId
   );
+}
+
+/**
+ * 两份签名只差显隐，且上次写入 model 时物料可见：此时 model 输入与元素上生效的 model 相同，
+ * 改 display 就够了。上次写入时隐藏则返回 false，显示时走完整重写。
+ *
+ * 显隐来自组件 `status`（作者隐藏、设计器把画板外组件标成隐藏锁定）时组件引用也会变，
+ * 所以组件按「除 `status` 外逐字段同引用」比较——`status` 不进 model。
+ */
+function onlyDisplayDiffers(applied: AppliedModelKey, next: AppliedModelKey): boolean {
+  return (
+    !applied.hidden &&
+    next.hidden &&
+    sameComponentExceptStatus(applied.component, next.component) &&
+    sameAppliedModelKey(applied, { ...next, component: applied.component, hidden: false })
+  );
+}
+
+function sameComponentExceptStatus(
+  left: AppliedModelKey['component'],
+  right: AppliedModelKey['component'],
+): boolean {
+  if (left === right) return true;
+  const leftRecord = left as unknown as Readonly<Record<string, unknown>>;
+  const rightRecord = right as unknown as Readonly<Record<string, unknown>>;
+  const leftKeys = Object.keys(leftRecord);
+  if (leftKeys.length !== Object.keys(rightRecord).length) return false;
+  for (const key of leftKeys) {
+    if (key === 'status') continue;
+    if (!(key in rightRecord) || leftRecord[key] !== rightRecord[key]) return false;
+  }
+  return true;
 }
 
 export function handleMaterialEvent(

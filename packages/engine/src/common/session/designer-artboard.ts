@@ -83,6 +83,23 @@ export function readDesignerComponentArtboards(document: ScreenDocument): Map<st
   return componentArtboards(document.components);
 }
 
+/**
+ * 画板外组件的「隐藏且锁定」副本，按原组件引用缓存：原组件不变就复用同一个副本。
+ * 渲染链路（文档解析的共享引用、候选校验缓存、挂载复用守卫）都按组件引用判定是否跳过，
+ * 每次投影都新建副本会让全部画板外组件在切换画板、每次提交时整套重校验、重写 model。
+ */
+const hiddenCopies = new WeakMap<ScreenComponentNode, ScreenComponentNode>();
+
+function hiddenCopyOf(component: ScreenComponentNode): ScreenComponentNode {
+  if (component.status.hidden && component.status.locked) return component;
+  let copy = hiddenCopies.get(component);
+  if (copy === undefined) {
+    copy = { ...component, status: { hidden: true, locked: true } };
+    hiddenCopies.set(component, copy);
+  }
+  return copy;
+}
+
 export function projectDesignerArtboard(
   document: ScreenDocument,
   artboard: DesignerArtboardId,
@@ -96,9 +113,7 @@ export function projectDesignerArtboard(
   }
   if (subCanvas === undefined && outside.size === 0) return { document, outside };
   const components = document.components.map((component) =>
-    outside.has(component.id) && !(component.status.hidden && component.status.locked)
-      ? { ...component, status: { hidden: true, locked: true } }
-      : component,
+    outside.has(component.id) ? hiddenCopyOf(component) : component,
   );
   const view: ScreenDocument = {
     ...document,

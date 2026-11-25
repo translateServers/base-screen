@@ -234,6 +234,7 @@ class Renderer implements BaseScreenRenderer {
     if (!parsedDocument.ok) {
       return parsedDocument;
     }
+    recordComponentSources(this.#state, document, parsedDocument.value);
     // 先同步从画布（ADR-0109）：只挂载主画布、当前页与弹框的组件，别的页不渲染、不投影。
     this.#state.subCanvases.prepare(parsedDocument.value);
     const view = this.#state.subCanvases.visibleDocument(parsedDocument.value);
@@ -728,6 +729,26 @@ class Renderer implements BaseScreenRenderer {
         document,
         this.#state.opacities.get(componentId) ?? 1,
       );
+    }
+  }
+}
+
+/**
+ * 记下解析结果里每个组件对应的输入组件（解析按下标一一对应；克隆才需要记，复用的就是它本身）。
+ */
+function recordComponentSources(
+  state: RendererState,
+  input: ScreenDocument,
+  parsed: ScreenDocument,
+): void {
+  if (input === parsed || input.components === parsed.components) return;
+  const sources = input.components;
+  if (!Array.isArray(sources) || sources.length !== parsed.components.length) return;
+  for (let index = 0; index < sources.length; index++) {
+    const source = sources[index]!;
+    const component = parsed.components[index]!;
+    if (source !== component && source.id === component.id) {
+      state.componentSources.set(component, source);
     }
   }
 }

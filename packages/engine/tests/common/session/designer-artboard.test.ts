@@ -94,6 +94,20 @@ describe('designer artboards (ADR-0109)', () => {
     expect(readDesignerArtboardOf(main.document)).toBeNull();
   });
 
+  it('reuses the hidden copy of an unchanged outside component across projections', () => {
+    const document = screen();
+    const popupView = projectDesignerArtboard(document, 'detail');
+    const mainView = projectDesignerArtboard(document, null);
+    const again = projectDesignerArtboard(document, 'detail');
+    // camera 在主画布与弹框画板里都在画板外：三次投影应是同一个副本引用。
+    const camera = (view: typeof popupView) =>
+      view.document.components.find((item) => item.id === 'camera');
+    expect(camera(mainView)).toBe(camera(popupView));
+    expect(camera(again)).toBe(camera(popupView));
+    // 画板内组件仍是原引用。
+    expect(popupView.document.components[1]).toBe(document.components[1]);
+  });
+
   it('edits the current popup through the view and writes back to the full document', () => {
     const { session, rendered, artboards } = createSession();
     expect(session.replaceDocument(screen()).ok).toBe(true);

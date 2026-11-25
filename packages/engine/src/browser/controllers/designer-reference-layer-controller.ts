@@ -1,4 +1,4 @@
-import type { ScreenDocument, ScreenJsonObject } from '@base-screen/contracts';
+import type { ScreenComponentNode, ScreenDocument, ScreenJsonObject } from '@base-screen/contracts';
 import type { BaseScreenMaterialEvent, BaseScreenRenderer } from '@base-screen/renderer';
 import {
   type DesignerArtboardId,
@@ -150,7 +150,6 @@ export class DesignerReferenceLayerController {
 function referenceDocument(source: ScreenDocument, canvas: DesignerArtboardId): ScreenDocument {
   const inside = listDesignerCanvasComponentIds(source, canvas);
   const { subCanvases: _subCanvases, startCanvasId: _start, ...rest } = source;
-  const refId = (id: string): string => `${REFERENCE_ID_PREFIX}${id}`.slice(0, 128);
   return {
     ...rest,
     canvas: {
@@ -160,16 +159,32 @@ function referenceDocument(source: ScreenDocument, canvas: DesignerArtboardId): 
     },
     components: source.components
       .filter((component) => inside.has(component.id))
-      .map((component) => {
-        const { canvasId: _canvasId, belowSubCanvas: _below, ...plain } = component;
-        return {
-          ...plain,
-          id: refId(component.id),
-          parentId: component.parentId === null ? null : refId(component.parentId),
-        };
-      }),
+      .map(referenceCopyOf),
     blueprint: { nodes: [], edges: [] },
   };
+}
+
+/**
+ * 参照组件副本按原组件引用缓存：原组件不变就复用同一个副本，参照渲染器的解析共享引用、
+ * 候选校验缓存与挂载复用守卫才能命中——文档每次提交只重投影真正改动过的参照组件。
+ */
+const referenceCopies = new WeakMap<ScreenComponentNode, ScreenComponentNode>();
+
+function referenceCopyOf(component: ScreenComponentNode): ScreenComponentNode {
+  const cached = referenceCopies.get(component);
+  if (cached !== undefined) return cached;
+  const { canvasId: _canvasId, belowSubCanvas: _below, ...plain } = component;
+  const copy: ScreenComponentNode = {
+    ...plain,
+    id: referenceId(component.id),
+    parentId: component.parentId === null ? null : referenceId(component.parentId),
+  };
+  referenceCopies.set(component, copy);
+  return copy;
+}
+
+function referenceId(id: string): string {
+  return `${REFERENCE_ID_PREFIX}${id}`.slice(0, 128);
 }
 
 const REFERENCE_ID_PREFIX = 'ref:';

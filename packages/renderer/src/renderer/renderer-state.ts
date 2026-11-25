@@ -1,4 +1,5 @@
 import type {
+  ScreenComponentNode,
   ScreenDataSourceSource,
   ScreenDiagnostic,
   ScreenJsonObject,
@@ -40,6 +41,12 @@ export interface RendererState {
   document: import('@base-screen/contracts').ScreenDocument | undefined;
   lastValidatedInput: import('@base-screen/contracts').ScreenDocument | undefined;
   validationCache: ComponentValidationCache;
+  /**
+   * 解析结果里的组件 → 宿主传入的组件。文档解析对首次出现的组件引用做克隆、对上一份输入里已有的
+   * 引用原样复用，同一个输入组件因此在相邻两次渲染里先是克隆、后是它本身。model 重赋值守卫按
+   * 输入组件判定，未变组件才不会在下一次渲染被白白重写一遍。
+   */
+  readonly componentSources: WeakMap<ScreenComponentNode, ScreenComponentNode>;
   variables: ScreenJsonObject;
   dataSuspended: boolean;
   disposed: boolean;
@@ -107,6 +114,7 @@ export function createRendererState(options: CreateBaseScreenRendererOptions): R
     document: undefined,
     lastValidatedInput: undefined,
     validationCache: { entries: new Map() },
+    componentSources: new WeakMap(),
     variables: {},
     dataSuspended: false,
     disposed: false,
