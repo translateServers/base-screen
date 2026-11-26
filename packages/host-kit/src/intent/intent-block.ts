@@ -1,6 +1,12 @@
 import type { ScreenJsonValue } from '@base-screen/contracts';
 import type { IntentCatalog, IntentCatalogMaterial } from './intent-catalog.js';
 import type { Box, IntentReferences, PushExtra, TextToken } from './intent-compile-types.js';
+import {
+  ensureDatasetSource,
+  missingParamDetail,
+  resolveDatasetFields,
+  resolveDatasetParams,
+} from './intent-dataset.js';
 import type { IntentStylePalette } from './intent-style.js';
 import type { IntentBlock, IntentDiagnostic, IntentTable } from './intent-types.js';
 
@@ -149,13 +155,47 @@ function resolveBlockPayload(
       const { datasetId } = block.bind;
       const dataset = context.references?.datasets.find((item) => item.datasetId === datasetId);
       if (dataset !== undefined) {
-        const dataSourceId = `agent-ds-${sink.dataSources.length + 1}`;
-        sink.dataSources.push({
-          id: dataSourceId,
-          name: dataset.name,
-          source: { kind: 'dataset', datasetId: dataset.datasetId },
-          params: {},
-        });
+        const resolved = resolveDatasetParams(dataset, block.bind.params);
+        if (!resolved.ok && resolved.invalid.length > 0) {
+          sink.warnings.push(
+            warning(
+              'AGENT_DATASET_PARAM_INVALID',
+              block,
+              `Parameter(s) ${resolved.invalid.join(', ')} of dataset ${datasetId} are not declared or not allowed.`,
+            ),
+          );
+          return null;
+        }
+        if (!resolved.ok) {
+          // 必填参数没有默认值：编出来的实例运行时必然取数失败，宁可跳过并说清楚要什么参数。
+          sink.warnings.push({
+            ...warning(
+              'AGENT_DATASET_PARAM_REQUIRED',
+              block,
+              `Dataset ${datasetId} requires parameter(s) ${resolved.missing
+                .map((item) => item.name)
+                .join(', ')} without a default; the block is skipped.`,
+            ),
+            detail: missingParamDetail(dataset, resolved.missing),
+          });
+          return null;
+        }
+        // 显式绑定先过字段闸：不合法就跳过该块并进修复，不退回按类型猜。
+        const explicit =
+          block.bind.fields === undefined
+            ? undefined
+            : resolveDatasetFields(material, dataset, block.bind.fields);
+        if (explicit !== undefined && !explicit.ok) {
+          sink.warnings.push(warning(explicit.code, block, explicit.message));
+          return null;
+        }
+        const dataSourceId = ensureDatasetSource(sink, dataset, resolved.params);
+        if (explicit !== undefined) {
+          return {
+            dataValue: { kind: 'data-source-field', dataSourceId, path: [] },
+            dataBinding: { fields: explicit.fields },
+          };
+        }
         // 列类型来自数据集 describe，角色分配与表格走同一套算法，避免两条规则漂移。
         const binding = assignRoles(material, {
           columns: dataset.columns.map((column) => ({

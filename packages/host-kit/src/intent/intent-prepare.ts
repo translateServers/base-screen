@@ -45,7 +45,15 @@ const ITEM_PATH =
   /^(?:kpis\[\d+\]|blocks\[\d+\]|regions\[\d+\]\.(?:items|blocks|main|rail)\[\d+\])$/;
 
 /** 编译期降级但值得修的码：块还在、只是退成了空图。 */
-const COMPILE_REPAIRABLE = new Set(['AGENT_BLOCK_BINDING_UNSATISFIED']);
+const COMPILE_REPAIRABLE = new Set([
+  'AGENT_BLOCK_BINDING_UNSATISFIED',
+  // ADR-0114 D5：字段闸与参数校验。缺必填参数（`AGENT_DATASET_PARAM_REQUIRED`）不修复——
+  // 模型无从知道用户要哪个取值，只在提案理由里说明。
+  'AGENT_BINDING_FIELD_UNKNOWN',
+  'AGENT_BINDING_TYPE_MISMATCH',
+  'AGENT_DATASET_PARAM_INVALID',
+  'AGENT_KPI_MULTI_ROW',
+]);
 
 export function prepareIntent(input: PrepareIntentInput): PreparedIntent {
   const parsed = parseScreenIntent(input.output, {

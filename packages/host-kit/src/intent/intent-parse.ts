@@ -350,6 +350,7 @@ export function parseIntentKpi(
   const diagnostics: IntentDiagnostic[] = [];
   const kpi = asRecord(raw);
   const label = typeof kpi?.label === 'string' ? kpi.label.trim() : '';
+  if (kpi !== null && kpi.bind !== undefined) return readBoundKpi(kpi, label, origin);
   const value = kpi?.value;
   const placeholder = value === null && options.placeholders === true;
   if (
@@ -390,6 +391,93 @@ export function parseIntentKpi(
     },
     diagnostics,
   };
+}
+
+/**
+ * 读数据集字段的指标卡（ADR-0114 D4 / D5）：`bind` 与字面量 `value` / `delta` 互斥，
+ * 同时给出判 `AGENT_BIND_CONFLICT` 进修复；`precision` 在绑定时无效（文本物料不格式化），只记 warning。
+ */
+function readBoundKpi(
+  kpi: Record<string, unknown>,
+  label: string,
+  origin: string,
+): IntentItemResult<IntentKpi> {
+  const diagnostics: IntentDiagnostic[] = [];
+  const fail = (code: string, message: string): IntentItemResult<IntentKpi> => {
+    diagnostics.push({ severity: 'error', code, path: origin, message });
+    return { value: undefined, diagnostics };
+  };
+  const bind = asRecord(kpi.bind);
+  const datasetId = typeof bind?.datasetId === 'string' ? bind.datasetId.trim() : '';
+  const field = typeof bind?.field === 'string' ? bind.field.trim() : '';
+  if (label === '' || bind === null || datasetId === '' || field === '') {
+    return fail('AGENT_KPI_INVALID', 'A bound KPI needs a label, bind.datasetId and bind.field.');
+  }
+  if ((kpi.value !== undefined && kpi.value !== null) || kpi.delta !== undefined) {
+    return fail(
+      'AGENT_BIND_CONFLICT',
+      'A KPI bound to a dataset field must not also give a literal value or delta.',
+    );
+  }
+  const params = readParamMap(bind.params);
+  if (params === null) {
+    return fail('AGENT_BIND_INVALID', 'bind.params must map parameter names to scalar values.');
+  }
+  if (kpi.precision !== undefined) {
+    diagnostics.push({
+      severity: 'warning',
+      code: 'AGENT_KPI_PRECISION_IGNORED',
+      path: origin,
+      message: 'precision has no effect on a KPI bound to a dataset field.',
+    });
+  }
+  const unit = typeof kpi.unit === 'string' ? kpi.unit.trim().slice(0, MAX_KPI_UNIT) : '';
+  return {
+    value: {
+      label: clampText(label, MAX_KPI_LABEL),
+      value: null,
+      ...(unit === '' ? {} : { unit }),
+      bind: { datasetId, field, ...(params === undefined ? {} : { params }) },
+      origin,
+    },
+    diagnostics,
+  };
+}
+
+/** `{ 角色: [字段...] }`：缺省返回 undefined，形状不对返回 null。 */
+function readFieldMap(raw: unknown): Record<string, string[]> | undefined | null {
+  if (raw === undefined) return undefined;
+  const record = asRecord(raw);
+  if (record === null) return null;
+  const output: Record<string, string[]> = {};
+  for (const [role, value] of Object.entries(record)) {
+    const list = typeof value === 'string' ? [value] : value;
+    if (!Array.isArray(list) || list.length === 0) return null;
+    const ids = list.map((item) => (typeof item === 'string' ? item.trim() : ''));
+    if (ids.some((id) => id === '')) return null;
+    output[role] = ids;
+  }
+  return Object.keys(output).length === 0 ? undefined : output;
+}
+
+/** `{ 参数名: 标量 }`：缺省返回 undefined，形状不对返回 null。 */
+function readParamMap(raw: unknown): Record<string, string | number | boolean> | undefined | null {
+  if (raw === undefined) return undefined;
+  const record = asRecord(raw);
+  if (record === null) return null;
+  const output: Record<string, string | number | boolean> = {};
+  for (const [name, value] of Object.entries(record)) {
+    if (
+      typeof value === 'string' ||
+      typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value))
+    ) {
+      output[name] = value;
+    } else {
+      return null;
+    }
+  }
+  return Object.keys(output).length === 0 ? undefined : output;
 }
 
 function readDelta(raw: unknown): IntentKpiDelta | undefined {
@@ -439,7 +527,26 @@ export function parseIntentBlock(
 
   const block = asRecord(raw);
   if (block === null) return drop('AGENT_BLOCK_INVALID', 'A block must be an object.');
-  const type = typeof block.type === 'string' ? block.type.trim() : '';
+  // 候选引用（ADR-0114 D4）：在本轮合法候选里挑，物料与绑定都由候选表给出，模型不自由写绑定。
+  const candidateId = typeof block.candidate === 'string' ? block.candidate.trim() : '';
+  const candidate =
+    candidateId === '' ? undefined : catalog.candidates?.find((item) => item.id === candidateId);
+  if (candidateId !== '' && candidate === undefined) {
+    return drop('AGENT_CANDIDATE_UNKNOWN', `Candidate ${candidateId} is not in this round's list.`);
+  }
+  // 单值候选只给指标卡用（`bind`），不能当块：块里的文本物料不接数据集。
+  if (candidate?.fact === 'value') {
+    return drop(
+      'AGENT_CANDIDATE_KPI_ONLY',
+      `Candidate ${candidateId} is a single value; use it as a KPI bind, not as a block.`,
+    );
+  }
+  const type =
+    candidate !== undefined
+      ? candidate.type
+      : typeof block.type === 'string'
+        ? block.type.trim()
+        : '';
   const material = catalog.materials.find((candidate) => candidate.type === type);
   // 外壳（可容纳子组件的物料）是编译器的组合手段，不是模型能挑的块类型。
   if (type === '' || material === undefined || material.children === true) {
@@ -463,7 +570,19 @@ export function parseIntentBlock(
     if (span !== rawSpan) warn('AGENT_BLOCK_SPAN_CLAMPED', 'The block span was clamped to 1–4.');
   }
 
-  const bind = readBind(block, material, catalog, origin, diagnostics);
+  const candidateParams = candidate === undefined ? undefined : readParamMap(block.params);
+  if (candidateParams === null) {
+    return drop('AGENT_BIND_INVALID', 'params must map parameter names to scalar values.');
+  }
+  const bind: IntentBind | undefined =
+    candidate !== undefined
+      ? {
+          kind: 'dataset',
+          datasetId: candidate.datasetId,
+          fields: candidate.fields,
+          ...(candidateParams === undefined ? {} : { params: candidateParams }),
+        }
+      : readBind(block, material, catalog, origin, diagnostics);
   if (bind === undefined) return { value: undefined, diagnostics };
 
   const props = readProps(block.props, material, origin, diagnostics);
@@ -480,6 +599,7 @@ export function parseIntentBlock(
       ...(note === '' ? {} : { note }),
       ...(props === undefined ? {} : { props }),
       ...(substituteFor === '' ? {} : { substituteFor }),
+      ...(candidate === undefined ? {} : { candidate: candidate.id }),
       origin,
     },
     diagnostics,
@@ -502,7 +622,29 @@ function readBind(
     // 二选一：给 `datasetId` 表示引用真实数据集，给 `table` 才是示例数据。
     // 这里只收下 id；认不认得出这个数据集由编译器按本轮引用判断（认不出会记警告并回落到表格）。
     const datasetId = typeof block.datasetId === 'string' ? block.datasetId.trim() : '';
-    if (datasetId !== '') return { kind: 'dataset', datasetId };
+    if (datasetId !== '') {
+      // 数字闸（ADR-0114 D5）：引用真实数据集的块不得再带示例表格。
+      if (block.table !== undefined) {
+        return error(
+          'AGENT_BIND_CONFLICT',
+          'A data block must give either datasetId or table, not both.',
+        );
+      }
+      const fields = readFieldMap(block.fields);
+      const params = readParamMap(block.params);
+      if (fields === null || params === null) {
+        return error(
+          'AGENT_BIND_INVALID',
+          'fields must map role ids to field ids and params must map names to scalar values.',
+        );
+      }
+      return {
+        kind: 'dataset',
+        datasetId,
+        ...(fields === undefined ? {} : { fields }),
+        ...(params === undefined ? {} : { params }),
+      };
+    }
     const table = readTable(block.table, origin, diagnostics);
     if (table === null) {
       return error(

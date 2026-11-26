@@ -346,6 +346,9 @@ export interface HttpProjectAdapterOptions extends HostKitHttpOptions {
 }
 
 // @public
+export const INTENT_MAX_REFERENCED_DATASETS = 4;
+
+// @public
 export const INTENT_STYLE_PRESET_IDS: readonly ['deep-tech', 'light-biz', 'warm-care', 'ink-finance'];
 
 // @public (undocumented)
@@ -367,6 +370,8 @@ export type IntentBind = {
 } | {
     readonly kind: 'dataset';
     readonly datasetId: string;
+    readonly fields?: Readonly<Record<string, readonly string[]>>;
+    readonly params?: Readonly<Record<string, string | number | boolean>>;
 } | {
     readonly kind: 'text';
     readonly text: string;
@@ -381,6 +386,7 @@ export type IntentBind = {
 export interface IntentBlock {
     // (undocumented)
     readonly bind: IntentBind;
+    readonly candidate?: string;
     readonly ident?: string;
     // (undocumented)
     readonly note?: string;
@@ -399,6 +405,7 @@ export interface IntentBlock {
 export interface IntentCatalog {
     // (undocumented)
     readonly assets: readonly IntentCatalogAsset[];
+    readonly candidates?: readonly IntentDataCandidate[];
     // (undocumented)
     readonly materials: readonly IntentCatalogMaterial[];
 }
@@ -458,6 +465,7 @@ export interface IntentCatalogRole {
     readonly max: number;
     // (undocumented)
     readonly min: number;
+    readonly valueTypes?: readonly ('string' | 'number' | 'boolean' | 'date')[];
 }
 
 // @public (undocumented)
@@ -476,6 +484,30 @@ export interface IntentCompileResult {
     readonly imageCount: number;
     readonly materials: readonly string[];
     readonly sources: Readonly<Record<string, string>>;
+    readonly warnings: readonly IntentDiagnostic[];
+}
+
+// @public
+export interface IntentDataCandidate {
+    // (undocumented)
+    readonly datasetId: string;
+    // (undocumented)
+    readonly fact: string;
+    // (undocumented)
+    readonly fields: Readonly<Record<string, readonly string[]>>;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly type: string;
+}
+
+// @public
+export interface IntentDataContext {
+    readonly candidates: readonly IntentDataCandidate[];
+    // (undocumented)
+    readonly profiles: readonly ScreenDatasetProfile[];
+    readonly references: readonly IntentReferenceDataset[];
+    // (undocumented)
     readonly warnings: readonly IntentDiagnostic[];
 }
 
@@ -560,6 +592,7 @@ export interface IntentItemResult<T> {
 
 // @public (undocumented)
 export interface IntentKpi {
+    readonly bind?: IntentKpiBind;
     // (undocumented)
     readonly delta?: IntentKpiDelta;
     readonly ident?: string;
@@ -570,6 +603,16 @@ export interface IntentKpi {
     readonly precision?: number;
     readonly unit?: string;
     readonly value: number | null;
+}
+
+// @public
+export interface IntentKpiBind {
+    // (undocumented)
+    readonly datasetId: string;
+    // (undocumented)
+    readonly field: string;
+    // (undocumented)
+    readonly params?: Readonly<Record<string, string | number | boolean>>;
 }
 
 // @public
@@ -615,6 +658,39 @@ export interface IntentParseResult {
 }
 
 // @public
+export interface IntentReferenceDataset {
+    // (undocumented)
+    readonly columns: readonly {
+        readonly id: string;
+        readonly type: string;
+        readonly label?: string;
+        readonly unit?: string;
+    }[];
+    // (undocumented)
+    readonly datasetId: string;
+    // (undocumented)
+    readonly name: string;
+    readonly parameters?: readonly IntentReferenceParameter[];
+    readonly rows?: {
+        readonly sampled: number;
+        readonly total?: number;
+    };
+}
+
+// @public
+export interface IntentReferenceParameter {
+    // (undocumented)
+    readonly allowedValues?: readonly (string | number | boolean)[];
+    // (undocumented)
+    readonly defaultValue?: string | number | boolean;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly required: boolean;
+    readonly valueType?: 'string' | 'number' | 'boolean' | 'date';
+}
+
+// @public
 export interface IntentReferences {
     // (undocumented)
     readonly assets: readonly {
@@ -622,14 +698,7 @@ export interface IntentReferences {
         readonly name: string;
     }[];
     // (undocumented)
-    readonly datasets: readonly {
-        readonly datasetId: string;
-        readonly name: string;
-        readonly columns: readonly {
-            readonly id: string;
-            readonly type: string;
-        }[];
-    }[];
+    readonly datasets: readonly IntentReferenceDataset[];
 }
 
 // @public (undocumented)
@@ -896,6 +965,23 @@ export interface PreparedIntent {
 
 // @public (undocumented)
 export function prepareIntent(input: PrepareIntentInput): PreparedIntent;
+
+// @public (undocumented)
+export function prepareIntentDataContext(input: PrepareIntentDataContextInput): Promise<IntentDataContext>;
+
+// @public (undocumented)
+export interface PrepareIntentDataContextInput {
+    // (undocumented)
+    readonly catalog: IntentCatalog;
+    // (undocumented)
+    readonly datasetIds: readonly string[];
+    readonly maxCandidatesPerDataset?: number;
+    // (undocumented)
+    readonly port: ScreenHostDatasetPort;
+    // (undocumented)
+    readonly signal: ScreenAbortSignal;
+    readonly timeoutMs?: number;
+}
 
 // @public (undocumented)
 export interface PrepareIntentInput {
@@ -1417,6 +1503,30 @@ interface ScreenDatasetParameterDefinition {
 type ScreenDatasetParameterValue = string | number | boolean;
 
 // @public (undocumented)
+interface ScreenDatasetProfile {
+    // (undocumented)
+    readonly datasetId: string;
+    // (undocumented)
+    readonly fields: readonly ScreenFieldProfile[];
+    readonly grain: {
+        readonly keys: readonly string[];
+        readonly unique: boolean;
+    };
+    // (undocumented)
+    readonly name: string;
+    readonly omittedFields: number;
+    // (undocumented)
+    readonly params: readonly ScreenParameterProfile[];
+    // (undocumented)
+    readonly rows: {
+        readonly sampled: number;
+        readonly total?: number;
+        readonly truncated: boolean;
+    };
+    readonly sampled: boolean;
+}
+
+// @public (undocumented)
 interface ScreenDatasetQueryRequest {
     // (undocumented)
     readonly datasetId: string;
@@ -1514,6 +1624,38 @@ interface ScreenDocument {
 
 // @public (undocumented)
 type ScreenDynamicVariable = ScreenDataSourceVariable | ScreenUrlQueryVariable;
+
+// @public (undocumented)
+type ScreenFieldKind = 'measure' | 'dimension' | 'time' | 'identifier' | 'empty';
+
+// @public (undocumented)
+interface ScreenFieldProfile {
+    readonly distinct: number;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: ScreenFieldKind;
+    // (undocumented)
+    readonly label: string;
+    readonly nullRatio: number;
+    // (undocumented)
+    readonly number?: {
+        readonly min: number;
+        readonly max: number;
+        readonly integer: boolean;
+        readonly nonNegative: boolean;
+    };
+    // (undocumented)
+    readonly time?: {
+        readonly min: string;
+        readonly max: string;
+        readonly granularity: ScreenTimeGranularity;
+    };
+    // (undocumented)
+    readonly unit?: string;
+    // (undocumented)
+    readonly valueType: ScreenDatasetValueType;
+}
 
 // @public
 interface ScreenHostDatasetPort {
@@ -1624,6 +1766,17 @@ interface ScreenPageCanvas extends ScreenSubCanvasBase {
     readonly backgroundColor?: string;
     // (undocumented)
     readonly display: 'page';
+}
+
+// @public (undocumented)
+interface ScreenParameterProfile {
+    // (undocumented)
+    readonly allowedValues?: readonly ScreenDatasetParameterValue[];
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly required: boolean;
+    readonly resolved: 'default' | 'missing' | 'optional';
 }
 
 // @public (undocumented)
@@ -1866,6 +2019,9 @@ type ScreenThemeBaseSlot = 'primary' | 'text' | 'textSecondary' | 'background' |
 
 // @public
 type ScreenThemeStatusSlot = 'danger' | 'warning' | 'info' | 'success';
+
+// @public (undocumented)
+type ScreenTimeGranularity = 'minute' | 'hour' | 'day' | 'month' | 'year' | 'irregular';
 
 // @public
 interface ScreenUpdatePolicy {

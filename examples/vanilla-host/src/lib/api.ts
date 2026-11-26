@@ -71,6 +71,13 @@ export interface AgentIntentShape {
     readonly datasetId: string;
     readonly name: string;
     readonly columns: readonly { readonly id: string; readonly type: string }[];
+    /** 查询参数定义（数据集 describe 的 `parameters`）：编译器据此写默认值、跳过缺必填参数的块。 */
+    readonly parameters?: readonly {
+      readonly name: string;
+      readonly required: boolean;
+      readonly defaultValue?: string | number | boolean;
+      readonly allowedValues?: readonly (string | number | boolean)[];
+    }[];
   }[];
   /** 后端侧的非阻断说明（例如素材库暂不可用）；解析与编译期的降级由宿主自己汇总。 */
   readonly warnings?: readonly AgentWarningShape[];

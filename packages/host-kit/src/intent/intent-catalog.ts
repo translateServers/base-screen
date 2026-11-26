@@ -19,6 +19,20 @@ export interface IntentCatalogRole {
   readonly id: string;
   readonly min: number;
   readonly max: number;
+  /**
+   * manifest 角色声明的 `valueTypes`（ADR-0114 S1 ③）：显式绑定时据此校验字段类型。
+   * 缺省表示宿主没上送（旧宿主），只校验字段存在与数量上下限。
+   */
+  readonly valueTypes?: readonly ('string' | 'number' | 'boolean' | 'date')[];
+}
+
+/** 本轮数据候选（`core` `enumerateScreenDataCandidates` 的结果），由宿主画像之后附上。 */
+export interface IntentDataCandidate {
+  readonly id: string;
+  readonly fact: string;
+  readonly datasetId: string;
+  readonly type: string;
+  readonly fields: Readonly<Record<string, readonly string[]>>;
 }
 
 export interface IntentCatalogMaterial {
@@ -50,6 +64,11 @@ export interface IntentCatalogAsset {
 export interface IntentCatalog {
   readonly materials: readonly IntentCatalogMaterial[];
   readonly assets: readonly IntentCatalogAsset[];
+  /**
+   * 本轮可引用的数据候选（ADR-0114 D4）：块写 `candidate: 'c3'` 时据此展开成物料与绑定。
+   * 只有引用了数据集、且宿主做过画像时才有。
+   */
+  readonly candidates?: readonly IntentDataCandidate[];
 }
 
 /** 目录摘要进不了提示词的兜底：标题类文本物料。 */

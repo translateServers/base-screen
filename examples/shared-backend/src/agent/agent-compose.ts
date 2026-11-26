@@ -138,6 +138,13 @@ export interface ComposeReferences {
     readonly datasetId: string;
     readonly name: string;
     readonly columns: readonly { readonly id: string; readonly type: string }[];
+    /** 查询参数定义（数据集 describe 的 `parameters`）：编译器据此写默认值、跳过缺必填参数的块。 */
+    readonly parameters?: readonly {
+      readonly name: string;
+      readonly required: boolean;
+      readonly defaultValue?: string | number | boolean;
+      readonly allowedValues?: readonly (string | number | boolean)[];
+    }[];
   }[];
 }
 
@@ -616,13 +623,46 @@ function resolveBlockPayload(
     if (datasetId !== '') {
       const dataset = context.references?.datasets.find((item) => item.datasetId === datasetId);
       if (dataset !== undefined) {
-        const dataSourceId = `agent-ds-${target.sink.dataSources.length + 1}`;
-        target.sink.dataSources.push({
-          id: dataSourceId,
-          name: dataset.name,
-          source: { kind: 'dataset', datasetId: dataset.datasetId },
-          params: {},
+        // 与 host-kit `intent-dataset.ts` 同一规则（ADR-0114 S1，等价测试守着两份不漂）：
+        // 默认值显式写进实例；必填又没有默认值的跳过该块；同数据集同参数共享一个实例。
+        const params: Record<string, { kind: 'inline'; value: string | number | boolean }> = {};
+        const missing: string[] = [];
+        for (const parameter of dataset.parameters ?? []) {
+          if (parameter.defaultValue !== undefined) {
+            params[parameter.name] = { kind: 'inline', value: parameter.defaultValue };
+          } else if (parameter.required) {
+            missing.push(parameter.name);
+          }
+        }
+        if (missing.length > 0) {
+          target.sink.warnings.push({
+            code: 'AGENT_DATASET_PARAM_REQUIRED',
+            path: `blocks.${block.title}`,
+            message: `数据集 ${datasetId} 需要参数 ${missing.join('、')}，本轮没有取值，该块已跳过。`,
+          });
+          return null;
+        }
+        const key = JSON.stringify(params);
+        const shared = target.sink.dataSources.find((entry) => {
+          const source = entry.source as { kind?: unknown; datasetId?: unknown } | undefined;
+          return (
+            source?.kind === 'dataset' &&
+            source.datasetId === dataset.datasetId &&
+            JSON.stringify(entry.params) === key
+          );
         });
+        let dataSourceId: string;
+        if (shared !== undefined && typeof shared.id === 'string') {
+          dataSourceId = shared.id;
+        } else {
+          dataSourceId = `agent-ds-${target.sink.dataSources.length + 1}`;
+          target.sink.dataSources.push({
+            id: dataSourceId,
+            name: dataset.name,
+            source: { kind: 'dataset', datasetId: dataset.datasetId },
+            params,
+          });
+        }
         // 列类型来自数据集 describe，角色分配与表格走同一套算法，避免两条规则漂移。
         const binding = assignRoles(material, {
           columns: dataset.columns.map((column) => ({

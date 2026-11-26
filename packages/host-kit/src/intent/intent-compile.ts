@@ -26,6 +26,7 @@ import {
   formatKpiValue,
   type IntentLanguage,
 } from './intent-format.js';
+import { drawBoundKpi } from './intent-kpi-bind.js';
 import {
   FOOTER_HEIGHT,
   FOOTER_Y,
@@ -286,7 +287,23 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
         beginShell('指标卡', box);
         pushSurface(shellMaterial === undefined ? '指标卡' : '底板', box, cardStyle);
         // 流式落稿时这一项还没到：只画外壳与底板。数值到了在同一张卡上填字，外壳与底板的 id、层级不变。
-        if (slot.kpi !== undefined) drawKpi(slot.kpi, box, palette, input.mode, language, pushText);
+        if (slot.kpi !== undefined) {
+          const kpi = slot.kpi;
+          const x = box.x + KPI_CARD_PADDING;
+          const width = box.width - KPI_CARD_PADDING * 2;
+          const bound =
+            kpi.bind !== undefined &&
+            drawBoundKpi(
+              kpi,
+              {
+                label: { x, y: box.y + 18, width, height: 26 },
+                value: { x, y: box.y + 50, width, height: 54 },
+              },
+              { textMaterial, references, sink, palette, language, push, pushText },
+            );
+          // 绑不上的指标卡画占位「—」（不改几何），原因已记进 warnings。
+          if (!bound) drawKpi(kpi, box, palette, input.mode, language, pushText);
+        }
         endShell();
       });
     } else if (region.kind === 'grid' && placed.kind === 'grid') {

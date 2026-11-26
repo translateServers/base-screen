@@ -1280,6 +1280,7 @@ const INTENT_WARNING_TEXT: Readonly<Record<string, string>> = {
   AGENT_BLOCK_INVALID: '有模块结构不完整，已跳过',
   AGENT_BLOCK_BINDING_UNSATISFIED: '有模块的列不满足绑定角色，已退化为无数据',
   AGENT_DATASET_UNKNOWN: '引用的数据集不在本轮上下文里，该模块已跳过',
+  AGENT_DATASET_PARAM_REQUIRED: '引用的数据集需要先指定参数，该模块已跳过',
   AGENT_BLOCKS_DROPPED: '有模块经修复仍不可用，已去掉，其余照常交出',
   AGENT_KPI_INVALID: '有指标数值不合格，已去掉',
   AGENT_KPI_DELTA_DROPPED: '有指标的增减量不合格，已只保留数值',
@@ -1314,6 +1315,17 @@ function describeIntentWarnings(
         `${item.code}:${wanted}`,
         item.code,
         `你要的「${wanted}」目录里没有，已用「${used}」代替`,
+      );
+      continue;
+    }
+    if (item.code === 'AGENT_DATASET_PARAM_REQUIRED') {
+      const dataset = String(item.detail?.dataset ?? '');
+      const params = String(item.detail?.params ?? '');
+      const allowed = String(item.detail?.allowed ?? '');
+      add(
+        `${item.code}:${dataset}`,
+        item.code,
+        `「${dataset}」需要先指定参数 ${params}${allowed === '' ? '' : `（可选 ${allowed}）`}，该模块已跳过`,
       );
       continue;
     }

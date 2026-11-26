@@ -117,6 +117,19 @@ export interface AgentGenerateResult extends Omit<AgentCandidateResult, 'name' |
  * 整屏生成的结果（ADR-0113 §2.1）：后端只做「模型 ⇄ 意图层 IR」，把模型原文原样交给宿主前端，
  * 由前端用 host-kit 解析、编译、审计；修复回环也由前端驱动，再带着 `repair` 回来要一次修复。
  */
+/** 本轮引用并解析出的一个数据集：列类型供角色分配，参数定义供编译器写默认值、判缺参。 */
+export interface ReferencedDataset {
+  readonly datasetId: string;
+  readonly name: string;
+  readonly columns: readonly { readonly id: string; readonly type: string }[];
+  readonly parameters: readonly {
+    readonly name: string;
+    readonly required: boolean;
+    readonly defaultValue?: string | number | boolean;
+    readonly allowedValues?: readonly (string | number | boolean)[];
+  }[];
+}
+
 export interface AgentIntentResult {
   /** 模型原文（JSON 文本）；未配置模型时是同形的确定性兜底 JSON（指标值为 null 占位）。 */
   readonly output: string;
@@ -126,11 +139,7 @@ export interface AgentIntentResult {
   /** 本轮可用素材（按 screenId 向宿主素材库核验）：解析与编译要用。 */
   readonly assets: readonly { readonly id: string; readonly name: string }[];
   /** 本轮引用并解析出的数据集（含列类型，供绑定角色分配）。 */
-  readonly datasets: readonly {
-    readonly datasetId: string;
-    readonly name: string;
-    readonly columns: readonly { readonly id: string; readonly type: string }[];
-  }[];
+  readonly datasets: readonly ReferencedDataset[];
   readonly warnings?: readonly AgentWarning[];
   readonly failure?: string;
 }
@@ -260,14 +269,13 @@ export class AgentService {
     compose:
       | {
           assets: { id: string; name: string }[];
-          datasets: { datasetId: string; name: string; columns: { id: string; type: string }[] }[];
+          datasets: ReferencedDataset[];
         }
       | undefined;
   }> {
     if (raw === undefined || raw.length === 0) return { prompt: undefined, compose: undefined };
     const assets: { id: string; name: string }[] = [];
-    const datasets: { datasetId: string; name: string; columns: { id: string; type: string }[] }[] =
-      [];
+    const datasets: ReferencedDataset[] = [];
     for (const item of raw) {
       const kind = item.kind;
       if (kind === 'asset') {
@@ -289,7 +297,18 @@ export class AgentService {
             id: field.id,
             type: field.valueType === 'number' ? 'number' : 'string',
           }));
-          datasets.push({ datasetId, name: definition.name, columns });
+          // 参数定义原样带上：运行时缺参数回落默认值，必填又没默认值时整次查询失败（ADR-0114 §8.1）。
+          const parameters = (definition.parameters ?? []).map((parameter) => ({
+            name: parameter.name,
+            required: parameter.required,
+            ...(parameter.defaultValue === undefined
+              ? {}
+              : { defaultValue: parameter.defaultValue }),
+            ...(parameter.allowedValues === undefined
+              ? {}
+              : { allowedValues: [...parameter.allowedValues] }),
+          }));
+          datasets.push({ datasetId, name: definition.name, columns, parameters });
         } catch {
           this.logger.warn(`agent reference dataset dropped: ${datasetId}`);
         }
@@ -304,6 +323,9 @@ export class AgentService {
           datasetId: dataset.datasetId,
           name: dataset.name,
           columns: dataset.columns.map((column) => column.id),
+          missingParams: dataset.parameters
+            .filter((parameter) => parameter.required && parameter.defaultValue === undefined)
+            .map((parameter) => parameter.name),
         })),
       },
       compose: { assets, datasets },
@@ -1359,6 +1381,7 @@ export const WARNING_MESSAGES: Readonly<Record<string, string>> = {
   AGENT_BLOCK_INVALID: '有模块结构不完整，已跳过',
   AGENT_BLOCK_BINDING_UNSATISFIED: '有模块的列不满足绑定角色，已退化为无数据',
   AGENT_DATASET_UNKNOWN: '引用的数据集不在本轮上下文里，已改用示例数据',
+  AGENT_DATASET_PARAM_REQUIRED: '引用的数据集需要先指定参数（例如产线），该模块已跳过',
   AGENT_BLOCKS_ALL_INVALID: '模型给的分块都不可用，已改用确定性布局',
   AGENT_BLOCKS_DROPPED: '有模块经修复仍不可用，已去掉，其余照常交出',
   AGENT_KPI_INVALID: '有指标数值不合格，已去掉',

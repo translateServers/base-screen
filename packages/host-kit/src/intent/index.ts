@@ -5,6 +5,7 @@ export type {
   IntentCatalogMaterial,
   IntentCatalogProp,
   IntentCatalogRole,
+  IntentDataCandidate,
 } from './intent-catalog.js';
 export { type CompileScreenIntentInput, compileScreenIntent } from './intent-compile.js';
 export type {
@@ -13,6 +14,8 @@ export type {
   CompiledScreenDocument,
   IntentCompileOutcome,
   IntentCompileResult,
+  IntentReferenceDataset,
+  IntentReferenceParameter,
   IntentReferences,
   IntentSkeleton,
   IntentSkeletonRegion,
@@ -20,6 +23,12 @@ export type {
   IntentStreamFrame,
 } from './intent-compile-types.js';
 export { flatSkeleton } from './intent-compile-types.js';
+export {
+  INTENT_MAX_REFERENCED_DATASETS,
+  type IntentDataContext,
+  type PrepareIntentDataContextInput,
+  prepareIntentDataContext,
+} from './intent-data-context.js';
 export {
   detectIntentLanguage,
   formatKpiDelta,
@@ -86,6 +95,7 @@ export type {
   IntentGrid,
   IntentItemResult,
   IntentKpi,
+  IntentKpiBind,
   IntentKpiDelta,
   IntentParseResult,
   IntentRegion,

@@ -90,6 +90,8 @@ export interface AgentPromptReferences {
     readonly datasetId: string;
     readonly name: string;
     readonly columns: readonly string[];
+    /** 必填又没有默认值的参数名：本轮取不到数，模型不要引用这个数据集。 */
+    readonly missingParams?: readonly string[];
   }[];
 }
 
@@ -100,7 +102,11 @@ export interface AgentPromptReferences {
  * 就白选了——产物看起来正常，但屏上跑的是假数据。
  */
 function referenceRule(references: AgentPromptReferences): string {
-  if (references.datasets.length > 0) {
+  // 缺必填参数的数据集本轮取不到数，不算「可引用」：全都缺参数时退回示例数据的规则。
+  const usable = references.datasets.filter(
+    (dataset) => (dataset.missingParams ?? []).length === 0,
+  );
+  if (usable.length > 0) {
     return '数据型块必须给 datasetId（只能用上面列出的引用数据集），不要给 table、也不要同时给两者。';
   }
   return '数据型块给 table（示例数据）；没有引用数据集时不要写 datasetId。';
@@ -114,7 +120,12 @@ function renderReferencesPrompt(references: AgentPromptReferences | undefined): 
     lines.push(`- 素材：${asset.name}（assetId: ${asset.id}）`);
   for (const dataset of references.datasets) {
     const columns = dataset.columns.length === 0 ? '字段未知' : dataset.columns.join(' / ');
-    lines.push(`- 数据集：${dataset.name}（datasetId: ${dataset.datasetId}，字段：${columns}）`);
+    const missing = dataset.missingParams ?? [];
+    lines.push(
+      missing.length === 0
+        ? `- 数据集：${dataset.name}（datasetId: ${dataset.datasetId}，字段：${columns}）`
+        : `- 数据集：${dataset.name}（datasetId: ${dataset.datasetId}）：需要先指定参数 ${missing.join('、')}，本轮取不到数，不要引用它，也不要为它编示例数据`,
+    );
   }
   if (lines.length === 0) return '';
   return `

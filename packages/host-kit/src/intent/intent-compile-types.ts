@@ -37,14 +37,44 @@ export interface CompiledScreenDocument {
   readonly blueprint: { readonly nodes: readonly never[]; readonly edges: readonly never[] };
 }
 
+/** 引用数据集的一个查询参数（来自数据集 describe 的 `parameters`）。 */
+export interface IntentReferenceParameter {
+  readonly name: string;
+  readonly required: boolean;
+  /** 数据集声明的参数类型；有它时模型给的取值按它校验。 */
+  readonly valueType?: 'string' | 'number' | 'boolean' | 'date';
+  readonly defaultValue?: string | number | boolean;
+  readonly allowedValues?: readonly (string | number | boolean)[];
+}
+
+/** 本轮引用的一个数据集。 */
+export interface IntentReferenceDataset {
+  readonly datasetId: string;
+  readonly name: string;
+  readonly columns: readonly {
+    readonly id: string;
+    /** 字段 `valueType`（`string` / `number` / `boolean` / `date`）。 */
+    readonly type: string;
+    readonly label?: string;
+    readonly unit?: string;
+  }[];
+  /**
+   * 画像时样本的行数（`sampled`）与宿主声明的总行数（`total`）。指标卡只能绑单行结果：
+   * 知道多于一行时编译器拒绝把它绑上指标卡（`AGENT_KPI_MULTI_ROW`）。缺省表示不知道。
+   */
+  readonly rows?: { readonly sampled: number; readonly total?: number };
+  /**
+   * 查询参数定义。编译时把默认值显式写进数据源实例；必填却没有默认值的参数，本轮无从取值，
+   * 引用它的块会被跳过（`AGENT_DATASET_PARAM_REQUIRED`），不编出运行时必然失败的实例。
+   * 缺省等同于没有参数（旧宿主不上送这一项）。
+   */
+  readonly parameters?: readonly IntentReferenceParameter[];
+}
+
 /** 本轮引用：用户指定的素材与数据集（列类型来自数据集 describe，供角色分配）。 */
 export interface IntentReferences {
   readonly assets: readonly { readonly id: string; readonly name: string }[];
-  readonly datasets: readonly {
-    readonly datasetId: string;
-    readonly name: string;
-    readonly columns: readonly { readonly id: string; readonly type: string }[];
-  }[];
+  readonly datasets: readonly IntentReferenceDataset[];
 }
 
 /**

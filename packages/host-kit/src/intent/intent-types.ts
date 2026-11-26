@@ -16,6 +16,16 @@ export interface IntentKpiDelta {
   readonly direction: 'up-good' | 'down-good' | 'neutral';
 }
 
+/**
+ * 指标卡读数据集的一个字段（ADR-0114 D4）。结果只能有一行：文本物料只读第一行。
+ * 有 `bind` 时模型不得写 `value` / `delta`——真实数值配示例增减量比整张示例卡更误导。
+ */
+export interface IntentKpiBind {
+  readonly datasetId: string;
+  readonly field: string;
+  readonly params?: Readonly<Record<string, string | number | boolean>>;
+}
+
 export interface IntentKpi {
   readonly label: string;
   /** `null` 表示没有数据（确定性兜底的占位），编译器画「—」而不是 0。 */
@@ -25,6 +35,8 @@ export interface IntentKpi {
   /** 小数位 0–3；缺省时由编译器按数量级决定。 */
   readonly precision?: number;
   readonly delta?: IntentKpiDelta;
+  /** 读数据集字段；有它时 `value` 为 `null`、没有 `delta` / `precision`。 */
+  readonly bind?: IntentKpiBind;
   readonly origin: string;
   /**
    * 稳定标识（会话里用）：编译出的组件 id 与层级按它分段，而不是按当前位置。
@@ -51,7 +63,14 @@ export interface IntentTable {
  */
 export type IntentBind =
   | { readonly kind: 'table'; readonly table: IntentTable }
-  | { readonly kind: 'dataset'; readonly datasetId: string }
+  | {
+      readonly kind: 'dataset';
+      readonly datasetId: string;
+      /** 角色 id → 字段 id（ADR-0114 D4）；缺省时编译器按列类型分配（阶段 2 的行为）。 */
+      readonly fields?: Readonly<Record<string, readonly string[]>>;
+      /** 查询参数；与数据集声明的默认值合并，取值须合法。 */
+      readonly params?: Readonly<Record<string, string | number | boolean>>;
+    }
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'asset'; readonly assetId: string }
   | { readonly kind: 'none' };
@@ -67,6 +86,8 @@ export interface IntentBlock {
   readonly props?: Readonly<Record<string, string | number | boolean>>;
   /** 目录里没有用户要的物料、用了替代品时，模型写明「本来要的是什么」，编译器据此说明缺口。 */
   readonly substituteFor?: string;
+  /** 由本轮候选表展开而来时的候选编号（`c3`）：提案理由与评测据此统计。 */
+  readonly candidate?: string;
   readonly origin: string;
   /** 稳定标识，见 `IntentKpi.ident`。 */
   readonly ident?: string;
