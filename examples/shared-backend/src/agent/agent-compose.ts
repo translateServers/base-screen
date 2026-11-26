@@ -439,8 +439,9 @@ export function formatKpiValue(kpi: AgentKpi): string {
   if (kpi.value === null) return KPI_PENDING;
   const unit = kpi.unit ?? '';
   const magnitude = Math.abs(kpi.value);
+  // 单位自己已经带数量级（「万元」「亿元」）时不再折算：否则会写成「28.6 万万元」。与 host-kit 同一规则。
   const [scaled, scale] =
-    unit === '%'
+    unit === '%' || /^(?:[万亿千]|[KMBk](?![a-z]))/.test(unit)
       ? [kpi.value, '']
       : magnitude >= 1e8
         ? [kpi.value / 1e8, '亿']
@@ -460,7 +461,9 @@ export function formatKpiValue(kpi: AgentKpi): string {
 export function formatKpiDelta(kpi: AgentKpi): string {
   const delta = kpi.delta;
   if (delta === undefined) return '';
-  const sign = delta.value > 0 ? '+' : delta.value < 0 ? '-' : '';
+  // 四舍五入后是零就不带符号，与 host-kit 同一规则。
+  const zero = deltaIsZero(delta);
+  const sign = zero ? '' : delta.value > 0 ? '+' : '-';
   const magnitude = Math.abs(delta.value);
   if (delta.unit === 'percent') return `${sign}${trimZeros(magnitude.toFixed(1))}%`;
   if (delta.unit === 'point') return `${sign}${trimZeros(magnitude.toFixed(1))} 个百分点`;
@@ -472,12 +475,17 @@ export function formatKpiDelta(kpi: AgentKpi): string {
   return `${sign}${absolute}`;
 }
 
+function deltaIsZero(delta: AgentKpiDelta): boolean {
+  if (delta.value === 0) return true;
+  return delta.unit === 'absolute' ? false : Number(Math.abs(delta.value).toFixed(1)) === 0;
+}
+
 /**
  * 增减量的颜色只取主题状态色位（ADR-0110 的 `theme:<slot>`），不写固定色值：
  * 增为好且在增、减为好且在减 → success；反过来 → danger；neutral 或没变化 → 次要文字色。
  */
 function deltaColor(delta: AgentKpiDelta, palette: StylePalette): string {
-  if (delta.direction === 'neutral' || delta.value === 0) return palette.muted;
+  if (delta.direction === 'neutral' || deltaIsZero(delta)) return palette.muted;
   const good = (delta.direction === 'up-good') === delta.value > 0;
   return good ? 'theme:success' : 'theme:danger';
 }

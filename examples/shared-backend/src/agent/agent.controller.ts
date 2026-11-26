@@ -121,6 +121,7 @@ function actInput(dto: AgentActDto, signal: AbortSignal): AgentActInput {
     ...(dto.references === undefined ? {} : { references: dto.references }),
     ...(dto.canvas === undefined ? {} : { canvas: dto.canvas }),
     ...(dto.context === undefined ? {} : { context: dto.context }),
+    ...(dto.session === undefined ? {} : { session: dto.session }),
   };
 }
 

@@ -77,6 +77,18 @@ export interface AgentIntentShape {
   readonly failure?: string;
 }
 
+/**
+ * 局部修改的结果（ADR-0113 §2.5）：对宿主持有的 IR 的操作列表，不是新 IR。
+ * 操作交给 host-kit 应用、重编译、做差；形状在后端把过关，语义由 host-kit 判。
+ */
+export interface AgentScreenEditShape {
+  readonly summary: string;
+  readonly ops: readonly unknown[];
+  readonly mode: 'llm' | 'deterministic';
+  readonly unsupported?: string;
+  readonly failure?: string;
+}
+
 /** 宿主回传的修复请求：只给诊断码与 IR 路径，修改建议由后端按码生成。 */
 export interface AgentRepairRequestShape {
   readonly output: string;
@@ -191,6 +203,8 @@ export interface AgentActInputShape {
     readonly hasBackgroundImage?: boolean;
   };
   readonly context?: AgentScreenDigestShape;
+  /** 宿主持有的整屏 IR 摘要（可操作的目标清单）；有它时非「重做」口吻的整屏指令走局部修改。 */
+  readonly session?: unknown;
 }
 
 /** 统一动作结果：按 `kind` 判别，宿主据此选择编译路径。 */
@@ -199,6 +213,10 @@ export type AgentActShape =
       readonly kind: 'generate_screen';
       readonly routedBy: 'rule' | 'model';
     } & AgentIntentShape)
+  | ({
+      readonly kind: 'edit_screen';
+      readonly routedBy: 'rule' | 'model';
+    } & AgentScreenEditShape)
   | ({
       readonly kind: 'edit_components';
       readonly routedBy: 'rule' | 'model';

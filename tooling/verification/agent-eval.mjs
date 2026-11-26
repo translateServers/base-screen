@@ -28,7 +28,10 @@ const { parseScreenDocument } = await load('packages/contracts/dist/index.js');
 const { auditScreenLayout, listSampleValueRefs } = await load('packages/core/dist/index.js');
 const {
   compileScreenIntent,
+  createIntentSession,
   createIntentStreamAssembler,
+  describeSession,
+  editIntent,
   mapDocumentIssues,
   prepareIntent,
   repairKey,
@@ -84,6 +87,11 @@ const catalog = withShell(
 const only = args.only === undefined ? undefined : new Set(args.only.split(','));
 const cases = AGENT_EVAL_CASES.filter((item) => only === undefined || only.has(item.id));
 
+if (args.edits !== undefined) {
+  await runEdits();
+  process.exit(0);
+}
+
 /** `/agent/candidate`（修复请求）要求一个真实存在的 screenId，用来读素材权限；评测临时建一个，跑完删掉。 */
 const hostScreen = await fetch(`${base}/screens`, {
   method: 'POST',
@@ -107,6 +115,120 @@ if (hostScreen !== undefined) {
 console.log(renderTable(results));
 console.log(renderSummary(results));
 if (args.out !== undefined) writeFileSync(args.out, `${JSON.stringify(results, null, 2)}\n`);
+
+/**
+ * 局部修改评测（ADR-0113 S6，`--edits`）：先整屏生成一屏并留下会话，再对同一份会话分别发 6 条
+ * 修改指令（改指标、删块、换物料、加块、改标题、目录里没有的形态），每条记：后端把关后是否有操作、
+ * 宿主 `editIntent` 能否应用、命令里新增 / 移除 / 更新了多少组件（越小越好）、模型是否老实说「做不到」。
+ */
+async function runEdits() {
+  const EDIT_BASE =
+    '生成区域销售周报大屏：顶部四个核心指标，主区放近两周销售趋势和各品类占比，右侧栏放今日要点和提醒';
+  const EDIT_CASES = [
+    { id: 'kpi', text: '把第二个指标的名字改成「本周新签客户」' },
+    { id: 'delete', text: '删掉提醒那一块' },
+    { id: 'swap', text: '把近两周销售趋势图换成柱状图' },
+    { id: 'add', text: '在主区下面加一块文字：本周重点盯库容紧张的仓' },
+    { id: 'title', text: '把大屏标题改成：华东销售运营总览' },
+    { id: 'gap', text: '加一个全国门店分布地图' },
+  ];
+
+  const post = async (path, body) => {
+    const response = await fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(240_000),
+    });
+    return { status: response.status, body: await response.json().catch(() => null) };
+  };
+  const generated = await post('/agent/act', { text: EDIT_BASE, scope: 'screen', catalog });
+  if (generated.body?.kind !== 'generate_screen') {
+    console.log(
+      `基础屏生成失败：${generated.status} ${JSON.stringify(generated.body).slice(0, 200)}`,
+    );
+    return;
+  }
+  const data = generated.body;
+  const prepared = prepareIntent({
+    output: data.output,
+    catalog: { materials: catalog.materials, assets: data.assets },
+    references: { assets: data.assets, datasets: data.datasets },
+    mode: data.mode,
+  });
+  if (prepared.compiled === undefined || prepared.intent === undefined) {
+    console.log(`基础屏编译失败：${JSON.stringify(prepared.issues)}`);
+    return;
+  }
+  const session = createIntentSession({
+    intent: prepared.intent,
+    compiled: prepared.compiled,
+    catalog: { materials: catalog.materials, assets: data.assets },
+    references: { assets: data.assets, datasets: data.datasets },
+    mode: data.mode,
+  });
+  const live = {
+    canvas: session.compiled.document.canvas,
+    components: session.compiled.document.components,
+  };
+  const digest = describeSession(session);
+  console.log(
+    `基础屏：${digest.title} ｜ 指标：${digest.regions
+      .filter((region) => region.kind === 'band')
+      .flatMap((region) => region.items.map((item) => item.title))
+      .join('、')}`,
+  );
+  const rows = [];
+  for (const item of EDIT_CASES) {
+    process.stderr.write(`· edit:${item.id} … `);
+    const started = Date.now();
+    const answer = await post('/agent/act', {
+      text: item.text,
+      scope: 'screen',
+      catalog,
+      session: digest,
+    });
+    const ms = Date.now() - started;
+    const result = answer.body;
+    const row = { id: item.id, text: item.text, ms, kind: result?.kind ?? `http-${answer.status}` };
+    if (result?.kind === 'edit_screen') {
+      row.ops = result.ops.length;
+      row.unsupported = result.unsupported ?? null;
+      row.failure = result.failure ?? null;
+      row.opKinds = result.ops.map((op) => `${op.op}:${op.target ?? op.region}`).join(' ');
+      row.opsRaw = result.ops;
+      if (result.ops.length > 0) {
+        const edited = editIntent(session, result.ops, live);
+        row.applied = edited.ok;
+        if (edited.ok) {
+          row.summary = edited.summary;
+          row.commands = edited.commands.map((command) => command.type).join(',');
+          row.keptForUser = edited.keptForUser.length;
+        } else {
+          row.diagnostic = edited.diagnostics
+            .map((item) => `${item.code}@${item.path}: ${item.message}`)
+            .join(' ');
+        }
+      }
+    }
+    rows.push(row);
+    process.stderr.write(`${row.kind} ${(ms / 1000).toFixed(1)}s\n`);
+  }
+  const yes = (value) => (value === true ? '是' : value === false ? '否' : '—');
+  console.log(
+    '| 用例 | 路由 | 操作数 | 能应用 | 变化（更新/新增/移除） | 做不到的说明 | 耗时 | 操作 |',
+  );
+  console.log('|---|---|---|---|---|---|---|---|');
+  for (const row of rows) {
+    const change = row.summary
+      ? `${row.summary.changed}/${row.summary.added}/${row.summary.removed}`
+      : (row.diagnostic ?? '—');
+    console.log(
+      `| ${row.id} | ${row.kind} | ${row.ops ?? '—'} | ${yes(row.applied)} | ${change} | ${row.unsupported ?? row.failure ?? '—'} | ${(row.ms / 1000).toFixed(1)}s | ${row.opKinds ?? '—'} |`,
+    );
+  }
+  if (args.out !== undefined) writeFileSync(args.out, `${JSON.stringify(rows, null, 2)}\n`);
+}
 
 /**
  * 评测目录来自旧导出：补上容器外壳（真实设计器目录里它声明 `children` 但不进物料库，
@@ -377,25 +499,51 @@ function contentFacts(document, intent) {
  * 最后一帧与最终候选之间也接得上，宿主才能原地收尾，否则要整屏替换一次。
  */
 function streamChecks(frames, final) {
-  if (frames.length === 0 || final === undefined) return { stable: null, finishInPlace: false };
+  if (frames.length === 0 || final === undefined) {
+    return { stable: null, finishInPlace: false, finishDiff: [] };
+  }
   const sequence = [...frames, final];
   let stable = true;
+  let finishInPlace = true;
   for (let index = 1; index < sequence.length; index += 1) {
     if (!sharedUnchanged(sequence[index - 1], sequence[index])) {
       if (index < sequence.length - 1) stable = false;
-      else return { stable, finishInPlace: false };
+      else finishInPlace = false;
     }
   }
-  return { stable, finishInPlace: true };
+  // 原地收尾失败时记下是哪些共有组件的哪些字段对不上：几何不变与收尾是两件事，要分开查原因。
+  const finishDiff = finishInPlace
+    ? []
+    : changedShared(sequence[sequence.length - 2], final).slice(0, 8);
+  return { stable, finishInPlace, finishDiff };
+}
+
+function changedShared(previous, next) {
+  const rows = [];
+  if (JSON.stringify(previous.canvas) !== JSON.stringify(next.canvas)) {
+    rows.push({ id: '(canvas)', fields: ['canvas'] });
+  }
+  const before = new Map(previous.components.map((component) => [component.id, component]));
+  for (const component of next.components) {
+    const old = before.get(component.id);
+    if (old === undefined) continue;
+    const fields = [...new Set([...Object.keys(old), ...Object.keys(component)])].filter(
+      (key) => JSON.stringify(old[key]) !== JSON.stringify(component[key]),
+    );
+    if (fields.length > 0) {
+      rows.push({
+        id: component.id,
+        fields,
+        before: fields.map((key) => JSON.stringify(old[key])?.slice(0, 80)),
+        after: fields.map((key) => JSON.stringify(component[key])?.slice(0, 80)),
+      });
+    }
+  }
+  return rows;
 }
 
 function sharedUnchanged(previous, next) {
-  if (JSON.stringify(previous.canvas) !== JSON.stringify(next.canvas)) return false;
-  const before = new Map(previous.components.map((component) => [component.id, component]));
-  return next.components.every((component) => {
-    const old = before.get(component.id);
-    return old === undefined || JSON.stringify(old) === JSON.stringify(component);
-  });
+  return changedShared(previous, next).length === 0;
 }
 
 async function* readEvents(stream) {
@@ -479,8 +627,19 @@ function renderSummary(rows) {
   const seconds = (ms) => (ms === null ? '—' : `${(ms / 1000).toFixed(1)}s`);
   const layouts = new Map();
   for (const row of generated) layouts.set(row.regions, (layouts.get(row.regions) ?? 0) + 1);
+  const unfinished = rows.filter(
+    (row) => row.finishInPlace === false && row.finishDiff?.length > 0,
+  );
+  const diffLines = unfinished.flatMap((row) => [
+    `- 未能原地收尾：${row.id}（共有组件里对不上的）：`,
+    ...row.finishDiff.map(
+      (item) =>
+        `  - ${item.id}：${item.fields.join('、')}${item.before ? `（${item.before[0]} → ${item.after[0]}）` : ''}`,
+    ),
+  ]);
   return [
     '',
+    ...diffLines,
     `- 用例 ${rows.length} 条：交出候选 ${generated.length}，未交出 ${count((row) => row.outcome === 'failed')}，传输失败 ${count((row) => row.outcome === 'error')}，其他 ${rows.length - generated.length - count((row) => row.outcome === 'failed') - count((row) => row.outcome === 'error')}`,
     `- 首轮合法 ${count((row) => row.firstRoundValid === true)} / ${rows.length}；修复轮合计 ${generated.reduce((sum, row) => sum + (row.repairRounds ?? 0), 0)}；模型调用合计 ${generated.reduce((sum, row) => sum + (row.modelCalls ?? 0), 0)}`,
     `- 带问题交出（修不好、去掉或保留降级项）${count((row) => row.droppedBlocks === true)} 条；容量冲突 ${generated.reduce((sum, row) => sum + (row.capacityConflicts ?? 0), 0)} 次；LAYOUT 违规 ${generated.reduce((sum, row) => sum + (row.layoutErrors ?? 0), 0)} 处；示例数据合计 ${generated.reduce((sum, row) => sum + (row.sampleValues ?? 0), 0)} 处`,

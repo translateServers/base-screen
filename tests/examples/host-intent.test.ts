@@ -188,6 +188,14 @@ function sse(events: readonly (readonly [string, unknown])[]): Response {
 }
 
 /** 六个纵向区域放不下：带指标带 + 5 个栅格区域。 */
+type ProposalCommand = {
+  type: string;
+  component?: ScreenDocument['components'][number];
+  patch?: unknown;
+  componentIds?: string[];
+};
+type Proposal = { scope: string; rationale: string; commands: ProposalCommand[] };
+
 const OVERFLOW = JSON.stringify({
   title: '作战室',
   subtitle: '按日汇总的口径',
@@ -923,6 +931,131 @@ describe('host intent whole-screen generation (ADR-0113 §2.7)', () => {
     expect(result.reason).toContain('引擎拒绝');
   });
 
+  describe('locked backdrop kept under the new screen', () => {
+    /** 一块锁定的整屏底板：整屏替换不删它，新内容叠在它上面。 */
+    function lockedBackdrop(fill: string): ScreenDocument {
+      const [base] = componentDocument().components;
+      if (base === undefined) throw new Error('fixture');
+      return {
+        ...document(),
+        components: [
+          {
+            ...base,
+            id: 'stage-bg',
+            type: 'base.rectangle',
+            name: '背景',
+            position: { x: 0, y: 0 },
+            size: { width: 1920, height: 1080 },
+            zIndex: 1,
+            status: { locked: true, hidden: false },
+            props: {},
+            style: { fill, opacity: 1 },
+            dataValue: null,
+          },
+        ],
+      } as ScreenDocument;
+    }
+    const lightOutput = output({ style: 'light-biz' });
+
+    it('asks the model to switch to a dark style when a light screen would sit on a locked dark backdrop', async () => {
+      const fetch = stubFetch(
+        intentResponse({ output: lightOutput }),
+        repairResponse({ output: output({ style: 'deep-tech' }) }),
+      );
+      const element = designer(lockedBackdrop('#0b1020'));
+
+      const outcome = await generationHandler(element)(request);
+
+      expect(outcome.ok).toBe(true);
+      const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+      expect(body.repair.issues).toEqual([{ code: 'LAYOUT_LOCKED_BACKDROP_DARK', path: '' }]);
+      expect(element.submitChangeProposal).toHaveBeenCalledOnce();
+      // 用户说的是浅色、交出的是深色：理由里要讲清楚为什么，以及想要浅色该怎么做。
+      const rationale = element.submitChangeProposal.mock.calls[0]?.[0]?.rationale as string;
+      expect(rationale).toContain('已改用深色风格');
+      expect(rationale).toContain('解锁或删除这个背景');
+    });
+
+    it('says what to do when the model keeps the clashing style', async () => {
+      stubFetch(intentResponse({ output: lightOutput }));
+      const element = designer(lockedBackdrop('#0b1020'));
+
+      const outcome = await generationHandler(element)(request);
+
+      expect(outcome.ok).toBe(false);
+      if (outcome.ok) throw new Error('unreachable');
+      expect(outcome.reason).toContain('锁定保留的深色背景');
+      expect(outcome.reason).toContain('解锁');
+      expect(element.submitChangeProposal).not.toHaveBeenCalled();
+    });
+
+    it('lets a dark screen through over the same dark backdrop', async () => {
+      const fetch = stubFetch(intentResponse({ output: output({ style: 'deep-tech' }) }));
+      const element = designer(lockedBackdrop('#0b1020'));
+
+      expect((await generationHandler(element)(request)).ok).toBe(true);
+      expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it('names a light backdrop as light', async () => {
+      const fetch = stubFetch(
+        intentResponse({ output: output({ style: 'deep-tech' }) }),
+        repairResponse({ output: lightOutput }),
+      );
+      const element = designer(lockedBackdrop('#f4f6fa'));
+
+      await generationHandler(element)(request);
+
+      const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+      expect(body.repair.issues).toEqual([{ code: 'LAYOUT_LOCKED_BACKDROP_LIGHT', path: '' }]);
+    });
+  });
+
+  it('clears the old gradient and background image, which would otherwise cover the new palette', async () => {
+    stubFetch(intentResponse());
+    const current: ScreenDocument = {
+      ...componentDocument(),
+      canvas: {
+        ...document().canvas,
+        background: {
+          type: 'linear-gradient',
+          angle: 180,
+          stops: [
+            { color: '#0b1020', position: 0 },
+            { color: '#1e293b', position: 100 },
+          ],
+        },
+        backgroundImage: 'https://example.com/bg.png',
+        backgroundImageFit: 'cover',
+      } as ScreenDocument['canvas'],
+    };
+    const element = designer(current);
+
+    expect((await generationHandler(element)(request)).ok).toBe(true);
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0] as unknown as Proposal;
+    const canvas = proposal.commands.find((command) => command.type === 'update-canvas') as
+      | { patch: Record<string, unknown> }
+      | undefined;
+    expect(canvas?.patch).toMatchObject({
+      background: null,
+      backgroundImage: null,
+      backgroundImageFit: null,
+    });
+  });
+
+  it('leaves the canvas fill alone when there is no gradient or image to clear', async () => {
+    stubFetch(intentResponse());
+    const element = designer();
+
+    expect((await generationHandler(element)(request)).ok).toBe(true);
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0] as unknown as Proposal;
+    const canvas = proposal.commands.find((command) => command.type === 'update-canvas') as
+      | { patch: Record<string, unknown> }
+      | undefined;
+    expect(canvas?.patch).not.toHaveProperty('background');
+    expect(canvas?.patch).not.toHaveProperty('backgroundImage');
+  });
+
   it('clears the old blueprint before removing the components it references', async () => {
     stubFetch(intentResponse());
     const current: ScreenDocument = {
@@ -947,6 +1080,193 @@ describe('host intent whole-screen generation (ADR-0113 §2.7)', () => {
     ).toMatchObject({
       blueprint: { nodes: [], edges: [] },
     });
+  });
+});
+
+describe('host intent partial edits on the held screen (ADR-0113 §2.5)', () => {
+  const editResponse = (overrides: Record<string, unknown> = {}) =>
+    Response.json({
+      kind: 'edit_screen',
+      routedBy: 'rule',
+      summary: '把要点改成库存紧张',
+      ops: [{ op: 'change', target: 'blocks[0]', set: { text: '库存紧张' } }],
+      mode: 'llm',
+      ...overrides,
+    });
+
+  function stubSequence(...responses: Response[]) {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    let call = 0;
+    const fetch = vi.fn(async () => {
+      const response = responses[Math.min(call, responses.length - 1)];
+      call += 1;
+      return (response as Response).clone();
+    });
+    vi.stubGlobal('fetch', fetch);
+    return fetch;
+  }
+
+  /** 用户采纳了整屏提案：活文档就是提案里加进来的那些组件。 */
+  function adopt(element: ReturnType<typeof designer>, proposal: Proposal): ScreenDocument {
+    const canvas = proposal.commands.find((command) => command.type === 'update-canvas') as
+      | { patch: Partial<ScreenDocument['canvas']> }
+      | undefined;
+    const adopted: ScreenDocument = {
+      ...document(),
+      canvas: { ...document().canvas, ...canvas?.patch },
+      components: proposal.commands.flatMap((command) =>
+        command.type === 'add-component' && command.component !== undefined
+          ? [command.component]
+          : [],
+      ),
+    };
+    element.getDocument.mockReturnValue(adopted);
+    return adopted;
+  }
+
+  /** 先整屏生成一次并采纳，再让下一次请求进来。返回替身与 fetch。 */
+  async function generated(...next: Response[]) {
+    const fetch = stubSequence(intentResponse(), ...next);
+    const element = designer();
+    const run = generationHandler(element);
+    expect((await run(request)).ok).toBe(true);
+    const first = element.submitChangeProposal.mock.calls[0]?.[0] as unknown as Proposal;
+    const adopted = adopt(element, first);
+    return { fetch, element, run, adopted };
+  }
+
+  const second = {
+    instanceId: 'instance-test',
+    text: '把要点改成库存紧张',
+    scope: { kind: 'screen' as const },
+  };
+
+  it('sends the target list of the held screen, then submits only the components that changed', async () => {
+    const { fetch, element, run } = await generated(editResponse());
+
+    const outcome = await run(second);
+
+    expect(outcome.ok).toBe(true);
+    const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+    expect(body.session).toMatchObject({
+      title: '作战室',
+      regions: [
+        { path: 'kpis', kind: 'band', items: [{ target: 'kpis[0]', kind: 'kpi', title: '总量' }] },
+        {
+          path: 'blocks',
+          kind: 'grid',
+          items: [{ target: 'blocks[0]', kind: 'block', type: 'base.text' }],
+        },
+      ],
+    });
+    const proposal = element.submitChangeProposal.mock.calls[1]?.[0] as unknown as Proposal;
+    expect(proposal.scope).toBe('局部修改');
+    expect(proposal.commands.map((command) => command.type)).toEqual(['update-components']);
+    expect(JSON.stringify(proposal.commands[0]?.patch)).toContain('库存紧张');
+    expect(proposal.rationale).toContain('其余组件保持原样');
+    expect(proposal.rationale).toContain('更新 1 个组件');
+  });
+
+  it('keeps going across rounds: the edited screen is the held one for the next edit', async () => {
+    const { element, run } = await generated(
+      editResponse(),
+      editResponse({ ops: [{ op: 'change', target: 'blocks[0]', set: { text: '第三版' } }] }),
+    );
+
+    expect((await run(second)).ok).toBe(true);
+    const edit = element.submitChangeProposal.mock.calls[1]?.[0] as unknown as Proposal;
+    // 用户采纳了局部修改：把 update 命令套到活文档上。
+    const live = element.getDocument() as ScreenDocument;
+    const update = edit.commands[0] as { componentIds: string[]; patch: Record<string, unknown> };
+    element.getDocument.mockReturnValue({
+      ...live,
+      components: live.components.map((component) =>
+        update.componentIds.includes(component.id) ? { ...component, ...update.patch } : component,
+      ),
+    } as ScreenDocument);
+
+    expect((await run({ ...second, text: '再改一次' })).ok).toBe(true);
+    const third = element.submitChangeProposal.mock.calls[2]?.[0] as unknown as Proposal;
+    expect(third.commands.map((command) => command.type)).toEqual(['update-components']);
+    expect(third.rationale).not.toContain('手动改过');
+  });
+
+  it('does not offer a session when the screen on the canvas is not the generated one', async () => {
+    const { fetch, element, run } = await generated(editResponse());
+    element.getDocument.mockReturnValue(componentDocument());
+
+    await run(second);
+
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).not.toHaveProperty('session');
+  });
+
+  it('does not offer a session before the first proposal was adopted', async () => {
+    const fetch = stubSequence(intentResponse(), editResponse());
+    const element = designer();
+    const run = generationHandler(element);
+    expect((await run(request)).ok).toBe(true);
+
+    await run(second);
+
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).not.toHaveProperty('session');
+  });
+
+  it('leaves a component the user edited by hand alone and says so', async () => {
+    const { element, run, adopted } = await generated(editResponse());
+    const body = adopted.components.find(
+      (component) => component.dataValue?.kind === 'inline' && component.dataValue.value === '甲',
+    );
+    if (body === undefined) throw new Error('fixture: block body');
+    element.getDocument.mockReturnValue({
+      ...adopted,
+      components: adopted.components.map((component) =>
+        component.id === body.id
+          ? { ...component, dataValue: { kind: 'inline', value: '我自己写的' } }
+          : component,
+      ),
+    } as ScreenDocument);
+
+    const outcome = await run(second);
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) throw new Error('unreachable');
+    expect(outcome.reason).toContain('手动改过');
+    expect(element.submitChangeProposal).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports an operation that cannot be applied, and changes nothing', async () => {
+    const { element, run } = await generated(
+      editResponse({ ops: [{ op: 'delete', target: 'blocks[7]' }] }),
+    );
+
+    const outcome = await run(second);
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) throw new Error('unreachable');
+    expect(outcome.reason).toContain('找不到');
+    expect(element.submitChangeProposal).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the model’s “cannot do that” through instead of guessing', async () => {
+    const { run } = await generated(
+      editResponse({ ops: [], unsupported: '目录里没有地图组件，可以先用图表代替' }),
+    );
+
+    const outcome = await run(second);
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) throw new Error('unreachable');
+    expect(outcome.reason).toBe('目录里没有地图组件，可以先用图表代替');
+  });
+
+  it('explains an empty edit caused by a missing model instead of failing silently', async () => {
+    const { run } = await generated(editResponse({ ops: [], failure: 'AGENT_NOT_CONFIGURED' }));
+
+    const outcome = await run(second);
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) throw new Error('unreachable');
+    expect(outcome.reason).toContain('未配置模型');
   });
 });
 

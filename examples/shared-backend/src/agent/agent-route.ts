@@ -32,7 +32,12 @@ import {
 
 export type AgentRoutedBy = 'rule' | 'model';
 
-export type AgentActionName = 'generate_screen' | 'edit_components' | 'set_canvas' | 'unsupported';
+export type AgentActionName =
+  | 'generate_screen'
+  | 'edit_screen'
+  | 'edit_components'
+  | 'set_canvas'
+  | 'unsupported';
 
 export type AgentUnsupportedReason =
   | 'out_of_domain'
@@ -63,6 +68,8 @@ export interface AgentScreenDigest {
 
 export type AgentRouteDecision =
   | { readonly action: 'generate_screen'; readonly routedBy: AgentRoutedBy }
+  /** 局部修改会话里持有的整屏 IR（ADR-0113 §2.5）：宿主带来了可操作的目标清单。 */
+  | { readonly action: 'edit_screen'; readonly routedBy: AgentRoutedBy }
   | { readonly action: 'edit_components'; readonly routedBy: AgentRoutedBy }
   | {
       readonly action: 'set_canvas';
@@ -208,6 +215,11 @@ export interface RouteAgentActionInput {
   readonly digest?: unknown;
   /** 画布当前值，用于判"改了等于没改"。 */
   readonly canvasState?: unknown;
+  /**
+   * 宿主持有一份可局部修改的整屏 IR（会话）。有会话时，不是「重做」口吻的整屏指令一律走局部修改：
+   * 「把第二块换成环形图」不该重出一屏。
+   */
+  readonly hasSession?: boolean;
   /** 没配置模型时传 null：规则仍然生效，长尾直接 unsupported。 */
   readonly settings: AgentLlmSettings | null;
   readonly logger: Logger;
@@ -246,6 +258,10 @@ export async function routeAgentAction(input: RouteAgentActionInput): Promise<Ag
 
   if (isGenerationIntent(text)) {
     return { action: 'generate_screen', routedBy: 'rule' };
+  }
+
+  if (input.hasSession === true) {
+    return { action: 'edit_screen', routedBy: 'rule' };
   }
 
   return routeWithModel(input, ['generate_screen', 'set_canvas', 'unsupported']);

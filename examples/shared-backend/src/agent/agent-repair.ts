@@ -64,6 +64,10 @@ const LAYOUT_HINTS: Readonly<Record<string, string>> = {
   LAYOUT_OUT_OF_BOUNDS: '这一块超出了画布：减少同一行的块数或总 span（每行最多 4 列）。',
   LAYOUT_OVERLAP: '这一块与相邻内容重叠：减少同一行的块数或调整 span。',
   LAYOUT_CONTRAST_LOW: '文字与背景对比不足：换一种风格预设（style）。',
+  LAYOUT_LOCKED_BACKDROP_DARK:
+    '画布上有用户锁定保留的深色背景，浅色风格的深色文字压在上面看不清：style 改成深色系风格（如 deep-tech），其余内容不变。',
+  LAYOUT_LOCKED_BACKDROP_LIGHT:
+    '画布上有用户锁定保留的浅色背景，深色风格的浅色文字压在上面看不清：style 改成浅色系风格（如 light-biz），其余内容不变。',
 };
 
 /** 前端修复请求的上限：原文按模型一轮输出的量级收口，诊断与契约上限一致。 */

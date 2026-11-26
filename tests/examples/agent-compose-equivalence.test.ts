@@ -268,8 +268,9 @@ function expectSameOutcome(
   const nextWarnings = next.value.warnings.filter(
     (item) => item.code !== 'INTENT_SHELL_UNAVAILABLE',
   );
-  expect(nextWarnings.map((item) => [item.code, item.message])).toEqual(
-    legacy.value.warnings.map((item) => [item.code, item.message]),
+  // 说明文字：host-kit 的是英文开发者文案、后端是中文，等价只比码（用户可读文案由宿主按码映射）。
+  expect(nextWarnings.map((item) => item.code)).toEqual(
+    legacy.value.warnings.map((item) => item.code),
   );
 }
 
@@ -400,6 +401,16 @@ describe('ADR-0113 S2 · 编译器迁移前后等价', () => {
       { label: 'a', value: 0.123456 },
       { label: 'a', value: 0 },
       { label: 'a', value: null },
+      { label: 'a', value: 286000, unit: '万元' },
+      { label: 'a', value: 3.2, unit: '亿元' },
+      { label: 'a', value: 1, delta: { value: -0.04, unit: 'point', direction: 'down-good' } },
+      { label: 'a', value: 1, delta: { value: 0.04, unit: 'percent', direction: 'up-good' } },
+      {
+        label: 'a',
+        value: 1,
+        unit: '万元',
+        delta: { value: 12, unit: 'absolute', direction: 'up-good' },
+      },
       ...KPIS,
     ];
     for (const kpi of values) {

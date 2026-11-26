@@ -56,6 +56,13 @@ import {
   type AgentUnsupportedReason,
   routeAgentAction,
 } from './agent-route';
+import {
+  type AgentEditOp,
+  buildEditOpsSystemPrompt,
+  buildEditOpsUserPrompt,
+  readEditOps,
+  readSessionDigest,
+} from './agent-session';
 import type { AgentPromptReferences } from './agent-spec';
 import {
   type AgentBlock,
@@ -128,6 +135,19 @@ export interface AgentIntentResult {
   readonly failure?: string;
 }
 
+/**
+ * 局部修改的结果（ADR-0113 §2.5）：对宿主持有的 IR 的操作列表，不是新 IR。
+ * 操作原样交给宿主的 host-kit 应用、重编译、做差；后端只把形状。
+ */
+export interface AgentScreenEditResult {
+  readonly summary: string;
+  readonly ops: readonly AgentEditOp[];
+  readonly mode: 'llm' | 'deterministic';
+  /** 模型认为这句话做不到时的一句原因；此时 `ops` 为空。 */
+  readonly unsupported?: string;
+  readonly failure?: string;
+}
+
 /** 流式落稿的事件：进度态、骨架、逐项内容（位置路径见 `scanStreamingPaths`）。 */
 export type AgentStreamEvent =
   | { readonly type: 'status'; readonly phase: 'thinking' | 'writing' }
@@ -160,6 +180,8 @@ export interface AgentActInput {
   readonly canvas?: unknown;
   /** 当前屏摘要，只用于路由提示词；同样在路由侧收窄。 */
   readonly context?: unknown;
+  /** 宿主持有的整屏 IR 摘要（会话）：有它时非「重做」口吻的整屏指令走局部修改。 */
+  readonly session?: unknown;
   /** 前端断开即中止上游模型请求。 */
   readonly signal?: AbortSignal;
   /** 流式落稿（ADR-0113 §2.8）：整屏生成时，推进度态、骨架与逐项内容；编译在宿主前端做。 */
@@ -174,6 +196,7 @@ export interface AgentActInput {
  */
 export type AgentActResult =
   | ({ readonly kind: 'generate_screen'; readonly routedBy: AgentRoutedBy } & AgentIntentResult)
+  | ({ readonly kind: 'edit_screen'; readonly routedBy: AgentRoutedBy } & AgentScreenEditResult)
   | ({
       readonly kind: 'edit_components';
       readonly routedBy: AgentRoutedBy;
@@ -670,6 +693,47 @@ export class AgentService {
   }
 
   /**
+   * 局部修改（ADR-0113 §2.5）：宿主带着会话摘要来，模型输出对 IR 的操作列表。
+   * 没配置模型就如实说做不了（不退回任何「猜」）；模型调用失败如实报错。
+   */
+  async editScreen(input: {
+    text: string;
+    session: unknown;
+    screenId?: string;
+    catalog?: unknown;
+    signal?: AbortSignal;
+  }): Promise<AgentScreenEditResult> {
+    const digest = readSessionDigest(input.session);
+    if (digest === null) {
+      throw new BadRequestException({
+        error: 'AGENT_SESSION_INVALID',
+        message: '会话摘要不合法，无法局部修改。',
+      });
+    }
+    const { catalog } = await this.resolveContext(input);
+    const settings = resolveAgentLlmSettings(this.config);
+    if (settings === null) {
+      return { summary: '', ops: [], mode: 'deterministic', failure: 'AGENT_NOT_CONFIGURED' };
+    }
+    const result = await requestAgentCompletion(
+      settings,
+      buildEditOpsSystemPrompt(catalog, digest),
+      buildEditOpsUserPrompt(input.text),
+      this.logger,
+      { retry: true, ...(input.signal === undefined ? {} : { signal: input.signal }) },
+    );
+    if (!result.ok || result.text === undefined) {
+      throw transportFailure(result.failure ?? 'AGENT_FAILED');
+    }
+    const edit = readEditOps(result.text);
+    if (edit === null) {
+      this.logger.warn('agent edit ops rejected by shape validation');
+      return { summary: '', ops: [], mode: 'llm', failure: 'AGENT_SPEC_INVALID' };
+    }
+    return { ...edit, mode: 'llm' };
+  }
+
+  /**
    * 目录严格解析；解析不通过直接 400，而不是退化成兜底目录——
    * 目录是宿主自己发的，发错说明集成有 bug，静默降级只会让问题更难查。
    */
@@ -787,6 +851,7 @@ export class AgentService {
       scope: input.scope,
       ...(input.context === undefined ? {} : { digest: input.context }),
       ...(input.canvas === undefined ? {} : { canvasState: input.canvas }),
+      hasSession: readSessionDigest(input.session) !== null,
       settings: resolveAgentLlmSettings(this.config),
       logger: this.logger,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
@@ -802,6 +867,17 @@ export class AgentService {
         ...(input.onEvent === undefined ? {} : { onEvent: input.onEvent }),
       });
       return { kind: 'generate_screen', routedBy: decision.routedBy, ...generated };
+    }
+
+    if (decision.action === 'edit_screen') {
+      const edit = await this.editScreen({
+        text,
+        session: input.session,
+        ...(input.screenId === undefined ? {} : { screenId: input.screenId }),
+        ...(input.catalog === undefined ? {} : { catalog: input.catalog }),
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      });
+      return { kind: 'edit_screen', routedBy: decision.routedBy, ...edit };
     }
 
     if (decision.action === 'edit_components') {

@@ -161,6 +161,12 @@ export const DEFAULT_INTENT_STYLE: IntentStylePresetId;
 type DescribeRequest = Parameters<ScreenHostDatasetPort['describe']>[0];
 
 // @public (undocumented)
+export function describeSession(session: IntentSession): IntentSessionDigest;
+
+// @public
+export function detectIntentLanguage(...texts: readonly string[]): IntentLanguage;
+
+// @public (undocumented)
 export function editIntent(session: IntentSession, rawOps: readonly unknown[], baseline: IntentEditBaseline): IntentEditOutcome;
 
 // @public
@@ -169,10 +175,10 @@ export function flatSkeleton(kpis: number, blocks: readonly IntentSkeletonSlot[]
 // @public
 export function formatKpiDelta(kpi: KpiValueInput & {
     readonly delta?: IntentKpiDelta;
-}): string;
+}, language?: IntentLanguage): string;
 
 // @public
-export function formatKpiValue(kpi: KpiValueInput): string;
+export function formatKpiValue(kpi: KpiValueInput, language?: IntentLanguage): string;
 
 // @public (undocumented)
 type GroupsRequest = Parameters<NonNullable<ScreenHostDatasetPort['groups']>>[0];
@@ -592,6 +598,9 @@ export interface IntentKpiDelta {
 }
 
 // @public
+export type IntentLanguage = 'zh' | 'en';
+
+// @public
 export type IntentOp = {
     readonly op: 'change';
     readonly target: string;
@@ -660,6 +669,27 @@ export interface IntentSession {
     readonly mode: 'llm' | 'deterministic';
     // (undocumented)
     readonly references: IntentReferences | undefined;
+}
+
+// @public
+export interface IntentSessionDigest {
+    // (undocumented)
+    readonly regions: readonly {
+        readonly path: string;
+        readonly kind: 'band' | 'grid' | 'split';
+        readonly items: readonly {
+            readonly target: string;
+            readonly kind: 'kpi' | 'block';
+            readonly part: 'items' | 'blocks' | 'main' | 'rail';
+            readonly type?: string;
+            readonly title: string;
+            readonly value?: string;
+        }[];
+    }[];
+    // (undocumented)
+    readonly subtitle: string;
+    // (undocumented)
+    readonly title: string;
 }
 
 // @public
@@ -865,6 +895,9 @@ export interface ParseScreenIntentOptions {
     readonly catalog: IntentCatalog;
     readonly placeholders?: boolean;
 }
+
+// @public
+export function pickSession(candidates: readonly IntentSession[], baseline: IntentEditBaseline): IntentSession | undefined;
 
 // @public (undocumented)
 export interface PreparedIntent {

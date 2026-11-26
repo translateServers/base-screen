@@ -11,7 +11,7 @@ import {
   isScreenCanvasPaletteColor,
   parseScreenDocument,
 } from 'base-screen/contracts';
-import { auditScreenLayout } from 'base-screen/core';
+import { auditScreenLayout, parseCssColor, relativeLuminance } from 'base-screen/core';
 import type { BaseScreenDesignerElement } from 'base-screen/designer';
 import type {
   DesignerChangeProposalInput,
@@ -20,11 +20,16 @@ import type {
 } from 'base-screen/engine';
 import {
   compileScreenIntent,
+  createIntentSession,
   createIntentStreamAssembler,
+  describeSession,
+  editIntent,
   type IntentCatalog,
   type IntentDiagnostic,
   type IntentRepairIssue,
+  type IntentSession,
   mapDocumentIssues,
+  pickSession,
   prepareIntent,
   repairKey,
 } from 'base-screen/host-kit';
@@ -36,6 +41,7 @@ import {
   type AgentEditableComponentShape,
   type AgentIntentShape,
   type AgentScreenDigestShape,
+  type AgentScreenEditShape,
   type AgentWarningShape,
   api,
 } from '../lib/api';
@@ -76,6 +82,15 @@ export interface HostIntentOptions {
  * 这里只把候选 document 编译成命令，并拒绝取消、文档已变化或已有待决草案的提交。
  */
 export function createHostIntentHandler(options: HostIntentOptions): DesignerIntentHandler {
+  // 会话（ADR-0113 §2.5）：最近几次整屏生成 / 局部修改留下的 IR。提案没被采纳之前，宿主不知道用户会
+  // 采纳还是拒绝，所以每次提交都留一份，下一次请求时按活文档挑出对得上的那份；刷新页面即失效，
+  // 不写进文档元数据（设计器重载后没有会话，「把第二块换成环形图」会走别的动作而不是瞎改）。
+  const held: IntentSession[] = [];
+  const remember = (session: IntentSession | undefined): void => {
+    if (session === undefined) return;
+    held.unshift(session);
+    held.length = Math.min(held.length, MAX_HELD_SESSIONS);
+  };
   return async (request, signal) => {
     if (signal?.aborted) {
       return { ok: false, diagnostics: [], reason: '请求已取消，未生成变更。' };
@@ -215,6 +230,14 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
       // 以前这里只有 generateScreenCandidate，所以"改个背景色"也会被当成新主题重做一屏。
       // 每次请求都从当前 catalog 同步构造物料摘要；图片由后端按 screenId 查询并校验。
       const catalog = options.catalog === undefined ? undefined : readAgentCatalog(options);
+      // 有对得上的会话就把可操作的目标清单带上：非「重做」口吻的整屏指令由后端路由成局部修改。
+      const session =
+        catalog === undefined
+          ? undefined
+          : pickSession(held, {
+              canvas: current.canvas,
+              components: current.components,
+            });
       // 流式落稿：骨架一到就挂「生成中」草案，内容逐帧填入。用户点「取消生成」时引擎撤掉草案，
       // 这里随即中止请求；引擎传来的 signal 照样转发。
       const streamAbort = new AbortController();
@@ -265,6 +288,7 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
             hasBackgroundImage: current.canvas.backgroundImage != null,
           },
           context: buildScreenDigest(current),
+          ...(session === undefined ? {} : { session: describeSession(session) }),
         },
         {
           onSkeleton: (head) => {
@@ -298,6 +322,23 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
           diagnostics: [],
           reason: acted.data.suggestion ?? describeUnsupported(acted.data.reason),
         };
+      }
+
+      if (acted.data.kind === 'edit_screen') {
+        draft?.discard();
+        if (session === undefined || catalog === undefined) {
+          return { ok: false, diagnostics: [], reason: '没有可以局部修改的内容，请先生成一屏。' };
+        }
+        const edited = submitScreenEdit(
+          options,
+          current,
+          request.text,
+          session,
+          catalog,
+          acted.data,
+        );
+        remember(edited.session);
+        return edited.outcome;
       }
 
       if (acted.data.kind === 'set_canvas') {
@@ -351,6 +392,8 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
       let data: AgentIntentShape = acted.data;
       let rounds = 0;
       let previousKey: string | undefined;
+      // 修复过哪些问题：理由里要说清楚「为什么和你说的不一样」（例如为锁定背景换了风格）。
+      const repairedFor = new Set<string>();
       for (;;) {
         const attempt = attemptWholeScreen(
           options,
@@ -360,8 +403,12 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
           data,
           rounds,
           draft,
+          repairedFor,
         );
-        if (attempt.ok) return { ok: true, value: null, diagnostics: [] };
+        if (attempt.ok) {
+          remember(attempt.session);
+          return { ok: true, value: null, diagnostics: [] };
+        }
 
         const key = repairKey(attempt.issues);
         const exhausted =
@@ -371,12 +418,14 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
           // 问题只在个别指标 / 块上时，去掉那几项、其余照常交出，并如实说明。
           if (attempt.deliver !== undefined) {
             const delivered = attempt.deliver();
+            if (delivered.ok) remember(delivered.session);
             return delivered.ok ? { ok: true, value: null, diagnostics: [] } : delivered.outcome;
           }
           return attempt.outcome;
         }
         previousKey = key;
         rounds += 1;
+        for (const issue of attempt.issues) repairedFor.add(issue.code);
         logger.debug('agent candidate repair requested', rounds, attempt.issues.length);
         const repaired = await api.generateScreenCandidate(
           request.text,
@@ -586,12 +635,15 @@ function layerBase(current: ScreenDocument): number {
 /** 修复轮数上限（ADR-0112 §2.1）：总共最多 3 次模型调用。 */
 const MAX_REPAIR_ROUNDS = 2;
 
+/** 同时留着的会话份数：当前提案被采纳 / 被拒绝 / 上一份被采纳后再改，三种情形都够用。 */
+const MAX_HELD_SESSIONS = 3;
+
 /**
  * 一次整屏尝试的结果。失败时 `issues` 是值得请模型修的诊断（按模型原文路径，可能为空：结构性错误
  * 修不了）；`deliver` 在「只有个别指标 / 块有问题、其余内容可用」时给出，修不好就用它去掉那几项交出。
  */
 type WholeScreenAttempt =
-  | { readonly ok: true }
+  | { readonly ok: true; readonly session?: IntentSession }
   | {
       readonly ok: false;
       readonly issues: readonly IntentRepairIssue[];
@@ -634,6 +686,7 @@ function attemptWholeScreen(
   data: AgentIntentShape,
   rounds: number,
   draft: StreamDraft | undefined,
+  repairedFor: ReadonlySet<string> = new Set(),
 ): WholeScreenAttempt {
   const prepared = prepareIntent({
     output: data.output,
@@ -641,7 +694,7 @@ function attemptWholeScreen(
     references: { assets: data.assets, datasets: data.datasets },
     mode: data.mode,
   });
-  if (prepared.compiled === undefined) {
+  if (prepared.compiled === undefined || prepared.intent === undefined) {
     logger.warn('agent intent not compilable', prepared.issues);
     draft?.discard();
     const capacity = prepared.issues.some((issue) => issue.code === 'LAYOUT_CAPACITY_EXCEEDED');
@@ -682,6 +735,21 @@ function attemptWholeScreen(
     );
   }
 
+  // 锁定组件会原样保留在新内容下面（整屏替换不删它们）：把它们和候选叠在一起再审一次对比度。
+  // 只审候选自己的组件；锁定背景与新风格深浅相反时，候选单独审是过的，落到画布上却看不清。
+  const backdrop = lockedBackdropConflict(current, parsed.value);
+  if (backdrop !== undefined) {
+    logger.warn('agent document conflicts with the locked backdrop', backdrop.diagnostics);
+    draft?.discard();
+    return failedAttempt(
+      [{ code: backdrop.code, path: '' }],
+      backdrop.diagnostics,
+      backdrop.code === 'LAYOUT_LOCKED_BACKDROP_DARK'
+        ? '画布上锁定保留的深色背景会让新内容看不清：换深色风格，或先解锁、删除这个背景再生成。未生成变更。'
+        : '画布上锁定保留的浅色背景会让新内容看不清：换浅色风格，或先解锁、删除这个背景再生成。未生成变更。',
+    );
+  }
+
   const submit = (dropped: boolean): WholeScreenAttempt => {
     // 去项交出时，没修好的那几项照实写进理由：逐条列出被去掉的指标 / 块，块被去掉另加一句总括。
     const droppedNotes: IntentDiagnostic[] = dropped
@@ -696,11 +764,25 @@ function attemptWholeScreen(
       [...droppedNotes, ...prepared.warnings],
       data.warnings ?? [],
     );
-    const repairedNote = rounds > 0 ? `；宿主校验未通过，已请模型修复 ${rounds} 次` : '';
+    const backdropNote = repairedFor.has('LAYOUT_LOCKED_BACKDROP_DARK')
+      ? '；画布上锁定保留的深色背景与浅色风格冲突（文字会看不清），已改用深色风格，想要浅色可先解锁或删除这个背景'
+      : repairedFor.has('LAYOUT_LOCKED_BACKDROP_LIGHT')
+        ? '；画布上锁定保留的浅色背景与深色风格冲突（文字会看不清），已改用浅色风格，想要深色可先解锁或删除这个背景'
+        : '';
+    const repairedNote =
+      rounds > 0 ? `；宿主校验未通过，已请模型修复 ${rounds} 次${backdropNote}` : '';
     const rationale = `${describeMode(data.mode, data.failure, warnings)}${repairedNote}。布局由宿主前端按区域确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeLocked(current)}`;
     // 流式草案接得上就原地收尾；接不上（最终结果与骨架对不上、或已修复过）先撤掉它，再整屏提交。
+    // 提案一旦提交就留下它的会话；是否被采纳由下一次请求时对活文档判断。
+    const kept = createIntentSession({
+      intent: prepared.intent as NonNullable<typeof prepared.intent>,
+      compiled: prepared.compiled as NonNullable<typeof prepared.compiled>,
+      catalog: toIntentCatalog(shape, data.assets),
+      references: { assets: data.assets, datasets: data.datasets },
+      mode: data.mode,
+    });
     if (rounds === 0 && !dropped && draft?.finish(parsed.value, rationale) === true) {
-      return { ok: true };
+      return { ok: true, session: kept };
     }
     draft?.discard();
     const submitted = options.designer.submitChangeProposal({
@@ -718,7 +800,7 @@ function attemptWholeScreen(
         '提案被引擎拒绝（命令或渲染校验未通过），未生成变更。',
       );
     }
-    return { ok: true };
+    return { ok: true, session: kept };
   };
 
   if (prepared.issues.length === 0) return submit(false);
@@ -733,6 +815,131 @@ function attemptWholeScreen(
 
 function note(code: string, path: string): IntentDiagnostic {
   return { severity: 'warning', code, path, message: '' };
+}
+
+/** 局部修改失败时，操作 / 编译层的诊断码 → 能念给用户听的一句话。 */
+const EDIT_FAILURE_TEXT: Readonly<Record<string, string>> = {
+  INTENT_OP_TARGET_UNKNOWN: '要改的位置在当前屏里找不到（可能已被删掉）',
+  INTENT_OP_FAILED: '改完之后的内容不可用',
+  INTENT_OP_INVALID: '给出的修改不合法',
+  INTENT_OP_NOT_SUPPORTED: '暂不支持这种修改',
+  LAYOUT_CAPACITY_EXCEEDED: '改完之后这一屏放不下，先删掉一些块再试',
+  AGENT_CATALOG_UNUSABLE: '目录里没有可用的基础物料',
+};
+
+/**
+ * 局部修改（ADR-0113 §2.5）：后端回对会话 IR 的操作列表，宿主应用到 IR、重编译、与上一次产物做差，
+ * 只把变化的组件编成提案——没动的组件 id 与几何不动，用户手改过的组件原样保留并在理由里说明。
+ * 任何一步失败都如实回原因，不退回整屏重做。
+ */
+function submitScreenEdit(
+  options: HostIntentOptions,
+  current: ScreenDocument,
+  instruction: string,
+  session: IntentSession,
+  shape: AgentCatalogShape,
+  data: AgentScreenEditShape,
+): { readonly outcome: DesignerIntentOutcome; readonly session?: IntentSession } {
+  const fail = (reason: string, diagnostics: readonly ScreenDiagnostic[] = []) => ({
+    outcome: { ok: false, diagnostics, reason } as const,
+  });
+  if (data.unsupported !== undefined) return fail(data.unsupported);
+  if (data.ops.length === 0) {
+    return fail(
+      data.failure === undefined
+        ? '没有识别到可以应用的修改。可以试试“把第二块换成环形图”“删掉提醒那一块”“把标题改成……”。'
+        : `没能局部修改：${describeAgentFailure(data.failure)}。`,
+    );
+  }
+  // 目录可能在生成之后变过（新装的物料包）：换成最新物料，素材沿用生成时授权的那份。
+  const refreshed: IntentSession = {
+    ...session,
+    catalog: { materials: shape.materials, assets: session.catalog.assets },
+  };
+  const edited = editIntent(refreshed, data.ops, {
+    canvas: current.canvas,
+    components: current.components,
+    ...(current.dataSources === undefined
+      ? {}
+      : { dataSources: current.dataSources as unknown as readonly Record<string, unknown>[] }),
+  });
+  if (!edited.ok) {
+    logger.warn('agent edit ops not applicable', edited.diagnostics);
+    const first = edited.diagnostics[0];
+    const why = first === undefined ? '' : (EDIT_FAILURE_TEXT[first.code] ?? '修改没能应用');
+    return fail(`智能体给的修改没能应用：${why}。当前屏没有任何变化。`);
+  }
+  if (edited.commands.length === 0) {
+    return fail(
+      edited.keptForUser.length > 0
+        ? `你手动改过 ${edited.keptForUser.length} 个相关组件，已原样保留，没有需要应用的改动。`
+        : '这次修改没有产生任何变化。',
+    );
+  }
+  const kept =
+    edited.keptForUser.length === 0
+      ? ''
+      : `你手动改过的 ${edited.keptForUser.length} 个组件已原样保留，没有被覆盖`;
+  const { changed, added, removed } = edited.summary;
+  const counts = [
+    changed > 0 ? `更新 ${changed} 个组件` : '',
+    added > 0 ? `新增 ${added} 个` : '',
+    removed > 0 ? `移除 ${removed} 个` : '',
+  ].filter((part) => part !== '');
+  const submitted = options.designer.submitChangeProposal({
+    title: `智能体 · ${truncate(instruction, 18)}`,
+    rationale: `${data.summary === '' ? '局部修改' : data.summary}。由模型生成；${counts.join('，')}，其余组件保持原样${kept === '' ? '' : `。${kept}`}。候选未写入文档。`,
+    scope: '局部修改',
+    commands: edited.commands as unknown as DesignerChangeProposalInput['commands'],
+    origin: { author: '智能体' },
+  });
+  if (!submitted.ok) {
+    logger.warn('change proposal rejected', submitted.diagnostics);
+    return fail('提案被引擎拒绝（命令或渲染校验未通过），未生成变更。', submitted.diagnostics);
+  }
+  return { outcome: { ok: true, value: null, diagnostics: [] }, session: edited.session };
+}
+
+/**
+ * 锁定组件与候选叠在一起后的对比度冲突。没有锁定组件、或叠起来没问题时返回 undefined。
+ * 深浅按冲突文字背后那块锁定底色判断：底色离黑近就是深色背景。
+ */
+function lockedBackdropConflict(
+  current: ScreenDocument,
+  candidate: ScreenDocument,
+):
+  | {
+      readonly code: 'LAYOUT_LOCKED_BACKDROP_DARK' | 'LAYOUT_LOCKED_BACKDROP_LIGHT';
+      readonly diagnostics: readonly ScreenDiagnostic[];
+    }
+  | undefined {
+  const locked = current.components.filter((component) => component.status.locked);
+  if (locked.length === 0) return undefined;
+  const base = layerBase(current);
+  const merged: ScreenDocument = {
+    ...candidate,
+    components: [
+      ...locked,
+      ...candidate.components.map((component) => ({
+        ...component,
+        zIndex: component.zIndex + base,
+      })),
+    ],
+  };
+  const diagnostics = auditScreenLayout(merged, {
+    componentIds: candidate.components.map((component) => component.id),
+  }).filter((item) => item.severity === 'error' && item.code === 'LAYOUT_CONTRAST_LOW');
+  if (diagnostics.length === 0) return undefined;
+  const fill = locked
+    .map((component) => component.style.fill ?? component.style.backgroundColor)
+    .find((value): value is string => typeof value === 'string');
+  const color = fill === undefined ? undefined : parseCssColor(fill);
+  // 相对亮度 0.179 是黑白两种文字对比度相等的分界点：低于它，白字比黑字更清楚，就是深色背景。
+  const dark = color === undefined ? true : relativeLuminance(color) < 0.179;
+  return {
+    code: dark ? 'LAYOUT_LOCKED_BACKDROP_DARK' : 'LAYOUT_LOCKED_BACKDROP_LIGHT',
+    diagnostics,
+  };
 }
 
 /** 引擎拒绝的诊断翻成修复请求：路径是提案层的，归到整份输出；`CHANGE_*` 是提案状态，模型修不了。 */
@@ -899,16 +1106,31 @@ function compileWholeScreenCommands(
   current: ScreenDocument,
   next: ScreenDocument,
 ): readonly ProposalCommand[] {
-  const commands: ProposalCommand[] = [
-    {
-      type: 'update-canvas',
-      patch: {
-        width: next.canvas.width,
-        height: next.canvas.height,
-        backgroundColor: next.canvas.backgroundColor,
-      },
-    },
-  ];
+  // 渲染层是渐变 / 背景图优先于 `backgroundColor` 的：只写底色，旧画布上的渐变或背景图会盖住新配色，
+  // 浅色风格的深色标题就落在深色渐变上看不清（浏览器核对时发现）。整屏替换是连画布一起换，
+  // 所以旧的填充与背景图也跟着清掉，除非新文档自己带了。
+  const canvasPatch: {
+    width: number;
+    height: number;
+    backgroundColor: string;
+    background?: ScreenCanvasBackground | null;
+    backgroundImage?: string | null;
+    backgroundImageFit?: 'cover' | 'contain' | null;
+  } = {
+    width: next.canvas.width,
+    height: next.canvas.height,
+    backgroundColor: next.canvas.backgroundColor,
+  };
+  if (current.canvas.background !== undefined || next.canvas.background !== undefined) {
+    if (!jsonEquals(current.canvas.background, next.canvas.background)) {
+      canvasPatch.background = next.canvas.background ?? null;
+    }
+  }
+  if (current.canvas.backgroundImage != null && next.canvas.backgroundImage == null) {
+    canvasPatch.backgroundImage = null;
+    canvasPatch.backgroundImageFit = null;
+  }
+  const commands: ProposalCommand[] = [{ type: 'update-canvas', patch: canvasPatch }];
 
   // 蓝图节点引用组件：先清空旧蓝图再删组件，否则删除那一步就因悬空引用被拒
   // （COMPONENT_PARENT_MISSING）；新蓝图等组件都加完再换上。

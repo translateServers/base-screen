@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   type CompiledComponent,
   createIntentSession,
+  describeSession,
   editIntent,
   type IntentEditBaseline,
   type IntentEditCommand,
   type IntentSession,
   isSessionUsable,
+  pickSession,
   prepareIntent,
 } from '../../src/index.js';
 import { flatOutput, SHELL_CATALOG, TREND_TABLE } from './fixtures.js';
@@ -88,6 +90,15 @@ function baselineOf(session: IntentSession): Live & IntentEditBaseline {
   };
 }
 
+/** 主区那块图表的主体组件 id（外壳、标题之后）。 */
+function chartBodyId(session: IntentSession): string {
+  const body = session.compiled.document.components.find(
+    (component) => component.type === 'base.chart' && component.id.startsWith('agent-r1-m0-'),
+  );
+  if (body === undefined) throw new Error('fixture: chart body');
+  return body.id;
+}
+
 function run(session: IntentSession, ops: unknown[], baseline: Live = baselineOf(session)) {
   const outcome = editIntent(session, ops, baseline);
   if (!outcome.ok) throw new Error(`edit failed: ${JSON.stringify(outcome.diagnostics)}`);
@@ -139,8 +150,15 @@ describe('editIntent · operations on the held IR', () => {
     expect(body?.props).toMatchObject({ seriesType: 'bar' });
     // 换物料不改版面位置：外壳与标题没有任何命令。
     expect(ids(outcome.commands, 'update-components')).not.toContain('agent-r1-m0-0');
-    expect(outcome.summary.added).toBe(0);
-    expect(outcome.summary.removed).toBe(0);
+    expect(ids(outcome.commands, 'update-components')).not.toContain('agent-r1-m0-1');
+    // `update-components` 改不了 type：换掉的组件先移除、再用同一个 id 新增（层级沿用活文档里的）。
+    const bodyId = chartBodyId(session);
+    expect(body?.id).toBe(bodyId);
+    expect(ids(outcome.commands, 'remove-components')).toEqual([bodyId]);
+    expect(ids(outcome.commands, 'add-component')).toEqual([bodyId]);
+    const order = outcome.commands.map((command) => command.type);
+    expect(order.indexOf('remove-components')).toBeLessThan(order.indexOf('add-component'));
+    expect(outcome.summary).toEqual({ changed: 1, added: 0, removed: 0 });
   });
 
   it('deletes a block: the one after it moves up but keeps every component id', () => {
@@ -248,6 +266,16 @@ describe('editIntent · operations on the held IR', () => {
       'INTENT_OP_INVALID',
     ],
     ['deleting the title', { op: 'delete', target: 'title' }, 'INTENT_OP_INVALID'],
+    [
+      'a KPI change with a field KPIs do not have',
+      { op: 'change', target: 'regions[0].items[0]', set: { name: '订单量' } },
+      'INTENT_OP_INVALID',
+    ],
+    [
+      'a block change with a field blocks do not have',
+      { op: 'change', target: 'regions[1].rail[0]', set: { color: 'red' } },
+      'INTENT_OP_INVALID',
+    ],
   ])('rejects %s with a path-bearing diagnostic', (_name, op, code) => {
     const session = sessionOf(REGIONS);
     const outcome = editIntent(session, [op], baselineOf(session));
@@ -429,5 +457,156 @@ describe('isSessionUsable', () => {
     expect(isSessionUsable(session, { ...baseline, canvas: { width: 1280, height: 720 } })).toBe(
       false,
     );
+  });
+});
+
+describe('canonical comparison', () => {
+  it('does not mistake a live component with reordered keys for a user edit', () => {
+    const session = sessionOf(REGIONS);
+    const baseline = baselineOf(session);
+    baseline.components = baseline.components.map((component) => ({
+      ...component,
+      // 活文档经引擎读写后键顺序不同、缺省字段显式为 null：都不算用户改过。
+      style: Object.fromEntries(Object.entries(component.style).reverse()),
+      ...(component.dataBinding === undefined ? { dataBinding: undefined } : {}),
+    })) as CompiledComponent[];
+
+    const outcome = run(
+      session,
+      [{ op: 'change', target: 'regions[1].rail[0]', set: { text: '库存紧张' } }],
+      baseline,
+    );
+
+    expect(outcome.keptForUser).toEqual([]);
+    expect(outcome.summary.changed).toBe(1);
+  });
+});
+
+describe('describeSession', () => {
+  it('lists every operable target with its current words and the region paths for adding', () => {
+    const digest = describeSession(sessionOf(REGIONS));
+
+    expect(digest.title).toBe('仓储作战室');
+    expect(digest.regions.map((region) => [region.path, region.kind])).toEqual([
+      ['regions[0]', 'band'],
+      ['regions[1]', 'split'],
+      ['regions[2]', 'grid'],
+    ]);
+    expect(digest.regions[0]?.items[0]).toEqual({
+      target: 'regions[0].items[0]',
+      kind: 'kpi',
+      part: 'items',
+      title: '总量',
+      value: '28.6 万件',
+    });
+    expect(digest.regions[1]?.items.map((item) => [item.target, item.part])).toEqual([
+      ['regions[1].main[0]', 'main'],
+      ['regions[1].rail[0]', 'rail'],
+      ['regions[1].rail[1]', 'rail'],
+    ]);
+    expect(digest.regions[2]?.items[0]).toMatchObject({ type: 'base.chart', title: '明细' });
+  });
+
+  it('keeps the target of a block that moved: it is the stable identifier, not the position', () => {
+    const session = sessionOf(
+      flatOutput([text('一', { span: 4 }), text('二', { span: 4 }), text('三', { span: 4 })]),
+    );
+    const outcome = run(session, [{ op: 'delete', target: 'blocks[1]' }]);
+
+    const items = describeSession(outcome.session).regions[1]?.items ?? [];
+    expect(items.map((item) => [item.target, item.title])).toEqual([
+      ['blocks[0]', '一'],
+      ['blocks[2]', '三'],
+    ]);
+  });
+});
+
+describe('pickSession', () => {
+  it('picks the session whose components are on the canvas', () => {
+    const first = sessionOf(REGIONS);
+    const edited = run(first, [{ op: 'delete', target: 'regions[1].rail[1]' }]).session;
+
+    // 用户采纳了删除：活文档是编辑后的那份。
+    expect(pickSession([edited, first], baselineOf(edited))).toBe(edited);
+    // 用户拒绝了删除：活文档还是原来那份。
+    expect(pickSession([edited, first], baselineOf(first))).toBe(first);
+  });
+
+  it('breaks ties by how many components are exactly as compiled', () => {
+    const first = sessionOf(REGIONS);
+    const edited = run(first, [
+      { op: 'change', target: 'regions[1].rail[0]', set: { text: '库存紧张' } },
+    ]).session;
+
+    expect(pickSession([edited, first], baselineOf(edited))).toBe(edited);
+    expect(pickSession([edited, first], baselineOf(first))).toBe(first);
+  });
+
+  it('returns nothing when the canvas is a different screen, or a different size', () => {
+    const session = sessionOf(REGIONS);
+
+    expect(
+      pickSession([session], { canvas: session.compiled.document.canvas, components: [] }),
+    ).toBeUndefined();
+    expect(
+      pickSession([session], { ...baselineOf(session), canvas: { width: 1280, height: 720 } }),
+    ).toBeUndefined();
+  });
+
+  it('tolerates a few components being deleted by hand, but not most of them', () => {
+    const session = sessionOf(REGIONS);
+    const baseline = baselineOf(session);
+
+    const few = { ...baseline, components: baseline.components.slice(0, -4) };
+    const most = { ...baseline, components: baseline.components.slice(0, 2) };
+
+    expect(pickSession([session], few)).toBe(session);
+    expect(pickSession([session], most)).toBeUndefined();
+  });
+});
+
+describe('editIntent · swapping the material keeps the stacking order', () => {
+  it('re-adds the swapped component at the layer it already has on the canvas', () => {
+    const session = sessionOf(REGIONS);
+    const baseline = baselineOf(session);
+    baseline.components = baseline.components.map((component) => ({
+      ...component,
+      zIndex: component.zIndex + 500,
+    }));
+    const live = baseline.components.find((component) => component.id === chartBodyId(session));
+
+    const outcome = run(
+      session,
+      [
+        {
+          op: 'swap',
+          target: 'regions[1].main[0]',
+          type: 'plugin.echarts',
+          props: { seriesType: 'bar' },
+        },
+      ],
+      baseline,
+    );
+
+    const added = outcome.commands.find((command) => command.type === 'add-component');
+    expect(added?.type === 'add-component' && added.component.zIndex).toBe(live?.zIndex);
+    expect(added?.type === 'add-component' && added.component.type).toBe('plugin.echarts');
+  });
+
+  it('does not swap a component the user already edited by hand', () => {
+    const session = sessionOf(REGIONS);
+    const baseline = baselineOf(session);
+    const chart = baseline.components.find((component) => component.id === chartBodyId(session));
+    if (chart === undefined) throw new Error('fixture');
+    chart.style = { ...chart.style, backgroundColor: '#ff0000' };
+
+    const outcome = run(
+      session,
+      [{ op: 'swap', target: 'regions[1].main[0]', type: 'plugin.echarts' }],
+      baseline,
+    );
+
+    expect(outcome.keptForUser).toContain(chartBodyId(session));
+    expect(ids(outcome.commands, 'remove-components')).not.toContain(chartBodyId(session));
   });
 });

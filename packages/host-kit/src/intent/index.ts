@@ -20,7 +20,13 @@ export type {
   IntentStreamFrame,
 } from './intent-compile-types.js';
 export { flatSkeleton } from './intent-compile-types.js';
-export { formatKpiDelta, formatKpiValue, type KpiValueInput } from './intent-format.js';
+export {
+  detectIntentLanguage,
+  formatKpiDelta,
+  formatKpiValue,
+  type IntentLanguage,
+  type KpiValueInput,
+} from './intent-format.js';
 export {
   type LayoutCapacityIssue,
   type LayoutRegion,
@@ -46,13 +52,16 @@ export {
 export {
   applyIntentOps,
   createIntentSession,
+  describeSession,
   editIntent,
   type IntentEditBaseline,
   type IntentEditCommand,
   type IntentEditOutcome,
   type IntentOp,
   type IntentSession,
+  type IntentSessionDigest,
   isSessionUsable,
+  pickSession,
 } from './intent-session.js';
 export {
   createIntentStreamAssembler,

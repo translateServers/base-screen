@@ -77,6 +77,16 @@ export class AgentActDto {
   canvas?: Record<string, unknown>;
 
   @ApiPropertyOptional({
+    description:
+      '宿主持有的整屏 IR 摘要（可操作的目标清单）；有它时非「重做」口吻的整屏指令走局部修改',
+    type: 'object',
+    additionalProperties: true,
+  })
+  @IsOptional()
+  @IsObject()
+  session?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
     description: '当前屏摘要（组件数 / 类型分布 / 选中项 / 锁定数）',
     type: 'object',
     additionalProperties: true,

@@ -65,7 +65,7 @@ export function compileBlock(
   const material = context.catalog.materials.find((item) => item.type === block.type);
   if (material === undefined) {
     target.sink.warnings.push(
-      warning('AGENT_MATERIAL_UNKNOWN', block, `目录里没有物料 ${block.type}。`),
+      warning('AGENT_MATERIAL_UNKNOWN', block, `The catalog has no material ${block.type}.`),
     );
     return;
   }
@@ -175,7 +175,7 @@ function resolveBlockPayload(
         warning(
           'AGENT_DATASET_UNKNOWN',
           block,
-          `数据集 ${datasetId} 不在本轮引用里，该块改用示例数据。`,
+          `Dataset ${datasetId} is not part of this round's references; the block is skipped.`,
         ),
       );
     }
@@ -185,7 +185,7 @@ function resolveBlockPayload(
         warning(
           'AGENT_BLOCK_DATA_MISSING',
           block,
-          `${material.type} 是数据型组件，但没有给 table。`,
+          `${material.type} is a data material but no table was given.`,
         ),
       );
       return null;
@@ -198,7 +198,7 @@ function resolveBlockPayload(
         warning(
           'AGENT_BLOCK_BINDING_UNSATISFIED',
           block,
-          `${material.type} 的绑定角色无法由这 ${table.columns.length} 列满足，该块已退化为无数据。`,
+          `The binding roles of ${material.type} cannot be satisfied by these ${table.columns.length} columns; the block degraded to an empty one.`,
         ),
       );
       return {};
@@ -216,7 +216,7 @@ function resolveBlockPayload(
       const asset = context.catalog.assets.find((item) => item.id === assetId);
       if (asset === undefined) {
         sink.warnings.push(
-          warning('AGENT_ASSET_UNKNOWN', block, `素材 ${assetId} 不在宿主素材清单里。`),
+          warning('AGENT_ASSET_UNKNOWN', block, `Asset ${assetId} is not in the host asset list.`),
         );
         return null;
       }
@@ -243,7 +243,7 @@ function resolveBlockPayload(
         warning(
           'AGENT_BLOCK_ASSET_REQUIRED',
           block,
-          `${material.type} 需要 assetId，本次只给了 text，该块已跳过。`,
+          `${material.type} needs an assetId but only text was given; the block is skipped.`,
         ),
       );
       return null;
@@ -251,7 +251,11 @@ function resolveBlockPayload(
     const text = block.bind.kind === 'text' ? block.bind.text : '';
     if (text === '') {
       sink.warnings.push(
-        warning('AGENT_BLOCK_DATA_MISSING', block, `${material.type} 是值型组件，但没有给 text。`),
+        warning(
+          'AGENT_BLOCK_DATA_MISSING',
+          block,
+          `${material.type} is a value material but no text was given.`,
+        ),
       );
       return null;
     }

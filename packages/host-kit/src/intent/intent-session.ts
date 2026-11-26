@@ -6,6 +6,7 @@ import type {
   IntentCompileResult,
   IntentReferences,
 } from './intent-compile-types.js';
+import { detectIntentLanguage, formatKpiValue } from './intent-format.js';
 import { clampText, parseIntentBlock, parseIntentKpi } from './intent-parse.js';
 import type {
   IntentBlock,
@@ -158,8 +159,18 @@ export function editIntent(
   const removable = removed.filter((id) => !gone.has(id) && !touched.has(id));
   for (const id of removed) if (touched.has(id)) keptForUser.add(id);
 
+  // 物料换了（`swap`）：`update-components` 改不了 `type`，所以换掉的组件先移除再用同一个 id 新增，
+  // 层级沿用它在活文档里的，位置与大小由新编译给出。用户改过的不换，原样保留。
+  const replaced = changed.filter(
+    (component) =>
+      !gone.has(component.id) &&
+      !touched.has(component.id) &&
+      previous.get(component.id)?.type !== component.type,
+  );
+  const replacedIds = new Set(replaced.map((component) => component.id));
+
   // 新增组件用到的数据源：按内容复用，冲突就换个 id（每次编译都从 `agent-ds-1` 重新编号）。
-  const dataSources = remapDataSources(after, added, baseline.dataSources ?? []);
+  const dataSources = remapDataSources(after, [...added, ...replaced], baseline.dataSources ?? []);
   if (dataSources.next !== undefined) {
     commands.push({ type: 'replace-data-sources', dataSources: dataSources.next });
   }
@@ -173,10 +184,21 @@ export function editIntent(
       keptForUser.add(component.id);
       continue;
     }
+    if (replacedIds.has(component.id)) continue;
     const patch = diffPatch(previous.get(component.id) as CompiledComponent, component);
     commands.push({ type: 'update-components', componentIds: [component.id], patch });
   }
-  if (removable.length > 0) commands.push({ type: 'remove-components', componentIds: removable });
+  const removals = [...removable, ...replacedIds];
+  if (removals.length > 0) commands.push({ type: 'remove-components', componentIds: removals });
+  for (const component of replaced) {
+    commands.push({
+      type: 'add-component',
+      component: dataSources.apply({
+        ...component,
+        zIndex: live.get(component.id)?.zIndex ?? component.zIndex + layerBase,
+      }),
+    });
+  }
   for (const component of added) {
     commands.push({
       type: 'add-component',
@@ -269,6 +291,19 @@ function applyOne(
   }
   if (op.op === 'delete') return { ok: true, intent: removeItem(intent, found) };
 
+  // 不认识的字段整批拒绝：静默忽略会让「把名字改成订单量」写成 `name` 时看起来成功、实际什么也没改。
+  if (op.op === 'change') {
+    const allowed = found.kpi !== undefined ? KPI_FIELDS : BLOCK_FIELDS;
+    const unknown = Object.keys(op.set).filter((key) => !allowed.has(key));
+    if (unknown.length > 0) {
+      return fail(
+        path,
+        'INTENT_OP_INVALID',
+        `Unknown field(s) ${unknown.join(', ')}; a ${found.kpi !== undefined ? 'KPI' : 'block'} change may set ${[...allowed].join(' / ')}.`,
+      );
+    }
+  }
+
   if (found.kpi !== undefined) {
     if (op.op !== 'change')
       return fail(path, 'INTENT_OP_INVALID', 'A KPI can only be changed or deleted.');
@@ -359,6 +394,10 @@ function addBlock(
 // ---------------------------------------------------------------------------
 // 定位、替换、删除
 // ---------------------------------------------------------------------------
+
+/** `change` 能改的字段：与提示词里写给模型的一致。 */
+const KPI_FIELDS = new Set(['label', 'value', 'unit', 'precision', 'delta']);
+const BLOCK_FIELDS = new Set(['title', 'note', 'text', 'table', 'props', 'substituteFor']);
 
 interface Found {
   readonly regionIndex: number;
@@ -583,7 +622,26 @@ const COMPARED = [
 function sameComponent(a: CompiledComponent, b: CompiledComponent): boolean {
   const left = a as unknown as Record<string, unknown>;
   const right = b as unknown as Record<string, unknown>;
-  return COMPARED.every((key) => JSON.stringify(left[key]) === JSON.stringify(right[key]));
+  return COMPARED.every((key) => canonical(left[key]) === canonical(right[key]));
+}
+
+/**
+ * 规范化比较：键顺序无关，`undefined` 与缺省等同于 `null`。
+ * 活文档里的组件经引擎读写后键顺序可能与编译产物不同，这不算用户改过。
+ */
+function canonical(value: unknown): string {
+  return JSON.stringify(sortKeys(value ?? null));
+}
+
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeys);
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, item]) => [key, sortKeys(item)]),
+  );
 }
 
 function diffPatch(before: CompiledComponent, after: CompiledComponent): Record<string, unknown> {
@@ -592,7 +650,7 @@ function diffPatch(before: CompiledComponent, after: CompiledComponent): Record<
   const patch: Record<string, unknown> = {};
   for (const key of COMPARED) {
     if (key === 'type') continue;
-    if (JSON.stringify(old[key]) !== JSON.stringify(next[key])) patch[key] = next[key];
+    if (canonical(old[key]) !== canonical(next[key])) patch[key] = next[key];
   }
   return patch;
 }
@@ -646,5 +704,109 @@ function remapDataSources(
         ? component
         : { ...component, dataValue: { ...value, dataSourceId: mapped } };
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 会话：挑出与活文档对得上的那一份、压成发给后端的摘要
+// ---------------------------------------------------------------------------
+
+/**
+ * 在几份候选会话里挑出与活文档最对得上的一份。
+ *
+ * 为什么有「几份」：提案还没被采纳时，宿主不知道用户会采纳还是拒绝，所以每次提交都留下那一份
+ * 会话；下一次请求时看活文档里剩下的是哪一份的组件。得分 = 内容完全一致的组件数 − 两边 id 的差异数；
+ * 命中的组件不到该会话的一半（或不足 3 个）就不算对得上——例如用户整屏换了别的内容，这时返回 undefined，
+ * 调用方当没有会话，让路由走别的动作。
+ */
+export function pickSession(
+  candidates: readonly IntentSession[],
+  baseline: IntentEditBaseline,
+): IntentSession | undefined {
+  const live = new Map(baseline.components.map((component) => [component.id, component]));
+  let best: { session: IntentSession; score: number } | undefined;
+  for (const session of candidates) {
+    if (!isSessionUsable(session, baseline)) continue;
+    const compiled = session.compiled.document.components;
+    let present = 0;
+    let identical = 0;
+    for (const component of compiled) {
+      const current = live.get(component.id) as unknown as CompiledComponent | undefined;
+      if (current === undefined) continue;
+      present += 1;
+      if (sameComponent(component, current)) identical += 1;
+    }
+    if (present < 3 || present < compiled.length / 2) continue;
+    const missing = compiled.length - present;
+    const extra = baseline.components.filter(
+      (component) => !compiled.some((item) => item.id === component.id),
+    ).length;
+    const score = identical - missing - extra;
+    if (best === undefined || score > best.score) best = { session, score };
+  }
+  return best?.session;
+}
+
+/** 发给后端的会话摘要（只有可操作的目标与当前文字，不含几何与数据行）。 */
+export interface IntentSessionDigest {
+  readonly title: string;
+  readonly subtitle: string;
+  readonly regions: readonly {
+    readonly path: string;
+    readonly kind: 'band' | 'grid' | 'split';
+    readonly items: readonly {
+      readonly target: string;
+      readonly kind: 'kpi' | 'block';
+      readonly part: 'items' | 'blocks' | 'main' | 'rail';
+      readonly type?: string;
+      readonly title: string;
+      readonly value?: string;
+    }[];
+  }[];
+}
+
+export function describeSession(session: IntentSession): IntentSessionDigest {
+  const { intent } = session;
+  const language = detectIntentLanguage(intent.title, intent.subtitle);
+  const block = (item: IntentBlock, part: 'blocks' | 'main' | 'rail') => ({
+    target: idOf(item),
+    kind: 'block' as const,
+    part,
+    type: item.type,
+    title: item.title === '' ? item.type : item.title,
+  });
+  return {
+    title: intent.title,
+    subtitle: intent.subtitle,
+    regions: intent.regions.map((region) => {
+      if (region.kind === 'band') {
+        return {
+          path: region.origin,
+          kind: 'band' as const,
+          items: region.items.map((kpi) => ({
+            target: idOf(kpi),
+            kind: 'kpi' as const,
+            part: 'items' as const,
+            title: kpi.label,
+            value: formatKpiValue(kpi, language),
+          })),
+        };
+      }
+      if (region.kind === 'grid') {
+        return {
+          path: region.origin,
+          kind: 'grid' as const,
+          items: region.blocks.map((item) => block(item, 'blocks')),
+        };
+      }
+      return {
+        path: region.origin,
+        kind: 'split' as const,
+        items: [
+          ...region.main.map((item) => block(item, 'main')),
+          ...region.rail.map((item) => block(item, 'rail')),
+        ],
+      };
+    }),
   };
 }
