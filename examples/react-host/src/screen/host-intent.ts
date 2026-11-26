@@ -87,6 +87,8 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
     const onChange = () => {
       documentChanged = true;
     };
+    // 整屏生成的流式草案（ADR-0112 §2.5）：它是本次请求自己挂的草案，不算「已有待决草案」。
+    let draft: StreamDraft | undefined;
     options.designer.addEventListener('base-screen-change', onChange);
     try {
       const staleReason = (): string | undefined => {
@@ -95,7 +97,8 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
         if (documentChanged || options.designer.getDocument() !== current) {
           return '当前文档已变化，请基于最新文档重新生成。';
         }
-        if (options.designer.readPendingChange() !== undefined) {
+        const pending = options.designer.readPendingChange();
+        if (pending !== undefined && pending.id !== draft?.id) {
           return '请先处理已有待决草案，再生成新的变更。';
         }
         return undefined;
@@ -204,7 +207,23 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
       // 以前这里只有 generateScreenCandidate，所以"改个背景色"也会被当成新主题重做一屏。
       // 每次请求都从当前 catalog 同步构造物料摘要；图片由后端按 screenId 查询并校验。
       const catalog = options.catalog === undefined ? undefined : readAgentCatalog(options);
-      const acted = await api.actAgent(
+      // 流式落稿：骨架一到就挂「生成中」草案，内容逐帧填入。用户点「取消生成」时引擎撤掉草案，
+      // 这里随即中止请求；引擎传来的 signal 照样转发。
+      const streamAbort = new AbortController();
+      const forwardAbort = () => streamAbort.abort();
+      signal?.addEventListener('abort', forwardAbort, { once: true });
+      let cancelled = false;
+      const streamDraft = createStreamDraft(
+        options.designer,
+        current,
+        `智能体 · ${truncate(request.text, 18)}`,
+        () => {
+          cancelled = true;
+          streamAbort.abort();
+        },
+      );
+      draft = streamDraft;
+      const acted = await api.actAgentStream(
         {
           text: request.text,
           scope: 'screen',
@@ -223,8 +242,13 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
           },
           context: buildScreenDigest(current),
         },
-        signal,
+        { onSkeleton: streamDraft.onSkeleton, onProgress: streamDraft.onProgress },
+        streamAbort.signal,
       );
+      signal?.removeEventListener('abort', forwardAbort);
+      if (cancelled) {
+        return { ok: false, diagnostics: [], reason: '已取消生成，未写入任何改动。' };
+      }
       const reason = staleReason();
       if (reason !== undefined) return { ok: false, diagnostics: [], reason };
       if (!acted.ok) {
@@ -289,6 +313,7 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
         const parsed = parseScreenDocument(candidate.document);
         if (!parsed.ok) {
           logger.warn('agent document rejected', parsed.diagnostics);
+          draft?.discard();
           return failedAttempt(
             'parse',
             undefined,
@@ -299,11 +324,13 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
         if (parsed.value.components.length === 0) {
           // 空文档会成为「删光未锁定组件」的整屏提案，比失败更糟：宁可什么都不提交。
           logger.warn('agent document has no usable components');
+          draft?.discard();
           return failedAttempt('empty', undefined, [], '模型这次没有产出可用组件，未生成变更。');
         }
         const audit = auditScreenLayout(parsed.value).filter((item) => item.severity === 'error');
         if (audit.length > 0) {
           logger.warn('agent document failed the layout audit', audit);
+          draft?.discard();
           return failedAttempt(
             'audit',
             parsed.value,
@@ -311,9 +338,13 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
             '智能体产物没有通过版面校验（字号、越界、重叠或对比度），未生成变更。',
           );
         }
+        const rationale = `${describeMode(candidate.mode, candidate.failure, candidate.warnings ?? [])}${repaired ? '；宿主校验未通过，已请模型修复一次' : ''}。布局由后端确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeLocked(current)}`;
+        // 流式草案接得上就原地收尾；接不上（最终结果与骨架对不上）先撤掉它，再整屏提交。
+        if (!repaired && draft?.finish(parsed.value, rationale) === true) return { ok: true };
+        draft?.discard();
         const submitted = options.designer.submitChangeProposal({
           title: `智能体 · ${truncate(request.text, 18)}`,
-          rationale: `${describeMode(candidate.mode, candidate.failure, candidate.warnings ?? [])}${repaired ? '；宿主校验未通过，已请模型修复一次' : ''}。布局由后端确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeLocked(current)}`,
+          rationale,
           scope: '整屏',
           commands: compileWholeScreenCommands(current, parsed.value),
           origin: { author: '智能体' },
@@ -357,11 +388,188 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
       return second.ok ? { ok: true, value: null, diagnostics: [] } : second.outcome;
     } finally {
       options.designer.removeEventListener('base-screen-change', onChange);
+      // 没能收尾的流式草案（失败、取消、过期）不留在画布上。
+      draft?.discard();
     }
   };
 }
 
 type IntentFailureOutcome = Extract<DesignerIntentOutcome, { readonly ok: false }>;
+
+/** 宿主侧的流式落稿草案（ADR-0112 §2.5），见 `createStreamDraft`。 */
+interface StreamDraft {
+  /** 草案 id；骨架还没挂出时为 undefined。 */
+  readonly id: string | undefined;
+  readonly onSkeleton: (document: unknown) => void;
+  readonly onProgress: (document: unknown) => void;
+  /** 用最终候选收尾：接得上就追加最后一段差量、换上最终理由并结束生成，返回 true。 */
+  finish(document: ScreenDocument, rationale: string): boolean;
+  /** 撤掉仍在生成中的自己的草案，并停止监听；可重复调用。 */
+  discard(): void;
+}
+
+const STREAMING_RATIONALE = '生成中：版面已按骨架排定，内容逐块填入；完成前不可采纳。';
+
+/** 引擎的待决提案状态事件（`BASE_SCREEN_CHANGE_STATE_EVENT`）。 */
+const CHANGE_STATE_EVENT = 'base-screen-change-state';
+
+/**
+ * 宿主侧的流式落稿：骨架到了先挂「生成中」草案，之后每一帧只追加差量命令。
+ *
+ * 任何一帧接不上（文档不合法、差量要改已出现的组件、引擎拒绝）就停止追加，草案停在上一帧，
+ * 等最终结果到了由调用方撤掉、整屏提交——宁可最后换一次，也不让画面边生成边挪。
+ * 用户点「取消生成」时草案由引擎撤掉，这里收到状态事件后回调 `onCancel`，由调用方中止请求。
+ */
+function createStreamDraft(
+  designer: BaseScreenDesignerElement,
+  current: ScreenDocument,
+  title: string,
+  onCancel: () => void,
+): StreamDraft {
+  let id: string | undefined;
+  let last: ScreenDocument | undefined;
+  let broken = false;
+  let listening = true;
+  const ownStreaming = () => {
+    const pending = designer.readPendingChange();
+    return id !== undefined && pending?.id === id && pending.streaming === true;
+  };
+  const stop = () => {
+    if (!listening) return;
+    listening = false;
+    designer.removeEventListener(CHANGE_STATE_EVENT, onState);
+  };
+  function onState() {
+    if (id === undefined || designer.readPendingChange()?.id === id) return;
+    stop();
+    onCancel();
+  }
+  designer.addEventListener(CHANGE_STATE_EVENT, onState);
+  const read = (raw: unknown): ScreenDocument | undefined => {
+    const parsed = parseScreenDocument(raw);
+    return parsed.ok && parsed.value.components.length > 0 ? parsed.value : undefined;
+  };
+  return {
+    get id() {
+      return id;
+    },
+    onSkeleton(raw) {
+      if (id !== undefined || broken) return;
+      const document = read(raw);
+      if (document === undefined) {
+        broken = true;
+        return;
+      }
+      const begun = designer.beginChangeProposal({
+        title,
+        rationale: STREAMING_RATIONALE,
+        scope: '整屏',
+        commands: compileWholeScreenCommands(current, document),
+        origin: { author: '智能体' },
+      });
+      if (!begun.ok) {
+        broken = true;
+        logger.warn('stream skeleton rejected', begun.diagnostics);
+        return;
+      }
+      id = begun.value.id;
+      last = document;
+    },
+    onProgress(raw) {
+      if (id === undefined || last === undefined || broken) return;
+      const document = read(raw);
+      const delta =
+        document === undefined ? undefined : compileStreamDelta(current, last, document);
+      if (document === undefined || delta === undefined) {
+        broken = true;
+        return;
+      }
+      if (delta.length > 0) {
+        const extended = designer.extendChangeProposal(id, delta);
+        if (!extended.ok) {
+          broken = true;
+          logger.warn('stream frame rejected', extended.diagnostics);
+          return;
+        }
+      }
+      last = document;
+    },
+    finish(document, rationale) {
+      if (id === undefined || last === undefined || broken || !ownStreaming()) return false;
+      const delta = compileStreamDelta(current, last, document);
+      if (delta === undefined) return false;
+      if (delta.length > 0 && !designer.extendChangeProposal(id, delta).ok) return false;
+      if (!designer.finishChangeProposal(id, { rationale }).ok) return false;
+      stop();
+      return true;
+    },
+    discard() {
+      stop();
+      if (ownStreaming()) designer.discardPendingChange();
+    },
+  };
+}
+
+/**
+ * 流式两帧之间的差量命令（ADR-0112 §2.5）。
+ *
+ * 上一帧有、这一帧没有的组件（占位框）移除；新出现的组件新增；数据源按新一帧整份替换。
+ * 两帧都有的组件必须一字不差，画布、变量、蓝图也不能变——否则就不是「只往格子里填内容」，
+ * 返回 undefined，调用方停止追加。
+ */
+export function compileStreamDelta(
+  current: ScreenDocument,
+  previous: ScreenDocument,
+  next: ScreenDocument,
+): readonly ProposalCommand[] | undefined {
+  if (
+    JSON.stringify(previous.canvas) !== JSON.stringify(next.canvas) ||
+    JSON.stringify(previous.variables) !== JSON.stringify(next.variables) ||
+    JSON.stringify(previous.blueprint) !== JSON.stringify(next.blueprint)
+  ) {
+    return undefined;
+  }
+  const before = new Map(previous.components.map((component) => [component.id, component]));
+  const kept = new Set<string>();
+  for (const component of next.components) {
+    const old = before.get(component.id);
+    if (old === undefined) continue;
+    if (JSON.stringify(old) !== JSON.stringify(component)) return undefined;
+    kept.add(component.id);
+  }
+  const previousSources = adoptDataSources(current, previous);
+  const nextSources = adoptDataSources(current, next);
+  for (const [from, to] of previousSources.remapped) {
+    if (nextSources.remapped.get(from) !== to) return undefined;
+  }
+  const commands: ProposalCommand[] = [];
+  const removed = previous.components
+    .filter((component) => !kept.has(component.id))
+    .map((component) => component.id);
+  if (removed.length > 0) commands.push({ type: 'remove-components', componentIds: removed });
+  if (JSON.stringify(previousSources.sources) !== JSON.stringify(nextSources.sources)) {
+    // 数据源只会随新块增加；一帧里数据源反而没了，说明这不是同一份输出的续写。
+    if (nextSources.sources === undefined) return undefined;
+    commands.push({ type: 'replace-data-sources', dataSources: nextSources.sources });
+  }
+  const zIndexBase = layerBase(current);
+  for (const component of next.components) {
+    if (kept.has(component.id)) continue;
+    commands.push({
+      type: 'add-component',
+      component: {
+        ...remapValueRef(component, nextSources.remapped),
+        zIndex: component.zIndex + zIndexBase,
+      },
+    });
+  }
+  return commands;
+}
+
+/** 候选组件叠在当前文档最上层：层级整体抬到现有最大值之上。 */
+function layerBase(current: ScreenDocument): number {
+  return current.components.reduce((max, component) => Math.max(max, component.zIndex), 0);
+}
 
 /** 一次整屏提交的结果：失败时记下卡在哪一步，修复请求要据此决定能不能修、诊断指向哪。 */
 type WholeScreenAttempt =
@@ -576,6 +784,13 @@ function compileWholeScreenCommands(
     },
   ];
 
+  // 蓝图节点引用组件：先清空旧蓝图再删组件，否则删除那一步就因悬空引用被拒
+  // （COMPONENT_PARENT_MISSING）；新蓝图等组件都加完再换上。
+  const blueprintChanged = JSON.stringify(current.blueprint) !== JSON.stringify(next.blueprint);
+  const clearedBlueprint = { ...current.blueprint, nodes: [], edges: [] };
+  const clearBlueprint = blueprintChanged && current.blueprint.nodes.length > 0;
+  if (clearBlueprint) commands.push({ type: 'replace-blueprint', blueprint: clearedBlueprint });
+
   const removable = current.components
     .filter((component) => !component.status.locked)
     .map((component) => component.id);
@@ -586,10 +801,7 @@ function compileWholeScreenCommands(
     commands.push({ type: 'replace-data-sources', dataSources: sources });
   }
 
-  const zIndexBase = current.components.reduce(
-    (max, component) => Math.max(max, component.zIndex),
-    0,
-  );
+  const zIndexBase = layerBase(current);
   for (const component of next.components) {
     commands.push({
       type: 'add-component',
@@ -600,7 +812,8 @@ function compileWholeScreenCommands(
   if (JSON.stringify(current.variables) !== JSON.stringify(next.variables)) {
     commands.push({ type: 'replace-variables', variables: next.variables });
   }
-  if (JSON.stringify(current.blueprint) !== JSON.stringify(next.blueprint)) {
+  const blueprintBefore = clearBlueprint ? clearedBlueprint : current.blueprint;
+  if (JSON.stringify(blueprintBefore) !== JSON.stringify(next.blueprint)) {
     commands.push({ type: 'replace-blueprint', blueprint: next.blueprint });
   }
   return commands;

@@ -406,9 +406,12 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.extendChangeProposal(this, id, commands);
   }
 
-  /** 结束生成：草案变为可采纳。 */
-  finishChangeProposal(id: string): ScreenParseResult<BaseScreenDesignerChangeProposalSummary> {
-    return this.#designerState.runtime.finishChangeProposal(this, id);
+  /** 结束生成：草案变为可采纳；可同时换上最终理由（如整份结果到齐后才知道的降级告警）。 */
+  finishChangeProposal(
+    id: string,
+    details?: { readonly rationale?: string },
+  ): ScreenParseResult<BaseScreenDesignerChangeProposalSummary> {
+    return this.#designerState.runtime.finishChangeProposal(this, id, details);
   }
 
   /** 读当前待决提案的摘要；没有待决提案时为 undefined。 */

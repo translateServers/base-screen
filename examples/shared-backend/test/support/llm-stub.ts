@@ -18,6 +18,16 @@ export type Responder = (call: RecordedCall, index: number) => Promise<StubReply
 
 export type StubReply =
   | { readonly kind: 'json'; readonly status?: number; readonly body: unknown }
+  /**
+   * 流式补全：每段正文写成一条 `data:` 事件，段与段之间隔 `delayMs`。
+   * `end: 'destroy'` 表示写完这些段后直接掐断连接；`'hang'` 表示写完后不再出声（模拟输出到一半卡住）。
+   */
+  | {
+      readonly kind: 'sse';
+      readonly chunks: readonly string[];
+      readonly delayMs?: number;
+      readonly end?: 'done' | 'destroy' | 'hang';
+    }
   | { readonly kind: 'hang' }
   | { readonly kind: 'socket-destroy' };
 
@@ -31,6 +41,16 @@ export interface LlmStub {
 /** 把模型返回的 assistant 文本包成 OpenAI chat.completions 形态。 */
 export function chatText(content: string): StubReply {
   return { kind: 'json', body: { choices: [{ message: { content } }] } };
+}
+
+/** 把一段 assistant 文本切成若干段流式返回。 */
+export function chatStream(content: string, pieces = 8, delayMs = 0): StubReply {
+  const size = Math.max(1, Math.ceil(content.length / pieces));
+  const chunks: string[] = [];
+  for (let index = 0; index < content.length; index += size) {
+    chunks.push(content.slice(index, index + size));
+  }
+  return { kind: 'sse', chunks, delayMs };
 }
 
 /** 工具调用形态：路由用它；name 对应 agent-route 的 action。 */
@@ -64,6 +84,23 @@ export async function startLlmStub(initial: Responder): Promise<LlmStub> {
         if (reply.kind === 'hang') return; // 永不回包，交给客户端超时
         if (reply.kind === 'socket-destroy') {
           req.socket.destroy();
+          return;
+        }
+        if (reply.kind === 'sse') {
+          res.writeHead(200, { 'content-type': 'text/event-stream' });
+          for (const chunk of reply.chunks) {
+            const event = { choices: [{ delta: { content: chunk } }] };
+            res.write(`data: ${JSON.stringify(event)}\n\n`);
+            if ((reply.delayMs ?? 0) > 0) {
+              await new Promise((resolve) => setTimeout(resolve, reply.delayMs));
+            }
+          }
+          if (reply.end === 'destroy') {
+            req.socket.destroy();
+            return;
+          }
+          if (reply.end === 'hang') return; // 写到一半不再出声，交给客户端的空闲超时
+          res.end('data: [DONE]\n\n');
           return;
         }
         res.writeHead(reply.status ?? 200, { 'content-type': 'application/json' });

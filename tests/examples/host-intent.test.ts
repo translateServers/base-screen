@@ -3,6 +3,7 @@ import type { ScreenDocument } from '@base-screen/contracts';
 import type { BaseScreenDesignerElement } from '@base-screen/sdk/designer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  compileStreamDelta,
   createHostIntentHandler,
   parseCanvasBackgroundInstruction,
 } from '../../examples/vanilla-host/src/screen/host-intent';
@@ -489,7 +490,7 @@ describe('host intent action routing', () => {
 });
 
 describe('host intent candidate safety', () => {
-  it('routes the screen scope through /agent/act and submits an unsaved proposal', async () => {
+  it('routes the screen scope through /agent/act/stream and submits an unsaved proposal', async () => {
     vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
     const fetch = vi.fn(async () => screenActResponse());
     vi.stubGlobal('fetch', fetch);
@@ -499,9 +500,10 @@ describe('host intent candidate safety', () => {
 
     expect((await handler(element)(request, controller.signal)).ok).toBe(true);
     // 关键：不再直接打 /agent/candidate；动作由后端判定，宿主只负责编译。
-    expect(fetch).toHaveBeenCalledExactlyOnceWith('http://api.test/agent/act', {
+    // 整屏作用域按 SSE 请求（ADR-0112 §2.5）；后端回普通 JSON 时照常按一次性结果处理。
+    expect(fetch).toHaveBeenCalledExactlyOnceWith('http://api.test/agent/act/stream', {
       method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: request.text,
         scope: 'screen',
@@ -520,7 +522,7 @@ describe('host intent candidate safety', () => {
           lockedCount: 0,
         },
       }),
-      signal: controller.signal,
+      signal: expect.any(AbortSignal),
     });
     expect(element.submitChangeProposal).toHaveBeenCalledOnce();
     expect(element.getDocument()).toBe(before);
@@ -785,6 +787,207 @@ describe('host intent candidate safety', () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('unreachable');
     expect(result.reason).toContain('引擎拒绝');
+  });
+});
+
+describe('host intent streamed generation (ADR-0112 §2.5)', () => {
+  function text(id: string, x: number, value: string, y = 32) {
+    const [base] = componentDocument().components;
+    if (base === undefined) throw new Error('fixture');
+    return {
+      ...base,
+      id,
+      name: id,
+      position: { x, y },
+      dataValue: { kind: 'inline' as const, value },
+    };
+  }
+  const skeleton = (): ScreenDocument => ({
+    ...document(),
+    components: [text('agent-title-0', 40, '作战室'), text('agent-block-0-pending', 400, '·', 200)],
+  });
+  const filled = (): ScreenDocument => ({
+    ...document(),
+    components: [text('agent-title-0', 40, '作战室'), text('agent-block-0-0', 400, '要点', 200)],
+  });
+  const result = (candidate: ScreenDocument) => ({
+    kind: 'generate_screen',
+    routedBy: 'rule',
+    name: '作战室',
+    document: candidate,
+    mode: 'llm',
+    imageCount: 0,
+    warnings: [{ code: 'AGENT_BLOCK_ROWS_TRIMMED', message: '表格超过 8 行，已裁剪' }],
+  });
+
+  function sse(events: readonly (readonly [string, unknown])[]): Response {
+    const body = events
+      .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+      .join('');
+    return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
+  }
+
+  /** 带流式草案接口的设计器替身：待决提案由它自己记，状态变化时发引擎同名事件。 */
+  function streamingDesigner(options: { readonly cancelAfterBegin?: boolean } = {}) {
+    const element = designer();
+    let pending: { id: string; streaming?: true } | undefined;
+    const notify = () => element.dispatchEvent(new Event('base-screen-change-state'));
+    const ok = { ok: true, diagnostics: [], value: { id: 'change-1' } };
+    return Object.assign(element, {
+      readPendingChange: vi.fn(() => pending),
+      beginChangeProposal: vi.fn(() => {
+        pending = { id: 'change-1', streaming: true };
+        notify();
+        // 用户在骨架挂出后点「取消生成」：引擎撤掉草案并发状态事件。
+        if (options.cancelAfterBegin === true) setTimeout(() => element.discardPendingChange(), 0);
+        return ok;
+      }),
+      extendChangeProposal: vi.fn(() => ok),
+      finishChangeProposal: vi.fn(() => {
+        pending = { id: 'change-1' };
+        notify();
+        return ok;
+      }),
+      discardPendingChange: vi.fn(() => {
+        pending = undefined;
+        notify();
+      }),
+    });
+  }
+
+  it('mounts the skeleton, appends deltas and finishes in place instead of resubmitting', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        sse([
+          ['skeleton', { document: skeleton() }],
+          ['progress', { document: filled() }],
+          ['result', result(filled())],
+        ]),
+      ),
+    );
+    const element = streamingDesigner();
+
+    expect((await handler(element)(request)).ok).toBe(true);
+    expect(element.beginChangeProposal).toHaveBeenCalledOnce();
+    expect(element.beginChangeProposal.mock.calls[0]?.[0]).toMatchObject({ scope: '整屏' });
+    expect(element.extendChangeProposal).toHaveBeenCalledExactlyOnceWith('change-1', [
+      { type: 'remove-components', componentIds: ['agent-block-0-pending'] },
+      { type: 'add-component', component: expect.objectContaining({ id: 'agent-block-0-0' }) },
+    ]);
+    expect(element.finishChangeProposal).toHaveBeenCalledExactlyOnceWith('change-1', {
+      rationale: expect.stringContaining('有 1 处降级：表格超过 8 行，已裁剪'),
+    });
+    expect(element.submitChangeProposal).not.toHaveBeenCalled();
+    expect(element.discardPendingChange).not.toHaveBeenCalled();
+  });
+
+  it('replaces the streamed draft when the final candidate moved a streamed component', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    const moved = filled();
+    const final = {
+      ...moved,
+      components: moved.components.map((node) =>
+        node.id === 'agent-title-0' ? { ...node, position: { x: 48, y: 32 } } : node,
+      ),
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        sse([
+          ['skeleton', { document: skeleton() }],
+          ['result', result(final)],
+        ]),
+      ),
+    );
+    const element = streamingDesigner();
+
+    expect((await handler(element)(request)).ok).toBe(true);
+    expect(element.finishChangeProposal).not.toHaveBeenCalled();
+    expect(element.discardPendingChange).toHaveBeenCalledOnce();
+    expect(element.submitChangeProposal).toHaveBeenCalledOnce();
+  });
+
+  it('aborts the request and submits nothing when the user cancels the generating draft', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: { signal: AbortSignal }) => {
+        const head = `event: skeleton\ndata: ${JSON.stringify({ document: skeleton() })}\n\n`;
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(head));
+            init.signal.addEventListener('abort', () =>
+              controller.error(new DOMException('aborted', 'AbortError')),
+            );
+          },
+        });
+        return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
+      }),
+    );
+    const element = streamingDesigner({ cancelAfterBegin: true });
+
+    const outcome = await handler(element)(request);
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) throw new Error('unreachable');
+    expect(outcome.reason).toContain('已取消生成');
+    expect(element.finishChangeProposal).not.toHaveBeenCalled();
+    expect(element.submitChangeProposal).not.toHaveBeenCalled();
+  });
+
+  it('clears the old blueprint before removing the components it references', async () => {
+    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => screenActResponse()),
+    );
+    const current: ScreenDocument = {
+      ...componentDocument(),
+      blueprint: {
+        nodes: [{ id: 'node-1', componentId: 'title' }],
+        edges: [],
+      } as unknown as ScreenDocument['blueprint'],
+    };
+    const element = designer(current);
+
+    expect((await handler(element)(request)).ok).toBe(true);
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0] as
+      | { commands: { type: string; blueprint?: unknown }[] }
+      | undefined;
+    const types = (proposal?.commands ?? []).map((command) => command.type);
+    // 蓝图节点引用组件：先清空蓝图再删组件，否则删除那一步因悬空引用被拒。
+    expect(types.indexOf('replace-blueprint')).toBeGreaterThan(-1);
+    expect(types.indexOf('replace-blueprint')).toBeLessThan(types.indexOf('remove-components'));
+    expect(
+      proposal?.commands.find((command) => command.type === 'replace-blueprint'),
+    ).toMatchObject({
+      blueprint: { nodes: [], edges: [] },
+    });
+  });
+
+  it('builds frame deltas only when every shared component is unchanged', () => {
+    const current = document();
+    expect(compileStreamDelta(current, skeleton(), filled())).toEqual([
+      { type: 'remove-components', componentIds: ['agent-block-0-pending'] },
+      { type: 'add-component', component: expect.objectContaining({ id: 'agent-block-0-0' }) },
+    ]);
+    expect(compileStreamDelta(current, filled(), filled())).toEqual([]);
+    const retitled = filled();
+    const changed = {
+      ...retitled,
+      components: retitled.components.map((node) =>
+        node.id === 'agent-title-0' ? { ...node, name: '换了' } : node,
+      ),
+    };
+    expect(compileStreamDelta(current, filled(), changed)).toBeUndefined();
+    expect(
+      compileStreamDelta(current, filled(), {
+        ...filled(),
+        canvas: { ...filled().canvas, backgroundColor: '#111111' },
+      }),
+    ).toBeUndefined();
   });
 });
 

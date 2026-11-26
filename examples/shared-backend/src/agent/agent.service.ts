@@ -23,6 +23,7 @@ import {
   type AgentChatMessage,
   type AgentLlmSettings,
   requestAgentCompletion,
+  requestAgentCompletionStream,
   resolveAgentLlmSettings,
 } from './agent-client';
 import {
@@ -33,7 +34,13 @@ import {
   parseAgentComponentEditSpec,
   readEditableComponents,
 } from './agent-component-edit';
-import { type ComposeReferences, composeScreenDocument } from './agent-compose';
+import {
+  type AgentLayoutSlot,
+  type AgentScreenLayout,
+  type ComposeReferences,
+  type ComposeStreamFrame,
+  composeScreenDocument,
+} from './agent-compose';
 import {
   AGENT_MAX_REPAIR_ROUNDS,
   type AgentParseIssues,
@@ -65,6 +72,7 @@ import {
   buildAgentUserPrompt,
   buildCatalogSystemPrompt,
 } from './agent-spec';
+import { scanStreamingSpec } from './agent-stream';
 import { resolveStylePreset } from './agent-style';
 
 /** 降级告警：code 供宿主归类，message 是能直接念给用户听的一句话。 */
@@ -124,6 +132,8 @@ export interface AgentActInput {
   readonly context?: unknown;
   /** 前端断开即中止上游模型请求。 */
   readonly signal?: AbortSignal;
+  /** 流式落稿（ADR-0112 §2.5）：整屏生成时，输出每写完一部分就推一份按骨架编译的候选。 */
+  readonly onProgress?: (document: Record<string, unknown>) => void;
 }
 
 /**
@@ -255,6 +265,8 @@ export class AgentService {
     signal?: AbortSignal;
     /** 前端校验或引擎拒绝后的一次修复（ADR-0112 §2.1.6）。 */
     repair?: unknown;
+    /** 流式落稿：只在首次生成时推帧；修复请求的输出整份重来，不流式。 */
+    onProgress?: (document: Record<string, unknown>) => void;
   }): Promise<AgentCandidateResult> {
     const topic = input.topic.trim();
     const repair = input.repair === undefined ? undefined : readRepairRequest(input.repair);
@@ -294,6 +306,10 @@ export class AgentService {
     let lastOutput: string | undefined;
 
     if (settings !== null) {
+      const onText =
+        input.onProgress === undefined || repair !== undefined
+          ? undefined
+          : this.streamFrames(catalog, references.compose, input.onProgress);
       const outcome = await this.generateWithRepair({
         settings,
         // 目录随请求到来，所以提示词也是按目录现生成的：宿主装了新物料，下一句话就能用上。
@@ -302,6 +318,7 @@ export class AgentService {
         catalog,
         ...(repair === undefined ? {} : { repair }),
         ...(input.signal === undefined ? {} : { signal: input.signal }),
+        ...(onText === undefined ? {} : { onText }),
       });
       if (outcome.kind === 'transport') {
         failure = outcome.failure;
@@ -372,6 +389,48 @@ export class AgentService {
   }
 
   /**
+   * 流式落稿的帧（ADR-0112 §2.5）：模型输出每写完一部分，就按骨架编译一份完整候选推给宿主。
+   *
+   * 骨架（标题、副标题、`layout`）没齐之前不推；同一组已完成部分只推一次。帧与最终候选走同一个
+   * 编译器、同一套 id 与层级规则，所以内容对得上时，最终候选就是最后一帧去掉占位框；
+   * 对不上（块被丢、个数与骨架不符）由宿主比对发现，整屏替换。
+   */
+  private streamFrames(
+    catalog: AgentCatalog,
+    references: ComposeReferences | undefined,
+    emit: (document: Record<string, unknown>) => void,
+  ): (text: string) => void {
+    let lastKey: string | undefined;
+    return (text) => {
+      const frame = readStreamingSpec(text, catalog);
+      if (frame === null || frame.key === lastKey) return;
+      lastKey = frame.key;
+      const composed = composeScreenDocument({
+        spec: {
+          title: frame.title,
+          subtitle: frame.subtitle,
+          kpis: [],
+          blocks: [],
+          mode: 'llm',
+        },
+        catalog,
+        style: resolveStylePreset(frame.style),
+        stream: frame.stream,
+        ...(references === undefined ? {} : { references }),
+      });
+      if (!composed.ok) return;
+      try {
+        emit(composed.value.document);
+      } catch (error) {
+        // 推帧失败（连接已断）不影响生成本身：断开由 signal 负责中止。
+        this.logger.warn(
+          `agent stream frame dropped: ${error instanceof Error ? error.name : 'unknown'}`,
+        );
+      }
+    };
+  }
+
+  /**
    * 生成 → 校验 → 修复回环（ADR-0112 §2.1）。
    *
    * 每轮：调用模型 → 宽容解析 IR → 收集诊断。没有诊断就交出；有诊断就把上一轮原文与诊断清单
@@ -390,6 +449,8 @@ export class AgentService {
      * 所以这条路径最多再多一次内部修复，总调用次数仍有上限。
      */
     readonly repair?: AgentRepairRequest;
+    /** 首轮改为流式请求，每收到一段正文交出累计全文（ADR-0112 §2.5）。 */
+    readonly onText?: (text: string) => void;
   }): Promise<
     | { readonly kind: 'transport'; readonly failure: string }
     | {
@@ -415,18 +476,32 @@ export class AgentService {
     let previousKey: string | undefined =
       input.repair === undefined ? undefined : repairKey(input.repair.issues);
     let repairRounds = input.repair === undefined ? 0 : 1;
+    let firstRound = true;
     for (;;) {
-      const result = await requestAgentCompletion(
-        input.settings,
-        input.system,
-        input.user,
-        this.logger,
-        {
-          retry: true,
-          followUp,
-          ...(input.signal === undefined ? {} : { signal: input.signal }),
-        },
-      );
+      const options = {
+        retry: true,
+        followUp,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      };
+      // 只有首轮流式：修复轮的输出是整份重来，边写边画只会让画面来回跳。
+      const onText = firstRound ? input.onText : undefined;
+      firstRound = false;
+      const result =
+        onText === undefined
+          ? await requestAgentCompletion(
+              input.settings,
+              input.system,
+              input.user,
+              this.logger,
+              options,
+            )
+          : await requestAgentCompletionStream(
+              input.settings,
+              input.system,
+              input.user,
+              this.logger,
+              { ...options, onText },
+            );
       if (!result.ok || result.text === undefined) {
         return { kind: 'transport', failure: result.failure ?? 'AGENT_FAILED' };
       }
@@ -609,6 +684,7 @@ export class AgentService {
         ...(input.catalog === undefined ? {} : { catalog: input.catalog }),
         ...(input.references === undefined ? {} : { references: input.references }),
         ...(input.signal === undefined ? {} : { signal: input.signal }),
+        ...(input.onProgress === undefined ? {} : { onProgress: input.onProgress }),
       });
       return { kind: 'generate_screen', routedBy: decision.routedBy, ...candidate };
     }
@@ -767,6 +843,91 @@ export function parseCatalogSpec(
     kpis,
     blocks: readBlocks(record.blocks, catalog, warnings, issues),
   };
+}
+
+/** 流式落稿的一帧所需：骨架 + 已写完的指标与块。 */
+export interface StreamingSpec {
+  readonly title: string;
+  readonly subtitle: string;
+  readonly style?: string;
+  readonly stream: ComposeStreamFrame;
+  /** 已写完部分的指纹：没变就不必再推一帧。 */
+  readonly key: string;
+}
+
+/**
+ * 从写了一部分的模型输出里读出骨架与已写完的指标、块（ADR-0112 §2.5）。
+ *
+ * 骨架要求标题、副标题与 `layout` 都已写完且合法；不齐就返回 null，此时不推任何帧，
+ * 等整份输出写完走常规路径。指标与块逐项按既有规则读，读不出来的那一格留空
+ * （宿主看到的是占位框），修复交给整份输出写完之后的常规回环。
+ */
+export function readStreamingSpec(text: string, catalog: AgentCatalog): StreamingSpec | null {
+  const snapshot = scanStreamingSpec(text);
+  const title = readStreamString(snapshot.fields.get('title'));
+  const subtitle = readStreamString(snapshot.fields.get('subtitle'));
+  const layout = readStreamLayout(snapshot.fields.get('layout'), catalog);
+  if (title === '' || subtitle === '' || layout === null) return null;
+  const style = readStreamString(snapshot.fields.get('style'));
+  const kpiItems = (snapshot.items.get('kpis') ?? []).slice(0, layout.kpis);
+  const blockItems = (snapshot.items.get('blocks') ?? []).slice(0, layout.blocks.length);
+  // 逐项读时的降级告警不在这里报：整份写完后的常规解析会再读一遍、如实汇总。
+  const ignored: string[] = [];
+  return {
+    title: title.slice(0, 20),
+    subtitle: subtitle.slice(0, 40),
+    ...(style === '' ? {} : { style }),
+    stream: {
+      layout,
+      kpis: kpiItems.map((raw) => readKpis([parseStreamJson(raw)], ignored)[0]),
+      blocks: blockItems.map((raw) => readBlocks([parseStreamJson(raw)], catalog, ignored)[0]),
+    },
+    key: `${style}|${kpiItems.length}|${blockItems.length}`,
+  };
+}
+
+/**
+ * 骨架：`{ kpis: 指标个数, blocks: [{ type, span }] }`。type 必须在目录里——数据型与否
+ * 由物料声明决定，行高权重据此算；span 与 `readBlocks` 一样收进 1–4。
+ */
+function readStreamLayout(
+  raw: string | undefined,
+  catalog: AgentCatalog,
+): AgentScreenLayout | null {
+  const layout = asRecord(parseStreamJson(raw));
+  if (layout === null) return null;
+  const kpis = layout.kpis;
+  if (typeof kpis !== 'number' || !Number.isInteger(kpis) || kpis < 1 || kpis > 5) return null;
+  if (!Array.isArray(layout.blocks) || layout.blocks.length < 1 || layout.blocks.length > 4) {
+    return null;
+  }
+  const blocks: AgentLayoutSlot[] = [];
+  for (const item of layout.blocks) {
+    const slot = asRecord(item);
+    const type = typeof slot?.type === 'string' ? slot.type.trim() : '';
+    const material = catalog.materials.find((candidate) => candidate.type === type);
+    const span = slot?.span;
+    if (material === undefined || typeof span !== 'number' || !Number.isFinite(span)) return null;
+    blocks.push({
+      span: Math.min(4, Math.max(1, Math.round(span))),
+      data: material.data === 'tabular',
+    });
+  }
+  return { kpis, blocks };
+}
+
+function readStreamString(raw: string | undefined): string {
+  const value = parseStreamJson(raw);
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function parseStreamJson(raw: string | undefined): unknown {
+  if (raw === undefined) return undefined;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 const KPI_DELTA_UNITS = new Set(['percent', 'point', 'absolute']);

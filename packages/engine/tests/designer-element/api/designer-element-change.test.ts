@@ -224,6 +224,19 @@ describe('BaseScreenDesignerElement streaming proposals (ADR-0112 §2.5)', () =>
     });
   });
 
+  it('swaps in the final rationale when generation finishes', () => {
+    const designer = streamingDesigner();
+    const begun = designer.beginChangeProposal(skeleton);
+    if (!begun.ok) throw new Error('expected skeleton to mount');
+    const rationale = '由模型生成（有 1 处降级：表格超过 8 行，已裁剪）';
+    expect(designer.finishChangeProposal(begun.value.id, { rationale })).toMatchObject({
+      ok: true,
+      value: { rationale },
+    });
+    expect(designer.readPendingChange()).toMatchObject({ id: begun.value.id, rationale });
+    expect(designer.readPendingChange()).not.toHaveProperty('streaming');
+  });
+
   it('leaves no draft behind when generation is cancelled', () => {
     const designer = streamingDesigner();
     const begun = designer.beginChangeProposal(skeleton);

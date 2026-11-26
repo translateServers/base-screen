@@ -645,7 +645,9 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     exportProject(projectId: string, revision: string): Promise<ScreenParseResult<ScreenDocument>>;
     extendChangeProposal(id: string, commands: DesignerChangeProposalInput['commands']): ScreenParseResult<BaseScreenDesignerChangeProposalSummary>;
-    finishChangeProposal(id: string): ScreenParseResult<BaseScreenDesignerChangeProposalSummary>;
+    finishChangeProposal(id: string, details?: {
+        readonly rationale?: string;
+    }): ScreenParseResult<BaseScreenDesignerChangeProposalSummary>;
     get fragmentSaveAction(): boolean;
     // (undocumented)
     getAuthoringEditorContext(): ScreenAuthoringEditorContext;

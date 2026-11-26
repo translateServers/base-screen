@@ -131,6 +131,114 @@ export async function requestAgentCompletion(
 }
 
 /**
+ * 流式取一次补全（ADR-0112 §2.5）：每收到一段正文，就把累计到目前的全文交给 `onText`。
+ *
+ * 空闲计时按「两段输出之间」算，长输出不会因为总时长超时。已经收到正文之后再失败不重试：
+ * 重来一遍会把已经画出来的骨架推翻，宁可把失败如实交给调用方。上游不支持流式、
+ * 直接回整段 JSON 时，按普通补全读出全文，再交一次 `onText`。
+ */
+export async function requestAgentCompletionStream(
+  config: AgentLlmSettings,
+  system: string,
+  user: string,
+  logger: Logger,
+  options: AgentRequestOptions & { readonly onText: (text: string) => void },
+): Promise<AgentClientResult> {
+  let received = false;
+  const onText = (text: string) => {
+    received = true;
+    options.onText(text);
+  };
+  return withRetry(
+    options,
+    logger,
+    async () => {
+      const reply = await postChat(
+        config,
+        {
+          model: config.model,
+          temperature: 0.4,
+          stream: true,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+            ...(options.followUp ?? []),
+          ],
+        },
+        logger,
+        'agent stream request',
+        options.signal,
+        (response, onChunk) => readCompletionStream(response, onChunk, onText),
+      );
+      if (!reply.ok) return { ok: false, failure: reply.failure };
+      const text = reply.payload as string;
+      if (text.trim() === '') {
+        logger.warn(`agent stream empty: elapsed=${reply.elapsedMs}ms`);
+        return { ok: false, failure: 'AGENT_EMPTY_RESPONSE' };
+      }
+      logger.log(`agent stream ok: elapsed=${reply.elapsedMs}ms chars=${text.length}`);
+      return { ok: true, text };
+    },
+    () => !received,
+  );
+}
+
+/**
+ * 读 OpenAI 兼容的流式响应：逐行取 `data:` 里的 `choices[0].delta.content`，累计成全文。
+ * 上游回的是普通 JSON（不支持流式）时，取 `choices[0].message.content` 整段交出。
+ */
+async function readCompletionStream(
+  response: Response,
+  onChunk: () => void,
+  onText: (text: string) => void,
+): Promise<string> {
+  if ((response.headers.get('content-type') ?? '').includes('application/json')) {
+    const payload = JSON.parse(await readBody(response, onChunk)) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const text = payload.choices?.[0]?.message?.content ?? '';
+    if (text !== '') onText(text);
+    return text;
+  }
+  const reader = response.body?.getReader();
+  if (reader === undefined) return '';
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let text = '';
+  const consume = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('data:')) return;
+    const data = trimmed.slice(5).trim();
+    if (data === '' || data === '[DONE]') return;
+    let delta: unknown;
+    try {
+      delta = (JSON.parse(data) as { choices?: { delta?: { content?: unknown } }[] }).choices?.[0]
+        ?.delta?.content;
+    } catch {
+      return;
+    }
+    if (typeof delta !== 'string' || delta === '') return;
+    text += delta;
+    onText(text);
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    onChunk();
+    buffer += decoder.decode(value, { stream: true });
+    let newline = buffer.indexOf('\n');
+    while (newline >= 0) {
+      consume(buffer.slice(0, newline));
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf('\n');
+    }
+  }
+  consume(buffer + decoder.decode());
+  return text;
+}
+
+/**
  * 工具调用形态：只许选一个动作，不允许并行，温度 0。
  *
  * 路由是"分类"，不是"创作"：温度必须为 0，否则同一句话两次能得到不同动作。
@@ -204,6 +312,9 @@ async function postChat(
   logger: Logger,
   label: string,
   signal: AbortSignal | undefined,
+  /** 读响应体；缺省按整段 JSON 解析。流式读取时由调用方给出。 */
+  read: (response: Response, onChunk: () => void) => Promise<unknown> = async (response, onChunk) =>
+    JSON.parse(await readBody(response, onChunk)) as unknown,
 ): Promise<ChatReply> {
   if (signal?.aborted) return { ok: false, failure: 'AGENT_CANCELLED' };
   const controller = new AbortController();
@@ -232,8 +343,8 @@ async function postChat(
       await response.body?.cancel().catch(() => undefined);
       return { ok: false, failure: `AGENT_HTTP_${response.status}` };
     }
-    const text = await readBody(response, arm);
-    return { ok: true, payload: JSON.parse(text) as unknown, elapsedMs: Date.now() - startedAt };
+    const payload = await read(response, arm);
+    return { ok: true, payload, elapsedMs: Date.now() - startedAt };
   } catch (error) {
     logger.warn(
       `${label} error: ${error instanceof Error ? error.name : 'unknown'} elapsed=${Date.now() - startedAt}ms`,
@@ -275,9 +386,18 @@ async function withRetry<T extends { readonly ok: boolean; readonly failure?: st
   options: AgentRequestOptions,
   logger: Logger,
   run: () => Promise<T>,
+  /** 失败之后是否还能重来；流式请求已经交出过正文时不能。 */
+  canRetry: () => boolean = () => true,
 ): Promise<T> {
   const first = await run();
-  if (first.ok || options.retry !== true || !isRetryableAgentFailure(first.failure)) return first;
+  if (
+    first.ok ||
+    options.retry !== true ||
+    !isRetryableAgentFailure(first.failure) ||
+    !canRetry()
+  ) {
+    return first;
+  }
   if (!(await sleep(RETRY_BACKOFF_MS, options.signal))) {
     return { ok: false, failure: 'AGENT_CANCELLED' } as unknown as T;
   }

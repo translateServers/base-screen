@@ -1082,6 +1082,15 @@ describe('目录驱动的解析与编译', () => {
     expect(rowHeight * (rows.length + 1)).toBeLessThanOrEqual(table.size.height);
   });
 
+  it('物料默认字号低于大屏可读下限时由编译器抬到 16px（ADR-0112 §2.2）', () => {
+    const spec = parseCatalogSpec(
+      blocksJson([{ type: 'base.table', title: '明细', span: 4, table: TREND_TABLE }]),
+      TEST_CATALOG,
+    );
+    if (spec === null) throw new Error('expected a valid spec');
+    expect(findNode(composeOk(spec), 'base.table').style.fontSize).toBe(16);
+  });
+
   it('列满足不了绑定角色时该块退化为无数据，屏仍然产出并给出降级告警', () => {
     const spec = parseCatalogSpec(
       blocksJson([

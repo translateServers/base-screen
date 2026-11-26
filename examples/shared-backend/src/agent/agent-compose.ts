@@ -56,6 +56,28 @@ export interface ComposeResult {
   readonly sources: Readonly<Record<string, string>>;
 }
 
+/**
+ * 版面骨架（ADR-0112 §2.5）：整屏几何只由它决定——指标个数，以及每块占几列、是不是数据型。
+ * 流式落稿时模型先给骨架，编译器据此一次算定全部位置；之后到达的内容只往格子里填。
+ */
+export interface AgentScreenLayout {
+  readonly kpis: number;
+  readonly blocks: readonly AgentLayoutSlot[];
+}
+
+export interface AgentLayoutSlot {
+  readonly span: number;
+  /** 数据型块（表格 / 数据集）行高权重更大。 */
+  readonly data: boolean;
+}
+
+/** 流式落稿的一帧：按骨架排版，`kpis[i]` / `blocks[i]` 落进骨架第 i 格，缺的格子画占位。 */
+export interface ComposeStreamFrame {
+  readonly layout: AgentScreenLayout;
+  readonly kpis: readonly (AgentKpi | undefined)[];
+  readonly blocks: readonly (AgentBlock | undefined)[];
+}
+
 export type ComposeOutcome =
   | { readonly ok: true; readonly value: ComposeResult }
   | { readonly ok: false; readonly diagnostics: readonly ComposeDiagnostic[] };
@@ -125,6 +147,11 @@ export function composeScreenDocument(input: {
   readonly references?: ComposeReferences;
   /** 风格预设；缺省为默认预设。颜色只从预设取，不接受任何自由色值。 */
   readonly style?: StylePreset;
+  /**
+   * 流式落稿的一帧：给了就按骨架排版，忽略 `spec.kpis` / `spec.blocks`。
+   * 骨架与内容对不上时以骨架为准——几何从第一帧起不变；对不上的整屏差异由宿主比对后整屏替换。
+   */
+  readonly stream?: ComposeStreamFrame;
 }): ComposeOutcome {
   const { spec, catalog, references } = input;
   const palette = (input.style ?? STYLE_PRESETS[DEFAULT_STYLE_PRESET]).palette;
@@ -137,7 +164,9 @@ export function composeScreenDocument(input: {
     source = path;
   };
   const used = new Set<string>();
-  let z = 1;
+  // 每个来源各自计数：id 与层级只由「属于 IR 的哪一处 + 在该处的第几个」决定。
+  // 流式落稿时某一处先到、后到，都不会让别处组件的 id 或层级漂移（ADR-0112 §2.5）。
+  const counters = new Map<string, number>();
   let imageCount = 0;
 
   const textMaterial = pickTextMaterial(catalog);
@@ -153,9 +182,14 @@ export function composeScreenDocument(input: {
       style?: Record<string, JsonValue>;
       dataValue?: Record<string, unknown> | null;
       dataBinding?: Record<string, unknown>;
+      /** 流式落稿的占位框：内容到了就被移除，不占该来源的计数。 */
+      pending?: boolean;
     } = {},
   ): void => {
-    const id = `agent-${slug(name)}-${components.length}`;
+    const local = extra.pending === true ? PENDING_LAYER : (counters.get(source) ?? 0);
+    if (extra.pending !== true) counters.set(source, local + 1);
+    const scope = scopeKey(source);
+    const id = extra.pending === true ? `agent-${scope}-pending` : `agent-${scope}-${local}`;
     sources[id] = source;
     components.push({
       id,
@@ -168,10 +202,10 @@ export function composeScreenDocument(input: {
         height: Math.max(1, Math.round(box.height)),
       },
       rotation: 0,
-      zIndex: z++,
+      zIndex: scopeLayer(source) + local,
       status: { locked: false, hidden: false },
       props: { ...material.defaults.props, ...extra.props },
-      style: { ...material.defaults.style, ...extra.style },
+      style: legibleStyle({ ...material.defaults.style, ...extra.style }),
       dataSource: null,
       dataValue: extra.dataValue ?? null,
       ...(extra.dataBinding === undefined ? {} : { dataBinding: extra.dataBinding }),
@@ -202,10 +236,18 @@ export function composeScreenDocument(input: {
    * 做两遍：多一个挡在最底层、容易误选的假组件，导出体积也白涨。早期编译器铺这层是为了兜底
    * 各宿主的画布底色；画布背景进契约之后它就是纯冗余（也正是它把椭圆 bug 放大成了整屏）。
    */
-  const pushSurface = (name: string, box: Box, style?: Record<string, JsonValue>): void => {
+  const pushSurface = (
+    name: string,
+    box: Box,
+    style?: Record<string, JsonValue>,
+    pending = false,
+  ): void => {
     if (surfaceMaterial === undefined) return;
     // 卡片底色来自预设；目录物料的默认填充只是兜底的占位，不能盖过风格。
-    push(surfaceMaterial, name, box, { style: { fill: palette.card, ...(style ?? {}) } });
+    push(surfaceMaterial, name, box, {
+      style: { fill: palette.card, ...(style ?? {}) },
+      ...(pending ? { pending: true } : {}),
+    });
   };
 
   setSource('title');
@@ -226,15 +268,34 @@ export function composeScreenDocument(input: {
     { fontSize: 20, color: palette.muted },
   );
 
+  const stream = input.stream;
+  const kpiItems = stream?.kpis ?? spec.kpis.slice(0, 5);
   composeKpis(
-    spec,
+    kpiItems,
+    Math.min(5, stream?.layout.kpis ?? kpiItems.length),
+    spec.mode,
     { pushSurface, pushText, setSource },
     palette,
     tintedSurfaceStyle(palette.card),
   );
 
-  const blocks = spec.blocks ?? [];
-  const rows = packRows(blocks);
+  // 版面只由骨架决定：普通生成时骨架就是 spec 自己的块；流式落稿时是模型先给的 layout，
+  // 内容按格子落位，还没到的格子画占位框。
+  const slots: BlockSlot[] =
+    stream === undefined
+      ? (spec.blocks ?? []).map((block, index) => ({
+          span: block.span,
+          data: isDataCell(block),
+          index,
+          block,
+        }))
+      : stream.layout.blocks.map((slot, index) => ({
+          span: slot.span,
+          data: slot.data,
+          index,
+          block: stream.blocks[index],
+        }));
+  const rows = packRows(slots);
   if (rows.length > 0) {
     const columnWidth = Math.floor((WIDTH - MARGIN * 2 - GAP * (COLUMNS - 1)) / COLUMNS);
     // 行高不再平均切：数据块（表格/图表）比文本块更吃纵向空间，按内容权重分配总高。
@@ -248,20 +309,25 @@ export function composeScreenDocument(input: {
       const spans = stretchSpans(row);
       const rowHeight = heights[rowIndex] ?? 240;
       let offset = 0;
-      row.forEach((block, blockIndex) => {
-        const span = spans[blockIndex] ?? clamp(block.span, 1, COLUMNS);
-        setSource(`blocks[${blocks.indexOf(block)}]`);
-        compileBlock(
-          block,
-          {
-            x: MARGIN + offset * (columnWidth + GAP),
-            y,
-            width: columnWidth * span + GAP * (span - 1),
-            height: rowHeight,
-          },
-          { catalog, textMaterial, assetMaterial, push, pushText, references, palette },
-          { sink, onAsset: () => (imageCount += 1) },
-        );
+      row.forEach((slot, blockIndex) => {
+        const span = spans[blockIndex] ?? clamp(slot.span, 1, COLUMNS);
+        const box: Box = {
+          x: MARGIN + offset * (columnWidth + GAP),
+          y,
+          width: columnWidth * span + GAP * (span - 1),
+          height: rowHeight,
+        };
+        setSource(`blocks[${slot.index}]`);
+        if (slot.block === undefined) {
+          pushSurface('占位', box, tintedSurfaceStyle(palette.card), true);
+        } else {
+          compileBlock(
+            slot.block,
+            box,
+            { catalog, textMaterial, assetMaterial, push, pushText, references, palette },
+            { sink, onAsset: () => (imageCount += 1) },
+          );
+        }
         offset += span;
       });
       y += rowHeight + GAP;
@@ -317,7 +383,9 @@ export function composeScreenDocument(input: {
 }
 
 function composeKpis(
-  spec: AgentScreenSpec,
+  items: readonly (AgentKpi | undefined)[],
+  count: number,
+  mode: AgentScreenSpec['mode'],
   context: {
     pushSurface: (name: string, box: Box, style?: Record<string, JsonValue>) => void;
     pushText: (name: string, value: string, box: Box, token?: TextToken, sample?: boolean) => void;
@@ -326,13 +394,15 @@ function composeKpis(
   palette: StylePalette,
   cardStyle: Record<string, JsonValue>,
 ): void {
-  const kpis = spec.kpis.slice(0, 5);
-  if (kpis.length === 0) return;
-  const width = Math.floor((WIDTH - MARGIN * 2 - GAP * (kpis.length - 1)) / kpis.length);
-  kpis.forEach((kpi, index) => {
+  if (count === 0) return;
+  const width = Math.floor((WIDTH - MARGIN * 2 - GAP * (count - 1)) / count);
+  for (let index = 0; index < count; index += 1) {
+    const kpi = items[index];
     const x = MARGIN + index * (width + GAP);
     context.setSource(`kpis[${index}]`);
     context.pushSurface('指标卡', { x, y: KPI_Y, width, height: KPI_HEIGHT }, cardStyle);
+    // 流式落稿时这一项还没到：只画卡片底板。数值到了在同一张卡上填字，底板 id 与层级不变。
+    if (kpi === undefined) continue;
     context.pushText(
       '指标名',
       kpi.label,
@@ -345,7 +415,7 @@ function composeKpis(
       formatKpiValue(kpi),
       { x: x + 20, y: KPI_Y + 50, width: width - 40, height: 54 },
       { fontSize: 42, fontWeight: '700', color: palette.text },
-      spec.mode === 'llm' && kpi.value !== null,
+      mode === 'llm' && kpi.value !== null,
     );
     if (kpi.delta !== undefined) {
       context.pushText(
@@ -355,7 +425,7 @@ function composeKpis(
         { fontSize: 16, color: deltaColor(kpi.delta, palette) },
       );
     }
-  });
+  }
 }
 
 /** 没有数据时的占位。 */
@@ -660,10 +730,30 @@ function resolveBlockPayload(
   return {};
 }
 
+/** 排版只看的那部分：占几列、是不是数据型块。 */
+interface LayoutCell {
+  readonly span: number;
+  readonly data?: boolean;
+  readonly table?: unknown;
+  readonly datasetId?: string;
+}
+
+/** 骨架里的一格：`index` 是它在 IR `blocks` 里的下标，`block` 为空表示内容还没到。 */
+interface BlockSlot {
+  readonly span: number;
+  readonly data: boolean;
+  readonly index: number;
+  readonly block: AgentBlock | undefined;
+}
+
+function isDataCell(cell: LayoutCell): boolean {
+  return cell.data === true || cell.table !== undefined || (cell.datasetId ?? '') !== '';
+}
+
 /** `span` 之和超过四列就换行，保持模型给的顺序。 */
-export function packRows(blocks: readonly AgentBlock[]): AgentBlock[][] {
-  const rows: AgentBlock[][] = [];
-  let current: AgentBlock[] = [];
+export function packRows<T extends { readonly span: number }>(blocks: readonly T[]): T[][] {
+  const rows: T[][] = [];
+  let current: T[] = [];
   let used = 0;
   for (const block of blocks) {
     const span = clamp(block.span, 1, COLUMNS);
@@ -685,7 +775,7 @@ export function packRows(blocks: readonly AgentBlock[]): AgentBlock[][] {
  * 模型经常给「一块 span 2 独占一行」，按原样排就只占半屏、右侧留一大片空。
  * 补齐按 span 从大到小逐列分配：单块直接铺满，两块 1+1 变成 2+2，不改相对宽度关系。
  */
-export function stretchSpans(row: readonly AgentBlock[]): number[] {
+export function stretchSpans(row: readonly { readonly span: number }[]): number[] {
   const spans = row.map((block) => clamp(block.span, 1, COLUMNS));
   let remaining = COLUMNS - spans.reduce((sum, span) => sum + span, 0);
   if (remaining <= 0 || spans.length === 0) return spans;
@@ -708,14 +798,12 @@ export function stretchSpans(row: readonly AgentBlock[]): number[] {
  * 纯文本与素材块让位。分配后再做最小高度兜底，超出总高时从最高的行里回收。
  */
 export function distributeRowHeights(
-  rows: readonly (readonly AgentBlock[])[],
+  rows: readonly (readonly LayoutCell[])[],
   available: number,
 ): number[] {
   if (rows.length === 0) return [];
   const minHeight = Math.max(120, Math.min(200, Math.floor(available / rows.length)));
-  const weights = rows.map((row) =>
-    row.some((block) => block.table !== undefined || (block.datasetId ?? '') !== '') ? 1.35 : 1,
-  );
+  const weights = rows.map((row) => (row.some(isDataCell) ? 1.35 : 1));
   const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || 1;
   const heights = weights.map((weight) =>
     Math.max(minHeight, Math.floor((available * weight) / totalWeight)),
@@ -895,10 +983,41 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)));
 }
 
-function slug(name: string): string {
-  const ascii = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-  return ascii === '' ? 'block' : ascii.slice(0, 24);
+/** 1920 宽画布的可读字号下限（core `resolveScreenFontFloorPx`）。 */
+const FONT_FLOOR_PX = 16;
+
+/**
+ * 字号兜底到可读下限（ADR-0112 §2.2）：物料默认字号是「随手拖一个」的尺度（表格 13px），
+ * 编译进 1920 宽的大屏就低于下限。模型不写样式，修复回环也修不了它，只能由编译器抬上来。
+ */
+function legibleStyle(style: Record<string, JsonValue>): Record<string, JsonValue> {
+  const size = style.fontSize;
+  return typeof size === 'number' && size < FONT_FLOOR_PX
+    ? { ...style, fontSize: FONT_FLOOR_PX }
+    : style;
+}
+
+/** 占位框的层级偏移：落在该块的层级区间末尾，不与块内组件冲突。 */
+const PENDING_LAYER = 19;
+
+/** IR 路径 → id 片段：`kpis[1]` → `kpi-1`，`blocks[2]` → `block-2`，编译器自有内容（页脚）→ `footer`。 */
+function scopeKey(source: string): string {
+  const match = /^(kpis|blocks)\[(\d+)\]$/.exec(source);
+  if (match !== null) return `${match[1] === 'kpis' ? 'kpi' : 'block'}-${match[2]}`;
+  return source === '' ? 'footer' : source;
+}
+
+/**
+ * 每个来源的层级区间：标题 1、副标题 2、第 i 张指标卡 10+10i、第 i 块 100+20i、页脚 1000。
+ * 区间内按该来源里的先后叠放；区间之间互不重叠，所以哪一处先到都不影响别处的层级。
+ */
+function scopeLayer(source: string): number {
+  if (source === 'title') return 1;
+  if (source === 'subtitle') return 2;
+  const match = /^(kpis|blocks)\[(\d+)\]$/.exec(source);
+  if (match !== null) {
+    const index = Number(match[2]);
+    return match[1] === 'kpis' ? 10 + index * 10 : 100 + index * 20;
+  }
+  return 1000;
 }

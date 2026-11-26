@@ -257,6 +257,107 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<A
   }
 }
 
+/** 流式落稿的帧回调：每一帧都是一份完整候选文档（未校验，由调用方解析）。 */
+export interface AgentStreamHandlers {
+  /** 骨架：所有组件已在最终位置，未到的内容是占位框。 */
+  readonly onSkeleton?: (document: unknown) => void;
+  /** 又写完一部分后的完整候选。 */
+  readonly onProgress?: (document: unknown) => void;
+}
+
+const STREAM_INCOMPLETE: ApiError = {
+  code: 'AGENT_STREAM_INCOMPLETE',
+  message: '与智能体的连接中断，未收到完整结果。',
+  status: 0,
+};
+
+/**
+ * POST + 读 SSE。`EventSource` 只能 GET，带不了请求体，所以用 fetch 读流。
+ * 事件：`skeleton` / `progress`（`{ document }`）、`result`（结果体）、`error`（错误体 + `status`）。
+ */
+async function requestStream<T>(
+  path: string,
+  body: unknown,
+  handlers: AgentStreamHandlers,
+  signal: AbortSignal | undefined,
+): Promise<ApiResult<T>> {
+  try {
+    const response = await fetch(`${resolveApiBase()}${path}`, {
+      method: 'POST',
+      headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      ...(signal === undefined ? {} : { signal }),
+    });
+    const type = response.headers.get('content-type') ?? '';
+    if (!type.includes('text/event-stream') || response.body === null) {
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok) return { ok: false, error: toApiError(payload, response.status) };
+      return { ok: true, data: payload as T };
+    }
+    let outcome: ApiResult<T> | undefined;
+    await readServerEvents(response.body, (event, data) => {
+      if (event === 'skeleton' || event === 'progress') {
+        const document = (data as { document?: unknown } | null)?.document;
+        if (document === undefined) return;
+        if (event === 'skeleton') handlers.onSkeleton?.(document);
+        else handlers.onProgress?.(document);
+      } else if (event === 'result') {
+        outcome = { ok: true, data: data as T };
+      } else if (event === 'error') {
+        const status = (data as { status?: unknown } | null)?.status;
+        outcome = { ok: false, error: toApiError(data, typeof status === 'number' ? status : 0) };
+      }
+    });
+    return outcome ?? { ok: false, error: STREAM_INCOMPLETE };
+  } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return { ok: false, error: { code: 'ABORTED', message: '请求已取消。', status: 0 } };
+    }
+    return { ok: false, error: NETWORK_ERROR };
+  }
+}
+
+const EVENT_SEPARATOR = /\r?\n\r?\n/;
+
+/** 按 SSE 规则切事件：空行分隔，`event:` 给类型，`data:` 可多行。data 不是 JSON 的事件丢弃。 */
+async function readServerEvents(
+  stream: ReadableStream<Uint8Array>,
+  onEvent: (event: string, data: unknown) => void,
+): Promise<void> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const dispatch = (block: string) => {
+    let event = 'message';
+    const data: string[] = [];
+    for (const line of block.split(/\r?\n/)) {
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
+    }
+    if (data.length === 0) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data.join('\n'));
+    } catch {
+      return;
+    }
+    onEvent(event, parsed);
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let separator = EVENT_SEPARATOR.exec(buffer);
+    while (separator !== null) {
+      dispatch(buffer.slice(0, separator.index));
+      buffer = buffer.slice(separator.index + separator[0].length);
+      separator = EVENT_SEPARATOR.exec(buffer);
+    }
+  }
+  buffer += decoder.decode();
+  if (buffer.trim() !== '') dispatch(buffer);
+}
+
 /** multipart 上传单独走一条路径：不能设置 Content-Type，交给浏览器生成 boundary。 */
 async function requestForm<T>(path: string, body: FormData): Promise<ApiResult<T>> {
   try {
@@ -429,6 +530,16 @@ export const api = {
       body: input,
       ...(signal === undefined ? {} : { signal }),
     }),
+  /**
+   * 同 `actAgent`，按 SSE 接收（ADR-0112 §2.5）：整屏生成时先收骨架、再逐帧收完整候选，
+   * 最后返回与 `actAgent` 相同的结果。后端回的不是事件流（入参被拒、旧后端）时按普通响应读。
+   */
+  actAgentStream: (
+    input: AgentActInputShape,
+    handlers: AgentStreamHandlers,
+    signal?: AbortSignal,
+  ): Promise<ApiResult<AgentActShape>> =>
+    requestStream('/agent/act/stream', input, handlers, signal),
   metricSeries: (metric: string, points: number): Promise<ApiResult<MetricSeries>> =>
     request(`/metrics/series?metric=${encodeURIComponent(metric)}&points=${points}`),
   metricRanking: (dimension: string, limit: number): Promise<ApiResult<MetricRanking>> =>

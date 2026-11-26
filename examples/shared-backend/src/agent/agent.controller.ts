@@ -1,7 +1,8 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
+import { Body, Controller, HttpException, Logger, Post, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import {
+  type AgentActInput,
   type AgentActResult,
   type AgentCandidateResult,
   type AgentComponentEditResult,
@@ -16,24 +17,55 @@ import { AgentGenerateDto } from './dto/agent-generate.dto';
 @ApiTags('agent')
 @Controller('agent')
 export class AgentController {
+  private readonly logger = new Logger('AgentController');
+
   constructor(private readonly agent: AgentService) {}
 
   @Post('act')
   @ApiOperation({ summary: '把一句话路由成动作并执行：生成整屏 / 改组件 / 改画布 / 明确不支持' })
   async act(@Body() dto: AgentActDto, @Req() request?: Request): Promise<AgentActResult> {
-    return this.agent.act({
-      signal: clientSignal(request),
-      text: dto.text,
-      scope: dto.scope,
-      ...(dto.componentIds === undefined ? {} : { componentIds: dto.componentIds }),
-      ...(dto.components === undefined ? {} : { components: dto.components }),
-      ...(dto.screenId === undefined ? {} : { screenId: dto.screenId }),
-      ...(dto.catalog === undefined ? {} : { catalog: dto.catalog }),
-      ...(dto.references === undefined ? {} : { references: dto.references }),
-      ...(dto.canvas === undefined ? {} : { canvas: dto.canvas }),
-      ...(dto.context === undefined ? {} : { context: dto.context }),
-    });
+    return this.agent.act(actInput(dto, clientSignal(request)));
   }
+
+  /**
+   * 同 `act`，结果用 SSE 推送（ADR-0112 §2.5）。整屏生成时先推 `skeleton`（骨架版面），
+   * 每写完一部分推 `progress`（完整候选），最后推 `result`（与 `act` 的响应体相同）；
+   * 失败推 `error`（状态码与错误体）。入参校验失败发生在进入流之前，仍按普通 JSON 错误返回。
+   */
+  @Post('act/stream')
+  @ApiOperation({ summary: '同 act，按 SSE 推送骨架与逐块进度，最后推送完整结果' })
+  async actStream(
+    @Body() dto: AgentActDto,
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<void> {
+    const signal = clientSignal(request);
+    response.status(200);
+    response.setHeader('content-type', 'text/event-stream; charset=utf-8');
+    response.setHeader('cache-control', 'no-cache, no-transform');
+    response.setHeader('x-accel-buffering', 'no');
+    response.flushHeaders();
+    const send = (event: string, data: unknown) => {
+      if (response.writableEnded) return;
+      response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+    let framed = false;
+    try {
+      const result = await this.agent.act({
+        ...actInput(dto, signal),
+        onProgress: (document) => {
+          send(framed ? 'progress' : 'skeleton', { document });
+          framed = true;
+        },
+      });
+      send('result', result);
+    } catch (error) {
+      send('error', streamError(error, this.logger));
+    } finally {
+      response.end();
+    }
+  }
+
   @Post('candidate')
   @ApiOperation({ summary: '生成整屏候选文档，不创建或更新大屏' })
   async candidate(
@@ -72,6 +104,36 @@ export class AgentController {
       ...(dto.catalog === undefined ? {} : { catalog: dto.catalog }),
     });
   }
+}
+
+function actInput(dto: AgentActDto, signal: AbortSignal): AgentActInput {
+  return {
+    signal,
+    text: dto.text,
+    scope: dto.scope,
+    ...(dto.componentIds === undefined ? {} : { componentIds: dto.componentIds }),
+    ...(dto.components === undefined ? {} : { components: dto.components }),
+    ...(dto.screenId === undefined ? {} : { screenId: dto.screenId }),
+    ...(dto.catalog === undefined ? {} : { catalog: dto.catalog }),
+    ...(dto.references === undefined ? {} : { references: dto.references }),
+    ...(dto.canvas === undefined ? {} : { canvas: dto.canvas }),
+    ...(dto.context === undefined ? {} : { context: dto.context }),
+  };
+}
+
+/**
+ * 流里的错误：与普通请求的错误体同形（`error` + `message` + 附加字段），另带 `status`，
+ * 宿主按同一套规则读。非业务异常不外泄细节。
+ */
+function streamError(error: unknown, logger: Logger): Record<string, unknown> {
+  if (error instanceof HttpException) {
+    const body = error.getResponse();
+    return typeof body === 'object' && body !== null
+      ? { status: error.getStatus(), ...(body as Record<string, unknown>) }
+      : { status: error.getStatus(), error: `HTTP_${error.getStatus()}`, message: String(body) };
+  }
+  logger.error(`agent stream failed: ${error instanceof Error ? error.name : 'unknown'}`);
+  return { status: 500, error: 'INTERNAL_ERROR', message: '服务内部错误。' };
 }
 
 /**

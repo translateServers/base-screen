@@ -174,25 +174,52 @@ export function extendChangeProposal(
   return { ok: true, value: summarizeChangeProposal(prepared.value), diagnostics: [] };
 }
 
-/** 结束生成：草案变为可采纳，单元照常拆分。 */
+/**
+ * 结束生成：草案变为可采纳，单元照常拆分。
+ *
+ * `details.rationale` 用来在收尾时换上最终理由——降级告警这类信息只有整份结果到齐才知道，
+ * 骨架挂出时写的只能是「生成中」。只换理由、不改命令，几何与内容都不动。
+ */
 export function finishChangeProposal(
   element: DesignerElementHost,
   id: string,
+  details: { readonly rationale?: string } = {},
 ): ScreenParseResult<BaseScreenDesignerChangeProposalSummary> {
-  const controller = getDesignerElementState(element).changeController;
+  const elementState = getDesignerElementState(element);
+  const controller = elementState.changeController;
   const current = controller.pending;
-  if (current === undefined || !controller.finishStream(id)) {
-    return {
-      ok: false,
-      diagnostics: [
-        changeDiagnostic(
-          'CHANGE_STREAM_NOT_ACTIVE',
-          `Change proposal ${id} is not being generated.`,
-        ),
-      ],
-    };
+  const input = controller.pendingInput;
+  const document = elementState.session.document;
+  const notActive = {
+    ok: false as const,
+    diagnostics: [
+      changeDiagnostic('CHANGE_STREAM_NOT_ACTIVE', `Change proposal ${id} is not being generated.`),
+    ],
+  };
+  if (current === undefined || current.id !== id || !controller.streaming) return notActive;
+  if (details.rationale !== undefined && details.rationale !== input?.rationale) {
+    if (input === undefined || document === undefined) return notActive;
+    const next: DesignerChangeProposalInput = { ...input, rationale: details.rationale };
+    const prepared = prepareDesignerChangeProposal(document, next, id);
+    if (!prepared.ok) return { ok: false, diagnostics: prepared.diagnostics };
+    if (!controller.extendStream(prepared.value, next)) {
+      return {
+        ok: false,
+        diagnostics: [
+          changeDiagnostic(
+            'CHANGE_PREVIEW_UNAVAILABLE',
+            'Change proposal preview could not be mounted.',
+          ),
+        ],
+      };
+    }
   }
-  return { ok: true, value: summarizeChangeProposal(current), diagnostics: [] };
+  if (!controller.finishStream(id)) return notActive;
+  return {
+    ok: true,
+    value: summarizeChangeProposal(controller.pending ?? current),
+    diagnostics: [],
+  };
 }
 
 /** 两版候选里都存在、但位置或尺寸变了的组件。 */

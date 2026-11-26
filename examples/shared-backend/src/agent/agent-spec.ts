@@ -140,6 +140,7 @@ ${renderCatalogPrompt(catalog)}${renderReferencesPrompt(references)}
   "title": "大屏标题，12 字以内",
   "subtitle": "一句口径说明，20 字以内",
   "style": "从下列风格中选一个 id，按主题气质选：${STYLE_PRESET_IDS.map((id) => `${id}=${STYLE_PRESETS[id].label}`).join('；')}",
+  "layout": { "kpis": 4, "blocks": [{ "type": "上面列出的某个 type", "span": 2 }] },
   "kpis": [{ "label": "指标名", "value": 286000, "unit": "件", "delta": { "value": 4.2, "unit": "percent", "direction": "up-good" } }],
   "blocks": [
     {
@@ -156,6 +157,8 @@ ${renderCatalogPrompt(catalog)}${renderReferencesPrompt(references)}
 }
 
 约束：
+- 按 title、subtitle、style、layout、kpis、blocks 的顺序输出。layout 先把版面定下来：kpis 写指标个数，
+  blocks 按顺序写每块的 type 与 span；后面的 kpis 与 blocks 必须与 layout 一一对应（个数、顺序、type、span 都相同）。
 - kpis 3 到 5 个：value 只写数字（不写单位、不写「万」、不加千分位），unit 写单位（如 %、元、件，可省略），precision 可省略；
   delta 可省略，给了就写 value（数字，减少为负数）、unit（percent 百分比 / point 百分点 / absolute 绝对值）
   与 direction（up-good 增长是好事 / down-good 下降是好事，如成本、故障 / neutral 无好坏，如库存、温度）。
