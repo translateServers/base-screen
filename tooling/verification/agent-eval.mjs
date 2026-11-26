@@ -32,9 +32,12 @@ const {
   createIntentStreamAssembler,
   describeSession,
   editIntent,
+  createRestDatasetPort,
   mapDocumentIssues,
   prepareIntent,
+  prepareIntentDataContext,
   repairKey,
+  summarizeIntentDataContext,
 } = await load('packages/host-kit/dist/index.js');
 
 const MAX_REPAIR_ROUNDS = 2;
@@ -79,13 +82,59 @@ export const AGENT_EVAL_CASES = [
   },
 ];
 
+/**
+ * 从数据出发（ADR-0114 S7，`--data`）：引用示例后端的固定数据集，走与宿主同一条链——
+ * describe → 默认参数取样 → 画像 → 候选随引用上送 → 编译。看数据源实例与参数、示例数据是否归零、缺参是否如实说明。
+ */
+export const DATA_EVAL_CASES = [
+  {
+    id: 'data-crew',
+    kind: '数据',
+    text: '用班组绩效数据做一屏 LINE-B 产线的班组对比大屏',
+    datasets: ['monitor.crew'],
+  },
+  {
+    id: 'data-crew-noline',
+    kind: '数据',
+    text: '用班组绩效数据做一屏班组对比大屏',
+    datasets: ['monitor.crew'],
+  },
+  {
+    id: 'data-alarms',
+    kind: '数据',
+    text: '用 LINE-A 的告警事件做一屏告警趋势大屏',
+    datasets: ['monitor.alarms'],
+  },
+  {
+    id: 'data-devices',
+    kind: '数据',
+    text: '用设备清单做一屏设备运行状态大屏',
+    datasets: ['monitor.devices'],
+  },
+  {
+    id: 'data-two',
+    kind: '数据',
+    text: '用设备清单和 LINE-A 的班组绩效做一屏产线对比大屏',
+    datasets: ['monitor.devices', 'monitor.crew'],
+  },
+  {
+    id: 'data-en',
+    kind: '数据',
+    text: 'Build a device status dashboard from the device list dataset',
+    datasets: ['monitor.devices'],
+  },
+];
+
 const args = readArgs(process.argv.slice(2));
 const base = (args.base ?? 'http://127.0.0.1:3000/api').replace(/\/+$/, '');
 const catalog = withShell(
   JSON.parse(readFileSync(resolve(here, 'agent-eval-catalog.json'), 'utf8')),
 );
 const only = args.only === undefined ? undefined : new Set(args.only.split(','));
-const cases = AGENT_EVAL_CASES.filter((item) => only === undefined || only.has(item.id));
+const datasetPort = createRestDatasetPort({ baseUrl: base });
+const cases = (args.data !== undefined ? DATA_EVAL_CASES : AGENT_EVAL_CASES).filter(
+  (item) => only === undefined || only.has(item.id),
+);
 
 if (args.edits !== undefined) {
   await runEdits();
@@ -114,6 +163,14 @@ if (hostScreen !== undefined) {
 }
 console.log(renderTable(results));
 console.log(renderSummary(results));
+if (args.data !== undefined) {
+  for (const row of results) {
+    console.log(
+      `${row.id}: 画像 ${row.profiled?.join(' ') ?? '-'}；候选 ${row.candidates ?? '-'}（用了 ${row.usedCandidates ?? '-'}）；` +
+        `实例 ${row.datasetSources?.join(' ') || '无'}；绑数指标卡 ${row.boundKpis ?? 0}；告警 ${row.dataWarnings?.join(',') || '无'}`,
+    );
+  }
+}
 if (args.out !== undefined) writeFileSync(args.out, `${JSON.stringify(results, null, 2)}\n`);
 
 /**
@@ -266,8 +323,50 @@ function withShell(shape) {
   };
 }
 
+/** 与宿主 `loadDataContext` + `enrichReferences` 同一口径。 */
+async function dataContextOf(item) {
+  if (item.datasets === undefined) return undefined;
+  const context = await prepareIntentDataContext({
+    datasetIds: item.datasets,
+    port: datasetPort,
+    catalog: { materials: catalog.materials, assets: [] },
+    signal: AbortSignal.timeout(10_000),
+  });
+  const summaries = new Map(
+    summarizeIntentDataContext(context).map((entry) => [entry.datasetId, entry]),
+  );
+  const references = item.datasets.map((datasetId) => {
+    const summary = summaries.get(datasetId);
+    return {
+      kind: 'dataset',
+      datasetId,
+      ...(summary === undefined
+        ? {}
+        : { profile: summary.profile, candidates: summary.candidates }),
+    };
+  });
+  return { context, references };
+}
+
+function intentCatalogOf(assets, data) {
+  return {
+    materials: catalog.materials,
+    assets,
+    ...(data === undefined || data.context.candidates.length === 0
+      ? {}
+      : { candidates: data.context.candidates }),
+  };
+}
+
+function datasetsOf(response, data) {
+  if (data === undefined) return response.datasets;
+  const profiled = new Map(data.context.references.map((entry) => [entry.datasetId, entry]));
+  return response.datasets.map((entry) => profiled.get(entry.datasetId) ?? entry);
+}
+
 async function runCase(item) {
   const started = Date.now();
+  const data = await dataContextOf(item);
   const frames = [];
   let skeletonMs;
   let thinkingMs;
@@ -275,7 +374,7 @@ async function runCase(item) {
   let result;
   let error;
   // 与宿主同一口径：骨架到了装配，之后每个 item 补一帧（素材与数据集引用要等最终结果，先留占位）。
-  const streamCatalog = { materials: catalog.materials, assets: [] };
+  const streamCatalog = intentCatalogOf([], data);
   const assembler = createIntentStreamAssembler(streamCatalog);
   const compileFrame = () => {
     const frame = assembler.frame();
@@ -292,7 +391,12 @@ async function runCase(item) {
     const response = await fetch(`${base}/agent/act/stream`, {
       method: 'POST',
       headers: { accept: 'text/event-stream', 'content-type': 'application/json' },
-      body: JSON.stringify({ text: item.text, scope: 'screen', catalog }),
+      body: JSON.stringify({
+        text: item.text,
+        scope: 'screen',
+        catalog,
+        ...(data === undefined ? {} : { references: data.references }),
+      }),
       signal: AbortSignal.timeout(240_000),
     });
     if (!(response.headers.get('content-type') ?? '').includes('text/event-stream')) {
@@ -347,12 +451,13 @@ async function runCase(item) {
       reason: result.reason ?? null,
     };
   }
-  const piped = await pipeline(item, result);
+  const piped = await pipeline(item, result, data);
   return {
     ...meta,
     totalMs: Date.now() - started,
     ...summarize(piped),
     ...streamChecks(frames, piped.document),
+    ...(data === undefined ? {} : dataFacts(piped, data)),
   };
 }
 
@@ -360,7 +465,42 @@ async function runCase(item) {
  * 宿主前端那条链：原文 → 解析 + 编译 → 文档校验 → 版面审计；有值得修的诊断就带着
  * 「上一轮原文 + 按模型路径整理的诊断」回去要修复，最多 2 轮，同一组诊断连续两轮不变就提前停。
  */
-async function pipeline(item, first) {
+/** 数据用例的额外事实：建了哪些数据源实例（带参数）、绑数据的指标卡、数据相关告警、候选用了几条。 */
+function dataFacts(piped, data) {
+  const document = piped.document;
+  const sources = (document?.dataSources ?? [])
+    .filter((entry) => entry.source?.kind === 'dataset')
+    .map((entry) => {
+      const params = Object.entries(entry.params ?? {})
+        .map(([name, value]) => `${name}=${value?.value}`)
+        .join(',');
+      return `${entry.source.datasetId}(${params})`;
+    });
+  const bound = (document?.components ?? []).filter(
+    (component) => component.dataValue?.kind === 'data-source-field' && component.name === '指标值',
+  ).length;
+  const warnings = (piped.prepared?.compiled === undefined ? [] : (piped.prepared.warnings ?? []))
+    .map((entry) => entry.code)
+    .filter((code) => /^AGENT_(DATASET|BINDING|KPI_MULTI|KPI_BIND|CANDIDATE|BIND_)/.test(code));
+  return {
+    profiled: data.context.profiles.map(
+      (entry) => `${entry.datasetId}:${entry.sampled ? 'sampled' : 'bare'}`,
+    ),
+    candidates: data.context.candidates.length,
+    usedCandidates: (piped.prepared?.intent?.regions ?? [])
+      .flatMap((region) => [
+        ...(region.blocks ?? []),
+        ...(region.main ?? []),
+        ...(region.rail ?? []),
+      ])
+      .filter((block) => block.candidate !== undefined).length,
+    datasetSources: sources,
+    boundKpis: bound,
+    dataWarnings: [...new Set(warnings)],
+  };
+}
+
+async function pipeline(item, first, dataContext) {
   let data = first;
   let rounds = 0;
   let calls = first.mode === 'llm' ? 1 : 0;
@@ -369,8 +509,8 @@ async function pipeline(item, first) {
   for (;;) {
     const prepared = prepareIntent({
       output: data.output,
-      catalog: { materials: catalog.materials, assets: data.assets },
-      references: { assets: data.assets, datasets: data.datasets },
+      catalog: intentCatalogOf(data.assets, dataContext),
+      references: { assets: data.assets, datasets: datasetsOf(data, dataContext) },
       mode: data.mode,
     });
     const issues = [...prepared.issues];
@@ -410,6 +550,7 @@ async function pipeline(item, first) {
         topic: item.text,
         ...(hostScreen === undefined ? {} : { screenId: hostScreen }),
         catalog,
+        ...(dataContext === undefined ? {} : { references: dataContext.references }),
         repair: { output: data.output, issues },
       }),
       signal: AbortSignal.timeout(240_000),
