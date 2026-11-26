@@ -48,6 +48,7 @@ export {
   type IntentCompileResult,
   type IntentDataCandidate,
   type IntentDataContext,
+  type IntentDatasetPromptSummary,
   type IntentDiagnostic,
   type IntentEditBaseline,
   type IntentEditCommand,
@@ -102,6 +103,7 @@ export {
   type SolvedRegion,
   type SolveOutcome,
   solveLayout,
+  summarizeIntentDataContext,
 } from './intent/index.js';
 export type {
   HostKitOperation,

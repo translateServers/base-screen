@@ -529,6 +529,16 @@ export interface IntentDataContext {
 }
 
 // @public
+export interface IntentDatasetPromptSummary {
+    // (undocumented)
+    readonly candidates: readonly IntentDataCandidate[];
+    // (undocumented)
+    readonly datasetId: string;
+    // (undocumented)
+    readonly profile: ScreenDatasetProfile;
+}
+
+// @public
 export interface IntentDiagnostic {
     // (undocumented)
     readonly code: string;
@@ -1088,6 +1098,9 @@ export interface SubscriptionHubOptions<Request> {
     readonly open: HostKitSubscribe<Request>;
     readonly replayRows?: number;
 }
+
+// @public (undocumented)
+export function summarizeIntentDataContext(context: IntentDataContext): IntentDatasetPromptSummary[];
 
 // @public
 export function toAbortSignal(source: ScreenAbortSignal | undefined): AbortSignal | undefined;

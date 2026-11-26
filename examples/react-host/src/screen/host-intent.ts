@@ -4,6 +4,8 @@ import type {
   ScreenDataSource,
   ScreenDiagnostic,
   ScreenDocument,
+  ScreenHostDatasetPort,
+  ScreenIntentReference,
   ScreenJsonValue,
 } from 'base-screen/contracts';
 import {
@@ -25,13 +27,16 @@ import {
   describeSession,
   editIntent,
   type IntentCatalog,
+  type IntentDataContext,
   type IntentDiagnostic,
   type IntentRepairIssue,
   type IntentSession,
   mapDocumentIssues,
   pickSession,
   prepareIntent,
+  prepareIntentDataContext,
   repairKey,
+  summarizeIntentDataContext,
 } from 'base-screen/host-kit';
 import type { BaseScreenMaterialCatalog } from 'base-screen/plugin-core';
 import {
@@ -68,6 +73,11 @@ export interface HostIntentOptions {
    * 传值会一直用旧的那份。取不到时返回 `undefined`，此时退回后端的兜底目录。
    */
   readonly catalog?: () => BaseScreenMaterialCatalog | undefined;
+  /**
+   * 设计器用的同一个数据集端口（ADR-0114 S4）：引用了数据集时，先经它 describe 并按默认参数取一份样本，
+   * 在前端画像、枚举候选，摘要随引用上送写进提示词。不传则沿用阶段 2 的行为（只有列名与类型）。
+   */
+  readonly datasetPort?: ScreenHostDatasetPort;
 }
 
 /**
@@ -256,7 +266,16 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
       draft = streamDraft;
       // 流式帧在这里本地编译（ADR-0113 §2.8）：后端推骨架与逐项内容，host-kit 装配并编出每一帧。
       // 素材与数据集引用要等最终结果才知道，所以含它们的块在流里先留占位，最终结果到了再补。
-      const streamCatalog = catalog === undefined ? undefined : toIntentCatalog(catalog, []);
+      // 从数据出发（ADR-0114 S4）：引用了数据集就先取样画像、枚举候选；摘要挂在数据集引用上，
+      // 首轮与修复轮都随引用上送。取样失败只少了画像，不挡生成。
+      // 没有数据集引用时不进 await：请求照旧同步发出（取消 / 过期判断依赖这个顺序）。
+      const dataContext =
+        catalog === undefined || !wantsDataContext(options, request.references)
+          ? undefined
+          : await loadDataContext(options, catalog, request.references, streamAbort.signal);
+      const agentReferences = enrichReferences(request.references, dataContext);
+      const streamCatalog =
+        catalog === undefined ? undefined : toIntentCatalog(catalog, [], dataContext);
       const assembler =
         streamCatalog === undefined ? undefined : createIntentStreamAssembler(streamCatalog);
       const frameDocument = (): unknown => {
@@ -276,9 +295,9 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
           scope: 'screen',
           screenId: options.screenId,
           ...(catalog === undefined ? {} : { catalog }),
-          ...(request.references === undefined || request.references.length === 0
+          ...(agentReferences === undefined || agentReferences.length === 0
             ? {}
-            : { references: request.references }),
+            : { references: agentReferences }),
           canvas: {
             backgroundColor: current.canvas.backgroundColor,
             // 带上当前填充：后端据此判断"改成渐变"到底是变更还是空操作。
@@ -404,6 +423,7 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
           rounds,
           draft,
           repairedFor,
+          dataContext,
         );
         if (attempt.ok) {
           remember(attempt.session);
@@ -431,7 +451,7 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
           request.text,
           options.screenId,
           catalog,
-          request.references,
+          agentReferences,
           signal,
           { output: data.output, issues: attempt.issues },
         );
@@ -668,8 +688,81 @@ function failedAttempt(
 function toIntentCatalog(
   shape: AgentCatalogShape,
   assets: AgentIntentShape['assets'],
+  dataContext?: IntentDataContext,
 ): IntentCatalog {
-  return { materials: shape.materials, assets };
+  return {
+    materials: shape.materials,
+    assets,
+    ...(dataContext === undefined || dataContext.candidates.length === 0
+      ? {}
+      : { candidates: dataContext.candidates }),
+  };
+}
+
+/** 编译用的数据集引用：宿主画像过的（带行数、字段名称与单位）优先，其余沿用后端解析出的。 */
+function intentDatasets(
+  data: AgentIntentShape,
+  dataContext: IntentDataContext | undefined,
+): NonNullable<Parameters<typeof prepareIntent>[0]['references']>['datasets'] {
+  if (dataContext === undefined) return data.datasets;
+  const profiled = new Map(dataContext.references.map((item) => [item.datasetId, item]));
+  const merged = data.datasets.map((item) => profiled.get(item.datasetId) ?? item);
+  for (const item of dataContext.references) {
+    if (!data.datasets.some((entry) => entry.datasetId === item.datasetId)) merged.push(item);
+  }
+  return merged;
+}
+
+function wantsDataContext(
+  options: HostIntentOptions,
+  references: readonly ScreenIntentReference[] | undefined,
+): boolean {
+  return (
+    options.datasetPort !== undefined && (references ?? []).some((item) => item.kind === 'dataset')
+  );
+}
+
+async function loadDataContext(
+  options: HostIntentOptions,
+  shape: AgentCatalogShape,
+  references: readonly ScreenIntentReference[] | undefined,
+  signal: AbortSignal,
+): Promise<IntentDataContext | undefined> {
+  const datasetIds = (references ?? []).flatMap((item) =>
+    item.kind === 'dataset' ? [item.datasetId] : [],
+  );
+  if (options.datasetPort === undefined || datasetIds.length === 0) return undefined;
+  try {
+    const context = await prepareIntentDataContext({
+      datasetIds,
+      port: options.datasetPort,
+      catalog: toIntentCatalog(shape, []),
+      signal,
+    });
+    if (context.warnings.length > 0) logger.warn('intent data context degraded', context.warnings);
+    return context;
+  } catch (error) {
+    logger.warn('intent data context unavailable', error);
+    return undefined;
+  }
+}
+
+/** 把画像与候选挂到对应的数据集引用上（只有统计，没有原始行）。 */
+function enrichReferences(
+  references: readonly ScreenIntentReference[] | undefined,
+  dataContext: IntentDataContext | undefined,
+): readonly ScreenIntentReference[] | undefined {
+  if (references === undefined || dataContext === undefined) return references;
+  const summaries = new Map(
+    summarizeIntentDataContext(dataContext).map((item) => [item.datasetId, item]),
+  );
+  return references.map((item) => {
+    if (item.kind !== 'dataset') return item;
+    const summary = summaries.get(item.datasetId);
+    return summary === undefined
+      ? item
+      : Object.assign({}, item, { profile: summary.profile, candidates: summary.candidates });
+  });
 }
 
 /**
@@ -687,11 +780,12 @@ function attemptWholeScreen(
   rounds: number,
   draft: StreamDraft | undefined,
   repairedFor: ReadonlySet<string> = new Set(),
+  dataContext?: IntentDataContext,
 ): WholeScreenAttempt {
   const prepared = prepareIntent({
     output: data.output,
-    catalog: toIntentCatalog(shape, data.assets),
-    references: { assets: data.assets, datasets: data.datasets },
+    catalog: toIntentCatalog(shape, data.assets, dataContext),
+    references: { assets: data.assets, datasets: intentDatasets(data, dataContext) },
     mode: data.mode,
   });
   if (prepared.compiled === undefined || prepared.intent === undefined) {
@@ -771,14 +865,14 @@ function attemptWholeScreen(
         : '';
     const repairedNote =
       rounds > 0 ? `；宿主校验未通过，已请模型修复 ${rounds} 次${backdropNote}` : '';
-    const rationale = `${describeMode(data.mode, data.failure, warnings)}${repairedNote}。布局由宿主前端按区域确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeLocked(current)}`;
+    const rationale = `${describeMode(data.mode, data.failure, warnings)}${repairedNote}。布局由宿主前端按区域确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeIncomingData(document)}${describeLocked(current)}`;
     // 流式草案接得上就原地收尾；接不上（最终结果与骨架对不上、或已修复过）先撤掉它，再整屏提交。
     // 提案一旦提交就留下它的会话；是否被采纳由下一次请求时对活文档判断。
     const kept = createIntentSession({
       intent: prepared.intent as NonNullable<typeof prepared.intent>,
       compiled: prepared.compiled as NonNullable<typeof prepared.compiled>,
-      catalog: toIntentCatalog(shape, data.assets),
-      references: { assets: data.assets, datasets: data.datasets },
+      catalog: toIntentCatalog(shape, data.assets, dataContext),
+      references: { assets: data.assets, datasets: intentDatasets(data, dataContext) },
       mode: data.mode,
     });
     if (rounds === 0 && !dropped && draft?.finish(parsed.value, rationale) === true) {
@@ -1225,6 +1319,26 @@ function remapValueRef(
 }
 
 /** 锁定组件被跳过时如实写进理由：用户在变更卡上要能看见「为什么还留着几个旧组件」。 */
+/**
+ * 提案理由里的「将接入的数据」（ADR-0114 D6）：采纳后会新建哪些数据集实例、用什么参数。
+ * 生成的实例不写刷新策略，采纳前用户就能看清这屏会去取哪些数。
+ */
+function describeIncomingData(document: unknown): string {
+  const sources =
+    isRecord(document) && Array.isArray(document.dataSources) ? document.dataSources : [];
+  const items: string[] = [];
+  for (const source of sources) {
+    if (!isRecord(source) || !isRecord(source.source) || source.source.kind !== 'dataset') continue;
+    const params = isRecord(source.params)
+      ? Object.entries(source.params)
+          .map(([name, value]) => `${name}=${isRecord(value) ? String(value.value) : ''}`)
+          .join('，')
+      : '';
+    items.push(`${String(source.name)}${params === '' ? '' : `（${params}）`}`);
+  }
+  return items.length === 0 ? '' : `将接入的数据：${items.join('；')}。`;
+}
+
 function describeLocked(current: ScreenDocument): string {
   const locked = current.components.filter((component) => component.status.locked);
   if (locked.length === 0) return '';

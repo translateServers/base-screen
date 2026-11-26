@@ -26,8 +26,10 @@ export { flatSkeleton } from './intent-compile-types.js';
 export {
   INTENT_MAX_REFERENCED_DATASETS,
   type IntentDataContext,
+  type IntentDatasetPromptSummary,
   type PrepareIntentDataContextInput,
   prepareIntentDataContext,
+  summarizeIntentDataContext,
 } from './intent-data-context.js';
 export {
   detectIntentLanguage,

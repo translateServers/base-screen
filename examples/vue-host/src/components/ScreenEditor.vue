@@ -124,6 +124,9 @@ function onDesignerMounted(
       designer: element,
       screenId,
       catalog: () => current.runtime.catalog,
+      ...(current.mountOptions.datasetPort === undefined
+        ? {}
+        : { datasetPort: current.mountOptions.datasetPort }),
     }),
   );
   handle.onDispose(() => element.setIntentHandler(undefined));

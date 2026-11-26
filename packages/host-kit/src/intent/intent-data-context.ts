@@ -213,3 +213,23 @@ function toReference(
       : {}),
   };
 }
+
+/**
+ * 随数据集引用上送给后端写提示词的摘要（ADR-0114 S4）：只有画像统计与候选，没有原始行（D2）。
+ * 宿主把它挂在对应的数据集引用上（`profile` / `candidates`），修复请求沿用同一份引用。
+ */
+export interface IntentDatasetPromptSummary {
+  readonly datasetId: string;
+  readonly profile: ScreenDatasetProfile;
+  readonly candidates: readonly IntentDataCandidate[];
+}
+
+export function summarizeIntentDataContext(
+  context: IntentDataContext,
+): IntentDatasetPromptSummary[] {
+  return context.profiles.map((profile) => ({
+    datasetId: profile.datasetId,
+    profile,
+    candidates: context.candidates.filter((item) => item.datasetId === profile.datasetId),
+  }));
+}

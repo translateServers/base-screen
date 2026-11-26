@@ -63,6 +63,8 @@ function readMaterial(manifest: BaseScreenMaterialManifest): AgentCatalogMateria
       id: role.id,
       min: role.minFields,
       max: role.maxFields,
+      // 显式绑定的字段闸按它校验字段类型（ADR-0114 S1 ③）；旧物料没声明就不带。
+      ...(Array.isArray(role.valueTypes) ? { valueTypes: [...role.valueTypes] } : {}),
     })),
     defaults: {
       props: scalarOnly(manifest.defaultProps),

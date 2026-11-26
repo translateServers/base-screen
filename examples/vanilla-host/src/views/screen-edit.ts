@@ -109,6 +109,7 @@ export const screenEditView: ViewModule = {
               designer: element,
               screenId,
               catalog: () => runtime.catalog,
+              datasetPort,
             }),
           );
           handle.onDispose(() => element.setIntentHandler(undefined));

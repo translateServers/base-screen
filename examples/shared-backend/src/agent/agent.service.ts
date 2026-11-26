@@ -35,6 +35,7 @@ import {
   readEditableComponents,
 } from './agent-component-edit';
 import { type ComposeReferences, composeScreenDocument } from './agent-compose';
+import { type PromptDataSummary, readDataSummary } from './agent-data-context';
 import {
   AGENT_MAX_REPAIR_ROUNDS,
   type AgentParseIssues,
@@ -276,6 +277,7 @@ export class AgentService {
     if (raw === undefined || raw.length === 0) return { prompt: undefined, compose: undefined };
     const assets: { id: string; name: string }[] = [];
     const datasets: ReferencedDataset[] = [];
+    const summaries = new Map<string, PromptDataSummary>();
     for (const item of raw) {
       const kind = item.kind;
       if (kind === 'asset') {
@@ -309,6 +311,9 @@ export class AgentService {
               : { allowedValues: [...parameter.allowedValues] }),
           }));
           datasets.push({ datasetId, name: definition.name, columns, parameters });
+          // 宿主前端算好的画像与候选（ADR-0114 S4）：只读、校验形状后写进提示词，不在这里重算。
+          const summary = readDataSummary(item);
+          if (summary !== undefined) summaries.set(datasetId, summary);
         } catch {
           this.logger.warn(`agent reference dataset dropped: ${datasetId}`);
         }
@@ -326,6 +331,13 @@ export class AgentService {
           missingParams: dataset.parameters
             .filter((parameter) => parameter.required && parameter.defaultValue === undefined)
             .map((parameter) => parameter.name),
+          paramChoices: dataset.parameters
+            .filter((parameter) => parameter.required && parameter.defaultValue === undefined)
+            .map((parameter) => ({
+              name: parameter.name,
+              allowed: (parameter.allowedValues ?? []).map((value) => String(value)),
+            })),
+          ...summaryOf(summaries, dataset.datasetId),
         })),
       },
       compose: { assets, datasets },
@@ -1388,6 +1400,14 @@ export const WARNING_MESSAGES: Readonly<Record<string, string>> = {
   AGENT_KPI_DELTA_DROPPED: '有指标的增减量不合格，已只保留数值',
   AGENT_ASSET_CATALOG_UNAVAILABLE: '素材目录不可用，本次未使用宿主图片',
 };
+
+function summaryOf(
+  summaries: ReadonlyMap<string, PromptDataSummary>,
+  datasetId: string,
+): { summary?: PromptDataSummary } {
+  const summary = summaries.get(datasetId);
+  return summary === undefined ? {} : { summary };
+}
 
 function describeWarning(code: string): string {
   return WARNING_MESSAGES[code] ?? '部分内容已降级';

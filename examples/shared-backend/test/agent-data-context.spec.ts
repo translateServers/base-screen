@@ -1,0 +1,81 @@
+import { FALLBACK_AGENT_CATALOG } from '../src/agent/agent-catalog';
+import { readDataSummary } from '../src/agent/agent-data-context';
+import { buildIntentSystemPrompt } from '../src/agent/agent-spec';
+
+/**
+ * ADR-0114 S4（后端一侧）：宿主随数据集引用上送的画像与候选，只读、校验形状后写进意图提示词。
+ */
+describe('agent data context', () => {
+  const reference = {
+    kind: 'dataset',
+    datasetId: 'monitor.crew',
+    profile: {
+      datasetId: 'monitor.crew',
+      sampled: true,
+      rows: { sampled: 6, total: 6, truncated: false },
+      grain: { keys: ['crew'], unique: true },
+      fields: [
+        { id: 'crew', label: '班组', kind: 'dimension', distinct: 6 },
+        {
+          id: 'oee',
+          label: 'OEE',
+          kind: 'measure',
+          unit: '%',
+          distinct: 6,
+          number: { min: 79.4, max: 86.5 },
+        },
+      ],
+    },
+    candidates: [
+      {
+        id: 'c1',
+        fact: 'categorization',
+        type: 'base.chart',
+        fields: { dimension: ['crew'], measures: ['oee'] },
+      },
+      { id: 'x9', fact: 'categorization', type: 'base.chart', fields: { dimension: ['crew'] } },
+      { id: 'c2', fact: 'unknown', type: 'base.chart', fields: { dimension: ['crew'] } },
+    ],
+  };
+
+  it('keeps only well-formed candidates and describes the profile', () => {
+    const summary = readDataSummary(reference);
+
+    expect(summary?.candidates.map((item) => item.id)).toEqual(['c1']);
+    expect(summary?.lines).toEqual([
+      '样本 6 行，共 6 行',
+      '已按 crew 汇总（每组一行）',
+      '字段：crew（班组，维度，6 个取值）；oee（OEE，度量，%，6 个取值，79.4–86.5）',
+    ]);
+  });
+
+  it('says plainly when there is no sample', () => {
+    const summary = readDataSummary({
+      ...reference,
+      profile: { ...reference.profile, sampled: false },
+    });
+    expect(summary?.lines[0]).toContain('没有取到样本');
+  });
+
+  it('puts the profile, the parameter rule and the candidate table into the intent prompt', () => {
+    const summary = readDataSummary(reference);
+    const prompt = buildIntentSystemPrompt(FALLBACK_AGENT_CATALOG, {
+      assets: [],
+      datasets: [
+        {
+          datasetId: 'monitor.crew',
+          name: '班组绩效',
+          columns: ['crew', 'oee'],
+          missingParams: ['line'],
+          paramChoices: [{ name: 'line', allowed: ['LINE-A', 'LINE-B'] }],
+          ...(summary === undefined ? {} : { summary }),
+        },
+      ],
+    });
+
+    expect(prompt).toContain('候选 c1：分类对比，base.chart（dimension=crew，measures=oee）');
+    expect(prompt).toContain('参数 line 必填，可选 LINE-A / LINE-B');
+    expect(prompt).toContain('"candidate": "c1"');
+    expect(prompt).not.toContain('x9');
+  });
+});

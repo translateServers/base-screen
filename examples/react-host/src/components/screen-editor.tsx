@@ -127,6 +127,7 @@ export function ScreenEditorPage(): ReactElement {
         designer: element,
         screenId,
         catalog: () => setup.runtime.catalog,
+        datasetPort: setup.datasetPort,
       }),
     );
     handle.onDispose(() => element.setIntentHandler(undefined));

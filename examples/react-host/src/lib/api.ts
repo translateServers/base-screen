@@ -124,7 +124,12 @@ export interface AgentCatalogMaterialShape {
   readonly children?: boolean;
   readonly size: { readonly width: number; readonly height: number };
   readonly props: Readonly<Record<string, AgentCatalogPropShape>>;
-  readonly roles: readonly { readonly id: string; readonly min: number; readonly max: number }[];
+  readonly roles: readonly {
+    readonly id: string;
+    readonly min: number;
+    readonly max: number;
+    readonly valueTypes?: readonly ('string' | 'number' | 'boolean' | 'date')[];
+  }[];
   readonly defaults: {
     readonly props: Readonly<Record<string, string | number | boolean | null>>;
     readonly style: Readonly<Record<string, string | number | boolean | null>>;
