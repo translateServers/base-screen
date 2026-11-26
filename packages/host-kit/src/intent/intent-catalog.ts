@@ -28,6 +28,11 @@ export interface IntentCatalogMaterial {
   readonly data: IntentCatalogData;
   /** manifest 的 `hostResourceSelection`：该物料能被素材身份直接赋值。 */
   readonly asset: boolean;
+  /**
+   * manifest 的 `designCapabilities.children`：该物料能当外壳容纳子组件（`base.container`）。
+   * 外壳是编译器的组合手段，不是模型能挑的块类型——解析会拒绝把它当块，提示词里也不列它。
+   */
+  readonly children?: boolean;
   readonly size: { readonly width: number; readonly height: number };
   readonly props: Readonly<Record<string, IntentCatalogProp>>;
   readonly roles: readonly IntentCatalogRole[];
@@ -78,7 +83,7 @@ export function pickSurfaceMaterial(catalog: IntentCatalog): IntentCatalogMateri
   let best: IntentCatalogMaterial | undefined;
   let bestScore = -1;
   for (const material of catalog.materials) {
-    if (material.data !== 'none') continue;
+    if (material.data !== 'none' || material.children === true) continue;
     if (typeof material.defaults.style.fill !== 'string') continue;
     if (NON_RECT_SHAPE_PATTERN.test(material.type)) continue;
     if (NON_RECT_NAME_PATTERN.test(material.name)) continue;
@@ -96,4 +101,16 @@ export function pickSurfaceMaterial(catalog: IntentCatalog): IntentCatalogMateri
     }
   }
   return best;
+}
+
+/**
+ * 组合用的外壳：声明了 `children` 的无数据物料（`base.container`）。
+ *
+ * 外壳让一张指标卡、一个图表块成为可整体移动 / 复制 / 删除的一个单元（ADR-0100 的组合分片）。
+ * 目录里没有可用外壳时返回 undefined，编译器退回平铺并在产物里如实说明，不静默降级。
+ */
+export function pickShellMaterial(catalog: IntentCatalog): IntentCatalogMaterial | undefined {
+  return catalog.materials.find(
+    (material) => material.children === true && material.data === 'none',
+  );
 }

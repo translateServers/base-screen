@@ -104,6 +104,8 @@ export interface AgentCatalogMaterialShape {
   readonly category: string;
   readonly data: 'scalar' | 'tabular' | 'none';
   readonly asset: boolean;
+  /** 能当外壳容纳子组件（`designCapabilities.children`）：编译器用它把卡片与块编成可整体移动的组合。 */
+  readonly children?: boolean;
   readonly size: { readonly width: number; readonly height: number };
   readonly props: Readonly<Record<string, AgentCatalogPropShape>>;
   readonly roles: readonly { readonly id: string; readonly min: number; readonly max: number }[];

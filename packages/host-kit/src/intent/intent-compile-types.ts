@@ -12,7 +12,7 @@ export interface CompiledComponent {
   id: string;
   type: string;
   name: string;
-  parentId: null;
+  parentId: string | null;
   position: { x: number; y: number };
   size: { width: number; height: number };
   rotation: number;
@@ -135,6 +135,8 @@ export interface PushExtra {
   style?: Record<string, ScreenJsonValue>;
   dataValue?: Record<string, unknown> | null;
   dataBinding?: Record<string, unknown>;
+  /** 显式给出父级；缺省沿用编译器当前打开的外壳（没有就是顶层）。 */
+  parentId?: string | null;
   /** 流式落稿的占位框：内容到了就被移除，不占该来源的计数。 */
   pending?: boolean;
 }

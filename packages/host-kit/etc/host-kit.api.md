@@ -45,7 +45,7 @@ export interface CompiledComponent {
     // (undocumented)
     name: string;
     // (undocumented)
-    parentId: null;
+    parentId: string | null;
     // (undocumented)
     position: {
         x: number;
@@ -401,6 +401,7 @@ export interface IntentCatalogMaterial {
     readonly asset: boolean;
     // (undocumented)
     readonly category: string;
+    readonly children?: boolean;
     // (undocumented)
     readonly data: IntentCatalogData;
     // (undocumented)

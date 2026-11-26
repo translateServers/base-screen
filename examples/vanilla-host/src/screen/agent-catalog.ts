@@ -28,7 +28,12 @@ import type {
 export function buildAgentCatalog(catalog: BaseScreenMaterialCatalog): AgentCatalogShape {
   const materials = catalog
     .list()
-    .filter((entry) => entry.manifest.libraryVisible !== false)
+    // 物料库不展示的容器也要进目录：它是编译器组合卡片与块的外壳（`children`），不会列给模型。
+    .filter(
+      (entry) =>
+        entry.manifest.libraryVisible !== false ||
+        entry.manifest.designCapabilities.children === true,
+    )
     .map((entry) => readMaterial(entry.manifest))
     .filter((material): material is AgentCatalogMaterialShape => material !== null)
     .sort((left, right) => left.type.localeCompare(right.type));
@@ -48,6 +53,7 @@ function readMaterial(manifest: BaseScreenMaterialManifest): AgentCatalogMateria
     asset:
       manifest.hostResourceSelection === true &&
       manifest.dataCapabilities.includes('host-resource'),
+    ...(manifest.designCapabilities.children === true ? { children: true as const } : {}),
     size: {
       width: Math.round(manifest.defaultSize.width),
       height: Math.round(manifest.defaultSize.height),

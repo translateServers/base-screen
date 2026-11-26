@@ -19,6 +19,7 @@ import {
   flatOutput,
   intentOf,
   SHAPE_CATALOG,
+  SHELL_CATALOG,
   SIX_ROW_TABLE,
   TREND_TABLE,
 } from './fixtures.js';
@@ -33,7 +34,11 @@ function compileOk(
     ...(extra.mode === undefined ? {} : { mode: extra.mode }),
   });
   if (!outcome.ok) throw new Error(`compile failed: ${outcome.diagnostics[0]?.code}`);
-  return outcome.value;
+  // 这些用例的目录没有外壳，编译器都会附一条「平铺」说明；它另有专门的用例，这里不让它干扰。
+  return {
+    ...outcome.value,
+    warnings: outcome.value.warnings.filter((item) => item.code !== 'INTENT_SHELL_UNAVAILABLE'),
+  };
 }
 
 function nodes(document: CompiledScreenDocument): readonly CompiledComponent[] {
@@ -647,5 +652,180 @@ describe('compileScreenIntent · regions', () => {
 
     expect(parsed.ok, JSON.stringify(parsed.diagnostics)).toBe(true);
     if (parsed.ok) expect(auditScreenLayout(parsed.value)).toEqual([]);
+  });
+});
+
+describe('compileScreenIntent · composition (shell + atoms)', () => {
+  const output = flatOutput([
+    CHART,
+    { type: 'base.text', title: '要点', span: 2, text: '甲\n乙', note: '本周口径' },
+  ]);
+  const intent = intentOf(output, SHELL_CATALOG);
+
+  function compose(extra: { mode?: 'llm' | 'deterministic' } = {}) {
+    const outcome = compileScreenIntent({
+      intent,
+      catalog: SHELL_CATALOG,
+      ...(extra.mode === undefined ? {} : { mode: extra.mode }),
+    });
+    if (!outcome.ok) throw new Error(`compile failed: ${outcome.diagnostics[0]?.code}`);
+    return outcome.value;
+  }
+
+  const childrenOf = (document: CompiledScreenDocument, parentId: string) =>
+    nodes(document).filter((node) => node.parentId === parentId);
+
+  it('compiles every KPI card into one shell holding a surface and its texts', () => {
+    const { document } = compose({ mode: 'llm' });
+    const shells = nodes(document).filter((node) => node.name === '指标卡');
+
+    expect(shells).toHaveLength(3);
+    for (const shell of shells) {
+      expect(shell.type).toBe('base.container');
+      expect(shell.parentId).toBeNull();
+      const kids = childrenOf(document, shell.id);
+      expect(kids.map((kid) => kid.name)).toEqual(
+        expect.arrayContaining(['底板', '指标名', '指标值']),
+      );
+      // 子组件都落在外壳的盒子里，层级在外壳之上。
+      for (const kid of kids) {
+        expect(kid.position.x).toBeGreaterThanOrEqual(shell.position.x);
+        expect(kid.position.y).toBeGreaterThanOrEqual(shell.position.y);
+        expect(kid.position.x + kid.size.width).toBeLessThanOrEqual(
+          shell.position.x + shell.size.width,
+        );
+        expect(kid.position.y + kid.size.height).toBeLessThanOrEqual(
+          shell.position.y + shell.size.height,
+        );
+        expect(kid.zIndex).toBeGreaterThan(shell.zIndex);
+      }
+    }
+  });
+
+  it('compiles every block into one shell holding its title, note and body', () => {
+    const { document, sources } = compose();
+    const shell = nodes(document).find((node) => node.id === 'agent-block-1-0');
+
+    expect(shell?.type).toBe('base.container');
+    expect(shell?.name).toBe('要点');
+    const kids = childrenOf(document, 'agent-block-1-0');
+    expect(kids.map((kid) => kid.name)).toEqual(['块标题', '块说明', '要点']);
+    // 外壳与它的子组件指回同一处模型原文。
+    expect(
+      new Set(['agent-block-1-0', ...kids.map((kid) => kid.id)].map((id) => sources[id])),
+    ).toEqual(new Set(['blocks[1]']));
+  });
+
+  it('keeps shells out of the model-chosen block types', () => {
+    const parsed = parseScreenIntent(
+      flatOutput([{ type: 'base.container', title: '壳', span: 2 }]),
+      { catalog: SHELL_CATALOG },
+    );
+
+    expect(parsed.diagnostics.map((item) => `${item.code}@${item.path}`)).toContain(
+      'AGENT_BLOCK_TYPE_UNKNOWN@blocks[0]',
+    );
+  });
+
+  it('never picks the shell as the card surface', () => {
+    const { document } = compose();
+    const surfaces = nodes(document).filter((node) => node.name === '底板');
+
+    expect(surfaces.length).toBeGreaterThan(0);
+    expect(new Set(surfaces.map((node) => node.type))).toEqual(new Set(['base.rectangle']));
+  });
+
+  it('draws only the shell and surface for a KPI that has not arrived yet, and keeps their ids when it does', () => {
+    const skeleton = flatSkeleton(3, [
+      { span: 2, data: true },
+      { span: 2, data: false },
+    ]);
+    const kpi = parseIntentKpi((output.kpis as unknown[])[0], 'kpis[0]').value;
+    const before = compileScreenIntent({
+      intent,
+      catalog: SHELL_CATALOG,
+      stream: { skeleton, kpis: {}, blocks: {} },
+    });
+    const after = compileScreenIntent({
+      intent,
+      catalog: SHELL_CATALOG,
+      stream: { skeleton, kpis: { 'kpis[0]': kpi as NonNullable<typeof kpi> }, blocks: {} },
+    });
+    if (!before.ok || !after.ok) throw new Error('compile failed');
+
+    const idsOf = (document: CompiledScreenDocument, prefix: string) =>
+      nodes(document)
+        .filter((node) => node.id.startsWith(prefix))
+        .map((node) => node.id);
+    expect(idsOf(before.value.document, 'agent-kpi-0-')).toEqual([
+      'agent-kpi-0-0',
+      'agent-kpi-0-1',
+    ]);
+    expect(idsOf(after.value.document, 'agent-kpi-0-').slice(0, 2)).toEqual([
+      'agent-kpi-0-0',
+      'agent-kpi-0-1',
+    ]);
+    // 外壳与底板的几何在 KPI 到达前后不变。
+    const geometry = (document: CompiledScreenDocument, id: string) => {
+      const node = nodes(document).find((item) => item.id === id);
+      return JSON.stringify([node?.position, node?.size, node?.parentId]);
+    };
+    for (const id of ['agent-kpi-0-0', 'agent-kpi-0-1']) {
+      expect(geometry(after.value.document, id)).toBe(geometry(before.value.document, id));
+    }
+  });
+
+  it('falls back to flat layout and says so when the catalog has no shell', () => {
+    const outcome = compileScreenIntent({ intent: intentOf(output), catalog: COMPILE_CATALOG });
+    if (!outcome.ok) throw new Error('compile failed');
+
+    expect(
+      outcome.value.warnings.filter((item) => item.code === 'INTENT_SHELL_UNAVAILABLE'),
+    ).toEqual([expect.objectContaining({ severity: 'warning', path: '' })]);
+    expect(nodes(outcome.value.document).every((node) => node.parentId === null)).toBe(true);
+  });
+
+  it('does not say anything when the catalog has a shell', () => {
+    expect(compose().warnings.map((item) => item.code)).not.toContain('INTENT_SHELL_UNAVAILABLE');
+  });
+
+  it('passes the contract parser and the layout audit, with a valid parent for every child', () => {
+    const { document } = compose({ mode: 'llm' });
+    const parsed = parseScreenDocument(document);
+
+    expect(parsed.ok, JSON.stringify(parsed.diagnostics)).toBe(true);
+    if (!parsed.ok) return;
+    expect(auditScreenLayout(parsed.value)).toEqual([]);
+    const ids = new Set(nodes(document).map((node) => node.id));
+    for (const node of nodes(document)) {
+      if (node.parentId !== null) expect(ids.has(node.parentId)).toBe(true);
+    }
+  });
+
+  it('composes region layouts the same way: split blocks are shells too', () => {
+    const regions = intentOf(
+      {
+        title: '仓储作战室',
+        subtitle: '按日汇总',
+        regions: [
+          { kind: 'band', items: [{ label: '总量', value: 1, unit: '件' }] },
+          {
+            kind: 'split',
+            main: [{ type: 'base.chart', title: '趋势', table: TREND_TABLE }],
+            rail: [{ type: 'base.text', title: '要点', text: '甲' }],
+          },
+        ],
+      },
+      SHELL_CATALOG,
+    );
+    const outcome = compileScreenIntent({ intent: regions, catalog: SHELL_CATALOG });
+    if (!outcome.ok) throw new Error('compile failed');
+    const shells = nodes(outcome.value.document).filter((node) => node.type === 'base.container');
+
+    expect(shells.map((node) => node.id)).toEqual([
+      'agent-r0-k0-0',
+      'agent-r1-m0-0',
+      'agent-r1-s0-0',
+    ]);
   });
 });

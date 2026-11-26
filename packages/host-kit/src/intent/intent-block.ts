@@ -11,12 +11,13 @@ import type { IntentBlock, IntentDiagnostic, IntentTable } from './intent-types.
  * 「外壳 + 原子物料」的组合，这里的 `inset` / 标题位置届时一并调整。
  */
 
+/** 落一个组件并返回它的 id（外壳要用它当子组件的父级）。 */
 export type PushFn = (
   material: IntentCatalogMaterial,
   name: string,
   box: Box,
   extra?: PushExtra,
-) => void;
+) => string;
 
 export type PushTextFn = (name: string, value: string, box: Box, token?: TextToken) => void;
 
@@ -36,6 +37,12 @@ export interface BlockContext {
   readonly palette: IntentStylePalette;
   readonly push: PushFn;
   readonly pushText: PushTextFn;
+  /**
+   * 打开 / 关闭一个组合外壳：之后落的组件都以它为父级（ADR-0113 §2.4）。
+   * 目录里没有可用外壳时 `beginShell` 什么也不做，组件平铺。
+   */
+  readonly beginShell: (name: string, box: Box) => void;
+  readonly endShell: () => void;
 }
 
 export interface BlockTarget {
@@ -78,6 +85,8 @@ export function compileBlock(
   const hasNote = hasTitle && (block.note ?? '').trim() !== '';
   const headerHeight = hasTitle ? (hasNote ? 64 : 36) : 0;
 
+  // 一个块 = 一个外壳 + 标题 / 说明 / 主体：整体移动、复制、删除。
+  context.beginShell(block.title.trim() === '' ? material.name : block.title, box);
   if (hasTitle) {
     // 标题与卡片左边缘对齐（卡片由 inset 内缩 16，标题不再额外偏移），整列看起来是一条竖线。
     context.pushText(
@@ -111,6 +120,7 @@ export function compileBlock(
     ...payload,
     ...(Object.keys(style).length === 0 ? {} : { style }),
   });
+  context.endShell();
 }
 
 /**

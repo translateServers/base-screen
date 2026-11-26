@@ -416,7 +416,8 @@ export function parseIntentBlock(
   if (block === null) return drop('AGENT_BLOCK_INVALID', 'A block must be an object.');
   const type = typeof block.type === 'string' ? block.type.trim() : '';
   const material = catalog.materials.find((candidate) => candidate.type === type);
-  if (type === '' || material === undefined) {
+  // 外壳（可容纳子组件的物料）是编译器的组合手段，不是模型能挑的块类型。
+  if (type === '' || material === undefined || material.children === true) {
     return drop('AGENT_BLOCK_TYPE_UNKNOWN', 'The block type is not in the catalog.');
   }
 

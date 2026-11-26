@@ -1044,7 +1044,7 @@ function readBlocks(
     }
     const type = typeof block.type === 'string' ? block.type.trim() : '';
     const material = catalog.materials.find((candidate) => candidate.type === type);
-    if (type === '' || material === undefined) {
+    if (type === '' || material === undefined || material.children === true) {
       drop('AGENT_BLOCK_TYPE_UNKNOWN', index);
       continue;
     }

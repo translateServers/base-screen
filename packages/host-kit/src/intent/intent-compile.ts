@@ -4,6 +4,7 @@ import { type CompileSink, compileBlock, tokenStyle } from './intent-block.js';
 import {
   type IntentCatalog,
   type IntentCatalogMaterial,
+  pickShellMaterial,
   pickSurfaceMaterial,
   pickTextMaterial,
 } from './intent-catalog.js';
@@ -142,13 +143,18 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
 
   const textMaterial = pickTextMaterial(catalog);
   const surfaceMaterial = pickSurfaceMaterial(catalog);
+  const shellMaterial = pickShellMaterial(catalog);
+  // 当前打开的外壳：其后落的组件以它为父级（组合，ADR-0113 §2.4）。
+  let shellId: string | null = null;
+  // 需要外壳却没有可用外壳：平铺，并在产物里如实说明。
+  let flattened = false;
 
   const push = (
     material: IntentCatalogMaterial,
     name: string,
     box: Box,
     extra: PushExtra = {},
-  ): void => {
+  ): string => {
     const pending = extra.pending === true;
     const where = scopeOf(scope);
     const local = pending ? where.pendingOffset : (counters.get(scope) ?? 0);
@@ -159,7 +165,7 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
       id,
       type: material.type,
       name,
-      parentId: null,
+      parentId: extra.parentId === undefined ? shellId : extra.parentId,
       position: { x: Math.round(box.x), y: Math.round(box.y) },
       size: {
         width: Math.max(1, Math.round(box.width)),
@@ -175,6 +181,22 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
       ...(extra.dataBinding === undefined ? {} : { dataBinding: extra.dataBinding }),
     });
     used.add(material.type);
+    return id;
+  };
+
+  /**
+   * 外壳：目录里的容器物料（默认样式，透明无边框），框住它所属的一组组件。
+   * 卡片的外观（底板、圆角）仍由里面的底板组件承担，外壳只是「整体」的把手。
+   */
+  const beginShell = (name: string, box: Box): void => {
+    if (shellMaterial === undefined) {
+      flattened = true;
+      return;
+    }
+    shellId = push(shellMaterial, name, box, { parentId: null });
+  };
+  const endShell = (): void => {
+    shellId = null;
   };
 
   const pushText = (
@@ -229,7 +251,16 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
   );
 
   const cardStyle = tintedSurfaceStyle(palette.card);
-  const blockContext = { catalog, textMaterial, push, pushText, references, palette };
+  const blockContext = {
+    catalog,
+    textMaterial,
+    push,
+    pushText,
+    references,
+    palette,
+    beginShell,
+    endShell,
+  };
   const blockTarget = { sink, onAsset: () => (imageCount += 1) };
   const drawBlock = (slot: BlockSlot, box: Box): void => {
     at(slot.path, slot.block?.origin ?? slot.path);
@@ -244,9 +275,12 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
       region.kpis.forEach((slot, slotIndex) => {
         const box = placed.boxes[slotIndex] as Box;
         at(slot.path, slot.kpi?.origin ?? slot.path);
-        pushSurface('指标卡', box, cardStyle);
-        // 流式落稿时这一项还没到：只画卡片底板。数值到了在同一张卡上填字，底板 id 与层级不变。
+        // 一张指标卡 = 一个外壳 + 底板 + 文字：整体移动、复制、删除。
+        beginShell('指标卡', box);
+        pushSurface(shellMaterial === undefined ? '指标卡' : '底板', box, cardStyle);
+        // 流式落稿时这一项还没到：只画外壳与底板。数值到了在同一张卡上填字，外壳与底板的 id、层级不变。
         if (slot.kpi !== undefined) drawKpi(slot.kpi, box, palette, input.mode, pushText);
+        endShell();
       });
     } else if (region.kind === 'grid' && placed.kind === 'grid') {
       region.blocks.forEach((slot, slotIndex) => drawBlock(slot, placed.boxes[slotIndex] as Box));
@@ -271,6 +305,15 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
     { fontSize: FONT_FLOOR_PX, color: palette.footer },
   );
 
+  if (flattened) {
+    sink.warnings.push({
+      severity: 'warning',
+      code: 'INTENT_SHELL_UNAVAILABLE',
+      path: '',
+      message:
+        'The catalog has no material that can hold child components, so cards and blocks were laid out flat instead of as movable groups.',
+    });
+  }
   if (sink.diagnostics.length > 0) return { ok: false, diagnostics: sink.diagnostics };
   if (components.length === 0) {
     return {

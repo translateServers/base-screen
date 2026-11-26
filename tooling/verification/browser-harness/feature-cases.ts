@@ -1,4 +1,10 @@
+import { buildAgentCatalog } from '../../../examples/react-host/src/screen/agent-catalog.ts';
 import type { ScreenIntentReferenceCatalogPort } from '../../../packages/contracts/src/index.ts';
+import {
+  compileScreenIntent,
+  type IntentCatalog,
+  parseScreenIntent,
+} from '../../../packages/host-kit/src/index.ts';
 import type { BaseScreenDesignerElement } from '../../../packages/sdk/src/index.ts';
 import {
   FEATURE_CASE_CATALOG,
@@ -192,6 +198,95 @@ async function applyAgentProposalStreaming(designer: BaseScreenDesignerElement):
     commands: [placeholder('stream-a', 80), placeholder('stream-b', 480)],
   });
   if (!begun.ok) throw new Error('Streaming skeleton was rejected.');
+  await painted();
+}
+
+/**
+ * 组合产物（ADR-0113 §2.4）：用宿主真实目录把一份意图编成整屏——主区 + 右侧栏版面，
+ * 每张指标卡、每个块都是「外壳 + 原子物料」。用于在设计器里核对整体选中 / 移动 / 图层分组。
+ */
+async function applyAgentComposedScreen(designer: BaseScreenDesignerElement): Promise<void> {
+  setHostShellVisible(false);
+  designer.setWorkbenchMode('canvas');
+  if (designer.catalog === undefined || designer.document === undefined) return;
+  const shape = buildAgentCatalog(designer.catalog);
+  const catalog: IntentCatalog = { materials: shape.materials, assets: [] };
+  const table = {
+    columns: [
+      { id: 'day', label: '日期', type: 'string' },
+      { id: 'amount', label: '金额', type: 'number' },
+    ],
+    rows: [
+      { day: '10-22', amount: 120 },
+      { day: '10-23', amount: 164 },
+      { day: '10-24', amount: 143 },
+      { day: '10-25', amount: 171 },
+    ],
+  };
+  const parsed = parseScreenIntent(
+    {
+      title: '华东渠道周会',
+      subtitle: '按周汇总的渠道经营口径',
+      style: 'deep-tech',
+      regions: [
+        {
+          kind: 'band',
+          items: [
+            {
+              label: '总库存',
+              value: 286000,
+              unit: '件',
+              delta: { value: 4.2, unit: 'percent', direction: 'neutral' },
+            },
+            { label: '周转天数', value: 23.7, unit: '天' },
+            { label: '缺货仓', value: 15, unit: '家' },
+          ],
+        },
+        {
+          kind: 'split',
+          main: [{ type: 'base.chart', title: '近四日趋势', note: '单位：万件', table }],
+          rail: [
+            { type: 'base.text', title: '结论', text: '库存水位整体平稳\n华东二仓需补货' },
+            { type: 'base.text', title: '提醒', text: '周五前完成盘点' },
+          ],
+        },
+      ],
+    },
+    { catalog },
+  );
+  if (parsed.intent === undefined) throw new Error('Composed fixture intent was rejected.');
+  const compiled = compileScreenIntent({ intent: parsed.intent, catalog, mode: 'llm' });
+  if (!compiled.ok)
+    throw new Error(`Composed fixture did not compile: ${compiled.diagnostics[0]?.code}`);
+
+  const commands: Parameters<BaseScreenDesignerElement['executeTransaction']>[0]['commands'] = [
+    {
+      type: 'update-canvas',
+      patch: {
+        width: compiled.value.document.canvas.width,
+        height: compiled.value.document.canvas.height,
+        backgroundColor: compiled.value.document.canvas.backgroundColor,
+      },
+    },
+    { type: 'replace-blueprint', blueprint: { nodes: [], edges: [] } },
+    ...(designer.document.components.length === 0
+      ? []
+      : [
+          {
+            type: 'remove-components' as const,
+            componentIds: designer.document.components.map((component) => component.id),
+          },
+        ]),
+    ...compiled.value.document.components.map((component) => ({
+      type: 'add-component' as const,
+      component: component as unknown as NonNullable<
+        typeof designer.document
+      >['components'][number],
+    })),
+  ];
+  const result = designer.executeTransaction({ commands });
+  if (!result.ok)
+    throw new Error(`Composed fixture was rejected: ${JSON.stringify(result.diagnostics)}`);
   await painted();
 }
 
@@ -575,6 +670,7 @@ const CASE_APPLIERS = {
   'agent-host-resource': applyAgentHostResource,
   'agent-proposal-review': applyAgentProposalReview,
   'agent-sample-data': applyAgentSampleData,
+  'agent-composed-screen': applyAgentComposedScreen,
   'agent-proposal-streaming': applyAgentProposalStreaming,
   'material-groups': applyMaterialGroups,
   'plugin-command': applyPluginCommand,

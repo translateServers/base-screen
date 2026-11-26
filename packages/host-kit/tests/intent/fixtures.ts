@@ -115,6 +115,32 @@ export const COMPILE_CATALOG: IntentCatalog = {
   ],
 };
 
+/**
+ * 带外壳的目录：在 `COMPILE_CATALOG` 之上加一个可容纳子组件的容器（`base.container`，
+ * 与真实目录一致：默认样式透明无边框，不进物料库）。编译器据此把指标卡与块编成可整体移动的组合。
+ */
+export const SHELL_CATALOG: IntentCatalog = {
+  ...COMPILE_CATALOG,
+  materials: [
+    ...COMPILE_CATALOG.materials,
+    {
+      type: 'base.container',
+      name: '容器',
+      category: '基础',
+      data: 'none',
+      asset: false,
+      children: true,
+      size: { width: 320, height: 180 },
+      props: {},
+      roles: [],
+      defaults: {
+        props: {},
+        style: { fill: 'transparent', borderColor: 'transparent', borderWidth: 1, opacity: 1 },
+      },
+    },
+  ],
+};
+
 /** 真实目录的排序会把 `base.ellipse` 排在 `base.rectangle` 前面：底板不能被它抢走。 */
 export const SHAPE_CATALOG: IntentCatalog = {
   assets: [],

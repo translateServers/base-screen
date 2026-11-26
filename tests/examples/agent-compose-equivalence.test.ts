@@ -264,7 +264,11 @@ function expectSameOutcome(
   expect(next.value.materials).toEqual(legacy.value.materials);
   expect(next.value.sources).toEqual(legacy.value.sources);
   // 降级告警：码与说明一致；路径不同是有意的（host-kit 写 IR 路径，后端写块标题）。
-  expect(next.value.warnings.map((item) => [item.code, item.message])).toEqual(
+  // `INTENT_SHELL_UNAVAILABLE`（目录没有外壳、已平铺）是 host-kit 才有的说明，后端不产出。
+  const nextWarnings = next.value.warnings.filter(
+    (item) => item.code !== 'INTENT_SHELL_UNAVAILABLE',
+  );
+  expect(nextWarnings.map((item) => [item.code, item.message])).toEqual(
     legacy.value.warnings.map((item) => [item.code, item.message]),
   );
 }

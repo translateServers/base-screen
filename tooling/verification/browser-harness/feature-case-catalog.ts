@@ -195,6 +195,19 @@ export const FEATURE_CASE_CATALOG = [
     stressGrouping: false,
   },
   {
+    id: 'agent-composed-screen',
+    title: '智能体组合产物',
+    summary:
+      '意图层编译出的整屏：每张指标卡、每个块都是「外壳 + 原子物料」的可整体移动组合；右侧栏版面。',
+    lookAt:
+      '点选一张指标卡：选中的是整张卡（外壳），拖动时底板与文字一起走；图层里它是一个可折叠的组。' +
+      '主区 + 右侧栏版面，侧栏两块纵向堆叠。',
+    packages: ['host-kit', 'core', 'engine'],
+    focused: 'pnpm --filter @base-screen/host-kit exec vitest run tests/intent',
+    verify: 'pnpm verify:browser',
+    stressGrouping: false,
+  },
+  {
     id: 'agent-sample-data',
     title: '智能体示例数据',
     summary: '两处带示例标记的取值：画布徽标、状态栏计数与定位、保留为常量。',
