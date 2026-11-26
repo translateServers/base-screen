@@ -165,8 +165,8 @@ function readFlat(
     diagnostics.push(...block.diagnostics);
     if (block.value !== undefined) blocks.push(block.value);
   }
-  const regions: IntentRegion[] = [{ kind: 'band', items }];
-  if (blocks.length > 0) regions.push({ kind: 'grid', blocks });
+  const regions: IntentRegion[] = [{ kind: 'band', items, origin: 'kpis' }];
+  if (blocks.length > 0) regions.push({ kind: 'grid', blocks, origin: 'blocks' });
   return regions;
 }
 
@@ -223,12 +223,14 @@ function readRegion(
       diagnostics.push(...kpi.diagnostics);
       if (kpi.value !== undefined) items.push(kpi.value);
     }
-    return items.length === 0 ? undefined : { kind: 'band', items };
+    return items.length === 0 ? undefined : { kind: 'band', items, origin: path };
   }
 
   if (kind === 'grid') {
     const blocks = readBlocks(region.blocks, catalog, path, 'blocks', true, diagnostics);
-    return blocks === undefined || blocks.length === 0 ? undefined : { kind: 'grid', blocks };
+    return blocks === undefined || blocks.length === 0
+      ? undefined
+      : { kind: 'grid', blocks, origin: path };
   }
 
   const ratio = readChoice(region.ratio, SPLIT_RATIOS, 'wide-narrow', `${path}.ratio`, diagnostics);
@@ -244,7 +246,7 @@ function readRegion(
   if (main === undefined || rail === undefined || main.length === 0 || rail.length === 0) {
     return undefined;
   }
-  return { kind: 'split', ratio, railSide, main, rail };
+  return { kind: 'split', ratio, railSide, main, rail, origin: path };
 }
 
 function readBlocks(

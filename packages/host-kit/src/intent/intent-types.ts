@@ -68,12 +68,16 @@ export interface IntentBlock {
 export interface IntentBand {
   readonly kind: 'band';
   readonly items: readonly IntentKpi[];
+  /** 区域在模型原文里的路径：`regions[1]`；平铺写法的指标带为 `kpis`。容量冲突的诊断靠它指回模型写的那一处。 */
+  readonly origin: string;
 }
 
 /** 四列栅格：块按顺序排，同一行 span 之和不超过 4。 */
 export interface IntentGrid {
   readonly kind: 'grid';
   readonly blocks: readonly IntentBlock[];
+  /** `regions[2]`；平铺写法的栅格为 `blocks`。 */
+  readonly origin: string;
 }
 
 /** 主区 + 侧栏：侧栏里的块纵向堆叠。 */
@@ -85,6 +89,7 @@ export interface IntentSplit {
   readonly railSide: 'left' | 'right';
   readonly main: readonly IntentBlock[];
   readonly rail: readonly IntentBlock[];
+  readonly origin: string;
 }
 
 export type IntentRegion = IntentBand | IntentGrid | IntentSplit;

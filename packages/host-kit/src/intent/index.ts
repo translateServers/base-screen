@@ -15,10 +15,20 @@ export type {
   IntentCompileResult,
   IntentReferences,
   IntentSkeleton,
+  IntentSkeletonRegion,
   IntentSkeletonSlot,
   IntentStreamFrame,
 } from './intent-compile-types.js';
+export { flatSkeleton } from './intent-compile-types.js';
 export { formatKpiDelta, formatKpiValue, type KpiValueInput } from './intent-format.js';
+export {
+  type LayoutCapacityIssue,
+  type LayoutRegion,
+  type LayoutSlot,
+  type SolvedRegion,
+  type SolveOutcome,
+  solveLayout,
+} from './intent-layout.js';
 export {
   type ParseScreenIntentOptions,
   parseIntentBlock,

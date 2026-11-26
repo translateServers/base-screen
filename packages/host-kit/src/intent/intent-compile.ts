@@ -12,34 +12,36 @@ import type {
   CompiledComponent,
   IntentCompileOutcome,
   IntentReferences,
+  IntentSkeleton,
+  IntentSkeletonRegion,
   IntentStreamFrame,
   PushExtra,
   TextToken,
 } from './intent-compile-types.js';
 import { deltaColor, formatKpiDelta, formatKpiValue } from './intent-format.js';
 import {
-  BLOCK_TOP,
-  COLUMNS,
-  CONTENT_BOTTOM,
-  clamp,
-  distributeRowHeights,
   FOOTER_HEIGHT,
   FOOTER_Y,
-  GAP,
   HEIGHT,
-  KPI_HEIGHT,
-  KPI_Y,
+  type LayoutCapacityIssue,
+  type LayoutRegion,
   MARGIN,
-  packRows,
+  type SolvedRegion,
   SUBTITLE_HEIGHT,
   SUBTITLE_Y,
-  stretchSpans,
+  solveLayout,
   TITLE_HEIGHT,
   TITLE_Y,
   WIDTH,
-} from './intent-grid.js';
+} from './intent-layout.js';
 import { type IntentStylePalette, resolveIntentStyle } from './intent-style.js';
-import type { IntentBlock, IntentDiagnostic, IntentKpi, ScreenIntent } from './intent-types.js';
+import type {
+  IntentBlock,
+  IntentDiagnostic,
+  IntentKpi,
+  IntentRegion,
+  ScreenIntent,
+} from './intent-types.js';
 
 export interface CompileScreenIntentInput {
   readonly intent: ScreenIntent;
@@ -57,16 +59,46 @@ export interface CompileScreenIntentInput {
   readonly stream?: IntentStreamFrame;
 }
 
-/** 块的格子：`index` 是它在骨架 / 平铺块列表里的下标，`block` 为空表示内容还没到。 */
+/** 最多 5 张指标卡（平铺写法）；区域写法的上限由求解器的最小卡宽决定。 */
+const FLAT_MAX_KPIS = 5;
+
+/** 指标卡内的排版相对卡片左上角。 */
+const KPI_CARD_PADDING = 20;
+
+/** 一个格子：位置路径（决定 id 与层级）、模型原文路径（来源表）、已到达的内容。 */
+interface KpiSlot {
+  readonly path: string;
+  readonly kpi: IntentKpi | undefined;
+}
 interface BlockSlot {
-  readonly span: number;
-  readonly data: boolean;
-  readonly index: number;
+  readonly path: string;
   readonly block: IntentBlock | undefined;
 }
 
-/** 最多 5 张指标卡。 */
-const MAX_KPIS = 5;
+/** 编译用的区域：求解器输入（`layout`）+ 每个格子的内容。 */
+type CompileRegion =
+  | {
+      readonly kind: 'band';
+      readonly path: string;
+      readonly origin: string;
+      readonly layout: LayoutRegion;
+      readonly kpis: readonly KpiSlot[];
+    }
+  | {
+      readonly kind: 'grid';
+      readonly path: string;
+      readonly origin: string;
+      readonly layout: LayoutRegion;
+      readonly blocks: readonly BlockSlot[];
+    }
+  | {
+      readonly kind: 'split';
+      readonly path: string;
+      readonly origin: string;
+      readonly layout: LayoutRegion;
+      readonly main: readonly BlockSlot[];
+      readonly rail: readonly BlockSlot[];
+    };
 
 /**
  * 目录驱动编译：模型挑组件与数据，编译器负责把它变成合法文档。
@@ -75,20 +107,22 @@ const MAX_KPIS = 5;
  * 2. 样式起点是物料 manifest 的 `defaultStyle`，只叠加一层设计令牌（字号 / 字重 / 文字色），
  *    且仅在物料声明过该键时才写，避免把不支持的样式塞给渲染器；
  * 3. 数据按物料声明的 `staticData.kind` 编——表格写 `dataValue: inline` + `dataBinding`，
- *    素材写 `dataSources` 实例 + `data-source-field` 引用，文档里只留资源身份。
- *
- * 当前只编译「一条指标带 + 一条栅格」的形态（S2，与迁移前逐字等价）；`split` 与其他区域顺序
- * 返回 `INTENT_LAYOUT_UNSUPPORTED`，等布局求解器（S3）接手。
+ *    素材写 `dataSources` 实例 + `data-source-field` 引用，文档里只留资源身份；
+ * 4. 几何由布局求解器（`solveLayout`）按区域序列一次算定，装不下返回 `LAYOUT_CAPACITY_EXCEEDED`。
  */
 export function compileScreenIntent(input: CompileScreenIntentInput): IntentCompileOutcome {
   const { intent, catalog, references, stream } = input;
   const palette = resolveIntentStyle(intent.style).palette;
   const sink: CompileSink = { diagnostics: [], warnings: [], dataSources: [] };
 
-  const flat = stream === undefined ? flattenRegions(intent) : undefined;
-  if (flat !== undefined && !flat.ok) return { ok: false, diagnostics: flat.diagnostics };
-  const kpis = flat?.ok === true ? flat.kpis : [];
-  const blocks = flat?.ok === true ? flat.blocks : [];
+  const regions = stream === undefined ? regionsOf(intent) : regionsOfSkeleton(stream);
+  const solved = solveLayout(regions.map((region) => region.layout));
+  if (!solved.ok) {
+    return {
+      ok: false,
+      diagnostics: solved.issues.map((issue) => capacityDiagnostic(issue, regions)),
+    };
+  }
 
   const components: CompiledComponent[] = [];
   // 来源表（ADR-0112 §2.1）：组件 id → IR 路径。修复回环靠它把文档诊断翻译回模型能看懂的位置。
@@ -116,10 +150,10 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
     extra: PushExtra = {},
   ): void => {
     const pending = extra.pending === true;
-    const local = pending ? PENDING_LAYER : (counters.get(scope) ?? 0);
+    const where = scopeOf(scope);
+    const local = pending ? where.pendingOffset : (counters.get(scope) ?? 0);
     if (!pending) counters.set(scope, local + 1);
-    const key = scopeKey(scope);
-    const id = pending ? `agent-${key}-pending` : `agent-${key}-${local}`;
+    const id = pending ? `agent-${where.key}-pending` : `agent-${where.key}-${local}`;
     sources[id] = origin;
     components.push({
       id,
@@ -132,7 +166,7 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
         height: Math.max(1, Math.round(box.height)),
       },
       rotation: 0,
-      zIndex: scopeLayer(scope) + local,
+      zIndex: where.layer + local,
       status: { locked: false, hidden: false },
       props: { ...material.defaults.props, ...extra.props },
       style: legibleStyle({ ...material.defaults.style, ...extra.style }),
@@ -194,70 +228,32 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
     { fontSize: 20, color: palette.muted },
   );
 
-  const kpiItems: readonly (IntentKpi | undefined)[] = stream?.kpis ?? kpis.slice(0, MAX_KPIS);
-  composeKpis(
-    kpiItems,
-    Math.min(MAX_KPIS, stream?.skeleton.kpis ?? kpiItems.length),
-    input.mode,
-    { pushSurface, pushText, at },
-    palette,
-    tintedSurfaceStyle(palette.card),
-  );
+  const cardStyle = tintedSurfaceStyle(palette.card);
+  const blockContext = { catalog, textMaterial, push, pushText, references, palette };
+  const blockTarget = { sink, onAsset: () => (imageCount += 1) };
+  const drawBlock = (slot: BlockSlot, box: Box): void => {
+    at(slot.path, slot.block?.origin ?? slot.path);
+    // 流式落稿时这一格还没到：画占位框，内容到了换成真内容。
+    if (slot.block === undefined) pushSurface('占位', box, cardStyle, true);
+    else compileBlock(slot.block, box, blockContext, blockTarget);
+  };
 
-  // 版面只由骨架决定：普通生成时骨架就是意图自己的块；流式落稿时是模型先给的骨架，
-  // 内容按格子落位，还没到的格子画占位框。
-  const slots: BlockSlot[] =
-    stream === undefined
-      ? blocks.map((block, index) => ({
-          span: block.span,
-          data: block.bind.kind === 'table' || block.bind.kind === 'dataset',
-          index,
-          block,
-        }))
-      : stream.skeleton.blocks.map((slot, index) => ({
-          span: slot.span,
-          data: slot.data,
-          index,
-          block: stream.blocks[index],
-        }));
-  const rows = packRows(slots);
-  if (rows.length > 0) {
-    const columnWidth = Math.floor((WIDTH - MARGIN * 2 - GAP * (COLUMNS - 1)) / COLUMNS);
-    // 行高不再平均切：数据块（表格/图表）比文本块更吃纵向空间，按内容权重分配总高。
-    const heights = distributeRowHeights(
-      rows,
-      CONTENT_BOTTOM - BLOCK_TOP - GAP * (rows.length - 1),
-    );
-    let y = BLOCK_TOP;
-    rows.forEach((row, rowIndex) => {
-      // 行内 span 补齐到 4 列：单块独占一行时铺满整行，而不是只占半屏、右边留一片空。
-      const spans = stretchSpans(row);
-      const rowHeight = heights[rowIndex] ?? 240;
-      let offset = 0;
-      row.forEach((slot, blockIndex) => {
-        const span = spans[blockIndex] ?? clamp(slot.span, 1, COLUMNS);
-        const box: Box = {
-          x: MARGIN + offset * (columnWidth + GAP),
-          y,
-          width: columnWidth * span + GAP * (span - 1),
-          height: rowHeight,
-        };
-        const path = `blocks[${slot.index}]`;
-        at(path, slot.block?.origin ?? path);
-        if (slot.block === undefined) {
-          pushSurface('占位', box, tintedSurfaceStyle(palette.card), true);
-        } else {
-          compileBlock(
-            slot.block,
-            box,
-            { catalog, textMaterial, push, pushText, references, palette },
-            { sink, onAsset: () => (imageCount += 1) },
-          );
-        }
-        offset += span;
+  for (const [index, region] of regions.entries()) {
+    const placed = solved.regions[index] as SolvedRegion;
+    if (region.kind === 'band' && placed.kind === 'band') {
+      region.kpis.forEach((slot, slotIndex) => {
+        const box = placed.boxes[slotIndex] as Box;
+        at(slot.path, slot.kpi?.origin ?? slot.path);
+        pushSurface('指标卡', box, cardStyle);
+        // 流式落稿时这一项还没到：只画卡片底板。数值到了在同一张卡上填字，底板 id 与层级不变。
+        if (slot.kpi !== undefined) drawKpi(slot.kpi, box, palette, input.mode, pushText);
       });
-      y += rowHeight + GAP;
-    });
+    } else if (region.kind === 'grid' && placed.kind === 'grid') {
+      region.blocks.forEach((slot, slotIndex) => drawBlock(slot, placed.boxes[slotIndex] as Box));
+    } else if (region.kind === 'split' && placed.kind === 'split') {
+      region.main.forEach((slot, slotIndex) => drawBlock(slot, placed.main[slotIndex] as Box));
+      region.rail.forEach((slot, slotIndex) => drawBlock(slot, placed.rail[slotIndex] as Box));
+    }
   }
 
   const modeLabel =
@@ -308,84 +304,169 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
   };
 }
 
-type Flat =
-  | {
-      readonly ok: true;
-      readonly kpis: readonly IntentKpi[];
-      readonly blocks: readonly IntentBlock[];
-    }
-  | { readonly ok: false; readonly diagnostics: readonly IntentDiagnostic[] };
+// ---------------------------------------------------------------------------
+// 区域：意图 / 骨架 → 编译用区域
+// ---------------------------------------------------------------------------
 
-/** 把区域序列压成「指标带 + 栅格」；其它形态在 S3 之前不编译，如实报出来。 */
-function flattenRegions(intent: ScreenIntent): Flat {
-  const kpis: IntentKpi[] = [];
-  const blocks: IntentBlock[] = [];
-  const diagnostics: IntentDiagnostic[] = [];
-  let sawBand = false;
-  let sawGrid = false;
-  for (const [index, region] of intent.regions.entries()) {
-    if (region.kind === 'band' && !sawBand && !sawGrid) {
-      sawBand = true;
-      kpis.push(...region.items);
-    } else if (region.kind === 'grid' && !sawGrid) {
-      sawGrid = true;
-      blocks.push(...region.blocks);
-    } else {
-      diagnostics.push({
-        severity: 'error',
-        code: 'INTENT_LAYOUT_UNSUPPORTED',
-        path: `regions[${index}]`,
-        message: '目前只能编译「一条指标带 + 一条栅格」的版面，这个区域暂不支持。',
-      });
-    }
-  }
-  return diagnostics.length > 0 ? { ok: false, diagnostics } : { ok: true, kpis, blocks };
+/** 平铺写法的区域沿用 `kpis` / `blocks` 路径；区域写法按位置记 `regions[i]`。 */
+function regionPath(region: { readonly origin: string }, position: number): string {
+  return region.origin === 'kpis' || region.origin === 'blocks'
+    ? region.origin
+    : `regions[${position}]`;
 }
 
-function composeKpis(
-  items: readonly (IntentKpi | undefined)[],
-  count: number,
-  mode: CompileScreenIntentInput['mode'],
-  context: {
-    pushSurface: (name: string, box: Box, style?: Record<string, ScreenJsonValue>) => void;
-    pushText: (name: string, value: string, box: Box, token?: TextToken, sample?: boolean) => void;
-    at: (path: string, from?: string) => void;
-  },
-  palette: IntentStylePalette,
-  cardStyle: Record<string, ScreenJsonValue>,
-): void {
-  if (count === 0) return;
-  const width = Math.floor((WIDTH - MARGIN * 2 - GAP * (count - 1)) / count);
-  for (let index = 0; index < count; index += 1) {
-    const kpi = items[index];
-    const x = MARGIN + index * (width + GAP);
-    const path = `kpis[${index}]`;
-    context.at(path, kpi?.origin ?? path);
-    context.pushSurface('指标卡', { x, y: KPI_Y, width, height: KPI_HEIGHT }, cardStyle);
-    // 流式落稿时这一项还没到：只画卡片底板。数值到了在同一张卡上填字，底板 id 与层级不变。
-    if (kpi === undefined) continue;
-    context.pushText(
-      '指标名',
-      kpi.label,
-      { x: x + 20, y: KPI_Y + 18, width: width - 40, height: 26 },
-      { fontSize: 18, color: palette.muted },
-    );
-    // 模型给的指标值是示例数据；兜底的占位（value 为 null）不是数，不打标记。
-    context.pushText(
-      '指标值',
-      formatKpiValue(kpi),
-      { x: x + 20, y: KPI_Y + 50, width: width - 40, height: 54 },
-      { fontSize: 42, fontWeight: '700', color: palette.text },
-      mode === 'llm' && kpi.value !== null,
-    );
-    if (kpi.delta !== undefined) {
-      context.pushText(
-        '同比',
-        formatKpiDelta(kpi),
-        { x: x + 20, y: KPI_Y + 108, width: width - 40, height: 24 },
-        { fontSize: 16, color: deltaColor(kpi.delta, palette) },
-      );
+/** 格子的位置路径：决定组件 id 与层级。 */
+function slotPath(path: string, part: 'items' | 'blocks' | 'main' | 'rail', index: number): string {
+  if (path === 'kpis' || path === 'blocks') return `${path}[${index}]`;
+  return `${path}.${part}[${index}]`;
+}
+
+const isData = (block: IntentBlock): boolean =>
+  block.bind.kind === 'table' || block.bind.kind === 'dataset';
+
+function regionsOf(intent: ScreenIntent): CompileRegion[] {
+  return intent.regions.map((region: IntentRegion, position): CompileRegion => {
+    const path = regionPath(region, position);
+    const slots = (items: readonly IntentBlock[], part: 'blocks' | 'main' | 'rail') =>
+      items.map((block, index): BlockSlot => ({ path: slotPath(path, part, index), block }));
+    if (region.kind === 'band') {
+      const flat = path === 'kpis';
+      const items = flat ? region.items.slice(0, FLAT_MAX_KPIS) : region.items;
+      return {
+        kind: 'band',
+        path,
+        origin: region.origin,
+        layout: { kind: 'band', count: items.length },
+        kpis: items.map((kpi, index): KpiSlot => ({ path: slotPath(path, 'items', index), kpi })),
+      };
     }
+    if (region.kind === 'grid') {
+      return {
+        kind: 'grid',
+        path,
+        origin: region.origin,
+        layout: {
+          kind: 'grid',
+          slots: region.blocks.map((block) => ({ span: block.span, data: isData(block) })),
+        },
+        blocks: slots(region.blocks, 'blocks'),
+      };
+    }
+    return {
+      kind: 'split',
+      path,
+      origin: region.origin,
+      layout: {
+        kind: 'split',
+        ratio: region.ratio,
+        railSide: region.railSide,
+        main: region.main.map((block) => ({ data: isData(block) })),
+        rail: region.rail.map((block) => ({ data: isData(block) })),
+      },
+      main: slots(region.main, 'main'),
+      rail: slots(region.rail, 'rail'),
+    };
+  });
+}
+
+function regionsOfSkeleton(frame: IntentStreamFrame): CompileRegion[] {
+  const { skeleton } = frame;
+  return skeleton.regions.map((region: IntentSkeletonRegion, position): CompileRegion => {
+    const path = skeletonRegionPath(skeleton, region, position);
+    const slots = (count: number, part: 'blocks' | 'main' | 'rail'): BlockSlot[] =>
+      Array.from({ length: count }, (_, index) => {
+        const where = slotPath(path, part, index);
+        return { path: where, block: frame.blocks[where] };
+      });
+    if (region.kind === 'band') {
+      const count = skeleton.flat === true ? Math.min(region.count, FLAT_MAX_KPIS) : region.count;
+      return {
+        kind: 'band',
+        path,
+        origin: path,
+        layout: { kind: 'band', count },
+        kpis: Array.from({ length: count }, (_, index): KpiSlot => {
+          const where = slotPath(path, 'items', index);
+          return { path: where, kpi: frame.kpis[where] };
+        }),
+      };
+    }
+    if (region.kind === 'grid') {
+      return {
+        kind: 'grid',
+        path,
+        origin: path,
+        layout: { kind: 'grid', slots: region.slots },
+        blocks: slots(region.slots.length, 'blocks'),
+      };
+    }
+    return {
+      kind: 'split',
+      path,
+      origin: path,
+      layout: region,
+      main: slots(region.main.length, 'main'),
+      rail: slots(region.rail.length, 'rail'),
+    };
+  });
+}
+
+function skeletonRegionPath(
+  skeleton: IntentSkeleton,
+  region: IntentSkeletonRegion,
+  position: number,
+): string {
+  if (skeleton.flat === true) return region.kind === 'band' ? 'kpis' : 'blocks';
+  return `regions[${position}]`;
+}
+
+function capacityDiagnostic(
+  issue: LayoutCapacityIssue,
+  regions: readonly CompileRegion[],
+): IntentDiagnostic {
+  const region = regions[issue.regionIndex];
+  const path = region?.origin ?? '';
+  const message =
+    issue.reason === 'width'
+      ? `The band needs ${issue.requiredPx}px to keep every card at least 240px wide, but only ${issue.availablePx}px is available; use fewer cards.`
+      : `The regions need ${issue.requiredPx}px of height but only ${issue.availablePx}px is available (short by ${issue.requiredPx - issue.availablePx}px); use fewer blocks.`;
+  return { severity: 'error', code: 'LAYOUT_CAPACITY_EXCEEDED', path, message };
+}
+
+// ---------------------------------------------------------------------------
+// 指标卡
+// ---------------------------------------------------------------------------
+
+function drawKpi(
+  kpi: IntentKpi,
+  box: Box,
+  palette: IntentStylePalette,
+  mode: CompileScreenIntentInput['mode'],
+  pushText: (name: string, value: string, box: Box, token?: TextToken, sample?: boolean) => void,
+): void {
+  const innerWidth = box.width - KPI_CARD_PADDING * 2;
+  const x = box.x + KPI_CARD_PADDING;
+  pushText(
+    '指标名',
+    kpi.label,
+    { x, y: box.y + 18, width: innerWidth, height: 26 },
+    { fontSize: 18, color: palette.muted },
+  );
+  // 模型给的指标值是示例数据；兜底的占位（value 为 null）不是数，不打标记。
+  pushText(
+    '指标值',
+    formatKpiValue(kpi),
+    { x, y: box.y + 50, width: innerWidth, height: 54 },
+    { fontSize: 42, fontWeight: '700', color: palette.text },
+    mode === 'llm' && kpi.value !== null,
+  );
+  if (kpi.delta !== undefined) {
+    pushText(
+      '同比',
+      formatKpiDelta(kpi),
+      { x, y: box.y + 108, width: innerWidth, height: 24 },
+      { fontSize: 16, color: deltaColor(kpi.delta, palette) },
+    );
   }
 }
 
@@ -433,27 +514,49 @@ function legibleStyle(style: Record<string, ScreenJsonValue>): Record<string, Sc
     : style;
 }
 
-/** 占位框的层级偏移：落在该块的层级区间末尾，不与块内组件冲突。 */
-const PENDING_LAYER = 19;
+// ---------------------------------------------------------------------------
+// id 与层级：位置路径 → 片段
+// ---------------------------------------------------------------------------
 
-/** IR 路径 → id 片段：`kpis[1]` → `kpi-1`，`blocks[2]` → `block-2`，编译器自有内容（页脚）→ `footer`。 */
-function scopeKey(path: string): string {
-  const match = /^(kpis|blocks)\[(\d+)\]$/.exec(path);
-  if (match !== null) return `${match[1] === 'kpis' ? 'kpi' : 'block'}-${match[2]}`;
-  return path === '' ? 'footer' : path;
+interface Scope {
+  readonly key: string;
+  /** 该来源的层级起点；来源内按先后叠放。 */
+  readonly layer: number;
+  /** 占位框的层级偏移：落在该来源区间的末尾，不与格内组件冲突。 */
+  readonly pendingOffset: number;
 }
 
+const REGION_PART_KEY = { items: 'k', blocks: 'b', main: 'm', rail: 's' } as const;
+const REGION_PART_LAYER = { items: 0, blocks: 0, main: 0, rail: 64 } as const;
+
 /**
- * 每个来源的层级区间：标题 1、副标题 2、第 i 张指标卡 10+10i、第 i 块 100+20i、页脚 1000。
- * 区间内按该来源里的先后叠放；区间之间互不重叠，所以哪一处先到都不影响别处的层级。
+ * 位置路径 → id 片段与层级区间：
+ * - 平铺写法：`kpis[1]` → `kpi-1`（层级 10+10i）、`blocks[2]` → `block-2`（层级 100+20i）；
+ * - 区域写法：`regions[1].blocks[2]` → `r1-b2`，层级 100 + 140r 起，格内 8 层；
+ * - 标题 1、副标题 2、编译器自有内容（页脚）→ `footer`，层级 1000。
+ * 区间互不重叠于同一屏的可见内容，所以哪一处先到都不影响别处的层级。
  */
-function scopeLayer(path: string): number {
-  if (path === 'title') return 1;
-  if (path === 'subtitle') return 2;
-  const match = /^(kpis|blocks)\[(\d+)\]$/.exec(path);
-  if (match !== null) {
-    const index = Number(match[2]);
-    return match[1] === 'kpis' ? 10 + index * 10 : 100 + index * 20;
+function scopeOf(path: string): Scope {
+  if (path === 'title') return { key: 'title', layer: 1, pendingOffset: 19 };
+  if (path === 'subtitle') return { key: 'subtitle', layer: 2, pendingOffset: 19 };
+  if (path === '') return { key: 'footer', layer: 1000, pendingOffset: 19 };
+  const flat = /^(kpis|blocks)\[(\d+)\]$/.exec(path);
+  if (flat !== null) {
+    const index = Number(flat[2]);
+    return flat[1] === 'kpis'
+      ? { key: `kpi-${index}`, layer: 10 + index * 10, pendingOffset: 19 }
+      : { key: `block-${index}`, layer: 100 + index * 20, pendingOffset: 19 };
   }
-  return 1000;
+  const region = /^regions\[(\d+)\]\.(items|blocks|main|rail)\[(\d+)\]$/.exec(path);
+  if (region !== null) {
+    const part = region[2] as keyof typeof REGION_PART_KEY;
+    const r = Number(region[1]);
+    const index = Number(region[3]);
+    return {
+      key: `r${r}-${REGION_PART_KEY[part]}${index}`,
+      layer: 100 + r * 140 + REGION_PART_LAYER[part] + index * 8,
+      pendingOffset: 7,
+    };
+  }
+  return { key: path, layer: 1000, pendingOffset: 19 };
 }

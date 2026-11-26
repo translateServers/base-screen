@@ -137,6 +137,9 @@ export const DEFAULT_INTENT_STYLE: IntentStylePresetId;
 type DescribeRequest = Parameters<ScreenHostDatasetPort['describe']>[0];
 
 // @public
+export function flatSkeleton(kpis: number, blocks: readonly IntentSkeletonSlot[]): IntentSkeleton;
+
+// @public
 export function formatKpiDelta(kpi: KpiValueInput & {
     readonly delta?: IntentKpiDelta;
 }): string;
@@ -337,6 +340,7 @@ export interface IntentBand {
     readonly items: readonly IntentKpi[];
     // (undocumented)
     readonly kind: 'band';
+    readonly origin: string;
 }
 
 // @public
@@ -474,6 +478,7 @@ export interface IntentGrid {
     readonly blocks: readonly IntentBlock[];
     // (undocumented)
     readonly kind: 'grid';
+    readonly origin: string;
 }
 
 // @public
@@ -536,11 +541,29 @@ export type IntentRegion = IntentBand | IntentGrid | IntentSplit;
 
 // @public
 export interface IntentSkeleton {
+    readonly flat?: true;
     // (undocumented)
-    readonly blocks: readonly IntentSkeletonSlot[];
-    // (undocumented)
-    readonly kpis: number;
+    readonly regions: readonly IntentSkeletonRegion[];
 }
+
+// @public (undocumented)
+export type IntentSkeletonRegion = {
+    readonly kind: 'band';
+    readonly count: number;
+} | {
+    readonly kind: 'grid';
+    readonly slots: readonly IntentSkeletonSlot[];
+} | {
+    readonly kind: 'split';
+    readonly ratio: 'wide-narrow' | 'even';
+    readonly railSide: 'left' | 'right';
+    readonly main: readonly {
+        readonly data: boolean;
+    }[];
+    readonly rail: readonly {
+        readonly data: boolean;
+    }[];
+};
 
 // @public (undocumented)
 export interface IntentSkeletonSlot {
@@ -556,6 +579,8 @@ export interface IntentSplit {
     // (undocumented)
     readonly main: readonly IntentBlock[];
     // (undocumented)
+    readonly origin: string;
+    // (undocumented)
     readonly rail: readonly IntentBlock[];
     readonly railSide: 'left' | 'right';
     readonly ratio: 'wide-narrow' | 'even';
@@ -564,9 +589,9 @@ export interface IntentSplit {
 // @public
 export interface IntentStreamFrame {
     // (undocumented)
-    readonly blocks: readonly (IntentBlock | undefined)[];
+    readonly blocks: Readonly<Record<string, IntentBlock>>;
     // (undocumented)
-    readonly kpis: readonly (IntentKpi | undefined)[];
+    readonly kpis: Readonly<Record<string, IntentKpi>>;
     // (undocumented)
     readonly skeleton: IntentSkeleton;
 }
@@ -622,6 +647,42 @@ export interface KpiValueInput {
 }
 
 // @public (undocumented)
+export interface LayoutCapacityIssue {
+    // (undocumented)
+    readonly availablePx: number;
+    readonly reason: 'height' | 'width';
+    // (undocumented)
+    readonly regionIndex: number;
+    // (undocumented)
+    readonly requiredPx: number;
+}
+
+// @public (undocumented)
+export type LayoutRegion = {
+    readonly kind: 'band';
+    readonly count: number;
+} | {
+    readonly kind: 'grid';
+    readonly slots: readonly LayoutSlot[];
+} | {
+    readonly kind: 'split';
+    readonly ratio: 'wide-narrow' | 'even';
+    readonly railSide: 'left' | 'right';
+    readonly main: readonly {
+        readonly data: boolean;
+    }[];
+    readonly rail: readonly {
+        readonly data: boolean;
+    }[];
+};
+
+// @public (undocumented)
+export interface LayoutSlot {
+    readonly data: boolean;
+    readonly span: number;
+}
+
+// @public (undocumented)
 type ListRequest = Parameters<ScreenHostDatasetPort['list']>[0];
 
 // @public (undocumented)
@@ -672,6 +733,31 @@ export interface ScreenIntent {
     // (undocumented)
     readonly title: string;
 }
+
+// @public
+export type SolvedRegion = {
+    readonly kind: 'band';
+    readonly boxes: readonly Box[];
+} | {
+    readonly kind: 'grid';
+    readonly boxes: readonly Box[];
+} | {
+    readonly kind: 'split';
+    readonly main: readonly Box[];
+    readonly rail: readonly Box[];
+};
+
+// @public (undocumented)
+export function solveLayout(regions: readonly LayoutRegion[]): SolveOutcome;
+
+// @public (undocumented)
+export type SolveOutcome = {
+    readonly ok: true;
+    readonly regions: readonly SolvedRegion[];
+} | {
+    readonly ok: false;
+    readonly issues: readonly LayoutCapacityIssue[];
+};
 
 // @public (undocumented)
 export interface SseSubscribeOptions<Request> {

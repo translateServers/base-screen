@@ -48,12 +48,17 @@ export interface IntentReferences {
 }
 
 /**
- * 版面骨架（ADR-0112 §2.5）：整屏几何只由它决定——指标个数，以及每块占几列、是不是数据型。
- * 流式落稿时模型先给骨架，编译器据此一次算定全部位置；之后到达的内容只往格子里填。
+ * 版面骨架（ADR-0112 §2.5 / ADR-0113 §2.3）：整屏几何只由它决定——区域序列，以及每个区域里
+ * 有几格、每块占几列、是不是数据型。流式落稿时模型先给骨架，编译器据此一次算定全部位置；
+ * 之后到达的内容只往格子里填。
  */
 export interface IntentSkeleton {
-  readonly kpis: number;
-  readonly blocks: readonly IntentSkeletonSlot[];
+  readonly regions: readonly IntentSkeletonRegion[];
+  /**
+   * 平铺写法（`kpis` + `blocks`）：区域路径记为 `kpis` / `blocks`，格子路径为 `kpis[i]` / `blocks[i]`，
+   * 组件 id 沿用 `agent-kpi-i-*` / `agent-block-i-*`。
+   */
+  readonly flat?: true;
 }
 
 export interface IntentSkeletonSlot {
@@ -62,11 +67,34 @@ export interface IntentSkeletonSlot {
   readonly data: boolean;
 }
 
-/** 流式落稿的一帧：按骨架排版，`kpis[i]` / `blocks[i]` 落进骨架第 i 格，缺的格子画占位。 */
+export type IntentSkeletonRegion =
+  | { readonly kind: 'band'; readonly count: number }
+  | { readonly kind: 'grid'; readonly slots: readonly IntentSkeletonSlot[] }
+  | {
+      readonly kind: 'split';
+      readonly ratio: 'wide-narrow' | 'even';
+      readonly railSide: 'left' | 'right';
+      readonly main: readonly { readonly data: boolean }[];
+      readonly rail: readonly { readonly data: boolean }[];
+    };
+
+/** 平铺写法的骨架：一条指标带（`kpis` > 0 时）+ 一条栅格（有块时）。 */
+export function flatSkeleton(kpis: number, blocks: readonly IntentSkeletonSlot[]): IntentSkeleton {
+  const regions: IntentSkeletonRegion[] = [];
+  if (kpis > 0) regions.push({ kind: 'band', count: kpis });
+  if (blocks.length > 0) regions.push({ kind: 'grid', slots: blocks });
+  return { regions, flat: true };
+}
+
+/**
+ * 流式落稿的一帧：按骨架排版，格子路径 → 已到达的内容；没到的格子画占位。
+ * 格子路径是位置路径：平铺写法 `kpis[1]` / `blocks[0]`，区域写法 `regions[1].items[0]` /
+ * `regions[2].blocks[1]` / `regions[3].main[0]` / `regions[3].rail[2]`。
+ */
 export interface IntentStreamFrame {
   readonly skeleton: IntentSkeleton;
-  readonly kpis: readonly (IntentKpi | undefined)[];
-  readonly blocks: readonly (IntentBlock | undefined)[];
+  readonly kpis: Readonly<Record<string, IntentKpi>>;
+  readonly blocks: Readonly<Record<string, IntentBlock>>;
 }
 
 export interface IntentCompileResult {

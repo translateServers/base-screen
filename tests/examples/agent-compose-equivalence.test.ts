@@ -24,6 +24,7 @@ import {
 import { auditScreenLayout } from '../../packages/core/src/index.js';
 import {
   compileScreenIntent,
+  flatSkeleton,
   formatKpiDelta,
   formatKpiValue,
   INTENT_STYLE_PRESET_IDS,
@@ -317,6 +318,7 @@ describe('ADR-0113 S2 · 编译器迁移前后等价', () => {
         data: block.table !== undefined || (block.datasetId ?? '') !== '',
       })),
     };
+    const skeleton = flatSkeleton(layout.kpis, layout.blocks);
     const kpiAt = (index: number) => parseIntentKpi(item.kpis[index], `kpis[${index}]`).value;
     const blockAt = (index: number) =>
       parseIntentBlock(item.blocks[index], COMPILE_CATALOG, `blocks[${index}]`, { grid: true })
@@ -331,9 +333,13 @@ describe('ADR-0113 S2 · 编译器迁移前后等价', () => {
           blocks: item.blocks.map((block, index) => (index < blockCount ? block : undefined)),
         };
         const nextFrame: IntentStreamFrame = {
-          skeleton: layout,
-          kpis: item.kpis.map((_, index) => (index < kpiCount ? kpiAt(index) : undefined)),
-          blocks: item.blocks.map((_, index) => (index < blockCount ? blockAt(index) : undefined)),
+          skeleton,
+          kpis: Object.fromEntries(
+            Array.from({ length: kpiCount }, (_, index) => [`kpis[${index}]`, kpiAt(index)]),
+          ) as IntentStreamFrame['kpis'],
+          blocks: Object.fromEntries(
+            Array.from({ length: blockCount }, (_, index) => [`blocks[${index}]`, blockAt(index)]),
+          ) as IntentStreamFrame['blocks'],
         };
         const next = compileScreenIntent({
           intent,
@@ -366,9 +372,14 @@ describe('ADR-0113 S2 · 编译器迁移前后等价', () => {
       blocks: [CHART as AgentBlock],
     };
     const nextFrame: IntentStreamFrame = {
-      skeleton: layout,
-      kpis: [parseIntentKpi(KPIS[0], 'kpis[0]').value, parseIntentKpi(KPIS[1], 'kpis[1]').value],
-      blocks: [parseIntentBlock(CHART, COMPILE_CATALOG, 'blocks[0]', { grid: true }).value],
+      skeleton: flatSkeleton(layout.kpis, layout.blocks),
+      kpis: {
+        'kpis[0]': parseIntentKpi(KPIS[0], 'kpis[0]').value,
+        'kpis[1]': parseIntentKpi(KPIS[1], 'kpis[1]').value,
+      } as IntentStreamFrame['kpis'],
+      blocks: {
+        'blocks[0]': parseIntentBlock(CHART, COMPILE_CATALOG, 'blocks[0]', { grid: true }).value,
+      } as IntentStreamFrame['blocks'],
     };
     const next = compileScreenIntent({ intent, catalog: COMPILE_CATALOG, stream: nextFrame });
     expectSameOutcome(next, legacyCompose(item, undefined, undefined, legacyFrame));

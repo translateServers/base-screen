@@ -1,8 +1,11 @@
+import { parseScreenDocument } from '@base-screen/contracts';
+import { auditScreenLayout } from '@base-screen/core';
 import { describe, expect, it } from 'vitest';
 import {
   type CompiledComponent,
   type CompiledScreenDocument,
   compileScreenIntent,
+  flatSkeleton,
   type IntentCatalog,
   type IntentCompileResult,
   type IntentStreamFrame,
@@ -145,6 +148,7 @@ describe('compileScreenIntent', () => {
         {
           kind: 'band',
           items: [{ label: '缺数', value: null, origin: 'kpis[0]' }],
+          origin: 'kpis',
         },
       ],
     };
@@ -314,9 +318,10 @@ describe('compileScreenIntent', () => {
         title: '指标',
         subtitle: '口径',
         regions: [
-          { kind: 'band', items: [{ label: '量', value: 1, origin: 'kpis[0]' }] },
+          { kind: 'band', items: [{ label: '量', value: 1, origin: 'kpis[0]' }], origin: 'kpis' },
           {
             kind: 'grid',
+            origin: 'blocks',
             blocks: [
               {
                 type: 'base.heatmap',
@@ -343,50 +348,6 @@ describe('compileScreenIntent', () => {
       ]);
       expect(nodes(result.document).some((node) => node.name === '要点')).toBe(true);
     });
-  });
-
-  it('refuses a region layout it cannot compile yet, saying where', () => {
-    const intent = intentOf(flatOutput([CHART]));
-    const split: ScreenIntent = {
-      ...intent,
-      regions: [
-        ...intent.regions,
-        {
-          kind: 'split',
-          ratio: 'wide-narrow',
-          railSide: 'right',
-          main: [
-            {
-              type: 'base.text',
-              title: 'a',
-              span: 1,
-              bind: { kind: 'text', text: '甲' },
-              origin: 'regions[2].main[0]',
-            },
-          ],
-          rail: [
-            {
-              type: 'base.text',
-              title: 'b',
-              span: 1,
-              bind: { kind: 'text', text: '乙' },
-              origin: 'regions[2].rail[0]',
-            },
-          ],
-        },
-      ],
-    };
-    const outcome = compileScreenIntent({ intent: split, catalog: COMPILE_CATALOG });
-
-    expect(outcome.ok).toBe(false);
-    if (outcome.ok) return;
-    expect(outcome.diagnostics).toEqual([
-      expect.objectContaining({
-        severity: 'error',
-        code: 'INTENT_LAYOUT_UNSUPPORTED',
-        path: 'regions[2]',
-      }),
-    ]);
   });
 
   it('fails the whole screen when the catalog has nothing to lay out with', () => {
@@ -424,13 +385,10 @@ describe('compileScreenIntent', () => {
 });
 
 describe('compileScreenIntent · streaming frame', () => {
-  const skeleton = {
-    kpis: 3,
-    blocks: [
-      { span: 2, data: true },
-      { span: 2, data: false },
-    ],
-  } as const;
+  const skeleton = flatSkeleton(3, [
+    { span: 2, data: true },
+    { span: 2, data: false },
+  ]);
   const output = flatOutput([CHART, NOTE]);
   const intent = intentOf(output);
   const kpiAt = (index: number) =>
@@ -440,8 +398,16 @@ describe('compileScreenIntent · streaming frame', () => {
       grid: true,
     }).value;
 
-  function frame(parts: Partial<IntentStreamFrame> = {}): IntentStreamFrame {
-    return { skeleton, kpis: [], blocks: [], ...parts };
+  function frame(kpis: number[], blocks: number[]): IntentStreamFrame {
+    return {
+      skeleton,
+      kpis: Object.fromEntries(
+        kpis.map((i) => [`kpis[${i}]`, kpiAt(i)]),
+      ) as IntentStreamFrame['kpis'],
+      blocks: Object.fromEntries(
+        blocks.map((i) => [`blocks[${i}]`, blockAt(i)]),
+      ) as IntentStreamFrame['blocks'],
+    };
   }
 
   function geometry(document: CompiledScreenDocument) {
@@ -451,7 +417,11 @@ describe('compileScreenIntent · streaming frame', () => {
   }
 
   it('draws a placeholder per unarrived slot, with a stable id and no content counter', () => {
-    const outcome = compileScreenIntent({ intent, catalog: COMPILE_CATALOG, stream: frame() });
+    const outcome = compileScreenIntent({
+      intent,
+      catalog: COMPILE_CATALOG,
+      stream: frame([], []),
+    });
     if (!outcome.ok) throw new Error('compile failed');
 
     const ids = nodes(outcome.value.document).map((node) => node.id);
@@ -465,12 +435,12 @@ describe('compileScreenIntent · streaming frame', () => {
     const first = compileScreenIntent({
       intent,
       catalog: COMPILE_CATALOG,
-      stream: frame({ kpis: [kpiAt(0), undefined, undefined] }),
+      stream: frame([0], []),
     });
     const second = compileScreenIntent({
       intent,
       catalog: COMPILE_CATALOG,
-      stream: frame({ kpis: [kpiAt(0), kpiAt(1), kpiAt(2)], blocks: [blockAt(0), undefined] }),
+      stream: frame([0, 1, 2], [0]),
     });
     if (!first.ok || !second.ok) throw new Error('compile failed');
 
@@ -491,14 +461,191 @@ describe('compileScreenIntent · streaming frame', () => {
       intent,
       catalog: COMPILE_CATALOG,
       mode: 'llm',
-      stream: frame({
-        kpis: [kpiAt(0), kpiAt(1), kpiAt(2)],
-        blocks: [blockAt(0), blockAt(1)],
-      }),
+      stream: frame([0, 1, 2], [0, 1]),
     });
     if (!streamed.ok) throw new Error('compile failed');
 
     expect(streamed.value.document).toEqual(plain.document);
     expect(streamed.value.sources).toEqual(plain.sources);
+  });
+});
+
+describe('compileScreenIntent · regions', () => {
+  const text = (title: string, extra: Record<string, unknown> = {}) => ({
+    type: 'base.text',
+    title,
+    text: '甲\n乙',
+    ...extra,
+  });
+  const regionsOutput = (regions: unknown[]) => ({
+    title: '仓储作战室',
+    subtitle: '按日汇总的出入库口径',
+    regions,
+  });
+  const band = {
+    kind: 'band',
+    items: [
+      { label: '总量', value: 286000, unit: '件' },
+      { label: '周转', value: 31.4, unit: '天' },
+    ],
+  };
+
+  it('lays a split out as a wide main column and a narrow rail on the right', () => {
+    const intent = intentOf(
+      regionsOutput([
+        band,
+        {
+          kind: 'split',
+          main: [{ type: 'base.chart', title: '趋势', table: TREND_TABLE }],
+          rail: [text('要点'), text('提醒')],
+        },
+      ]),
+    );
+    const { document, sources } = compileOk(intent);
+    const chart = named(document, '趋势');
+    const rail = nodes(document).filter((node) => node.name === '要点' || node.name === '提醒');
+
+    // 主区约占三列，侧栏占一列且在主区右侧，纵向堆叠两格。
+    expect(chart.size.width).toBeGreaterThan(1200);
+    const [first, second] = rail;
+    expect(first?.position.x).toBeGreaterThan(chart.position.x + chart.size.width);
+    expect(first?.position.x).toBe(second?.position.x);
+    expect(first?.position.y).toBeLessThan(second?.position.y ?? 0);
+    // id 带区域序号，来源表指回模型原文。
+    expect(nodes(document).map((node) => node.id)).toEqual(
+      expect.arrayContaining(['agent-r0-k0-0', 'agent-r1-m0-0', 'agent-r1-s0-0', 'agent-r1-s1-0']),
+    );
+    expect(sources['agent-r1-m0-1']).toBe('regions[1].main[0]');
+    expect(sources['agent-r1-s1-1']).toBe('regions[1].rail[1]');
+  });
+
+  it('puts the rail on the left when asked, and splits even columns evenly', () => {
+    const base = (extra: Record<string, unknown>) =>
+      compileOk(
+        intentOf(
+          regionsOutput([
+            band,
+            {
+              kind: 'split',
+              ...extra,
+              main: [{ type: 'base.chart', title: '趋势', table: TREND_TABLE }],
+              rail: [text('要点')],
+            },
+          ]),
+        ),
+      ).document;
+
+    const left = base({ railSide: 'left' });
+    expect(named(left, '要点').position.x).toBeLessThan(named(left, '趋势').position.x);
+
+    const even = base({ ratio: 'even' });
+    expect(named(even, '趋势').size.width).toBe(named(even, '要点').size.width);
+  });
+
+  it('stacks regions from top to bottom and gives data regions more height', () => {
+    const intent = intentOf(
+      regionsOutput([
+        band,
+        {
+          kind: 'grid',
+          blocks: [{ type: 'base.chart', title: '趋势', span: 4, table: TREND_TABLE }],
+        },
+        { kind: 'grid', blocks: [text('结论', { span: 4 })] },
+      ]),
+    );
+    const { document } = compileOk(intent);
+    const chart = named(document, '趋势');
+    const note = named(document, '结论');
+
+    expect(note.position.y).toBeGreaterThan(chart.position.y);
+    expect(chart.size.height).toBeGreaterThan(note.size.height);
+    // 最下面的块不越过页脚上方。
+    expect(note.position.y + note.size.height).toBeLessThanOrEqual(1010);
+  });
+
+  it('works without a band, starting right below the header', () => {
+    const intent = intentOf(
+      regionsOutput([
+        {
+          kind: 'grid',
+          blocks: [{ type: 'base.chart', title: '趋势', span: 4, table: TREND_TABLE }],
+        },
+      ]),
+    );
+    const { document } = compileOk(intent);
+
+    expect(nodes(document).some((node) => node.name === '指标卡')).toBe(false);
+    // 区域从 172 起；块标题占 36、内边距 16，图表落在 224。
+    expect(named(document, '块标题').position.y).toBe(172);
+    expect(named(document, '趋势').position.y).toBe(224);
+  });
+
+  it('reports a capacity conflict naming the region and how far short it is', () => {
+    const grid = (index: number) => ({
+      kind: 'grid',
+      blocks: [text(`块${index}`, { span: 4 })],
+    });
+    const outcome = compileScreenIntent({
+      intent: intentOf(regionsOutput([band, grid(0), grid(1), grid(2), grid(3), grid(4)])),
+      catalog: COMPILE_CATALOG,
+    });
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.diagnostics).toEqual([
+      expect.objectContaining({
+        severity: 'error',
+        code: 'LAYOUT_CAPACITY_EXCEEDED',
+        message: expect.stringContaining('short by'),
+      }),
+    ]);
+    expect(outcome.diagnostics[0]?.path).toMatch(/^regions\[\d\]$/);
+  });
+
+  it('reports a band with too many cards instead of squeezing them', () => {
+    const items = Array.from({ length: 8 }, (_, index) => ({
+      label: `指标${index}`,
+      value: index,
+    }));
+    const outcome = compileScreenIntent({
+      intent: intentOf(
+        regionsOutput([
+          { kind: 'band', items },
+          { kind: 'grid', blocks: [text('要点', { span: 4 })] },
+        ]),
+      ),
+      catalog: COMPILE_CATALOG,
+    });
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.diagnostics).toEqual([
+      expect.objectContaining({ code: 'LAYOUT_CAPACITY_EXCEEDED', path: 'regions[0]' }),
+    ]);
+  });
+
+  it('keeps every compiled region screen free of layout violations', () => {
+    const intent = intentOf(
+      regionsOutput([
+        band,
+        {
+          kind: 'split',
+          main: [{ type: 'base.chart', title: '趋势', table: TREND_TABLE }],
+          rail: [text('要点'), text('提醒')],
+        },
+        {
+          kind: 'grid',
+          blocks: [
+            { type: 'base.table', title: '明细', span: 3, table: TREND_TABLE },
+            text('结论', { span: 1 }),
+          ],
+        },
+      ]),
+    );
+    const { document } = compileOk(intent, { mode: 'llm' });
+    const parsed = parseScreenDocument(document);
+
+    expect(parsed.ok, JSON.stringify(parsed.diagnostics)).toBe(true);
+    if (parsed.ok) expect(auditScreenLayout(parsed.value)).toEqual([]);
   });
 });
