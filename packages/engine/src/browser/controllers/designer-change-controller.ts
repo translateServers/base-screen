@@ -63,6 +63,8 @@ export class DesignerChangeController {
   #comparing = false;
   /** 草案层挂的是整份候选（画布级变化或子集挂载失败时），还是只挂受影响组件。 */
   #ghostFull = false;
+  /** 流式落稿中（ADR-0112 §2.5）：草案逐块填充，完成前不可采纳。 */
+  #streaming = false;
   #confirmAll = false;
   #feedback: DesignerChangeFeedback | undefined;
   #ghostHandlers: DesignerChangeGhostHandlers | undefined;
@@ -100,6 +102,7 @@ export class DesignerChangeController {
     this.#rightPanel = undefined;
     this.#input = undefined;
     this.#proposal = undefined;
+    this.#streaming = false;
     this.#paneMode = 'inspector';
     this.#lastRenderedPaneMode = undefined;
     this.#comparing = false;
@@ -151,6 +154,47 @@ export class DesignerChangeController {
 
   get pending(): DesignerChangeProposal | undefined {
     return this.#proposal;
+  }
+
+  get streaming(): boolean {
+    return this.#proposal !== undefined && this.#streaming;
+  }
+
+  /** 以「生成中」挂出骨架草案（ADR-0112 §2.5）；与 submit 同样不替换已有草案。 */
+  beginStream(proposal: DesignerChangeProposal, input: DesignerChangeProposalInput): boolean {
+    if (!this.submit(proposal, input)) return false;
+    this.#streaming = true;
+    this.render();
+    return true;
+  }
+
+  /**
+   * 生成中替换为追加了命令的新一版草案：挂载失败时保留上一版，不留半张画面。
+   * 只接受同一份草案（同 id）且仍在生成中。
+   */
+  extendStream(proposal: DesignerChangeProposal, input: DesignerChangeProposalInput): boolean {
+    if (!this.streaming || this.#proposal?.id !== proposal.id) return false;
+    if (!this.mountGhost(proposal)) {
+      this.mountGhost(this.#proposal);
+      return false;
+    }
+    this.#proposal = proposal;
+    this.#input = input;
+    this.render();
+    return true;
+  }
+
+  /** 结束生成：草案变为可采纳，单元照常拆分（ADR-0111 D1）。 */
+  finishStream(id: string): boolean {
+    if (!this.streaming || this.#proposal?.id !== id) return false;
+    this.#streaming = false;
+    this.render();
+    return true;
+  }
+
+  /** 当前草案的原始入参：追加命令时以它为底。 */
+  get pendingInput(): DesignerChangeProposalInput | undefined {
+    return this.#input;
   }
 
   get paneMode(): RightPaneMode {
@@ -206,7 +250,7 @@ export class DesignerChangeController {
   adoptUnit(unitId: string): boolean {
     const proposal = this.#proposal;
     const handler = this.#adoptHandler;
-    if (proposal === undefined || handler === undefined) return false;
+    if (proposal === undefined || handler === undefined || this.#streaming) return false;
     const unit = proposal.units.find((item) => item.id === unitId);
     if (unit === undefined) return false;
     const commands = proposal.commands.filter((_, index) => unit.commandIndexes.includes(index));
@@ -229,7 +273,7 @@ export class DesignerChangeController {
   /** 忽略单个单元：不写文档，只把它从待决集合里去掉。 */
   rejectUnit(unitId: string): boolean {
     const proposal = this.#proposal;
-    if (proposal === undefined) return false;
+    if (proposal === undefined || this.#streaming) return false;
     const unit = proposal.units.find((item) => item.id === unitId);
     if (unit === undefined) return false;
     this.#metricHandler?.('change_reject');
@@ -239,7 +283,7 @@ export class DesignerChangeController {
 
   /** 全部采纳的第一步：切到智能体页签并进入确认态，不写文档。 */
   requestAdoptAll(): void {
-    if (this.#proposal === undefined) return;
+    if (this.#proposal === undefined || this.#streaming) return;
     this.#confirmAll = true;
     this.#paneMode = 'intent';
     this.render('request-adopt-all');
@@ -265,7 +309,7 @@ export class DesignerChangeController {
   adoptAllDirect(): boolean {
     const proposal = this.#proposal;
     const handler = this.#adoptHandler;
-    if (proposal === undefined || handler === undefined) return false;
+    if (proposal === undefined || handler === undefined || this.#streaming) return false;
     const result = handler(proposal.commands, proposal.provenance);
     if (!result.ok) {
       this.#feedback = {
@@ -428,6 +472,7 @@ export class DesignerChangeController {
     if (feedback !== undefined) this.#paneMode = 'intent';
     this.#proposal = undefined;
     this.#input = undefined;
+    this.#streaming = false;
     this.#comparing = false;
     this.#confirmAll = false;
     this.render();
@@ -477,7 +522,13 @@ export class DesignerChangeController {
     if (bar !== undefined) {
       bar.hidden = proposal === undefined;
       if (proposal !== undefined)
-        renderDraftBar(bar, proposal, this.#comparing, this.#paneMode === 'intent');
+        renderDraftBar(
+          bar,
+          proposal,
+          this.#comparing,
+          this.#paneMode === 'intent',
+          this.#streaming,
+        );
       if (focusAction !== undefined) {
         bar.querySelector<HTMLButtonElement>(`[data-change-action="${focusAction}"]`)?.focus();
       }
@@ -505,6 +556,7 @@ export class DesignerChangeController {
         this.#historyReader?.(),
         this.#feedback,
         this.#getIntentScope?.(),
+        this.#streaming,
       );
     }
   }

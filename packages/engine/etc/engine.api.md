@@ -496,6 +496,7 @@ export interface BaseScreenDesignerChangeProposalSummary {
     readonly rationale: string;
     // (undocumented)
     readonly scope: string;
+    readonly streaming?: true;
     // (undocumented)
     readonly title: string;
     // (undocumented)
@@ -589,6 +590,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     attributeChangedCallback(name: string, previousValue: string | null, value: string | null): void;
     // (undocumented)
     get backButton(): boolean;
+    beginChangeProposal(input: DesignerChangeProposalInput): ScreenParseResult<BaseScreenDesignerChangeProposalSummary>;
     // (undocumented)
     cancelAuthoringEdit(requestId: string): boolean;
     // (undocumented)
@@ -642,6 +644,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     exportDocument(): ScreenParseResult<string>;
     // (undocumented)
     exportProject(projectId: string, revision: string): Promise<ScreenParseResult<ScreenDocument>>;
+    extendChangeProposal(id: string, commands: DesignerChangeProposalInput['commands']): ScreenParseResult<BaseScreenDesignerChangeProposalSummary>;
+    finishChangeProposal(id: string): ScreenParseResult<BaseScreenDesignerChangeProposalSummary>;
     get fragmentSaveAction(): boolean;
     // (undocumented)
     getAuthoringEditorContext(): ScreenAuthoringEditorContext;

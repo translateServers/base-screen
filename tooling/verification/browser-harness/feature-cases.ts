@@ -158,6 +158,43 @@ async function applyAgentProposalReview(designer: BaseScreenDesignerElement): Pr
   await painted();
 }
 
+/**
+ * 流式落稿（ADR-0112 §2.5）：骨架先挂出——两块占位框的几何一次给全，草案「生成中」、不可采纳；
+ * 逐块填充由验收时在页面里调用 `extendChangeProposal` / `finishChangeProposal` 完成。
+ */
+async function applyAgentProposalStreaming(designer: BaseScreenDesignerElement): Promise<void> {
+  setHostShellVisible(false);
+  designer.setWorkbenchMode('canvas');
+  const manifest = designer.catalog?.get('base.rectangle')?.manifest;
+  if (manifest === undefined) return;
+  const placeholder = (id: string, x: number) => ({
+    type: 'add-component' as const,
+    component: {
+      id,
+      type: manifest.type,
+      name: `占位 ${id}`,
+      parentId: null,
+      position: { x, y: 300 },
+      size: { width: 360, height: 180 },
+      rotation: 0,
+      zIndex: 10,
+      status: { locked: false, hidden: false },
+      props: manifest.defaultProps,
+      style: { ...manifest.defaultStyle, fill: '#22324a' },
+      dataSource: null,
+    },
+  });
+  const begun = designer.beginChangeProposal({
+    title: '阶段1验收：流式落稿',
+    rationale: '骨架先行、几何不变、逐块填充。',
+    scope: '整屏',
+    origin: { author: 'Stage 1 QA' },
+    commands: [placeholder('stream-a', 80), placeholder('stream-b', 480)],
+  });
+  if (!begun.ok) throw new Error('Streaming skeleton was rejected.');
+  await painted();
+}
+
 async function applyAgentSampleData(designer: BaseScreenDesignerElement): Promise<void> {
   setHostShellVisible(false);
   designer.setWorkbenchMode('canvas');
@@ -538,6 +575,7 @@ const CASE_APPLIERS = {
   'agent-host-resource': applyAgentHostResource,
   'agent-proposal-review': applyAgentProposalReview,
   'agent-sample-data': applyAgentSampleData,
+  'agent-proposal-streaming': applyAgentProposalStreaming,
   'material-groups': applyMaterialGroups,
   'plugin-command': applyPluginCommand,
   'plugin-panel': applyPluginPanel,

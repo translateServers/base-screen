@@ -26,11 +26,17 @@ export function draftBarMarkup(
   proposal: DesignerChangeProposal,
   comparing: boolean,
   paneOpen = false,
+  streaming = false,
 ): string {
   const text = DESIGNER_UI_TEXT.change;
+  const label = streaming
+    ? text.streamingLabel
+    : comparing
+      ? text.viewingOldLabel
+      : text.draftLabel;
   return `<span class="draft-state">
       <span class="draft-dot" aria-hidden="true"></span>
-      <span class="draft-label">${comparing ? text.viewingOldLabel : text.draftLabel}</span>
+      <span class="draft-label" data-draft-streaming="${String(streaming)}">${label}</span>
     </span>
     <span class="draft-summary">
       <span class="draft-title" title="${escapeHtml(proposal.title)}">${escapeHtml(proposal.title)}</span>
@@ -42,8 +48,8 @@ export function draftBarMarkup(
       ${
         paneOpen
           ? ''
-          : `<button type="button" class="designer-control designer-button" data-size="compact" data-change-action="discard">${text.discard}</button>
-      <button type="button" class="designer-control designer-button" data-size="compact" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>`
+          : `<button type="button" class="designer-control designer-button" data-size="compact" data-change-action="discard">${streaming ? text.cancelStreaming : text.discard}</button>
+      ${streaming ? '' : `<button type="button" class="designer-control designer-button" data-size="compact" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>`}`
       }
     </span>`;
 }
@@ -59,6 +65,7 @@ export function changePaneMarkup(
   history?: readonly ScreenHistoryNode[],
   feedback?: DesignerChangeFeedback,
   intentScope?: ScreenIntentScope,
+  streaming = false,
 ): string {
   const text = DESIGNER_UI_TEXT.change;
   const notice =
@@ -128,31 +135,36 @@ export function changePaneMarkup(
     </details>
     <section class="change-panel-section">
       <h3 class="change-panel-heading-text">${text.diffLabel}</h3>
-      <ul class="change-diff-list">${units.map((unit) => unitMarkup(unit, reviewing, feedback, proposal.commands)).join('')}</ul>
+      <ul class="change-diff-list">${units.map((unit) => unitMarkup(unit, reviewing, feedback, proposal.commands, streaming)).join('')}</ul>
     </section>
     ${historyMarkup(history)}
     <footer class="change-panel-actions">
       <span class="change-panel-hint">${
-        reviewing
-          ? DESIGNER_UI_TEXT.review.progress(review.total - units.length, review.total)
-          : text.adoptHint
+        streaming
+          ? text.streamingHint
+          : reviewing
+            ? DESIGNER_UI_TEXT.review.progress(review.total - units.length, review.total)
+            : text.adoptHint
       }</span>
       <span class="change-panel-action-buttons">${
-        reviewing
-          ? confirmAll
-            ? `<button type="button" class="designer-control designer-button" data-change-action="cancel-adopt-all">${text.cancelAdoptAll}</button>
+        // 生成中只能取消：内容还没填完，任何采纳都会采到半张屏（ADR-0112 §2.5）。
+        streaming
+          ? `<button type="button" class="designer-control designer-button" data-change-action="discard">${text.cancelStreaming}</button>`
+          : reviewing
+            ? confirmAll
+              ? `<button type="button" class="designer-control designer-button" data-change-action="cancel-adopt-all">${text.cancelAdoptAll}</button>
+                 <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="adopt">${text.confirmAdoptAll}</button>`
+              : `<button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>${
+                  units.length === 1 && units[0]?.presentation?.kind === 'whole-screen-replacement'
+                    ? `<button type="button" class="designer-control designer-button" data-change-action="discard">${text.discard}</button>
+                       <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>`
+                    : ''
+                }`
+            : confirmAll
+              ? `<button type="button" class="designer-control designer-button" data-change-action="cancel-adopt-all">${text.cancelAdoptAll}</button>
                <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="adopt">${text.confirmAdoptAll}</button>`
-            : `<button type="button" class="designer-control designer-button" data-change-action="exit-review">${DESIGNER_UI_TEXT.review.exit}</button>${
-                units.length === 1 && units[0]?.presentation?.kind === 'whole-screen-replacement'
-                  ? `<button type="button" class="designer-control designer-button" data-change-action="discard">${text.discard}</button>
-                     <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>`
-                  : ''
-              }`
-          : confirmAll
-            ? `<button type="button" class="designer-control designer-button" data-change-action="cancel-adopt-all">${text.cancelAdoptAll}</button>
-             <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="adopt">${text.confirmAdoptAll}</button>`
-            : `<button type="button" class="designer-control designer-button" data-change-action="discard">${text.discard}</button>
-             <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>`
+              : `<button type="button" class="designer-control designer-button" data-change-action="discard">${text.discard}</button>
+               <button type="button" class="designer-control designer-button" data-variant="primary" data-change-action="request-adopt-all">${text.adoptAll}</button>`
       }</span>
     </footer>`;
 }
@@ -282,6 +294,7 @@ function unitMarkup(
   reviewing = false,
   feedback?: DesignerChangeFeedback,
   commands: DesignerChangeProposal['commands'] = [],
+  streaming = false,
 ): string {
   const text = DESIGNER_UI_TEXT.change;
   const label = unit.label === '' ? text.unitDocument : unit.label;
@@ -299,9 +312,11 @@ function unitMarkup(
         commands.filter((_, index) => unit.commandIndexes.includes(index)),
       )
     : diffEntries(unit);
-  const actions = wholeScreen
-    ? `<p class="change-panel-hint" data-change-whole-screen-hint>${text.wholeScreenHint}</p>`
-    : `<div class="change-unit-actions">
+  const actions = streaming
+    ? ''
+    : wholeScreen
+      ? `<p class="change-panel-hint" data-change-whole-screen-hint>${text.wholeScreenHint}</p>`
+      : `<div class="change-unit-actions">
         <button type="button" class="designer-control designer-button" data-variant="ghost" data-change-action="reject-unit" data-change-unit="${escapeHtml(unit.id)}">${reviewing ? DESIGNER_UI_TEXT.review.reject : text.rejectUnit}</button>
         <button type="button" class="designer-control designer-button" data-change-action="adopt-unit" data-change-unit="${escapeHtml(unit.id)}">${reviewing ? DESIGNER_UI_TEXT.review.approve : text.adoptUnit}</button>
       </div>`;
@@ -394,8 +409,9 @@ export function renderDraftBar(
   proposal: DesignerChangeProposal,
   comparing: boolean,
   paneOpen = false,
+  streaming = false,
 ): void {
-  bar.innerHTML = draftBarMarkup(proposal, comparing, paneOpen);
+  bar.innerHTML = draftBarMarkup(proposal, comparing, paneOpen, streaming);
   adoptDesignerFormControls(bar);
 }
 
@@ -491,8 +507,17 @@ export function renderChangePane(
   history?: readonly ScreenHistoryNode[],
   feedback?: DesignerChangeFeedback,
   intentScope?: ScreenIntentScope,
+  streaming = false,
 ): void {
-  pane.innerHTML = changePaneMarkup(proposal, confirmAll, review, history, feedback, intentScope);
+  pane.innerHTML = changePaneMarkup(
+    proposal,
+    confirmAll,
+    review,
+    history,
+    feedback,
+    intentScope,
+    streaming,
+  );
   adoptDesignerFormControls(pane);
   renderChangeReviewToggle(pane, proposal, review);
 }

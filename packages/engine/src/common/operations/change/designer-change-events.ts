@@ -25,6 +25,8 @@ export interface BaseScreenDesignerChangeProposalSummary {
   readonly affectedComponentIds: readonly string[];
   readonly units: readonly BaseScreenDesignerChangeUnitSummary[];
   readonly origin?: DesignerChangeProposalOrigin;
+  /** 流式落稿中（ADR-0112 §2.5）：内容未填完，不可采纳。 */
+  readonly streaming?: true;
 }
 
 export interface BaseScreenDesignerChangeStateDetail {

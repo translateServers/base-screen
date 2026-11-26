@@ -387,6 +387,30 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.submitChangeProposal(this, input);
   }
 
+  /**
+   * 流式落稿（ADR-0112 §2.5）：先提交骨架命令（全部几何），草案以「生成中」挂出、不可采纳；
+   * 之后用 `extendChangeProposal` 逐块追加内容，用 `finishChangeProposal` 结束。
+   * 中途取消用 `discardPendingChange`。传输由宿主负责，引擎不感知。
+   */
+  beginChangeProposal(
+    input: DesignerChangeProposalInput,
+  ): ScreenParseResult<BaseScreenDesignerChangeProposalSummary> {
+    return this.#designerState.runtime.beginChangeProposal(this, input);
+  }
+
+  /** 给生成中的草案追加命令；不得改变已出现组件的几何。失败时保留上一版草案。 */
+  extendChangeProposal(
+    id: string,
+    commands: DesignerChangeProposalInput['commands'],
+  ): ScreenParseResult<BaseScreenDesignerChangeProposalSummary> {
+    return this.#designerState.runtime.extendChangeProposal(this, id, commands);
+  }
+
+  /** 结束生成：草案变为可采纳。 */
+  finishChangeProposal(id: string): ScreenParseResult<BaseScreenDesignerChangeProposalSummary> {
+    return this.#designerState.runtime.finishChangeProposal(this, id);
+  }
+
   /** 读当前待决提案的摘要；没有待决提案时为 undefined。 */
   readPendingChange(): BaseScreenDesignerChangeProposalSummary | undefined {
     return this.#designerState.runtime.readPendingChange(this);

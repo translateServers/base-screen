@@ -155,3 +155,82 @@ describe('BaseScreenDesignerElement.submitChangeProposal diagnostics', () => {
     }
   });
 });
+
+describe('BaseScreenDesignerElement streaming proposals (ADR-0112 §2.5)', () => {
+  function streamingDesigner(): BaseScreenDesignerElement {
+    const designer = configuredDesigner(true);
+    getDesignerElementState(designer).changeController.setGhostHandlers({
+      render: () => true,
+      clear: () => undefined,
+    });
+    return designer;
+  }
+
+  const skeleton = proposal([rename]);
+  const fill = {
+    type: 'update-components',
+    componentIds: ['title'],
+    patch: { zIndex: 3 },
+  } as const;
+
+  it('mounts a skeleton that cannot be adopted until it is finished', () => {
+    const designer = streamingDesigner();
+    const begun = designer.beginChangeProposal(skeleton);
+    expect(begun.ok).toBe(true);
+    if (!begun.ok) return;
+    expect(designer.readPendingChange()).toMatchObject({ id: begun.value.id, streaming: true });
+    expect(designer.adoptAllChanges()).toBe(false);
+    expect(designer.adoptChangeUnit('title')).toBe(false);
+
+    const extended = designer.extendChangeProposal(begun.value.id, [fill]);
+    expect(extended.ok).toBe(true);
+    expect(designer.finishChangeProposal(begun.value.id).ok).toBe(true);
+    expect(designer.readPendingChange()).not.toHaveProperty('streaming');
+    expect(designer.adoptAllChanges()).toBe(true);
+    const title = designer.document?.components.find((item) => item.id === 'title');
+    expect(title).toMatchObject({ name: '新标题', zIndex: 3 });
+  });
+
+  it('rejects streamed commands that move existing components and keeps the previous draft', () => {
+    const designer = streamingDesigner();
+    const begun = designer.beginChangeProposal(skeleton);
+    if (!begun.ok) throw new Error('expected skeleton to mount');
+    const moved = designer.extendChangeProposal(begun.value.id, [
+      { type: 'update-components', componentIds: ['title'], patch: { position: { x: 10, y: 0 } } },
+    ]);
+    expect(moved).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'CHANGE_STREAM_GEOMETRY_CHANGED' }],
+    });
+    expect(designer.readPendingChange()).toMatchObject({ id: begun.value.id, streaming: true });
+  });
+
+  it('reports a stream that is not active', () => {
+    const designer = streamingDesigner();
+    expect(designer.extendChangeProposal('change-404', [fill])).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'CHANGE_STREAM_NOT_ACTIVE' }],
+    });
+    const begun = designer.beginChangeProposal(skeleton);
+    if (!begun.ok) throw new Error('expected skeleton to mount');
+    expect(designer.finishChangeProposal(begun.value.id).ok).toBe(true);
+    expect(designer.finishChangeProposal(begun.value.id)).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'CHANGE_STREAM_NOT_ACTIVE' }],
+    });
+    expect(designer.extendChangeProposal(begun.value.id, [fill])).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'CHANGE_STREAM_NOT_ACTIVE' }],
+    });
+  });
+
+  it('leaves no draft behind when generation is cancelled', () => {
+    const designer = streamingDesigner();
+    const begun = designer.beginChangeProposal(skeleton);
+    if (!begun.ok) throw new Error('expected skeleton to mount');
+    designer.discardPendingChange();
+    expect(designer.readPendingChange()).toBeUndefined();
+    expect(designer.extendChangeProposal(begun.value.id, [fill]).ok).toBe(false);
+    expect(designer.document?.components[0]?.name).toBe('标题');
+  });
+});

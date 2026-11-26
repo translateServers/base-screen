@@ -184,6 +184,17 @@ export const FEATURE_CASE_CATALOG = [
     stressGrouping: false,
   },
   {
+    id: 'agent-proposal-streaming',
+    title: '智能体流式落稿',
+    summary: '骨架草案「生成中」不可采纳，逐块填充时几何不变，结束后可采纳。',
+    lookAt: '草案条「草案 · 生成中」与「取消生成」，两块占位框；填充后位置尺寸不变。',
+    packages: ['contracts', 'engine'],
+    focused:
+      'pnpm --filter @base-screen/engine exec vitest run tests/designer-element/api/designer-element-change.test.ts',
+    verify: 'pnpm verify:browser',
+    stressGrouping: false,
+  },
+  {
     id: 'agent-sample-data',
     title: '智能体示例数据',
     summary: '两处带示例标记的取值：画布徽标、状态栏计数与定位、保留为常量。',

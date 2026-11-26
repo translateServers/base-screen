@@ -1,4 +1,4 @@
-import type { ScreenParseResult } from '@base-screen/contracts';
+import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenDesignerChangeProposalSummary,
   summarizeChangeProposal,
@@ -68,6 +68,149 @@ export function submitChangeProposal(
 }
 
 /**
+ * 流式落稿第一步（ADR-0112 §2.5）：提交骨架命令并整批试算，成功后草案进入「生成中」，不可采纳。
+ *
+ * 骨架要一次给全几何：之后的 `extendChangeProposal` 只能填内容，不能再动已出现组件的位置与尺寸，
+ * 这样从第一帧起画面就不会抖。
+ */
+export function beginChangeProposal(
+  element: DesignerElementHost,
+  input: DesignerChangeProposalInput,
+): ScreenParseResult<BaseScreenDesignerChangeProposalSummary> {
+  const elementState = getDesignerElementState(element);
+  const document = elementState.session.document;
+  if (document === undefined) {
+    return {
+      ok: false,
+      diagnostics: [
+        changeDiagnostic('CHANGE_DOCUMENT_UNAVAILABLE', 'Designer has no document loaded.'),
+      ],
+    };
+  }
+  elementState.changeGeneration += 1;
+  const id = `change-${elementState.changeGeneration}`;
+  const prepared = prepareDesignerChangeProposal(document, input, id);
+  if (!prepared.ok) return { ok: false, diagnostics: prepared.diagnostics };
+  const controller = elementState.changeController;
+  const draftPending = controller.pending !== undefined;
+  if (!controller.beginStream(prepared.value, input)) {
+    return {
+      ok: false,
+      diagnostics: [
+        draftPending
+          ? changeDiagnostic(
+              'CHANGE_DRAFT_PENDING',
+              'A pending change proposal must be adopted or discarded first.',
+            )
+          : changeDiagnostic(
+              'CHANGE_PREVIEW_UNAVAILABLE',
+              'Change proposal preview could not be mounted.',
+            ),
+      ],
+    };
+  }
+  return { ok: true, value: summarizeChangeProposal(prepared.value), diagnostics: [] };
+}
+
+/**
+ * 流式落稿：追加命令后整批重算同一份草案。失败时保留上一版草案并返回诊断；
+ * 追加的命令若改变了已出现组件的位置或尺寸，按协议错误拒绝（`CHANGE_STREAM_GEOMETRY_CHANGED`）。
+ */
+export function extendChangeProposal(
+  element: DesignerElementHost,
+  id: string,
+  commands: DesignerChangeProposalInput['commands'],
+): ScreenParseResult<BaseScreenDesignerChangeProposalSummary> {
+  const elementState = getDesignerElementState(element);
+  const controller = elementState.changeController;
+  const current = controller.pending;
+  const input = controller.pendingInput;
+  const document = elementState.session.document;
+  if (
+    !controller.streaming ||
+    current?.id !== id ||
+    input === undefined ||
+    document === undefined
+  ) {
+    return {
+      ok: false,
+      diagnostics: [
+        changeDiagnostic(
+          'CHANGE_STREAM_NOT_ACTIVE',
+          `Change proposal ${id} is not being generated.`,
+        ),
+      ],
+    };
+  }
+  const next: DesignerChangeProposalInput = {
+    ...input,
+    commands: [...input.commands, ...commands],
+  };
+  const prepared = prepareDesignerChangeProposal(document, next, id);
+  if (!prepared.ok) return { ok: false, diagnostics: prepared.diagnostics };
+  const moved = movedComponentIds(current.candidate, prepared.value.candidate);
+  if (moved.length > 0) {
+    return {
+      ok: false,
+      diagnostics: [
+        changeDiagnostic(
+          'CHANGE_STREAM_GEOMETRY_CHANGED',
+          `Streaming commands must not move or resize existing components: ${moved.slice(0, 5).join(', ')}.`,
+        ),
+      ],
+    };
+  }
+  if (!controller.extendStream(prepared.value, next)) {
+    return {
+      ok: false,
+      diagnostics: [
+        changeDiagnostic(
+          'CHANGE_PREVIEW_UNAVAILABLE',
+          'Change proposal preview could not be mounted.',
+        ),
+      ],
+    };
+  }
+  return { ok: true, value: summarizeChangeProposal(prepared.value), diagnostics: [] };
+}
+
+/** 结束生成：草案变为可采纳，单元照常拆分。 */
+export function finishChangeProposal(
+  element: DesignerElementHost,
+  id: string,
+): ScreenParseResult<BaseScreenDesignerChangeProposalSummary> {
+  const controller = getDesignerElementState(element).changeController;
+  const current = controller.pending;
+  if (current === undefined || !controller.finishStream(id)) {
+    return {
+      ok: false,
+      diagnostics: [
+        changeDiagnostic(
+          'CHANGE_STREAM_NOT_ACTIVE',
+          `Change proposal ${id} is not being generated.`,
+        ),
+      ],
+    };
+  }
+  return { ok: true, value: summarizeChangeProposal(current), diagnostics: [] };
+}
+
+/** 两版候选里都存在、但位置或尺寸变了的组件。 */
+function movedComponentIds(before: ScreenDocument, after: ScreenDocument): readonly string[] {
+  const previous = new Map(before.components.map((component) => [component.id, component]));
+  return after.components.flatMap((component) => {
+    const old = previous.get(component.id);
+    if (old === undefined) return [];
+    const same =
+      old.position.x === component.position.x &&
+      old.position.y === component.position.y &&
+      old.size.width === component.size.width &&
+      old.size.height === component.size.height;
+    return same ? [] : [component.id];
+  });
+}
+
+/**
  * 读当前待决提案的摘要：标题、作用域、理由、单元与归属。
  *
  * 只给摘要，不给候选文档——宿主不需要、也不应该拿它去改文档。
@@ -75,8 +218,11 @@ export function submitChangeProposal(
 export function readPendingChange(
   element: DesignerElementHost,
 ): BaseScreenDesignerChangeProposalSummary | undefined {
-  const proposal = getDesignerElementState(element).changeController.pending;
-  return proposal === undefined ? undefined : summarizeChangeProposal(proposal);
+  const controller = getDesignerElementState(element).changeController;
+  const proposal = controller.pending;
+  if (proposal === undefined) return undefined;
+  const summary = summarizeChangeProposal(proposal);
+  return controller.streaming ? { ...summary, streaming: true } : summary;
 }
 
 /** 采纳一个单元：该单元的命令作为一次普通事务提交，其余单元按当前文档重算。 */

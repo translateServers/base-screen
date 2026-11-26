@@ -295,6 +295,10 @@ export const DESIGNER_UI_TEXT = {
     // 草案期间被移除的旧组件留轮廓（ADR-0111 §2.2）；「查看旧版」时草案条改说当前看的是旧版。
     removalMark: '将移除',
     viewingOldLabel: '旧版 · 当前文档',
+    // 流式落稿（ADR-0112 §2.5）：骨架先挂出，逐块填充，完成前只能取消。
+    streamingLabel: '草案 · 生成中',
+    streamingHint: '正在逐块生成，完成后才能采纳。',
+    cancelStreaming: '取消生成',
     diffPath: {
       type: '物料类型',
       name: '名称',
