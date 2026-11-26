@@ -18,15 +18,23 @@ import type {
   DesignerIntentHandler,
   DesignerIntentOutcome,
 } from 'base-screen/engine';
+import {
+  compileScreenIntent,
+  createIntentStreamAssembler,
+  type IntentCatalog,
+  type IntentDiagnostic,
+  type IntentRepairIssue,
+  mapDocumentIssues,
+  prepareIntent,
+  repairKey,
+} from 'base-screen/host-kit';
 import type { BaseScreenMaterialCatalog } from 'base-screen/plugin-core';
 import {
-  type AgentCandidateShape,
   type AgentCanvasPatchShape,
   type AgentCatalogShape,
   type AgentComponentPatchShape,
   type AgentEditableComponentShape,
-  type AgentRepairContextShape,
-  type AgentRepairRequestShape,
+  type AgentIntentShape,
   type AgentScreenDigestShape,
   type AgentWarningShape,
   api,
@@ -223,6 +231,22 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
         },
       );
       draft = streamDraft;
+      // 流式帧在这里本地编译（ADR-0113 §2.8）：后端推骨架与逐项内容，host-kit 装配并编出每一帧。
+      // 素材与数据集引用要等最终结果才知道，所以含它们的块在流里先留占位，最终结果到了再补。
+      const streamCatalog = catalog === undefined ? undefined : toIntentCatalog(catalog, []);
+      const assembler =
+        streamCatalog === undefined ? undefined : createIntentStreamAssembler(streamCatalog);
+      const frameDocument = (): unknown => {
+        const frame = assembler?.frame();
+        if (frame === undefined || streamCatalog === undefined) return undefined;
+        const outcome = compileScreenIntent({
+          intent: frame.intent,
+          catalog: streamCatalog,
+          mode: 'llm',
+          stream: frame.stream,
+        });
+        return outcome.ok ? outcome.value.document : undefined;
+      };
       const acted = await api.actAgentStream(
         {
           text: request.text,
@@ -242,7 +266,18 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
           },
           context: buildScreenDigest(current),
         },
-        { onSkeleton: streamDraft.onSkeleton, onProgress: streamDraft.onProgress },
+        {
+          onSkeleton: (head) => {
+            if (assembler?.skeleton(head) !== true) return;
+            const document = frameDocument();
+            if (document !== undefined) streamDraft.onSkeleton(document);
+          },
+          onItem: (path, value) => {
+            if (assembler?.item(path, value) !== true) return;
+            const document = frameDocument();
+            if (document !== undefined) streamDraft.onProgress(document);
+          },
+        },
         streamAbort.signal,
       );
       signal?.removeEventListener('abort', forwardAbort);
@@ -304,88 +339,65 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
         };
       }
 
-      // generate_screen：候选须先过 canonical 文档校验，再过生成产物的版面审计（ADR-0112 §2.2），
-      // 都过了才提交成提案。审计不过或引擎拒绝时，凭 repairContext 请后端修复一次，不循环（§2.1.6）。
-      const submitWholeScreen = (
-        candidate: AgentCandidateShape,
-        repaired: boolean,
-      ): WholeScreenAttempt => {
-        const parsed = parseScreenDocument(candidate.document);
-        if (!parsed.ok) {
-          logger.warn('agent document rejected', parsed.diagnostics);
-          draft?.discard();
-          return failedAttempt(
-            'parse',
-            undefined,
-            parsed.diagnostics,
-            '智能体返回的大屏文档结构不合法，未生成变更。',
-          );
-        }
-        if (parsed.value.components.length === 0) {
-          // 空文档会成为「删光未锁定组件」的整屏提案，比失败更糟：宁可什么都不提交。
-          logger.warn('agent document has no usable components');
-          draft?.discard();
-          return failedAttempt('empty', undefined, [], '模型这次没有产出可用组件，未生成变更。');
-        }
-        const audit = auditScreenLayout(parsed.value).filter((item) => item.severity === 'error');
-        if (audit.length > 0) {
-          logger.warn('agent document failed the layout audit', audit);
-          draft?.discard();
-          return failedAttempt(
-            'audit',
-            parsed.value,
-            audit,
-            '智能体产物没有通过版面校验（字号、越界、重叠或对比度），未生成变更。',
-          );
-        }
-        const rationale = `${describeMode(candidate.mode, candidate.failure, candidate.warnings ?? [])}${repaired ? '；宿主校验未通过，已请模型修复一次' : ''}。布局由后端确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeLocked(current)}`;
-        // 流式草案接得上就原地收尾；接不上（最终结果与骨架对不上）先撤掉它，再整屏提交。
-        if (!repaired && draft?.finish(parsed.value, rationale) === true) return { ok: true };
+      // generate_screen（ADR-0113 §2.7）：后端只给模型原文，解析、编译、审计与修复回环都在这里——
+      // 原文 → host-kit 解析并编译 → canonical 文档校验 → 版面审计 → 提交提案；任何一步有值得请模型修的
+      // 诊断（解析丢掉的项、版面放不下、审计不过、引擎拒绝），就带着「上一轮原文 + 按模型路径整理的诊断」
+      // 回去要一次修复，最多 2 轮，同一组诊断连续两轮不变就提前停（ADR-0112 §2.1）。
+      if (catalog === undefined) {
         draft?.discard();
-        const submitted = options.designer.submitChangeProposal({
-          title: `智能体 · ${truncate(request.text, 18)}`,
-          rationale,
-          scope: '整屏',
-          commands: compileWholeScreenCommands(current, parsed.value),
-          origin: { author: '智能体' },
-        });
-        if (!submitted.ok) {
-          logger.warn('change proposal rejected', submitted.diagnostics);
-          return failedAttempt(
-            'engine',
-            parsed.value,
-            submitted.diagnostics,
-            '提案被引擎拒绝（命令或渲染校验未通过），未生成变更。',
-          );
-        }
-        return { ok: true };
-      };
-
-      const first = submitWholeScreen(acted.data, false);
-      if (first.ok) return { ok: true, value: null, diagnostics: [] };
-      const repair = buildRepairRequest(acted.data.repairContext, first);
-      if (repair === undefined) return first.outcome;
-      logger.debug('agent candidate repair requested', repair.issues.length);
-      const repaired = await api.generateScreenCandidate(
-        request.text,
-        options.screenId,
-        catalog,
-        request.references,
-        signal,
-        repair,
-      );
-      const lateReason = staleReason();
-      if (lateReason !== undefined) return { ok: false, diagnostics: [], reason: lateReason };
-      if (!repaired.ok) {
-        logger.warn('agent repair failed', repaired.error);
-        return {
-          ok: false,
-          diagnostics: first.outcome.diagnostics,
-          reason: describeFailure(repaired.error.message),
-        };
+        return { ok: false, diagnostics: [], reason: '读不到设计器的物料目录，未生成变更。' };
       }
-      const second = submitWholeScreen(repaired.data, true);
-      return second.ok ? { ok: true, value: null, diagnostics: [] } : second.outcome;
+      const shape = catalog;
+      let data: AgentIntentShape = acted.data;
+      let rounds = 0;
+      let previousKey: string | undefined;
+      for (;;) {
+        const attempt = attemptWholeScreen(
+          options,
+          current,
+          request.text,
+          shape,
+          data,
+          rounds,
+          draft,
+        );
+        if (attempt.ok) return { ok: true, value: null, diagnostics: [] };
+
+        const key = repairKey(attempt.issues);
+        const exhausted =
+          attempt.issues.length === 0 || rounds >= MAX_REPAIR_ROUNDS || key === previousKey;
+        if (exhausted) {
+          logger.warn('agent repair exhausted', rounds, key);
+          // 问题只在个别指标 / 块上时，去掉那几项、其余照常交出，并如实说明。
+          if (attempt.deliver !== undefined) {
+            const delivered = attempt.deliver();
+            return delivered.ok ? { ok: true, value: null, diagnostics: [] } : delivered.outcome;
+          }
+          return attempt.outcome;
+        }
+        previousKey = key;
+        rounds += 1;
+        logger.debug('agent candidate repair requested', rounds, attempt.issues.length);
+        const repaired = await api.generateScreenCandidate(
+          request.text,
+          options.screenId,
+          catalog,
+          request.references,
+          signal,
+          { output: data.output, issues: attempt.issues },
+        );
+        const lateReason = staleReason();
+        if (lateReason !== undefined) return { ok: false, diagnostics: [], reason: lateReason };
+        if (!repaired.ok) {
+          logger.warn('agent repair failed', repaired.error);
+          return {
+            ok: false,
+            diagnostics: attempt.outcome.diagnostics,
+            reason: describeFailure(repaired.error.message),
+          };
+        }
+        data = repaired.data;
+      }
     } finally {
       options.designer.removeEventListener('base-screen-change', onChange);
       // 没能收尾的流式草案（失败、取消、过期）不留在画布上。
@@ -571,54 +583,168 @@ function layerBase(current: ScreenDocument): number {
   return current.components.reduce((max, component) => Math.max(max, component.zIndex), 0);
 }
 
-/** 一次整屏提交的结果：失败时记下卡在哪一步，修复请求要据此决定能不能修、诊断指向哪。 */
+/** 修复轮数上限（ADR-0112 §2.1）：总共最多 3 次模型调用。 */
+const MAX_REPAIR_ROUNDS = 2;
+
+/**
+ * 一次整屏尝试的结果。失败时 `issues` 是值得请模型修的诊断（按模型原文路径，可能为空：结构性错误
+ * 修不了）；`deliver` 在「只有个别指标 / 块有问题、其余内容可用」时给出，修不好就用它去掉那几项交出。
+ */
 type WholeScreenAttempt =
   | { readonly ok: true }
   | {
       readonly ok: false;
-      readonly stage: 'parse' | 'empty' | 'audit' | 'engine';
-      readonly document: ScreenDocument | undefined;
-      readonly diagnostics: readonly ScreenDiagnostic[];
+      readonly issues: readonly IntentRepairIssue[];
       readonly outcome: IntentFailureOutcome;
+      readonly deliver?: () => WholeScreenAttempt;
     };
 
 function failedAttempt(
-  stage: 'parse' | 'empty' | 'audit' | 'engine',
-  document: ScreenDocument | undefined,
+  issues: readonly IntentRepairIssue[],
   diagnostics: readonly ScreenDiagnostic[],
   reason: string,
+  deliver?: () => WholeScreenAttempt,
 ): WholeScreenAttempt {
-  return { ok: false, stage, document, diagnostics, outcome: { ok: false, diagnostics, reason } };
+  return {
+    ok: false,
+    issues,
+    outcome: { ok: false, diagnostics, reason },
+    ...(deliver === undefined ? {} : { deliver }),
+  };
+}
+
+function toIntentCatalog(
+  shape: AgentCatalogShape,
+  assets: AgentIntentShape['assets'],
+): IntentCatalog {
+  return { materials: shape.materials, assets };
 }
 
 /**
- * 修复请求（ADR-0112 §2.1.6）：只修审计与引擎拒绝这两类，且只在模型产物上修（有 repairContext）。
- * 文档路径 `components[i]…` 经来源表翻成 IR 路径；翻不到的归 IR 根。`CHANGE_*` 是提案层的状态
- * （已有草案、文档未加载等），模型修不了，不发。
+ * 一轮：模型原文 → 解析 + 编译 → 文档校验 → 版面审计 → 提交提案。
+ *
+ * 首轮且无任何问题时，流式草案接得上就原地收尾；修复过的轮次一律撤掉草案、整屏提交——
+ * 修复后的输出是整份重来的，不是骨架的续写。
  */
-export function buildRepairRequest(
-  context: AgentRepairContextShape | undefined,
-  attempt: WholeScreenAttempt,
-): AgentRepairRequestShape | undefined {
-  if (context === undefined || attempt.ok) return undefined;
-  if (attempt.stage !== 'audit' && attempt.stage !== 'engine') return undefined;
-  const seen = new Set<string>();
-  const issues: { code: string; path: string }[] = [];
-  for (const diagnostic of attempt.diagnostics) {
-    if (diagnostic.code.startsWith('CHANGE_')) continue;
-    const [head, index] = diagnostic.path;
-    const componentId =
-      attempt.stage === 'audit' && head === 'components' && typeof index === 'number'
-        ? attempt.document?.components[index]?.id
-        : undefined;
-    const path = componentId === undefined ? '' : (context.sources[componentId] ?? '');
-    const key = `${diagnostic.code}@${path}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    issues.push({ code: diagnostic.code, path });
-    if (issues.length >= 100) break;
+function attemptWholeScreen(
+  options: HostIntentOptions,
+  current: ScreenDocument,
+  instruction: string,
+  shape: AgentCatalogShape,
+  data: AgentIntentShape,
+  rounds: number,
+  draft: StreamDraft | undefined,
+): WholeScreenAttempt {
+  const prepared = prepareIntent({
+    output: data.output,
+    catalog: toIntentCatalog(shape, data.assets),
+    references: { assets: data.assets, datasets: data.datasets },
+    mode: data.mode,
+  });
+  if (prepared.compiled === undefined) {
+    logger.warn('agent intent not compilable', prepared.issues);
+    draft?.discard();
+    const capacity = prepared.issues.some((issue) => issue.code === 'LAYOUT_CAPACITY_EXCEEDED');
+    return failedAttempt(
+      prepared.issues,
+      [],
+      capacity
+        ? '智能体给的版面在这块画布上放不下，未生成变更。'
+        : '智能体返回的内容无法整理成大屏，未生成变更。',
+    );
   }
-  return issues.length === 0 ? undefined : { output: context.output, issues };
+  const { document, sources } = prepared.compiled;
+  const parsed = parseScreenDocument(document);
+  if (!parsed.ok) {
+    logger.warn('agent document rejected', parsed.diagnostics);
+    draft?.discard();
+    return failedAttempt([], parsed.diagnostics, '智能体返回的大屏文档结构不合法，未生成变更。');
+  }
+  if (parsed.value.components.length === 0) {
+    // 空文档会成为「删光未锁定组件」的整屏提案，比失败更糟：宁可什么都不提交。
+    logger.warn('agent document has no usable components');
+    draft?.discard();
+    return failedAttempt([], [], '模型这次没有产出可用组件，未生成变更。');
+  }
+  const audit = auditScreenLayout(parsed.value).filter((item) => item.severity === 'error');
+  const auditIssues = mapDocumentIssues(
+    audit,
+    parsed.value.components.map((component) => component.id),
+    sources,
+  );
+  if (audit.length > 0) {
+    logger.warn('agent document failed the layout audit', audit);
+    draft?.discard();
+    return failedAttempt(
+      [...prepared.issues, ...auditIssues],
+      audit,
+      '智能体产物没有通过版面校验（字号、越界、重叠或对比度），未生成变更。',
+    );
+  }
+
+  const submit = (dropped: boolean): WholeScreenAttempt => {
+    // 去项交出时，没修好的那几项照实写进理由：逐条列出被去掉的指标 / 块，块被去掉另加一句总括。
+    const droppedNotes: IntentDiagnostic[] = dropped
+      ? [
+          ...prepared.issues.map((issue) => note(issue.code, issue.path)),
+          ...(prepared.issues.some((issue) => /blocks\[|main\[|rail\[/.test(issue.path))
+            ? [note('AGENT_BLOCKS_DROPPED', '')]
+            : []),
+        ]
+      : [];
+    const warnings = describeIntentWarnings(
+      [...droppedNotes, ...prepared.warnings],
+      data.warnings ?? [],
+    );
+    const repairedNote = rounds > 0 ? `；宿主校验未通过，已请模型修复 ${rounds} 次` : '';
+    const rationale = `${describeMode(data.mode, data.failure, warnings)}${repairedNote}。布局由宿主前端按区域确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeLocked(current)}`;
+    // 流式草案接得上就原地收尾；接不上（最终结果与骨架对不上、或已修复过）先撤掉它，再整屏提交。
+    if (rounds === 0 && !dropped && draft?.finish(parsed.value, rationale) === true) {
+      return { ok: true };
+    }
+    draft?.discard();
+    const submitted = options.designer.submitChangeProposal({
+      title: `智能体 · ${truncate(instruction, 18)}`,
+      rationale,
+      scope: '整屏',
+      commands: compileWholeScreenCommands(current, parsed.value),
+      origin: { author: '智能体' },
+    });
+    if (!submitted.ok) {
+      logger.warn('change proposal rejected', submitted.diagnostics);
+      return failedAttempt(
+        mapEngineIssues(submitted.diagnostics),
+        submitted.diagnostics,
+        '提案被引擎拒绝（命令或渲染校验未通过），未生成变更。',
+      );
+    }
+    return { ok: true };
+  };
+
+  if (prepared.issues.length === 0) return submit(false);
+  // 有值得修的诊断：先不提交，交给调用方决定修还是去项交出。
+  return failedAttempt(
+    prepared.issues,
+    [],
+    '智能体输出里有不合格的指标或模块，未生成变更。',
+    prepared.deliverable ? () => submit(true) : undefined,
+  );
+}
+
+function note(code: string, path: string): IntentDiagnostic {
+  return { severity: 'warning', code, path, message: '' };
+}
+
+/** 引擎拒绝的诊断翻成修复请求：路径是提案层的，归到整份输出；`CHANGE_*` 是提案状态，模型修不了。 */
+function mapEngineIssues(diagnostics: readonly ScreenDiagnostic[]): IntentRepairIssue[] {
+  const seen = new Set<string>();
+  const issues: IntentRepairIssue[] = [];
+  for (const diagnostic of diagnostics) {
+    if (diagnostic.code.startsWith('CHANGE_') || seen.has(diagnostic.code)) continue;
+    seen.add(diagnostic.code);
+    issues.push({ code: diagnostic.code, path: '' });
+  }
+  return issues;
 }
 
 function resolveSelectedComponents(
@@ -915,6 +1041,64 @@ function describeWarnings(warnings: readonly AgentWarningShape[]): string {
   return warnings.length === 1
     ? `有 1 处降级：${first.message}`
     : `有 ${warnings.length} 处降级，例如${first.message}`;
+}
+
+/** 解析与编译期的降级码 → 能直接念给用户听的一句话（后端不再维护这份码表）。 */
+const INTENT_WARNING_TEXT: Readonly<Record<string, string>> = {
+  AGENT_BLOCK_TYPE_UNKNOWN: '有模块用了目录里没有的组件，已跳过',
+  AGENT_ASSET_UNKNOWN: '有模块的素材不在授权清单里，已跳过',
+  AGENT_BLOCK_ASSET_REQUIRED: '有图片类模块没有给素材，已跳过',
+  AGENT_BLOCK_DATA_MISSING: '有模块缺少数据，已跳过',
+  AGENT_BLOCK_ROWS_TRIMMED: '表格超过 8 行，已裁剪',
+  AGENT_BLOCK_COLUMNS_TRIMMED: '表格超过 4 列，已裁剪',
+  AGENT_BLOCK_COLUMN_COERCED: '有列的值与声明类型不符，已按文本处理',
+  AGENT_BLOCK_PROPS_DROPPED: '有组件参数不在目录声明里，已忽略',
+  AGENT_BLOCK_SPAN_CLAMPED: '有模块宽度越界，已收进 1–4 列',
+  AGENT_BLOCK_TEXT_TRIMMED: '有文案超出长度上限，已截断',
+  AGENT_BLOCK_INVALID: '有模块结构不完整，已跳过',
+  AGENT_BLOCK_BINDING_UNSATISFIED: '有模块的列不满足绑定角色，已退化为无数据',
+  AGENT_DATASET_UNKNOWN: '引用的数据集不在本轮上下文里，该模块已跳过',
+  AGENT_BLOCKS_DROPPED: '有模块经修复仍不可用，已去掉，其余照常交出',
+  AGENT_KPI_INVALID: '有指标数值不合格，已去掉',
+  AGENT_KPI_DELTA_DROPPED: '有指标的增减量不合格，已只保留数值',
+  AGENT_ASSET_CATALOG_UNAVAILABLE: '素材目录不可用，本次未使用宿主图片',
+  INTENT_PART_NOT_SUPPORTED: '有暂不支持的内容（页面、变量、交互等）已忽略',
+  INTENT_ITEMS_TRIMMED: '区域或模块超过上限，已裁剪',
+  INTENT_REGION_VALUE_DEFAULTED: '有版面取值不认识，已用默认值',
+  INTENT_REGION_INVALID: '有区域结构不完整，已去掉',
+  INTENT_SHELL_UNAVAILABLE: '目录里没有可容纳子组件的物料，卡片与模块已平铺，不能整体移动',
+};
+
+/**
+ * 合并后端说明与 host-kit 的解析 / 编译告警，按码去重。
+ * 模型用目录里有的组件替代了用户要的东西时，逐条如实说明——不静默降级。
+ */
+function describeIntentWarnings(
+  diagnostics: readonly IntentDiagnostic[],
+  backend: readonly AgentWarningShape[],
+): AgentWarningShape[] {
+  const seen = new Set<string>();
+  const output: AgentWarningShape[] = [];
+  const add = (key: string, code: string, message: string): void => {
+    if (seen.has(key)) return;
+    seen.add(key);
+    output.push({ code, message });
+  };
+  for (const item of diagnostics) {
+    if (item.code === 'INTENT_BLOCK_SUBSTITUTED') {
+      const wanted = String(item.detail?.wanted ?? '');
+      const used = String(item.detail?.used ?? '');
+      add(
+        `${item.code}:${wanted}`,
+        item.code,
+        `你要的「${wanted}」目录里没有，已用「${used}」代替`,
+      );
+      continue;
+    }
+    add(item.code, item.code, INTENT_WARNING_TEXT[item.code] ?? '部分内容已降级');
+  }
+  for (const item of backend) add(item.code, item.code, item.message);
+  return output;
 }
 
 function describeAgentFailure(failure: string | undefined): string {

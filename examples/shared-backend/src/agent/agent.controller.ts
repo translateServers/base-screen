@@ -4,9 +4,9 @@ import type { Request, Response } from 'express';
 import {
   type AgentActInput,
   type AgentActResult,
-  type AgentCandidateResult,
   type AgentComponentEditResult,
   type AgentGenerateResult,
+  type AgentIntentResult,
   AgentService,
 } from './agent.service';
 import { AgentActDto } from './dto/agent-act.dto';
@@ -28,9 +28,11 @@ export class AgentController {
   }
 
   /**
-   * 同 `act`，结果用 SSE 推送（ADR-0112 §2.5）。整屏生成时先推 `skeleton`（骨架版面），
-   * 每写完一部分推 `progress`（完整候选），最后推 `result`（与 `act` 的响应体相同）；
-   * 失败推 `error`（状态码与错误体）。入参校验失败发生在进入流之前，仍按普通 JSON 错误返回。
+   * 同 `act`，结果用 SSE 推送（ADR-0112 §2.5 / ADR-0113 §2.8）。整屏生成时先推 `status`
+   * （`thinking`：模型推理中，不展示推理内容；`writing`：开始写正文），骨架写齐推 `skeleton`
+   * （标题、副标题、风格、版面骨架），之后每写完一个指标或块推一条 `item`（位置路径 + 值），
+   * 最后推 `result`（与 `act` 的响应体相同，带模型原文）；失败推 `error`（状态码与错误体）。
+   * 编译与审计在宿主前端做。入参校验失败发生在进入流之前，仍按普通 JSON 错误返回。
    */
   @Post('act/stream')
   @ApiOperation({ summary: '同 act，按 SSE 推送骨架与逐块进度，最后推送完整结果' })
@@ -49,14 +51,10 @@ export class AgentController {
       if (response.writableEnded) return;
       response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
-    let framed = false;
     try {
       const result = await this.agent.act({
         ...actInput(dto, signal),
-        onProgress: (document) => {
-          send(framed ? 'progress' : 'skeleton', { document });
-          framed = true;
-        },
+        onEvent: ({ type, ...payload }) => send(type, payload),
       });
       send('result', result);
     } catch (error) {
@@ -67,12 +65,14 @@ export class AgentController {
   }
 
   @Post('candidate')
-  @ApiOperation({ summary: '生成整屏候选文档，不创建或更新大屏' })
+  @ApiOperation({
+    summary: '生成整屏意图（模型原文），不创建或更新大屏；带 repair 时返回修复后的整份原文',
+  })
   async candidate(
     @Body() dto: AgentCandidateDto,
     @Req() request?: Request,
-  ): Promise<AgentCandidateResult> {
-    return this.agent.generateCandidate({
+  ): Promise<AgentIntentResult> {
+    return this.agent.generateIntent({
       signal: clientSignal(request),
       topic: dto.topic,
       screenId: dto.screenId,

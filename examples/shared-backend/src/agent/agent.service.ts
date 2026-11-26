@@ -34,13 +34,7 @@ import {
   parseAgentComponentEditSpec,
   readEditableComponents,
 } from './agent-component-edit';
-import {
-  type AgentLayoutSlot,
-  type AgentScreenLayout,
-  type ComposeReferences,
-  type ComposeStreamFrame,
-  composeScreenDocument,
-} from './agent-compose';
+import { type ComposeReferences, composeScreenDocument } from './agent-compose';
 import {
   AGENT_MAX_REPAIR_ROUNDS,
   type AgentParseIssues,
@@ -49,6 +43,7 @@ import {
   blockIssue,
   buildRepairPrompt,
   createParseIssues,
+  enrichBindingHints,
   issueBlockIndexes,
   kpiIssue,
   readRepairRequest,
@@ -71,8 +66,9 @@ import {
   type AgentScreenSpec,
   buildAgentUserPrompt,
   buildCatalogSystemPrompt,
+  buildIntentSystemPrompt,
 } from './agent-spec';
-import { scanStreamingSpec } from './agent-stream';
+import { scanStreamingPaths } from './agent-stream';
 import { resolveStylePreset } from './agent-style';
 
 /** 降级告警：code 供宿主归类，message 是能直接念给用户听的一句话。 */
@@ -110,6 +106,40 @@ export interface AgentGenerateResult extends Omit<AgentCandidateResult, 'name' |
   readonly screen: ScreenShape;
 }
 
+/**
+ * 整屏生成的结果（ADR-0113 §2.1）：后端只做「模型 ⇄ 意图层 IR」，把模型原文原样交给宿主前端，
+ * 由前端用 host-kit 解析、编译、审计；修复回环也由前端驱动，再带着 `repair` 回来要一次修复。
+ */
+export interface AgentIntentResult {
+  /** 模型原文（JSON 文本）；未配置模型时是同形的确定性兜底 JSON（指标值为 null 占位）。 */
+  readonly output: string;
+  /** 本次实际走的通道；界面照实标注，不假装一定调了模型。 */
+  readonly mode: 'llm' | 'deterministic';
+  readonly catalogSource: 'client' | 'fallback';
+  /** 本轮可用素材（按 screenId 向宿主素材库核验）：解析与编译要用。 */
+  readonly assets: readonly { readonly id: string; readonly name: string }[];
+  /** 本轮引用并解析出的数据集（含列类型，供绑定角色分配）。 */
+  readonly datasets: readonly {
+    readonly datasetId: string;
+    readonly name: string;
+    readonly columns: readonly { readonly id: string; readonly type: string }[];
+  }[];
+  readonly warnings?: readonly AgentWarning[];
+  readonly failure?: string;
+}
+
+/** 流式落稿的事件：进度态、骨架、逐项内容（位置路径见 `scanStreamingPaths`）。 */
+export type AgentStreamEvent =
+  | { readonly type: 'status'; readonly phase: 'thinking' | 'writing' }
+  | {
+      readonly type: 'skeleton';
+      readonly title: string;
+      readonly subtitle: string;
+      readonly style?: string;
+      readonly layout: unknown;
+    }
+  | { readonly type: 'item'; readonly path: string; readonly value: unknown };
+
 export interface AgentComponentEditResult {
   readonly summary: string;
   readonly patches: readonly AgentComponentPatch[];
@@ -132,8 +162,8 @@ export interface AgentActInput {
   readonly context?: unknown;
   /** 前端断开即中止上游模型请求。 */
   readonly signal?: AbortSignal;
-  /** 流式落稿（ADR-0112 §2.5）：整屏生成时，输出每写完一部分就推一份按骨架编译的候选。 */
-  readonly onProgress?: (document: Record<string, unknown>) => void;
+  /** 流式落稿（ADR-0113 §2.8）：整屏生成时，推进度态、骨架与逐项内容；编译在宿主前端做。 */
+  readonly onEvent?: (event: AgentStreamEvent) => void;
 }
 
 /**
@@ -143,7 +173,7 @@ export interface AgentActInput {
  * `set_canvas` 只回 patch，编译成 `update-canvas` 是宿主的职责。
  */
 export type AgentActResult =
-  | ({ readonly kind: 'generate_screen'; readonly routedBy: AgentRoutedBy } & AgentCandidateResult)
+  | ({ readonly kind: 'generate_screen'; readonly routedBy: AgentRoutedBy } & AgentIntentResult)
   | ({
       readonly kind: 'edit_components';
       readonly routedBy: AgentRoutedBy;
@@ -265,8 +295,6 @@ export class AgentService {
     signal?: AbortSignal;
     /** 前端校验或引擎拒绝后的一次修复（ADR-0112 §2.1.6）。 */
     repair?: unknown;
-    /** 流式落稿：只在首次生成时推帧；修复请求的输出整份重来，不流式。 */
-    onProgress?: (document: Record<string, unknown>) => void;
   }): Promise<AgentCandidateResult> {
     const topic = input.topic.trim();
     const repair = input.repair === undefined ? undefined : readRepairRequest(input.repair);
@@ -276,25 +304,7 @@ export class AgentService {
         message: '修复请求需要上一轮输出与按 IR 路径整理的诊断。',
       });
     }
-    const clientCatalog = this.resolveCatalog(input.catalog);
-    let assetCatalogWarning: string | undefined;
-    let availableAssets: AgentCatalog['assets'] = [];
-    if (input.screenId !== undefined) {
-      try {
-        availableAssets = (await this.assets.list({ screenId: input.screenId })).assets.map(
-          (asset) => ({ id: asset.id, name: asset.name.slice(0, 60) }),
-        );
-      } catch (error) {
-        if (error instanceof HttpException) throw error;
-        assetCatalogWarning = 'AGENT_ASSET_CATALOG_UNAVAILABLE';
-        this.logger.warn('agent image catalog unavailable; candidate will omit host images');
-      }
-    }
-    const catalog: AgentCatalog = {
-      ...clientCatalog,
-      assets: availableAssets,
-    };
-    const references = await this.resolveReferences(catalog, input.references);
+    const { catalog, references, assetCatalogWarning } = await this.resolveContext(input);
     const settings = resolveAgentLlmSettings(this.config);
 
     let spec = deterministicSpec(topic, catalog, references.compose);
@@ -306,10 +316,6 @@ export class AgentService {
     let lastOutput: string | undefined;
 
     if (settings !== null) {
-      const onText =
-        input.onProgress === undefined || repair !== undefined
-          ? undefined
-          : this.streamFrames(catalog, references.compose, input.onProgress);
       const outcome = await this.generateWithRepair({
         settings,
         // 目录随请求到来，所以提示词也是按目录现生成的：宿主装了新物料，下一句话就能用上。
@@ -318,7 +324,6 @@ export class AgentService {
         catalog,
         ...(repair === undefined ? {} : { repair }),
         ...(input.signal === undefined ? {} : { signal: input.signal }),
-        ...(onText === undefined ? {} : { onText }),
       });
       if (outcome.kind === 'transport') {
         // 模型调用失败（超时、HTTP 错误、断连）如实报失败，不退回确定性布局冒充产出（ADR-0112 §2.1.5）：
@@ -391,48 +396,6 @@ export class AgentService {
   }
 
   /**
-   * 流式落稿的帧（ADR-0112 §2.5）：模型输出每写完一部分，就按骨架编译一份完整候选推给宿主。
-   *
-   * 骨架（标题、副标题、`layout`）没齐之前不推；同一组已完成部分只推一次。帧与最终候选走同一个
-   * 编译器、同一套 id 与层级规则，所以内容对得上时，最终候选就是最后一帧去掉占位框；
-   * 对不上（块被丢、个数与骨架不符）由宿主比对发现，整屏替换。
-   */
-  private streamFrames(
-    catalog: AgentCatalog,
-    references: ComposeReferences | undefined,
-    emit: (document: Record<string, unknown>) => void,
-  ): (text: string) => void {
-    let lastKey: string | undefined;
-    return (text) => {
-      const frame = readStreamingSpec(text, catalog);
-      if (frame === null || frame.key === lastKey) return;
-      lastKey = frame.key;
-      const composed = composeScreenDocument({
-        spec: {
-          title: frame.title,
-          subtitle: frame.subtitle,
-          kpis: [],
-          blocks: [],
-          mode: 'llm',
-        },
-        catalog,
-        style: resolveStylePreset(frame.style),
-        stream: frame.stream,
-        ...(references === undefined ? {} : { references }),
-      });
-      if (!composed.ok) return;
-      try {
-        emit(composed.value.document);
-      } catch (error) {
-        // 推帧失败（连接已断）不影响生成本身：断开由 signal 负责中止。
-        this.logger.warn(
-          `agent stream frame dropped: ${error instanceof Error ? error.name : 'unknown'}`,
-        );
-      }
-    };
-  }
-
-  /**
    * 生成 → 校验 → 修复回环（ADR-0112 §2.1）。
    *
    * 每轮：调用模型 → 宽容解析 IR → 收集诊断。没有诊断就交出；有诊断就把上一轮原文与诊断清单
@@ -451,8 +414,6 @@ export class AgentService {
      * 所以这条路径最多再多一次内部修复，总调用次数仍有上限。
      */
     readonly repair?: AgentRepairRequest;
-    /** 首轮改为流式请求，每收到一段正文交出累计全文（ADR-0112 §2.5）。 */
-    readonly onText?: (text: string) => void;
   }): Promise<
     | { readonly kind: 'transport'; readonly failure: string }
     | {
@@ -478,32 +439,19 @@ export class AgentService {
     let previousKey: string | undefined =
       input.repair === undefined ? undefined : repairKey(input.repair.issues);
     let repairRounds = input.repair === undefined ? 0 : 1;
-    let firstRound = true;
     for (;;) {
       const options = {
         retry: true,
         followUp,
         ...(input.signal === undefined ? {} : { signal: input.signal }),
       };
-      // 只有首轮流式：修复轮的输出是整份重来，边写边画只会让画面来回跳。
-      const onText = firstRound ? input.onText : undefined;
-      firstRound = false;
-      const result =
-        onText === undefined
-          ? await requestAgentCompletion(
-              input.settings,
-              input.system,
-              input.user,
-              this.logger,
-              options,
-            )
-          : await requestAgentCompletionStream(
-              input.settings,
-              input.system,
-              input.user,
-              this.logger,
-              { ...options, onText },
-            );
+      const result = await requestAgentCompletion(
+        input.settings,
+        input.system,
+        input.user,
+        this.logger,
+        options,
+      );
       if (!result.ok || result.text === undefined) {
         return { kind: 'transport', failure: result.failure ?? 'AGENT_FAILED' };
       }
@@ -554,6 +502,171 @@ export class AgentService {
         { role: 'user', content: buildRepairPrompt(issues) },
       );
     }
+  }
+
+  /**
+   * 一次生成的上下文：宿主目录、本屏授权素材、解析过的引用。
+   * 素材按 screenId 向宿主素材库核验；认不出来的引用直接丢掉并记日志。
+   */
+  private async resolveContext(input: {
+    screenId?: string;
+    catalog?: unknown;
+    references?: readonly Record<string, unknown>[];
+  }): Promise<{
+    catalog: AgentCatalog;
+    references: Awaited<ReturnType<AgentService['resolveReferences']>>;
+    assetCatalogWarning: string | undefined;
+  }> {
+    const clientCatalog = this.resolveCatalog(input.catalog);
+    let assetCatalogWarning: string | undefined;
+    let availableAssets: AgentCatalog['assets'] = [];
+    if (input.screenId !== undefined) {
+      try {
+        availableAssets = (await this.assets.list({ screenId: input.screenId })).assets.map(
+          (asset) => ({ id: asset.id, name: asset.name.slice(0, 60) }),
+        );
+      } catch (error) {
+        if (error instanceof HttpException) throw error;
+        assetCatalogWarning = 'AGENT_ASSET_CATALOG_UNAVAILABLE';
+        this.logger.warn('agent image catalog unavailable; candidate will omit host images');
+      }
+    }
+    const catalog: AgentCatalog = { ...clientCatalog, assets: availableAssets };
+    const references = await this.resolveReferences(catalog, input.references);
+    return { catalog, references, assetCatalogWarning };
+  }
+
+  /**
+   * 整屏生成（设计器路径，ADR-0113 §2.1）：只做「模型 ⇄ IR」。
+   *
+   * 把模型原文原样交给宿主前端；解析、编译、审计与修复回环都在宿主做（host-kit）。
+   * 前端带 `repair`（上一轮原文 + 按模型路径整理的诊断）回来时，把它们作为后续对话发给模型，
+   * 返回修复后的整份原文。首次生成可以流式：先推进度态，骨架写完推 `skeleton`，之后每写完一项推 `item`。
+   * 模型调用失败（超时、HTTP 错误、断连）如实报错，不退回确定性布局（ADR-0112 §2.1.5）。
+   */
+  async generateIntent(input: {
+    topic: string;
+    screenId?: string;
+    catalog?: unknown;
+    references?: readonly Record<string, unknown>[];
+    signal?: AbortSignal;
+    repair?: unknown;
+    onEvent?: (event: AgentStreamEvent) => void;
+  }): Promise<AgentIntentResult> {
+    const topic = input.topic.trim();
+    const repair = input.repair === undefined ? undefined : readRepairRequest(input.repair);
+    if (repair === null) {
+      throw new BadRequestException({
+        error: 'AGENT_REPAIR_INVALID',
+        message: '修复请求需要上一轮输出与按 IR 路径整理的诊断。',
+      });
+    }
+    const { catalog, references, assetCatalogWarning } = await this.resolveContext(input);
+    const settings = resolveAgentLlmSettings(this.config);
+    const context = {
+      catalogSource: catalog.source,
+      assets: catalog.assets,
+      datasets: references.compose?.datasets ?? [],
+      ...(assetCatalogWarning === undefined
+        ? {}
+        : {
+            warnings: [
+              { code: assetCatalogWarning, message: describeWarning(assetCatalogWarning) },
+            ],
+          }),
+    } as const;
+
+    if (settings === null) {
+      return {
+        output: JSON.stringify(deterministicIntent(topic, catalog, references.compose)),
+        mode: 'deterministic',
+        failure: 'AGENT_NOT_CONFIGURED',
+        ...context,
+      };
+    }
+
+    const followUp: AgentChatMessage[] =
+      repair === undefined
+        ? []
+        : [
+            { role: 'assistant', content: repair.output },
+            {
+              role: 'user',
+              content: buildRepairPrompt(enrichBindingHints(repair.issues, repair.output, catalog)),
+            },
+          ];
+    const options = {
+      retry: true,
+      followUp,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    };
+    const system = buildIntentSystemPrompt(catalog, references.prompt);
+    const user = buildAgentUserPrompt(topic);
+    // 修复轮的输出是整份重来，边写边画只会让画面来回跳：只有首次生成才流式。
+    const streaming = input.onEvent !== undefined && repair === undefined;
+    input.onEvent?.({ type: 'status', phase: 'thinking' });
+    const result = streaming
+      ? await requestAgentCompletionStream(settings, system, user, this.logger, {
+          ...options,
+          onText: this.streamEvents(input.onEvent as (event: AgentStreamEvent) => void),
+        })
+      : await requestAgentCompletion(settings, system, user, this.logger, options);
+    if (!result.ok || result.text === undefined) {
+      throw transportFailure(result.failure ?? 'AGENT_FAILED');
+    }
+    return { output: result.text, mode: 'llm', ...context };
+  }
+
+  /**
+   * 流式事件：模型每吐一段正文，就把新写完的部分推给宿主。
+   *
+   * 骨架（标题、副标题、`layout`）没写齐之前不推任何内容项；同一项只推一次。
+   * 推送失败（连接已断）不影响生成本身：断开由 signal 负责中止。
+   */
+  private streamEvents(emit: (event: AgentStreamEvent) => void): (text: string) => void {
+    const sent = new Set<string>();
+    let wrote = false;
+    let skeleton = false;
+    const push = (event: AgentStreamEvent): void => {
+      try {
+        emit(event);
+      } catch (error) {
+        this.logger.warn(
+          `agent stream event dropped: ${error instanceof Error ? error.name : 'unknown'}`,
+        );
+      }
+    };
+    return (text) => {
+      if (!wrote) {
+        wrote = true;
+        push({ type: 'status', phase: 'writing' });
+      }
+      const found = scanStreamingPaths(text);
+      if (!skeleton) {
+        const title = parseJson(found.get('title'));
+        const subtitle = parseJson(found.get('subtitle'));
+        const layout = parseJson(found.get('layout'));
+        if (typeof title !== 'string' || typeof subtitle !== 'string' || layout === undefined) {
+          return;
+        }
+        const style = parseJson(found.get('style'));
+        skeleton = true;
+        push({
+          type: 'skeleton',
+          title,
+          subtitle,
+          ...(typeof style === 'string' && style !== '' ? { style } : {}),
+          layout,
+        });
+      }
+      for (const [path, raw] of found) {
+        if (sent.has(path) || !/\[\d+\]$/.test(path)) continue;
+        const value = parseJson(raw);
+        if (value === undefined) continue;
+        sent.add(path);
+        push({ type: 'item', path, value });
+      }
+    };
   }
 
   /**
@@ -680,15 +793,15 @@ export class AgentService {
     });
 
     if (decision.action === 'generate_screen') {
-      const candidate = await this.generateCandidate({
+      const generated = await this.generateIntent({
         topic: text,
         ...(input.screenId === undefined ? {} : { screenId: input.screenId }),
         ...(input.catalog === undefined ? {} : { catalog: input.catalog }),
         ...(input.references === undefined ? {} : { references: input.references }),
         ...(input.signal === undefined ? {} : { signal: input.signal }),
-        ...(input.onProgress === undefined ? {} : { onProgress: input.onProgress }),
+        ...(input.onEvent === undefined ? {} : { onEvent: input.onEvent }),
       });
-      return { kind: 'generate_screen', routedBy: decision.routedBy, ...candidate };
+      return { kind: 'generate_screen', routedBy: decision.routedBy, ...generated };
     }
 
     if (decision.action === 'edit_components') {
@@ -866,91 +979,6 @@ function describeTransportFailure(failure: string): string {
   if (failure === 'AGENT_CANCELLED') return '请求已取消';
   const status = /^AGENT_HTTP_(\d{3})$/.exec(failure)?.[1];
   return status === undefined ? '模型调用失败' : `模型服务返回错误（HTTP ${status}）`;
-}
-
-/** 流式落稿的一帧所需：骨架 + 已写完的指标与块。 */
-export interface StreamingSpec {
-  readonly title: string;
-  readonly subtitle: string;
-  readonly style?: string;
-  readonly stream: ComposeStreamFrame;
-  /** 已写完部分的指纹：没变就不必再推一帧。 */
-  readonly key: string;
-}
-
-/**
- * 从写了一部分的模型输出里读出骨架与已写完的指标、块（ADR-0112 §2.5）。
- *
- * 骨架要求标题、副标题与 `layout` 都已写完且合法；不齐就返回 null，此时不推任何帧，
- * 等整份输出写完走常规路径。指标与块逐项按既有规则读，读不出来的那一格留空
- * （宿主看到的是占位框），修复交给整份输出写完之后的常规回环。
- */
-export function readStreamingSpec(text: string, catalog: AgentCatalog): StreamingSpec | null {
-  const snapshot = scanStreamingSpec(text);
-  const title = readStreamString(snapshot.fields.get('title'));
-  const subtitle = readStreamString(snapshot.fields.get('subtitle'));
-  const layout = readStreamLayout(snapshot.fields.get('layout'), catalog);
-  if (title === '' || subtitle === '' || layout === null) return null;
-  const style = readStreamString(snapshot.fields.get('style'));
-  const kpiItems = (snapshot.items.get('kpis') ?? []).slice(0, layout.kpis);
-  const blockItems = (snapshot.items.get('blocks') ?? []).slice(0, layout.blocks.length);
-  // 逐项读时的降级告警不在这里报：整份写完后的常规解析会再读一遍、如实汇总。
-  const ignored: string[] = [];
-  return {
-    title: title.slice(0, 20),
-    subtitle: subtitle.slice(0, 40),
-    ...(style === '' ? {} : { style }),
-    stream: {
-      layout,
-      kpis: kpiItems.map((raw) => readKpis([parseStreamJson(raw)], ignored)[0]),
-      blocks: blockItems.map((raw) => readBlocks([parseStreamJson(raw)], catalog, ignored)[0]),
-    },
-    key: `${style}|${kpiItems.length}|${blockItems.length}`,
-  };
-}
-
-/**
- * 骨架：`{ kpis: 指标个数, blocks: [{ type, span }] }`。type 必须在目录里——数据型与否
- * 由物料声明决定，行高权重据此算；span 与 `readBlocks` 一样收进 1–4。
- */
-function readStreamLayout(
-  raw: string | undefined,
-  catalog: AgentCatalog,
-): AgentScreenLayout | null {
-  const layout = asRecord(parseStreamJson(raw));
-  if (layout === null) return null;
-  const kpis = layout.kpis;
-  if (typeof kpis !== 'number' || !Number.isInteger(kpis) || kpis < 1 || kpis > 5) return null;
-  if (!Array.isArray(layout.blocks) || layout.blocks.length < 1 || layout.blocks.length > 4) {
-    return null;
-  }
-  const blocks: AgentLayoutSlot[] = [];
-  for (const item of layout.blocks) {
-    const slot = asRecord(item);
-    const type = typeof slot?.type === 'string' ? slot.type.trim() : '';
-    const material = catalog.materials.find((candidate) => candidate.type === type);
-    const span = slot?.span;
-    if (material === undefined || typeof span !== 'number' || !Number.isFinite(span)) return null;
-    blocks.push({
-      span: Math.min(4, Math.max(1, Math.round(span))),
-      data: material.data === 'tabular',
-    });
-  }
-  return { kpis, blocks };
-}
-
-function readStreamString(raw: string | undefined): string {
-  const value = parseStreamJson(raw);
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function parseStreamJson(raw: string | undefined): unknown {
-  if (raw === undefined) return undefined;
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return undefined;
-  }
 }
 
 const KPI_DELTA_UNITS = new Set(['percent', 'point', 'absolute']);
@@ -1270,4 +1298,26 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+/**
+ * 未配置模型时的确定性兜底，写成意图层 IR 的 JSON（平铺写法）：只给版面与占位，不给任何数字——
+ * 指标值为 null，宿主编译时画「—」；编译与审计与模型产物走同一条链。
+ */
+function deterministicIntent(
+  topic: string,
+  catalog: AgentCatalog,
+  references?: ComposeReferences,
+): Record<string, unknown> {
+  const spec = deterministicSpec(topic, catalog, references);
+  return { title: spec.title, subtitle: spec.subtitle, kpis: spec.kpis, blocks: spec.blocks };
+}
+
+function parseJson(raw: string | undefined): unknown {
+  if (raw === undefined) return undefined;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return undefined;
+  }
 }

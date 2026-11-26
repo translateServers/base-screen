@@ -146,6 +146,41 @@ export function createScreenMcpServer(provider) {
   );
   registerTool(
     server,
+    'compile_screen_intent',
+    {
+      intent: z.unknown(),
+      catalog: z
+        .object({
+          materials: z.array(z.unknown()).min(1).max(200),
+          assets: z.array(z.object({ id: z.string().min(1), name: z.string() })).optional(),
+        })
+        .strict(),
+      references: z
+        .object({
+          assets: z.array(z.object({ id: z.string().min(1), name: z.string() })),
+          datasets: z.array(
+            z.object({
+              datasetId: z.string().min(1),
+              name: z.string(),
+              columns: z.array(z.object({ id: z.string().min(1), type: z.string() })),
+            }),
+          ),
+        })
+        .optional(),
+      mode: z.enum(['llm', 'deterministic']).optional().default('llm'),
+    },
+    'Compile an agent intent (the model output: title, subtitle, style, and either regions of band / grid / split or the flat kpis + blocks shape) into a Screen Document candidate, with the same parser, compiler and layout solver the designer host runs. Needs the material catalog (type, data kind, props, binding roles, defaults, and children for shell containers). Returns the candidate document, the component-id → model-path source table, repair issues keyed by model path (dropped items, LAYOUT_CAPACITY_EXCEEDED, unsatisfiable bindings, layout audit errors) and warnings (including INTENT_BLOCK_SUBSTITUTED gaps). Does not touch the loaded snapshot; persist the candidate yourself.',
+    (input) => provider.compileScreenIntent(input),
+  );
+  registerTool(
+    server,
+    'solve_layout',
+    { regions: z.array(z.unknown()).min(1).max(6) },
+    'Solve the layout of a region sequence without any content: band (count of equal KPI cards), grid (slots with span 1-4 and a data flag) and split (main + rail stacks, ratio wide-narrow | even, railSide left | right). Returns pixel boxes per region on the 1920x1080 canvas, or LAYOUT_CAPACITY_EXCEEDED with the required and available pixels when the regions do not fit. Pure function; propose_layout (align / distribute existing components) is unrelated.',
+    (input) => provider.solveLayout(input),
+  );
+  registerTool(
+    server,
     'export_screen',
     { document: z.unknown().optional() },
     'Serialize a Screen Document to canonical JSON text, the artifact a host persists and compares. Omit document to export the loaded snapshot.',

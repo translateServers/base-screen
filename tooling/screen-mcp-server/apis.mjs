@@ -30,14 +30,19 @@ const CORE_EXPORTS = [
   'resolveScreenFontFloorPx',
 ];
 
+/** 意图层（ADR-0113）：编译与布局求解，与设计器宿主前端同一份实现。 */
+const HOST_KIT_EXPORTS = ['mapDocumentIssues', 'prepareIntent', 'repairKey', 'solveLayout'];
+
 export async function loadScreenApis() {
-  const [contracts, core] = await Promise.all([
+  const [contracts, core, hostKit] = await Promise.all([
     loadPackage('@base-screen/contracts', 'packages/contracts/dist/index.js'),
     loadPackage('@base-screen/core', 'packages/core/dist/index.js'),
+    loadPackage('@base-screen/host-kit', 'packages/host-kit/dist/index.js'),
   ]);
   assertExports(contracts, CONTRACTS_EXPORTS, '@base-screen/contracts');
   assertExports(core, CORE_EXPORTS, '@base-screen/core');
-  return { ...contracts, ...core };
+  assertExports(hostKit, HOST_KIT_EXPORTS, '@base-screen/host-kit');
+  return { ...contracts, ...core, intent: hostKit };
 }
 
 async function loadPackage(specifier, fallback) {

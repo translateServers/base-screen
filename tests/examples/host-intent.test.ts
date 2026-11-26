@@ -72,19 +72,133 @@ const request = {
   scope: { kind: 'screen' as const },
 };
 
-/** 整屏作用域现在统一打 `/agent/act`；这个 helper 给"路由判定为生成"的响应形状。 */
-function screenActResponse(candidate: unknown = componentDocument()): Response {
+/**
+ * 整屏生成的夹具（ADR-0113 §2.7）：后端只回模型原文，解析、编译、审计与修复回环都在宿主。
+ * 目录用假的 `list()`，形状取自真实物料的最小子集；容器声明了 `children`，所以卡片与块会编成组合。
+ */
+function manifestOf(
+  type: string,
+  name: string,
+  extra: Record<string, unknown> = {},
+): { manifest: Record<string, unknown> } {
+  return {
+    manifest: {
+      type,
+      name,
+      category: '基础',
+      defaultSize: { width: 240, height: 120 },
+      defaultProps: {},
+      defaultStyle: {},
+      styleSchema: { kind: 'object', properties: {}, required: [] },
+      propsSchema: { kind: 'object', properties: {}, required: [] },
+      dataCapabilities: [],
+      designCapabilities: { resize: true, rotate: true },
+      ...extra,
+    },
+  };
+}
+
+const GENERATION_CATALOG = {
+  list: () => [
+    manifestOf('base.text', '文本', {
+      staticData: { kind: 'scalar' },
+      defaultStyle: { color: '#e9eef5', fontSize: 20, fontWeight: '400' },
+    }),
+    manifestOf('base.rectangle', '矩形', {
+      defaultStyle: { fill: '#141b24', borderRadius: 12 },
+    }),
+    manifestOf('base.chart', '图表', {
+      category: '数据',
+      staticData: { kind: 'tabular' },
+      dataBinding: {
+        roles: [
+          { id: 'dimension', minFields: 1, maxFields: 1 },
+          { id: 'measures', minFields: 1, maxFields: 8 },
+        ],
+      },
+      defaultStyle: { backgroundColor: '#111827', color: '#f9fafb' },
+    }),
+    manifestOf('base.container', '容器', {
+      libraryVisible: false,
+      designCapabilities: { resize: true, rotate: true, children: true },
+      defaultStyle: { fill: 'transparent', borderColor: 'transparent', borderWidth: 1 },
+    }),
+  ],
+};
+
+const generationHandler = (element = designer()) =>
+  createHostIntentHandler({
+    designer: element as unknown as BaseScreenDesignerElement,
+    screenId: 'screen-test',
+    catalog: () => GENERATION_CATALOG as never,
+  });
+
+const KPI = { label: '总量', value: 286000, unit: '件' };
+const NOTE = { type: 'base.text', title: '要点', span: 2, text: '甲' };
+const CHART_TABLE = {
+  columns: [
+    { id: 'day', label: '日期', type: 'string' },
+    { id: 'amount', label: '金额', type: 'number' },
+  ],
+  rows: Array.from({ length: 10 }, (_, index) => ({ day: `d${index}`, amount: index })),
+};
+
+/** 模型原文：平铺写法，一条指标 + 一个文字块。 */
+function output(extra: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    title: '作战室',
+    subtitle: '按日汇总的口径',
+    kpis: [KPI],
+    blocks: [NOTE],
+    ...extra,
+  });
+}
+
+/** 整屏作用域统一打 `/agent/act/stream`；这个 helper 给「路由判定为生成」的一次性响应。 */
+function intentResponse(overrides: Record<string, unknown> = {}): Response {
   return Response.json({
     kind: 'generate_screen',
     routedBy: 'rule',
-    name: '作战室',
-    document: candidate,
-    mode: 'deterministic',
-    imageCount: 0,
+    output: output(),
+    mode: 'llm',
     catalogSource: 'client',
-    materials: [],
+    assets: [],
+    datasets: [],
+    ...overrides,
   });
 }
+
+/** `/agent/candidate` 的修复响应：不带 kind / routedBy。 */
+function repairResponse(overrides: Record<string, unknown> = {}): Response {
+  return Response.json({
+    output: output(),
+    mode: 'llm',
+    catalogSource: 'client',
+    assets: [],
+    datasets: [],
+    ...overrides,
+  });
+}
+
+function sse(events: readonly (readonly [string, unknown])[]): Response {
+  const body = events
+    .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+    .join('');
+  return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
+}
+
+/** 六个纵向区域放不下：带指标带 + 5 个栅格区域。 */
+const OVERFLOW = JSON.stringify({
+  title: '作战室',
+  subtitle: '按日汇总的口径',
+  regions: [
+    { kind: 'band', items: [KPI] },
+    ...Array.from({ length: 5 }, (_, index) => ({
+      kind: 'grid',
+      blocks: [{ ...NOTE, title: `块${index}`, span: 4 }],
+    })),
+  ],
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -473,59 +587,59 @@ describe('host intent action routing', () => {
     expect(result.reason).toBe('先选中要改的组件');
     expect(element.submitChangeProposal).not.toHaveBeenCalled();
   });
-
-  it('never submits a whole-screen proposal built from an empty document', async () => {
-    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => screenActResponse(document())),
-    );
-    const element = designer();
-
-    const result = await handler(element)(request);
-
-    expect(result.ok).toBe(false);
-    expect(element.submitChangeProposal).not.toHaveBeenCalled();
-  });
 });
 
-describe('host intent candidate safety', () => {
-  it('routes the screen scope through /agent/act/stream and submits an unsaved proposal', async () => {
+describe('host intent whole-screen generation (ADR-0113 §2.7)', () => {
+  const stubFetch = (...responses: Response[]) => {
     vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-    const fetch = vi.fn(async () => screenActResponse());
+    // 每次都交出一份克隆：原件的响应体不会被读掉，最后一份可以无限重复。
+    let call = 0;
+    const fetch = vi.fn(async () => {
+      const response = responses[Math.min(call, responses.length - 1)];
+      call += 1;
+      return (response as Response).clone();
+    });
     vi.stubGlobal('fetch', fetch);
+    return fetch;
+  };
+
+  it('routes the screen scope through /agent/act/stream, compiles locally and submits an unsaved proposal', async () => {
+    const fetch = stubFetch(intentResponse());
     const element = designer();
     const before = element.getDocument();
-    const controller = new AbortController();
 
-    expect((await handler(element)(request, controller.signal)).ok).toBe(true);
-    // 关键：不再直接打 /agent/candidate；动作由后端判定，宿主只负责编译。
-    // 整屏作用域按 SSE 请求（ADR-0112 §2.5）；后端回普通 JSON 时照常按一次性结果处理。
-    expect(fetch).toHaveBeenCalledExactlyOnceWith('http://api.test/agent/act/stream', {
-      method: 'POST',
-      headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: request.text,
-        scope: 'screen',
-        screenId: 'screen-test',
-        canvas: { backgroundColor: '#000000', hasBackgroundImage: false },
-        context: {
-          canvas: {
-            width: 1920,
-            height: 1080,
-            backgroundColor: '#000000',
-            hasBackgroundImage: false,
-          },
-          componentCount: 0,
-          types: [],
-          selection: [],
-          lockedCount: 0,
-        },
-      }),
-      signal: expect.any(AbortSignal),
-    });
+    expect((await generationHandler(element)(request, new AbortController().signal)).ok).toBe(true);
+    // 不再直接打 /agent/candidate；动作由后端判定，整屏作用域按 SSE 请求，后端回普通 JSON 时照常读。
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls[0]?.[0]).toBe('http://api.test/agent/act/stream');
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body).toMatchObject({ text: request.text, scope: 'screen', screenId: 'screen-test' });
+    // 目录随请求带来，容器带 children 标记（外壳），但不会出现在模型可挑的类型里（后端提示词不列）。
+    expect(body.catalog.materials.map((item: { type: string }) => item.type)).toContain(
+      'base.container',
+    );
     expect(element.submitChangeProposal).toHaveBeenCalledOnce();
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
+    expect(proposal?.scope).toBe('整屏');
+    expect(
+      proposal?.commands.some((command: { type: string }) => command.type === 'add-component'),
+    ).toBe(true);
+    // 候选只是提案，文档本身没动。
     expect(element.getDocument()).toBe(before);
+  });
+
+  it('compiles cards and blocks into movable groups when the catalog has a shell', async () => {
+    stubFetch(intentResponse());
+    const element = designer();
+
+    expect((await generationHandler(element)(request)).ok).toBe(true);
+    const commands = (element.submitChangeProposal.mock.calls[0]?.[0]?.commands ?? []) as {
+      type: string;
+      component?: { type: string; parentId: string | null };
+    }[];
+    const added = commands.filter((command) => command.type === 'add-component');
+    expect(added.some((command) => command.component?.type === 'base.container')).toBe(true);
+    expect(added.some((command) => command.component?.parentId !== null)).toBe(true);
   });
 
   it.each(['abort', 'document', 'undo', 'unload', 'pending'] as const)(
@@ -544,13 +658,13 @@ describe('host intent candidate safety', () => {
       );
       const element = designer();
       const controller = new AbortController();
-      const result = handler(element)(request, controller.signal);
+      const result = generationHandler(element)(request, controller.signal);
       if (change === 'abort') controller.abort();
       if (change === 'document') element.getDocument.mockReturnValue(document());
       if (change === 'undo') element.dispatchEvent(new Event('base-screen-change'));
       if (change === 'unload') element.getDocument.mockReturnValue(undefined);
       if (change === 'pending') element.readPendingChange.mockReturnValue({ id: 'existing' });
-      finish(screenActResponse());
+      finish(intentResponse());
 
       expect((await result).ok).toBe(false);
       expect(element.submitChangeProposal).not.toHaveBeenCalled();
@@ -572,45 +686,60 @@ describe('host intent candidate safety', () => {
       if (state === 'unloaded') element.getDocument.mockReturnValue(undefined);
       if (state === 'pending') element.readPendingChange.mockReturnValue({ id: 'existing' });
 
-      expect((await handler(element)(request, controller.signal)).ok).toBe(false);
+      expect((await generationHandler(element)(request, controller.signal)).ok).toBe(false);
       expect(fetch).not.toHaveBeenCalled();
       expect(element.submitChangeProposal).not.toHaveBeenCalled();
     },
   );
 
-  it('rejects an invalid candidate document without submitting it', async () => {
-    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => screenActResponse({ invalid: true })),
-    );
+  it('refuses to generate without the designer catalog instead of guessing one', async () => {
+    const fetch = stubFetch(intentResponse());
     const element = designer();
 
     const result = await handler(element)(request);
+
     expect(result.ok).toBe(false);
-    expect(result.diagnostics.length).toBeGreaterThan(0);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toContain('物料目录');
+    expect(element.submitChangeProposal).not.toHaveBeenCalled();
+    void fetch;
+  });
+
+  it('never submits a whole-screen proposal built from an empty output', async () => {
+    stubFetch(intentResponse({ output: '{}' }));
+    const element = designer();
+
+    const result = await generationHandler(element)(request);
+
+    expect(result.ok).toBe(false);
+    expect(element.submitChangeProposal).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unparseable output after asking for a repair once, without submitting it', async () => {
+    const fetch = stubFetch(intentResponse({ output: '这不是 JSON' }));
+    const element = designer();
+
+    const result = await generationHandler(element)(request);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toContain('无法整理成大屏');
+    // 同一组诊断连续两轮不变就提前停：一次修复请求后原地打转，不再请求。
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(element.submitChangeProposal).not.toHaveBeenCalled();
   });
 
   it('explains why the deterministic fallback ran in the proposal rationale', async () => {
-    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        Response.json({
-          kind: 'generate_screen',
-          routedBy: 'rule',
-          name: '作战室',
-          document: componentDocument(),
-          mode: 'deterministic',
-          imageCount: 0,
-          failure: 'AGENT_NOT_CONFIGURED',
-        }),
-      ),
+    stubFetch(
+      intentResponse({
+        mode: 'deterministic',
+        failure: 'AGENT_NOT_CONFIGURED',
+        output: output({ kpis: [{ label: '总量', value: null }] }),
+      }),
     );
     const element = designer();
 
-    expect((await handler(element)(request)).ok).toBe(true);
+    expect((await generationHandler(element)(request)).ok).toBe(true);
     const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
     expect(proposal?.title).toBe('智能体 · 生成一张作战室');
     expect(proposal?.origin).toEqual({ author: '智能体' });
@@ -618,146 +747,136 @@ describe('host intent candidate safety', () => {
     expect(proposal?.rationale).not.toContain('AGENT_NOT_CONFIGURED');
   });
 
-  it('names the degradation count in the proposal rationale', async () => {
-    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        Response.json({
-          kind: 'generate_screen',
-          routedBy: 'model',
-          name: '作战室',
-          document: componentDocument(),
-          mode: 'llm',
-          imageCount: 0,
-          warnings: [{ code: 'AGENT_BLOCK_ROWS_TRIMMED', message: '表格超过 8 行，已裁剪' }],
+  it('names the degradation in the proposal rationale', async () => {
+    stubFetch(
+      intentResponse({
+        output: output({
+          blocks: [{ type: 'base.chart', title: '趋势', span: 4, table: CHART_TABLE }],
         }),
-      ),
+      }),
     );
     const element = designer();
 
-    expect((await handler(element)(request)).ok).toBe(true);
+    expect((await generationHandler(element)(request)).ok).toBe(true);
     const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
     expect(proposal?.rationale).toContain('有 1 处降级：表格超过 8 行，已裁剪');
   });
 
-  it('reports the failure even when the model still produced a screen', async () => {
-    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        Response.json({
-          kind: 'generate_screen',
-          routedBy: 'model',
-          name: '作战室',
-          document: componentDocument(),
-          mode: 'llm',
-          imageCount: 0,
-          failure: 'AGENT_SPEC_INVALID',
+  it('says what the model substituted for what the user asked for', async () => {
+    stubFetch(
+      intentResponse({
+        output: output({
+          blocks: [
+            {
+              type: 'base.chart',
+              title: '门店排行',
+              span: 4,
+              substituteFor: '全国门店分布地图',
+              table: { ...CHART_TABLE, rows: CHART_TABLE.rows.slice(0, 4) },
+            },
+          ],
         }),
-      ),
+      }),
     );
     const element = designer();
 
-    expect((await handler(element)(request)).ok).toBe(true);
-    const proposal = element.submitChangeProposal.mock.calls[0]?.[0];
-    // 有产出不等于没出问题：failure 必须出现在理由里，而不是被「由模型生成」盖过去。
-    expect(proposal?.rationale).toContain('模型输出未通过校验');
+    expect((await generationHandler(element)(request)).ok).toBe(true);
+    expect(element.submitChangeProposal.mock.calls[0]?.[0]?.rationale).toContain(
+      '你要的「全国门店分布地图」目录里没有，已用「图表」代替',
+    );
   });
 
-  describe('host audit and one repair round (ADR-0112 §2.1.6)', () => {
-    /** 一份字号 12px 的模型候选：canonical 合法，但过不了生成产物的版面审计。 */
-    function tinyDocument(): ScreenDocument {
-      const base = componentDocument();
-      return {
-        ...base,
-        components: base.components.map((component) => ({
-          ...component,
-          id: 'agent-kpi-0',
-          style: { ...component.style, fontSize: 12 },
-        })),
-      };
-    }
+  it('reports the failure even when the model still produced a screen', async () => {
+    stubFetch(intentResponse({ failure: 'AGENT_SPEC_INVALID' }));
+    const element = designer();
 
-    function llmActResponse(candidate: ScreenDocument): Response {
-      return Response.json({
-        kind: 'generate_screen',
-        routedBy: 'rule',
-        name: '作战室',
-        document: candidate,
-        mode: 'llm',
-        imageCount: 0,
-        catalogSource: 'client',
-        materials: [],
-        repairContext: { output: '{"draft":1}', sources: { 'agent-kpi-0': 'kpis[0]' } },
-      });
-    }
+    expect((await generationHandler(element)(request)).ok).toBe(true);
+    // 有产出不等于没出问题：failure 必须出现在理由里，而不是被「由模型生成」盖过去。
+    expect(element.submitChangeProposal.mock.calls[0]?.[0]?.rationale).toContain(
+      '模型输出未通过校验',
+    );
+  });
 
-    it('audits the candidate, asks for one repair with IR paths, then submits the repair', async () => {
-      vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-      const fetch = vi
-        .fn()
-        .mockResolvedValueOnce(llmActResponse(tinyDocument()))
-        .mockResolvedValueOnce(
-          Response.json({
-            name: '作战室',
-            document: componentDocument(),
-            mode: 'llm',
-            imageCount: 0,
-            materials: [],
-          }),
-        );
-      vi.stubGlobal('fetch', fetch);
+  describe('repair loop (ADR-0112 §2.1, driven by the host)', () => {
+    const BAD_KPI = output({ kpis: [KPI, { label: '坏', value: '28.6 万' }] });
+
+    it('asks for a repair with model paths when an item is unusable, then submits the repaired output', async () => {
+      const fetch = stubFetch(intentResponse({ output: BAD_KPI }), repairResponse());
       const element = designer();
 
-      const result = await handler(element)(request);
+      const result = await generationHandler(element)(request);
 
       expect(result.ok).toBe(true);
       expect(fetch).toHaveBeenCalledTimes(2);
       expect(fetch.mock.calls[1]?.[0]).toBe('http://api.test/agent/candidate');
       const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
       expect(body.repair).toEqual({
-        output: '{"draft":1}',
-        issues: [{ code: 'LAYOUT_FONT_TOO_SMALL', path: 'kpis[0]' }],
+        output: BAD_KPI,
+        issues: [{ code: 'AGENT_KPI_INVALID', path: 'kpis[1]' }],
       });
-      // 没过审计的那份从未进草案：只提交了修复后的一份。
+      // 没修好的那份从未进草案：只提交了修复后的一份，理由里写明修复过。
       expect(element.submitChangeProposal).toHaveBeenCalledOnce();
+      expect(element.submitChangeProposal.mock.calls[0]?.[0]?.rationale).toContain(
+        '已请模型修复 1 次',
+      );
     });
 
-    it('stops after one repair when the repaired candidate still fails', async () => {
-      vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-      const fetch = vi
-        .fn()
-        .mockResolvedValueOnce(llmActResponse(tinyDocument()))
-        .mockResolvedValueOnce(llmActResponse(tinyDocument()));
-      vi.stubGlobal('fetch', fetch);
+    it('asks for a repair when the layout does not fit, naming the capacity conflict', async () => {
+      const fetch = stubFetch(intentResponse({ output: OVERFLOW }), repairResponse());
       const element = designer();
 
-      const result = await handler(element)(request);
+      expect((await generationHandler(element)(request)).ok).toBe(true);
+      const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+      expect(body.repair.issues).toEqual([
+        { code: 'LAYOUT_CAPACITY_EXCEEDED', path: expect.stringMatching(/^regions\[\d\]$/) },
+      ]);
+    });
+
+    it('stops when the same diagnostics come back, and delivers the usable rest with an honest note', async () => {
+      const fetch = stubFetch(intentResponse({ output: BAD_KPI }));
+      const element = designer();
+
+      const result = await generationHandler(element)(request);
+
+      // 一次修复后诊断没变：不再请求；问题只在个别指标上，去掉那一项、其余照常交出。
+      expect(result.ok).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      const rationale = element.submitChangeProposal.mock.calls[0]?.[0]?.rationale as string;
+      expect(rationale).toContain('有 1 处降级：有指标数值不合格，已去掉');
+      expect(rationale).not.toContain('有模块经修复仍不可用');
+    });
+
+    it('adds a summary line when whole blocks were dropped, listing each reason', async () => {
+      const dropped = output({
+        blocks: [NOTE, { type: 'no.such.material', title: '没有的组件', span: 2 }],
+      });
+      stubFetch(intentResponse({ output: dropped }));
+      const element = designer();
+
+      expect((await generationHandler(element)(request)).ok).toBe(true);
+      const rationale = element.submitChangeProposal.mock.calls[0]?.[0]?.rationale as string;
+      expect(rationale).toContain('有 2 处降级');
+      expect(rationale).toContain('有模块用了目录里没有的组件，已跳过');
+    });
+
+    it('gives up after two repair rounds when the output keeps changing but stays unusable', async () => {
+      const fetch = stubFetch(
+        intentResponse({ output: OVERFLOW }),
+        repairResponse({ output: '这不是 JSON' }),
+        repairResponse({ output: JSON.stringify({ title: '无', subtitle: '无' }) }),
+      );
+      const element = designer();
+
+      const result = await generationHandler(element)(request);
 
       expect(result.ok).toBe(false);
-      if (result.ok) throw new Error('unreachable');
-      expect(result.reason).toContain('版面校验');
-      expect(result.diagnostics.map((item) => item.code)).toContain('LAYOUT_FONT_TOO_SMALL');
-      expect(fetch).toHaveBeenCalledTimes(2);
+      // 首次 + 两轮修复，总共三次模型调用，不会有第四次。
+      expect(fetch).toHaveBeenCalledTimes(3);
       expect(element.submitChangeProposal).not.toHaveBeenCalled();
     });
 
-    it('does not ask for a repair without a model repair context', async () => {
-      vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-      const fetch = vi.fn(async () => screenActResponse(tinyDocument()));
-      vi.stubGlobal('fetch', fetch);
-
-      const result = await handler(designer())(request);
-
-      expect(result.ok).toBe(false);
-      expect(fetch).toHaveBeenCalledOnce();
-    });
-
     it('does not ask the model to repair proposal-state rejections', async () => {
-      vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-      const fetch = vi.fn(async () => llmActResponse(componentDocument()));
-      vi.stubGlobal('fetch', fetch);
+      const fetch = stubFetch(intentResponse());
       const element = designer();
       element.submitChangeProposal.mockReturnValue({
         ok: false,
@@ -767,65 +886,86 @@ describe('host intent candidate safety', () => {
         value: {},
       } as never);
 
-      const result = await handler(element)(request);
+      const result = await generationHandler(element)(request);
 
       expect(result.ok).toBe(false);
       expect(fetch).toHaveBeenCalledOnce();
     });
+
+    it('reports a repair transport failure instead of claiming success', async () => {
+      stubFetch(
+        intentResponse({ output: BAD_KPI }),
+        Response.json(
+          { error: 'AGENT_TIMEOUT', message: '模型响应超时，请稍后重试。' },
+          { status: 504 },
+        ),
+      );
+      const element = designer();
+
+      const result = await generationHandler(element)(request);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error('unreachable');
+      expect(result.reason).toBe('模型响应超时，请稍后重试。');
+      expect(element.submitChangeProposal).not.toHaveBeenCalled();
+    });
   });
 
   it('reports engine rejection without claiming success', async () => {
-    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => screenActResponse()),
-    );
+    stubFetch(intentResponse());
     const element = designer();
     element.submitChangeProposal.mockReturnValue({ ok: false, diagnostics: [], value: {} });
 
-    const result = await handler(element)(request);
+    const result = await generationHandler(element)(request);
+
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('unreachable');
     expect(result.reason).toContain('引擎拒绝');
   });
+
+  it('clears the old blueprint before removing the components it references', async () => {
+    stubFetch(intentResponse());
+    const current: ScreenDocument = {
+      ...componentDocument(),
+      blueprint: {
+        nodes: [{ id: 'node-1', componentId: 'title' }],
+        edges: [],
+      } as unknown as ScreenDocument['blueprint'],
+    };
+    const element = designer(current);
+
+    expect((await generationHandler(element)(request)).ok).toBe(true);
+    const proposal = element.submitChangeProposal.mock.calls[0]?.[0] as
+      | { commands: { type: string; blueprint?: unknown }[] }
+      | undefined;
+    const types = (proposal?.commands ?? []).map((command) => command.type);
+    // 蓝图节点引用组件：先清空蓝图再删组件，否则删除那一步因悬空引用被拒。
+    expect(types.indexOf('replace-blueprint')).toBeGreaterThan(-1);
+    expect(types.indexOf('replace-blueprint')).toBeLessThan(types.indexOf('remove-components'));
+    expect(
+      proposal?.commands.find((command) => command.type === 'replace-blueprint'),
+    ).toMatchObject({
+      blueprint: { nodes: [], edges: [] },
+    });
+  });
 });
 
-describe('host intent streamed generation (ADR-0112 §2.5)', () => {
-  function text(id: string, x: number, value: string, y = 32) {
-    const [base] = componentDocument().components;
-    if (base === undefined) throw new Error('fixture');
-    return {
-      ...base,
-      id,
-      name: id,
-      position: { x, y },
-      dataValue: { kind: 'inline' as const, value },
-    };
-  }
-  const skeleton = (): ScreenDocument => ({
-    ...document(),
-    components: [text('agent-title-0', 40, '作战室'), text('agent-block-0-pending', 400, '·', 200)],
-  });
-  const filled = (): ScreenDocument => ({
-    ...document(),
-    components: [text('agent-title-0', 40, '作战室'), text('agent-block-0-0', 400, '要点', 200)],
-  });
-  const result = (candidate: ScreenDocument) => ({
+describe('host intent streamed generation (ADR-0112 §2.5 / ADR-0113 §2.8)', () => {
+  const skeletonEvent = {
+    title: '作战室',
+    subtitle: '按日汇总的口径',
+    layout: { kpis: 1, blocks: [{ type: 'base.text', span: 2 }] },
+  };
+  const resultEvent = (overrides: Record<string, unknown> = {}) => ({
     kind: 'generate_screen',
     routedBy: 'rule',
-    name: '作战室',
-    document: candidate,
+    output: output(),
     mode: 'llm',
-    imageCount: 0,
-    warnings: [{ code: 'AGENT_BLOCK_ROWS_TRIMMED', message: '表格超过 8 行，已裁剪' }],
+    catalogSource: 'client',
+    assets: [],
+    datasets: [],
+    ...overrides,
   });
-
-  function sse(events: readonly (readonly [string, unknown])[]): Response {
-    const body = events
-      .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-      .join('');
-    return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
-  }
 
   /** 带流式草案接口的设计器替身：待决提案由它自己记，状态变化时发引擎同名事件。 */
   function streamingDesigner(options: { readonly cancelAfterBegin?: boolean } = {}) {
@@ -855,55 +995,68 @@ describe('host intent streamed generation (ADR-0112 §2.5)', () => {
     });
   }
 
-  it('mounts the skeleton, appends deltas and finishes in place instead of resubmitting', async () => {
+  const stubStream = (events: readonly (readonly [string, unknown])[]) => {
     vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        sse([
-          ['skeleton', { document: skeleton() }],
-          ['progress', { document: filled() }],
-          ['result', result(filled())],
-        ]),
-      ),
+      vi.fn(async () => sse(events)),
     );
+  };
+
+  it('mounts the skeleton, appends deltas and finishes in place instead of resubmitting', async () => {
+    stubStream([
+      ['status', { phase: 'thinking' }],
+      ['status', { phase: 'writing' }],
+      ['skeleton', skeletonEvent],
+      ['item', { path: 'kpis[0]', value: KPI }],
+      ['item', { path: 'blocks[0]', value: NOTE }],
+      ['result', resultEvent()],
+    ]);
     const element = streamingDesigner();
 
-    expect((await handler(element)(request)).ok).toBe(true);
+    expect((await generationHandler(element)(request)).ok).toBe(true);
     expect(element.beginChangeProposal).toHaveBeenCalledOnce();
     expect(element.beginChangeProposal.mock.calls[0]?.[0]).toMatchObject({ scope: '整屏' });
-    expect(element.extendChangeProposal).toHaveBeenCalledExactlyOnceWith('change-1', [
-      { type: 'remove-components', componentIds: ['agent-block-0-pending'] },
-      { type: 'add-component', component: expect.objectContaining({ id: 'agent-block-0-0' }) },
-    ]);
+    // 骨架先行：两项内容各补一帧，已有组件不动（占位框被内容换掉）。
+    expect(element.extendChangeProposal).toHaveBeenCalledTimes(2);
     expect(element.finishChangeProposal).toHaveBeenCalledExactlyOnceWith('change-1', {
-      rationale: expect.stringContaining('有 1 处降级：表格超过 8 行，已裁剪'),
+      rationale: expect.stringContaining('由模型生成'),
     });
     expect(element.submitChangeProposal).not.toHaveBeenCalled();
     expect(element.discardPendingChange).not.toHaveBeenCalled();
   });
 
-  it('replaces the streamed draft when the final candidate moved a streamed component', async () => {
-    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-    const moved = filled();
-    const final = {
-      ...moved,
-      components: moved.components.map((node) =>
-        node.id === 'agent-title-0' ? { ...node, position: { x: 48, y: 32 } } : node,
-      ),
-    };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        sse([
-          ['skeleton', { document: skeleton() }],
-          ['result', result(final)],
-        ]),
-      ),
-    );
+  it('does not stream a skeleton the catalog cannot lay out', async () => {
+    stubStream([
+      [
+        'skeleton',
+        { ...skeletonEvent, layout: { kpis: 1, blocks: [{ type: 'no.such', span: 2 }] } },
+      ],
+      ['result', resultEvent()],
+    ]);
     const element = streamingDesigner();
 
-    expect((await handler(element)(request)).ok).toBe(true);
+    expect((await generationHandler(element)(request)).ok).toBe(true);
+    // 骨架不合法就不挂草案，等整份结果到了整屏提交。
+    expect(element.beginChangeProposal).not.toHaveBeenCalled();
+    expect(element.submitChangeProposal).toHaveBeenCalledOnce();
+  });
+
+  it('replaces the streamed draft when the final output moved a streamed component', async () => {
+    // 最终结果的指标比骨架多一条：指标卡变窄，已出现的组件几何变了，草案接不上。
+    stubStream([
+      ['skeleton', skeletonEvent],
+      ['item', { path: 'kpis[0]', value: KPI }],
+      [
+        'result',
+        resultEvent({
+          output: output({ kpis: [KPI, { label: '周转', value: 31.4, unit: '天' }] }),
+        }),
+      ],
+    ]);
+    const element = streamingDesigner();
+
+    expect((await generationHandler(element)(request)).ok).toBe(true);
     expect(element.finishChangeProposal).not.toHaveBeenCalled();
     expect(element.discardPendingChange).toHaveBeenCalledOnce();
     expect(element.submitChangeProposal).toHaveBeenCalledOnce();
@@ -914,7 +1067,7 @@ describe('host intent streamed generation (ADR-0112 §2.5)', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (_url: string, init: { signal: AbortSignal }) => {
-        const head = `event: skeleton\ndata: ${JSON.stringify({ document: skeleton() })}\n\n`;
+        const head = `event: skeleton\ndata: ${JSON.stringify(skeletonEvent)}\n\n`;
         const body = new ReadableStream<Uint8Array>({
           start(controller) {
             controller.enqueue(new TextEncoder().encode(head));
@@ -928,7 +1081,7 @@ describe('host intent streamed generation (ADR-0112 §2.5)', () => {
     );
     const element = streamingDesigner({ cancelAfterBegin: true });
 
-    const outcome = await handler(element)(request);
+    const outcome = await generationHandler(element)(request);
 
     expect(outcome.ok).toBe(false);
     if (outcome.ok) throw new Error('unreachable');
@@ -937,34 +1090,24 @@ describe('host intent streamed generation (ADR-0112 §2.5)', () => {
     expect(element.submitChangeProposal).not.toHaveBeenCalled();
   });
 
-  it('clears the old blueprint before removing the components it references', async () => {
-    vi.stubGlobal('window', { __HOST_APP_CONFIG__: { apiBaseUrl: 'http://api.test' } });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => screenActResponse()),
-    );
-    const current: ScreenDocument = {
-      ...componentDocument(),
-      blueprint: {
-        nodes: [{ id: 'node-1', componentId: 'title' }],
-        edges: [],
-      } as unknown as ScreenDocument['blueprint'],
+  function text(id: string, x: number, value: string, y = 32) {
+    const [base] = componentDocument().components;
+    if (base === undefined) throw new Error('fixture');
+    return {
+      ...base,
+      id,
+      name: id,
+      position: { x, y },
+      dataValue: { kind: 'inline' as const, value },
     };
-    const element = designer(current);
-
-    expect((await handler(element)(request)).ok).toBe(true);
-    const proposal = element.submitChangeProposal.mock.calls[0]?.[0] as
-      | { commands: { type: string; blueprint?: unknown }[] }
-      | undefined;
-    const types = (proposal?.commands ?? []).map((command) => command.type);
-    // 蓝图节点引用组件：先清空蓝图再删组件，否则删除那一步因悬空引用被拒。
-    expect(types.indexOf('replace-blueprint')).toBeGreaterThan(-1);
-    expect(types.indexOf('replace-blueprint')).toBeLessThan(types.indexOf('remove-components'));
-    expect(
-      proposal?.commands.find((command) => command.type === 'replace-blueprint'),
-    ).toMatchObject({
-      blueprint: { nodes: [], edges: [] },
-    });
+  }
+  const skeleton = (): ScreenDocument => ({
+    ...document(),
+    components: [text('agent-title-0', 40, '作战室'), text('agent-block-0-pending', 400, '·', 200)],
+  });
+  const filled = (): ScreenDocument => ({
+    ...document(),
+    components: [text('agent-title-0', 40, '作战室'), text('agent-block-0-0', 400, '要点', 200)],
   });
 
   it('builds frame deltas only when every shared component is unchanged', () => {

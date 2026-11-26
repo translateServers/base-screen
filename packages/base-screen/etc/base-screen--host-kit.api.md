@@ -4,6 +4,18 @@
 
 ```ts
 
+// @public
+export function applyIntentOps(intent: ScreenIntent, rawOps: readonly unknown[], catalog: IntentCatalog): ApplyOutcome;
+
+// @public (undocumented)
+type ApplyOutcome = {
+    readonly ok: true;
+    readonly intent: ScreenIntent;
+} | {
+    readonly ok: false;
+    readonly diagnostics: readonly IntentDiagnostic[];
+};
+
 // @public (undocumented)
 export interface Box {
     // (undocumented)
@@ -105,6 +117,18 @@ export function createHostProjectAdapter<LoadPayload, SavePayload>(options: Host
 // @public
 export function createHttpProjectAdapter(options: HttpProjectAdapterOptions): ScreenProjectAdapter;
 
+// @public (undocumented)
+export function createIntentSession(input: {
+    readonly intent: ScreenIntent;
+    readonly compiled: IntentCompileResult;
+    readonly catalog: IntentCatalog;
+    readonly references?: IntentReferences;
+    readonly mode: 'llm' | 'deterministic';
+}): IntentSession;
+
+// @public (undocumented)
+export function createIntentStreamAssembler(catalog: IntentCatalog): IntentStreamAssembler;
+
 // @public
 export function createRestDatasetPort(options: RestDatasetPortOptions): ScreenHostDatasetPort;
 
@@ -119,6 +143,9 @@ export const DEFAULT_INTENT_STYLE: IntentStylePresetId;
 
 // @public (undocumented)
 type DescribeRequest = Parameters<ScreenHostDatasetPort['describe']>[0];
+
+// @public (undocumented)
+export function editIntent(session: IntentSession, rawOps: readonly unknown[], baseline: IntentEditBaseline): IntentEditOutcome;
 
 // @public
 export function flatSkeleton(kpis: number, blocks: readonly IntentSkeletonSlot[]): IntentSkeleton;
@@ -348,6 +375,7 @@ export type IntentBind = {
 export interface IntentBlock {
     // (undocumented)
     readonly bind: IntentBind;
+    readonly ident?: string;
     // (undocumented)
     readonly note?: string;
     // (undocumented)
@@ -449,6 +477,7 @@ export interface IntentCompileResult {
 export interface IntentDiagnostic {
     // (undocumented)
     readonly code: string;
+    readonly detail?: Readonly<Record<string, string | number>>;
     // (undocumented)
     readonly message: string;
     // (undocumented)
@@ -456,6 +485,55 @@ export interface IntentDiagnostic {
     // (undocumented)
     readonly severity: 'error' | 'warning';
 }
+
+// @public
+export interface IntentEditBaseline {
+    // (undocumented)
+    readonly canvas: {
+        readonly width: number;
+        readonly height: number;
+    };
+    // (undocumented)
+    readonly components: readonly {
+        readonly id: string;
+        readonly zIndex?: number;
+    }[];
+    // (undocumented)
+    readonly dataSources?: readonly Record<string, unknown>[];
+}
+
+// @public
+export type IntentEditCommand = {
+    readonly type: 'remove-components';
+    readonly componentIds: readonly string[];
+} | {
+    readonly type: 'add-component';
+    readonly component: CompiledComponent;
+} | {
+    readonly type: 'update-components';
+    readonly componentIds: readonly string[];
+    readonly patch: Readonly<Record<string, unknown>>;
+} | {
+    readonly type: 'replace-data-sources';
+    readonly dataSources: readonly Record<string, unknown>[];
+};
+
+// @public (undocumented)
+export type IntentEditOutcome = {
+    readonly ok: true;
+    readonly session: IntentSession;
+    readonly commands: readonly IntentEditCommand[];
+    readonly keptForUser: readonly string[];
+    readonly summary: {
+        readonly changed: number;
+        readonly added: number;
+        readonly removed: number;
+    };
+    readonly warnings: readonly IntentDiagnostic[];
+} | {
+    readonly ok: false;
+    readonly diagnostics: readonly IntentDiagnostic[];
+};
 
 // @public
 export interface IntentGrid {
@@ -478,6 +556,7 @@ export interface IntentItemResult<T> {
 export interface IntentKpi {
     // (undocumented)
     readonly delta?: IntentKpiDelta;
+    readonly ident?: string;
     // (undocumented)
     readonly label: string;
     // (undocumented)
@@ -495,6 +574,29 @@ export interface IntentKpiDelta {
     // (undocumented)
     readonly value: number;
 }
+
+// @public
+export type IntentOp = {
+    readonly op: 'change';
+    readonly target: string;
+    readonly set: Readonly<Record<string, unknown>>;
+} | {
+    readonly op: 'swap';
+    readonly target: string;
+    readonly type: string;
+    readonly props?: Readonly<Record<string, unknown>>;
+} | {
+    readonly op: 'delete';
+    readonly target: string;
+} | {
+    readonly op: 'add';
+    readonly region: string;
+    readonly part?: 'main' | 'rail';
+    readonly block: unknown;
+} | {
+    readonly op: 'rebind';
+    readonly target: string;
+};
 
 // @public (undocumented)
 export interface IntentParseResult {
@@ -523,6 +625,26 @@ export interface IntentReferences {
 
 // @public (undocumented)
 export type IntentRegion = IntentBand | IntentGrid | IntentSplit;
+
+// @public
+export interface IntentRepairIssue {
+    readonly code: string;
+    readonly path: string;
+}
+
+// @public (undocumented)
+export interface IntentSession {
+    // (undocumented)
+    readonly catalog: IntentCatalog;
+    // (undocumented)
+    readonly compiled: IntentCompileResult;
+    // (undocumented)
+    readonly intent: ScreenIntent;
+    // (undocumented)
+    readonly mode: 'llm' | 'deterministic';
+    // (undocumented)
+    readonly references: IntentReferences | undefined;
+}
 
 // @public
 export interface IntentSkeleton {
@@ -571,6 +693,16 @@ export interface IntentSplit {
     readonly ratio: 'wide-narrow' | 'even';
 }
 
+// @public (undocumented)
+export interface IntentStreamAssembler {
+    frame(): {
+        readonly intent: ScreenIntent;
+        readonly stream: IntentStreamFrame;
+    } | undefined;
+    item(path: string, value: unknown): boolean;
+    skeleton(head: IntentStreamHead): boolean;
+}
+
 // @public
 export interface IntentStreamFrame {
     // (undocumented)
@@ -579,6 +711,18 @@ export interface IntentStreamFrame {
     readonly kpis: Readonly<Record<string, IntentKpi>>;
     // (undocumented)
     readonly skeleton: IntentSkeleton;
+}
+
+// @public (undocumented)
+export interface IntentStreamHead {
+    // (undocumented)
+    readonly layout: unknown;
+    // (undocumented)
+    readonly style?: string;
+    // (undocumented)
+    readonly subtitle: string;
+    // (undocumented)
+    readonly title: string;
 }
 
 // @public (undocumented)
@@ -620,6 +764,9 @@ export interface IntentTableColumn {
     // (undocumented)
     readonly type: 'string' | 'number' | 'boolean';
 }
+
+// @public
+export function isSessionUsable(session: IntentSession, baseline: IntentEditBaseline): boolean;
 
 // @public
 export interface KpiValueInput {
@@ -674,12 +821,24 @@ type ListRequest = Parameters<ScreenHostDatasetPort['list']>[0];
 type LoadRequest = Parameters<ScreenProjectAdapter['load']>[0];
 
 // @public
+export function mapDocumentIssues(diagnostics: readonly {
+    readonly severity: string;
+    readonly code: string;
+    readonly path: readonly (string | number)[];
+}[], componentIds: readonly string[], sources: Readonly<Record<string, string>>): IntentRepairIssue[];
+
+// @public
 export function parseIntentBlock(raw: unknown, catalog: IntentCatalog, origin: string, where: {
     readonly grid: boolean;
 }): IntentItemResult<IntentBlock>;
 
 // @public
-export function parseIntentKpi(raw: unknown, origin: string): IntentItemResult<IntentKpi>;
+export function parseIntentKpi(raw: unknown, origin: string, options?: {
+    readonly placeholders?: boolean;
+}): IntentItemResult<IntentKpi>;
+
+// @public
+export function parseIntentSkeleton(raw: unknown, catalog: IntentCatalog): IntentSkeleton | undefined;
 
 // @public
 export function parseScreenIntent(input: unknown, options: ParseScreenIntentOptions): IntentParseResult;
@@ -688,10 +847,39 @@ export function parseScreenIntent(input: unknown, options: ParseScreenIntentOpti
 export interface ParseScreenIntentOptions {
     // (undocumented)
     readonly catalog: IntentCatalog;
+    readonly placeholders?: boolean;
+}
+
+// @public (undocumented)
+export interface PreparedIntent {
+    // (undocumented)
+    readonly compiled: IntentCompileResult | undefined;
+    readonly deliverable: boolean;
+    // (undocumented)
+    readonly intent: ScreenIntent | undefined;
+    readonly issues: readonly IntentRepairIssue[];
+    readonly warnings: readonly IntentDiagnostic[];
+}
+
+// @public (undocumented)
+export function prepareIntent(input: PrepareIntentInput): PreparedIntent;
+
+// @public (undocumented)
+export interface PrepareIntentInput {
+    // (undocumented)
+    readonly catalog: IntentCatalog;
+    // (undocumented)
+    readonly mode: 'llm' | 'deterministic';
+    readonly output: string;
+    // (undocumented)
+    readonly references?: IntentReferences;
 }
 
 // @public (undocumented)
 type QueryRequest = Parameters<ScreenHostDatasetPort['query']>[0];
+
+// @public
+export function repairKey(issues: readonly IntentRepairIssue[]): string;
 
 // @public
 export function resolveIntentStyle(value?: unknown): IntentStylePreset;

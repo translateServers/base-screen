@@ -391,6 +391,76 @@ export async function createScreenProvider(screenFile) {
       const text = apis.serializeScreenDocument(target.document);
       return ok({ text, bytes: Buffer.byteLength(text, 'utf8') });
     },
+    /**
+     * 意图层编译（ADR-0113 §2.9）：模型原文或已解析的意图 + 目录 → 文档候选与按模型路径整理的诊断。
+     * 与设计器宿主前端的 `prepareIntent` 是同一份实现；不读也不改已加载的快照。
+     */
+    compileScreenIntent({ intent, catalog, references, mode = 'llm' }) {
+      const prepared = apis.intent.prepareIntent({
+        output: typeof intent === 'string' ? intent : JSON.stringify(intent),
+        catalog: { materials: catalog.materials, assets: catalog.assets ?? [] },
+        ...(references === undefined ? {} : { references }),
+        mode,
+      });
+      const warnings = prepared.warnings;
+      if (prepared.compiled === undefined) {
+        return failure({
+          compiled: false,
+          issues: prepared.issues,
+          warnings,
+          diagnostics: prepared.issues.map((issue) => ({
+            severity: 'error',
+            code: issue.code,
+            path: issue.path,
+            message: `The intent could not be compiled at ${issue.path === '' ? 'the whole output' : issue.path}.`,
+          })),
+        });
+      }
+      const normalized = normalizeScreenDocument(apis, prepared.compiled.document);
+      if (!normalized.ok) {
+        return failure({
+          compiled: false,
+          issues: prepared.issues,
+          warnings,
+          diagnostics: normalized.diagnostics,
+        });
+      }
+      const audit = apis
+        .auditScreenLayout(normalized.document)
+        .filter((issue) => issue.severity === 'error');
+      const auditIssues = apis.intent.mapDocumentIssues(
+        audit,
+        normalized.document.components.map((component) => component.id),
+        prepared.compiled.sources,
+      );
+      return ok({
+        compiled: true,
+        document: normalized.document,
+        sources: prepared.compiled.sources,
+        materials: prepared.compiled.materials,
+        issues: [...prepared.issues, ...auditIssues],
+        warnings,
+        deliverable: prepared.deliverable && audit.length === 0,
+        audit,
+      });
+    },
+    /** 布局求解（ADR-0113 §2.3）：区域序列 + 每格内容量 → 像素矩形，装不下返回带差额的容量冲突。 */
+    solveLayout({ regions }) {
+      const invalid = regions.flatMap((region, index) => validateLayoutRegion(region, index));
+      if (invalid.length > 0) return failure({ solved: false, diagnostics: invalid });
+      const outcome = apis.intent.solveLayout(regions);
+      if (outcome.ok) return ok({ solved: true, regions: outcome.regions });
+      return failure({
+        solved: false,
+        issues: outcome.issues,
+        diagnostics: outcome.issues.map((issue) => ({
+          severity: 'error',
+          code: 'LAYOUT_CAPACITY_EXCEEDED',
+          path: `regions[${issue.regionIndex}]`,
+          message: `Needs ${issue.requiredPx}px but ${issue.availablePx}px is available (${issue.reason}).`,
+        })),
+      });
+    },
     importScreen({ document: candidate }) {
       const target = normalizeScreenDocument(apis, candidate);
       if (!target.ok)
@@ -407,6 +477,39 @@ export async function createScreenProvider(screenFile) {
       });
     },
   });
+}
+
+/** 求解器入参的形状校验：宿主调用方给的是原始 JSON，进求解器之前先挡一道。 */
+function validateLayoutRegion(region, index) {
+  const path = `regions[${index}]`;
+  const bad = (message) => [{ severity: 'error', code: 'INTENT_REGION_INVALID', path, message }];
+  if (typeof region !== 'object' || region === null) return bad('A region must be an object.');
+  const isCell = (cell) =>
+    typeof cell === 'object' && cell !== null && typeof cell.data === 'boolean';
+  if (region.kind === 'band') {
+    return Number.isInteger(region.count) && region.count >= 1 && region.count <= 8
+      ? []
+      : bad('A band needs an integer count from 1 to 8.');
+  }
+  if (region.kind === 'grid') {
+    return Array.isArray(region.slots) &&
+      region.slots.length >= 1 &&
+      region.slots.length <= 8 &&
+      region.slots.every((slot) => isCell(slot) && Number.isFinite(slot.span))
+      ? []
+      : bad('A grid needs 1 to 8 slots, each with a numeric span and a boolean data flag.');
+  }
+  if (region.kind === 'split') {
+    const stack = (cells) =>
+      Array.isArray(cells) && cells.length >= 1 && cells.length <= 8 && cells.every(isCell);
+    return stack(region.main) &&
+      stack(region.rail) &&
+      ['wide-narrow', 'even'].includes(region.ratio) &&
+      ['left', 'right'].includes(region.railSide)
+      ? []
+      : bad('A split needs ratio, railSide and 1 to 8 cells in both main and rail.');
+  }
+  return bad('A region kind must be band, grid or split.');
 }
 
 function snapshotTarget(document) {

@@ -84,15 +84,26 @@ describe('agent candidate and persisted generation', () => {
     const candidate = await controller.candidate({ topic: '  渠道经营  ', screenId: 'screen-1' });
 
     expect(candidate).toMatchObject({
-      name: '渠道经营',
       mode: 'deterministic',
-      // 兜底目录里没有素材，就不画图片块——不假装有一张图。
-      imageCount: 0,
       catalogSource: 'fallback',
       failure: 'AGENT_NOT_CONFIGURED',
-      document: { canvas: { width: 1920, height: 1080 } },
+      // 兜底目录里没有素材，就不带素材——不假装有一张图。
+      assets: [],
+      datasets: [],
     });
+    // 后端只交意图层 IR（模型原文或同形的兜底 JSON），编译在宿主前端（ADR-0113）。
+    expect(candidate).not.toHaveProperty('document');
     expect(candidate).not.toHaveProperty('screen');
+    // 兜底只给版面与占位，不给任何数字：指标值为 null，由宿主编译成「—」。
+    const intent = JSON.parse(candidate.output);
+    expect(intent.title).toBe('渠道经营');
+    expect(intent.kpis.map((kpi: { label: string }) => kpi.label)).toEqual([
+      '总量',
+      '周转',
+      '缺货',
+      '在途',
+    ]);
+    expect(intent.kpis.every((kpi: { value: unknown }) => kpi.value === null)).toBe(true);
     expect(screens.create).not.toHaveBeenCalled();
     expect(screens.update).not.toHaveBeenCalled();
   });

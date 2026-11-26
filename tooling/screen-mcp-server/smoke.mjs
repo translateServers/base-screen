@@ -20,7 +20,7 @@ try {
     client.listResourceTemplates(),
   ]);
   if (
-    tools.tools.length !== 12 ||
+    tools.tools.length !== 14 ||
     resources.resources.length !== 3 ||
     templates.resourceTemplates.length !== 0
   )
@@ -96,7 +96,93 @@ try {
     validated.structuredContent?.valid !== true
   )
     throw new Error('Screen MCP read/validate/apply/diff/propose/audit smoke check failed.');
-  console.log('Screen MCP smoke check passed: 3 resources, 12 tools.');
+  // 意图层（ADR-0113 §2.9）：无状态的编译与布局求解，不依赖已加载的快照。
+  const material = (type, name, extra) => ({
+    type,
+    name,
+    category: '基础',
+    data: 'none',
+    asset: false,
+    size: { width: 240, height: 120 },
+    props: {},
+    roles: [],
+    defaults: { props: {}, style: {} },
+    ...extra,
+  });
+  const catalog = {
+    materials: [
+      material('base.text', '文本', {
+        data: 'scalar',
+        defaults: { props: {}, style: { color: '#e9eef5', fontSize: 20, fontWeight: '400' } },
+      }),
+      material('base.rectangle', '矩形', {
+        defaults: { props: {}, style: { fill: '#141b24', borderRadius: 12 } },
+      }),
+      material('base.container', '容器', {
+        children: true,
+        defaults: { props: {}, style: { fill: 'transparent', borderColor: 'transparent' } },
+      }),
+    ],
+  };
+  const compiled = await client.callTool({
+    name: 'compile_screen_intent',
+    arguments: {
+      catalog,
+      intent: {
+        title: '作战室',
+        subtitle: '按日汇总的口径',
+        regions: [
+          { kind: 'band', items: [{ label: '总量', value: 286000, unit: '件' }] },
+          {
+            kind: 'split',
+            main: [{ type: 'base.text', title: '要点', text: '甲\n乙' }],
+            rail: [{ type: 'base.text', title: '提醒', text: '丙' }],
+          },
+        ],
+      },
+    },
+  });
+  const broken = await client.callTool({
+    name: 'compile_screen_intent',
+    arguments: { catalog, intent: '这不是 JSON' },
+  });
+  const solved = await client.callTool({
+    name: 'solve_layout',
+    arguments: {
+      regions: [
+        { kind: 'band', count: 3 },
+        { kind: 'grid', slots: [{ span: 4, data: true }] },
+      ],
+    },
+  });
+  const overflow = await client.callTool({
+    name: 'solve_layout',
+    arguments: {
+      regions: [
+        { kind: 'band', count: 3 },
+        ...Array.from({ length: 5 }, () => ({
+          kind: 'grid',
+          slots: [{ span: 4, data: false }],
+        })),
+      ],
+    },
+  });
+  if (
+    compiled.isError === true ||
+    compiled.structuredContent?.compiled !== true ||
+    compiled.structuredContent?.issues?.length !== 0 ||
+    !compiled.structuredContent?.document?.components?.some(
+      (component) => component.type === 'base.container' && component.parentId === null,
+    ) ||
+    broken.isError !== true ||
+    broken.structuredContent?.issues?.[0]?.code !== 'AGENT_SPEC_INVALID' ||
+    solved.structuredContent?.solved !== true ||
+    solved.structuredContent?.regions?.[1]?.boxes?.[0]?.height !== 666 ||
+    overflow.isError !== true ||
+    overflow.structuredContent?.issues?.[0]?.reason !== 'height'
+  )
+    throw new Error('Screen MCP intent compile / layout smoke check failed.');
+  console.log('Screen MCP smoke check passed: 3 resources, 14 tools.');
 } finally {
   await client.close();
 }

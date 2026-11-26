@@ -2,12 +2,9 @@ import { Logger, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { AgentController } from '../src/agent/agent.controller';
-import { AgentService, parseCatalogSpec, readStreamingSpec } from '../src/agent/agent.service';
-import type { AgentCatalog } from '../src/agent/agent-catalog';
+import { AgentService, type AgentStreamEvent } from '../src/agent/agent.service';
 import { requestAgentCompletionStream } from '../src/agent/agent-client';
-import { composeScreenDocument } from '../src/agent/agent-compose';
-import { scanStreamingSpec } from '../src/agent/agent-stream';
-import { resolveStylePreset } from '../src/agent/agent-style';
+import { scanStreamingPaths } from '../src/agent/agent-stream';
 import type { AgentActDto } from '../src/agent/dto/agent-act.dto';
 import type { AssetsService } from '../src/assets/assets.service';
 import type { DatasetCatalogService } from '../src/datasets/dataset-catalog.service';
@@ -15,243 +12,158 @@ import type { ScreensService } from '../src/screens/screens.service';
 import { chatStream, chatText, type LlmStub, startLlmStub } from './support/llm-stub';
 
 /**
- * 流式落稿（ADR-0112 §2.5）：骨架先行、几何不变、逐块填充。
+ * 流式落稿（ADR-0112 §2.5 / ADR-0113 §2.8）：后端只做增量扫描，推进度态、骨架与逐项内容；
+ * 编译在宿主前端。
  *
- * 断言的是三条承诺：写了一半的值从不提前当真；骨架帧之后已出现的组件一字不差；
- * 最后一帧就是常规编译的结果。
+ * 断言的是三条承诺：写了一半的值从不提前当真；骨架没写齐之前不推任何内容项；
+ * 只有首轮流式，修复轮整份重来。
  */
 
-const CATALOG: AgentCatalog = {
-  source: 'client',
-  assets: [],
-  materials: [
-    {
-      type: 'base.rectangle',
-      name: '矩形',
-      category: '基础',
-      data: 'none',
-      asset: false,
-      size: { width: 240, height: 120 },
-      props: {},
-      roles: [],
-      defaults: { props: {}, style: { fill: '#2563eb', borderRadius: 0, opacity: 1 } },
-    },
-    {
-      type: 'base.text',
-      name: '文本',
-      category: '基础',
-      data: 'scalar',
-      asset: false,
-      size: { width: 320, height: 72 },
-      props: {},
-      roles: [],
-      defaults: { props: {}, style: { color: '#e9eef5', fontSize: 20, fontWeight: '400' } },
-    },
-    {
-      type: 'base.chart',
-      name: '图表',
-      category: '数据',
-      data: 'tabular',
-      asset: false,
-      size: { width: 480, height: 280 },
-      props: {},
-      roles: [
-        { id: 'dimension', min: 1, max: 1 },
-        { id: 'measures', min: 1, max: 8 },
-      ],
-      defaults: { props: {}, style: { backgroundColor: '#111827', color: '#f9fafb' } },
-    },
-  ],
-};
-
-const TABLE = {
-  columns: [
-    { id: 'day', label: '日期', type: 'string' },
-    { id: 'amount', label: '件数', type: 'number' },
-  ],
-  rows: [
-    { day: '10-21', amount: 120 },
-    { day: '10-22', amount: 164 },
-    { day: '10-23', amount: 98 },
-  ],
-};
-
-/** 字符串里故意带引号、花括号、反斜杠与换行：扫描器不能被它们骗。 */
-const OUTPUT = JSON.stringify(
+const MATERIALS = [
   {
-    title: '华东"渠道"{周会}',
-    subtitle: '按周汇总 \\ 渠道经营口径',
-    style: 'light-biz',
-    layout: {
-      kpis: 3,
-      blocks: [
-        { type: 'base.chart', span: 2 },
-        { type: 'base.text', span: 2 },
-        { type: 'base.chart', span: 4 },
-      ],
-    },
-    kpis: [
-      {
-        label: '总量',
-        value: 286000,
-        unit: '件',
-        delta: { value: 4.2, unit: 'percent', direction: 'up-good' },
-      },
-      { label: '周转', value: 31.4, unit: '天' },
-      { label: '缺货', value: 12, unit: '家' },
+    type: 'base.text',
+    name: '文本',
+    category: '基础',
+    data: 'scalar',
+    asset: false,
+    size: { width: 320, height: 72 },
+    props: {},
+    roles: [],
+    defaults: { props: {}, style: { color: '#e9eef5', fontSize: 20, fontWeight: '400' } },
+  },
+  {
+    type: 'base.chart',
+    name: '图表',
+    category: '数据',
+    data: 'tabular',
+    asset: false,
+    size: { width: 480, height: 280 },
+    props: {},
+    roles: [
+      { id: 'dimension', min: 1, max: 1 },
+      { id: 'measures', min: 1, max: 8 },
     ],
-    blocks: [
-      { type: 'base.chart', title: '近三日趋势', note: '单位：件', span: 2, table: TABLE },
-      {
-        type: 'base.text',
-        title: '要点',
-        span: 2,
-        text: '· 华东 {环比} 回升\n· "缺货" 集中在 3 家',
-      },
-      { type: 'base.chart', title: '分渠道', span: 4, table: TABLE },
+    defaults: { props: {}, style: {} },
+  },
+];
+
+const INTENT = {
+  title: '作战室',
+  subtitle: '按日汇总的口径',
+  style: 'deep-tech',
+  layout: {
+    regions: [
+      { kind: 'band', count: 2 },
+      { kind: 'split', main: [{ type: 'base.chart' }], rail: [{ type: 'base.text' }] },
     ],
   },
-  null,
-  2,
-);
+  regions: [
+    {
+      kind: 'band',
+      items: [
+        { label: '总量', value: 286000, unit: '件' },
+        { label: '周转', value: 31.4, unit: '天' },
+      ],
+    },
+    {
+      kind: 'split',
+      main: [
+        {
+          type: 'base.chart',
+          title: '趋势',
+          table: {
+            columns: [
+              { id: 'day', label: '日期', type: 'string' },
+              { id: 'amount', label: '金额', type: 'number' },
+            ],
+            rows: [
+              { day: '10-24', amount: 128 },
+              { day: '10-25', amount: 164 },
+            ],
+          },
+        },
+      ],
+      rail: [{ type: 'base.text', title: '要点', text: '库存平稳\n华东二仓需补货' }],
+    },
+  ],
+};
+const OUTPUT = JSON.stringify(INTENT);
 
-interface Node {
-  readonly id: string;
-  readonly position: { readonly x: number; readonly y: number };
-  readonly size: { readonly width: number; readonly height: number };
-}
+describe('scanStreamingPaths', () => {
+  it('reports the head fields and every finished item by its position path', () => {
+    const found = scanStreamingPaths(OUTPUT);
 
-function componentsOf(document: Record<string, unknown> | undefined): Node[] {
-  return (document?.components ?? []) as Node[];
-}
-
-/** 按字符逐个喂给流式读取，记录每一帧编译出的完整候选。 */
-function frames(text: string): Record<string, unknown>[] {
-  const documents: Record<string, unknown>[] = [];
-  let lastKey: string | undefined;
-  for (let end = 1; end <= text.length; end += 1) {
-    const frame = readStreamingSpec(text.slice(0, end), CATALOG);
-    if (frame === null || frame.key === lastKey) continue;
-    lastKey = frame.key;
-    const composed = composeScreenDocument({
-      spec: { title: frame.title, subtitle: frame.subtitle, kpis: [], blocks: [], mode: 'llm' },
-      catalog: CATALOG,
-      style: resolveStylePreset(frame.style),
-      stream: frame.stream,
-    });
-    if (!composed.ok) throw new Error(`frame failed: ${composed.diagnostics[0]?.code}`);
-    documents.push(composed.value.document);
-  }
-  return documents;
-}
-
-function finalDocument(text: string): Record<string, unknown> {
-  const spec = parseCatalogSpec(text, CATALOG);
-  if (spec === null) throw new Error('expected a valid spec');
-  const composed = composeScreenDocument({
-    spec: { ...spec, mode: 'llm' },
-    catalog: CATALOG,
-    style: resolveStylePreset(spec.style),
-  });
-  if (!composed.ok) throw new Error(`compose failed: ${composed.diagnostics[0]?.code}`);
-  return composed.value.document;
-}
-
-describe('scanStreamingSpec', () => {
-  const final = JSON.parse(OUTPUT) as Record<string, unknown>;
-
-  it('只交出已经写完的字段与数组元素，写了一半的值从不提前当真', () => {
-    for (let end = 0; end <= OUTPUT.length; end += 1) {
-      const snapshot = scanStreamingSpec(OUTPUT.slice(0, end));
-      for (const [key, raw] of snapshot.fields) expect(JSON.parse(raw)).toEqual(final[key]);
-      for (const [key, items] of snapshot.items) {
-        items.forEach((raw, index) => {
-          expect(JSON.parse(raw)).toEqual((final[key] as unknown[])[index]);
-        });
-      }
-    }
-    const complete = scanStreamingSpec(OUTPUT);
-    expect([...complete.fields.keys()]).toEqual([
+    expect([...found.keys()]).toEqual([
       'title',
       'subtitle',
       'style',
       'layout',
-      'kpis',
-      'blocks',
+      'regions[0].items[0]',
+      'regions[0].items[1]',
+      'regions[1].main[0]',
+      'regions[1].rail[0]',
     ]);
-    expect(complete.items.get('blocks')).toHaveLength(3);
+    expect(JSON.parse(found.get('title') ?? '')).toBe('作战室');
+    expect(JSON.parse(found.get('layout') ?? '')).toEqual(INTENT.layout);
+    expect(JSON.parse(found.get('regions[1].rail[0]') ?? '')).toEqual(INTENT.regions[1]?.rail?.[0]);
   });
 
-  it('数字写到一半不算完：286 与 286000 只差几个字符', () => {
-    expect(scanStreamingSpec('{"total": 286').fields.has('total')).toBe(false);
-    expect(scanStreamingSpec('{"total": 286,').fields.get('total')).toBe('286');
-    expect(scanStreamingSpec('{"a": [1, 2').items.get('a')).toEqual(['1']);
-    expect(scanStreamingSpec('{"a": [1, 2]}').items.get('a')).toEqual(['1', '2']);
+  it('reads the flat shape too', () => {
+    const flat = JSON.stringify({
+      title: 't',
+      subtitle: 's',
+      kpis: [
+        { label: 'a', value: 1 },
+        { label: 'b', value: 2 },
+      ],
+      blocks: [{ type: 'base.text', title: 'x', span: 2, text: 'y' }],
+    });
+
+    expect([...scanStreamingPaths(flat).keys()]).toEqual([
+      'title',
+      'subtitle',
+      'kpis[0]',
+      'kpis[1]',
+      'blocks[0]',
+    ]);
   });
 
-  it('跳过模型偶尔加的代码块围栏', () => {
-    expect(scanStreamingSpec('```json\n{"title": "x", ').fields.get('title')).toBe('"x"');
-  });
-});
-
-describe('流式落稿的帧', () => {
-  it('骨架一到就给出全部几何：之后每一帧里已出现的组件一字不差', () => {
-    const documents = frames(OUTPUT);
-    // 骨架 1 帧 + 3 个指标 + 3 个块，各推一帧。
-    expect(documents).toHaveLength(7);
-    expect(
-      componentsOf(documents[0])
-        .filter((node) => node.id.endsWith('-pending'))
-        .map((node) => node.id),
-    ).toEqual(['agent-block-0-pending', 'agent-block-1-pending', 'agent-block-2-pending']);
-    for (let index = 1; index < documents.length; index += 1) {
-      const before = new Map(componentsOf(documents[index - 1]).map((node) => [node.id, node]));
-      for (const node of componentsOf(documents[index])) {
-        const old = before.get(node.id);
-        if (old !== undefined) expect(node).toEqual(old);
+  it('never reports a half-written value: every prefix only ever agrees with the final result', () => {
+    const final = scanStreamingPaths(OUTPUT);
+    for (let length = 1; length < OUTPUT.length; length += 1) {
+      for (const [path, raw] of scanStreamingPaths(OUTPUT.slice(0, length))) {
+        expect(final.get(path)).toBe(raw);
       }
     }
   });
 
-  it('最后一帧就是常规编译的结果：占位框全部被替换', () => {
-    const documents = frames(OUTPUT);
-    expect(documents.at(-1)).toEqual(finalDocument(OUTPUT));
-    expect(JSON.stringify(documents.at(-1))).not.toContain('-pending');
+  it('waits for a delimiter before trusting a number: 286 may become 2860', () => {
+    const cut = '{"title":"a","kpis":[{"label":"总量","value":286';
+
+    expect(scanStreamingPaths(cut).has('kpis[0]')).toBe(false);
+    expect(scanStreamingPaths(`${cut}0}`).has('kpis[0]')).toBe(true);
+    expect(JSON.parse(scanStreamingPaths(`${cut}0}`).get('kpis[0]') ?? '')).toEqual({
+      label: '总量',
+      value: 2860,
+    });
   });
 
-  it('块的内容落在骨架给它的那一格里', () => {
-    const skeleton = componentsOf(frames(OUTPUT)[0]);
-    const final = componentsOf(finalDocument(OUTPUT));
-    for (const index of [0, 1, 2]) {
-      const cell = skeleton.find((node) => node.id === `agent-block-${index}-pending`);
-      if (cell === undefined) throw new Error(`missing placeholder ${index}`);
-      const content = final.filter((node) => node.id.startsWith(`agent-block-${index}-`));
-      expect(content.length).toBeGreaterThan(0);
-      for (const node of content) {
-        expect(node.position.x).toBeGreaterThanOrEqual(cell.position.x);
-        expect(node.position.y).toBeGreaterThanOrEqual(cell.position.y);
-        expect(node.position.x + node.size.width).toBeLessThanOrEqual(
-          cell.position.x + cell.size.width,
-        );
-        expect(node.position.y + node.size.height).toBeLessThanOrEqual(
-          cell.position.y + cell.size.height,
-        );
-      }
-    }
+  it('skips a code fence in front of the object, and survives garbage', () => {
+    expect([...scanStreamingPaths(`\`\`\`json\n${OUTPUT}`).keys()]).toContain('regions[1].main[0]');
+    expect(scanStreamingPaths('不是 JSON').size).toBe(0);
+    expect(scanStreamingPaths('{"title": ').size).toBe(0);
+    expect(scanStreamingPaths('').size).toBe(0);
   });
 
-  it('骨架不齐或不合法时不推帧，等整份写完走常规路径', () => {
-    const parsed = JSON.parse(OUTPUT) as Record<string, unknown>;
-    const without = (patch: Record<string, unknown>) =>
-      readStreamingSpec(JSON.stringify({ ...parsed, ...patch }), CATALOG);
-    expect(without({ layout: undefined })).toBeNull();
-    expect(without({ layout: { kpis: 0, blocks: [{ type: 'base.text', span: 1 }] } })).toBeNull();
-    expect(without({ layout: { kpis: 3, blocks: [{ type: 'base.map', span: 2 }] } })).toBeNull();
-    expect(without({ title: '' })).toBeNull();
+  it('keeps going past an escaped quote inside a string', () => {
+    const found = scanStreamingPaths('{"title":"他说 \\"好\\"","subtitle":"s"}');
+
+    expect(JSON.parse(found.get('title') ?? '')).toBe('他说 "好"');
+    expect(found.has('subtitle')).toBe(true);
   });
 });
 
-describe('流式生成链路', () => {
+describe('AgentService.generateIntent streaming', () => {
   let stub: LlmStub;
 
   beforeAll(async () => {
@@ -275,43 +187,173 @@ describe('流式生成链路', () => {
     );
   }
 
-  it('首轮按流式请求，边写边推帧，最终候选等于最后一帧', async () => {
+  it('first round streams: status, then the skeleton once, then each item once in order', async () => {
     stub.setResponder(() => chatStream(OUTPUT, 12));
     const before = stub.calls.length;
-    const pushed: Record<string, unknown>[] = [];
-    const candidate = await service().generateCandidate({
+    const events: AgentStreamEvent[] = [];
+
+    const result = await service().generateIntent({
       topic: '渠道经营',
-      catalog: { materials: CATALOG.materials },
-      onProgress: (document) => pushed.push(JSON.parse(JSON.stringify(document))),
+      catalog: { materials: MATERIALS },
+      onEvent: (event) => events.push(JSON.parse(JSON.stringify(event))),
     });
+
     expect(stub.calls.slice(before).map((call) => call.body.stream)).toEqual([true]);
-    expect(pushed.length).toBeGreaterThanOrEqual(2);
-    expect(JSON.stringify(pushed[0])).toContain('-pending');
-    expect(candidate.mode).toBe('llm');
-    expect(candidate.document).toEqual(pushed.at(-1));
+    expect(events.map((event) => event.type)).toEqual([
+      'status',
+      'status',
+      'skeleton',
+      'item',
+      'item',
+      'item',
+      'item',
+    ]);
+    expect(events.slice(0, 2)).toEqual([
+      { type: 'status', phase: 'thinking' },
+      { type: 'status', phase: 'writing' },
+    ]);
+    expect(events[2]).toEqual({
+      type: 'skeleton',
+      title: '作战室',
+      subtitle: '按日汇总的口径',
+      style: 'deep-tech',
+      layout: INTENT.layout,
+    });
+    expect(
+      events
+        .filter((event) => event.type === 'item')
+        .map((event) => (event as { path: string }).path),
+    ).toEqual([
+      'regions[0].items[0]',
+      'regions[0].items[1]',
+      'regions[1].main[0]',
+      'regions[1].rail[0]',
+    ]);
+    // 结果交的是模型原文，不做任何解析或编译。
+    expect(result).toMatchObject({ output: OUTPUT, mode: 'llm', catalogSource: 'client' });
+    expect(result).not.toHaveProperty('document');
   });
 
-  it('只有首轮流式：修复轮整份重来，不再推帧', async () => {
-    const parsed = JSON.parse(OUTPUT) as { blocks: Record<string, unknown>[] };
-    const broken = JSON.stringify({
-      ...parsed,
-      blocks: [parsed.blocks[0], { ...parsed.blocks[1], type: 'base.unknown' }, parsed.blocks[2]],
-    });
-    const before = stub.calls.length;
-    stub.setResponder((_call, index) =>
-      index === before ? chatStream(broken, 6) : chatText(OUTPUT),
-    );
-    const pushed: unknown[] = [];
-    const candidate = await service().generateCandidate({
+  it('pushes no content item before the skeleton is complete', async () => {
+    // 没有 layout 的输出：永远凑不齐骨架，也就不推任何内容项。
+    const noLayout = JSON.stringify({ ...INTENT, layout: undefined });
+    stub.setResponder(() => chatStream(noLayout, 12));
+    const events: AgentStreamEvent[] = [];
+
+    await service().generateIntent({
       topic: '渠道经营',
-      catalog: { materials: CATALOG.materials },
-      onProgress: (document) => pushed.push(document),
+      catalog: { materials: MATERIALS },
+      onEvent: (event) => events.push(event),
     });
-    expect(stub.calls.slice(before).map((call) => call.body.stream)).toEqual([true, false]);
-    expect(candidate.repairRounds).toBe(1);
-    // 修复后的整份结果与流式帧对不上的部分由宿主整屏替换；后端只如实交出最终候选。
-    expect(pushed.length).toBeGreaterThan(0);
-    expect(JSON.stringify(candidate.document)).not.toContain('-pending');
+
+    expect(events.map((event) => event.type)).toEqual(['status', 'status']);
+  });
+
+  it('does not stream a repair round: the output is redone whole', async () => {
+    stub.setResponder(() => chatText(OUTPUT));
+    const before = stub.calls.length;
+    const events: AgentStreamEvent[] = [];
+
+    const result = await service().generateIntent({
+      topic: '渠道经营',
+      catalog: { materials: MATERIALS },
+      repair: {
+        output: OUTPUT,
+        issues: [{ code: 'AGENT_KPI_INVALID', path: 'regions[0].items[1]' }],
+      },
+      onEvent: (event) => events.push(event),
+    });
+
+    const [call] = stub.calls.slice(before);
+    expect(call?.body.stream).toBe(false);
+    // 上一轮原文与按模型路径整理的诊断作为后续对话发给模型。
+    const text = JSON.stringify(call?.body.messages);
+    expect(text).toContain('AGENT_KPI_INVALID');
+    expect(text).toContain('regions[0].items[1]');
+    expect(events.map((event) => event.type)).toEqual(['status']);
+    expect(result.output).toBe(OUTPUT);
+  });
+
+  it('tells the model what the unsatisfied block actually needs: roles and column counts', async () => {
+    stub.setResponder(() => chatText(OUTPUT));
+    const before = stub.calls.length;
+    const oneColumn = JSON.stringify({
+      ...INTENT,
+      regions: [
+        INTENT.regions[0],
+        {
+          kind: 'split',
+          main: [
+            {
+              type: 'base.chart',
+              title: '趋势',
+              table: {
+                columns: [{ id: 'day', label: '日期', type: 'string' }],
+                rows: [{ day: 'a' }],
+              },
+            },
+          ],
+          rail: INTENT.regions[1]?.rail,
+        },
+      ],
+    });
+
+    await service().generateIntent({
+      topic: '渠道经营',
+      catalog: { materials: MATERIALS },
+      repair: {
+        output: oneColumn,
+        issues: [{ code: 'AGENT_BLOCK_BINDING_UNSATISFIED', path: 'regions[1].main[0]' }],
+      },
+    });
+
+    const text = JSON.stringify(stub.calls.slice(before)[0]?.body.messages);
+    expect(text).toContain('dimension（1 列）');
+    expect(text).toContain('measures（1–8 列）');
+    expect(text).toContain('只给了 1 列');
+  });
+
+  it('keeps the generic hint when the block cannot be found in the previous output', async () => {
+    stub.setResponder(() => chatText(OUTPUT));
+    const before = stub.calls.length;
+
+    await service().generateIntent({
+      topic: '渠道经营',
+      catalog: { materials: MATERIALS },
+      repair: {
+        output: OUTPUT,
+        issues: [{ code: 'AGENT_BLOCK_BINDING_UNSATISFIED', path: 'regions[3].main[0]' }],
+      },
+    });
+
+    const text = JSON.stringify(stub.calls.slice(before)[0]?.body.messages);
+    expect(text).toContain('AGENT_BLOCK_BINDING_UNSATISFIED');
+    expect(text).not.toContain('只给了');
+  });
+
+  it('rejects a malformed repair request instead of guessing', async () => {
+    await expect(
+      service().generateIntent({
+        topic: '渠道经营',
+        catalog: { materials: MATERIALS },
+        repair: { output: OUTPUT, issues: [{ code: 'lowercase', path: 'blocks[0]' }] },
+      }),
+    ).rejects.toMatchObject({ response: { error: 'AGENT_REPAIR_INVALID' } });
+    await expect(
+      service().generateIntent({
+        topic: '渠道经营',
+        catalog: { materials: MATERIALS },
+        repair: { output: OUTPUT, issues: [{ code: 'AGENT_KPI_INVALID', path: 'evil[0]' }] },
+      }),
+    ).rejects.toMatchObject({ response: { error: 'AGENT_REPAIR_INVALID' } });
+  });
+
+  it('reports a model transport failure instead of falling back to a fake layout', async () => {
+    stub.setResponder(() => ({ kind: 'json', status: 500, body: { error: 'boom' } }));
+
+    await expect(
+      service().generateIntent({ topic: '渠道经营', catalog: { materials: MATERIALS } }),
+    ).rejects.toMatchObject({ status: 502 });
   });
 
   const settings = () => ({ baseUrl: stub.baseUrl, apiKey: 'test', model: 'test', timeoutMs: 300 });
@@ -376,7 +418,9 @@ describe('POST /agent/act/stream', () => {
     return { response, events };
   }
 
-  function stream(act: (input: { onProgress?: (document: unknown) => void }) => Promise<unknown>) {
+  function stream(
+    act: (input: { onEvent?: (event: AgentStreamEvent) => void }) => Promise<unknown>,
+  ) {
     const { response, events } = fakeResponse();
     const controller = new AgentController({ act } as unknown as AgentService);
     return {
@@ -391,11 +435,12 @@ describe('POST /agent/act/stream', () => {
     };
   }
 
-  it('先推骨架、再推进度、最后推结果', async () => {
+  it('推进度态、骨架、逐项内容，最后推结果', async () => {
     const { run, response, events } = stream(async (input) => {
-      input.onProgress?.({ frame: 1 });
-      input.onProgress?.({ frame: 2 });
-      return { kind: 'generate_screen' };
+      input.onEvent?.({ type: 'status', phase: 'thinking' });
+      input.onEvent?.({ type: 'skeleton', title: 't', subtitle: 's', layout: { kpis: 1 } });
+      input.onEvent?.({ type: 'item', path: 'kpis[0]', value: { label: 'a', value: 1 } });
+      return { kind: 'generate_screen', output: '{}' };
     });
     await run();
     expect(response.setHeader).toHaveBeenCalledWith(
@@ -403,9 +448,10 @@ describe('POST /agent/act/stream', () => {
       'text/event-stream; charset=utf-8',
     );
     expect(events()).toEqual([
-      { event: 'skeleton', data: { document: { frame: 1 } } },
-      { event: 'progress', data: { document: { frame: 2 } } },
-      { event: 'result', data: { kind: 'generate_screen' } },
+      { event: 'status', data: { phase: 'thinking' } },
+      { event: 'skeleton', data: { title: 't', subtitle: 's', layout: { kpis: 1 } } },
+      { event: 'item', data: { path: 'kpis[0]', value: { label: 'a', value: 1 } } },
+      { event: 'result', data: { kind: 'generate_screen', output: '{}' } },
     ]);
     expect(response.end).toHaveBeenCalledTimes(1);
   });

@@ -36,6 +36,31 @@ export {
   parseScreenIntent,
 } from './intent-parse.js';
 export {
+  type IntentRepairIssue,
+  mapDocumentIssues,
+  type PreparedIntent,
+  type PrepareIntentInput,
+  prepareIntent,
+  repairKey,
+} from './intent-prepare.js';
+export {
+  applyIntentOps,
+  createIntentSession,
+  editIntent,
+  type IntentEditBaseline,
+  type IntentEditCommand,
+  type IntentEditOutcome,
+  type IntentOp,
+  type IntentSession,
+  isSessionUsable,
+} from './intent-session.js';
+export {
+  createIntentStreamAssembler,
+  type IntentStreamAssembler,
+  type IntentStreamHead,
+  parseIntentSkeleton,
+} from './intent-stream.js';
+export {
   DEFAULT_INTENT_STYLE,
   INTENT_STYLE_PRESET_IDS,
   INTENT_STYLE_PRESETS,

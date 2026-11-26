@@ -1,3 +1,5 @@
+import type { AgentCatalog } from './agent-catalog';
+
 /**
  * 生成 → 校验 → 修复回环的诊断面（ADR-0112 §2.1）。
  *
@@ -52,6 +54,12 @@ const BLOCK_HINTS: Readonly<Record<string, string>> = {
 };
 
 const LAYOUT_HINTS: Readonly<Record<string, string>> = {
+  LAYOUT_CAPACITY_EXCEEDED:
+    '这一屏纵向放不下：减少区域里的块（或把侧栏的块并进主区），带指标带时整屏所有行加起来不要超过 4 行；指标带的指标最多 5 个。',
+  INTENT_REGION_INVALID:
+    '区域必须是对象，kind 取 band / grid / split；band 要 items，grid 要 blocks，split 要 main 与 rail。',
+  AGENT_BLOCK_BINDING_UNSATISFIED:
+    '这一块的列满足不了该物料的绑定角色：给足一个字符串维度列加至少一个数值列，或换成目录里更合适的物料。',
   LAYOUT_FONT_TOO_SMALL: '字号低于可读下限：减少这一块的内容量，或把 span 调大让它有更多空间。',
   LAYOUT_OUT_OF_BOUNDS: '这一块超出了画布：减少同一行的块数或总 span（每行最多 4 列）。',
   LAYOUT_OVERLAP: '这一块与相邻内容重叠：减少同一行的块数或调整 span。',
@@ -60,7 +68,9 @@ const LAYOUT_HINTS: Readonly<Record<string, string>> = {
 
 /** 前端修复请求的上限：原文按模型一轮输出的量级收口，诊断与契约上限一致。 */
 const MAX_REPAIR_OUTPUT_CHARS = 64_000;
-const REPAIR_PATH = /^(?:|title|subtitle|kpis\[[0-4]\]|blocks\[[0-3]\])$/;
+/** 模型原文里的路径：整份、标题、平铺写法的指标 / 块、区域写法的区域与区域里的格子。 */
+const REPAIR_PATH =
+  /^(?:|title|subtitle|kpis\[[0-4]\]|blocks\[[0-3]\]|regions\[[0-5]\](?:\.(?:items|blocks|main|rail)\[[0-7]\])?)$/;
 const REPAIR_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 
 export interface AgentRepairRequest {
@@ -198,4 +208,65 @@ export function buildRepairPrompt(issues: readonly AgentRepairIssue[]): string {
     ...lines,
     '只改有问题的部分，其余内容原样保留；仍然只输出一个完整的 JSON 对象，结构与系统提示一致。',
   ].join('\n');
+}
+
+/**
+ * 「列满足不了绑定角色」的修复提示要具体（ADR-0113 §2.7）：通用一句「补足列或换物料」模型往往原样重发。
+ * 这里按上一轮原文里该块的 `type` 查目录，把该物料需要的角色与列数写进提示，再说明这一块实际给了几列。
+ * 路径或块读不出来就保持通用提示。
+ */
+export function enrichBindingHints(
+  issues: readonly AgentRepairIssue[],
+  output: string,
+  catalog: AgentCatalog,
+): AgentRepairIssue[] {
+  let root: unknown;
+  try {
+    root = JSON.parse(
+      output
+        .trim()
+        .replace(/^```(?:json)?/i, '')
+        .replace(/```$/, '')
+        .trim(),
+    );
+  } catch {
+    return [...issues];
+  }
+  return issues.map((issue) => {
+    if (issue.code !== 'AGENT_BLOCK_BINDING_UNSATISFIED') return issue;
+    const block = readPath(root, issue.path);
+    const type = typeof block?.type === 'string' ? block.type : '';
+    const material = catalog.materials.find((candidate) => candidate.type === type);
+    if (material === undefined || material.roles.length === 0) return issue;
+    const given = Array.isArray((block?.table as { columns?: unknown } | undefined)?.columns)
+      ? ((block?.table as { columns: unknown[] }).columns.length ?? 0)
+      : 0;
+    const roles = material.roles
+      .map(
+        (role) =>
+          `${role.id}（${role.min === role.max ? role.min : `${role.min}–${role.max}`} 列）`,
+      )
+      .join('、');
+    return {
+      ...issue,
+      hint: `${material.type} 需要的绑定角色：${roles}。dimension 取字符串列，其余角色取数值列，columns 可取任意列；这一块只给了 ${given} 列。请补足所需的列，或换成目录里更合适的物料。`,
+    };
+  });
+}
+
+/** `blocks[0]` / `regions[1].main[0]`：沿路径取模型原文里的那个对象。 */
+function readPath(root: unknown, path: string): Record<string, unknown> | undefined {
+  let current: unknown = root;
+  for (const token of path.split('.')) {
+    const match = /^([A-Za-z]+)(?:\[(\d+)\])?$/.exec(token);
+    if (match === null || typeof current !== 'object' || current === null) return undefined;
+    current = (current as Record<string, unknown>)[match[1] as string];
+    if (match[2] !== undefined) {
+      if (!Array.isArray(current)) return undefined;
+      current = current[Number(match[2])];
+    }
+  }
+  return typeof current === 'object' && current !== null && !Array.isArray(current)
+    ? (current as Record<string, unknown>)
+    : undefined;
 }

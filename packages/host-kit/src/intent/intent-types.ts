@@ -26,6 +26,12 @@ export interface IntentKpi {
   readonly precision?: number;
   readonly delta?: IntentKpiDelta;
   readonly origin: string;
+  /**
+   * 稳定标识（会话里用）：编译出的组件 id 与层级按它分段，而不是按当前位置。
+   * 删掉一块之后，后面的块位置前移、几何要变，但组件 id 不能跟着漂——未变的组件才能原样保留，
+   * 用户改过的内容才能对得上。缺省时用位置路径。
+   */
+  readonly ident?: string;
 }
 
 export interface IntentTableColumn {
@@ -62,6 +68,8 @@ export interface IntentBlock {
   /** 目录里没有用户要的物料、用了替代品时，模型写明「本来要的是什么」，编译器据此说明缺口。 */
   readonly substituteFor?: string;
   readonly origin: string;
+  /** 稳定标识，见 `IntentKpi.ident`。 */
+  readonly ident?: string;
 }
 
 /** 一排等宽的小卡（指标条）。 */
@@ -117,6 +125,11 @@ export interface IntentDiagnostic {
   readonly code: string;
   readonly path: string;
   readonly message: string;
+  /**
+   * 给宿主拼用户可读文案用的结构化细节（英文 `message` 不面向用户）。
+   * `INTENT_BLOCK_SUBSTITUTED`：`wanted`（模型写明本来要的）与 `used`（实际用的物料名）。
+   */
+  readonly detail?: Readonly<Record<string, string | number>>;
 }
 
 export interface IntentParseResult {

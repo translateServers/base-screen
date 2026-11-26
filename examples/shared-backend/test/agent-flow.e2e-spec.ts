@@ -393,7 +393,9 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
         .expect(201);
 
       expect(response.body.mode).toBe('llm');
-      expect(response.body.document).toBeDefined();
+      // 后端只交模型原文（意图层 IR）；编译由宿主前端做，所以没有 document。
+      expect(response.body.document).toBeUndefined();
+      expect(JSON.parse(response.body.output as string)).toMatchObject({ title: VALID_SPEC.title });
 
       const after = await request(server()).get('/api/screens').expect(200);
       expect((after.body.screens as unknown[]).length).toBe(countBefore);
@@ -433,7 +435,8 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
       expect(response.body.kind).toBe('generate_screen');
       expect(response.body.routedBy).toBe('rule');
       expect(response.body.mode).toBe('llm');
-      expect(response.body.document).toBeDefined();
+      expect(response.body.document).toBeUndefined();
+      expect(JSON.parse(response.body.output as string)).toMatchObject({ title: VALID_SPEC.title });
       // 只有一次生成调用，没有额外的路由调用。
       expect(stub.calls).toHaveLength(1);
       // act 只产出候选：宿主拿到候选后走提案通道，由用户确认才会写入。

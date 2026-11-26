@@ -386,9 +386,9 @@ describe('single items', () => {
       {
         type: 'base.text',
         title: '一二三四五六七八九十一二三四五六七八九十一二三四五六',
-        note: 'n'.repeat(40),
+        note: '注'.repeat(40),
         span: 9,
-        text: 'x'.repeat(200),
+        text: '字'.repeat(200),
       },
       CATALOG,
       'blocks[0]',
@@ -529,5 +529,35 @@ describe('single items', () => {
     expect(result.value?.label).toHaveLength(12);
     expect(result.value?.unit).toHaveLength(6);
     expect(result.value?.precision).toBe(3);
+  });
+});
+
+describe('text limits by script', () => {
+  it('lets plain Latin text run twice as long, so an English title is not cut mid-word', () => {
+    const result = parse({
+      title: 'East China Control Tower Overview',
+      subtitle: 'Warehouse throughput and carrier handoffs this week',
+      kpis: KPIS,
+      blocks: [{ type: 'base.text', title: 'Today highlights and risks', span: 2, text: 'a' }],
+    });
+
+    expect(result.intent?.title).toBe('East China Control Tower Overview');
+    expect(result.intent?.subtitle).toBe('Warehouse throughput and carrier handoffs this week');
+    const block = result.intent?.regions[1];
+    expect(block?.kind === 'grid' && block.blocks[0]?.title).toBe('Today highlights and risks');
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('still cuts Latin text at twice the limit, and keeps the Chinese limit for Chinese', () => {
+    const long = 'x'.repeat(100);
+    const result = parse({
+      title: long,
+      subtitle: '一二三四五六七八九十'.repeat(6),
+      kpis: KPIS,
+      blocks: [{ type: 'base.text', title: 't', span: 2, text: 'a' }],
+    });
+
+    expect(result.intent?.title).toHaveLength(40);
+    expect(result.intent?.subtitle).toHaveLength(40);
   });
 });

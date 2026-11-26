@@ -54,30 +54,27 @@ export interface AgentWarningShape {
   readonly message: string;
 }
 
-export interface AgentCandidateShape {
-  readonly name: string;
-  readonly document: unknown;
+/**
+ * 整屏生成的结果（ADR-0113 §2.1）：后端只回模型原文与编译需要的上下文，解析、编译、审计与
+ * 修复回环都在宿主前端用 host-kit 做。
+ */
+export interface AgentIntentShape {
+  /** 模型原文（JSON 文本）；未配置模型时是同形的确定性兜底。 */
+  readonly output: string;
   readonly mode: 'llm' | 'deterministic';
-  readonly imageCount: number;
   /** 目录来源：client = 本次随请求带来的设计器目录；fallback = 后端内置最小目录。 */
   readonly catalogSource?: 'client' | 'fallback';
-  /** 实际落进文档的物料 type，用于核对「用的确实是设计器里的组件」。 */
-  readonly materials?: readonly string[];
-  /** 非阻断降级：屏仍然产出，但要如实告诉用户哪几处被裁/被跳过。 */
+  /** 本轮授权的素材：解析与编译核验 assetId 要用。 */
+  readonly assets: readonly { readonly id: string; readonly name: string }[];
+  /** 本轮引用并解析出的数据集（含列类型）。 */
+  readonly datasets: readonly {
+    readonly datasetId: string;
+    readonly name: string;
+    readonly columns: readonly { readonly id: string; readonly type: string }[];
+  }[];
+  /** 后端侧的非阻断说明（例如素材库暂不可用）；解析与编译期的降级由宿主自己汇总。 */
   readonly warnings?: readonly AgentWarningShape[];
   readonly failure?: string;
-  /** 修复回环用掉的修复轮数；首轮即通过时省略。 */
-  readonly repairRounds?: number;
-  /**
-   * 修复上下文（ADR-0112 §2.1.6）：模型最后一轮原文与「组件 id → IR 路径」来源表。
-   * 只有模型产物才有；宿主审计或引擎拒绝时凭它请求一次修复。
-   */
-  readonly repairContext?: AgentRepairContextShape;
-}
-
-export interface AgentRepairContextShape {
-  readonly output: string;
-  readonly sources: Readonly<Record<string, string>>;
 }
 
 /** 宿主回传的修复请求：只给诊断码与 IR 路径，修改建议由后端按码生成。 */
@@ -201,7 +198,7 @@ export type AgentActShape =
   | ({
       readonly kind: 'generate_screen';
       readonly routedBy: 'rule' | 'model';
-    } & AgentCandidateShape)
+    } & AgentIntentShape)
   | ({
       readonly kind: 'edit_components';
       readonly routedBy: 'rule' | 'model';
@@ -259,12 +256,19 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<A
   }
 }
 
-/** 流式落稿的帧回调：每一帧都是一份完整候选文档（未校验，由调用方解析）。 */
+/** 流式落稿的事件回调（ADR-0113 §2.8）：内容未校验，由调用方交给 host-kit 解析。 */
 export interface AgentStreamHandlers {
-  /** 骨架：所有组件已在最终位置，未到的内容是占位框。 */
-  readonly onSkeleton?: (document: unknown) => void;
-  /** 又写完一部分后的完整候选。 */
-  readonly onProgress?: (document: unknown) => void;
+  /** 模型进度态：`thinking` 推理中（不展示推理内容）、`writing` 开始写正文。 */
+  readonly onStatus?: (phase: 'thinking' | 'writing') => void;
+  /** 骨架写齐：标题、副标题、风格与版面骨架。 */
+  readonly onSkeleton?: (head: {
+    readonly title: string;
+    readonly subtitle: string;
+    readonly style?: string;
+    readonly layout: unknown;
+  }) => void;
+  /** 又写完一个指标或块：位置路径 + 值。 */
+  readonly onItem?: (path: string, value: unknown) => void;
 }
 
 const STREAM_INCOMPLETE: ApiError = {
@@ -275,7 +279,7 @@ const STREAM_INCOMPLETE: ApiError = {
 
 /**
  * POST + 读 SSE。`EventSource` 只能 GET，带不了请求体，所以用 fetch 读流。
- * 事件：`skeleton` / `progress`（`{ document }`）、`result`（结果体）、`error`（错误体 + `status`）。
+ * 事件：`status` / `skeleton` / `item`、`result`（结果体）、`error`（错误体 + `status`）。
  */
 async function requestStream<T>(
   path: string,
@@ -298,11 +302,29 @@ async function requestStream<T>(
     }
     let outcome: ApiResult<T> | undefined;
     await readServerEvents(response.body, (event, data) => {
-      if (event === 'skeleton' || event === 'progress') {
-        const document = (data as { document?: unknown } | null)?.document;
-        if (document === undefined) return;
-        if (event === 'skeleton') handlers.onSkeleton?.(document);
-        else handlers.onProgress?.(document);
+      if (event === 'status') {
+        const phase = (data as { phase?: unknown } | null)?.phase;
+        if (phase === 'thinking' || phase === 'writing') handlers.onStatus?.(phase);
+      } else if (event === 'skeleton') {
+        const head = data as {
+          title?: unknown;
+          subtitle?: unknown;
+          style?: unknown;
+          layout?: unknown;
+        } | null;
+        if (typeof head?.title !== 'string' || typeof head.subtitle !== 'string') return;
+        if (head.layout === undefined) return;
+        handlers.onSkeleton?.({
+          title: head.title,
+          subtitle: head.subtitle,
+          ...(typeof head.style === 'string' ? { style: head.style } : {}),
+          layout: head.layout,
+        });
+      } else if (event === 'item') {
+        const item = data as { path?: unknown; value?: unknown } | null;
+        if (typeof item?.path === 'string' && item.value !== undefined) {
+          handlers.onItem?.(item.path, item.value);
+        }
       } else if (event === 'result') {
         outcome = { ok: true, data: data as T };
       } else if (event === 'error') {
@@ -498,7 +520,7 @@ export const api = {
     references?: readonly ScreenIntentReference[],
     signal?: AbortSignal,
     repair?: AgentRepairRequestShape,
-  ): Promise<ApiResult<AgentCandidateShape>> =>
+  ): Promise<ApiResult<AgentIntentShape>> =>
     request('/agent/candidate', {
       method: 'POST',
       body: {
@@ -533,8 +555,8 @@ export const api = {
       ...(signal === undefined ? {} : { signal }),
     }),
   /**
-   * 同 `actAgent`，按 SSE 接收（ADR-0112 §2.5）：整屏生成时先收骨架、再逐帧收完整候选，
-   * 最后返回与 `actAgent` 相同的结果。后端回的不是事件流（入参被拒、旧后端）时按普通响应读。
+   * 同 `actAgent`，按 SSE 接收（ADR-0112 §2.5 / ADR-0113 §2.8）：整屏生成时先收进度态与骨架、
+   * 再逐项收指标与块，最后返回与 `actAgent` 相同的结果。后端回的不是事件流（入参被拒、旧后端）时按普通响应读。
    */
   actAgentStream: (
     input: AgentActInputShape,

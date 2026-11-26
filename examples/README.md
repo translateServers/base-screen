@@ -801,9 +801,13 @@ cp my-data.db examples/shared-backend/data/datasources/
 
 ## 示例智能体：一句话生成大屏
 
-共享后端内置一个最小智能体（`src/agent/`）：模型只输出**中间表示**（标题、KPI、图块），
-组件树由宿主编译（`agent-compose.ts`）按**宿主设计器的实时目录**生成，非法结构进不来。
-生成结果直接落库，三个前端都能在列表里打开。
+共享后端内置一个最小智能体（`src/agent/`）：模型只输出**意图层 IR**（标题、指标带、栅格与主区 + 侧栏的区域、
+每块用什么组件与数据），组件树由**宿主前端**用 `host-kit` 的意图层（`parseScreenIntent` →
+`compileScreenIntent`，含布局求解与「外壳 + 原子物料」组合）按**宿主设计器的实时目录**确定性编译，
+非法结构进不来（ADR-0113）。设计器路径（`/agent/act`、`/agent/act/stream`、`/agent/candidate`）后端只做
+「模型 ⇄ IR」，把模型原文原样交给宿主；`POST /agent/generate`（首页「用智能体新建」，生成后直接落库）仍由后端
+编译（`agent-compose.ts`，CJS 工程引不了 ESM 的 host-kit），与 host-kit 的编译器靠根级等价测试
+`tests/examples/agent-compose-equivalence.test.ts` 防漂移，待创建流程也改成前端编译后一并删除。
 
 ```bash
 curl -X POST http://127.0.0.1:3000/api/agent/generate \
@@ -820,7 +824,7 @@ curl -X POST http://127.0.0.1:3000/api/agent/generate \
   下一句话就能用上，不需要导出快照或重启后端。
 - 模型只负责「用哪个组件、放几列、给什么数据」：`blocks[]` 里的 `type` 必须来自目录，
   `span` 是四列栅格里占几列；数据型组件给 `table`（列 + 行），值型组件给 `text` 或 `assetId`。
-- 编译器（`agent-compose.ts`）不认识任何具体 `type`：它按物料 manifest 声明的
+- 编译器（`host-kit` 的 `compileScreenIntent`，`agent-compose.ts` 是它在后端的等价副本）不认识任何具体 `type`：它按物料 manifest 声明的
   `staticData.kind` 决定要不要数据、按 `dataBinding.roles` 把列分到绑定角色、按 `defaultStyle`
   起样式，只叠加一层设计令牌（字号 / 字重 / 文字色）。目录里没有的 `type` 直接判整份失败
   （`failure: AGENT_SPEC_INVALID`），不猜、不替换成别的组件。
@@ -832,8 +836,9 @@ curl -X POST http://127.0.0.1:3000/api/agent/generate \
 ### 交互与失败
 
 - 三个编辑页的右栏「意图书写面」都已接线（`src/screen/host-intent.ts`，三端逐字一致）：
-  一句话 → 整屏走 `POST /agent/act/stream`（修复时走 `/agent/candidate`）、选中组件走 `POST /agent/edit` → 候选文档或补丁编译成
-  提案，进右栏「智能体」页签逐条采纳才写入；提案理由会写明走的是模型还是确定性兜底，兜底时
+  一句话 → 整屏走 `POST /agent/act/stream`（修复时走 `/agent/candidate`）、选中组件走 `POST /agent/edit` → 后端回模型原文，
+  宿主本地解析、编译、审计后编成提案（组件补丁走原有路径），进右栏「智能体」页签逐条采纳才写入；
+  解析丢掉的项、版面放不下、审计不过、引擎拒绝都由宿主带着「上一轮原文 + 按模型路径整理的诊断」回去要修复，最多 2 轮；提案理由会写明走的是模型还是确定性兜底，兜底时
   给出原因（未配置模型、模型输出未通过校验等）；组件作用域只接受选区内组件的 `props` / `style`
   与文本补丁，越界或重复的补丁整份丢弃，已绑数据的文本不会被换成内联值。
 - 整屏候选带来的数据源实例会随提案一起替换（id 冲突时重新编号并回写引用），只保留被保留组件
@@ -845,5 +850,7 @@ curl -X POST http://127.0.0.1:3000/api/agent/generate \
 - 模型调用失败（空闲超时、上游 HTTP 错误、断连、空响应）不再退回确定性结构：客户端对超时 / 429 / 5xx
   重试一次后仍失败，就返回错误（超时 504，其余 502，`error` 为失败码），不交候选、不落库
   （ADR-0112 §2.1.5）。意图书写面把 `message` 原样显示给用户。
-- 整屏生成走 `POST /agent/act/stream`（SSE）：骨架先挂成「生成中」草案，指标与块逐个原位填入，
-  完成后照常采纳；「取消生成」会中止请求并经 signal 中止上游模型调用（ADR-0112 §2.5）。
+- 整屏生成走 `POST /agent/act/stream`（SSE）：事件为 `status`（`thinking` / `writing`）、`skeleton`（标题、副标题、
+  风格与版面骨架）、`item`（位置路径 + 值）、`result`（模型原文）。骨架先挂成「生成中」草案，指标与块逐个原位填入
+  （帧在宿主前端本地编译），完成后照常采纳；「取消生成」会中止请求并经 signal 中止上游模型调用
+  （ADR-0112 §2.5 / ADR-0113 §2.8）。

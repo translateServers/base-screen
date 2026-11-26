@@ -47,6 +47,14 @@ const FLAT_MAX_BLOCKS = 4;
 const REGION_MAX_REGIONS = 6;
 const REGION_MAX_ITEMS = 8;
 
+/** 汉字、日韩文与全角符号占两倍宽：字数上限按中文口径定，纯西文放宽一倍，免得把英文标题截在词中间。 */
+const WIDE = /[⺀-鿿豈-﫿＀-￯]/;
+
+/** 按字符宽度截断：含中日韩字符按 `max` 字，纯西文按 `max * 2` 字符。 */
+export function clampText(text: string, max: number): string {
+  return text.slice(0, WIDE.test(text) ? max : max * 2);
+}
+
 const DELTA_UNITS = new Set(['percent', 'point', 'absolute']);
 const DELTA_DIRECTIONS = new Set(['up-good', 'down-good', 'neutral']);
 const SPLIT_RATIOS = new Set(['wide-narrow', 'even']);
@@ -57,6 +65,11 @@ const RESERVED_PARTS = ['pages', 'facts', 'variables', 'interactions', 'states']
 
 export interface ParseScreenIntentOptions {
   readonly catalog: IntentCatalog;
+  /**
+   * 允许指标值为 `null`（没有数据的占位，编译器画「—」）。只给确定性兜底用：
+   * 模型给的 `null` 不是占位而是漏写，仍按不合格的指标进修复回环。
+   */
+  readonly placeholders?: boolean;
 }
 
 /**
@@ -115,8 +128,8 @@ export function parseScreenIntent(
   }
 
   const regions = hasRegions
-    ? readRegions(root.regions, options.catalog, diagnostics)
-    : readFlat(root, options.catalog, diagnostics);
+    ? readRegions(root.regions, options.catalog, diagnostics, options.placeholders === true)
+    : readFlat(root, options.catalog, diagnostics, options.placeholders === true);
   if (regions === undefined) return { intent: undefined, diagnostics };
 
   const style = typeof root.style === 'string' ? root.style.trim() : undefined;
@@ -143,6 +156,7 @@ function readFlat(
   root: Record<string, unknown>,
   catalog: IntentCatalog,
   diagnostics: IntentDiagnostic[],
+  placeholders: boolean,
 ): readonly IntentRegion[] | undefined {
   if (!Array.isArray(root.kpis) || !Array.isArray(root.blocks)) {
     failedInto(diagnostics, 'AGENT_SPEC_INVALID', 'Intent needs "kpis" and "blocks" arrays.');
@@ -150,7 +164,7 @@ function readFlat(
   }
   const items: IntentKpi[] = [];
   for (const [index, raw] of root.kpis.slice(0, FLAT_MAX_KPIS).entries()) {
-    const kpi = parseIntentKpi(raw, `kpis[${index}]`);
+    const kpi = parseIntentKpi(raw, `kpis[${index}]`, { placeholders });
     diagnostics.push(...kpi.diagnostics);
     if (kpi.value !== undefined) items.push(kpi.value);
   }
@@ -174,6 +188,7 @@ function readRegions(
   raw: unknown,
   catalog: IntentCatalog,
   diagnostics: IntentDiagnostic[],
+  placeholders: boolean,
 ): readonly IntentRegion[] | undefined {
   if (!Array.isArray(raw) || raw.length === 0) {
     failedInto(diagnostics, 'AGENT_SPEC_INVALID', 'Intent needs a non-empty "regions" array.');
@@ -181,7 +196,7 @@ function readRegions(
   }
   const regions: IntentRegion[] = [];
   for (const [index, item] of raw.slice(0, REGION_MAX_REGIONS).entries()) {
-    const region = readRegion(item, catalog, `regions[${index}]`, diagnostics);
+    const region = readRegion(item, catalog, `regions[${index}]`, diagnostics, placeholders);
     if (region !== undefined) regions.push(region);
   }
   if (raw.length > REGION_MAX_REGIONS) {
@@ -204,6 +219,7 @@ function readRegion(
   catalog: IntentCatalog,
   path: string,
   diagnostics: IntentDiagnostic[],
+  placeholders: boolean,
 ): IntentRegion | undefined {
   const region = asRecord(raw);
   const kind = region?.kind;
@@ -219,7 +235,7 @@ function readRegion(
     if (rawItems === undefined) return undefined;
     const items: IntentKpi[] = [];
     for (const [index, item] of rawItems.entries()) {
-      const kpi = parseIntentKpi(item, `${path}.items[${index}]`);
+      const kpi = parseIntentKpi(item, `${path}.items[${index}]`, { placeholders });
       diagnostics.push(...kpi.diagnostics);
       if (kpi.value !== undefined) items.push(kpi.value);
     }
@@ -326,12 +342,21 @@ function hasBlocks(region: IntentRegion): boolean {
  * 一条指标：数值必须是有限数字，单位与格式化交给编译器。不合格的丢弃并记 `AGENT_KPI_INVALID`；
  * 增减量写错只丢增减量、保留指标本身（`AGENT_KPI_DELTA_DROPPED`）。
  */
-export function parseIntentKpi(raw: unknown, origin: string): IntentItemResult<IntentKpi> {
+export function parseIntentKpi(
+  raw: unknown,
+  origin: string,
+  options: { readonly placeholders?: boolean } = {},
+): IntentItemResult<IntentKpi> {
   const diagnostics: IntentDiagnostic[] = [];
   const kpi = asRecord(raw);
   const label = typeof kpi?.label === 'string' ? kpi.label.trim() : '';
   const value = kpi?.value;
-  if (kpi === null || label === '' || typeof value !== 'number' || !Number.isFinite(value)) {
+  const placeholder = value === null && options.placeholders === true;
+  if (
+    kpi === null ||
+    label === '' ||
+    (!placeholder && (typeof value !== 'number' || !Number.isFinite(value)))
+  ) {
     diagnostics.push({
       severity: 'error',
       code: 'AGENT_KPI_INVALID',
@@ -356,8 +381,8 @@ export function parseIntentKpi(raw: unknown, origin: string): IntentItemResult<I
   }
   return {
     value: {
-      label: label.slice(0, MAX_KPI_LABEL),
-      value,
+      label: clampText(label, MAX_KPI_LABEL),
+      value: placeholder ? null : (value as number),
       ...(unit === '' ? {} : { unit }),
       ...(precision === undefined ? {} : { precision }),
       ...(delta === undefined ? {} : { delta }),
@@ -422,13 +447,13 @@ export function parseIntentBlock(
   }
 
   let title = typeof block.title === 'string' ? block.title.trim() : '';
-  if (title.length > MAX_BLOCK_TITLE) {
-    title = title.slice(0, MAX_BLOCK_TITLE);
+  if (clampText(title, MAX_BLOCK_TITLE).length < title.length) {
+    title = clampText(title, MAX_BLOCK_TITLE);
     warn('AGENT_BLOCK_TEXT_TRIMMED', 'The block title was trimmed.');
   }
   let note = typeof block.note === 'string' ? block.note.trim() : '';
-  if (note.length > MAX_BLOCK_NOTE) {
-    note = note.slice(0, MAX_BLOCK_NOTE);
+  if (clampText(note, MAX_BLOCK_NOTE).length < note.length) {
+    note = clampText(note, MAX_BLOCK_NOTE);
     warn('AGENT_BLOCK_TEXT_TRIMMED', 'The block note was trimmed.');
   }
   let span = 1;
@@ -497,8 +522,8 @@ function readBind(
     }
     let text = typeof block.text === 'string' ? block.text.trim() : '';
     if (text === '') return error('AGENT_BLOCK_DATA_MISSING', 'A text block needs text.');
-    if (text.length > MAX_BLOCK_TEXT) {
-      text = text.slice(0, MAX_BLOCK_TEXT);
+    if (clampText(text, MAX_BLOCK_TEXT).length < text.length) {
+      text = clampText(text, MAX_BLOCK_TEXT);
       diagnostics.push({
         severity: 'warning',
         code: 'AGENT_BLOCK_TEXT_TRIMMED',
@@ -663,7 +688,7 @@ function readRoot(input: unknown): Record<string, unknown> | undefined {
 }
 
 function readText(value: unknown, max: number): string {
-  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+  return typeof value === 'string' ? clampText(value.trim(), max) : '';
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

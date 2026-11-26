@@ -371,7 +371,9 @@ function regionsOf(intent: ScreenIntent): CompileRegion[] {
   return intent.regions.map((region: IntentRegion, position): CompileRegion => {
     const path = regionPath(region, position);
     const slots = (items: readonly IntentBlock[], part: 'blocks' | 'main' | 'rail') =>
-      items.map((block, index): BlockSlot => ({ path: slotPath(path, part, index), block }));
+      items.map(
+        (block, index): BlockSlot => ({ path: block.ident ?? slotPath(path, part, index), block }),
+      );
     if (region.kind === 'band') {
       const flat = path === 'kpis';
       const items = flat ? region.items.slice(0, FLAT_MAX_KPIS) : region.items;
@@ -380,7 +382,9 @@ function regionsOf(intent: ScreenIntent): CompileRegion[] {
         path,
         origin: region.origin,
         layout: { kind: 'band', count: items.length },
-        kpis: items.map((kpi, index): KpiSlot => ({ path: slotPath(path, 'items', index), kpi })),
+        kpis: items.map(
+          (kpi, index): KpiSlot => ({ path: kpi.ident ?? slotPath(path, 'items', index), kpi }),
+        ),
       };
     }
     if (region.kind === 'grid') {

@@ -85,6 +85,16 @@ export function compileBlock(
   const hasNote = hasTitle && (block.note ?? '').trim() !== '';
   const headerHeight = hasTitle ? (hasNote ? 64 : 36) : 0;
 
+  // 模型用目录里有的物料替代了用户要的东西：不是错误，但必须如实说明（F4，不静默降级）。
+  if (block.substituteFor !== undefined) {
+    target.sink.warnings.push({
+      severity: 'warning',
+      code: 'INTENT_BLOCK_SUBSTITUTED',
+      path: block.origin,
+      message: `The model used "${material.name}" in place of "${block.substituteFor}", which the catalog does not offer.`,
+      detail: { wanted: block.substituteFor, used: material.name },
+    });
+  }
   // 一个块 = 一个外壳 + 标题 / 说明 / 主体：整体移动、复制、删除。
   context.beginShell(block.title.trim() === '' ? material.name : block.title, box);
   if (hasTitle) {
