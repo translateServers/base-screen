@@ -358,6 +358,9 @@ importers:
       '@base-screen/contracts':
         specifier: workspace:^
         version: link:../contracts
+      '@base-screen/core':
+        specifier: workspace:^
+        version: link:../core
 
   packages/material:
     dependencies:

@@ -46,3 +46,54 @@ export interface IntentCatalog {
   readonly materials: readonly IntentCatalogMaterial[];
   readonly assets: readonly IntentCatalogAsset[];
 }
+
+/** 目录摘要进不了提示词的兜底：标题类文本物料。 */
+export function pickTextMaterial(catalog: IntentCatalog): IntentCatalogMaterial | undefined {
+  return catalog.materials.find(
+    (material) =>
+      material.data === 'scalar' && typeof material.defaults.style.fontSize === 'number',
+  );
+}
+
+/**
+ * 非矩形形状：这类物料铺成整块会变成椭圆/线条/箭头，绝不能当底板。
+ * 目录里 `base.ellipse` 的 type 排在 `base.rectangle` 前面，早先只按「无数据 + 有 fill」挑，
+ * 结果整屏背景被铺成一颗巨大的椭圆——形状语义必须在选择时就排除掉。
+ */
+const NON_RECT_SHAPE_PATTERN =
+  /(?:^|[-.])(?:ellipse|oval|circle|triangle|polygon|star|arrow|line|rule|connector|divider)(?:$|[-.])/i;
+const RECT_SHAPE_PATTERN =
+  /(?:^|[-.])(?:rectangle|rect|card|panel|surface|box|frame|tile)(?:$|[-.])/i;
+const NON_RECT_NAME_PATTERN = /(椭圆|圆形|圆|三角|多边形|星形|箭头|线条|连线|分隔线)/;
+const RECT_NAME_PATTERN = /(矩形|方形|底板|卡片|面板|背景|容器|框架|色块)/;
+
+/**
+ * 卡片底板：无数据、默认样式里带纯色填充的装饰物料。
+ *
+ * 只挑矩形语义的：type 命中 `rectangle/card/panel/...`、名称命中「矩形/卡片/底板/...」，
+ * 或至少声明了 `borderRadius`（形状物料里只有矩形暴露这个键，椭圆固定 50%）。
+ * 拿不到合格底板时返回 undefined——宁可不出卡片，也不要把一颗椭圆拉成整屏。
+ */
+export function pickSurfaceMaterial(catalog: IntentCatalog): IntentCatalogMaterial | undefined {
+  let best: IntentCatalogMaterial | undefined;
+  let bestScore = -1;
+  for (const material of catalog.materials) {
+    if (material.data !== 'none') continue;
+    if (typeof material.defaults.style.fill !== 'string') continue;
+    if (NON_RECT_SHAPE_PATTERN.test(material.type)) continue;
+    if (NON_RECT_NAME_PATTERN.test(material.name)) continue;
+
+    let score = 0;
+    if (/(?:^|[-.])rect(?:angle)?(?:$|[-.])/i.test(material.type)) score += 4;
+    if (RECT_SHAPE_PATTERN.test(material.type)) score += 2;
+    if (material.name.includes('矩形')) score += 3;
+    if (RECT_NAME_PATTERN.test(material.name)) score += 1;
+    if ('borderRadius' in material.defaults.style) score += 1;
+
+    if (score > bestScore) {
+      best = material;
+      bestScore = score;
+    }
+  }
+  return best;
+}

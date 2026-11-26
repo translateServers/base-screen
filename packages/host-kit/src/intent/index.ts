@@ -6,12 +6,34 @@ export type {
   IntentCatalogProp,
   IntentCatalogRole,
 } from './intent-catalog.js';
+export { type CompileScreenIntentInput, compileScreenIntent } from './intent-compile.js';
+export type {
+  Box,
+  CompiledComponent,
+  CompiledScreenDocument,
+  IntentCompileOutcome,
+  IntentCompileResult,
+  IntentReferences,
+  IntentSkeleton,
+  IntentSkeletonSlot,
+  IntentStreamFrame,
+} from './intent-compile-types.js';
+export { formatKpiDelta, formatKpiValue, type KpiValueInput } from './intent-format.js';
 export {
   type ParseScreenIntentOptions,
   parseIntentBlock,
   parseIntentKpi,
   parseScreenIntent,
 } from './intent-parse.js';
+export {
+  DEFAULT_INTENT_STYLE,
+  INTENT_STYLE_PRESET_IDS,
+  INTENT_STYLE_PRESETS,
+  type IntentStylePalette,
+  type IntentStylePreset,
+  type IntentStylePresetId,
+  resolveIntentStyle,
+} from './intent-style.js';
 export type {
   IntentBand,
   IntentBind,

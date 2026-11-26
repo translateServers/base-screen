@@ -1,7 +1,7 @@
 # @base-screen/host-kit
 
 宿主接入辅助：把示例里反复手抄、抄错就运行时失败的端口样板收编为上游公共 helper。
-只依赖 `@base-screen/contracts`，支持复用宿主业务 API 或注入 `fetch`，不引入存储、网络重试或业务降级。
+只依赖 `@base-screen/contracts` 与 `@base-screen/core`（后者仅供智能体意图层取可读字号下限），支持复用宿主业务 API 或注入 `fetch`，不引入存储、网络重试或业务降级。
 
 ## 提供
 
@@ -15,6 +15,7 @@
 | `createSseSubscribe({ url, mapEvent?, fetchSnapshot?, ... })` | 推送订阅：基于原生 `EventSource`，映射推送事件、连接状态与「先挂监听再取快照」（ADR-0104） |
 | `createSubscriptionHub({ keyOf, open, lingerMs? })` | 推送订阅中心：同键逻辑订阅复用一条上游连接，迟到者收合成快照，最后一个离开后延迟关闭 |
 | `parseScreenIntent(input, { catalog })` / `parseIntentBlock` / `parseIntentKpi` | 智能体意图层（ADR-0113）：把模型输出宽容解析成 `ScreenIntent`——区域 `band / grid / split`、指标、块与取值；单项瑕疵只降级该项，诊断带模型原文路径（`origin`），供修复回环指回模型自己写的那一处。目录以纯 JSON 的 `IntentCatalog` 传入，不依赖物料契约 |
+| `compileScreenIntent({ intent, catalog, references?, mode?, stream? })` / `formatKpiValue` / `formatKpiDelta` / `resolveIntentStyle` | 智能体意图层的确定性编译器（ADR-0113）：目录驱动，把 `ScreenIntent` 编成合法文档草稿（组件、示例数据标记、数据源引用、绑定角色分配、字号兜底），并随产物返回「组件 id → 模型原文路径」来源表。当前编译「一条指标带 + 一条栅格」，`stream` 帧按骨架排版、未到的格子画占位。产物仍须经契约解析与引擎提交校验 |
 
 REST helper 对接[示例后端 REST 契约](https://github.com/translateServers/base-screen/blob/master/examples/README.md#rest-契约由-shared-backend-实现三端共用)，
 并复用同一业务回调核心。宿主后端路径或 JSON 形状不同时可提供 `mapping`；已有业务 API 函数时

@@ -17,7 +17,8 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@base-screen/contracts": "workspace:^"
+    "@base-screen/contracts": "workspace:^",
+    "@base-screen/core": "workspace:^"
   },
   "exports": {
     ".": {

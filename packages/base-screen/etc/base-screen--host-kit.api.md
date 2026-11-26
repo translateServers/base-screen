@@ -4,6 +4,95 @@
 
 ```ts
 
+// @public (undocumented)
+export interface Box {
+    // (undocumented)
+    readonly height: number;
+    // (undocumented)
+    readonly width: number;
+    // (undocumented)
+    readonly x: number;
+    // (undocumented)
+    readonly y: number;
+}
+
+// @public
+export interface CompiledComponent {
+    // (undocumented)
+    dataBinding?: Record<string, unknown>;
+    // (undocumented)
+    dataSource: null;
+    // (undocumented)
+    dataValue: Record<string, unknown> | null;
+    // (undocumented)
+    id: string;
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    parentId: null;
+    // (undocumented)
+    position: {
+        x: number;
+        y: number;
+    };
+    // (undocumented)
+    props: Record<string, ScreenJsonValue>;
+    // (undocumented)
+    rotation: number;
+    // (undocumented)
+    size: {
+        width: number;
+        height: number;
+    };
+    // (undocumented)
+    status: {
+        locked: boolean;
+        hidden: boolean;
+    };
+    // (undocumented)
+    style: Record<string, ScreenJsonValue>;
+    // (undocumented)
+    type: string;
+    // (undocumented)
+    zIndex: number;
+}
+
+// @public (undocumented)
+export interface CompiledScreenDocument {
+    // (undocumented)
+    readonly blueprint: {
+        readonly nodes: readonly never[];
+        readonly edges: readonly never[];
+    };
+    // (undocumented)
+    readonly canvas: {
+        readonly width: number;
+        readonly height: number;
+        readonly backgroundColor: string;
+    };
+    // (undocumented)
+    readonly components: readonly CompiledComponent[];
+    // (undocumented)
+    readonly dataSources?: readonly Record<string, unknown>[];
+    // (undocumented)
+    readonly variables: readonly never[];
+}
+
+// @public
+export function compileScreenIntent(input: CompileScreenIntentInput): IntentCompileOutcome;
+
+// @public (undocumented)
+export interface CompileScreenIntentInput {
+    // (undocumented)
+    readonly catalog: IntentCatalog;
+    // (undocumented)
+    readonly intent: ScreenIntent;
+    readonly mode?: 'llm' | 'deterministic';
+    // (undocumented)
+    readonly references?: IntentReferences;
+    readonly stream?: IntentStreamFrame;
+}
+
 // @public
 export function createHostDatasetPort<GroupsPayload, ListPayload, DescribePayload, QueryPayload>(options: HostDatasetPortOptions<GroupsPayload, ListPayload, DescribePayload, QueryPayload>): ScreenHostDatasetPort;
 
@@ -26,7 +115,18 @@ export function createSseSubscribe<Request>(options: SseSubscribeOptions<Request
 export function createSubscriptionHub<Request>(options: SubscriptionHubOptions<Request>): HostKitSubscriptionHub<Request>;
 
 // @public (undocumented)
+export const DEFAULT_INTENT_STYLE: IntentStylePresetId;
+
+// @public (undocumented)
 type DescribeRequest = Parameters<ScreenHostDatasetPort['describe']>[0];
+
+// @public
+export function formatKpiDelta(kpi: KpiValueInput & {
+    readonly delta?: IntentKpiDelta;
+}): string;
+
+// @public
+export function formatKpiValue(kpi: KpiValueInput): string;
 
 // @public (undocumented)
 type GroupsRequest = Parameters<NonNullable<ScreenHostDatasetPort['groups']>>[0];
@@ -210,6 +310,12 @@ export interface HttpProjectAdapterOptions extends HostKitHttpOptions {
 }
 
 // @public
+export const INTENT_STYLE_PRESET_IDS: readonly ['deep-tech', 'light-biz', 'warm-care', 'ink-finance'];
+
+// @public (undocumented)
+export const INTENT_STYLE_PRESETS: Readonly<Record<IntentStylePresetId, IntentStylePreset>>;
+
+// @public
 export interface IntentBand {
     // (undocumented)
     readonly items: readonly IntentKpi[];
@@ -315,6 +421,25 @@ export interface IntentCatalogRole {
     readonly min: number;
 }
 
+// @public (undocumented)
+export type IntentCompileOutcome = {
+    readonly ok: true;
+    readonly value: IntentCompileResult;
+} | {
+    readonly ok: false;
+    readonly diagnostics: readonly IntentDiagnostic[];
+};
+
+// @public (undocumented)
+export interface IntentCompileResult {
+    // (undocumented)
+    readonly document: CompiledScreenDocument;
+    readonly imageCount: number;
+    readonly materials: readonly string[];
+    readonly sources: Readonly<Record<string, string>>;
+    readonly warnings: readonly IntentDiagnostic[];
+}
+
 // @public
 export interface IntentDiagnostic {
     // (undocumented)
@@ -372,8 +497,41 @@ export interface IntentParseResult {
     readonly intent: ScreenIntent | undefined;
 }
 
+// @public
+export interface IntentReferences {
+    // (undocumented)
+    readonly assets: readonly {
+        readonly id: string;
+        readonly name: string;
+    }[];
+    // (undocumented)
+    readonly datasets: readonly {
+        readonly datasetId: string;
+        readonly name: string;
+        readonly columns: readonly {
+            readonly id: string;
+            readonly type: string;
+        }[];
+    }[];
+}
+
 // @public (undocumented)
 export type IntentRegion = IntentBand | IntentGrid | IntentSplit;
+
+// @public
+export interface IntentSkeleton {
+    // (undocumented)
+    readonly blocks: readonly IntentSkeletonSlot[];
+    // (undocumented)
+    readonly kpis: number;
+}
+
+// @public (undocumented)
+export interface IntentSkeletonSlot {
+    readonly data: boolean;
+    // (undocumented)
+    readonly span: number;
+}
 
 // @public
 export interface IntentSplit {
@@ -386,6 +544,38 @@ export interface IntentSplit {
     readonly railSide: 'left' | 'right';
     readonly ratio: 'wide-narrow' | 'even';
 }
+
+// @public
+export interface IntentStreamFrame {
+    // (undocumented)
+    readonly blocks: readonly (IntentBlock | undefined)[];
+    // (undocumented)
+    readonly kpis: readonly (IntentKpi | undefined)[];
+    // (undocumented)
+    readonly skeleton: IntentSkeleton;
+}
+
+// @public (undocumented)
+export interface IntentStylePalette {
+    readonly accent: string;
+    readonly canvas: string;
+    readonly card: string;
+    readonly footer: string;
+    readonly muted: string;
+    readonly text: string;
+}
+
+// @public (undocumented)
+export interface IntentStylePreset {
+    // (undocumented)
+    readonly id: IntentStylePresetId;
+    readonly label: string;
+    // (undocumented)
+    readonly palette: IntentStylePalette;
+}
+
+// @public (undocumented)
+export type IntentStylePresetId = (typeof INTENT_STYLE_PRESET_IDS)[number];
 
 // @public (undocumented)
 export interface IntentTable {
@@ -403,6 +593,16 @@ export interface IntentTableColumn {
     readonly label: string;
     // (undocumented)
     readonly type: 'string' | 'number' | 'boolean';
+}
+
+// @public
+export interface KpiValueInput {
+    // (undocumented)
+    readonly precision?: number;
+    // (undocumented)
+    readonly unit?: string;
+    // (undocumented)
+    readonly value: number | null;
 }
 
 // @public (undocumented)
@@ -430,6 +630,9 @@ export interface ParseScreenIntentOptions {
 
 // @public (undocumented)
 type QueryRequest = Parameters<ScreenHostDatasetPort['query']>[0];
+
+// @public
+export function resolveIntentStyle(value?: unknown): IntentStylePreset;
 
 // @public (undocumented)
 export interface RestDatasetPortOptions extends HostKitHttpOptions {
