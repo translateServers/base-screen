@@ -225,11 +225,224 @@ export interface HttpProjectAdapterOptions extends HostKitHttpOptions {
     readonly migrate?: (input: unknown) => ScreenMigrationResult;
 }
 
+// @public
+export interface IntentBand {
+    // (undocumented)
+    readonly items: readonly IntentKpi[];
+    // (undocumented)
+    readonly kind: 'band';
+}
+
+// @public
+export type IntentBind = {
+    readonly kind: 'table';
+    readonly table: IntentTable;
+} | {
+    readonly kind: 'dataset';
+    readonly datasetId: string;
+} | {
+    readonly kind: 'text';
+    readonly text: string;
+} | {
+    readonly kind: 'asset';
+    readonly assetId: string;
+} | {
+    readonly kind: 'none';
+};
+
+// @public (undocumented)
+export interface IntentBlock {
+    // (undocumented)
+    readonly bind: IntentBind;
+    // (undocumented)
+    readonly note?: string;
+    // (undocumented)
+    readonly origin: string;
+    // (undocumented)
+    readonly props?: Readonly<Record<string, string | number | boolean>>;
+    readonly span: number;
+    readonly substituteFor?: string;
+    // (undocumented)
+    readonly title: string;
+    readonly type: string;
+}
+
+// @public (undocumented)
+export interface IntentCatalog {
+    // (undocumented)
+    readonly assets: readonly IntentCatalogAsset[];
+    // (undocumented)
+    readonly materials: readonly IntentCatalogMaterial[];
+}
+
+// @public (undocumented)
+export interface IntentCatalogAsset {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly name: string;
+}
+
+// @public
+export type IntentCatalogData = 'tabular' | 'scalar' | 'none';
+
+// @public (undocumented)
+export interface IntentCatalogMaterial {
+    readonly asset: boolean;
+    // (undocumented)
+    readonly category: string;
+    // (undocumented)
+    readonly data: IntentCatalogData;
+    // (undocumented)
+    readonly defaults: {
+        readonly props: Readonly<Record<string, ScreenJsonValue>>;
+        readonly style: Readonly<Record<string, ScreenJsonValue>>;
+    };
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly props: Readonly<Record<string, IntentCatalogProp>>;
+    // (undocumented)
+    readonly roles: readonly IntentCatalogRole[];
+    // (undocumented)
+    readonly size: {
+        readonly width: number;
+        readonly height: number;
+    };
+    // (undocumented)
+    readonly type: string;
+}
+
+// @public (undocumented)
+export interface IntentCatalogProp {
+    // (undocumented)
+    readonly kind: 'string' | 'number' | 'boolean' | 'enum';
+    // (undocumented)
+    readonly values?: readonly string[];
+}
+
+// @public (undocumented)
+export interface IntentCatalogRole {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly max: number;
+    // (undocumented)
+    readonly min: number;
+}
+
+// @public
+export interface IntentDiagnostic {
+    // (undocumented)
+    readonly code: string;
+    // (undocumented)
+    readonly message: string;
+    // (undocumented)
+    readonly path: string;
+    // (undocumented)
+    readonly severity: 'error' | 'warning';
+}
+
+// @public
+export interface IntentGrid {
+    // (undocumented)
+    readonly blocks: readonly IntentBlock[];
+    // (undocumented)
+    readonly kind: 'grid';
+}
+
+// @public
+export interface IntentItemResult<T> {
+    // (undocumented)
+    readonly diagnostics: readonly IntentDiagnostic[];
+    // (undocumented)
+    readonly value: T | undefined;
+}
+
+// @public (undocumented)
+export interface IntentKpi {
+    // (undocumented)
+    readonly delta?: IntentKpiDelta;
+    // (undocumented)
+    readonly label: string;
+    // (undocumented)
+    readonly origin: string;
+    readonly precision?: number;
+    readonly unit?: string;
+    readonly value: number | null;
+}
+
+// @public
+export interface IntentKpiDelta {
+    // (undocumented)
+    readonly direction: 'up-good' | 'down-good' | 'neutral';
+    readonly unit: 'percent' | 'point' | 'absolute';
+    // (undocumented)
+    readonly value: number;
+}
+
+// @public (undocumented)
+export interface IntentParseResult {
+    // (undocumented)
+    readonly diagnostics: readonly IntentDiagnostic[];
+    readonly intent: ScreenIntent | undefined;
+}
+
+// @public (undocumented)
+export type IntentRegion = IntentBand | IntentGrid | IntentSplit;
+
+// @public
+export interface IntentSplit {
+    // (undocumented)
+    readonly kind: 'split';
+    // (undocumented)
+    readonly main: readonly IntentBlock[];
+    // (undocumented)
+    readonly rail: readonly IntentBlock[];
+    readonly railSide: 'left' | 'right';
+    readonly ratio: 'wide-narrow' | 'even';
+}
+
+// @public (undocumented)
+export interface IntentTable {
+    // (undocumented)
+    readonly columns: readonly IntentTableColumn[];
+    // (undocumented)
+    readonly rows: readonly Readonly<Record<string, string | number | boolean>>[];
+}
+
+// @public (undocumented)
+export interface IntentTableColumn {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly label: string;
+    // (undocumented)
+    readonly type: 'string' | 'number' | 'boolean';
+}
+
 // @public (undocumented)
 type ListRequest = Parameters<ScreenHostDatasetPort['list']>[0];
 
 // @public (undocumented)
 type LoadRequest = Parameters<ScreenProjectAdapter['load']>[0];
+
+// @public
+export function parseIntentBlock(raw: unknown, catalog: IntentCatalog, origin: string, where: {
+    readonly grid: boolean;
+}): IntentItemResult<IntentBlock>;
+
+// @public
+export function parseIntentKpi(raw: unknown, origin: string): IntentItemResult<IntentKpi>;
+
+// @public
+export function parseScreenIntent(input: unknown, options: ParseScreenIntentOptions): IntentParseResult;
+
+// @public (undocumented)
+export interface ParseScreenIntentOptions {
+    // (undocumented)
+    readonly catalog: IntentCatalog;
+}
 
 // @public (undocumented)
 type QueryRequest = Parameters<ScreenHostDatasetPort['query']>[0];
@@ -246,6 +459,16 @@ export interface RestDatasetPortOptions extends HostKitHttpOptions {
 
 // @public (undocumented)
 type SaveRequest = Parameters<ScreenProjectAdapter['save']>[0];
+
+// @public (undocumented)
+export interface ScreenIntent {
+    readonly regions: readonly IntentRegion[];
+    readonly style?: string;
+    // (undocumented)
+    readonly subtitle: string;
+    // (undocumented)
+    readonly title: string;
+}
 
 // @public (undocumented)
 export interface SseSubscribeOptions<Request> {

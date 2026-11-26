@@ -14,6 +14,7 @@
 | `createHostKitHttp` / `toHostKitSearch` / `toAbortSignal` | 最小 JSON HTTP 客户端与 query/signal 桥接 |
 | `createSseSubscribe({ url, mapEvent?, fetchSnapshot?, ... })` | 推送订阅：基于原生 `EventSource`，映射推送事件、连接状态与「先挂监听再取快照」（ADR-0104） |
 | `createSubscriptionHub({ keyOf, open, lingerMs? })` | 推送订阅中心：同键逻辑订阅复用一条上游连接，迟到者收合成快照，最后一个离开后延迟关闭 |
+| `parseScreenIntent(input, { catalog })` / `parseIntentBlock` / `parseIntentKpi` | 智能体意图层（ADR-0113）：把模型输出宽容解析成 `ScreenIntent`——区域 `band / grid / split`、指标、块与取值；单项瑕疵只降级该项，诊断带模型原文路径（`origin`），供修复回环指回模型自己写的那一处。目录以纯 JSON 的 `IntentCatalog` 传入，不依赖物料契约 |
 
 REST helper 对接[示例后端 REST 契约](https://github.com/translateServers/base-screen/blob/master/examples/README.md#rest-契约由-shared-backend-实现三端共用)，
 并复用同一业务回调核心。宿主后端路径或 JSON 形状不同时可提供 `mapping`；已有业务 API 函数时
