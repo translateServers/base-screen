@@ -21,6 +21,7 @@ import {
 import { DesignerAlignmentIndex } from './designer-canvas-snap-alignment-index.js';
 import type { DesignerSnapCandidates } from './designer-canvas-snap-candidates.js';
 import type { DesignerSpacingIndex } from './designer-canvas-snap-spacing.js';
+import type { DesignerSnapTuning } from './designer-snap-tuning.js';
 
 export * from './designer-canvas-aids-types.js';
 export {
@@ -35,6 +36,7 @@ export {
   type DesignerSnapCandidates,
 } from './designer-canvas-snap-candidates.js';
 export { DesignerSpacingIndex } from './designer-canvas-snap-spacing.js';
+export { type DesignerSnapTuning, resolveDesignerSnapTuning } from './designer-snap-tuning.js';
 
 type DesignerSnapTargets = DesignerSnapCandidates | DesignerAlignmentIndex;
 type DesignerSnapCoordinates = { readonly x: number; readonly y: number };
@@ -47,8 +49,9 @@ export function snapDesignerCanvasPoint(
   candidates: DesignerSnapTargets = EMPTY_CANDIDATES,
   zoom = 1,
   session?: DesignerSnapSession,
+  tuning?: DesignerSnapTuning,
 ): DesignerSnapPoint {
-  return resolveCanvasSnap(point, state, candidates, zoom, session, undefined, undefined);
+  return resolveCanvasSnap(point, state, candidates, zoom, session, undefined, undefined, tuning);
 }
 
 export function snapDesignerSelectionTranslation(
@@ -59,8 +62,9 @@ export function snapDesignerSelectionTranslation(
   zoom = 1,
   session?: DesignerSnapSession,
   spacing?: DesignerSpacingIndex,
+  tuning?: DesignerSnapTuning,
 ): DesignerSnapTranslation {
-  return resolveCanvasSnap(translation, state, candidates, zoom, session, bounds, spacing);
+  return resolveCanvasSnap(translation, state, candidates, zoom, session, bounds, spacing, tuning);
 }
 
 /** Phase two alone, for geometry another step produced (resize, drawing a new component). */
@@ -69,9 +73,14 @@ export function collectDesignerAlignmentGuides(
   state: DesignerCanvasAidsState,
   candidates: DesignerSnapTargets = EMPTY_CANDIDATES,
   zoom = 1,
+  tuning?: DesignerSnapTuning,
 ): DesignerSnapGuides | undefined {
   if (!state.smartGuidesEnabled) return undefined;
-  return toIndex(candidates).guides(bounds, alignmentTolerance(zoom), designerSnapGuideReach(zoom));
+  return toIndex(candidates).guides(
+    bounds,
+    alignmentTolerance(zoom),
+    tuning === undefined ? designerSnapGuideReach(zoom) : tuning.reach + tuning.threshold,
+  );
 }
 
 function resolveCanvasSnap(
@@ -82,6 +91,7 @@ function resolveCanvasSnap(
   session: DesignerSnapSession | undefined,
   bounds: DesignerSelectionSnapBounds | undefined,
   spacing: DesignerSpacingIndex | undefined,
+  tuning: DesignerSnapTuning | undefined,
 ): DesignerSnapTranslation {
   if (!state.smartGuidesEnabled) {
     if (session !== undefined) {
@@ -91,7 +101,8 @@ function resolveCanvasSnap(
     return { x: raw.x, y: raw.y };
   }
   const scale = Math.max(zoom, Number.EPSILON);
-  const threshold = DESIGNER_SMART_GUIDE_THRESHOLD / scale;
+  const threshold = tuning?.threshold ?? DESIGNER_SMART_GUIDE_THRESHOLD / scale;
+  const reach = tuning?.reach ?? DESIGNER_SNAP_REACH / scale;
   const releaseThreshold = threshold * DESIGNER_SNAP_RELEASE_MULTIPLIER;
   const anchors =
     bounds === undefined
@@ -104,7 +115,6 @@ function resolveCanvasSnap(
   const posesY = anchors?.y.map((anchor) => anchor + raw.y) ?? [raw.y];
   const directions = anchors === undefined ? [] : SELECTION_DIRECTIONS;
   const index = toIndex(candidates);
-  const reach = DESIGNER_SNAP_REACH / scale;
   // The geometry being moved, before snapping: the reach is measured from it.
   const moved =
     bounds === undefined
@@ -149,8 +159,11 @@ function resolveCanvasSnap(
           bottom: bounds.bottom + y.value,
         };
   const tolerance = alignmentTolerance(zoom);
-  const guides = index.guides(final, tolerance, designerSnapGuideReach(zoom));
-  const equalSpacing = spacing?.measurements(final, tolerance, designerSnapGuideReach(zoom)) ?? [];
+  // Guides and marks use the same narrowed reach as the snap, plus one capture window so a
+  // target that just won the snap cannot lose its line to the final-position filter.
+  const markReach = reach + threshold;
+  const guides = index.guides(final, tolerance, markReach);
+  const equalSpacing = spacing?.measurements(final, tolerance, markReach) ?? [];
   return {
     x: x.value,
     y: y.value,

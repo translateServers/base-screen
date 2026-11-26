@@ -12,6 +12,12 @@ import {
 
 export type { DesignerGuideAxis } from './designer-guide-overlay-nodes.js';
 
+/**
+ * 读数至少要占一行（`--designer-overlay-line-height` = 14 屏幕 px）才画数字；更短的间距只留
+ * 虚线与端点，避免密集排布或缩小时读数叠在一起。
+ */
+const MIN_LABEL_SCREEN_SIZE = 14;
+
 export interface DesignerGuideOverlayOptions {
   readonly canvas: HTMLDivElement;
   readonly canvasAids: DesignerCanvasAidsState;
@@ -86,6 +92,7 @@ function collectOverlayItems(options: DesignerGuideOverlayOptions): DesignerGuid
       key: 'measurement:' + measurement.axis + ':' + ordinals[measurement.axis]++,
       kind: 'measurement',
       measurement,
+      showLabel: measurement.distance * options.zoom >= MIN_LABEL_SCREEN_SIZE,
     });
   }
   return items;

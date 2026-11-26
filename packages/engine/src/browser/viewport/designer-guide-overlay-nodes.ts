@@ -19,6 +19,8 @@ export type DesignerGuideOverlayItem =
       readonly key: string;
       readonly kind: 'measurement';
       readonly measurement: DesignerCanvasMeasurement;
+      /** False when the gap is shorter than one reading line on screen: draw the ticks only. */
+      readonly showLabel: boolean;
     };
 
 export interface DesignerGuideOverlayNode {
@@ -63,7 +65,7 @@ export function updateDesignerGuideOverlayNode(
       axis === 'x' ? `${to - from}px` : '',
       axis === 'y' ? `${to - from}px` : '',
     );
-    const text = String(Math.round(distance));
+    const text = item.showLabel ? String(Math.round(distance)) : '';
     if (label !== undefined && label.textContent !== text) label.textContent = text;
     return;
   }

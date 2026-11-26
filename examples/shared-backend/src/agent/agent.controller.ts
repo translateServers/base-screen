@@ -96,7 +96,10 @@ export class AgentController {
   }
 
   @Post('generate')
-  @ApiOperation({ summary: '让示例智能体生成一屏并落库；失败时退回确定性结构并如实标注' })
+  @ApiOperation({
+    summary:
+      '让示例智能体生成一屏并落库；未配置模型时退回确定性结构并如实标注，模型调用失败时报错、不落库',
+  })
   async generate(@Body() dto: AgentGenerateDto): Promise<AgentGenerateResult> {
     return this.agent.generate({
       topic: dto.topic,

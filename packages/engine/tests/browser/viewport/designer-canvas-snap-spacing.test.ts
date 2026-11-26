@@ -53,20 +53,31 @@ describe('DesignerSpacingIndex snapping', () => {
     const index = new DesignerSpacingIndex(crowded);
     expect(index.snap('x', box(500 * 60 - 3, 0, 40, 40), 8)).toBe(3);
   });
+
+  it('does not offer a span that skips over a component in the same row', () => {
+    // A 0..40, M 60..80, B 100..140: the only gaps are 20 (40..60 and 80..100). The 60
+    // span A→B used to be offered too and would snap the selection to 200 here.
+    const row = new DesignerSpacingIndex([
+      box(0, 0, 40, 40),
+      box(60, 0, 20, 40),
+      box(100, 0, 40, 40),
+    ]);
+    expect(row.snap('x', box(205, 0, 40, 40), 8)).toBeUndefined();
+    // The 20 gap after B still duplicates: 140 + 20 = 160.
+    expect(row.snap('x', box(163, 0, 40, 40), 8)).toBe(-3);
+  });
 });
 
 describe('DesignerSpacingIndex equal-spacing marks', () => {
-  it('marks the duplicated gap together with the chain of equal gaps it extends', () => {
+  it('marks the duplicated gap and the gap it copies, without extending the chain', () => {
     const index = new DesignerSpacingIndex(ROW);
     expect(index.measurements(box(180, 5, 40, 30), 0.5)).toEqual([
-      equal('x', 40, 60, 20),
       equal('x', 100, 120, 20),
       equal('x', 160, 180, 20),
     ]);
     expect(index.measurements(box(-60, 0, 40, 40), 0.5)).toEqual([
       equal('x', -20, 0, 20),
       equal('x', 40, 60, 20),
-      equal('x', 100, 120, 20),
     ]);
   });
 
@@ -96,6 +107,19 @@ describe('DesignerSpacingIndex equal-spacing marks', () => {
       equal('x', 100, 120, 100),
     ]);
   });
+
+  it('marks only the two halves of a centred gap instead of the whole column', () => {
+    // Ten 40px rows 16 apart with the selection filling one row slot: every gap in the
+    // column is 16, and the chain used to label all of them.
+    const column = Array.from({ length: 10 }, (_, index) => box(0, index * 56, 100, 40)).filter(
+      (bounds) => bounds.top !== 280,
+    );
+    const marks = new DesignerSpacingIndex(column).measurements(box(0, 280, 100, 40), 0.5);
+    expect(marks.map((mark) => [mark.from, mark.to])).toEqual([
+      [264, 280],
+      [320, 336],
+    ]);
+  });
 });
 
 describe('equal spacing in the selection solver', () => {
@@ -115,11 +139,7 @@ describe('equal spacing in the selection solver', () => {
       new DesignerSpacingIndex(ROW),
     );
     expect(result).toMatchObject({ x: 180, y: 0, snappedX: 180 });
-    expect(result.measurements).toEqual([
-      equal('x', 40, 60, 20),
-      equal('x', 100, 120, 20),
-      equal('x', 160, 180, 20),
-    ]);
+    expect(result.measurements).toEqual([equal('x', 100, 120, 20), equal('x', 160, 180, 20)]);
   });
 
   it('keeps the alignment when it is as near as the equal spacing', () => {

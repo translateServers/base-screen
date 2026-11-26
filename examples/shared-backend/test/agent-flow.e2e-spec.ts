@@ -139,6 +139,20 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
     return response.body;
   }
 
+  /** 模型调用失败时不落库、不交候选：返回错误码与状态（ADR-0112 §2.1.5）。 */
+  async function generateExpectingFailure(topic: string, status: number) {
+    const before = await request(server()).get('/api/screens').expect(200);
+    const response = await request(server())
+      .post('/api/agent/generate')
+      .send({ topic })
+      .expect(status);
+    const after = await request(server()).get('/api/screens').expect(200);
+    expect((after.body.screens as unknown[]).length).toBe(
+      (before.body.screens as unknown[]).length,
+    );
+    return response.body as { error: string; message: string };
+  }
+
   describe('生成整屏并落库', () => {
     it('模型给出合法中间表示：mode=llm、落库、读回的文档结构完整', async () => {
       stub.setResponder(() => chatText(JSON.stringify(VALID_SPEC)));
@@ -220,10 +234,9 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
 
     it('模型 HTTP 500：失败码 AGENT_HTTP_500，不伪装成模型产物', async () => {
       stub.setResponder(() => ({ kind: 'json', status: 500, body: { error: 'boom' } }));
-      const body = await generateAndTrack('上游报错');
+      const body = await generateExpectingFailure('上游报错', 502);
 
-      expect(body.mode).toBe('deterministic');
-      expect(body.failure).toBe('AGENT_HTTP_500');
+      expect(body.error).toBe('AGENT_HTTP_500');
       // 5xx 可恢复：退避后重试一次，仍失败才放弃（ADR-0112 §2.6）。
       expect(stub.calls).toHaveLength(2);
     });
@@ -243,24 +256,31 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
 
     it('模型 400：不重试，交给上层如实标注', async () => {
       stub.setResponder(() => ({ kind: 'json', status: 400, body: { error: 'bad request' } }));
-      const body = await generateAndTrack('请求有误');
+      const body = await generateExpectingFailure('请求有误', 502);
 
-      expect(body.failure).toBe('AGENT_HTTP_400');
+      expect(body.error).toBe('AGENT_HTTP_400');
       expect(stub.calls).toHaveLength(1);
     });
 
     it('模型返回空内容：失败码 AGENT_EMPTY_RESPONSE', async () => {
       stub.setResponder(() => chatText('   '));
-      const body = await generateAndTrack('空响应');
+      const body = await generateExpectingFailure('空响应', 502);
 
-      expect(body.mode).toBe('deterministic');
-      expect(body.failure).toBe('AGENT_EMPTY_RESPONSE');
+      expect(body.error).toBe('AGENT_EMPTY_RESPONSE');
     });
 
     it('兜底不伪造数字：KPI 数值为占位，标题保留完整主题（不按字符截断）', async () => {
-      stub.setResponder(() => ({ kind: 'hang' }));
+      // 确定性兜底只剩「没配置模型」这一条路（ADR-0112 §2.1.5）。
+      const saved = process.env.AGENT_LLM_BASE_URL;
+      delete process.env.AGENT_LLM_BASE_URL;
       const topic = '集团财务月度经营分析';
-      const body = await generateAndTrack(topic);
+      let body: Awaited<ReturnType<typeof generateAndTrack>>;
+      try {
+        body = await generateAndTrack(topic);
+      } finally {
+        if (saved === undefined) delete process.env.AGENT_LLM_BASE_URL;
+        else process.env.AGENT_LLM_BASE_URL = saved;
+      }
       expect(body.mode).toBe('deterministic');
 
       const loaded = await request(server()).get(`/api/screens/${body.screen.id}`).expect(200);
@@ -287,11 +307,10 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
     it('模型空闲超时（客户端 1.5s 中止）：重试一次后报 AGENT_TIMEOUT，请求没有挂死', async () => {
       stub.setResponder(() => ({ kind: 'hang' }));
       const startedAt = Date.now();
-      const body = await generateAndTrack('超时兜底');
+      const body = await generateExpectingFailure('超时失败', 504);
       const elapsed = Date.now() - startedAt;
 
-      expect(body.mode).toBe('deterministic');
-      expect(body.failure).toBe('AGENT_TIMEOUT');
+      expect(body.error).toBe('AGENT_TIMEOUT');
       // 两次 1.5s 空闲超时加 1s 退避：明显早于旧的 60s 总时长，也不早于两次超时之和。
       expect(stub.calls).toHaveLength(2);
       expect(elapsed).toBeGreaterThanOrEqual(3_000);
@@ -300,10 +319,9 @@ describe('agent full chain (e2e, real HTTP + SQLite, stubbed model endpoint)', (
 
     it('模型连接被断开：失败码 AGENT_UNREACHABLE（与超时区分）', async () => {
       stub.setResponder(() => ({ kind: 'socket-destroy' }));
-      const body = await generateAndTrack('连接断开');
+      const body = await generateExpectingFailure('连接断开', 502);
 
-      expect(body.mode).toBe('deterministic');
-      expect(body.failure).toBe('AGENT_UNREACHABLE');
+      expect(body.error).toBe('AGENT_UNREACHABLE');
     });
 
     it('所有块都不可用且修不好：422，诊断指回模型原文的块', async () => {

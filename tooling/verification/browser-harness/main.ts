@@ -1759,8 +1759,10 @@ let envelope = {
 let nextSaveFailure: 'PROJECT_CONFLICT' | 'PROJECT_UNAVAILABLE' | undefined;
 // 模拟保存 loading：>0 时让 save 挂起对应毫秒，用于在浏览器里观察保存按钮的 loading（spinner）状态。
 let saveDelayMs = 0;
+// `?publish`：开放发布能力（发布即回当前信封），用来核对发布前的拦截，例如示例数据（ADR-0112 §2.3）。
+const harnessPublish = new URLSearchParams(window.location.search).has('publish');
 designer.projectAdapter = {
-  capabilities: { publish: false },
+  capabilities: { publish: harnessPublish },
   async load({ projectId }) {
     return projectId === envelope.projectId
       ? { ok: true as const, value: envelope, diagnostics: [] }
@@ -1795,6 +1797,13 @@ designer.projectAdapter = {
     };
     return { ok: true as const, value: envelope, diagnostics: [] };
   },
+  ...(harnessPublish
+    ? {
+        async publish() {
+          return { ok: true as const, value: envelope, diagnostics: [] };
+        },
+      }
+    : {}),
 };
 designer.addEventListener('base-screen-change', (event) => {
   viewer.document = (event as CustomEvent<{ document: typeof screenDocument }>).detail.document;

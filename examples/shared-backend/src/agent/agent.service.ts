@@ -321,7 +321,9 @@ export class AgentService {
         ...(onText === undefined ? {} : { onText }),
       });
       if (outcome.kind === 'transport') {
-        failure = outcome.failure;
+        // 模型调用失败（超时、HTTP 错误、断连）如实报失败，不退回确定性布局冒充产出（ADR-0112 §2.1.5）：
+        // 确定性兜底只留给「没配置模型」。重试已在客户端做过一次（§2.6）。
+        throw transportFailure(outcome.failure);
       } else if (outcome.kind === 'exhausted') {
         // 修不好且没有可交的块（或整份 / 文档级出错）：不交候选，也不再退回确定性布局冒充产出
         // （ADR-0112 §2.1.5）。把最后一轮诊断如实交给宿主。
@@ -843,6 +845,27 @@ export function parseCatalogSpec(
     kpis,
     blocks: readBlocks(record.blocks, catalog, warnings, issues),
   };
+}
+
+/** 模型调用失败 → HTTP 异常：超时 504、取消 499，其余（不可达、上游 HTTP 错误、空响应）502。 */
+function transportFailure(failure: string): HttpException {
+  const status = failure === 'AGENT_TIMEOUT' ? 504 : failure === 'AGENT_CANCELLED' ? 499 : 502;
+  return new HttpException(
+    {
+      error: failure,
+      message: `${describeTransportFailure(failure)}，本次没有生成候选，可稍后重试。`,
+    },
+    status,
+  );
+}
+
+function describeTransportFailure(failure: string): string {
+  if (failure === 'AGENT_TIMEOUT') return '模型响应超时';
+  if (failure === 'AGENT_UNREACHABLE') return '连不上模型服务';
+  if (failure === 'AGENT_EMPTY_RESPONSE') return '模型返回为空';
+  if (failure === 'AGENT_CANCELLED') return '请求已取消';
+  const status = /^AGENT_HTTP_(\d{3})$/.exec(failure)?.[1];
+  return status === undefined ? '模型调用失败' : `模型服务返回错误（HTTP ${status}）`;
 }
 
 /** 流式落稿的一帧所需：骨架 + 已写完的指标与块。 */

@@ -1,11 +1,16 @@
 // 等间距吸附（tldraw BoundsSnaps 的 gap_center / gap_duplicate，Penpot snap-distance）：
 // 只在拖动选区时生效。每帧只看与选区在正交方向重叠的组件（同一行 / 同一列），
-// 两两之间的间距作为候选：
+// **只有相邻两段之间真正空着的间距**才算候选：
 // - 居中：选区放进某个间距的正中；
 // - 复制：在某个间距一侧的组件外再复制出相同间距。
-// 吸附后再按最终几何收集精确相等的间距（含沿同一排继续相等的间距链），作为间距标注。
+// 吸附后再按最终几何收集精确相等的间距，作为间距标注：复制时画新间距与它参照的那一段，
+// 居中时画两侧两段。不再沿同一排延伸整条等距链——整列 16px 会把同一读数铺满画布。
 // 带 reach 时，只用主轴上离选区 ≤ reach 的组件、且间距本身 ≤ reach（Moveable
-// maxSnapElementGuidelineDistance / maxSnapElementGapDistance），标注链也止于这个范围。
+// maxSnapElementGuidelineDistance / maxSnapElementGapDistance），标注也止于这个范围。
+//
+// 间距只认“空档”：A 与 B 之间若还夹着同排的第三个组件，A→B 就不是间距。tldraw 的
+// getVisibleGaps 会把这种跨过组件的区间也算进来，密集排布下一列 8 个 16px 组件会同时
+// 产出 16 / 32 / 48 / 64 等一堆并不存在的“间距”，吸附与标注都跟着抖动。
 
 import type {
   DesignerCanvasMeasurement,
@@ -14,6 +19,9 @@ import type {
 
 /** 每帧参与间距计算的同排组件上限（Grida 参考值），超出时取主轴上离选区最近的若干个。 */
 const MAX_SPACING_NEIGHBORS = 64;
+
+/** 每条轴最多画出的等间距标注段数：新段 + 参照段，两侧 / 多个居中间距合计的上限。 */
+const MAX_EQUAL_MARKS = 4;
 
 type SpacingAxis = 'x' | 'y';
 
@@ -130,33 +138,6 @@ export class DesignerSpacingIndex {
         segments.set(key, { axis, distance: to - from, from, to, position, kind: 'equal' });
       }
     };
-    const chain = (
-      node: SpacingNode,
-      length: number,
-      direction: 'forward' | 'backward',
-      crossStart: number,
-      crossEnd: number,
-      visited = new Set<number>(),
-    ) => {
-      if (visited.has(node.id)) return;
-      visited.add(node.id);
-      for (const gap of gaps) {
-        if ((direction === 'forward' ? gap.startNode : gap.endNode) !== node) continue;
-        if (Math.abs(gap.length - length) > tolerance) continue;
-        const nextStart = Math.max(crossStart, gap.crossStart);
-        const nextEnd = Math.min(crossEnd, gap.crossEnd);
-        if (!(nextEnd > nextStart)) continue;
-        add(gap.startNode, gap.endNode);
-        chain(
-          direction === 'forward' ? gap.endNode : gap.startNode,
-          length,
-          direction,
-          nextStart,
-          nextEnd,
-          visited,
-        );
-      }
-    };
     // Adjacent evenly spaced items yield many centred gaps over the same breadth: keep the
     // smallest one per overlapping breadth (tldraw findOverlappingCenterSnap).
     const centred: SpacingGap[] = [];
@@ -168,29 +149,24 @@ export class DesignerSpacingIndex {
       else if (centred[overlapping]!.length > gap.length) centred[overlapping] = gap;
     }
     for (const gap of centred) {
-      const length = (gap.length - size) / 2;
-      const crossStart = Math.max(gap.crossStart, selection.crossStart);
-      const crossEnd = Math.min(gap.crossEnd, selection.crossEnd);
-      chain(gap.startNode, length, 'backward', crossStart, crossEnd);
       add(gap.startNode, selection);
       add(selection, gap.endNode);
-      chain(gap.endNode, length, 'forward', crossStart, crossEnd);
     }
-    for (const gap of gaps) {
-      const crossStart = Math.max(gap.crossStart, selection.crossStart);
-      const crossEnd = Math.min(gap.crossEnd, selection.crossEnd);
-      if (Math.abs(gap.endNode.end + gap.length - selection.start) <= tolerance) {
-        chain(gap.startNode, gap.length, 'backward', crossStart, crossEnd);
-        add(gap.startNode, gap.endNode);
-        add(gap.endNode, selection);
-      }
-      if (Math.abs(gap.startNode.start - gap.length - selection.end) <= tolerance) {
-        add(selection, gap.startNode);
-        add(gap.startNode, gap.endNode);
-        chain(gap.endNode, gap.length, 'forward', crossStart, crossEnd);
+    // Centring already explains the spacing on this axis; a duplicate reading would add the
+    // far side of the neighbour it copied from (one more label per side in a dense column).
+    if (centred.length === 0) {
+      for (const gap of gaps) {
+        if (Math.abs(gap.endNode.end + gap.length - selection.start) <= tolerance) {
+          add(gap.startNode, gap.endNode);
+          add(gap.endNode, selection);
+        }
+        if (Math.abs(gap.startNode.start - gap.length - selection.end) <= tolerance) {
+          add(selection, gap.startNode);
+          add(gap.startNode, gap.endNode);
+        }
       }
     }
-    return [...segments.values()].sort(
+    return nearestMarks([...segments.values()], selection).sort(
       (left, right) => left.position - right.position || left.from - right.from,
     );
   }
@@ -216,18 +192,22 @@ export class DesignerSpacingIndex {
   }
 }
 
-// Every pair with empty space between them along the axis that also overlaps on the cross
-// axis (tldraw getVisibleGaps), no wider than `reach`. `nodes` is sorted by start.
+// Every pair of adjacent components with empty space between them along the axis that also
+// overlaps on the cross axis (tldraw getVisibleGaps, narrowed to real gaps), no wider than
+// `reach`. `nodes` is sorted by start. A third component inside the span — in the same cross
+// band — makes it an occupied run rather than a gap.
 function gapsOf(nodes: readonly SpacingNode[], reach: number): readonly SpacingGap[] {
   const gaps: SpacingGap[] = [];
   for (let first = 0; first < nodes.length; first++) {
     const startNode = nodes[first]!;
     for (let second = first + 1; second < nodes.length; second++) {
       const endNode = nodes[second]!;
-      if (!(startNode.end < endNode.start) || endNode.start - startNode.end > reach) continue;
+      if (endNode.start - startNode.end > reach) break;
+      if (!(startNode.end < endNode.start)) continue;
       const crossStart = Math.max(startNode.crossStart, endNode.crossStart);
       const crossEnd = Math.min(startNode.crossEnd, endNode.crossEnd);
       if (!(crossEnd > crossStart)) continue;
+      if (hasIntruder(nodes, startNode, endNode, crossStart, crossEnd)) continue;
       gaps.push({
         startNode,
         endNode,
@@ -240,6 +220,45 @@ function gapsOf(nodes: readonly SpacingNode[], reach: number): readonly SpacingG
     }
   }
   return gaps;
+}
+
+// A component overlapping the empty span on the same cross band splits it: the gap is then
+// between that component and one of the pair, not across it.
+function hasIntruder(
+  nodes: readonly SpacingNode[],
+  startNode: SpacingNode,
+  endNode: SpacingNode,
+  crossStart: number,
+  crossEnd: number,
+): boolean {
+  for (const node of nodes) {
+    if (node === startNode || node === endNode) continue;
+    if (node.start >= endNode.start || node.end <= startNode.end) continue;
+    if (Math.min(crossEnd, node.crossEnd) - Math.max(crossStart, node.crossStart) > 0) return true;
+  }
+  return false;
+}
+
+// Duplicates on both sides, or several centred gaps, can still add up; keep the segments
+// nearest the selection (they are the ones the pointer just produced) so the reading stays
+// legible in dense layouts.
+function nearestMarks(
+  marks: readonly DesignerCanvasMeasurement[],
+  selection: SpacingSpan,
+): DesignerCanvasMeasurement[] {
+  if (marks.length <= MAX_EQUAL_MARKS) return [...marks];
+  return [...marks]
+    .sort(
+      (left, right) =>
+        markDistance(left, selection) - markDistance(right, selection) ||
+        left.from - right.from ||
+        left.position - right.position,
+    )
+    .slice(0, MAX_EQUAL_MARKS);
+}
+
+function markDistance(mark: DesignerCanvasMeasurement, selection: SpacingSpan): number {
+  return Math.max(0, mark.from - selection.end, selection.start - mark.to);
 }
 
 function overlaps(left: SpacingGap, right: SpacingGap): boolean {

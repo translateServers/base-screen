@@ -125,6 +125,23 @@ describe('DesignerGuideOverlay incremental rendering', () => {
     expect(marker.className).toBe('canvas-measurement');
   });
 
+  it('draws a reading only when the gap holds one line on screen', () => {
+    const { overlay, container, options } = fixture();
+    const marker = (distance: number) => {
+      overlay.render({
+        ...options,
+        zoom: 2,
+        snapPreview: preview({
+          measurements: [{ axis: 'y', from: 100, to: 100 + distance, position: 80, distance }],
+        }),
+      });
+      return container.children.find((node) => node.className.includes('canvas-measurement'))!;
+    };
+    // 6 document px at zoom 2 is 12 screen px: shorter than the 14px reading line.
+    expect(marker(6).children[0]?.textContent).toBe('');
+    expect(marker(8).children[0]?.textContent).toBe('8');
+  });
+
   it('keeps a zero-length guide local instead of spanning the canvas', () => {
     const { overlay, container, options } = fixture();
     overlay.render({

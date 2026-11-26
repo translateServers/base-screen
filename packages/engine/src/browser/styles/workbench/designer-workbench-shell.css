@@ -80,6 +80,95 @@
   display: none;
 }
 
+/* 发布被示例数据拦截时的逐项列表：居中模态，列表可滚动，点一项定位到画布。 */
+.sample-blocked-layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--designer-surface-scrim);
+  pointer-events: auto;
+}
+
+.sample-blocked-card {
+  display: flex;
+  box-sizing: border-box;
+  width: min(420px, calc(100% - 32px));
+  max-height: min(520px, calc(100% - 48px));
+  flex-direction: column;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-5);
+  border-radius: var(--designer-radius-4);
+  background: var(--designer-surface-raised);
+  box-shadow: var(--designer-shadow-overlay);
+  color: var(--designer-text-primary);
+}
+
+.sample-blocked-title {
+  margin: 0;
+  font-size: var(--designer-font-size-md);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.sample-blocked-hint {
+  margin: 0;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  line-height: 1.5;
+}
+
+.sample-blocked-list {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--designer-space-1);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.sample-blocked-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-2) var(--designer-space-3);
+  border: 0;
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+  color: inherit;
+  font: var(--designer-font-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sample-blocked-item:hover,
+.sample-blocked-item:focus-visible {
+  background: var(--designer-surface-control-hover);
+  outline: 1px solid var(--designer-accent);
+}
+
+.sample-blocked-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sample-blocked-meta {
+  flex: 0 0 auto;
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+}
+
+.sample-blocked-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .status-sample-next,
 .status-sample-keep {
   min-height: 24px;

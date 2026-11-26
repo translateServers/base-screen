@@ -1,6 +1,6 @@
 // 吸附捕获阈值（屏幕 px，按 zoom 换算成文档坐标），对齐吸附与等间距吸附共用。参考值：
 // Moveable 5、Grida 5–6、tldraw / Excalidraw 8、Penpot 10（research/canvas-snap-guides-2026-11-22.md）。
-// 8 在加入等间距候选后手感偏“黏”，取 6。
+// 8 在加入等间距候选后手感偏“黏”，取 6。密集布局由 designer-snap-tuning.ts 动态收紧。
 export const DESIGNER_SMART_GUIDE_THRESHOLD = 6;
 // 吸附保持范围倍率：1.0 = 捕获阈值本身（超出阈值立即释放），
 // 对齐 Moveable / Penpot 的每帧重新判定语义（无额外滞后带）。
@@ -9,7 +9,7 @@ export const DESIGNER_SNAP_RELEASE_MULTIPLIER = 1;
 // 间距 ≤ 该值时才参与吸附、参考线、等间距与间距标注；等间距本身也不超过该值。对应 Moveable
 // maxSnapElementGuidelineDistance / maxSnapElementGapDistance（默认不限）。大屏设计器通常
 // 整张画布都在视口内，只靠视口过滤（tldraw / Penpot）不能约束范围，因此另设此上限。
-// 画布边与用户 guide 不受此限。
+// 画布边与用户 guide 不受此限。这是稀疏布局的基础值，密集布局由 designer-snap-tuning.ts 收紧。
 export const DESIGNER_SNAP_REACH = 180;
 // 间距标注判定“同轨道 / 已重合”的容差（屏幕 px，按 zoom 换算成文档坐标）。
 export const DESIGNER_SNAP_RENDER_THRESHOLD = 1;
@@ -37,7 +37,7 @@ export interface DesignerSnapPoint {
 }
 
 /**
- * 选区对齐轨道上的可视间距：`axis` 表示长度方向，`position` 表示正交坐标。
+ * 选区周边的可视间距：`axis` 表示长度方向，`position` 表示正交坐标。
  * 例如 `axis: 'y'` 从 `from` 到 `to` 的竖线位于 `position` 的 x 坐标。
  */
 export interface DesignerCanvasMeasurement {
@@ -46,7 +46,7 @@ export interface DesignerCanvasMeasurement {
   readonly from: number;
   readonly position: number;
   readonly to: number;
-  /** `equal`：与同排其它间距精确相等的等间距标注；缺省为对齐轨道上的普通间距。 */
+  /** `equal`：与同排其它间距精确相等的等间距标注；缺省为选区四侧最近的一段间距。 */
   readonly kind?: 'equal' | undefined;
 }
 
@@ -77,7 +77,7 @@ export interface DesignerSnapTranslation {
   readonly snappedY?: number | undefined;
   /** 吸附后与最终几何精确重合的对齐线（每个坐标一条）。 */
   readonly guides?: DesignerSnapGuides | undefined;
-  /** 选区对齐轨道上的相邻组件间距，仅作为覆盖层视觉反馈。 */
+  /** 选区四侧最近间距（kind 缺省）或等间距标注，仅作为覆盖层视觉反馈。 */
   readonly measurements?: readonly DesignerCanvasMeasurement[] | undefined;
 }
 

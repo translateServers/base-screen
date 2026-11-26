@@ -15,7 +15,7 @@ import {
   projectPhaseLabel,
   saveStatusSpinnerGlyph,
 } from './designer-element-guards.js';
-import { renderSampleStatus } from './designer-element-sample-data.js';
+import { openSampleBlockedDialog, renderSampleStatus } from './designer-element-sample-data.js';
 import { type DesignerElementHost, getDesignerElementState } from './designer-element-state.js';
 
 export function renderProjectStatus(element: DesignerElementHost): void {
@@ -265,6 +265,13 @@ export function reportProject(
   const elementState = getDesignerElementState(element);
 
   if (!result.ok) elementState.runtime.emitDiagnostics(element, result.diagnostics);
+  // 发布被示例数据拦截：除了通知，再给逐项列表，点一项定位（ADR-0112 §2.3）。
+  if (
+    !result.ok &&
+    result.diagnostics.some((item) => item.code === 'PUBLISH_SAMPLE_DATA_PRESENT')
+  ) {
+    openSampleBlockedDialog(element);
+  }
 }
 
 export function reportPreview(element: DesignerElementHost, result: ScreenParseResult<void>): void {

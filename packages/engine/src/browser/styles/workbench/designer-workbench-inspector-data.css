@@ -171,6 +171,20 @@
   font-size: var(--designer-font-size-xs);
 }
 
+/* 示例数据提示：说明一行，两个出路按钮另起一行右对齐，窄检查器里不挤压文字。 */
+.designer-sample-data-notice {
+  flex-wrap: wrap;
+  align-self: start;
+  margin-inline: var(--designer-space-6);
+}
+
+.designer-sample-data-actions {
+  display: flex;
+  flex: 1 0 100%;
+  justify-content: flex-end;
+  gap: var(--designer-space-2);
+}
+
 /* ---- 取值方式：空态引导行 / 配置态分段 ---- */
 
 .properties .designer-data-source-type > .designer-inspector-section-title {
@@ -1229,6 +1243,19 @@
 
 .properties .designer-data-source-panel:has(> .designer-data-panel-notice:not(:empty)) {
   grid-template-rows: auto minmax(0, 1fr);
+}
+
+/* 示例数据提示（ADR-0112 §2.3）多占一行自适应高度，数据流仍独占剩余高度。
+   空的提示位 `display: none` 不进网格，所以只按「示例数据提示 + 数据流」或三者都在两种情况排。 */
+.properties .designer-data-source-panel:has(> .designer-sample-data-notice) {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.properties
+  .designer-data-source-panel:has(> .designer-data-panel-notice:not(:empty)):has(
+    > .designer-sample-data-notice
+  ) {
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 /* 内容短时把状态条推到底部；内容长时 sticky 仍然把它钉在可视区底部。 */

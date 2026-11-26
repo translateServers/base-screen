@@ -11,7 +11,7 @@ import {
   type DesignerSnapSession,
   type DesignerSnapTranslation,
   DesignerSpacingIndex,
-  designerSnapGuideReach,
+  resolveDesignerSnapTuning,
   snapDesignerCanvasPoint,
   snapDesignerSelectionTranslation,
 } from '../../viewport/designer-canvas-aids.js';
@@ -104,12 +104,15 @@ export class DesignerSnapController {
     excludedComponentIds: readonly string[] = [],
   ): DesignerSnapPoint {
     if (!this.#enabled || !this.#canvasAids.smartGuidesEnabled) return { x: point.x, y: point.y };
+    const geometry = this.resolveGeometry(excludedComponentIds);
+    const zoom = this.callbacks.getZoom();
     return snapDesignerCanvasPoint(
       point,
       this.#canvasAids,
-      this.resolveGeometry(excludedComponentIds).index,
-      this.callbacks.getZoom(),
+      geometry.index,
+      zoom,
       this.#sessionActive ? this.#session : undefined,
+      resolveDesignerSnapTuning(geometry.components ?? [], around(point.x, point.y), zoom),
     );
   }
 
@@ -123,6 +126,13 @@ export class DesignerSnapController {
     const zoom = this.callbacks.getZoom();
     const components = geometry.components;
     if (components !== undefined) geometry.spacing ??= new DesignerSpacingIndex(components);
+    // Density is read from where the selection is about to land, so the parameters follow the
+    // pointer between sparse and crowded regions instead of being fixed per gesture.
+    const tuning = resolveDesignerSnapTuning(
+      components ?? [],
+      translateSelectionBounds(bounds, offset),
+      zoom,
+    );
     const snapped = snapDesignerSelectionTranslation(
       bounds,
       offset,
@@ -131,9 +141,10 @@ export class DesignerSnapController {
       zoom,
       this.#sessionActive ? this.#session : undefined,
       geometry.spacing,
+      tuning,
     );
     // Equal spacing, when the final position has it, is the only spacing worth showing;
-    // otherwise fall back to the gaps along the selection's alignment rails.
+    // otherwise fall back to the nearest gap on each side of the selection.
     if (components === undefined || snapped.measurements !== undefined) return snapped;
     geometry.measurements ??= new DesignerCanvasMeasurementIndex(components);
     return {
@@ -141,7 +152,7 @@ export class DesignerSnapController {
       measurements: geometry.measurements.measure(
         translateSelectionBounds(bounds, snapped),
         zoom,
-        designerSnapGuideReach(zoom),
+        tuning.reach + tuning.threshold,
       ),
     };
   }
@@ -152,11 +163,14 @@ export class DesignerSnapController {
     excludedComponentIds: readonly string[] = [],
   ): DesignerSnapGuides | undefined {
     if (!this.#enabled || !this.#canvasAids.smartGuidesEnabled) return undefined;
+    const geometry = this.resolveGeometry(excludedComponentIds);
+    const zoom = this.callbacks.getZoom();
     return collectDesignerAlignmentGuides(
       bounds,
       this.#canvasAids,
-      this.resolveGeometry(excludedComponentIds).index,
-      this.callbacks.getZoom(),
+      geometry.index,
+      zoom,
+      resolveDesignerSnapTuning(geometry.components ?? [], bounds, zoom),
     );
   }
 
@@ -290,4 +304,9 @@ function translateSelectionBounds(
     right: bounds.right + translation.x,
     top: bounds.top + translation.y,
   };
+}
+
+// A point has no extent; the density window still reads the components around it.
+function around(x: number, y: number): DesignerSelectionSnapBounds {
+  return { bottom: y, left: x, right: x, top: y };
 }

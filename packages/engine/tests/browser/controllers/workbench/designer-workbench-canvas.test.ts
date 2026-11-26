@@ -83,7 +83,7 @@ describe('DesignerWorkbenchController canvas state', () => {
     expect(workbench.guides.children[0]?.children).toHaveLength(3);
   });
 
-  it('R2 renders alignment-rail measurements only for a moving preview without changing snap candidates', () => {
+  it('R2 renders one gap per side on a moving preview without changing snap candidates', () => {
     const workbench = createWorkbench();
     const components = workbench.document.components as unknown as Array<
       ScreenDocument['components'][number]
@@ -102,19 +102,22 @@ describe('DesignerWorkbenchController canvas state', () => {
       workbench.guides.children.filter((child) => child.className === 'canvas-measurement'),
     ).toHaveLength(0);
 
-    // Offsets away from any equal spacing, so the alignment-rail gaps are what is shown. The
-    // lower rows (407..527) are beyond the snap reach, so their 59px gap is no longer marked.
+    // Offsets away from any equal spacing; the nearest gap above (56) and below (38) are the
+    // only readings, instead of every adjacent pair along the three alignment rails.
     const preview = workbench.controller.snapSelectionOffset(
       { left: 0, right: 200, top: 146, bottom: 180 },
       { x: 0, y: 10 },
       ['c1'],
     );
-    expect(preview.measurements?.[0]).toMatchObject({ axis: 'y', distance: 56 });
+    expect(preview.measurements).toEqual([
+      { axis: 'y', position: 100, from: 100, to: 156, distance: 56 },
+      { axis: 'y', position: 50, from: 190, to: 228, distance: 38 },
+    ]);
     workbench.controller.renderSnapPreview(preview);
     let measurements = workbench.guides.children.filter(
       (child) => child.className === 'canvas-measurement',
     );
-    expect(measurements).toHaveLength(4);
+    expect(measurements).toHaveLength(2);
     expect(measurements[0]?.dataset.axis).toBe('y');
     expect(measurements[0]?.children[0]?.textContent).toBe('56');
     expect((measurements[0]?.style as unknown as CSSStyleDeclaration).height).toBe('56px');

@@ -832,7 +832,7 @@ curl -X POST http://127.0.0.1:3000/api/agent/generate \
 ### 交互与失败
 
 - 三个编辑页的右栏「意图书写面」都已接线（`src/screen/host-intent.ts`，三端逐字一致）：
-  一句话 → 整屏走 `POST /agent/candidate`、选中组件走 `POST /agent/edit` → 候选文档或补丁编译成
+  一句话 → 整屏走 `POST /agent/act/stream`（修复时走 `/agent/candidate`）、选中组件走 `POST /agent/edit` → 候选文档或补丁编译成
   提案，进右栏「智能体」页签逐条采纳才写入；提案理由会写明走的是模型还是确定性兜底，兜底时
   给出原因（未配置模型、模型输出未通过校验等）；组件作用域只接受选区内组件的 `props` / `style`
   与文本补丁，越界或重复的补丁整份丢弃，已绑数据的文本不会被换成内联值。
@@ -840,5 +840,10 @@ curl -X POST http://127.0.0.1:3000/api/agent/generate \
   仍引用的旧实例；否则组件里的 `data-value` 引用会指向不存在的实例，被引擎整批拒绝。
 - 配置：`examples/shared-backend/.env.local`（已被 `.gitignore` 忽略），变量
   `AGENT_LLM_BASE_URL` / `AGENT_LLM_API_KEY` / `AGENT_LLM_MODEL`。
-- 未配置或模型失败时退回确定性结构（同样按目录挑组件，没有素材就不画图片块），响应里的
-  `mode` 会如实标 `deterministic`，并带 `failure` 诊断码，不假装调用过模型。
+- 未配置模型时退回确定性结构（同样按目录挑组件，没有素材就不画图片块，数值位只画占位），
+  响应里的 `mode` 会如实标 `deterministic`，并带 `failure: AGENT_NOT_CONFIGURED`。
+- 模型调用失败（空闲超时、上游 HTTP 错误、断连、空响应）不再退回确定性结构：客户端对超时 / 429 / 5xx
+  重试一次后仍失败，就返回错误（超时 504，其余 502，`error` 为失败码），不交候选、不落库
+  （ADR-0112 §2.1.5）。意图书写面把 `message` 原样显示给用户。
+- 整屏生成走 `POST /agent/act/stream`（SSE）：骨架先挂成「生成中」草案，指标与块逐个原位填入，
+  完成后照常采纳；「取消生成」会中止请求并经 signal 中止上游模型调用（ADR-0112 §2.5）。

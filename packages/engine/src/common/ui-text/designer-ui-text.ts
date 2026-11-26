@@ -649,6 +649,16 @@ export const DESIGNER_UI_TEXT = {
     keep: '保留为常量',
     keepTip: '去掉选中组件的示例数据标记，值不变',
     keepHistory: '示例数据保留为常量',
+    // 检查器数据段：选中组件的取值是示例数据时，在数据面板顶部说明并给出两条出路。
+    inspectorNotice: '示例数据：由智能体生成，发布前需绑定数据集，或确认保留为常量。',
+    bind: '绑定数据集',
+    bindTip: '为这个组件选择真实数据来源',
+    // 发布被拦截时的逐项列表。
+    publishBlockedTitle: (count: number) => `还有 ${count} 处示例数据，暂不能发布`,
+    publishBlockedHint: '逐项绑定数据集或保留为常量后再发布。点一项可定位到画布上的组件。',
+    publishBlockedOther: (count: number) =>
+      `另有 ${count} 处在数据源参数或变量上，请在数据面板处理`,
+    publishBlockedClose: '知道了',
   },
   groupEditingPath: (path: string) => `组内：${path}`,
   notifications: '操作通知',

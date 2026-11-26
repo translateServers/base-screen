@@ -295,7 +295,7 @@
   height: var(--designer-overlay-active, 2px);
 }
 
-/* 选区对齐轨道上的布局间距：强调蓝虚线段 + 强调蓝读数，和吸附线解耦，不会参与命中。 */
+/* 选区四侧最近一段间距：强调蓝虚线段 + 强调蓝读数，和吸附线解耦，不会参与命中。 */
 .canvas-measurement {
   position: absolute;
   box-sizing: border-box;
@@ -370,6 +370,11 @@
   top: 50%;
   left: var(--designer-overlay-label-offset, 5px);
   translate: 0 -50%;
+}
+
+/* 间距短到放不下一行读数时只画虚线与端点；空标签不占位，等间距胶囊也不会留下空壳。 */
+.canvas-measurement-label:empty {
+  display: none;
 }
 
 /* 等间距标注（tldraw / Penpot）：与同排其它间距精确相等时，实线 + 强调色读数胶囊，

@@ -1,5 +1,9 @@
-// 拖动时的布局间距标注收集：为当前选区收集同轨道相邻组件之间的 gap 测量线
-// （即吸附时画布上显示的 46 / 48 / 59 这类间距数字）。纯计算，不含 DOM 渲染。
+// 拖动时的布局间距标注：只标选区四侧各自最近的一段空档（同排 / 同列、正交投影真实重叠）。
+//
+// 旧实现沿选区 left/center/right 三条对齐轨道，把轨道上每一对相邻组件的间距都标出来：
+// 一列 8 个 16px 组件会同时画出 7 段读数，其中大部分与选区无关，密集场景下读数互相遮挡。
+// 吸附本身只关心最近的一段，标注因此收敛到同一范围（Figma / Penpot 的最近邻取法）：
+// 每侧最多一条，总计 ≤ 4。等间距标注由 DesignerSpacingIndex 单独负责。
 
 import type { ScreenDocument } from '@base-screen/contracts';
 import {
@@ -9,24 +13,15 @@ import {
 } from './designer-canvas-aids-types.js';
 import { collectDesignerSnapComponentBounds } from './designer-canvas-snap-geometry.js';
 
-interface Interval {
-  readonly end: number;
-  readonly start: number;
+/** 单侧最近空档：长度方向 from→to，position 是正交方向上的重叠中心。 */
+interface SideGap {
+  readonly distance: number;
+  readonly from: number;
+  readonly overlap: number;
+  readonly position: number;
+  readonly to: number;
 }
 
-interface AnchorEntry {
-  readonly value: number;
-  readonly index: number;
-}
-
-/**
- * 生成与当前拖动选区 anchor 对齐的布局间距标注。
- *
- * 每条 x/y 轨道只收集与选区 left/center/right 或 top/middle/bottom 重合、且正交投影真实重叠
- * 的可见组件，再按另一轴的视觉区间排序并标注相邻非重叠 gap。这样能同时显示选区周边和同
- * 轨道后续组件之间的间距（参考图中的 46 / 48 / 59），但不会把仅共享边/角的关系或网格线
- * 变成测量或吸附目标。
- */
 export function collectDesignerCanvasMeasurements(
   document: ScreenDocument,
   selection: DesignerSelectionSnapBounds,
@@ -49,173 +44,111 @@ export function measureDesignerCanvasBounds(
   return new DesignerCanvasMeasurementIndex(components).measure(selection, zoom);
 }
 
-/**
- * Gesture path: built once per geometry snapshot. Each rail only visits components whose
- * start / center / end lies inside the tolerance window (binary search over sorted anchors),
- * so a frame costs O(log N + matches) instead of scanning every component per rail.
- */
+/** Gesture path: built once per geometry snapshot, scanned per frame. */
 export class DesignerCanvasMeasurementIndex {
   readonly #components: readonly DesignerSelectionSnapBounds[];
-  readonly #x: readonly AnchorEntry[];
-  readonly #y: readonly AnchorEntry[];
-  readonly #visited: Uint32Array;
-  #visit = 0;
 
   constructor(components: readonly DesignerSelectionSnapBounds[]) {
     this.#components = components;
-    this.#x = sortedAnchors(components, (bounds) => [bounds.left, bounds.right]);
-    this.#y = sortedAnchors(components, (bounds) => [bounds.top, bounds.bottom]);
-    this.#visited = new Uint32Array(components.length);
   }
 
-  /** `reach` (document units) drops rail components farther than it from the selection. */
+  /** `reach` (document units) drops neighbours farther than it from the selection. */
   measure(
     selection: DesignerSelectionSnapBounds,
     zoom = 1,
     reach = Number.POSITIVE_INFINITY,
   ): readonly DesignerCanvasMeasurement[] {
     const tolerance = DESIGNER_SNAP_RENDER_THRESHOLD / Math.max(zoom, Number.EPSILON);
-    const measurements: DesignerCanvasMeasurement[] = [];
-
-    for (const position of uniqueAnchors(selection.left, selection.right)) {
-      const intervals: Interval[] = [{ start: selection.top, end: selection.bottom }];
-      for (const index of this.#matches(this.#x, position, tolerance)) {
-        const bounds = this.#components[index]!;
-        const overlaps = hasEffectiveOverlap(
-          selection.left,
-          selection.right,
-          bounds.left,
-          bounds.right,
-          tolerance,
+    let left: SideGap | undefined;
+    let right: SideGap | undefined;
+    let top: SideGap | undefined;
+    let bottom: SideGap | undefined;
+    for (const bounds of this.#components) {
+      // A side is only measured against a neighbour that shares a real cross span with the
+      // selection; meeting at an edge or corner is not a gap.
+      const verticalStart = Math.max(selection.top, bounds.top);
+      const verticalEnd = Math.min(selection.bottom, bounds.bottom);
+      if (verticalEnd - verticalStart > tolerance) {
+        left = closer(
+          left,
+          gapBetween(bounds.right, selection.left, verticalStart, verticalEnd, tolerance, reach),
         );
-        const gap = gapBetween(selection.top, selection.bottom, bounds.top, bounds.bottom);
-        if (overlaps && gap <= reach) {
-          intervals.push({ start: bounds.top, end: bounds.bottom });
-        }
-      }
-      measurements.push(...collectGapMeasurements('y', position, intervals, tolerance));
-    }
-    for (const position of uniqueAnchors(selection.top, selection.bottom)) {
-      const intervals: Interval[] = [{ start: selection.left, end: selection.right }];
-      for (const index of this.#matches(this.#y, position, tolerance)) {
-        const bounds = this.#components[index]!;
-        const overlaps = hasEffectiveOverlap(
-          selection.top,
-          selection.bottom,
-          bounds.top,
-          bounds.bottom,
-          tolerance,
+        right = closer(
+          right,
+          gapBetween(selection.right, bounds.left, verticalStart, verticalEnd, tolerance, reach),
         );
-        const gap = gapBetween(selection.left, selection.right, bounds.left, bounds.right);
-        if (overlaps && gap <= reach) {
-          intervals.push({ start: bounds.left, end: bounds.right });
-        }
       }
-      measurements.push(...collectGapMeasurements('x', position, intervals, tolerance));
+      const horizontalStart = Math.max(selection.left, bounds.left);
+      const horizontalEnd = Math.min(selection.right, bounds.right);
+      if (horizontalEnd - horizontalStart > tolerance) {
+        top = closer(
+          top,
+          gapBetween(
+            bounds.bottom,
+            selection.top,
+            horizontalStart,
+            horizontalEnd,
+            tolerance,
+            reach,
+          ),
+        );
+        bottom = closer(
+          bottom,
+          gapBetween(
+            selection.bottom,
+            bounds.top,
+            horizontalStart,
+            horizontalEnd,
+            tolerance,
+            reach,
+          ),
+        );
+      }
     }
-    return measurements;
-  }
-
-  // Components with any anchor in [position - tolerance, position + tolerance], once each,
-  // in document order (the same membership as `Math.abs(anchor - position) <= tolerance`).
-  #matches(entries: readonly AnchorEntry[], position: number, tolerance: number): number[] {
-    let low = 0;
-    let high = entries.length;
-    while (low < high) {
-      const middle = (low + high) >>> 1;
-      if (entries[middle]!.value - position < -tolerance) low = middle + 1;
-      else high = middle;
-    }
-    const visit = this.#nextVisit();
-    const matches: number[] = [];
-    for (let cursor = low; cursor < entries.length; cursor++) {
-      const entry = entries[cursor]!;
-      if (entry.value - position > tolerance) break;
-      if (this.#visited[entry.index] === visit) continue;
-      this.#visited[entry.index] = visit;
-      matches.push(entry.index);
-    }
-    return matches.length > 1 ? matches.sort((left, right) => left - right) : matches;
-  }
-
-  #nextVisit(): number {
-    this.#visit = (this.#visit + 1) >>> 0;
-    if (this.#visit === 0) {
-      this.#visited.fill(0);
-      this.#visit = 1;
-    }
-    return this.#visit;
+    return [
+      measurement('x', left),
+      measurement('x', right),
+      measurement('y', top),
+      measurement('y', bottom),
+    ].filter((item): item is DesignerCanvasMeasurement => item !== undefined);
   }
 }
 
-function sortedAnchors(
-  components: readonly DesignerSelectionSnapBounds[],
-  span: (bounds: DesignerSelectionSnapBounds) => readonly [number, number],
-): readonly AnchorEntry[] {
-  const entries: AnchorEntry[] = [];
-  for (const [index, bounds] of components.entries()) {
-    const [start, end] = span(bounds);
-    // Same center expression as the original per-rail scan, so floating-point membership matches.
-    for (const value of [start, (start + end) / 2, end]) {
-      if (Number.isFinite(value)) entries.push({ value, index });
-    }
-  }
-  return entries.sort((left, right) => left.value - right.value);
-}
-
-function uniqueAnchors(start: number, end: number): readonly number[] {
-  return [...new Set([start, (start + end) / 2, end])];
-}
-
-function gapBetween(firstStart: number, firstEnd: number, secondStart: number, secondEnd: number) {
-  return Math.max(0, secondStart - firstEnd, firstStart - secondEnd);
-}
-
-function hasEffectiveOverlap(
-  firstStart: number,
-  firstEnd: number,
-  secondStart: number,
-  secondEnd: number,
+// `from`/`to` run along the measured axis; `crossStart..crossEnd` is the shared span that
+// decides where the line and its reading sit.
+function gapBetween(
+  from: number,
+  to: number,
+  crossStart: number,
+  crossEnd: number,
   tolerance: number,
-): boolean {
-  return Math.min(firstEnd, secondEnd) - Math.max(firstStart, secondStart) > tolerance;
+  reach: number,
+): SideGap | undefined {
+  const distance = to - from;
+  if (!(distance > tolerance) || distance > reach) return undefined;
+  return {
+    distance,
+    from,
+    to,
+    overlap: crossEnd - crossStart,
+    position: (crossStart + crossEnd) / 2,
+  };
 }
 
-function collectGapMeasurements(
+// Nearest wins; at equal distances the neighbour sharing more of the selection's span reads
+// better, so it owns the mark (a row of equal-height items under a wide selection).
+function closer(current: SideGap | undefined, next: SideGap | undefined): SideGap | undefined {
+  if (next === undefined) return current;
+  if (current === undefined) return next;
+  if (next.distance !== current.distance) return next.distance < current.distance ? next : current;
+  return next.overlap > current.overlap ? next : current;
+}
+
+function measurement(
   axis: DesignerCanvasMeasurement['axis'],
-  position: number,
-  intervals: readonly Interval[],
-  tolerance: number,
-): readonly DesignerCanvasMeasurement[] {
-  const merged = mergeIntervals(intervals, tolerance);
-  const measurements: DesignerCanvasMeasurement[] = [];
-  for (let index = 1; index < merged.length; index += 1) {
-    const previous = merged[index - 1]!;
-    const next = merged[index]!;
-    const distance = next.start - previous.end;
-    if (distance <= tolerance) continue;
-    measurements.push({
-      axis,
-      distance,
-      from: previous.end,
-      position,
-      to: next.start,
-    });
-  }
-  return measurements;
-}
-
-function mergeIntervals(intervals: readonly Interval[], tolerance: number): readonly Interval[] {
-  const merged: Interval[] = [];
-  for (const interval of [...intervals].sort((left, right) => left.start - right.start)) {
-    const previous = merged.at(-1);
-    if (previous === undefined || interval.start > previous.end + tolerance) {
-      merged.push({ ...interval });
-      continue;
-    }
-    if (interval.end > previous.end) {
-      merged[merged.length - 1] = { start: previous.start, end: interval.end };
-    }
-  }
-  return merged;
+  gap: SideGap | undefined,
+): DesignerCanvasMeasurement | undefined {
+  return gap === undefined
+    ? undefined
+    : { axis, distance: gap.distance, from: gap.from, to: gap.to, position: gap.position };
 }

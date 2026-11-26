@@ -204,7 +204,7 @@ describe('agent candidate and persisted generation', () => {
     AGENT_LLM_MODEL: 'test',
   };
 
-  it.each(['llm', 'failure'] as const)('does not persist the %s candidate path', async (path) => {
+  it('does not persist the llm candidate path', async () => {
     const valid = blocksJson([
       { type: 'base.chart', title: '近三日趋势', span: 2, table: TREND_TABLE },
       { type: 'base.text', title: '要点', span: 1, text: '甲\n乙\n丙' },
@@ -212,17 +212,35 @@ describe('agent candidate and persisted generation', () => {
     jest
       .mocked(requestAgentCompletion)
       .mockReset()
-      .mockResolvedValueOnce(
-        path === 'failure' ? { ok: false, failure: 'AGENT_TIMEOUT' } : { ok: true, text: valid },
-      );
+      .mockResolvedValueOnce({ ok: true, text: valid });
     const { service, screens } = setup(LLM_CONFIG);
     const candidate = await service.generateCandidate({ topic: '渠道经营' });
 
-    expect(candidate.mode).toBe(path === 'llm' ? 'llm' : 'deterministic');
-    expect(candidate.failure).toBe(path === 'llm' ? undefined : 'AGENT_TIMEOUT');
+    expect(candidate.mode).toBe('llm');
+    expect(candidate.failure).toBeUndefined();
     expect(screens.create).not.toHaveBeenCalled();
     expect(screens.update).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['AGENT_TIMEOUT', 504],
+    ['AGENT_UNREACHABLE', 502],
+    ['AGENT_HTTP_500', 502],
+    ['AGENT_EMPTY_RESPONSE', 502],
+  ] as const)(
+    '模型调用失败 %s 如实报 %i，不退回确定性布局（ADR-0112 §2.1.5）',
+    async (failure, status) => {
+      jest.mocked(requestAgentCompletion).mockReset().mockResolvedValue({ ok: false, failure });
+      const { service, screens } = setup(LLM_CONFIG);
+      const pending = service.generate({ topic: '渠道经营' });
+
+      await expect(pending).rejects.toMatchObject({
+        status,
+        response: { error: failure, message: expect.stringContaining('没有生成候选') },
+      });
+      expect(screens.create).not.toHaveBeenCalled();
+    },
+  );
 
   describe('generate → validate → repair loop (ADR-0112 §2.1)', () => {
     afterEach(() => {
@@ -363,9 +381,11 @@ describe('agent candidate and persisted generation', () => {
         .mockReset()
         .mockResolvedValue({ ok: false, failure: 'AGENT_HTTP_400' });
       const { service } = setup(LLM_CONFIG);
-      const candidate = await service.generateCandidate({ topic: '渠道经营' });
 
-      expect(candidate.failure).toBe('AGENT_HTTP_400');
+      await expect(service.generateCandidate({ topic: '渠道经营' })).rejects.toMatchObject({
+        status: 502,
+        response: { error: 'AGENT_HTTP_400' },
+      });
       expect(requestAgentCompletion).toHaveBeenCalledTimes(1);
     });
   });

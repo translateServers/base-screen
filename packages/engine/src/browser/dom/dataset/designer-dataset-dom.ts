@@ -1,4 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { createDesignerButton } from '../designer-ui-primitives.js';
 import { renderDataPanelNoticeSlot } from './designer-data-panel-notice.js';
 import { refreshStrategyNotice } from './designer-dataset-authoring-dom.js';
 import { disposeDatasetSections } from './designer-dataset-config-dom.js';
@@ -38,6 +39,8 @@ export function renderDesignerDataSourcePanel(
   section.dataset.dataSourcePanel = 'true';
   section.dataset.inspectorSearchSection = 'true';
   section.appendChild(renderDataPanelNoticeSlot(panel.ownerDocument, options.dataState));
+  const sampleNotice = renderSampleDataNotice(panel.ownerDocument, options);
+  if (sampleNotice !== undefined) section.appendChild(sampleNotice);
   const flow = renderDataSourceFlow(options);
   section.appendChild(flow);
 
@@ -61,6 +64,48 @@ export function renderDesignerDataSourcePanel(
     layerHost.appendChild(renderSourceSheet(options));
   }
   return { feedback };
+}
+
+/**
+ * 示例数据提示（ADR-0112 §2.3）：选中组件的取值是智能体给的示例数据时，在数据面板顶部说明，
+ * 并给出两条出路——「绑定数据集」打开来源浮层，「保留为常量」去掉标记（一次事务、可撤销）。
+ * 只在检查器里出现；数据工作台面向数据集本身，不关心某个组件的取值。
+ */
+function renderSampleDataNotice(
+  ownerDocument: Document,
+  options: DesignerDataSourcePanelOptions,
+): HTMLElement | undefined {
+  const value = options.dataValue;
+  if (options.surface !== 'inspector' || value?.kind !== 'inline' || value.sample !== true) {
+    return undefined;
+  }
+  const text = DESIGNER_UI_TEXT.sampleData;
+  const bar = ownerDocument.createElement('div');
+  bar.className = 'designer-data-notice designer-sample-data-notice';
+  bar.dataset.dataNoticeTone = 'warning';
+  bar.dataset.sampleInspectorNotice = '';
+  bar.setAttribute('role', 'status');
+  const message = ownerDocument.createElement('span');
+  message.className = 'designer-data-notice-text';
+  message.textContent = text.inspectorNotice;
+  const actions = ownerDocument.createElement('span');
+  actions.className = 'designer-sample-data-actions';
+  const bind = createDesignerButton(ownerDocument, {
+    className: 'designer-data-notice-retry',
+    text: text.bind,
+  });
+  // 复用既有「更换来源」动作：打开来源浮层，落在数据集页签上。
+  bind.dataset.datasetChange = '';
+  bind.dataset.tip = text.bindTip;
+  const keep = createDesignerButton(ownerDocument, {
+    className: 'designer-data-notice-retry',
+    text: text.keep,
+  });
+  keep.dataset.sampleAction = 'keep';
+  keep.dataset.tip = text.keepTip;
+  actions.append(bind, keep);
+  bar.append(message, actions);
+  return bar;
 }
 
 export function renderDesignerDatasetWorkbench(

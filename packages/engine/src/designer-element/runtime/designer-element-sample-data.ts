@@ -79,6 +79,19 @@ export function renderSampleStatus(element: DesignerElementHost): void {
 }
 
 export function onSampleStatusClick(element: DesignerElementHost, target: Element): boolean {
+  const locate = target.closest<HTMLElement>('[data-sample-locate]')?.dataset.sampleLocate;
+  if (locate !== undefined) {
+    closeSampleBlockedDialog(element);
+    locateSample(element, locate);
+    return true;
+  }
+  if (
+    target.closest('[data-sample-blocked-close]') !== null ||
+    target.classList?.contains('sample-blocked-layer') === true
+  ) {
+    closeSampleBlockedDialog(element);
+    return true;
+  }
   const action = target.closest<HTMLButtonElement>('[data-sample-action]')?.dataset.sampleAction;
   if (action === 'next') {
     locateNextSample(element);
@@ -99,7 +112,14 @@ function locateNextSample(element: DesignerElementHost): void {
   if (ids.length === 0) return;
   const index = ((sampleCursor.get(element) ?? -1) + 1) % ids.length;
   sampleCursor.set(element, index);
-  const id = ids[index]!;
+  locateSample(element, ids[index]!);
+}
+
+/** 选中并居中一个组件。 */
+function locateSample(element: DesignerElementHost, id: string): void {
+  const elementState = getDesignerElementState(element);
+  const document = elementState.session.document;
+  if (document === undefined) return;
   elementState.session.reduceSelection({
     type: 'replace-selection',
     componentIds: [id],
@@ -147,4 +167,96 @@ export function keepSelectedSamplesAsConstants(element: DesignerElementHost): bo
   });
   if (!result.ok) elementState.runtime.emitDiagnostics(element, result.diagnostics);
   return result.ok;
+}
+
+/**
+ * 发布被示例数据拦截时的逐项列表（ADR-0112 §2.3）：哪些组件还带着示例数据，点一项定位到画布。
+ *
+ * 数据源参数与变量上的示例值没有画布位置，只计数。弹层不提供「强制发布」——出路只有绑定数据集
+ * 或显式保留为常量，两者都在检查器数据段与状态栏里。
+ */
+export function openSampleBlockedDialog(element: DesignerElementHost): void {
+  const elementState = getDesignerElementState(element);
+  const document = elementState.session.document;
+  const root = element.shadowRoot?.querySelector<HTMLElement>('.designer');
+  if (document === undefined || root === null || root === undefined) return;
+  const refs = listSampleValueRefs(document);
+  if (refs.length === 0) return;
+  const text = DESIGNER_UI_TEXT.sampleData;
+  const doc = root.ownerDocument;
+  let host = root.querySelector<HTMLElement>('[data-designer-overlay-host]');
+  if (host === null) {
+    host = doc.createElement('div');
+    host.className = 'designer-overlay-host';
+    host.dataset.designerOverlayHost = 'true';
+    root.appendChild(host);
+  }
+  host.querySelector('[data-sample-blocked]')?.remove();
+
+  const layer = doc.createElement('div');
+  layer.className = 'sample-blocked-layer';
+  layer.dataset.sampleBlocked = '';
+  const card = doc.createElement('section');
+  card.className = 'sample-blocked-card';
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-modal', 'true');
+  card.setAttribute('aria-labelledby', 'sample-blocked-title');
+  const title = doc.createElement('h2');
+  title.id = 'sample-blocked-title';
+  title.className = 'sample-blocked-title';
+  title.textContent = text.publishBlockedTitle(refs.length);
+  const hint = doc.createElement('p');
+  hint.className = 'sample-blocked-hint';
+  hint.textContent = text.publishBlockedHint;
+  const list = doc.createElement('ul');
+  list.className = 'sample-blocked-list';
+  const seen = new Set<string>();
+  let others = 0;
+  for (const ref of refs) {
+    if (ref.owner.kind !== 'component') {
+      others += 1;
+      continue;
+    }
+    if (seen.has(ref.owner.id)) continue;
+    seen.add(ref.owner.id);
+    const component = document.components.find((item) => item.id === ref.owner.id);
+    const item = doc.createElement('li');
+    const button = doc.createElement('button');
+    button.type = 'button';
+    button.className = 'sample-blocked-item';
+    button.dataset.sampleLocate = ref.owner.id;
+    const name = doc.createElement('span');
+    name.className = 'sample-blocked-name';
+    name.textContent = component?.name ?? ref.owner.id;
+    const meta = doc.createElement('span');
+    meta.className = 'sample-blocked-meta';
+    meta.textContent = component?.type ?? '';
+    button.append(name, meta);
+    item.appendChild(button);
+    list.appendChild(item);
+  }
+  card.append(title, hint, list);
+  if (others > 0) {
+    const other = doc.createElement('p');
+    other.className = 'sample-blocked-hint';
+    other.textContent = text.publishBlockedOther(others);
+    card.appendChild(other);
+  }
+  const footer = doc.createElement('footer');
+  footer.className = 'sample-blocked-footer';
+  const close = doc.createElement('button');
+  close.type = 'button';
+  close.className = 'designer-control designer-button';
+  close.dataset.variant = 'primary';
+  close.dataset.sampleBlockedClose = '';
+  close.textContent = text.publishBlockedClose;
+  footer.appendChild(close);
+  card.appendChild(footer);
+  layer.appendChild(card);
+  host.appendChild(layer);
+  close.focus();
+}
+
+export function closeSampleBlockedDialog(element: DesignerElementHost): void {
+  element.shadowRoot?.querySelector('[data-sample-blocked]')?.remove();
 }

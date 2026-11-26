@@ -1,13 +1,12 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import { describe, expect, it } from 'vitest';
-import type { DesignerSelectionSnapBounds } from '../../../src/browser/viewport/designer-canvas-aids-types.js';
 import {
   collectDesignerCanvasMeasurements,
   DesignerCanvasMeasurementIndex,
 } from '../../../src/browser/viewport/designer-canvas-measurements.js';
 
 describe('collectDesignerCanvasMeasurements', () => {
-  it('R2 renders each adjacent gap along the selected alignment rails', () => {
+  it('R2 marks only the nearest gap on each side of the selection', () => {
     const document: ScreenDocument = {
       canvas: { width: 400, height: 700, backgroundColor: '#000000' },
       components: [
@@ -27,13 +26,10 @@ describe('collectDesignerCanvasMeasurements', () => {
         'selected',
       ]),
     ).toEqual([
-      { axis: 'y', position: 0, from: 100, to: 146, distance: 46 },
-      { axis: 'y', position: 0, from: 180, to: 228, distance: 48 },
-      { axis: 'y', position: 0, from: 348, to: 407, distance: 59 },
-      { axis: 'y', position: 100, from: 180, to: 228, distance: 48 },
-      { axis: 'y', position: 100, from: 348, to: 407, distance: 59 },
-      { axis: 'y', position: 200, from: 180, to: 228, distance: 48 },
-      { axis: 'y', position: 200, from: 348, to: 407, distance: 59 },
+      // The 46px gap above is read across the whole shared span; the 48px gap below ties
+      // between the two upper boxes and keeps the first one's 100px span.
+      { axis: 'y', position: 100, from: 100, to: 146, distance: 46 },
+      { axis: 'y', position: 50, from: 180, to: 228, distance: 48 },
     ]);
   });
 
@@ -55,7 +51,7 @@ describe('collectDesignerCanvasMeasurements', () => {
     ).toEqual([{ axis: 'y', position: 50, from: 100, to: 170, distance: 70 }]);
   });
 
-  it('R2 excludes lanes whose components only meet the selection at an edge or corner', () => {
+  it('R2 excludes neighbours that only meet the selection at an edge or corner', () => {
     const document: ScreenDocument = {
       canvas: { width: 800, height: 500, backgroundColor: '#000000' },
       components: [component('above-left', 115, 22, 242, 120)],
@@ -71,101 +67,65 @@ describe('collectDesignerCanvasMeasurements', () => {
       ),
     ).toEqual([]);
   });
-
-  it.each([0.1, 0.5, 1, 1.25, 3])(
-    'indexed rails match the full per-rail scan on seeded layouts at zoom %s',
-    (zoom) => {
-      let seed = 0x3a5e + Math.round(zoom * 100);
-      const random = () => {
-        seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0;
-        return seed / 0x1_0000_0000;
-      };
-      // Snapped-to-10 coordinates plus sub-pixel jitter exercise both exact and boundary matches.
-      const components = Array.from({ length: 800 }, () => {
-        const left = Math.round(random() * 200) * 10 + (random() < 0.3 ? random() : 0);
-        const top = Math.round(random() * 200) * 10;
-        const width = [50, 100, 100.5, 200][Math.floor(random() * 4)]!;
-        const height = [20, 40, 120][Math.floor(random() * 3)]!;
-        return { left, top, right: left + width, bottom: top + height };
-      });
-      const index = new DesignerCanvasMeasurementIndex(components);
-      for (let frame = 0; frame < 80; frame++) {
-        const anchor = components[Math.floor(random() * components.length)]!;
-        const left = anchor.left + [0, 0, 0.3, -0.5, 2][frame % 5]!;
-        const top = random() * 2_000;
-        const selection = {
-          left,
-          right: left + [50, 100, 200][frame % 3]!,
-          top,
-          bottom: top + [20, 40][frame % 2]!,
-        };
-        expect(index.measure(selection, zoom)).toEqual(scanRails(components, selection, zoom));
-      }
-    },
-  );
 });
 
-// The pre-index algorithm, kept verbatim as the reference for the indexed gesture path.
-function scanRails(
-  components: readonly DesignerSelectionSnapBounds[],
-  selection: DesignerSelectionSnapBounds,
-  zoom: number,
-) {
-  const tolerance = 1 / Math.max(zoom, Number.EPSILON);
-  const anchors = (start: number, end: number) => [...new Set([start, (start + end) / 2, end])];
-  const matches = (position: number, start: number, end: number) =>
-    Math.abs(start - position) <= tolerance ||
-    Math.abs((start + end) / 2 - position) <= tolerance ||
-    Math.abs(end - position) <= tolerance;
-  const overlaps = (a0: number, a1: number, b0: number, b1: number) =>
-    Math.min(a1, b1) - Math.max(a0, b0) > tolerance;
-  const gaps = (
-    axis: 'x' | 'y',
-    position: number,
-    intervals: readonly { start: number; end: number }[],
-  ) => {
-    const merged: { start: number; end: number }[] = [];
-    for (const interval of [...intervals].sort((left, right) => left.start - right.start)) {
-      const previous = merged.at(-1);
-      if (previous === undefined || interval.start > previous.end + tolerance) {
-        merged.push({ ...interval });
-      } else if (interval.end > previous.end) {
-        merged[merged.length - 1] = { start: previous.start, end: interval.end };
-      }
-    }
-    return merged.slice(1).flatMap((next, index) => {
-      const distance = next.start - merged[index]!.end;
-      return distance <= tolerance
-        ? []
-        : [{ axis, distance, from: merged[index]!.end, position, to: next.start }];
-    });
-  };
-  return [
-    ...anchors(selection.left, selection.right).flatMap((position) =>
-      gaps('y', position, [
-        { start: selection.top, end: selection.bottom },
-        ...components
-          .filter(
-            (bounds) =>
-              matches(position, bounds.left, bounds.right) &&
-              overlaps(selection.left, selection.right, bounds.left, bounds.right),
-          )
-          .map((bounds) => ({ start: bounds.top, end: bounds.bottom })),
-      ]),
-    ),
-    ...anchors(selection.top, selection.bottom).flatMap((position) =>
-      gaps('x', position, [
-        { start: selection.left, end: selection.right },
-        ...components
-          .filter(
-            (bounds) =>
-              matches(position, bounds.top, bounds.bottom) &&
-              overlaps(selection.top, selection.bottom, bounds.top, bounds.bottom),
-          )
-          .map((bounds) => ({ start: bounds.left, end: bounds.right })),
-      ]),
-    ),
-  ];
+describe('DesignerCanvasMeasurementIndex', () => {
+  it('R2 keeps a dense column to one gap per side instead of every adjacent pair', () => {
+    // Ten 40px rows 16 apart, with the selection occupying the row at 280..320.
+    const components = Array.from({ length: 10 }, (_, index) => box(0, index * 56, 100, 40)).filter(
+      (bounds) => bounds.top !== 280,
+    );
+    expect(
+      new DesignerCanvasMeasurementIndex(components).measure({
+        left: 0,
+        right: 100,
+        top: 280,
+        bottom: 320,
+      }),
+    ).toEqual([
+      { axis: 'y', position: 50, from: 264, to: 280, distance: 16 },
+      { axis: 'y', position: 50, from: 320, to: 336, distance: 16 },
+    ]);
+  });
+
+  it('R2 measures a side gap along its own axis at the shared span centre', () => {
+    const index = new DesignerCanvasMeasurementIndex([box(40, 120, 40, 40)]);
+    expect(index.measure({ left: 100, right: 200, top: 100, bottom: 200 })).toEqual([
+      { axis: 'x', position: 140, from: 80, to: 100, distance: 20 },
+    ]);
+  });
+
+  it('R2 picks the neighbour sharing more of the selection span at equal distance', () => {
+    const index = new DesignerCanvasMeasurementIndex([
+      box(100, -40, 40, 30),
+      box(140, -40, 60, 30),
+    ]);
+    expect(index.measure({ left: 100, right: 200, top: 0, bottom: 100 })).toEqual([
+      { axis: 'y', position: 170, from: -10, to: 0, distance: 10 },
+    ]);
+  });
+
+  it('R2 drops neighbours beyond the reach', () => {
+    const index = new DesignerCanvasMeasurementIndex([box(0, -40, 100, 30)]);
+    const selection = { left: 0, right: 100, top: 0, bottom: 100 };
+    expect(index.measure(selection, 1, 8)).toEqual([]);
+    expect(index.measure(selection)).toEqual([
+      { axis: 'y', position: 50, from: -10, to: 0, distance: 10 },
+    ]);
+  });
+
+  it('R2 measures a sub-pixel gap only once zoom makes it a real gap on screen', () => {
+    const index = new DesignerCanvasMeasurementIndex([box(0, -40, 100, 39.5)]);
+    const selection = { left: 0, right: 100, top: 0, bottom: 100 };
+    expect(index.measure(selection, 1)).toEqual([]);
+    expect(index.measure(selection, 4)).toEqual([
+      { axis: 'y', position: 50, from: -0.5, to: 0, distance: 0.5 },
+    ]);
+  });
+});
+
+function box(left: number, top: number, width: number, height: number) {
+  return { left, top, right: left + width, bottom: top + height };
 }
 
 function component(
