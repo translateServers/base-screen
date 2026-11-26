@@ -20,7 +20,7 @@ try {
     client.listResourceTemplates(),
   ]);
   if (
-    tools.tools.length !== 14 ||
+    tools.tools.length !== 16 ||
     resources.resources.length !== 3 ||
     templates.resourceTemplates.length !== 0
   )
@@ -167,6 +167,52 @@ try {
       ],
     },
   });
+  const profiled = await client.callTool({
+    name: 'profile_dataset',
+    arguments: {
+      definition: {
+        datasetId: 'crew',
+        name: '班组绩效',
+        fields: [
+          { id: 'crew', label: '班组', valueType: 'string' },
+          { id: 'oee', label: 'OEE', valueType: 'number', unit: '%' },
+        ],
+      },
+      sample: {
+        rows: [
+          { crew: '甲班', oee: 86.5 },
+          { crew: '乙班', oee: 82.1 },
+        ],
+      },
+    },
+  });
+  const enumerated = await client.callTool({
+    name: 'enumerate_data_candidates',
+    arguments: {
+      profiles: [profiled.structuredContent?.profile],
+      materials: [
+        {
+          type: 'base.chart',
+          name: '图表',
+          roles: [
+            {
+              id: 'dimension',
+              minFields: 1,
+              maxFields: 1,
+              valueTypes: ['string', 'number', 'boolean', 'date'],
+            },
+            { id: 'measures', minFields: 1, maxFields: 8, valueTypes: ['number'] },
+          ],
+        },
+      ],
+    },
+  });
+  if (
+    profiled.isError === true ||
+    profiled.structuredContent?.profile?.grain?.unique !== true ||
+    enumerated.structuredContent?.candidates?.[0]?.fact !== 'categorization'
+  )
+    throw new Error('Screen MCP data profile / candidates smoke check failed.');
   if (
     compiled.isError === true ||
     compiled.structuredContent?.compiled !== true ||
@@ -182,7 +228,7 @@ try {
     overflow.structuredContent?.issues?.[0]?.reason !== 'height'
   )
     throw new Error('Screen MCP intent compile / layout smoke check failed.');
-  console.log('Screen MCP smoke check passed: 3 resources, 14 tools.');
+  console.log('Screen MCP smoke check passed: 3 resources, 16 tools.');
 } finally {
   await client.close();
 }

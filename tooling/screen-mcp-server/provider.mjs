@@ -444,6 +444,23 @@ export async function createScreenProvider(screenFile) {
         audit,
       });
     },
+    /**
+     * 字段画像（ADR-0114 D10）：describe 结果 + 调用方给的样本 → 确定性画像。
+     * MCP 服务不取数——谁接触数据由宿主决定（上位设计 §2），样本由调用方传入。
+     */
+    profileDataset({ definition, sample }) {
+      return ok({ profile: apis.profileScreenDataset(definition, sample) });
+    },
+    /** 候选枚举（ADR-0114 D3）：画像 × 物料绑定角色 → 合法的（事实, 物料, 角色绑定）。 */
+    enumerateDataCandidates({ profiles, materials, maxPerDataset }) {
+      return ok({
+        candidates: apis.enumerateScreenDataCandidates(
+          profiles,
+          materials,
+          maxPerDataset === undefined ? {} : { maxPerDataset },
+        ),
+      });
+    },
     /** 布局求解（ADR-0113 §2.3）：区域序列 + 每格内容量 → 像素矩形，装不下返回带差额的容量冲突。 */
     solveLayout({ regions }) {
       const invalid = regions.flatMap((region, index) => validateLayoutRegion(region, index));

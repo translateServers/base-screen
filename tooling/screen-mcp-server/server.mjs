@@ -162,7 +162,34 @@ export function createScreenMcpServer(provider) {
             z.object({
               datasetId: z.string().min(1),
               name: z.string(),
-              columns: z.array(z.object({ id: z.string().min(1), type: z.string() })),
+              columns: z.array(
+                z.object({
+                  id: z.string().min(1),
+                  type: z.string(),
+                  label: z.string().optional(),
+                  unit: z.string().optional(),
+                }),
+              ),
+              // ADR-0114：参数定义与画像行数，编译器据此写默认参数、判缺参、拒绝多行结果绑指标卡。
+              parameters: z
+                .array(
+                  z.object({
+                    name: z.string().min(1),
+                    required: z.boolean(),
+                    valueType: z.enum(['string', 'number', 'boolean', 'date']).optional(),
+                    defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
+                    allowedValues: z
+                      .array(z.union([z.string(), z.number(), z.boolean()]))
+                      .optional(),
+                  }),
+                )
+                .optional(),
+              rows: z
+                .object({
+                  sampled: z.number().int().min(0),
+                  total: z.number().int().min(0).optional(),
+                })
+                .optional(),
             }),
           ),
         })
@@ -171,6 +198,83 @@ export function createScreenMcpServer(provider) {
     },
     'Compile an agent intent (the model output: title, subtitle, style, and either regions of band / grid / split or the flat kpis + blocks shape) into a Screen Document candidate, with the same parser, compiler and layout solver the designer host runs. Needs the material catalog (type, data kind, props, binding roles, defaults, and children for shell containers). Returns the candidate document, the component-id → model-path source table, repair issues keyed by model path (dropped items, LAYOUT_CAPACITY_EXCEEDED, unsatisfiable bindings, layout audit errors) and warnings (including INTENT_BLOCK_SUBSTITUTED gaps). Does not touch the loaded snapshot; persist the candidate yourself.',
     (input) => provider.compileScreenIntent(input),
+  );
+  registerTool(
+    server,
+    'profile_dataset',
+    {
+      definition: z.object({
+        datasetId: z.string().min(1),
+        name: z.string(),
+        description: z.string().nullable().optional().default(null),
+        fields: z
+          .array(
+            z.object({
+              id: z.string().min(1),
+              label: z.string(),
+              valueType: z.enum(['string', 'number', 'boolean', 'date']),
+              nullable: z.boolean().optional(),
+              unit: z.string().optional(),
+              format: z.string().optional(),
+            }),
+          )
+          .max(512),
+        parameters: z
+          .array(
+            z.object({
+              name: z.string().min(1),
+              label: z.string(),
+              valueType: z.enum(['string', 'number', 'boolean', 'date']),
+              required: z.boolean(),
+              defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
+              allowedValues: z.array(z.union([z.string(), z.number(), z.boolean()])).optional(),
+            }),
+          )
+          .optional()
+          .default([]),
+      }),
+      sample: z
+        .object({
+          rows: z.array(z.record(z.string(), z.unknown())).max(5000),
+          totalRowCount: z.number().int().min(0).optional(),
+        })
+        .optional(),
+    },
+    'Profile a dataset deterministically from its describe result and a sample of rows the caller already fetched: per field kind (measure / dimension / time / identifier / empty), distinct count, null ratio, numeric range, time granularity; grain (whether the rows are already aggregated by their dimension and time keys); parameters that still need a value. This server never queries data itself; pass the sample in. Up to 1000 rows are used.',
+    (input) =>
+      provider.profileDataset({
+        definition: input.definition,
+        ...(input.sample === undefined
+          ? {}
+          : { sample: { fields: input.definition.fields, ...input.sample } }),
+      }),
+  );
+  registerTool(
+    server,
+    'enumerate_data_candidates',
+    {
+      profiles: z.array(z.unknown()).min(1).max(4),
+      materials: z
+        .array(
+          z.object({
+            type: z.string().min(1),
+            name: z.string(),
+            roles: z.array(
+              z.object({
+                id: z.string().min(1),
+                minFields: z.number().int().min(0),
+                maxFields: z.number().int().min(1),
+                valueTypes: z.array(z.enum(['string', 'number', 'boolean', 'date'])).min(1),
+              }),
+            ),
+          }),
+        )
+        .min(1)
+        .max(200),
+      maxPerDataset: z.number().int().min(1).max(32).optional(),
+    },
+    "Enumerate legal (fact, material, role binding) candidates from dataset profiles (output of profile_dataset) and the materials' binding roles. Facts are value, trend, categorization, proportion, rank, association and detail; detail-level (non-aggregated) data only yields detail and single-value candidates. Bindings follow the declared valueTypes and field counts, never role names. Candidates are numbered c1, c2, ... for the intent to reference.",
+    (input) => provider.enumerateDataCandidates(input),
   );
   registerTool(
     server,

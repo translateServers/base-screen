@@ -28,6 +28,9 @@ const CORE_EXPORTS = [
   'diffScreenDocuments',
   'auditScreenLayout',
   'resolveScreenFontFloorPx',
+  // 从数据出发（ADR-0114 D10）：字段画像与候选枚举，纯函数。
+  'profileScreenDataset',
+  'enumerateScreenDataCandidates',
 ];
 
 /** 意图层（ADR-0113）：编译与布局求解，与设计器宿主前端同一份实现。 */
