@@ -78,6 +78,8 @@ describe('agent data context', () => {
     expect(prompt).toContain('参数 line 必填，可选 LINE-A / LINE-B');
     expect(prompt).toContain('"candidate": "c1"');
     expect(prompt).not.toContain('x9');
+    // 只有分类候选、没有单值候选：提醒指标带少放（S7 评测 F1）。
+    expect(prompt).toContain('band 只放 3 个');
   });
 
   it('accepts a rebind op and explains it in the edit prompt when data is referenced', () => {

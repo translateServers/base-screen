@@ -148,6 +148,13 @@ export function renderDataPrompt(references: AgentPromptReferences | undefined):
       blocks.push(`- ${dataset.name}（datasetId: ${dataset.datasetId}）\n${lines.join('\n')}`);
   }
   if (blocks.length === 0) return '';
+  // 没有单值候选时指标卡没法绑真实数据，模型写的数都是示例：指标带少放，别让假数占满一整排（S7 评测 F1）。
+  const hasValue = references.datasets.some((dataset) =>
+    (dataset.summary?.candidates ?? []).some((candidate) => candidate.fact === 'value'),
+  );
+  const kpiRule = hasValue
+    ? ''
+    : '\n本轮没有单值候选：指标带的数字只能是示例数据，band 只放 3 个最关键的指标，不要把明细里的某一行当成指标。';
   return `
 
 本轮数据集的画像与候选（宿主按真实样本算好的统计，候选都是合法的组件 + 字段组合）：
@@ -156,7 +163,7 @@ ${blocks.join('\n')}
 1. 用候选：{ "candidate": "c1", "type": "候选里的 type", "title": "块标题" }，需要参数时加 "params"；layout 里这一格的 type 也照候选写。
 2. 用户点名了字段而候选里没有：{ "type": "…", "datasetId": "…", "fields": { "角色": ["字段 id"] } }，字段只能用画像里列出的。
 3. 单值候选只能用在指标带：{ "label": "指标名", "unit": "单位", "bind": { "datasetId": "…", "field": "字段 id" } }，不要写 value 与 delta；结果多于一行的数据集不要绑指标卡。
-有数据集引用时，数据型块不要写 table、不要编数字；明细级数据不要画趋势或分类图；没有合适的候选就少放一块，不要硬凑。`;
+有数据集引用时，数据型块不要写 table、不要编数字；明细级数据不要画趋势或分类图；没有合适的候选就少放一块，不要硬凑。${kpiRule}`;
 }
 
 /** 用户本轮显式引用的素材与数据集：模型必须用上，不能编造别的 id。 */

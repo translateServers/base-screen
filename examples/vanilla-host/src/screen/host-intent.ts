@@ -865,7 +865,7 @@ function attemptWholeScreen(
         : '';
     const repairedNote =
       rounds > 0 ? `；宿主校验未通过，已请模型修复 ${rounds} 次${backdropNote}` : '';
-    const rationale = `${describeMode(data.mode, data.failure, warnings)}${repairedNote}。布局由宿主前端按区域确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeIncomingData(document)}${describeLocked(current)}`;
+    const rationale = `${describeMode(data.mode, data.failure, warnings)}${repairedNote}。布局由宿主前端按区域确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeIncomingData(document, dataContext)}${describeLocked(current)}`;
     // 流式草案接得上就原地收尾；接不上（最终结果与骨架对不上、或已修复过）先撤掉它，再整屏提交。
     // 提案一旦提交就留下它的会话；是否被采纳由下一次请求时对活文档判断。
     const kept = createIntentSession({
@@ -1324,10 +1324,11 @@ function remapValueRef(
  * 提案理由里的「将接入的数据」（ADR-0114 D6）：采纳后会新建哪些数据集实例、用什么参数。
  * 生成的实例不写刷新策略，采纳前用户就能看清这屏会去取哪些数。
  */
-function describeIncomingData(document: unknown): string {
+function describeIncomingData(document: unknown, dataContext?: IntentDataContext): string {
   const sources =
     isRecord(document) && Array.isArray(document.dataSources) ? document.dataSources : [];
   const items: string[] = [];
+  const used = new Set<string>();
   for (const source of sources) {
     if (!isRecord(source) || !isRecord(source.source) || source.source.kind !== 'dataset') continue;
     const params = isRecord(source.params)
@@ -1336,8 +1337,29 @@ function describeIncomingData(document: unknown): string {
           .join('，')
       : '';
     items.push(`${String(source.name)}${params === '' ? '' : `（${params}）`}`);
+    if (typeof source.source.datasetId === 'string') used.add(source.source.datasetId);
   }
-  return items.length === 0 ? '' : `将接入的数据：${items.join('；')}。`;
+  // 引用了却没接上、原因是缺必填参数的数据集：说清楚要什么、怎么说（编译器不替用户挑取值）。
+  const waiting = (dataContext?.references ?? []).flatMap((reference) => {
+    if (used.has(reference.datasetId)) return [];
+    const missing = (reference.parameters ?? []).filter(
+      (parameter) => parameter.required && parameter.defaultValue === undefined,
+    );
+    if (missing.length === 0) return [];
+    const choices = missing
+      .map((parameter) =>
+        parameter.allowedValues === undefined || parameter.allowedValues.length === 0
+          ? parameter.name
+          : `${parameter.name}（可选 ${parameter.allowedValues.join(' / ')}）`,
+      )
+      .join('、');
+    const example = missing[0]?.allowedValues?.[0];
+    return [
+      `「${reference.name}」需要先指定 ${choices}，本轮没有接入${example === undefined ? '' : `，说「用 ${String(example)} 的」即可`}`,
+    ];
+  });
+  const incoming = items.length === 0 ? '' : `将接入的数据：${items.join('；')}。`;
+  return `${incoming}${waiting.length === 0 ? '' : `${waiting.join('；')}。`}`;
 }
 
 function describeLocked(current: ScreenDocument): string {
