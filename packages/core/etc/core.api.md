@@ -20,7 +20,9 @@ import { ScreenComponentNode } from '@base-screen/contracts';
 import type { ScreenComponentStates } from '@base-screen/contracts';
 import { ScreenComponentStatus } from '@base-screen/contracts';
 import { ScreenDataBinding } from '@base-screen/contracts';
+import type { ScreenDatasetDefinition } from '@base-screen/contracts';
 import { ScreenDatasetField } from '@base-screen/contracts';
+import type { ScreenDatasetParameterValue } from '@base-screen/contracts';
 import { ScreenDatasetValueType } from '@base-screen/contracts';
 import type { ScreenDataSource } from '@base-screen/contracts';
 import { ScreenDiagnostic } from '@base-screen/contracts';
@@ -36,6 +38,7 @@ import { ScreenSize } from '@base-screen/contracts';
 import { ScreenStaticDataSource } from '@base-screen/contracts';
 import { ScreenStaticVariable } from '@base-screen/contracts';
 import type { ScreenSubCanvas } from '@base-screen/contracts';
+import type { ScreenTabularDataset } from '@base-screen/contracts';
 import type { ScreenTargetDisplayProfile } from '@base-screen/contracts';
 import type { ScreenThemeSlot } from '@base-screen/contracts';
 import { ScreenValueRef } from '@base-screen/contracts';
@@ -114,6 +117,14 @@ export function diffScreenDocuments(before: ScreenDocument, after: ScreenDocumen
 export function dispatchScreenBlueprintEvent(plan: ScreenBlueprintPlan, state: ScreenJsonObject, event: ScreenBlueprintEvent): ScreenParseResult<ScreenBlueprintDispatchResult>;
 
 // @public (undocumented)
+export function enumerateScreenDataCandidates(profiles: readonly ScreenDatasetProfile[], materials: readonly ScreenCandidateMaterial[], options?: EnumerateScreenDataCandidatesOptions): ScreenDataCandidate[];
+
+// @public (undocumented)
+export interface EnumerateScreenDataCandidatesOptions {
+    readonly maxPerDataset?: number;
+}
+
+// @public (undocumented)
 export function evaluateScreenHostResourceParameters(params: Readonly<Record<string, ScreenHostResourceParameter>>, variables: ScreenJsonObject): ScreenParseResult<ScreenHostResourceParameterEvaluation>;
 
 // @public
@@ -186,6 +197,9 @@ export function parseCssColorAlpha(value: string): {
 export function parseScreenDocumentCommand(input: unknown): ScreenParseResult<ScreenDocumentCommand>;
 
 // @public (undocumented)
+export function profileScreenDataset(definition: ScreenDatasetDefinition, sample?: ScreenTabularDataset): ScreenDatasetProfile;
+
+// @public (undocumented)
 export function queryScreenComponentsInRect(document: ScreenDocument, rect: ScreenRect, mode: 'intersect' | 'contain'): readonly string[];
 
 // @public
@@ -223,6 +237,18 @@ export interface RgbColor {
 }
 
 export { SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY }
+
+// @public
+export const SCREEN_CATEGORY_MAX = 12;
+
+// @public
+export const SCREEN_PROFILE_MAX_FIELDS = 64;
+
+// @public
+export const SCREEN_PROFILE_MAX_ROWS = 1000;
+
+// @public
+export const SCREEN_PROPORTION_MAX = 8;
 
 // @public (undocumented)
 export interface ScreenAlignmentDelta {
@@ -566,6 +592,16 @@ export interface ScreenBounds {
     readonly top: number;
 }
 
+// @public (undocumented)
+export interface ScreenCandidateMaterial {
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly roles: readonly ScreenDataBindingRole[];
+    // (undocumented)
+    readonly type: string;
+}
+
 export { ScreenCanvas }
 
 // @public
@@ -648,6 +684,47 @@ interface ScreenDataBindingValidation {
 }
 export { ScreenDataBindingValidation }
 export { ScreenDataBindingValidation as ScreenHostResourceBindingValidation }
+
+// @public (undocumented)
+export interface ScreenDataCandidate {
+    // (undocumented)
+    readonly datasetId: string;
+    // (undocumented)
+    readonly fact: ScreenDataFact;
+    readonly fields: Readonly<Record<string, readonly string[]>>;
+    readonly id: string;
+    // (undocumented)
+    readonly score: number;
+    // (undocumented)
+    readonly type: string;
+}
+
+// @public
+export type ScreenDataFact = 'value' | 'trend' | 'categorization' | 'proportion' | 'rank' | 'association' | 'detail';
+
+// @public (undocumented)
+export interface ScreenDatasetProfile {
+    // (undocumented)
+    readonly datasetId: string;
+    // (undocumented)
+    readonly fields: readonly ScreenFieldProfile[];
+    readonly grain: {
+        readonly keys: readonly string[];
+        readonly unique: boolean;
+    };
+    // (undocumented)
+    readonly name: string;
+    readonly omittedFields: number;
+    // (undocumented)
+    readonly params: readonly ScreenParameterProfile[];
+    // (undocumented)
+    readonly rows: {
+        readonly sampled: number;
+        readonly total?: number;
+        readonly truncated: boolean;
+    };
+    readonly sampled: boolean;
+}
 
 export { ScreenDiagnostic }
 
@@ -737,6 +814,38 @@ export interface ScreenDocumentTransaction {
 }
 
 // @public (undocumented)
+export type ScreenFieldKind = 'measure' | 'dimension' | 'time' | 'identifier' | 'empty';
+
+// @public (undocumented)
+export interface ScreenFieldProfile {
+    readonly distinct: number;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: ScreenFieldKind;
+    // (undocumented)
+    readonly label: string;
+    readonly nullRatio: number;
+    // (undocumented)
+    readonly number?: {
+        readonly min: number;
+        readonly max: number;
+        readonly integer: boolean;
+        readonly nonNegative: boolean;
+    };
+    // (undocumented)
+    readonly time?: {
+        readonly min: string;
+        readonly max: string;
+        readonly granularity: ScreenTimeGranularity;
+    };
+    // (undocumented)
+    readonly unit?: string;
+    // (undocumented)
+    readonly valueType: ScreenDatasetValueType;
+}
+
+// @public (undocumented)
 export interface ScreenHistoryEntry {
     // (undocumented)
     readonly after: ScreenDocument;
@@ -812,6 +921,17 @@ export interface ScreenLayoutAuditOptions {
 }
 
 // @public (undocumented)
+export interface ScreenParameterProfile {
+    // (undocumented)
+    readonly allowedValues?: readonly ScreenDatasetParameterValue[];
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly required: boolean;
+    readonly resolved: 'default' | 'missing' | 'optional';
+}
+
+// @public (undocumented)
 export interface ScreenPoint {
     // (undocumented)
     readonly x: number;
@@ -873,6 +993,9 @@ export { ScreenStaticVariable }
 
 // @public
 type ScreenThemePatch = Readonly<Partial<Record<ScreenThemeSlot, string>>>;
+
+// @public (undocumented)
+export type ScreenTimeGranularity = 'minute' | 'hour' | 'day' | 'month' | 'year' | 'irregular';
 
 // @public (undocumented)
 export interface ScreenTransactionFailure {

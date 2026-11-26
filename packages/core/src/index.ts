@@ -51,7 +51,26 @@ export type {
   ScreenTransactionSource,
   ScreenTransactionSuccess,
 } from './commands/types.js';
+export {
+  type EnumerateScreenDataCandidatesOptions,
+  enumerateScreenDataCandidates,
+  SCREEN_CATEGORY_MAX,
+  SCREEN_PROPORTION_MAX,
+  type ScreenCandidateMaterial,
+  type ScreenDataCandidate,
+  type ScreenDataFact,
+} from './data/data-candidates.js';
 export { componentsReferencingDataSources } from './data/data-source-dependents.js';
+export {
+  profileScreenDataset,
+  SCREEN_PROFILE_MAX_FIELDS,
+  SCREEN_PROFILE_MAX_ROWS,
+  type ScreenDatasetProfile,
+  type ScreenFieldKind,
+  type ScreenFieldProfile,
+  type ScreenParameterProfile,
+  type ScreenTimeGranularity,
+} from './data/dataset-profile.js';
 export type {
   ScreenDataBindingRole,
   ScreenDataBindingValidation,
