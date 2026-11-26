@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyIntentOps,
   type CompiledScreenDocument,
   compileScreenIntent,
+  createIntentSession,
+  editIntent,
   type IntentCatalog,
   type IntentReferences,
   parseIntentBlock,
@@ -279,5 +282,183 @@ describe('compile', () => {
     expect(named(result.document, '指标值')[0]?.dataValue).toMatchObject({ kind: 'inline' });
     expect(named(result.document, '指标值')[0]?.dataValue).not.toHaveProperty('sample');
     expect(result.document.dataSources ?? []).toEqual([]);
+  });
+});
+
+describe('rebind (ADR-0114 D9)', () => {
+  const base = () => {
+    const parsed = parseScreenIntent(
+      flatOutput([
+        {
+          type: 'base.chart',
+          title: '订单',
+          span: 4,
+          table: {
+            columns: [
+              { id: 'day', label: '日期', type: 'string' },
+              { id: 'n', label: '量', type: 'number' },
+            ],
+            rows: [
+              { day: '1', n: 1 },
+              { day: '2', n: 2 },
+              { day: '3', n: 3 },
+            ],
+          },
+        },
+      ]),
+      { catalog: CATALOG },
+    );
+    if (parsed.intent === undefined) throw new Error('fixture');
+    return parsed.intent;
+  };
+
+  it('rebinds a block to a candidate and a KPI to a field, keeping title, span and identity', () => {
+    const outcome = applyIntentOps(
+      base(),
+      [
+        {
+          op: 'rebind',
+          target: 'blocks[0]',
+          bind: { candidate: 'c1', params: { line: 'LINE-A' } },
+        },
+        { op: 'rebind', target: 'kpis[0]', bind: { datasetId: 'plant', field: 'oee' } },
+      ],
+      CATALOG,
+    );
+    if (!outcome.ok) throw new Error(JSON.stringify(outcome.diagnostics));
+    const grid = outcome.intent.regions.find((region) => region.kind === 'grid');
+    const band = outcome.intent.regions.find((region) => region.kind === 'band');
+    const block = grid?.kind === 'grid' ? grid.blocks[0] : undefined;
+    const kpi = band?.kind === 'band' ? band.items[0] : undefined;
+
+    expect(block).toMatchObject({
+      title: '订单',
+      span: 4,
+      candidate: 'c1',
+      ident: 'blocks[0]',
+      bind: {
+        kind: 'dataset',
+        datasetId: 'crew',
+        fields: { dimension: ['crew'], measures: ['oee'] },
+        params: { line: 'LINE-A' },
+      },
+    });
+    expect(kpi).toMatchObject({
+      label: '总量',
+      value: null,
+      ident: 'kpis[0]',
+      bind: { datasetId: 'plant', field: 'oee' },
+    });
+
+    // 绑过数据的项再做别的修改，绑定原样保留（会话里来回改不丢字段与参数）。
+    const again = applyIntentOps(
+      outcome.intent,
+      [
+        { op: 'change', target: 'blocks[0]', set: { title: '班组 OEE' } },
+        { op: 'change', target: 'kpis[0]', set: { label: '全厂 OEE' } },
+      ],
+      CATALOG,
+    );
+    if (!again.ok) throw new Error(JSON.stringify(again.diagnostics));
+    const grid2 = again.intent.regions.find((region) => region.kind === 'grid');
+    const band2 = again.intent.regions.find((region) => region.kind === 'band');
+    expect(grid2?.kind === 'grid' ? grid2.blocks[0]?.bind : undefined).toEqual(block?.bind);
+    expect(band2?.kind === 'band' ? band2.items[0]?.bind : undefined).toEqual(kpi?.bind);
+  });
+
+  it('rejects a rebind to an unknown candidate or one without a bind', () => {
+    const unknown = applyIntentOps(
+      base(),
+      [{ op: 'rebind', target: 'blocks[0]', bind: { candidate: 'c9' } }],
+      CATALOG,
+    );
+    expect(unknown.ok).toBe(false);
+    const malformed = applyIntentOps(base(), [{ op: 'rebind', target: 'blocks[0]' }], CATALOG);
+    expect(malformed.ok).toBe(false);
+  });
+});
+
+describe('rebind through a session', () => {
+  it('turns a sample-data chart into a dataset-bound one and brings the data source along', () => {
+    const parsed = parseScreenIntent(
+      flatOutput([
+        {
+          type: 'base.chart',
+          title: '订单',
+          span: 4,
+          table: {
+            columns: [
+              { id: 'day', label: '日期', type: 'string' },
+              { id: 'n', label: '量', type: 'number' },
+            ],
+            rows: [
+              { day: '1', n: 1 },
+              { day: '2', n: 2 },
+              { day: '3', n: 3 },
+            ],
+          },
+        },
+      ]),
+      { catalog: CATALOG },
+    );
+    if (parsed.intent === undefined) throw new Error('fixture');
+    const compiled = compileScreenIntent({
+      intent: parsed.intent,
+      catalog: CATALOG,
+      references: REFS,
+    });
+    if (!compiled.ok) throw new Error('compile');
+    const session = createIntentSession({
+      intent: parsed.intent,
+      compiled: compiled.value,
+      catalog: CATALOG,
+      references: REFS,
+      mode: 'llm',
+    });
+    const other = {
+      id: 'agent-ds-1',
+      name: '别的',
+      source: { kind: 'dataset', datasetId: 'x' },
+      params: {},
+    };
+    const edited = editIntent(
+      session,
+      [
+        {
+          op: 'rebind',
+          target: 'blocks[0]',
+          bind: { candidate: 'c1', params: { line: 'LINE-A' } },
+        },
+      ],
+      {
+        canvas: compiled.value.document.canvas as never,
+        components: compiled.value.document.components as never,
+        dataSources: [other],
+      },
+    );
+    if (!edited.ok) throw new Error(JSON.stringify(edited.diagnostics));
+
+    const replaced = edited.commands.find((command) => command.type === 'replace-data-sources');
+    expect(replaced).toEqual({
+      type: 'replace-data-sources',
+      dataSources: [
+        other,
+        {
+          id: 'agent-ds-1-e2',
+          name: '班组绩效',
+          source: { kind: 'dataset', datasetId: 'crew' },
+          params: {
+            line: { kind: 'inline', value: 'LINE-A' },
+            limit: { kind: 'inline', value: 6 },
+          },
+        },
+      ],
+    });
+    const update = edited.commands.find(
+      (command) =>
+        command.type === 'update-components' &&
+        JSON.stringify(command).includes('data-source-field'),
+    );
+    expect(JSON.stringify(update)).toContain('agent-ds-1-e2');
   });
 });

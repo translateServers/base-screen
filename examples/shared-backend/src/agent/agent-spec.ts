@@ -124,7 +124,7 @@ function referenceRule(references: AgentPromptReferences): string {
  * 意图写法的数据段（ADR-0114 D4 / D5）：画像、候选表与写法规则。只进整屏意图提示词，
  * 平铺写法（`/agent/generate`）不认候选与绑定，不给它看。
  */
-function renderDataPrompt(references: AgentPromptReferences | undefined): string {
+export function renderDataPrompt(references: AgentPromptReferences | undefined): string {
   if (references === undefined) return '';
   const blocks: string[] = [];
   for (const dataset of references.datasets) {

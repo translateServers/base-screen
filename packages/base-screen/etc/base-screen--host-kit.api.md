@@ -658,6 +658,7 @@ export type IntentOp = {
 } | {
     readonly op: 'rebind';
     readonly target: string;
+    readonly bind: Readonly<Record<string, unknown>>;
 };
 
 // @public (undocumented)

@@ -248,7 +248,12 @@ describe('editIntent · operations on the held IR', () => {
   });
 
   it.each([
-    ['rebind', { op: 'rebind', target: 'regions[1].main[0]' }, 'INTENT_OP_NOT_SUPPORTED'],
+    // rebind 已支持（ADR-0114 D9）；没给 bind 的仍是形状不对。
+    [
+      'a rebind without a bind',
+      { op: 'rebind', target: 'regions[1].main[0]' },
+      'INTENT_OP_INVALID',
+    ],
     ['an unknown operation', { op: 'explode', target: 'x' }, 'INTENT_OP_INVALID'],
     [
       'a swap to a material that is not in the catalog',

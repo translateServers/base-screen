@@ -735,6 +735,7 @@ export class AgentService {
     session: unknown;
     screenId?: string;
     catalog?: unknown;
+    references?: readonly Record<string, unknown>[];
     signal?: AbortSignal;
   }): Promise<AgentScreenEditResult> {
     const digest = readSessionDigest(input.session);
@@ -744,14 +745,14 @@ export class AgentService {
         message: '会话摘要不合法，无法局部修改。',
       });
     }
-    const { catalog } = await this.resolveContext(input);
+    const { catalog, references } = await this.resolveContext(input);
     const settings = resolveAgentLlmSettings(this.config);
     if (settings === null) {
       return { summary: '', ops: [], mode: 'deterministic', failure: 'AGENT_NOT_CONFIGURED' };
     }
     const result = await requestAgentCompletion(
       settings,
-      buildEditOpsSystemPrompt(catalog, digest),
+      buildEditOpsSystemPrompt(catalog, digest, references.prompt),
       buildEditOpsUserPrompt(input.text),
       this.logger,
       { retry: true, ...(input.signal === undefined ? {} : { signal: input.signal }) },
@@ -909,6 +910,7 @@ export class AgentService {
         session: input.session,
         ...(input.screenId === undefined ? {} : { screenId: input.screenId }),
         ...(input.catalog === undefined ? {} : { catalog: input.catalog }),
+        ...(input.references === undefined ? {} : { references: input.references }),
         ...(input.signal === undefined ? {} : { signal: input.signal }),
       });
       return { kind: 'edit_screen', routedBy: decision.routedBy, ...edit };

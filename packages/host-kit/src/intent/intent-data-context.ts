@@ -122,9 +122,14 @@ async function profileOne(
     let missing = false;
     for (const parameter of definition.parameters) {
       if (parameter.defaultValue !== undefined) params[parameter.name] = parameter.defaultValue;
-      else if (parameter.required) missing = true;
+      else if (parameter.required) {
+        // 必填又没有默认值：有可选值时用第一个代为取样，只用来判字段形状与粒度（哪条产线都一样）；
+        // 实例参数仍要用户指定，编译器照旧按缺参处理。没有可选值就无从代取，不取样。
+        const stand = parameter.allowedValues?.[0];
+        if (stand === undefined) missing = true;
+        else params[parameter.name] = stand;
+      }
     }
-    // 必填又没有默认值：运行时也取不到，不取样；缺口由编译器按参数规则说明。
     if (missing) return { definition, profile: profileScreenDataset(definition) };
     let sample: ScreenTabularDataset | undefined;
     try {

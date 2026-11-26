@@ -45,7 +45,16 @@ export type IntentOp =
       readonly part?: 'main' | 'rail';
       readonly block: unknown;
     }
-  | { readonly op: 'rebind'; readonly target: string };
+  | {
+      /**
+       * 换数据绑定（ADR-0114 D9）：`bind` 为 `{ candidate: 'c5' }`（按本轮候选表换物料与字段），
+       * 或 `{ datasetId, fields?, params?, type? }`；指标卡为 `{ datasetId, field, params? }`。
+       * 编译器展开成数据源实例的增减与绑定更新，在同一个提案里评审。
+       */
+      readonly op: 'rebind';
+      readonly target: string;
+      readonly bind: Readonly<Record<string, unknown>>;
+    };
 
 export interface IntentSession {
   readonly intent: ScreenIntent;
@@ -169,8 +178,23 @@ export function editIntent(
   );
   const replacedIds = new Set(replaced.map((component) => component.id));
 
+  // 换了取值来源的组件（`rebind`，ADR-0114 D9）：物料没变、走 `update-components`，但它引用的数据源
+  // 也是新编出来的，要和新增组件一起按内容复用 / 换 id，否则补丁会指向活文档里不存在的实例。
+  const rebound = changed.filter((component) => {
+    if (gone.has(component.id) || touched.has(component.id) || replacedIds.has(component.id))
+      return false;
+    const value = component.dataValue as { dataSourceId?: unknown } | null;
+    return (
+      typeof value?.dataSourceId === 'string' &&
+      JSON.stringify(previous.get(component.id)?.dataValue ?? null) !== JSON.stringify(value)
+    );
+  });
   // 新增组件用到的数据源：按内容复用，冲突就换个 id（每次编译都从 `agent-ds-1` 重新编号）。
-  const dataSources = remapDataSources(after, [...added, ...replaced], baseline.dataSources ?? []);
+  const dataSources = remapDataSources(
+    after,
+    [...added, ...replaced, ...rebound],
+    baseline.dataSources ?? [],
+  );
   if (dataSources.next !== undefined) {
     commands.push({ type: 'replace-data-sources', dataSources: dataSources.next });
   }
@@ -185,7 +209,10 @@ export function editIntent(
       continue;
     }
     if (replacedIds.has(component.id)) continue;
-    const patch = diffPatch(previous.get(component.id) as CompiledComponent, component);
+    const patch = diffPatch(
+      previous.get(component.id) as CompiledComponent,
+      dataSources.apply(component),
+    );
     commands.push({ type: 'update-components', componentIds: [component.id], patch });
   }
   const removals = [...removable, ...replacedIds];
@@ -265,9 +292,6 @@ function applyOne(
   catalog: IntentCatalog,
   path: string,
 ): ApplyOutcome {
-  if (op.op === 'rebind') {
-    return fail(path, 'INTENT_OP_NOT_SUPPORTED', 'Rebinding data is not available yet.');
-  }
   if (op.op === 'add') return addBlock(intent, op, catalog, path);
 
   if (op.target === 'title' || op.target === 'subtitle') {
@@ -290,6 +314,7 @@ function applyOne(
     return fail(path, 'INTENT_OP_TARGET_UNKNOWN', `No item is addressed by "${op.target}".`);
   }
   if (op.op === 'delete') return { ok: true, intent: removeItem(intent, found) };
+  if (op.op === 'rebind') return rebindItem(intent, found, op, catalog, path);
 
   // 不认识的字段整批拒绝：静默忽略会让「把名字改成订单量」写成 `name` 时看起来成功、实际什么也没改。
   if (op.op === 'change') {
@@ -326,7 +351,8 @@ function applyOne(
   const block = found.block as IntentBlock;
   const raw =
     op.op === 'swap'
-      ? { ...blockToRaw(block), type: op.type, props: op.props }
+      ? // 换物料后角色可能不同：显式字段作废，交给编译器按列类型重新分配。
+        { ...withoutFields(blockToRaw(block)), type: op.type, props: op.props }
       : { ...blockToRaw(block), ...op.set };
   const parsed = parseIntentBlock(raw, catalog, block.origin, { grid: found.grid });
   const errors = parsed.diagnostics.filter((item) => item.severity === 'error');
@@ -345,6 +371,66 @@ function applyOne(
       span: block.span,
       ident: block.ident ?? block.origin,
     }),
+  };
+}
+
+/** 换数据绑定：保留标题、说明、参数与版面位置，只换取值来源（与 `swap` 一样不动 `span`）。 */
+function rebindItem(
+  intent: ScreenIntent,
+  found: Found,
+  op: Extract<IntentOp, { op: 'rebind' }>,
+  catalog: IntentCatalog,
+  path: string,
+): ApplyOutcome {
+  if (found.kpi !== undefined) {
+    const parsed = parseIntentKpi(
+      {
+        label: found.kpi.label,
+        ...(found.kpi.unit === undefined ? {} : { unit: found.kpi.unit }),
+        bind: op.bind,
+      },
+      found.kpi.origin,
+    );
+    if (parsed.value === undefined)
+      return fail(path, 'INTENT_OP_FAILED', 'The rebound KPI is not usable.');
+    return {
+      ok: true,
+      intent: replaceItem(intent, found, { ...parsed.value, ident: idOf(found.kpi) }),
+    };
+  }
+  const block = found.block as IntentBlock;
+  const {
+    table: _table,
+    datasetId: _datasetId,
+    fields: _fields,
+    params: _params,
+    text: _text,
+    assetId: _assetId,
+    ...kept
+  } = blockToRaw(block);
+  const candidate = typeof op.bind.candidate === 'string' ? op.bind.candidate : undefined;
+  const raw =
+    candidate !== undefined
+      ? { ...kept, candidate, ...(isRecord(op.bind.params) ? { params: op.bind.params } : {}) }
+      : {
+          ...kept,
+          ...(typeof op.bind.type === 'string' ? { type: op.bind.type } : {}),
+          datasetId: op.bind.datasetId,
+          ...(op.bind.fields === undefined ? {} : { fields: op.bind.fields }),
+          ...(op.bind.params === undefined ? {} : { params: op.bind.params }),
+        };
+  const parsed = parseIntentBlock(raw, catalog, block.origin, { grid: found.grid });
+  const errors = parsed.diagnostics.filter((item) => item.severity === 'error');
+  if (parsed.value === undefined || errors.length > 0) {
+    return fail(
+      path,
+      'INTENT_OP_FAILED',
+      `The rebound block is not usable (${errors[0]?.code ?? 'unknown'}).`,
+    );
+  }
+  return {
+    ok: true,
+    intent: replaceItem(intent, found, { ...parsed.value, span: block.span, ident: idOf(block) }),
   };
 }
 
@@ -528,7 +614,20 @@ function withIdents(intent: ScreenIntent): ScreenIntent {
 // IR ⇄ 模型原文形状
 // ---------------------------------------------------------------------------
 
+function withoutFields(raw: Record<string, unknown>): Record<string, unknown> {
+  const { fields: _fields, ...rest } = raw;
+  return rest;
+}
+
 function kpiToRaw(kpi: IntentKpi): Record<string, unknown> {
+  // 绑数据的指标卡没有字面量：写回 `bind`，不写 `value`（否则会被当成「既绑又写数」拒绝）。
+  if (kpi.bind !== undefined) {
+    return {
+      label: kpi.label,
+      ...(kpi.unit === undefined ? {} : { unit: kpi.unit }),
+      bind: kpi.bind,
+    };
+  }
   return {
     label: kpi.label,
     value: kpi.value,
@@ -547,7 +646,13 @@ function blockToRaw(block: IntentBlock): Record<string, unknown> {
     ...(block.props === undefined ? {} : { props: block.props }),
     ...(block.substituteFor === undefined ? {} : { substituteFor: block.substituteFor }),
     ...(block.bind.kind === 'table' ? { table: block.bind.table } : {}),
-    ...(block.bind.kind === 'dataset' ? { datasetId: block.bind.datasetId } : {}),
+    ...(block.bind.kind === 'dataset'
+      ? {
+          datasetId: block.bind.datasetId,
+          ...(block.bind.fields === undefined ? {} : { fields: block.bind.fields }),
+          ...(block.bind.params === undefined ? {} : { params: block.bind.params }),
+        }
+      : {}),
     ...(block.bind.kind === 'text' ? { text: block.bind.text } : {}),
     ...(block.bind.kind === 'asset' ? { assetId: block.bind.assetId } : {}),
   };
@@ -583,7 +688,9 @@ function readOp(raw: unknown): IntentOp | undefined {
           }
         : undefined;
     case 'rebind':
-      return target === undefined ? undefined : { op: 'rebind', target };
+      return target !== undefined && isRecord(op.bind)
+        ? { op: 'rebind', target, bind: op.bind }
+        : undefined;
     default:
       return undefined;
   }

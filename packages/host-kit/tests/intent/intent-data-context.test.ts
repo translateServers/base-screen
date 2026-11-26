@@ -109,16 +109,19 @@ describe('prepareIntentDataContext', () => {
       signal,
     });
 
-    // 缺必填参数的 pipeline 不取样；其余按默认参数取一次。
+    // 缺必填参数的 pipeline 用第一个可选值代为取样（只判形状）；其余按默认参数取一次。
     expect(queries).toEqual([
       { datasetId: 'crew', params: { line: 'LINE-A' } },
+      { datasetId: 'pipeline', params: { line: 'LINE-A' } },
       { datasetId: 'broken', params: { line: 'LINE-A' } },
     ]);
     expect(context.profiles.map((item) => [item.datasetId, item.sampled])).toEqual([
       ['crew', true],
-      ['pipeline', false],
+      ['pipeline', true],
       ['broken', false],
     ]);
+    // 代取样不改参数定义：编译时 pipeline 仍按缺参处理。
+    expect(context.references[1]?.parameters?.[0]).not.toHaveProperty('defaultValue');
     expect(context.warnings.map((item) => `${item.code}:${item.detail?.datasetId}`)).toEqual([
       'AGENT_DATASET_SAMPLE_UNAVAILABLE:broken',
       'AGENT_DATASET_UNKNOWN:gone',
@@ -140,6 +143,7 @@ describe('prepareIntentDataContext', () => {
       parameters: [{ name: 'line', required: true, valueType: 'string', defaultValue: 'LINE-A' }],
       rows: { sampled: 2, total: 2 },
     });
-    expect(context.references[1]).not.toHaveProperty('rows');
+    // 取样失败的 broken 不带行数（不知道就不拦指标卡的多行判断）。
+    expect(context.references[2]).not.toHaveProperty('rows');
   });
 });

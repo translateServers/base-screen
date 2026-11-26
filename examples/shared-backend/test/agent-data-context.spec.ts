@@ -1,5 +1,6 @@
 import { FALLBACK_AGENT_CATALOG } from '../src/agent/agent-catalog';
 import { readDataSummary } from '../src/agent/agent-data-context';
+import { buildEditOpsSystemPrompt, readEditOps } from '../src/agent/agent-session';
 import { buildIntentSystemPrompt } from '../src/agent/agent-spec';
 
 /**
@@ -77,5 +78,34 @@ describe('agent data context', () => {
     expect(prompt).toContain('参数 line 必填，可选 LINE-A / LINE-B');
     expect(prompt).toContain('"candidate": "c1"');
     expect(prompt).not.toContain('x9');
+  });
+
+  it('accepts a rebind op and explains it in the edit prompt when data is referenced', () => {
+    const ops = readEditOps(
+      JSON.stringify({
+        summary: '换成真实数据',
+        ops: [{ op: 'rebind', target: 'blocks[0]', bind: { candidate: 'c1' } }],
+      }),
+    );
+    expect(ops?.ops[0]).toMatchObject({ op: 'rebind', bind: { candidate: 'c1' } });
+    expect(
+      readEditOps(JSON.stringify({ summary: 'x', ops: [{ op: 'rebind', target: 'blocks[0]' }] })),
+    ).toBeNull();
+
+    const summary = readDataSummary(reference);
+    const digest = { title: '班组', subtitle: '今日', regions: [] };
+    const withData = buildEditOpsSystemPrompt(FALLBACK_AGENT_CATALOG, digest, {
+      assets: [],
+      datasets: [
+        {
+          datasetId: 'monitor.crew',
+          name: '班组绩效',
+          columns: ['crew', 'oee'],
+          ...(summary === undefined ? {} : { summary }),
+        },
+      ],
+    });
+    expect(withData).toContain('"op": "rebind"');
+    expect(buildEditOpsSystemPrompt(FALLBACK_AGENT_CATALOG, digest)).not.toContain('rebind');
   });
 });

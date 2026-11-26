@@ -948,7 +948,8 @@ function submitScreenEdit(
   // 目录可能在生成之后变过（新装的物料包）：换成最新物料，素材沿用生成时授权的那份。
   const refreshed: IntentSession = {
     ...session,
-    catalog: { materials: shape.materials, assets: session.catalog.assets },
+    // 本轮候选（`rebind` 引用的 `c3`）沿用生成时那份，与会话里的引用数据集对得上。
+    catalog: { ...session.catalog, materials: shape.materials },
   };
   const edited = editIntent(refreshed, data.ops, {
     canvas: current.canvas,
