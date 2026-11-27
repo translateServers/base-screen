@@ -138,10 +138,14 @@ class TemplateAuditor {
         const source = node.source;
         if (source === undefined) return;
         const raw =
-          source.k === 'rows'
-            ? env.rows.length
-            : this.#evaluate(source.n, env, node, 'source');
-        const count = Math.max(0, Math.min(BASE_SCREEN_MATERIAL_TEMPLATE_LIMITS.repeat, Math.trunc(Number.isFinite(raw) ? raw : 0)));
+          source.k === 'rows' ? env.rows.length : this.#evaluate(source.n, env, node, 'source');
+        const count = Math.max(
+          0,
+          Math.min(
+            BASE_SCREEN_MATERIAL_TEMPLATE_LIMITS.repeat,
+            Math.trunc(Number.isFinite(raw) ? raw : 0),
+          ),
+        );
         for (let index = 0; index < count; index += 1) {
           const inner: BaseScreenMaterialTemplateEnv = {
             ...env,
@@ -163,8 +167,13 @@ class TemplateAuditor {
         return;
       case 'g': {
         // 组的位移会改变子节点的实际位置：几何越界只检查顶层节点，这里不再下钻判越界。
-        const translated = node.num.x !== undefined || node.num.y !== undefined || node.num.rotate !== undefined || node.num.scale !== undefined;
-        for (const [key, expression] of Object.entries(node.num)) this.#evaluate(expression, env, node, key);
+        const translated =
+          node.num.x !== undefined ||
+          node.num.y !== undefined ||
+          node.num.rotate !== undefined ||
+          node.num.scale !== undefined;
+        for (const [key, expression] of Object.entries(node.num))
+          this.#evaluate(expression, env, node, key);
         for (const child of node.children ?? []) this.#walk(child, env, clipped || translated);
         return;
       }
@@ -172,23 +181,37 @@ class TemplateAuditor {
         break;
     }
     const params: Record<string, number> = {};
-    for (const [key, expression] of Object.entries(node.num)) params[key] = this.#evaluate(expression, env, node, key);
+    for (const [key, expression] of Object.entries(node.num))
+      params[key] = this.#evaluate(expression, env, node, key);
     if (node.content !== undefined) evaluateBaseScreenMaterialTemplateExpression(node.content, env);
-    for (const item of node.on?.payload ?? []) evaluateBaseScreenMaterialTemplateExpression(item.value, env);
+    for (const item of node.on?.payload ?? [])
+      evaluateBaseScreenMaterialTemplateExpression(item.value, env);
     if (node.points !== undefined) {
       const source = node.points.source;
       const count =
         source.k === 'rows'
           ? env.rows.length
-          : Math.max(0, Math.min(BASE_SCREEN_MATERIAL_TEMPLATE_LIMITS.repeat, Math.trunc(this.#evaluate(source.n, env, node, 'points'))));
+          : Math.max(
+              0,
+              Math.min(
+                BASE_SCREEN_MATERIAL_TEMPLATE_LIMITS.repeat,
+                Math.trunc(this.#evaluate(source.n, env, node, 'points')),
+              ),
+            );
       for (let index = 0; index < count; index += 1) {
-        const inner = { ...env, index, count, ...(source.k === 'rows' ? { row: env.rows[index] } : {}) };
+        const inner = {
+          ...env,
+          index,
+          count,
+          ...(source.k === 'rows' ? { row: env.rows[index] } : {}),
+        };
         const x = this.#evaluate(node.points.x, inner, node, 'points.x');
         const y = this.#evaluate(node.points.y, inner, node, 'points.y');
         if (!clipped) this.#checkBounds(node, [x, x], [y, y]);
       }
     }
-    for (const [, args] of node.d ?? []) for (const arg of args) this.#evaluate(arg, env, node, 'd');
+    for (const [, args] of node.d ?? [])
+      for (const arg of args) this.#evaluate(arg, env, node, 'd');
     if (node.kind === 'text') {
       const record = this.#texts.get(node.id);
       const fontSize = params.fontSize ?? 0;
@@ -206,17 +229,33 @@ class TemplateAuditor {
         this.#checkBounds(node, [v('x'), v('x') + v('width')], [v('y'), v('y') + v('height')]);
         return;
       case 'circle':
-        this.#checkBounds(node, [v('cx') - v('r'), v('cx') + v('r')], [v('cy') - v('r'), v('cy') + v('r')]);
+        this.#checkBounds(
+          node,
+          [v('cx') - v('r'), v('cx') + v('r')],
+          [v('cy') - v('r'), v('cy') + v('r')],
+        );
         return;
       case 'ellipse':
-        this.#checkBounds(node, [v('cx') - v('rx'), v('cx') + v('rx')], [v('cy') - v('ry'), v('cy') + v('ry')]);
+        this.#checkBounds(
+          node,
+          [v('cx') - v('rx'), v('cx') + v('rx')],
+          [v('cy') - v('ry'), v('cy') + v('ry')],
+        );
         return;
       case 'line':
-        this.#checkBounds(node, [Math.min(v('x1'), v('x2')), Math.max(v('x1'), v('x2'))], [Math.min(v('y1'), v('y2')), Math.max(v('y1'), v('y2'))]);
+        this.#checkBounds(
+          node,
+          [Math.min(v('x1'), v('x2')), Math.max(v('x1'), v('x2'))],
+          [Math.min(v('y1'), v('y2')), Math.max(v('y1'), v('y2'))],
+        );
         return;
       case 'arc': {
         const outer = v('r') + v('thickness') / 2;
-        this.#checkBounds(node, [v('cx') - outer, v('cx') + outer], [v('cy') - outer, v('cy') + outer]);
+        this.#checkBounds(
+          node,
+          [v('cx') - outer, v('cx') + outer],
+          [v('cy') - outer, v('cy') + outer],
+        );
         return;
       }
       case 'text':
@@ -227,7 +266,11 @@ class TemplateAuditor {
     }
   }
 
-  #checkBounds(node: CompiledTemplateNode, xs: readonly [number, number], ys: readonly [number, number]): void {
+  #checkBounds(
+    node: CompiledTemplateNode,
+    xs: readonly [number, number],
+    ys: readonly [number, number],
+  ): void {
     const [vx, vy, vw, vh] = this.template.viewBox;
     const slack = 0.5;
     if (
@@ -301,13 +344,17 @@ class TemplateAuditor {
       case 'ref': {
         if (expression.root !== 'style' || expression.key === undefined) return [];
         const value = this.style[expression.key];
-        return typeof value === 'string' && BASE_SCREEN_MATERIAL_TEMPLATE_COLOR.test(value) ? [value] : [];
+        return typeof value === 'string' && BASE_SCREEN_MATERIAL_TEMPLATE_COLOR.test(value)
+          ? [value]
+          : [];
       }
       case 'cond':
         return [...this.#expressionColors(expression.a), ...this.#expressionColors(expression.b)];
       case 'call':
         return expression.args.flatMap((arg, index) =>
-          index === 0 || (index % 2 === 1 && index !== expression.args.length - 1) ? [] : this.#expressionColors(arg),
+          index === 0 || (index % 2 === 1 && index !== expression.args.length - 1)
+            ? []
+            : this.#expressionColors(arg),
         );
       default:
         return [];

@@ -1,6 +1,13 @@
 import type { ScreenJsonObject, ScreenJsonValue } from '@base-screen/contracts';
 import { BASE_SCREEN_MATERIAL_EVENT } from '@base-screen/plugin-core';
 import {
+  BASE_SCREEN_MATERIAL_TEMPLATE_COLOR,
+  BASE_SCREEN_MATERIAL_TEMPLATE_LIMITS,
+  type BaseScreenMaterialTemplatePaint,
+  type CompiledBaseScreenMaterialTemplate,
+  type CompiledTemplateNode,
+} from './material-template.js';
+import {
   BASE_SCREEN_MATERIAL_TEMPLATE_STEP_BUDGET,
   type BaseScreenMaterialTemplateEnv,
   type BaseScreenMaterialTemplateExpression,
@@ -9,13 +16,6 @@ import {
   isTemplateTruthy,
   toTemplateNumber,
 } from './material-template-expression.js';
-import {
-  BASE_SCREEN_MATERIAL_TEMPLATE_COLOR,
-  BASE_SCREEN_MATERIAL_TEMPLATE_LIMITS,
-  type BaseScreenMaterialTemplatePaint,
-  type CompiledBaseScreenMaterialTemplate,
-  type CompiledTemplateNode,
-} from './material-template.js';
 
 /**
  * L2 模板解释器（base-screen-docs ADR-0116 §2.2 / §2.5）。
@@ -40,7 +40,9 @@ export interface BaseScreenMaterialTemplateRenderInput {
   formatNumber(value: unknown): string;
 }
 
-export type BaseScreenMaterialTemplateRenderer = (input: BaseScreenMaterialTemplateRenderInput) => void;
+export type BaseScreenMaterialTemplateRenderer = (
+  input: BaseScreenMaterialTemplateRenderInput,
+) => void;
 
 const SVG = 'http://www.w3.org/2000/svg';
 let instanceCounter = 0;
@@ -68,7 +70,9 @@ export function createBaseScreenMaterialTemplateRenderer(
       .map((item) => [item.target, true] as const),
   );
   const changeByTarget = new Map(
-    template.animations.flatMap((item) => (item.kind === 'change' ? [[item.target, item] as const] : [])),
+    template.animations.flatMap((item) =>
+      item.kind === 'change' ? [[item.target, item] as const] : [],
+    ),
   );
 
   return (input) => {
@@ -87,7 +91,11 @@ export function createBaseScreenMaterialTemplateRenderer(
     svg.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`);
     svg.setAttribute(
       'preserveAspectRatio',
-      template.fit === 'cover' ? 'xMidYMid slice' : template.fit === 'stretch' ? 'none' : 'xMidYMid meet',
+      template.fit === 'cover'
+        ? 'xMidYMid slice'
+        : template.fit === 'stretch'
+          ? 'none'
+          : 'xMidYMid meet',
     );
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', '100%');
@@ -112,7 +120,8 @@ export function createBaseScreenMaterialTemplateRenderer(
       const element = doc.createElementNS(SVG, gradient.kind);
       element.setAttribute('id', `${namespace}-${gradient.id}`);
       element.setAttribute('gradientUnits', 'objectBoundingBox');
-      for (const [key, value] of Object.entries(gradient.geometry)) element.setAttribute(key, num(value));
+      for (const [key, value] of Object.entries(gradient.geometry))
+        element.setAttribute(key, num(value));
       for (const stop of gradient.stops) {
         const color = resolvePaint(stop.color, env, namespace);
         if (color === undefined) continue;
@@ -126,7 +135,11 @@ export function createBaseScreenMaterialTemplateRenderer(
     }
 
     const tweens: TemplateTween[] = [];
-    const loops: { readonly element: SVGElement; readonly target: string; readonly env: BaseScreenMaterialTemplateEnv }[] = [];
+    const loops: {
+      readonly element: SVGElement;
+      readonly target: string;
+      readonly env: BaseScreenMaterialTemplateEnv;
+    }[] = [];
 
     const build = (
       node: CompiledTemplateNode,
@@ -146,7 +159,8 @@ export function createBaseScreenMaterialTemplateRenderer(
               count,
               ...(node.source?.k === 'rows' ? { row: input.rows[index] } : {}),
             };
-            for (const child of children) build(child, inner, parent, key === '' ? `${index}` : `${key}.${index}`);
+            for (const child of children)
+              build(child, inner, parent, key === '' ? `${index}` : `${key}.${index}`);
           }
           return;
         }
@@ -175,7 +189,8 @@ export function createBaseScreenMaterialTemplateRenderer(
           const params = evaluateParams(node, scope);
           const apply = (values: Record<string, number>): void => applyGroup(group, values);
           apply(params);
-          if (Number.isFinite(params.opacity)) group.setAttribute('opacity', num(clamp01(params.opacity as number)));
+          if (Number.isFinite(params.opacity))
+            group.setAttribute('opacity', num(clamp01(params.opacity as number)));
           trackChange(node, instanceKey, params, apply);
           attach(node, group, parent, instanceKey, scope);
           for (const child of node.children ?? []) build(child, scope, group, key);
@@ -257,20 +272,33 @@ export function createBaseScreenMaterialTemplateRenderer(
       const now = doc.defaultView?.performance.now() ?? 0;
       const running = active.get(instanceKey);
       const inFlight = running !== undefined && now < running.start + running.duration;
-      const changed = Object.keys(next).some((attr) => before[attr] !== undefined && before[attr] !== next[attr]);
+      const changed = Object.keys(next).some(
+        (attr) => before[attr] !== undefined && before[attr] !== next[attr],
+      );
       if (!changed) {
         // 读数没变：若上一轮过渡还没播完，新节点接着播完它。
         if (inFlight && running !== undefined) {
           const from = { ...params, ...running.from };
           apply(interpolate(from, params, progress(running, now, change.easing)));
-          tweens.push({ apply, from, to: params, start: running.start, duration: running.duration, easing: change.easing });
+          tweens.push({
+            apply,
+            from,
+            to: params,
+            start: running.start,
+            duration: running.duration,
+            easing: change.easing,
+          });
         } else active.delete(instanceKey);
         return;
       }
       // 读数变了：从当前画面上的位置（过渡中则取插值）出发。
       const origin =
         inFlight && running !== undefined
-          ? interpolate({ ...params, ...running.from }, { ...params, ...running.to }, progress(running, now, change.easing))
+          ? interpolate(
+              { ...params, ...running.from },
+              { ...params, ...running.to },
+              progress(running, now, change.easing),
+            )
           : { ...params, ...before };
       apply(origin);
       const entry = { from: origin, to: params, start: now, duration: change.duration };
@@ -281,7 +309,13 @@ export function createBaseScreenMaterialTemplateRenderer(
     const createShape = (
       node: CompiledTemplateNode,
       scope: BaseScreenMaterialTemplateEnv,
-    ): { element: SVGElement; params: Record<string, number>; apply: (values: Record<string, number>) => void } | undefined => {
+    ):
+      | {
+          element: SVGElement;
+          params: Record<string, number>;
+          apply: (values: Record<string, number>) => void;
+        }
+      | undefined => {
       const params = evaluateParams(node, scope);
       let element: SVGElement;
       let apply: (values: Record<string, number>) => void;
@@ -362,7 +396,10 @@ export function createBaseScreenMaterialTemplateRenderer(
           element.setAttribute('fill', 'none');
           element.setAttribute('stroke-linecap', node.linecap ?? 'round');
           apply = (p) => {
-            element.setAttribute('d', arcPath(p.cx ?? 0, p.cy ?? 0, p.r ?? 0, p.start ?? 0, p.end ?? 0));
+            element.setAttribute(
+              'd',
+              arcPath(p.cx ?? 0, p.cy ?? 0, p.r ?? 0, p.start ?? 0, p.end ?? 0),
+            );
             setNumber(element, 'stroke-width', Math.max(0, p.thickness ?? 0));
           };
           break;
@@ -385,7 +422,11 @@ export function createBaseScreenMaterialTemplateRenderer(
           element.setAttribute('text-anchor', node.anchor ?? 'start');
           element.setAttribute(
             'dominant-baseline',
-            node.baseline === 'middle' ? 'central' : node.baseline === 'hanging' ? 'hanging' : 'auto',
+            node.baseline === 'middle'
+              ? 'central'
+              : node.baseline === 'hanging'
+                ? 'hanging'
+                : 'auto',
           );
           element.setAttribute('font-weight', String(node.fontWeight ?? 400));
           element.style.fontFamily = 'inherit';
@@ -403,19 +444,23 @@ export function createBaseScreenMaterialTemplateRenderer(
       apply(params);
       paint(element, 'fill', node.fill, scope);
       paint(element, 'stroke', node.stroke, scope);
-      if (node.kind === 'text' && node.fill === undefined) element.setAttribute('fill', 'currentColor');
-      if (node.kind === 'ticks' && node.stroke === undefined) element.setAttribute('stroke', 'currentColor');
+      if (node.kind === 'text' && node.fill === undefined)
+        element.setAttribute('fill', 'currentColor');
+      if (node.kind === 'ticks' && node.stroke === undefined)
+        element.setAttribute('stroke', 'currentColor');
       if (Number.isFinite(params.strokeWidth) && node.kind !== 'arc') {
         setNumber(element, 'stroke-width', Math.max(0, params.strokeWidth as number));
       }
-      if (Number.isFinite(params.opacity)) element.setAttribute('opacity', num(clamp01(params.opacity as number)));
+      if (Number.isFinite(params.opacity))
+        element.setAttribute('opacity', num(clamp01(params.opacity as number)));
       if (node.dash !== undefined) {
         const dash = node.dash.map((item) => toTemplateNumber(evaluate(item, scope)));
         if (dash.every((item) => Number.isFinite(item) && item >= 0)) {
           element.setAttribute('stroke-dasharray', dash.map(num).join(' '));
         }
       }
-      if (node.linecap !== undefined && node.kind !== 'arc') element.setAttribute('stroke-linecap', node.linecap);
+      if (node.linecap !== undefined && node.kind !== 'arc')
+        element.setAttribute('stroke-linecap', node.linecap);
       return { element, params, apply };
     };
 
@@ -433,7 +478,8 @@ export function createBaseScreenMaterialTemplateRenderer(
     const evaluate = (
       expression: BaseScreenMaterialTemplateExpression,
       scope: BaseScreenMaterialTemplateEnv,
-    ): BaseScreenMaterialTemplateScalar => evaluateBaseScreenMaterialTemplateExpression(expression, scope);
+    ): BaseScreenMaterialTemplateScalar =>
+      evaluateBaseScreenMaterialTemplateExpression(expression, scope);
 
     const evaluateParams = (
       node: CompiledTemplateNode,
@@ -454,7 +500,11 @@ export function createBaseScreenMaterialTemplateRenderer(
     for (const loop of loops) {
       for (const animation of template.animations) {
         if (animation.kind !== 'loop' || animation.target !== loop.target) continue;
-        if (animation.enabledBy !== undefined && !isTemplateTruthy(evaluate(animation.enabledBy, loop.env))) continue;
+        if (
+          animation.enabledBy !== undefined &&
+          !isTemplateTruthy(evaluate(animation.enabledBy, loop.env))
+        )
+          continue;
         const from = toTemplateNumber(evaluate(animation.from, loop.env));
         const to = toTemplateNumber(evaluate(animation.to, loop.env));
         if (!Number.isFinite(from) || !Number.isFinite(to)) continue;
@@ -476,7 +526,11 @@ export function createBaseScreenMaterialTemplateRenderer(
   };
 }
 
-function iterations(node: CompiledTemplateNode, scope: BaseScreenMaterialTemplateEnv, rows: number): number {
+function iterations(
+  node: CompiledTemplateNode,
+  scope: BaseScreenMaterialTemplateEnv,
+  rows: number,
+): number {
   return node.source === undefined ? 0 : sourceCount(node.source, scope, rows);
 }
 
@@ -485,7 +539,10 @@ function sourceCount(
   scope: BaseScreenMaterialTemplateEnv,
   rows: number,
 ): number {
-  const raw = source.k === 'rows' ? rows : toTemplateNumber(evaluateBaseScreenMaterialTemplateExpression(source.n, scope));
+  const raw =
+    source.k === 'rows'
+      ? rows
+      : toTemplateNumber(evaluateBaseScreenMaterialTemplateExpression(source.n, scope));
   if (!Number.isFinite(raw)) return 0;
   return Math.max(0, Math.min(BASE_SCREEN_MATERIAL_TEMPLATE_LIMITS.repeat, Math.trunc(raw)));
 }
@@ -601,7 +658,10 @@ export function arcPath(cx: number, cy: number, r: number, start: number, end: n
 }
 
 function ticksPath(p: Record<string, number>): string {
-  const count = Math.max(0, Math.min(BASE_SCREEN_MATERIAL_TEMPLATE_LIMITS.repeat, Math.trunc(finite(p.count))));
+  const count = Math.max(
+    0,
+    Math.min(BASE_SCREEN_MATERIAL_TEMPLATE_LIMITS.repeat, Math.trunc(finite(p.count))),
+  );
   const cx = finite(p.cx);
   const cy = finite(p.cy);
   const r = finite(p.r);
@@ -615,7 +675,9 @@ function ticksPath(p: Record<string, number>): string {
     const rad = (deg * Math.PI) / 180;
     const outer = [cx + r * Math.sin(rad), cy - r * Math.cos(rad)];
     const inner = [cx + (r - length) * Math.sin(rad), cy - (r - length) * Math.cos(rad)];
-    segments.push(`M${num(outer[0] as number)} ${num(outer[1] as number)} L${num(inner[0] as number)} ${num(inner[1] as number)}`);
+    segments.push(
+      `M${num(outer[0] as number)} ${num(outer[1] as number)} L${num(inner[0] as number)} ${num(inner[1] as number)}`,
+    );
   }
   return segments.join(' ');
 }
@@ -638,7 +700,9 @@ function wavePath(p: Record<string, number>): string {
   let guard = 0;
   while (cursor < x + width && guard < 400) {
     const next = cursor + half;
-    segments.push(`Q${num(cursor + half / 2)} ${num(y + (up ? -amplitude : amplitude))} ${num(next)} ${num(y)}`);
+    segments.push(
+      `Q${num(cursor + half / 2)} ${num(y + (up ? -amplitude : amplitude))} ${num(next)} ${num(y)}`,
+    );
     cursor = next;
     up = !up;
     guard += 1;

@@ -17,10 +17,6 @@ export * from './material-package.js';
 export * from './material-rendered-element.js';
 export * from './material-spec.js';
 export * from './material-spec-audit.js';
-export * from './material-template.js';
-export * from './material-template-audit.js';
-export * from './material-template-expression.js';
-export * from './material-template-render.js';
 export {
   type BaseScreenMaterialStateViewOptions,
   createBaseScreenMaterialEmptyView,
@@ -28,6 +24,10 @@ export {
   createBaseScreenMaterialStateView,
 } from './material-state-view.js';
 export * from './material-style-keys.js';
+export * from './material-template.js';
+export * from './material-template-audit.js';
+export * from './material-template-expression.js';
+export * from './material-template-render.js';
 export * from './plugin-definition.js';
 export * from './plugin-package.js';
 export * from './plugin-registration.js';

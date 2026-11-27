@@ -25,15 +25,15 @@ import {
   parseBaseScreenMaterialSpec,
 } from './material-spec.js';
 import {
-  type CompiledBaseScreenMaterialTemplate,
-  compileBaseScreenMaterialTemplate,
-} from './material-template.js';
-import { createBaseScreenMaterialTemplateRenderer } from './material-template-render.js';
-import {
   createBaseScreenMaterialEmptyView,
   createBaseScreenMaterialErrorView,
   createBaseScreenMaterialStateView,
 } from './material-state-view.js';
+import {
+  type CompiledBaseScreenMaterialTemplate,
+  compileBaseScreenMaterialTemplate,
+} from './material-template.js';
+import { createBaseScreenMaterialTemplateRenderer } from './material-template-render.js';
 
 /**
  * 渲染函数物料（base-screen-docs ADR-0105 §2.3）：作者只写「数据就绪时怎么画」，

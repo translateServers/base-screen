@@ -145,7 +145,28 @@ type Token =
   | { readonly t: 'op'; readonly v: string }
   | { readonly t: 'end' };
 
-const OPERATORS = ['==', '!=', '<=', '>=', '&&', '||', '<', '>', '+', '-', '*', '/', '%', '!', '?', ':', '(', ')', ',', '.'];
+const OPERATORS = [
+  '==',
+  '!=',
+  '<=',
+  '>=',
+  '&&',
+  '||',
+  '<',
+  '>',
+  '+',
+  '-',
+  '*',
+  '/',
+  '%',
+  '!',
+  '?',
+  ':',
+  '(',
+  ')',
+  ',',
+  '.',
+];
 
 function tokenize(source: string): Token[] | string {
   const tokens: Token[] = [];
@@ -321,7 +342,9 @@ class Parser {
   #call(name: string, depth: number): BaseScreenMaterialTemplateExpression {
     const spec = FUNCTIONS[name];
     if (spec === undefined) {
-      throw new ParseError(`不支持函数 ${name}（可用：${BASE_SCREEN_MATERIAL_TEMPLATE_FUNCTIONS.join('、')}）。`);
+      throw new ParseError(
+        `不支持函数 ${name}（可用：${BASE_SCREEN_MATERIAL_TEMPLATE_FUNCTIONS.join('、')}）。`,
+      );
     }
     this.#expect('(');
     const args: BaseScreenMaterialTemplateExpression[] = [];
@@ -397,7 +420,9 @@ class Parser {
       case 'style': {
         const declared = root === 'props' ? scope.props : scope.style;
         if (key === undefined || !declared.has(key)) {
-          throw new ParseError(`${root}.${key ?? ''} 不是规格里声明的${root === 'props' ? '参数' : '样式'}字段。`);
+          throw new ParseError(
+            `${root}.${key ?? ''} 不是规格里声明的${root === 'props' ? '参数' : '样式'}字段。`,
+          );
         }
         return this.#node({ k: 'ref', root, key }, depth);
       }
@@ -551,7 +576,10 @@ function evaluateCall(
     return name === 'maxOf' ? Math.max(...numbers) : Math.min(...numbers);
   }
   if (name === 'pick') {
-    const key = evaluateBaseScreenMaterialTemplateExpression(args[0] as BaseScreenMaterialTemplateExpression, env);
+    const key = evaluateBaseScreenMaterialTemplateExpression(
+      args[0] as BaseScreenMaterialTemplateExpression,
+      env,
+    );
     // 参数形如 [取值, 键1, 值1, …, 键n, 值n, 缺省值]：成对的键值位于 1..length-2。
     for (let at = 1; at <= args.length - 3; at += 2) {
       const candidate = evaluateBaseScreenMaterialTemplateExpression(
@@ -659,7 +687,10 @@ function truthy(value: BaseScreenMaterialTemplateScalar): boolean {
 }
 
 /** 相等：同类型严格比较；数字与数字字符串按数值比较（数据集里状态码常是字符串）。 */
-function looseEquals(a: BaseScreenMaterialTemplateScalar, b: BaseScreenMaterialTemplateScalar): boolean {
+function looseEquals(
+  a: BaseScreenMaterialTemplateScalar,
+  b: BaseScreenMaterialTemplateScalar,
+): boolean {
   if (typeof a === typeof b) return a === b;
   if (
     (typeof a === 'number' && typeof b === 'string') ||
