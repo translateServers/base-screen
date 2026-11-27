@@ -462,3 +462,80 @@ describe('rebind through a session', () => {
     expect(JSON.stringify(update)).toContain('agent-ds-1-e2');
   });
 });
+
+describe('role assignment by declared value types (stage 3 eval §6)', () => {
+  const STATUS_GRID = {
+    type: 'board.status-grid',
+    name: '状态宫格',
+    category: '看板',
+    data: 'tabular' as const,
+    asset: false,
+    size: { width: 480, height: 280 },
+    props: {},
+    roles: [{ id: 'items', min: 2, max: 3, valueTypes: ['string' as const, 'number' as const] }],
+    defaults: { props: {}, style: {} },
+  };
+  const LEGEND = {
+    ...STATUS_GRID,
+    type: 'board.status-legend',
+    name: '状态图例',
+    roles: [{ id: 'status', min: 1, max: 1, valueTypes: ['string' as const] }],
+  };
+  const TYPED: IntentCatalog = {
+    ...CATALOG,
+    // 基础夹具里已有一个按旧形状声明的 board.status-grid（角色 columns、无 valueTypes）：换掉它，不是追加。
+    materials: [
+      ...CATALOG.materials.filter((material) => material.type !== 'board.status-grid'),
+      STATUS_GRID,
+      LEGEND,
+    ],
+  };
+  const TABLE = {
+    columns: [
+      { id: 'name', label: '设备', type: 'string' },
+      { id: 'status', label: '状态', type: 'string' },
+      { id: 'load', label: '负载', type: 'number' },
+    ],
+    rows: [
+      { name: '冲压-1', status: '运行', load: 62 },
+      { name: '焊装-2', status: '停机', load: 0 },
+      { name: '涂装-3', status: '运行', load: 48 },
+    ],
+  };
+
+  it('fills a mixed string role instead of degrading the block to an empty one', () => {
+    const parsed = parseScreenIntent(
+      flatOutput([
+        { type: 'board.status-grid', title: '设备状态', span: 2, table: TABLE },
+        { type: 'board.status-legend', title: '状态分布', span: 2, table: TABLE },
+      ]),
+      { catalog: TYPED },
+    );
+    if (parsed.intent === undefined) throw new Error(JSON.stringify(parsed.diagnostics));
+    const outcome = compileScreenIntent({ intent: parsed.intent, catalog: TYPED });
+    if (!outcome.ok) throw new Error('compile');
+
+    expect(codes(outcome.value.warnings)).toEqual([]);
+    const grid = outcome.value.document.components.find(
+      (node) => node.type === 'board.status-grid',
+    );
+    const legend = outcome.value.document.components.find(
+      (node) => node.type === 'board.status-legend',
+    );
+    expect(grid?.dataBinding).toEqual({ fields: { items: ['name', 'status', 'load'] } });
+    // 只收文本的单字段角色：取第一个文本列，不会把数值列塞给它。
+    expect(legend?.dataBinding).toEqual({ fields: { status: ['name'] } });
+  });
+
+  it('keeps the chart binding the same as the name-based rule', () => {
+    const parsed = parseScreenIntent(
+      flatOutput([{ type: 'base.chart', title: '负载', span: 4, table: TABLE }]),
+      { catalog: TYPED },
+    );
+    if (parsed.intent === undefined) throw new Error('fixture');
+    const outcome = compileScreenIntent({ intent: parsed.intent, catalog: TYPED });
+    if (!outcome.ok) throw new Error('compile');
+    const chart = outcome.value.document.components.find((node) => node.type === 'base.chart');
+    expect(chart?.dataBinding).toEqual({ fields: { dimension: ['name'], measures: ['load'] } });
+  });
+});

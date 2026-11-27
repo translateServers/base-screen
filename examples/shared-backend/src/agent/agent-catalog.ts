@@ -34,6 +34,8 @@ export interface AgentCatalogRole {
   readonly id: string;
   readonly min: number;
   readonly max: number;
+  /** manifest 角色的 `valueTypes`（宿主上送时才有）：只用来写修复提示，编译仍在宿主前端。 */
+  readonly valueTypes?: readonly ('string' | 'number' | 'boolean' | 'date')[];
 }
 
 export interface AgentCatalogMaterial {
@@ -520,7 +522,13 @@ function readMaterial(
     const min = readPositiveInteger(role?.min, `${path}.roles[${roleIndex}].min`, diagnostics);
     const max = readPositiveInteger(role?.max, `${path}.roles[${roleIndex}].max`, diagnostics);
     if (min === null || max === null || max < min) return null;
-    roles.push({ id, min, max });
+    const valueTypes = Array.isArray(role?.valueTypes)
+      ? role.valueTypes.filter(
+          (type): type is 'string' | 'number' | 'boolean' | 'date' =>
+            type === 'string' || type === 'number' || type === 'boolean' || type === 'date',
+        )
+      : [];
+    roles.push({ id, min, max, ...(valueTypes.length === 0 ? {} : { valueTypes }) });
   }
 
   const defaultsRecord = asRecord(record.defaults);

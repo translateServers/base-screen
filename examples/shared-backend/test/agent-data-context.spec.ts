@@ -1,6 +1,6 @@
 import { FALLBACK_AGENT_CATALOG } from '../src/agent/agent-catalog';
 import { readDataSummary } from '../src/agent/agent-data-context';
-import { readRepairRequest } from '../src/agent/agent-repair';
+import { buildRepairPrompt, readRepairRequest } from '../src/agent/agent-repair';
 import { buildEditOpsSystemPrompt, readEditOps } from '../src/agent/agent-session';
 import { buildIntentSystemPrompt } from '../src/agent/agent-spec';
 
@@ -124,5 +124,14 @@ describe('agent data context', () => {
       expect.stringContaining('全是空值'),
       expect.stringContaining('画像里列出的'),
     ]);
+  });
+
+  it('keeps an English screen in English through the repair round', () => {
+    const issues = [{ code: 'AGENT_KPI_INVALID', path: 'kpis[0]', hint: 'x' }];
+    expect(buildRepairPrompt(issues, { instruction: 'Generate a logistics dashboard' })).toContain(
+      'keep every title, label, note and text in English',
+    );
+    expect(buildRepairPrompt(issues, { instruction: '生成一张物流大屏' })).not.toContain('English');
+    expect(buildRepairPrompt(issues)).not.toContain('English');
   });
 });

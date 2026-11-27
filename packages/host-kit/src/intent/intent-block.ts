@@ -326,16 +326,25 @@ function warning(code: string, block: IntentBlock, message: string): IntentDiagn
 /**
  * 把表格列分配到物料的绑定角色。
  *
- * 角色 id 与上下限来自目录（`dataBinding.roles`），这里只按列的值类型匹配：
+ * 角色 id 与上下限来自目录（`dataBinding.roles`）。
+ *
+ * 目录带了角色的 `valueTypes`（ADR-0114 S1 ③，三端宿主都会带）时按类型分配，见 `assignByValueTypes`。
+ * 没带时（旧宿主、后端兜底目录、等价测试夹具）沿用按角色 id 猜的旧规则：
  * - `columns`：全部列；
  * - `dimension`：第一个非数值列（没有就退回第一列）；
  * - `value` / `measures` / 其它：所有数值列。
+ *
+ * 旧规则把 `items` / `stages` / `status` 这类收字符串的角色也当成只收数值，状态宫格（标签 + 状态两列）
+ * 永远凑不够列，评测里 4 / 12 条首轮不合法都是它（阶段 2 F2 的遗留，见阶段 3 评测 §6）。
  */
 export function assignRoles(
   material: IntentCatalogMaterial,
   table: Pick<IntentTable, 'columns'>,
 ): Record<string, string[]> | null {
   if (material.roles.length === 0) return null;
+  if (material.roles.every((role) => role.valueTypes !== undefined)) {
+    return assignByValueTypes(material, table);
+  }
   const all = table.columns.map((column) => column.id);
   const numeric = table.columns
     .filter((column) => column.type === 'number')
@@ -350,6 +359,46 @@ export function assignRoles(
     if (id === 'columns') picked = all;
     else if (id === 'dimension') picked = nonNumeric.length > 0 ? nonNumeric : all;
     else picked = numeric.length > 0 ? numeric : all;
+    const bounded = picked.slice(0, role.max);
+    if (bounded.length < role.min) return null;
+    binding[role.id] = bounded;
+  }
+  return binding;
+}
+
+/**
+ * 按角色声明的 `valueTypes` 分配，角色按声明顺序依次取列：
+ * - 只收数值的角色（度量）：取所有还没被单值角色占用的数值列；
+ * - 单字段且收字符串的角色（维度、状态）：取第一个合格的非数值列，没有就取第一个合格的列，取走后
+ *   其余角色不再用它；
+ * - 其余角色（`columns` / `items` / `stages` 这类多字段混合角色）：按列顺序取所有类型合格的列。
+ *
+ * 维度 + 度量的图表、全收的表格，分配结果与旧规则相同；差别只在收字符串的多字段角色。
+ * 文本里的日期在意图层表格里是 `string`，角色收 `date` 时也算合格。
+ */
+function assignByValueTypes(
+  material: IntentCatalogMaterial,
+  table: Pick<IntentTable, 'columns'>,
+): Record<string, string[]> | null {
+  const accepts = (types: readonly string[], type: string): boolean =>
+    types.includes(type) || (type === 'string' && types.includes('date'));
+  const taken = new Set<string>();
+  const binding: Record<string, string[]> = {};
+  for (const role of material.roles) {
+    const types = role.valueTypes ?? [];
+    const fit = table.columns.filter((column) => accepts(types, column.type));
+    let picked: string[];
+    if (types.length === 1 && types[0] === 'number') {
+      picked = fit.filter((column) => !taken.has(column.id)).map((column) => column.id);
+    } else if (role.max === 1 && accepts(types, 'string')) {
+      const first =
+        fit.find((column) => column.type !== 'number' && !taken.has(column.id)) ??
+        fit.find((column) => !taken.has(column.id));
+      picked = first === undefined ? [] : [first.id];
+      if (first !== undefined) taken.add(first.id);
+    } else {
+      picked = fit.map((column) => column.id);
+    }
     const bounded = picked.slice(0, role.max);
     if (bounded.length < role.min) return null;
     binding[role.id] = bounded;

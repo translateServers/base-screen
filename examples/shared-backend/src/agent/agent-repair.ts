@@ -216,7 +216,20 @@ export function issueBlockIndexes(issues: readonly AgentRepairIssue[]): {
  * 修复消息：上一轮原文由调用方作为 assistant 轮次发回，这里只写诊断清单与修改纪律，
  * 不重发整个上下文。
  */
-export function buildRepairPrompt(issues: readonly AgentRepairIssue[]): string {
+function typeLabel(type: string): string {
+  return type === 'number'
+    ? '数值'
+    : type === 'string'
+      ? '文本'
+      : type === 'boolean'
+        ? '布尔'
+        : '日期';
+}
+
+export function buildRepairPrompt(
+  issues: readonly AgentRepairIssue[],
+  options: { readonly instruction?: string } = {},
+): string {
   const lines = issues
     .slice(0, MAX_REPAIR_ISSUES)
     .map(
@@ -227,6 +240,12 @@ export function buildRepairPrompt(issues: readonly AgentRepairIssue[]): string {
     '上一轮输出没有通过校验，问题如下：',
     ...lines,
     '只改有问题的部分，其余内容原样保留；仍然只输出一个完整的 JSON 对象，结构与系统提示一致。',
+    // 修复消息本身是中文：不写明的话，英文指令的屏会在修复轮被整份翻成中文（阶段 3 评测 §6）。
+    ...(options.instruction !== undefined && !/[\u3400-\u9fff]/.test(options.instruction)
+      ? [
+          'The user wrote the original instruction in English: keep every title, label, note and text in English, exactly as in your previous output.',
+        ]
+      : []),
   ].join('\n');
 }
 
@@ -261,15 +280,22 @@ export function enrichBindingHints(
     const given = Array.isArray((block?.table as { columns?: unknown } | undefined)?.columns)
       ? ((block?.table as { columns: unknown[] }).columns.length ?? 0)
       : 0;
+    const typed = material.roles.every((role) => role.valueTypes !== undefined);
     const roles = material.roles
-      .map(
-        (role) =>
-          `${role.id}（${role.min === role.max ? role.min : `${role.min}–${role.max}`} 列）`,
-      )
+      .map((role) => {
+        const count = role.min === role.max ? `${role.min}` : `${role.min}–${role.max}`;
+        const types =
+          role.valueTypes === undefined ? '' : `，收 ${role.valueTypes.map(typeLabel).join(' / ')}`;
+        return `${role.id}（${count} 列${types}）`;
+      })
       .join('、');
+    // 宿主带了角色的值类型就照实写；没带才退回旧的按角色名说明。
+    const rule = typed
+      ? '列的 type 要落在对应角色收的类型里'
+      : 'dimension 取字符串列，其余角色取数值列，columns 可取任意列';
     return {
       ...issue,
-      hint: `${material.type} 需要的绑定角色：${roles}。dimension 取字符串列，其余角色取数值列，columns 可取任意列；这一块只给了 ${given} 列。请补足所需的列，或换成目录里更合适的物料。`,
+      hint: `${material.type} 需要的绑定角色：${roles}。${rule}；这一块只给了 ${given} 列。请补足所需的列，或换成目录里更合适的物料。`,
     };
   });
 }

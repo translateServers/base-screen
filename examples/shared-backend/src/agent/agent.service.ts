@@ -649,7 +649,12 @@ export class AgentService {
             { role: 'assistant', content: repair.output },
             {
               role: 'user',
-              content: buildRepairPrompt(enrichBindingHints(repair.issues, repair.output, catalog)),
+              content: buildRepairPrompt(
+                enrichBindingHints(repair.issues, repair.output, catalog),
+                {
+                  instruction: topic,
+                },
+              ),
             },
           ];
     const options = {
