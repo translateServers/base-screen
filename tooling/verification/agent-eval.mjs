@@ -537,18 +537,18 @@ async function runCase(item) {
     ...summarize(piped),
     ...streamChecks(frames, piped.document),
     ...(data === undefined ? {} : dataFacts(piped, data)),
-    ...(args.behavior === undefined ? {} : behaviorFacts(piped, item)),
+    ...(args.behavior === undefined ? {} : behaviorFacts(piped, item, data)),
   };
 }
 
 /** 行为用例的事实：编进文档的联动 / 状态、变量与连线、行为相关告警，以及是否符合用例预期。 */
-function behaviorFacts(piped, item) {
+function behaviorFacts(piped, item, data) {
   const compiled = piped.prepared?.compiled;
   const behaviors = compiled?.behaviors ?? [];
   const warnings = (piped.prepared?.warnings ?? [])
     .map((entry) => entry.code)
     .filter((code) =>
-      /^(AGENT_INTERACTION_|AGENT_STATE_|INTENT_FILTER_|INTENT_STATE_|INTENT_INTERACTION_|INTENT_KEY_)/.test(
+      /^(AGENT_INTERACTION_|AGENT_STATE_|INTENT_FILTER_|INTENT_STATE_|INTENT_INTERACTION_|INTENT_KEY_|INTENT_BEHAVIOR_)/.test(
         code,
       ),
     );
@@ -567,6 +567,11 @@ function behaviorFacts(piped, item) {
     behaviorWarnings: [...new Set(warnings)],
     // 模型写了什么联动（修复后的最终原文）：看它是否老实不写做不到的联动。
     interactionsWritten: piped.prepared?.intent?.interactions?.length ?? 0,
+    // 排查用：本轮候选（编号:事实:物料）与最终原文（截断）。
+    candidateList: (data?.context.candidates ?? []).map(
+      (entry) => `${entry.id}:${entry.fact}:${entry.type}:${JSON.stringify(entry.fields)}`,
+    ),
+    finalOutput: String(piped.data?.output ?? '').slice(0, 8000),
   };
   const checks = [
     expect.filter === undefined || facts.filters === expect.filter,

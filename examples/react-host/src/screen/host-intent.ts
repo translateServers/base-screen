@@ -913,8 +913,9 @@ async function attemptWholeScreen(
       : repairedFor.has('LAYOUT_LOCKED_BACKDROP_LIGHT')
         ? '；画布上锁定保留的浅色背景与深色风格冲突（文字会看不清），已改用浅色风格，想要深色可先解锁或删除这个背景'
         : '';
+    const behaviorNote = describeRepairedBehaviors(repairedFor, prepared.compiled?.behaviors ?? []);
     const repairedNote =
-      rounds > 0 ? `；宿主校验未通过，已请模型修复 ${rounds} 次${backdropNote}` : '';
+      rounds > 0 ? `；宿主校验未通过，已请模型修复 ${rounds} 次${backdropNote}${behaviorNote}` : '';
     const rationale = `${describeMode(data.mode, data.failure, warnings)}${repairedNote}。布局由宿主前端按区域确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeIncomingData(document, dataContext)}${describeBehaviors(prepared.compiled?.behaviors ?? [])}${describeDataCheck(dataCheck)}${describeLocked(current)}`;
     // 流式草案接得上就原地收尾；接不上（最终结果与骨架对不上、或已修复过）先撤掉它，再整屏提交。
     // 提案一旦提交就留下它的会话；是否被采纳由下一次请求时对活文档判断。
@@ -1586,6 +1587,11 @@ function describeIntentWarnings(
       );
       continue;
     }
+    if (item.code === 'INTENT_BEHAVIOR_GAP') {
+      const text = String(item.detail?.text ?? '');
+      add(`${item.code}:${text}`, item.code, `做不到的要求：${text}`);
+      continue;
+    }
     if (item.code === 'INTENT_STATE_SUGGESTED') {
       add(
         `${item.code}:${String(item.detail?.target ?? '')}`,
@@ -1613,6 +1619,26 @@ function describeBehaviors(behaviors: readonly IntentBehaviorSummary[]): string 
     return `点「${item.from}」${item.detail}「${item.to.join('」「')}」`;
   });
   return `生成的联动与状态：${lines.join('；')}。`;
+}
+
+/**
+ * 修复过的联动问题（ADR-0115 D6）：模型修复时可能直接删掉那条联动，最终产物里就没有告警了。
+ * 首轮被拦下的原因写进理由，用户才知道自己要的联动为什么没出现。
+ */
+function describeRepairedBehaviors(
+  repairedFor: ReadonlySet<string>,
+  behaviors: readonly IntentBehaviorSummary[],
+): string {
+  const reasons: string[] = [];
+  if (repairedFor.has('AGENT_INTERACTION_NO_EFFECT')) {
+    reasons.push('首轮写的联动点了也不会改变目标（来源各行取值相同，或不在目标参数的可选值里）');
+  }
+  if (repairedFor.has('AGENT_INTERACTION_TARGET_INVALID')) {
+    reasons.push('首轮写的筛选目标没有对应的数据集参数（筛选只经数据集参数生效）');
+  }
+  if (reasons.length === 0) return '';
+  const filters = behaviors.filter((item) => item.kind === 'filter').length;
+  return `；${reasons.join('，')}${filters === 0 ? '，最终没有生成筛选联动' : ''}`;
 }
 
 /** 局部修改的降级说明（联动没编进去的原因等），只列行为相关的几条。 */

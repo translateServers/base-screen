@@ -269,7 +269,10 @@ ${filterRule}
   "states": [{ "op": "gte", "value": 90, "tone": "danger", "label": "过载" }, { "op": "gte", "value": 70, "tone": "warning" }]，
   op 为 gt / gte / lt / lte / eq / neq，tone 为 danger / warning / success / info，严重的写在前面；
   用户没给具体阈值、是你按常识补的，写成 { "rules": [ … ], "suggested": true }。示例数值的指标不要写 states。
-- 不要写 variables、blueprint，变量与连线由宿主根据 interactions 推出。`;
+- 不要写 variables、blueprint，变量与连线由宿主根据 interactions 推出。
+- 用户明确要求的联动或状态按上面的规则做不到（目标数据集没有对应参数、来源各行取值都一样、事件带不出值、指标没有真实数据）时，
+  不要硬写，也不要假装做到：在 interactions 之后写 "gaps": ["一句话说明做不到什么、为什么，30 字以内"]，最多 3 条。
+  gaps 只写用户要求过、却做不到的联动或状态；用户没提的东西（例如没要的趋势图）不要写进 gaps。`;
 }
 
 /**

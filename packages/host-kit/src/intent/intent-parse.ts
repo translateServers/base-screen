@@ -137,6 +137,7 @@ export function parseScreenIntent(
 
   const style = typeof root.style === 'string' ? root.style.trim() : undefined;
   const interactions = readInteractions(root.interactions, diagnostics);
+  readGaps(root.gaps, diagnostics);
   const intent: ScreenIntent = {
     title,
     subtitle,
@@ -964,6 +965,26 @@ function readInteractions(
     });
   }
   return output.length === 0 ? undefined : output;
+}
+
+/**
+ * 做不到的要求（ADR-0115 D7）：模型按规则判断用户要的联动或状态做不到时（目标没有对应参数、
+ * 事件带不出值、没有真实数据），不硬写，而是在 `gaps` 里一句话说明。每条记一个
+ * `INTENT_BEHAVIOR_GAP` 告警，宿主原样写进提案理由。
+ */
+function readGaps(raw: unknown, diagnostics: IntentDiagnostic[]): void {
+  if (!Array.isArray(raw)) return;
+  for (const [index, item] of raw.slice(0, 3).entries()) {
+    const text = typeof item === 'string' ? clampText(item.trim(), 40) : '';
+    if (text === '') continue;
+    diagnostics.push({
+      severity: 'warning',
+      code: 'INTENT_BEHAVIOR_GAP',
+      path: `gaps[${index}]`,
+      message: `The model reported a request it could not fulfil: ${text}`,
+      detail: { text },
+    });
+  }
 }
 
 /**

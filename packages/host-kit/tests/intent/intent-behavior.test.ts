@@ -331,6 +331,26 @@ describe('filter interactions', () => {
   });
 });
 
+describe('gaps', () => {
+  it('turns what the model could not do into warnings the host can show', () => {
+    const parsed = parseScreenIntent(
+      screen({ gaps: ['设备清单没有班组参数，无法按班组筛选', '', 42] }),
+      { catalog: CATALOG },
+    );
+    expect(parsed.diagnostics).toContainEqual(
+      expect.objectContaining({
+        severity: 'warning',
+        code: 'INTENT_BEHAVIOR_GAP',
+        path: 'gaps[0]',
+        detail: { text: '设备清单没有班组参数，无法按班组筛选' },
+      }),
+    );
+    expect(parsed.diagnostics.filter((item) => item.code === 'INTENT_BEHAVIOR_GAP')).toHaveLength(
+      1,
+    );
+  });
+});
+
 describe('show interactions', () => {
   it('hides the target block up front and wires the source event to its shell', () => {
     const compiled = compile(
