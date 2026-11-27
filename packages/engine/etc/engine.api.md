@@ -1110,10 +1110,18 @@ const DESIGNER_TOOLS: readonly [{
     readonly materialKey: undefined;
 }];
 
+// @public
+export interface DesignerChangeProposalGroup {
+    readonly commandIndexes: readonly number[];
+    readonly label: string;
+    readonly notes?: readonly string[];
+}
+
 // @public (undocumented)
 export interface DesignerChangeProposalInput {
     // (undocumented)
     readonly commands: readonly ScreenDocumentCommand[];
+    readonly groups?: readonly DesignerChangeProposalGroup[];
     // (undocumented)
     readonly origin?: DesignerChangeProposalOrigin;
     readonly rationale: string;
@@ -1143,6 +1151,7 @@ interface DesignerChangeUnit {
     readonly kind: 'added' | 'removed' | 'changed' | 'document';
     // (undocumented)
     readonly label: string;
+    readonly notes?: readonly string[];
     // (undocumented)
     readonly presentation?: DesignerChangeUnitPresentation;
 }

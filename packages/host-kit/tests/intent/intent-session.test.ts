@@ -416,11 +416,11 @@ describe('editIntent · data sources of added blocks', () => {
     const session = sessionOf(REGIONS);
     const outcome = run(session, [{ op: 'add', region: 'regions[2]', block: imageBlock }]);
 
-    const replaced = outcome.commands.find((command) => command.type === 'replace-data-sources');
-    expect(replaced?.type === 'replace-data-sources' && replaced.dataSources).toHaveLength(1);
+    const replaced = outcome.commands.find((command) => command.type === 'add-data-sources');
+    expect(replaced?.type === 'add-data-sources' && replaced.dataSources).toHaveLength(1);
     // 数据源在新增组件之前：组件引用它。
     const order = outcome.commands.map((command) => command.type);
-    expect(order.indexOf('replace-data-sources')).toBeLessThan(order.indexOf('add-component'));
+    expect(order.indexOf('add-data-sources')).toBeLessThan(order.indexOf('add-component'));
   });
 
   it('renames a clashing data source id and rewrites the reference, keeping the existing instance', () => {
@@ -438,12 +438,10 @@ describe('editIntent · data sources of added blocks', () => {
       ],
     });
 
-    const replaced = outcome.commands.find((command) => command.type === 'replace-data-sources');
-    if (replaced?.type !== 'replace-data-sources') throw new Error('expected data sources');
-    expect(replaced.dataSources.map((source) => source.id)).toEqual([
-      'agent-ds-1',
-      'agent-ds-1-e2',
-    ]);
+    // 已有的 agent-ds-1 原样保留，只追加换了 id 的新实例。
+    const replaced = outcome.commands.find((command) => command.type === 'add-data-sources');
+    if (replaced?.type !== 'add-data-sources') throw new Error('expected data sources');
+    expect(replaced.dataSources.map((source) => source.id)).toEqual(['agent-ds-1-e2']);
     const image = outcome.commands.find(
       (command) => command.type === 'add-component' && command.component.type === 'base.image',
     );

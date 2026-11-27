@@ -311,7 +311,7 @@ function unitMarkup(
         unit,
         commands.filter((_, index) => unit.commandIndexes.includes(index)),
       )
-    : diffEntries(unit);
+    : `${diffEntries(unit)}${noteEntries(unit)}`;
   const actions = streaming
     ? ''
     : wholeScreen
@@ -329,6 +329,16 @@ function unitMarkup(
       ${feedback?.kind === 'adopt-failed' && feedback.unitId === unit.id ? feedbackMarkup(feedback) : ''}
       ${actions}
     </li>`;
+}
+
+/** 宿主分组提示带来的可读说明（ADR-0115 D5）：文档级变化（联动、变量）靠它让评审人看懂。 */
+function noteEntries(unit: DesignerChangeUnit): string {
+  return (unit.notes ?? [])
+    .map(
+      (note) =>
+        `<li class="change-diff-entry" data-change-note><span class="change-diff-single">${escapeHtml(note)}</span></li>`,
+    )
+    .join('');
 }
 
 /** 普通单元：新增 / 删除整行，修改按字段展开。 */

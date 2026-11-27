@@ -438,11 +438,11 @@ describe('rebind through a session', () => {
     );
     if (!edited.ok) throw new Error(JSON.stringify(edited.diagnostics));
 
-    const replaced = edited.commands.find((command) => command.type === 'replace-data-sources');
+    // 只追加新实例，活文档里已有的实例不重写（ADR-0115 D4）。
+    const replaced = edited.commands.find((command) => command.type === 'add-data-sources');
     expect(replaced).toEqual({
-      type: 'replace-data-sources',
+      type: 'add-data-sources',
       dataSources: [
-        other,
         {
           id: 'agent-ds-1-e2',
           name: '班组绩效',

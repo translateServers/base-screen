@@ -1073,6 +1073,8 @@ function submitScreenEdit(
     rationale: `${data.summary === '' ? '局部修改' : data.summary}。由模型生成；${counts.length === 0 ? '组件不变' : counts.join('，')}，其余组件保持原样${kept === '' ? '' : `。${kept}`}。${JSON.stringify(refreshed.compiled.behaviors) === JSON.stringify(edited.session.compiled.behaviors) ? '' : describeBehaviors(edited.session.compiled.behaviors)}${describeEditWarnings(edited.warnings)}候选未写入文档。`,
     scope: '局部修改',
     commands: edited.commands as unknown as DesignerChangeProposalInput['commands'],
+    // 版面与联动都变了时分两组，评审面上各自采纳（ADR-0115 D5）。
+    ...(edited.groups === undefined ? {} : { groups: edited.groups }),
     origin: { author: '智能体' },
   });
   if (!submitted.ok) {

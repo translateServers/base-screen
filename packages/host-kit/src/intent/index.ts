@@ -84,6 +84,7 @@ export {
   editIntent,
   type IntentEditBaseline,
   type IntentEditCommand,
+  type IntentEditGroup,
   type IntentEditOutcome,
   type IntentOp,
   type IntentSession,

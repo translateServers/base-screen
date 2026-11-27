@@ -63,6 +63,7 @@ export {
   type DesignerChangeUnitKind,
 } from '../common/operations/change/designer-change-events.js';
 export type {
+  DesignerChangeProposalGroup,
   DesignerChangeProposalInput,
   DesignerChangeProposalOrigin,
   DesignerChangeUnitPresentation,

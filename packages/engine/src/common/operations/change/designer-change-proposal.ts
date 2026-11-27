@@ -28,6 +28,25 @@ export interface DesignerChangeProposalInput {
   readonly scope: string;
   readonly commands: readonly ScreenDocumentCommand[];
   readonly origin?: DesignerChangeProposalOrigin;
+  /**
+   * 可选的单元分组提示（ADR-0115 D5）：宿主知道哪些命令属于同一件事（例如「版面」与「联动」），
+   * 引擎按自己的组件并集分组只看得到组件。给了就按它拆单元，但仍失败关闭：分组必须恰好覆盖全部
+   * 命令、互不重叠，且每组都能在当前文档上单独成立，否则忽略提示、退回默认拆分。整屏替换不拆。
+   */
+  readonly groups?: readonly DesignerChangeProposalGroup[];
+}
+
+/** 宿主给的一组命令：评审面上显示为一个可独立采纳的单元。 */
+export interface DesignerChangeProposalGroup {
+  /** 单元标题（例如「联动：点产线概览 → 筛选告警明细」），1–80 字符。 */
+  readonly label: string;
+  /** 这一组命令在 `commands` 里的下标。 */
+  readonly commandIndexes: readonly number[];
+  /**
+   * 可读说明，评审面在单元里逐行列出（至多 8 行，每行至多 120 字符）。文档级变化（变量、蓝图、
+   * 数据源参数）没有组件差异行，没有说明时评审人看不到这个单元改了什么。
+   */
+  readonly notes?: readonly string[];
 }
 
 export type {
@@ -65,6 +84,8 @@ export interface DesignerChangeUnit {
   readonly commandIndexes: readonly number[];
   readonly diff: readonly DesignerChangeDiffRow[];
   readonly presentation?: DesignerChangeUnitPresentation;
+  /** 宿主分组提示带来的可读说明（ADR-0115 D5）。 */
+  readonly notes?: readonly string[];
 }
 
 /**
@@ -143,7 +164,7 @@ export function prepareDesignerChangeProposal(
       candidate: result.document,
       affectedComponentIds: result.changedComponentIds,
       diff,
-      units: buildUnits(document, input.commands, diff),
+      units: buildUnits(document, input.commands, diff, input.groups),
       provenance,
       ...(input.origin === undefined ? {} : { origin: input.origin }),
     },
@@ -156,6 +177,33 @@ export function changeDiagnostic(
   message: string,
 ): ScreenDiagnostic {
   return { severity: 'error', code, path: [], message };
+}
+
+/**
+ * 去掉已采纳 / 已忽略的命令后剩下的提案入参：分组提示的下标随之重排，整组被去掉的分组丢弃。
+ * 控制器按剩余命令重建提案时用它，分组提示才不会指向错位的命令。
+ */
+export function remainingChangeProposalInput(
+  input: DesignerChangeProposalInput,
+  removedIndexes: readonly number[],
+): DesignerChangeProposalInput {
+  const removed = new Set(removedIndexes);
+  const shift = new Map<number, number>();
+  let next = 0;
+  input.commands.forEach((_, index) => {
+    if (!removed.has(index)) shift.set(index, next++);
+  });
+  const commands = input.commands.filter((_, index) => !removed.has(index));
+  if (input.groups === undefined) return { ...input, commands };
+  const groups = input.groups
+    .map((group) => ({
+      ...group,
+      commandIndexes: group.commandIndexes
+        .map((index) => shift.get(index))
+        .filter((index): index is number => index !== undefined),
+    }))
+    .filter((group) => group.commandIndexes.length > 0);
+  return { ...input, commands, groups };
 }
 
 /** 取选定单元的原始命令，保持提交时的顺序。 */
@@ -180,6 +228,7 @@ function buildUnits(
   document: ScreenDocument,
   commands: readonly ScreenDocumentCommand[],
   diff: readonly DesignerChangeDiffRow[],
+  hints?: readonly DesignerChangeProposalGroup[],
 ): readonly DesignerChangeUnit[] {
   const replacement = wholeScreenReplacement(document, commands, diff);
   if (replacement !== undefined) {
@@ -190,6 +239,8 @@ function buildUnits(
       },
     ];
   }
+  const hinted = hints === undefined ? undefined : hintedUnits(document, commands, hints);
+  if (hinted !== undefined) return hinted;
   const componentCommands = commands.map((command) => componentTargets(command));
   const groups = groupComponentTargets(componentCommands);
   const names = new Map(document.components.map((component) => [component.id, component.name]));
@@ -236,6 +287,63 @@ function buildUnits(
     });
   }
   return units.length === 0 ? [wholeUnit(commands, diff)] : units;
+}
+
+const MAX_GROUPS = 20;
+const MAX_GROUP_LABEL = 80;
+const MAX_GROUP_NOTES = 8;
+const MAX_GROUP_NOTE = 120;
+
+/**
+ * 按宿主的分组提示拆单元。任何一条不满足就返回 undefined（调用方退回默认拆分）：
+ * 分组数 1–20、标题非空；下标合法、互不重叠、恰好覆盖全部命令；每组单独在当前文档上成立，
+ * 且确实产生了变化。单元的差异行取「这一组单独应用」的结果，而不是整份提案的差异。
+ */
+function hintedUnits(
+  document: ScreenDocument,
+  commands: readonly ScreenDocumentCommand[],
+  groups: readonly DesignerChangeProposalGroup[],
+): readonly DesignerChangeUnit[] | undefined {
+  if (!Array.isArray(groups) || groups.length === 0 || groups.length > MAX_GROUPS) return undefined;
+  const seen = new Set<number>();
+  for (const group of groups) {
+    if (typeof group?.label !== 'string') return undefined;
+    const label = group.label.trim();
+    if (label === '' || label.length > MAX_GROUP_LABEL) return undefined;
+    if (!Array.isArray(group.commandIndexes) || group.commandIndexes.length === 0) return undefined;
+    for (const index of group.commandIndexes) {
+      if (!Number.isInteger(index) || index < 0 || index >= commands.length || seen.has(index)) {
+        return undefined;
+      }
+      seen.add(index);
+    }
+  }
+  if (seen.size !== commands.length) return undefined;
+
+  const units: DesignerChangeUnit[] = [];
+  for (const [position, group] of groups.entries()) {
+    const commandIndexes = [...group.commandIndexes].sort((a, b) => a - b);
+    const subset = commandIndexes.map((index) => commands[index] as ScreenDocumentCommand);
+    const applied = applyScreenDocumentTransaction(document, { commands: subset });
+    if (!applied.ok || screenJsonEquals(document, applied.document)) return undefined;
+    const rows = diffScreenDocuments(document, applied.document);
+    const rawNotes: readonly unknown[] = Array.isArray(group.notes) ? group.notes : [];
+    const notes = rawNotes
+      .filter((note): note is string => typeof note === 'string' && note.trim() !== '')
+      .slice(0, MAX_GROUP_NOTES)
+      .map((note) =>
+        note.length > MAX_GROUP_NOTE ? `${note.slice(0, MAX_GROUP_NOTE - 1)}…` : note,
+      );
+    units.push({
+      id: `group-${position + 1}`,
+      label: group.label.trim(),
+      kind: unitKind(rows),
+      commandIndexes,
+      diff: rows,
+      ...(notes.length === 0 ? {} : { notes }),
+    });
+  }
+  return units;
 }
 
 /**

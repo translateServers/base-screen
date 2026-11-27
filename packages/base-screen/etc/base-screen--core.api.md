@@ -1486,6 +1486,32 @@ export type ScreenDocumentCommand = {
 } | {
     readonly type: 'update-theme';
     readonly patch: ScreenThemePatch;
+}
+/**
+* 按 id 的文档级集合局部命令（ADR-0115 D4）：只动点名的项，其余原样保留，
+* 一份提案里的多组改动因此可以各自独立采纳。新增遇到已有 id、删除 / 更新遇到不存在的 id 都失败。
+*/
+| {
+    readonly type: 'add-data-sources';
+    readonly dataSources: readonly ScreenDataSource[];
+} | {
+    readonly type: 'update-data-source-params';
+    readonly dataSourceId: string;
+    readonly params: Readonly<Record<string, ScreenValueRef | null>>;
+} | {
+    readonly type: 'add-variables';
+    readonly variables: readonly ScreenVariableEntry[];
+} | {
+    readonly type: 'remove-variables';
+    readonly variableIds: readonly string[];
+} | {
+    readonly type: 'add-blueprint-elements';
+    readonly nodes: readonly ScreenBlueprintNode[];
+    readonly edges: readonly ScreenBlueprintEdge[];
+} | {
+    readonly type: 'remove-blueprint-elements';
+    readonly nodeIds: readonly string[];
+    readonly edgeIds: readonly string[];
 };
 
 // @public (undocumented)

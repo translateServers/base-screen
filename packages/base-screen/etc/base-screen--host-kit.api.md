@@ -663,16 +663,40 @@ export type IntentEditCommand = {
     readonly type: 'update-components';
     readonly componentIds: readonly string[];
     readonly patch: Readonly<Record<string, unknown>>;
-} | {
-    readonly type: 'replace-data-sources';
+}
+/** 以下为按 id 的局部命令（core ADR-0115 D4）：只动点名的项，版面与联动因此能分开采纳。 */
+| {
+    readonly type: 'add-data-sources';
     readonly dataSources: readonly Record<string, unknown>[];
 } | {
-    readonly type: 'replace-variables';
+    readonly type: 'update-data-source-params';
+    readonly dataSourceId: string;
+    readonly params: Readonly<Record<string, unknown>>;
+} | {
+    readonly type: 'add-variables';
     readonly variables: readonly Record<string, unknown>[];
 } | {
-    readonly type: 'replace-blueprint';
-    readonly blueprint: Readonly<Record<string, unknown>>;
+    readonly type: 'remove-variables';
+    readonly variableIds: readonly string[];
+} | {
+    readonly type: 'add-blueprint-elements';
+    readonly nodes: readonly Record<string, unknown>[];
+    readonly edges: readonly Record<string, unknown>[];
+} | {
+    readonly type: 'remove-blueprint-elements';
+    readonly nodeIds: readonly string[];
+    readonly edgeIds: readonly string[];
 };
+
+// @public
+export interface IntentEditGroup {
+    // (undocumented)
+    readonly commandIndexes: readonly number[];
+    // (undocumented)
+    readonly label: string;
+    // (undocumented)
+    readonly notes?: readonly string[];
+}
 
 // @public (undocumented)
 export type IntentEditOutcome = {
@@ -686,6 +710,7 @@ export type IntentEditOutcome = {
         readonly removed: number;
     };
     readonly warnings: readonly IntentDiagnostic[];
+    readonly groups?: readonly IntentEditGroup[];
 } | {
     readonly ok: false;
     readonly diagnostics: readonly IntentDiagnostic[];

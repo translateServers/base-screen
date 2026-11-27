@@ -3,6 +3,7 @@ import { compileScreenIntent } from './intent-compile.js';
 import type {
   CompiledComponent,
   CompiledScreenDocument,
+  IntentBehaviorSummary,
   IntentCompileResult,
   IntentReferences,
 } from './intent-compile-types.js';
@@ -89,12 +90,35 @@ export type IntentEditCommand =
       readonly componentIds: readonly string[];
       readonly patch: Readonly<Record<string, unknown>>;
     }
+  /** 以下为按 id 的局部命令（core ADR-0115 D4）：只动点名的项，版面与联动因此能分开采纳。 */
+  | { readonly type: 'add-data-sources'; readonly dataSources: readonly Record<string, unknown>[] }
   | {
-      readonly type: 'replace-data-sources';
-      readonly dataSources: readonly Record<string, unknown>[];
+      readonly type: 'update-data-source-params';
+      readonly dataSourceId: string;
+      readonly params: Readonly<Record<string, unknown>>;
     }
-  | { readonly type: 'replace-variables'; readonly variables: readonly Record<string, unknown>[] }
-  | { readonly type: 'replace-blueprint'; readonly blueprint: Readonly<Record<string, unknown>> };
+  | { readonly type: 'add-variables'; readonly variables: readonly Record<string, unknown>[] }
+  | { readonly type: 'remove-variables'; readonly variableIds: readonly string[] }
+  | {
+      readonly type: 'add-blueprint-elements';
+      readonly nodes: readonly Record<string, unknown>[];
+      readonly edges: readonly Record<string, unknown>[];
+    }
+  | {
+      readonly type: 'remove-blueprint-elements';
+      readonly nodeIds: readonly string[];
+      readonly edgeIds: readonly string[];
+    };
+
+/**
+ * 提案的单元分组提示（与引擎 `DesignerChangeProposalGroup` 同构）：版面一组、联动一组，
+ * 评审面上各自独立采纳。两组都有内容时才给。
+ */
+export interface IntentEditGroup {
+  readonly label: string;
+  readonly commandIndexes: readonly number[];
+  readonly notes?: readonly string[];
+}
 
 /** 活文档里宿主只需要给的那一小部分：用来判断「用户改过没有」「哪些还在」。 */
 export interface IntentEditBaseline {
@@ -120,6 +144,8 @@ export type IntentEditOutcome =
         readonly removed: number;
       };
       readonly warnings: readonly IntentDiagnostic[];
+      /** 版面与联动都变了时的分组提示，原样交给 `submitChangeProposal` 的 `groups`。 */
+      readonly groups?: readonly IntentEditGroup[];
     }
   | { readonly ok: false; readonly diagnostics: readonly IntentDiagnostic[] };
 
@@ -201,34 +227,64 @@ export function editIntent(
 
   // 换了取值来源的组件（`rebind`，ADR-0114 D9）：物料没变、走 `update-components`，但它引用的数据源
   // 也是新编出来的，要和新增组件一起按内容复用 / 换 id，否则补丁会指向活文档里不存在的实例。
+  //
+  // 每次编译数据源都从 `agent-ds-1` 重新编号：删掉前面一块之后，后面的块读的还是同一个实例，只是编号前移了。
+  // 这种「只是编号变了」的不算换来源，组件继续读活文档里的那个实例（`sameSource`），不新建重复实例。
+  // 比较时忽略引用智能体变量的参数：联动的增减不改变「读的是哪份数据」。
+  const sameSource = new Map<string, string>();
+  const beforeSources = new Map((before.dataSources ?? []).map((item) => [String(item.id), item]));
+  const afterSources = new Map((after.dataSources ?? []).map((item) => [String(item.id), item]));
+  for (const component of changed) {
+    const oldId = dataSourceIdOf(previous.get(component.id)?.dataValue);
+    const newId = dataSourceIdOf(component.dataValue);
+    const liveId = dataSourceIdOf(
+      (live.get(component.id) as { dataValue?: unknown } | undefined)?.dataValue,
+    );
+    if (oldId === undefined || newId === undefined || liveId === undefined || oldId === newId)
+      continue;
+    if (sameSource.has(newId)) continue;
+    if (sameSourceContent(beforeSources.get(oldId), afterSources.get(newId))) {
+      sameSource.set(newId, liveId);
+    }
+  }
   const rebound = changed.filter((component) => {
     if (gone.has(component.id) || touched.has(component.id) || replacedIds.has(component.id))
       return false;
     const value = component.dataValue as { dataSourceId?: unknown } | null;
     return (
       typeof value?.dataSourceId === 'string' &&
+      !sameSource.has(value.dataSourceId) &&
       JSON.stringify(previous.get(component.id)?.dataValue ?? null) !== JSON.stringify(value)
     );
   });
-  // 新增组件用到的数据源：按内容复用，冲突就换个 id（每次编译都从 `agent-ds-1` 重新编号）。
+  // 新增组件用到的数据源：按内容复用，冲突就换个 id。
   const dataSources = remapDataSources(
     after,
     [...added, ...replaced, ...rebound],
     baseline.dataSources ?? [],
+    sameSource,
   );
-  // 联动（ADR-0115 D9）：变量先扩成「新旧并集」，数据源才能引用新变量；蓝图先摘掉旧的智能体连线，
-  // 删组件、删变量才不会被悬空引用拦下。收尾再把变量收成新集合、换上新连线。
+  // 联动（ADR-0115 D9）：只动智能体生成的变量与连线，用按 id 的局部命令写。命令按这个顺序排，
+  // 每一步都没有悬空引用：摘旧连线 → 摘掉对将删变量的引用 → 删变量 → 加变量 →（版面的新数据源）
+  // → 接上对新变量的引用 →（版面的组件）→ 加新连线。
   const behavior = behaviorEdit(before, after, baseline, live);
-  if (behavior.clearBlueprint !== undefined) {
-    commands.push({ type: 'replace-blueprint', blueprint: behavior.clearBlueprint });
+  const layoutIndexes: number[] = [];
+  const behaviorIndexes: number[] = [];
+  const pushBehavior = (items: readonly IntentEditCommand[]): void => {
+    for (const command of items) {
+      behaviorIndexes.push(commands.length);
+      commands.push(command);
+    }
+  };
+  const pushLayout = (command: IntentEditCommand): void => {
+    layoutIndexes.push(commands.length);
+    commands.push(command);
+  };
+  pushBehavior(behavior.detach);
+  if (dataSources.fresh.length > 0) {
+    pushLayout({ type: 'add-data-sources', dataSources: dataSources.fresh });
   }
-  if (behavior.widenVariables !== undefined) {
-    commands.push({ type: 'replace-variables', variables: behavior.widenVariables });
-  }
-  const nextSources = behavior.patchSources(dataSources.next ?? baseline.dataSources ?? []);
-  if (dataSources.next !== undefined || nextSources.changed) {
-    commands.push({ type: 'replace-data-sources', dataSources: nextSources.list });
-  }
+  pushBehavior(behavior.attach);
   const layerBase = baseline.components.reduce(
     (max, component) => Math.max(max, component.zIndex ?? 0),
     0,
@@ -241,15 +297,17 @@ export function editIntent(
     }
     if (replacedIds.has(component.id)) continue;
     const patch = diffPatch(
-      previous.get(component.id) as CompiledComponent,
+      dataSources.applyPrevious(previous.get(component.id) as CompiledComponent),
       dataSources.apply(component),
     );
-    commands.push({ type: 'update-components', componentIds: [component.id], patch });
+    // 只是数据源编号变了、映射回活文档后完全一致的组件：没有要改的。
+    if (Object.keys(patch).length === 0) continue;
+    pushLayout({ type: 'update-components', componentIds: [component.id], patch });
   }
   const removals = [...removable, ...replacedIds];
-  if (removals.length > 0) commands.push({ type: 'remove-components', componentIds: removals });
+  if (removals.length > 0) pushLayout({ type: 'remove-components', componentIds: removals });
   for (const component of replaced) {
-    commands.push({
+    pushLayout({
       type: 'add-component',
       component: dataSources.apply({
         ...component,
@@ -258,18 +316,29 @@ export function editIntent(
     });
   }
   for (const component of added) {
-    commands.push({
+    pushLayout({
       type: 'add-component',
       component: dataSources.apply({ ...component, zIndex: component.zIndex + layerBase }),
     });
   }
+  pushBehavior(behavior.wire);
 
-  if (behavior.finalVariables !== undefined) {
-    commands.push({ type: 'replace-variables', variables: behavior.finalVariables });
-  }
-  if (behavior.finalBlueprint !== undefined) {
-    commands.push({ type: 'replace-blueprint', blueprint: behavior.finalBlueprint });
-  }
+  const language = detectIntentLanguage(applied.intent.title, applied.intent.subtitle);
+  const notes = behaviorNotes(session.compiled.behaviors, compiled.value.behaviors, language);
+  const groups: IntentEditGroup[] | undefined =
+    layoutIndexes.length > 0 && behaviorIndexes.length > 0
+      ? [
+          {
+            label: language === 'en' ? 'Layout and content' : '版面与内容',
+            commandIndexes: layoutIndexes,
+          },
+          {
+            label: language === 'en' ? 'Interactions' : '联动',
+            commandIndexes: behaviorIndexes,
+            ...(notes.length === 0 ? {} : { notes }),
+          },
+        ]
+      : undefined;
 
   return {
     ok: true,
@@ -287,7 +356,34 @@ export function editIntent(
       removed: removable.length,
     },
     warnings: compiled.value.warnings,
+    ...(groups === undefined ? {} : { groups }),
   };
+}
+
+/** 联动单元的可读说明：新增与去掉的联动（状态随组件走，不在这里）。 */
+function behaviorNotes(
+  before: readonly IntentBehaviorSummary[],
+  after: readonly IntentBehaviorSummary[],
+  language: 'zh' | 'en',
+): string[] {
+  const text = (item: IntentBehaviorSummary): string =>
+    language === 'en'
+      ? `${item.from}: ${item.detail} ${item.to.join(', ')}`
+      : `点「${item.from}」${item.detail}「${item.to.join('」「')}」`;
+  const key = (item: IntentBehaviorSummary): string =>
+    JSON.stringify([item.kind, item.from, item.to, item.detail]);
+  const links = (list: readonly IntentBehaviorSummary[]) =>
+    list.filter((item) => item.kind !== 'state');
+  const old = new Set(links(before).map(key));
+  const now = new Set(links(after).map(key));
+  return [
+    ...links(after)
+      .filter((item) => !old.has(key(item)))
+      .map((item) => `${language === 'en' ? 'Add' : '新增'}：${text(item)}`),
+    ...links(before)
+      .filter((item) => !now.has(key(item)))
+      .map((item) => `${language === 'en' ? 'Remove' : '去掉'}：${text(item)}`),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -824,38 +920,77 @@ const isAgentVariable = (id: unknown): boolean =>
   typeof id === 'string' && id.startsWith('agent-var-');
 
 interface BehaviorEdit {
-  readonly clearBlueprint?: Readonly<Record<string, unknown>>;
-  readonly widenVariables?: readonly Record<string, unknown>[];
-  readonly finalVariables?: readonly Record<string, unknown>[];
-  readonly finalBlueprint?: Readonly<Record<string, unknown>>;
-  /** 把联动带来的参数变化（常量 ⇄ 引用智能体变量）落到活文档的数据源实例上。 */
-  readonly patchSources: (sources: readonly Record<string, unknown>[]) => {
-    readonly list: readonly Record<string, unknown>[];
-    readonly changed: boolean;
-  };
+  /** 摘旧连线、摘掉对将删变量的引用、删变量、加变量：都在版面命令之前。 */
+  readonly detach: readonly IntentEditCommand[];
+  /** 接上对新变量的引用（数据源参数）：在版面新增的数据源之后、组件之前。 */
+  readonly attach: readonly IntentEditCommand[];
+  /** 加新连线：在全部组件命令之后（连线引用的组件节点可能是本次新增的）。 */
+  readonly wire: readonly IntentEditCommand[];
 }
+
+const isVariableRef = (ref: unknown): ref is { kind: 'variable'; variableId: string } =>
+  isRecord(ref) && ref.kind === 'variable' && typeof ref.variableId === 'string';
 
 /**
  * 联动变化的差量：只动智能体生成的那部分（变量 `agent-var-*`、节点 `agent:*`、连线 `agent-edge-*`），
- * 用户在蓝图里自己连的线与变量原样保留。
+ * 用户在蓝图里自己连的线与变量原样保留。内容没变的项不动；变了的先删后加（同 id 也一样）。
  */
 function behaviorEdit(
-  before: CompiledScreenDocument,
+  _before: CompiledScreenDocument,
   after: CompiledScreenDocument,
   baseline: IntentEditBaseline,
   live: ReadonlyMap<string, { readonly id: string }>,
 ): BehaviorEdit {
-  const liveBlueprint = isRecord(baseline.blueprint)
-    ? baseline.blueprint
-    : { nodes: [], edges: [] };
-  const liveNodes = Array.isArray(liveBlueprint.nodes) ? (liveBlueprint.nodes as unknown[]) : [];
-  const liveEdges = Array.isArray(liveBlueprint.edges) ? (liveBlueprint.edges as unknown[]) : [];
+  const liveBlueprint = isRecord(baseline.blueprint) ? baseline.blueprint : {};
+  const liveNodes = (Array.isArray(liveBlueprint.nodes) ? liveBlueprint.nodes : []).filter(
+    isRecord,
+  );
+  const liveEdges = (Array.isArray(liveBlueprint.edges) ? liveBlueprint.edges : []).filter(
+    isRecord,
+  );
   const liveVariables = (baseline.variables ?? []).filter(isRecord);
-  const own = liveVariables.filter((item) => !isAgentVariable(item.id));
   const oldAgent = liveVariables.filter((item) => isAgentVariable(item.id));
 
-  // 参数补丁：编译产物里组件读的实例 → 活文档里同一组件读的实例。
-  const patches = new Map<string, Record<string, unknown>>();
+  const same = (list: readonly Record<string, unknown>[], item: Record<string, unknown>) =>
+    list.some((entry) => entry.id === item.id && canonical(entry) === canonical(item));
+
+  // 蓝图：活文档里的智能体节点 / 连线，编译产物里没有原样对应的删掉；产物里有、活文档没有原样对应的加上。
+  const agentNodes = liveNodes.filter((node) => isAgentNode(node.id));
+  const agentEdges = liveEdges.filter((edge) => isAgentEdge(edge.id));
+  const nextNodes = after.blueprint.nodes.filter(isRecord);
+  const nextEdges = after.blueprint.edges.filter(isRecord);
+  const removeNodes = agentNodes
+    .filter((node) => !same(nextNodes, node))
+    .map((node) => String(node.id));
+  const removedNodeSet = new Set(removeNodes);
+  // 删节点会连带删掉接在它上面的连线：这些连线不再单独列，但要从「保留」里去掉，后面才会重新加上。
+  const removeEdges = agentEdges
+    .filter(
+      (edge) =>
+        !same(nextEdges, edge) &&
+        !removedNodeSet.has(String((edge.from as { node?: unknown } | undefined)?.node)) &&
+        !removedNodeSet.has(String((edge.to as { node?: unknown } | undefined)?.node)),
+    )
+    .map((edge) => String(edge.id));
+  const keptEdges = agentEdges.filter(
+    (edge) =>
+      same(nextEdges, edge) &&
+      !removedNodeSet.has(String((edge.from as { node?: unknown } | undefined)?.node)) &&
+      !removedNodeSet.has(String((edge.to as { node?: unknown } | undefined)?.node)),
+  );
+  const keptNodes = agentNodes.filter((node) => !removedNodeSet.has(String(node.id)));
+  const addNodes = nextNodes.filter((node) => !same(keptNodes, node));
+  const addEdges = nextEdges.filter((edge) => !same(keptEdges, edge));
+
+  // 变量：同上，先删后加。
+  const removeVariables = oldAgent.filter((item) => !same(after.variables, item));
+  const removedVariableSet = new Set(removeVariables.map((item) => String(item.id)));
+  const keptVariables = oldAgent.filter((item) => !removedVariableSet.has(String(item.id)));
+  const addVariables = after.variables.filter((item) => !same(keptVariables, item));
+
+  // 数据源参数：编译产物里组件读的实例 → 活文档里同一组件读的实例；只看联动相关的参数
+  // （新引用了智能体变量，或原来引用、现在不再引用）。
+  const desired = new Map<string, Record<string, unknown>>();
   const afterSources = new Map((after.dataSources ?? []).map((item) => [String(item.id), item]));
   for (const component of after.components) {
     const compiledId = (component.dataValue as { dataSourceId?: unknown } | null)?.dataSourceId;
@@ -865,88 +1000,62 @@ function behaviorEdit(
     const compiled = typeof compiledId === 'string' ? afterSources.get(compiledId) : undefined;
     if (compiled === undefined || typeof liveId !== 'string') continue;
     const params = isRecord(compiled.params) ? compiled.params : {};
-    patches.set(liveId, { ...(patches.get(liveId) ?? {}), ...params });
+    desired.set(liveId, { ...(desired.get(liveId) ?? {}), ...params });
   }
-  // 不再存在的智能体变量：还引用它的实例（例如目标块被删、组件没了、实例还在）退回变量初值的常量，
-  // 否则收掉变量那一步会被悬空引用拦下。
-  const kept = new Set(after.variables.map((item) => String(item.id)));
-  const retired = new Map(
-    oldAgent
-      .filter((item) => !kept.has(String(item.id)))
-      .map((item) => [String(item.id), item.initialValue]),
-  );
-  const patchSources = (sources: readonly Record<string, unknown>[]) => {
-    let changed = false;
-    const list = sources.map((source) => {
-      const params = isRecord(source.params) ? source.params : {};
-      const patch: Record<string, unknown> = { ...(patches.get(String(source.id)) ?? {}) };
-      for (const [name, ref] of Object.entries(params)) {
-        if (
-          patch[name] === undefined &&
-          isRecord(ref) &&
-          ref.kind === 'variable' &&
-          retired.has(String(ref.variableId))
-        ) {
-          patch[name] = { kind: 'inline', value: retired.get(String(ref.variableId)) ?? null };
-        }
+  const detachParams: IntentEditCommand[] = [];
+  const attachParams: IntentEditCommand[] = [];
+  for (const source of baseline.dataSources ?? []) {
+    const id = String(source.id);
+    const params = isRecord(source.params) ? source.params : {};
+    const want = desired.get(id) ?? {};
+    const detach: Record<string, unknown> = {};
+    const attach: Record<string, unknown> = {};
+    for (const [name, current] of Object.entries(params)) {
+      if (!isVariableRef(current) || !isAgentVariable(current.variableId)) continue;
+      const target = want[name];
+      const keeps =
+        isVariableRef(target) &&
+        target.variableId === current.variableId &&
+        !removedVariableSet.has(current.variableId);
+      if (keeps) continue;
+      // 先退回常量（变量初值），变量才能删；要改成别的引用的，等新变量加上之后再接。
+      const old = oldAgent.find((item) => item.id === current.variableId);
+      detach[name] = { kind: 'inline', value: old?.initialValue ?? null };
+      if (isVariableRef(target)) attach[name] = target;
+      else if (target !== undefined && canonical(target) !== canonical(detach[name])) {
+        attach[name] = target;
       }
-      if (Object.keys(patch).length === 0) return source;
-      const next: Record<string, unknown> = { ...params };
-      for (const [name, value] of Object.entries(patch)) {
-        const old = params[name];
-        const agentRef = (ref: unknown): boolean =>
-          isRecord(ref) && ref.kind === 'variable' && isAgentVariable(ref.variableId);
-        // 只改联动相关的参数：新引用了智能体变量，或原来引用、现在不再引用。
-        if ((agentRef(value) || agentRef(old)) && canonical(old) !== canonical(value)) {
-          next[name] = value;
-        }
-      }
-      if (canonical(next) === canonical(params)) return source;
-      changed = true;
-      return { ...source, params: next };
-    });
-    return { list, changed };
-  };
+    }
+    for (const [name, target] of Object.entries(want)) {
+      if (!isVariableRef(target) || !isAgentVariable(target.variableId)) continue;
+      if (attach[name] !== undefined || detach[name] !== undefined) continue;
+      if (canonical(params[name]) !== canonical(target)) attach[name] = target;
+    }
+    if (Object.keys(detach).length > 0) {
+      detachParams.push({ type: 'update-data-source-params', dataSourceId: id, params: detach });
+    }
+    if (Object.keys(attach).length > 0) {
+      attachParams.push({ type: 'update-data-source-params', dataSourceId: id, params: attach });
+    }
+  }
 
-  const variablesChanged =
-    canonical(oldAgent) !== canonical(after.variables) ||
-    canonical(before.variables) !== canonical(after.variables);
-  const agentNodes = liveNodes.filter((node) => isRecord(node) && isAgentNode(node.id));
-  const agentEdges = liveEdges.filter((edge) => isRecord(edge) && isAgentEdge(edge.id));
-  const blueprintChanged =
-    canonical({ nodes: agentNodes, edges: agentEdges }) !== canonical(after.blueprint);
-  const stripped = {
-    ...liveBlueprint,
-    nodes: liveNodes.filter((node) => !(isRecord(node) && isAgentNode(node.id))),
-    edges: liveEdges.filter((edge) => !(isRecord(edge) && isAgentEdge(edge.id))),
-  };
-  const finalVariables = [...own, ...after.variables];
-  const widened = [
-    ...own,
-    ...oldAgent,
-    ...after.variables.filter((item) => !oldAgent.some((old) => old.id === item.id)),
-  ];
-  return {
-    ...(blueprintChanged && (agentNodes.length > 0 || agentEdges.length > 0)
-      ? { clearBlueprint: stripped }
-      : {}),
-    ...(variablesChanged && canonical(widened) !== canonical(liveVariables)
-      ? { widenVariables: widened }
-      : {}),
-    ...(variablesChanged && canonical(finalVariables) !== canonical(widened)
-      ? { finalVariables }
-      : {}),
-    ...(blueprintChanged && after.blueprint.nodes.length + after.blueprint.edges.length > 0
-      ? {
-          finalBlueprint: {
-            ...stripped,
-            nodes: [...stripped.nodes, ...after.blueprint.nodes],
-            edges: [...stripped.edges, ...after.blueprint.edges],
-          },
-        }
-      : {}),
-    patchSources,
-  };
+  const detach: IntentEditCommand[] = [];
+  if (removeNodes.length + removeEdges.length > 0) {
+    detach.push({ type: 'remove-blueprint-elements', nodeIds: removeNodes, edgeIds: removeEdges });
+  }
+  detach.push(...detachParams);
+  if (removeVariables.length > 0) {
+    detach.push({
+      type: 'remove-variables',
+      variableIds: removeVariables.map((item) => String(item.id)),
+    });
+  }
+  if (addVariables.length > 0) detach.push({ type: 'add-variables', variables: addVariables });
+  const wire: IntentEditCommand[] =
+    addNodes.length + addEdges.length > 0
+      ? [{ type: 'add-blueprint-elements', nodes: addNodes, edges: addEdges }]
+      : [];
+  return { detach, attach: attachParams, wire };
 }
 
 // ---------------------------------------------------------------------------
@@ -1014,23 +1123,51 @@ function remapDataSources(
   after: CompiledScreenDocument,
   added: readonly CompiledComponent[],
   existing: readonly Record<string, unknown>[],
+  known: ReadonlyMap<string, string> = new Map(),
 ): {
-  readonly next: readonly Record<string, unknown>[] | undefined;
+  /** 需要新增的实例（id 已避开活文档里的）。 */
+  readonly fresh: readonly Record<string, unknown>[];
   readonly apply: (component: CompiledComponent) => CompiledComponent;
+  /** 上一次编译产物里的组件：按活文档里的实际编号改写，做差时才不把「编号变了」当成改动。 */
+  readonly applyPrevious: (component: CompiledComponent) => CompiledComponent;
 } {
   const referenced = new Set<string>();
   for (const component of added) {
     const value = component.dataValue as { dataSourceId?: unknown } | null;
     if (typeof value?.dataSourceId === 'string') referenced.add(value.dataSourceId);
   }
-  if (referenced.size === 0) return { next: undefined, apply: (component) => component };
+  const rewrite =
+    (map: ReadonlyMap<string, string>) =>
+    (component: CompiledComponent): CompiledComponent => {
+      const value = component.dataValue as { dataSourceId?: unknown } | null;
+      const mapped =
+        typeof value?.dataSourceId === 'string' ? map.get(value.dataSourceId) : undefined;
+      return mapped === undefined || value === null
+        ? component
+        : { ...component, dataValue: { ...value, dataSourceId: mapped } };
+    };
+  // 上一次编译 → 活文档：同一组件在两边读的实例编号（只为「编号变了」的那几个）。
+  const previousMap = new Map<string, string>();
+  const applyPrevious = (component: CompiledComponent): CompiledComponent => {
+    const id = dataSourceIdOf(component.dataValue);
+    const nextId = dataSourceIdOf(
+      after.components.find((item) => item.id === component.id)?.dataValue,
+    );
+    const liveId = nextId === undefined ? undefined : known.get(nextId);
+    if (id === undefined || liveId === undefined) return component;
+    previousMap.set(id, liveId);
+    return rewrite(previousMap)(component);
+  };
+  if (referenced.size === 0) {
+    return { fresh: [], apply: rewrite(known), applyPrevious };
+  }
 
   const taken = new Set(existing.map((source) => String(source.id)));
-  const remap = new Map<string, string>();
+  const remap = new Map<string, string>(known);
   const fresh: Record<string, unknown>[] = [];
   for (const source of after.dataSources ?? []) {
     const id = String(source.id);
-    if (!referenced.has(id)) continue;
+    if (!referenced.has(id) || remap.has(id)) continue;
     const reusable = existing.find(
       (candidate) =>
         JSON.stringify({ ...candidate, id: '' }) === JSON.stringify({ ...source, id: '' }),
@@ -1046,16 +1183,41 @@ function remapDataSources(
     fresh.push({ ...source, id: nextId });
   }
   return {
-    next: fresh.length === 0 ? undefined : [...existing, ...fresh],
-    apply: (component) => {
-      const value = component.dataValue as { dataSourceId?: unknown } | null;
-      const mapped =
-        typeof value?.dataSourceId === 'string' ? remap.get(value.dataSourceId) : undefined;
-      return mapped === undefined || value === null
-        ? component
-        : { ...component, dataValue: { ...value, dataSourceId: mapped } };
-    },
+    fresh,
+    apply: rewrite(remap),
+    applyPrevious,
   };
+}
+
+function dataSourceIdOf(value: unknown): string | undefined {
+  return isRecord(value) &&
+    value.kind === 'data-source-field' &&
+    typeof value.dataSourceId === 'string'
+    ? value.dataSourceId
+    : undefined;
+}
+
+/**
+ * 两个数据源实例「读的是不是同一份数据」：来源、名称与参数相同；任一侧引用智能体变量的参数不比
+ * （联动的增减只改这几个参数，不算换来源）。
+ */
+function sameSourceContent(
+  left: Record<string, unknown> | undefined,
+  right: Record<string, unknown> | undefined,
+): boolean {
+  if (left === undefined || right === undefined) return false;
+  const a = isRecord(left.params) ? left.params : {};
+  const b = isRecord(right.params) ? right.params : {};
+  const agentRef = (ref: unknown): boolean => isVariableRef(ref) && isAgentVariable(ref.variableId);
+  const ignored = new Set(
+    [...Object.keys(a), ...Object.keys(b)].filter((name) => agentRef(a[name]) || agentRef(b[name])),
+  );
+  const own = (params: Record<string, unknown>) =>
+    Object.fromEntries(Object.entries(params).filter(([name]) => !ignored.has(name)));
+  return (
+    canonical({ source: left.source, name: left.name, params: own(a) }) ===
+    canonical({ source: right.source, name: right.name, params: own(b) })
+  );
 }
 
 // ---------------------------------------------------------------------------

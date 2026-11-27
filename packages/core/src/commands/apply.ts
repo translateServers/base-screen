@@ -9,6 +9,14 @@ import { componentsReferencingDataSources } from '../data/data-source-dependents
 import { prefixDiagnostic, sortDiagnostics } from '../internal/diagnostics.js';
 import { assertCoreValidDocument } from '../internal/document.js';
 import {
+  applyAddBlueprintElementsCommand,
+  applyAddDataSourcesCommand,
+  applyAddVariablesCommand,
+  applyRemoveBlueprintElementsCommand,
+  applyRemoveVariablesCommand,
+  applyUpdateDataSourceParamsCommand,
+} from './apply-collection-commands.js';
+import {
   applyAddComponentCommand,
   applyMoveComponentsCommand,
   applyRemoveComponentsCommand,
@@ -138,6 +146,18 @@ function applyValidatedCommand(
       return applyRenameVariableCommand(document, command);
     case 'update-theme':
       return applyTheme(document, command.patch);
+    case 'add-data-sources':
+      return applyAddDataSourcesCommand(document, command.dataSources);
+    case 'update-data-source-params':
+      return applyUpdateDataSourceParamsCommand(document, command.dataSourceId, command.params);
+    case 'add-variables':
+      return applyAddVariablesCommand(document, command.variables);
+    case 'remove-variables':
+      return applyRemoveVariablesCommand(document, command.variableIds);
+    case 'add-blueprint-elements':
+      return applyAddBlueprintElementsCommand(document, command.nodes, command.edges);
+    case 'remove-blueprint-elements':
+      return applyRemoveBlueprintElementsCommand(document, command.nodeIds, command.edgeIds);
     default:
       return screenCommandFailure(
         document,

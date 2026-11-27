@@ -457,14 +457,57 @@ describe('editing interactions', () => {
       blueprint: live.blueprint,
     });
     if (!outcome.ok) throw new Error(JSON.stringify(outcome.diagnostics));
+    // 只加联动：全是按 id 的局部命令，不整体替换任何集合。
     expect(outcome.commands.map((command) => command.type)).toEqual([
-      'replace-variables',
-      'replace-data-sources',
-      'replace-blueprint',
+      'add-variables',
+      'update-data-source-params',
+      'add-blueprint-elements',
     ]);
-    const sources = outcome.commands.find((command) => command.type === 'replace-data-sources');
-    expect(JSON.stringify(sources)).toContain('agent-var-1');
+    expect(outcome.commands[1]).toMatchObject({
+      params: { line: { kind: 'variable', variableId: 'agent-var-1' } },
+    });
     expect(outcome.session.intent.interactions).toHaveLength(1);
+    // 版面没动：不给分组提示（只有一组，没得拆）。
+    expect(outcome.groups).toBeUndefined();
+  });
+
+  it('splits a layout change and a new interaction into two groups that each stand alone', () => {
+    const compiled = compile(screen({}, EDIT_BLOCKS));
+    const session = createIntentSession({
+      intent: intentOf(screen({}, EDIT_BLOCKS)),
+      compiled,
+      catalog: CATALOG,
+      references: REFERENCES,
+      mode: 'llm',
+    });
+    const live = compiled.document;
+    const grid = session.intent.regions[1];
+    const alarms = grid?.kind === 'grid' ? grid.blocks[1] : undefined;
+    const outcome = editIntent(
+      session,
+      [
+        { op: 'change', target: alarms?.ident ?? '', set: { title: '告警流水' } },
+        { op: 'link', interaction: FILTER },
+      ],
+      {
+        canvas: live.canvas,
+        components: live.components,
+        ...(live.dataSources === undefined ? {} : { dataSources: live.dataSources }),
+        variables: live.variables,
+        blueprint: live.blueprint,
+      },
+    );
+    if (!outcome.ok) throw new Error(JSON.stringify(outcome.diagnostics));
+    const [layout, link] = outcome.groups ?? [];
+    expect(layout?.commandIndexes.map((index) => outcome.commands[index]?.type)).toEqual(
+      expect.arrayContaining(['update-components']),
+    );
+    expect(link?.commandIndexes.map((index) => outcome.commands[index]?.type)).toEqual([
+      'add-variables',
+      'update-data-source-params',
+      'add-blueprint-elements',
+    ]);
+    expect(link?.notes).toEqual(['新增：点「产线概览」点击行 → 按 line 筛选「告警流水」']);
   });
 
   it('removes the interactions of a deleted block', () => {
@@ -488,9 +531,24 @@ describe('editing interactions', () => {
     });
     if (!outcome.ok) throw new Error(JSON.stringify(outcome.diagnostics));
     expect(outcome.session.intent.interactions).toBeUndefined();
-    // 先摘连线，再删组件，最后收掉变量。
+    // 先摘连线、退回常量、删变量，再动组件（右边那块左移补位）。
     const types = outcome.commands.map((command) => command.type);
-    expect(types[0]).toBe('replace-blueprint');
-    expect(types.at(-1)).toBe('replace-variables');
+    expect(types.slice(0, 3)).toEqual([
+      'remove-blueprint-elements',
+      'update-data-source-params',
+      'remove-variables',
+    ]);
+    expect(types).toContain('remove-components');
+    // 告警块读的还是活文档里那个实例（只是编译编号前移了），不新建重复实例。
+    expect(types).not.toContain('add-data-sources');
+    expect(JSON.stringify(outcome.commands)).not.toContain('"dataValue"');
+    expect(outcome.commands[1]).toMatchObject({
+      params: { line: { kind: 'inline', value: 'LINE-B' } },
+    });
+    // 版面与联动各一组；但删组件离不开先摘连线，引擎按「每组能否单独成立」自会退回整批。
+    expect(outcome.groups?.map((group) => group.label)).toEqual(['版面与内容', '联动']);
+    expect(outcome.groups?.[1]?.notes).toEqual([
+      '去掉：点「产线概览」点击行 → 按 line 筛选「告警明细」',
+    ]);
   });
 });

@@ -11,6 +11,7 @@ import {
   type DesignerChangeProposal,
   type DesignerChangeProposalInput,
   prepareDesignerChangeProposal,
+  remainingChangeProposalInput,
 } from '../../common/operations/change/designer-change-proposal.js';
 import type { DesignerReviewMeta } from '../../common/operations/change/designer-review.js';
 import {
@@ -451,16 +452,18 @@ export class DesignerChangeController {
       this.clearDraft({ kind: 'remaining-invalid', remainingCount });
       return;
     }
-    const prepared = prepareDesignerChangeProposal(
-      document,
-      { ...input, commands: remaining },
-      proposal.id,
+    // 入参与当前提案同步收窄：分组提示的下标跟着剩余命令重排（ADR-0115 D5）。
+    const next = remainingChangeProposalInput(
+      { ...input, commands: proposal.commands },
+      removedIndexes,
     );
+    const prepared = prepareDesignerChangeProposal(document, next, proposal.id);
     if (!prepared.ok || !this.mountGhost(prepared.value)) {
       this.clearDraft({ kind: 'remaining-invalid', remainingCount });
       return;
     }
     this.#proposal = prepared.value;
+    this.#input = next;
     this.#feedback = undefined;
     this.#confirmAll = false;
     this.render();

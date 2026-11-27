@@ -1,5 +1,7 @@
 import type {
   ScreenBlueprint,
+  ScreenBlueprintEdge,
+  ScreenBlueprintNode,
   ScreenCanvasBackground,
   ScreenCanvasBackgroundImageFit,
   ScreenComponentDataSource,
@@ -75,7 +77,31 @@ export type ScreenDocumentCommand =
       readonly variableId: string;
       readonly nextName: string;
     }
-  | { readonly type: 'update-theme'; readonly patch: ScreenThemePatch };
+  | { readonly type: 'update-theme'; readonly patch: ScreenThemePatch }
+  /**
+   * 按 id 的文档级集合局部命令（ADR-0115 D4）：只动点名的项，其余原样保留，
+   * 一份提案里的多组改动因此可以各自独立采纳。新增遇到已有 id、删除 / 更新遇到不存在的 id 都失败。
+   */
+  | { readonly type: 'add-data-sources'; readonly dataSources: readonly ScreenDataSource[] }
+  | {
+      /** 合并实例参数：给出的写入，`null` 删除该参数，没给的保持原样。 */
+      readonly type: 'update-data-source-params';
+      readonly dataSourceId: string;
+      readonly params: Readonly<Record<string, ScreenValueRef | null>>;
+    }
+  | { readonly type: 'add-variables'; readonly variables: readonly ScreenVariableEntry[] }
+  | { readonly type: 'remove-variables'; readonly variableIds: readonly string[] }
+  | {
+      readonly type: 'add-blueprint-elements';
+      readonly nodes: readonly ScreenBlueprintNode[];
+      readonly edges: readonly ScreenBlueprintEdge[];
+    }
+  | {
+      /** 删节点时连带删掉接在它上面的连线与布局位置。 */
+      readonly type: 'remove-blueprint-elements';
+      readonly nodeIds: readonly string[];
+      readonly edgeIds: readonly string[];
+    };
 
 /** 主题色板补丁：槽位 → 具体颜色；与现有色板合并后必须凑齐全部语义槽。 */
 export type ScreenThemePatch = Readonly<Partial<Record<ScreenThemeSlot, string>>>;

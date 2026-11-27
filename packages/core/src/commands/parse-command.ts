@@ -16,6 +16,12 @@ const COMMAND_TYPES = new Set([
   'move-components',
   'rename-variable',
   'update-theme',
+  'add-data-sources',
+  'update-data-source-params',
+  'add-variables',
+  'remove-variables',
+  'add-blueprint-elements',
+  'remove-blueprint-elements',
 ]);
 
 const COMMAND_FIELDS: Readonly<Record<string, ReadonlySet<string>>> = {
@@ -31,6 +37,12 @@ const COMMAND_FIELDS: Readonly<Record<string, ReadonlySet<string>>> = {
   'move-components': new Set(['type', 'componentIds', 'canvasId']),
   'rename-variable': new Set(['type', 'variableId', 'nextName']),
   'update-theme': new Set(['type', 'patch']),
+  'add-data-sources': new Set(['type', 'dataSources']),
+  'update-data-source-params': new Set(['type', 'dataSourceId', 'params']),
+  'add-variables': new Set(['type', 'variables']),
+  'remove-variables': new Set(['type', 'variableIds']),
+  'add-blueprint-elements': new Set(['type', 'nodes', 'edges']),
+  'remove-blueprint-elements': new Set(['type', 'nodeIds', 'edgeIds']),
 };
 
 /** 可缺省的命令字段（其余字段必填）。 */

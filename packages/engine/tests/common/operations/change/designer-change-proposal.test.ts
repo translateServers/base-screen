@@ -5,6 +5,7 @@ import {
   commandsForUnits,
   diffScreenDocuments,
   prepareDesignerChangeProposal,
+  remainingChangeProposalInput,
 } from '../../../../src/common/operations/change/designer-change-proposal.js';
 
 function textComponent(overrides: Partial<ScreenComponentNode> = {}): ScreenComponentNode {
@@ -504,5 +505,132 @@ describe('whole-screen replacement presentation', () => {
     expect(summary.units[0]).toMatchObject({
       presentation: { kind: 'whole-screen-replacement', addedCount: 1 },
     });
+  });
+});
+
+describe('host grouping hints (ADR-0115 D5)', () => {
+  const source: ScreenDataSource = {
+    id: 'alarms',
+    name: 'alarms',
+    source: { kind: 'dataset', datasetId: 'monitor.alarms' },
+    params: { line: { kind: 'inline', value: 'LINE-A' } },
+  };
+  const withSource = (): ScreenDocument => ({
+    ...screenDocument([textComponent(), textComponent({ id: 'picker', name: '产线概览' })]),
+    dataSources: [source],
+  });
+  const linkCommands = [
+    {
+      type: 'add-variables',
+      variables: [{ id: 'agent-var-1', name: 'line_1', type: 'static', initialValue: 'LINE-A' }],
+    },
+    {
+      type: 'update-data-source-params',
+      dataSourceId: 'alarms',
+      params: { line: { kind: 'variable', variableId: 'agent-var-1' } },
+    },
+    {
+      type: 'add-blueprint-elements',
+      nodes: [
+        { kind: 'component', id: 'agent:c:picker', componentId: 'picker' },
+        { kind: 'variable', id: 'agent:v:agent-var-1', variableId: 'agent-var-1' },
+      ],
+      edges: [
+        {
+          kind: 'flow',
+          id: 'agent-edge-1',
+          from: { node: 'agent:c:picker', port: 'event:rowClick' },
+          to: { node: 'agent:v:agent-var-1', port: 'set' },
+          value: { kind: 'event-payload', path: ['row', 'line'] },
+        },
+      ],
+    },
+  ] as const;
+  const commands = [linkCommands[0], linkCommands[1], recolor, linkCommands[2]] as const;
+
+  it('splits by the hint, with notes, so layout and interactions adopt separately', () => {
+    const result = prepareDesignerChangeProposal(
+      withSource(),
+      {
+        title: '加联动',
+        rationale: '',
+        scope: '局部修改',
+        commands,
+        groups: [
+          { label: '版面与内容', commandIndexes: [2] },
+          {
+            label: '联动',
+            commandIndexes: [0, 1, 3],
+            notes: ['新增：点「产线概览」点击行 → 按 line 筛选'],
+          },
+        ],
+      },
+      'change-1',
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result.diagnostics));
+    expect(result.value.units.map((unit) => [unit.label, unit.kind, unit.commandIndexes])).toEqual([
+      ['版面与内容', 'changed', [2]],
+      ['联动', 'document', [0, 1, 3]],
+    ]);
+    expect(result.value.units[1]?.notes).toEqual(['新增：点「产线概览」点击行 → 按 line 筛选']);
+    expect(commandsForUnits(result.value, ['group-2']).map((command) => command.type)).toEqual([
+      'add-variables',
+      'update-data-source-params',
+      'add-blueprint-elements',
+    ]);
+  });
+
+  it('falls back to the default split when a hinted group cannot stand alone', () => {
+    const result = prepareDesignerChangeProposal(
+      withSource(),
+      {
+        title: '加联动',
+        rationale: '',
+        scope: '局部修改',
+        commands,
+        // 连线单独一组：没有变量就接不上，这一组不能单独成立。
+        groups: [
+          { label: '版面', commandIndexes: [0, 1, 2] },
+          { label: '连线', commandIndexes: [3] },
+        ],
+      },
+      'change-1',
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result.diagnostics));
+    expect(result.value.units.map((unit) => unit.label)).not.toContain('连线');
+  });
+
+  it('ignores hints that do not cover every command exactly once', () => {
+    const result = prepareDesignerChangeProposal(
+      withSource(),
+      {
+        title: '加联动',
+        rationale: '',
+        scope: '局部修改',
+        commands,
+        groups: [{ label: '联动', commandIndexes: [0, 1, 3, 3] }],
+      },
+      'change-1',
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result.diagnostics));
+    expect(result.value.units.some((unit) => unit.label === '联动')).toBe(false);
+  });
+
+  it('re-indexes the hints for the commands that remain', () => {
+    const next = remainingChangeProposalInput(
+      {
+        title: '',
+        rationale: '',
+        scope: '',
+        commands,
+        groups: [
+          { label: '版面与内容', commandIndexes: [2] },
+          { label: '联动', commandIndexes: [0, 1, 3] },
+        ],
+      },
+      [2],
+    );
+    expect(next.commands).toHaveLength(3);
+    expect(next.groups).toEqual([{ label: '联动', commandIndexes: [0, 1, 2] }]);
   });
 });

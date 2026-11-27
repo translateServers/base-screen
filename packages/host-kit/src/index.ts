@@ -61,6 +61,7 @@ export {
   type IntentDiagnostic,
   type IntentEditBaseline,
   type IntentEditCommand,
+  type IntentEditGroup,
   type IntentEditOutcome,
   type IntentGrid,
   type IntentInteraction,
