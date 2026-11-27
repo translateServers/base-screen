@@ -46,6 +46,12 @@ export interface IntentKpiStates {
   readonly rules: readonly IntentStateRule[];
   /** 阈值是模型补的（用户没说具体数）：提案理由里提示用户核对（`INTENT_STATE_SUGGESTED`）。 */
   readonly suggested?: boolean;
+  /**
+   * 状态来源（ADR-0115 D2）：缺省为 `threshold`（按 `rules` 判定）；`level-scale` 表示按宿主为该字段
+   * 声明的分级表生成（ADR-0110 §2.6.3 的同一套规则），此时 `rules` 为空。宿主没给分级表时不编译、
+   * 写进理由（`AGENT_STATE_LEVEL_SCALE_UNAVAILABLE`）。
+   */
+  readonly source?: 'threshold' | 'level-scale';
 }
 
 /**
@@ -173,6 +179,8 @@ export type IntentInteraction =
       readonly field?: string;
       readonly to: readonly string[];
       readonly param: string;
+      /** 再点同一项恢复原来的取值（ADR-0115 D2）：编译成蓝图条件分支。 */
+      readonly reset?: true;
       readonly origin: string;
     }
   | {
@@ -181,6 +189,18 @@ export type IntentInteraction =
       readonly event: string;
       readonly to: readonly string[];
       readonly mode: 'show' | 'hide' | 'toggle';
+      readonly origin: string;
+    }
+  | {
+      /**
+       * 设状态（ADR-0115 D2）：点来源 → 把目标指标切到它某个已声明的状态（按状态名或色调找），
+       * `reset` 表示恢复按判定显示。目标必须是本屏声明了 `states` 的指标。
+       */
+      readonly kind: 'state';
+      readonly from: string;
+      readonly event: string;
+      readonly to: readonly string[];
+      readonly state: string;
       readonly origin: string;
     };
 

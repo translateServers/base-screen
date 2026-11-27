@@ -1,4 +1,10 @@
-import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
+import {
+  readScreenVariableRecord,
+  type ScreenDocument,
+  type ScreenJsonObject,
+  type ScreenJsonValue,
+  type ScreenParseResult,
+} from '@base-screen/contracts';
 import {
   type BaseScreenCanvasChange,
   type BaseScreenMaterialEvent,
@@ -638,10 +644,35 @@ function createGhostRenderer(elementState: DesignerElementState): void {
       : { contributionIndex: elementState.runtimeContributions }),
   });
   const ghostHandlers = {
-    render: (document: ScreenDocument) => elementState.ghostRenderer?.render(document).ok ?? false,
+    render: (document: ScreenDocument) => {
+      const renderer = elementState.ghostRenderer;
+      if (renderer === undefined) return false;
+      // 草案可能带来新变量（智能体生成的联动，ADR-0115）：数据源参数引用它们时，草案层没有取值会
+      // 报「变量没有值」。画布已有的变量沿用当前值，草案新增的取初值。
+      renderer.setVariables(
+        ghostVariables(document, elementState.canvasRuntimeController.readVariables()),
+      );
+      return renderer.render(document).ok;
+    },
     clear: () => elementState.ghostRenderer?.clear(),
   };
   elementState.changeController.setGhostHandlers(ghostHandlers);
+}
+
+function ghostVariables(
+  document: ScreenDocument,
+  current: ScreenJsonObject | undefined,
+): ScreenJsonObject {
+  const values: Record<string, ScreenJsonValue> = {};
+  for (const variable of document.variables) {
+    const record = readScreenVariableRecord(variable);
+    if (current !== undefined && Object.hasOwn(current, record.id)) {
+      values[record.id] = current[record.id] as ScreenJsonValue;
+    } else if (!(record.controlled && record.value.kind === 'data-source-field')) {
+      values[record.id] = record.initialValue;
+    }
+  }
+  return values;
 }
 
 export function applyNativeEvents(element: DesignerElementHost, enabled: boolean): void {

@@ -803,6 +803,8 @@ function contentFacts(document, intent) {
 /**
  * 流式帧检查：与宿主 `compileStreamDelta` 同一口径——帧之间共有的组件必须一字不差；
  * 最后一帧与最终候选之间也接得上，宿主才能原地收尾，否则要整屏替换一次。
+ * 收尾那一步与宿主 `final` 模式一致：共有组件只要几何不变（类型、父级、位置、尺寸、旋转、层级、
+ * 所属画布），取值、绑定、状态、显隐等可以换，变量与蓝图可以整体换上。
  */
 function streamChecks(frames, final) {
   if (frames.length === 0 || final === undefined) {
@@ -812,16 +814,37 @@ function streamChecks(frames, final) {
   let stable = true;
   let finishInPlace = true;
   for (let index = 1; index < sequence.length; index += 1) {
-    if (!sharedUnchanged(sequence[index - 1], sequence[index])) {
-      if (index < sequence.length - 1) stable = false;
-      else finishInPlace = false;
+    const last = index === sequence.length - 1;
+    if (!last && !sharedUnchanged(sequence[index - 1], sequence[index])) stable = false;
+    if (last && !finishCompatible(sequence[index - 1], sequence[index])) {
+      finishInPlace = false;
     }
   }
   // 原地收尾失败时记下是哪些共有组件的哪些字段对不上：几何不变与收尾是两件事，要分开查原因。
   const finishDiff = finishInPlace
     ? []
-    : changedShared(sequence[sequence.length - 2], final).slice(0, 8);
+    : changedShared(sequence[sequence.length - 2], final)
+        .filter((row) => row.fields.some((key) => !FINISH_MUTABLE.has(key)))
+        .slice(0, 8);
   return { stable, finishInPlace, finishDiff };
+}
+
+/** 收尾时共有组件可以换的字段（与宿主 `contentPatch` 同集合）。 */
+const FINISH_MUTABLE = new Set([
+  'name',
+  'status',
+  'props',
+  'style',
+  'states',
+  'dataValue',
+  'dataBinding',
+  'belowSubCanvas',
+]);
+
+function finishCompatible(previous, next) {
+  return changedShared(previous, next).every(
+    (row) => row.id !== '(canvas)' && row.fields.every((key) => FINISH_MUTABLE.has(key)),
+  );
 }
 
 function changedShared(previous, next) {

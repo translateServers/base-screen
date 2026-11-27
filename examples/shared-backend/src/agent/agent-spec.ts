@@ -256,7 +256,8 @@ function renderBehaviorPrompt(
     ? `- 筛选：{ "kind": "filter", "from": "来源块的 key", "event": "来源组件的事件", "field": "来源行里的字段 id", "to": ["目标块的 key"], "param": "目标数据集的参数名" }。
   点了来源块，就把事件里的值写进目标块数据集的查询参数。目标必须是读数据集、且数据集声明了该参数的块；
   事件带 row 时写 field（来源块绑定的字段），图表点击取横轴值、页签取选中值时不写 field。
-  来源字段的取值要能落进目标参数的可选值，并且不同行取值不同，否则点了也不会变。`
+  来源字段的取值要能落进目标参数的可选值，并且不同行取值不同，否则点了也不会变。
+  用户说「再点一次恢复 / 取消选中」时加 "reset": true。`
     : '- 筛选（filter）只能经数据集参数生效：本轮没有引用数据集，不要写 filter。';
   return `
 
@@ -265,6 +266,8 @@ function renderBehaviorPrompt(
 - 在 regions 之后写 "interactions": [ … ]，最多 8 条，事件名只能用上面组件「事件」里列出的。
 ${filterRule}
 - 显隐：{ "kind": "show", "from": "来源块的 key", "event": "事件", "to": ["目标块的 key"], "mode": "show" }；mode 为 show（目标先隐藏，点了显示）/ hide / toggle。
+- 设状态：{ "kind": "state", "from": "来源块的 key", "event": "事件", "to": ["指标的 key"], "state": "该指标 states 里某条的 label" }；
+  目标必须是写了 states 的指标；"state": "reset" 表示恢复按阈值判定显示。用户说「点了 … 把 … 标成告警 / 高亮」时用它。
 - 阈值状态只写在绑了数据集字段的指标上（有 bind 的那种）：
   "states": [{ "op": "gte", "value": 90, "tone": "danger", "label": "过载" }, { "op": "gte", "value": 70, "tone": "warning" }]，
   op 为 gt / gte / lt / lte / eq / neq，tone 为 danger / warning / success / info，严重的写在前面；

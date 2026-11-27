@@ -407,8 +407,7 @@ export interface IntentBand {
 export interface IntentBehaviorSummary {
     readonly detail: string;
     readonly from: string;
-    // (undocumented)
-    readonly kind: 'filter' | 'show' | 'state';
+    readonly kind: 'filter' | 'show' | 'set-state' | 'state';
     readonly origin: string;
     readonly suggested?: boolean;
     readonly to: readonly string[];
@@ -734,6 +733,7 @@ export type IntentInteraction = {
     readonly field?: string;
     readonly to: readonly string[];
     readonly param: string;
+    readonly reset?: true;
     readonly origin: string;
 } | {
     readonly kind: 'show';
@@ -741,6 +741,13 @@ export type IntentInteraction = {
     readonly event: string;
     readonly to: readonly string[];
     readonly mode: 'show' | 'hide' | 'toggle';
+    readonly origin: string;
+} | {
+    readonly kind: 'state';
+    readonly from: string;
+    readonly event: string;
+    readonly to: readonly string[];
+    readonly state: string;
     readonly origin: string;
 };
 
@@ -795,6 +802,7 @@ export interface IntentKpiDelta {
 export interface IntentKpiStates {
     // (undocumented)
     readonly rules: readonly IntentStateRule[];
+    readonly source?: 'threshold' | 'level-scale';
     readonly suggested?: boolean;
 }
 
@@ -849,6 +857,14 @@ export interface IntentReferenceDataset {
     }[];
     // (undocumented)
     readonly datasetId: string;
+    readonly levelScales?: readonly {
+        readonly path: readonly string[];
+        readonly levels: readonly {
+            readonly value: string | number | boolean;
+            readonly label: string;
+            readonly tone: 'success' | 'warning' | 'danger' | 'info';
+        }[];
+    }[];
     // (undocumented)
     readonly name: string;
     readonly parameters?: readonly IntentReferenceParameter[];
@@ -910,13 +926,15 @@ export interface IntentSession {
 export interface IntentSessionDigest {
     readonly interactions?: readonly {
         readonly target: string;
-        readonly kind: 'filter' | 'show';
+        readonly kind: 'filter' | 'show' | 'state';
         readonly from: string;
         readonly to: readonly string[];
         readonly event: string;
         readonly field?: string;
         readonly param?: string;
+        readonly reset?: true;
         readonly mode?: 'show' | 'hide' | 'toggle';
+        readonly state?: string;
     }[];
     // (undocumented)
     readonly regions: readonly {
@@ -930,6 +948,7 @@ export interface IntentSessionDigest {
             readonly title: string;
             readonly value?: string;
             readonly key?: string;
+            readonly states?: readonly string[];
         }[];
     }[];
     // (undocumented)

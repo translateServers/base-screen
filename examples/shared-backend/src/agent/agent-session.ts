@@ -22,18 +22,23 @@ export interface AgentSessionItem {
   readonly value?: string;
   /** 联动用的句柄（ADR-0115）。 */
   readonly key?: string;
+  /** 指标已声明的状态名（「设状态」联动按它指向）。 */
+  readonly states?: readonly string[];
 }
 
 /** 当前的一条联动（ADR-0115 D9）：`unlink` 的 target 取它的 `target`。 */
 export interface AgentSessionInteraction {
   readonly target: string;
-  readonly kind: 'filter' | 'show';
+  readonly kind: 'filter' | 'show' | 'state';
   readonly from: string;
   readonly to: readonly string[];
   readonly event: string;
   readonly field?: string;
   readonly param?: string;
   readonly mode?: string;
+  readonly reset?: true;
+  /** 设状态的目标状态名。 */
+  readonly state?: string;
 }
 
 export interface AgentSessionRegion {
@@ -108,6 +113,12 @@ export function readSessionDigest(raw: unknown): AgentSessionDigest | null {
       const type = text(entry.type, 64);
       const value = text(entry.value, 40);
       const key = text(entry.key, 32);
+      const states = Array.isArray(entry.states)
+        ? entry.states
+            .map((state) => text(state, 16))
+            .filter((state) => state !== '')
+            .slice(0, 8)
+        : [];
       items.push({
         target,
         kind: entry.kind,
@@ -116,6 +127,7 @@ export function readSessionDigest(raw: unknown): AgentSessionDigest | null {
         ...(type === '' ? {} : { type }),
         ...(value === '' ? {} : { value }),
         ...(key === '' ? {} : { key }),
+        ...(states.length === 0 ? {} : { states }),
       });
     }
     regions.push({ path, kind, items });
@@ -134,7 +146,7 @@ function readInteractions(raw: unknown): AgentSessionInteraction[] {
     if (
       entry === null ||
       !INTERACTION_TARGET.test(target) ||
-      (kind !== 'filter' && kind !== 'show')
+      (kind !== 'filter' && kind !== 'show' && kind !== 'state')
     )
       continue;
     const to = Array.isArray(entry.to)
@@ -146,6 +158,7 @@ function readInteractions(raw: unknown): AgentSessionInteraction[] {
     const field = text(entry.field, 64);
     const param = text(entry.param, 64);
     const mode = text(entry.mode, 8);
+    const state = text(entry.state, 16);
     output.push({
       target,
       kind,
@@ -155,6 +168,8 @@ function readInteractions(raw: unknown): AgentSessionInteraction[] {
       ...(field === '' ? {} : { field }),
       ...(param === '' ? {} : { param }),
       ...(mode === '' ? {} : { mode }),
+      ...(entry.reset === true ? { reset: true as const } : {}),
+      ...(state === '' ? {} : { state }),
     });
   }
   return output;
@@ -194,7 +209,10 @@ ${renderSessionPrompt(digest)}${data}
     catalogHasEvents(catalog)
       ? `
 - 加联动：{ "op": "link", "interaction": { "kind": "filter", "from": "来源块的 target 或 key", "event": "目录里该组件的事件", "field": "来源行里的字段 id", "to": ["目标块的 target 或 key"], "param": "目标数据集的参数名" } }，
-  或 { "op": "link", "interaction": { "kind": "show", "from": "…", "event": "…", "to": ["…"], "mode": "show" } }；筛选只经数据集参数生效，目标必须读数据集。
+  或 { "op": "link", "interaction": { "kind": "show", "from": "…", "event": "…", "to": ["…"], "mode": "show" } }；筛选只经数据集参数生效，目标必须读数据集；
+  筛选要「再点恢复」时加 "reset": true；点了把某个指标切到它的某个状态写 { "kind": "state", "from": "…", "event": "…", "to": ["指标的 target 或 key"], "state": "状态名或 reset" }。
+  用户说「点 … 把某指标标成 / 切到 <状态>」且该指标「已有状态」里有它时，用这条 link，不要去改阈值；
+  指标还没有状态时，先用 change 给它写 states，再 link。
 - 去掉联动：{ "op": "unlink", "target": "上面列出的 interactions[i]" }。
 - 改指标的阈值状态：{ "op": "change", "target": "某个绑了数据集字段的指标", "set": { "states": [{ "op": "gte", "value": 90, "tone": "danger", "label": "过载" }] } }；阈值是你补的就写 { "rules": [ … ], "suggested": true }。`
       : ''
@@ -215,7 +233,7 @@ function renderSessionPrompt(digest: AgentSessionDigest): string {
     for (const item of region.items) {
       const label =
         item.kind === 'kpi'
-          ? `指标「${item.title}」${item.value === undefined ? '' : `，当前 ${item.value}`}`
+          ? `指标「${item.title}」${item.value === undefined ? '' : `，当前 ${item.value}`}${item.states === undefined ? '' : `，已有状态 ${item.states.join(' / ')}`}`
           : `块「${item.title}」，type ${item.type ?? '未知'}${region.kind === 'split' ? `，在 ${item.part === 'rail' ? '侧栏' : '主区'}` : ''}`;
       lines.push(
         `  - target: ${item.target} ｜ ${label}${item.key === undefined ? '' : `，key ${item.key}`}`,
@@ -225,8 +243,10 @@ function renderSessionPrompt(digest: AgentSessionDigest): string {
   for (const item of digest.interactions ?? []) {
     const what =
       item.kind === 'filter'
-        ? `点「${item.from}」${item.event}${item.field === undefined ? '' : `（${item.field}）`} → 筛选 ${item.to.join('、')} 的 ${item.param ?? ''}`
-        : `点「${item.from}」${item.event} → ${item.mode ?? 'toggle'} ${item.to.join('、')}`;
+        ? `点「${item.from}」${item.event}${item.field === undefined ? '' : `（${item.field}）`} → 筛选 ${item.to.join('、')} 的 ${item.param ?? ''}${item.reset === true ? '（再点恢复）' : ''}`
+        : item.kind === 'show'
+          ? `点「${item.from}」${item.event} → ${item.mode ?? 'toggle'} ${item.to.join('、')}`
+          : `点「${item.from}」${item.event} → 把 ${item.to.join('、')} 设为 ${item.state ?? ''}`;
     lines.push(`联动 ${item.target}：${what}`);
   }
   const body = lines.join('\n').replace(/(?:<<<\s*UNTRUSTED|UNTRUSTED\s*>>>)/gi, '[removed]');

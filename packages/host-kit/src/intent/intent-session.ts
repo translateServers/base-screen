@@ -455,6 +455,24 @@ function applyOne(
 
   // 不认识的字段整批拒绝：静默忽略会让「把名字改成订单量」写成 `name` 时看起来成功、实际什么也没改。
   if (op.op === 'change') {
+    // 指标阈值的简写：模型常把 `{ rules, suggested }` 直接写在 set 上，等同于 `states`。
+    // 也见过 `states: [...]` 配顶层 `suggested`：都折成 `states: { rules, suggested? }`。
+    if (found.kpi !== undefined && (Array.isArray(op.set.rules) || 'suggested' in op.set)) {
+      const { rules, suggested, states, ...rest } = op.set;
+      const base = Array.isArray(states)
+        ? { rules: states }
+        : states !== null && typeof states === 'object'
+          ? (states as Record<string, unknown>)
+          : Array.isArray(rules)
+            ? { rules }
+            : undefined;
+      if (base !== undefined) {
+        op = {
+          ...op,
+          set: { ...rest, states: suggested === true ? { ...base, suggested: true } : base },
+        };
+      }
+    }
     const allowed = found.kpi !== undefined ? KPI_FIELDS : BLOCK_FIELDS;
     const unknown = Object.keys(op.set).filter((key) => !allowed.has(key));
     if (unknown.length > 0) {
@@ -1276,18 +1294,24 @@ export interface IntentSessionDigest {
       readonly value?: string;
       /** 联动用的句柄（有才带）。 */
       readonly key?: string;
+      /** 指标已声明的状态名（「设状态」联动按它指向）。 */
+      readonly states?: readonly string[];
     }[];
   }[];
   /** 当前联动（ADR-0115 D9）：`unlink` 的 target 取它。 */
   readonly interactions?: readonly {
     readonly target: string;
-    readonly kind: 'filter' | 'show';
+    readonly kind: 'filter' | 'show' | 'state';
     readonly from: string;
     readonly to: readonly string[];
     readonly event: string;
     readonly field?: string;
     readonly param?: string;
+    /** 筛选再点恢复。 */
+    readonly reset?: true;
     readonly mode?: 'show' | 'hide' | 'toggle';
+    /** 设状态的目标状态名（或 `reset`）。 */
+    readonly state?: string;
   }[];
 }
 
@@ -1309,8 +1333,14 @@ export function describeSession(session: IntentSession): IntentSessionDigest {
     to: item.to,
     event: item.event,
     ...(item.kind === 'filter'
-      ? { param: item.param, ...(item.field === undefined ? {} : { field: item.field }) }
-      : { mode: item.mode }),
+      ? {
+          param: item.param,
+          ...(item.field === undefined ? {} : { field: item.field }),
+          ...(item.reset === true ? { reset: true as const } : {}),
+        }
+      : item.kind === 'show'
+        ? { mode: item.mode }
+        : { state: item.state }),
   }));
   return {
     title: intent.title,
@@ -1328,6 +1358,11 @@ export function describeSession(session: IntentSession): IntentSessionDigest {
             title: kpi.label,
             value: formatKpiValue(kpi, language),
             ...(kpi.key === undefined ? {} : { key: kpi.key }),
+            ...(kpi.states === undefined || kpi.states.rules.length === 0
+              ? {}
+              : {
+                  states: kpi.states.rules.map((rule) => rule.label ?? `${rule.tone}`),
+                }),
           })),
         };
       }

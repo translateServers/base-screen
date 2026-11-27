@@ -599,7 +599,7 @@ function createStreamDraft(
     },
     finish(document, rationale) {
       if (id === undefined || last === undefined || broken || !ownStreaming()) return false;
-      const delta = compileStreamDelta(current, last, document);
+      const delta = compileStreamDelta(current, last, document, { final: true });
       if (delta === undefined) return false;
       if (delta.length > 0 && !designer.extendChangeProposal(id, delta).ok) return false;
       if (!designer.finishChangeProposal(id, { rationale }).ok) return false;
@@ -619,25 +619,37 @@ function createStreamDraft(
  * 上一帧有、这一帧没有的组件（占位框）移除；新出现的组件新增；数据源按新一帧整份替换。
  * 两帧都有的组件必须一字不差，画布、变量、蓝图也不能变——否则就不是「只往格子里填内容」，
  * 返回 undefined，调用方停止追加。
+ *
+ * 收尾那一次（`final`，最终候选接最后一帧）放宽一处：共有组件的几何（位置、尺寸、旋转、层级、
+ * 父级、类型）仍须一字不差，但取值、绑定、状态、显隐、props / style 可以变——流式帧编译时还没有
+ * 本轮的数据集画像与行为，绑了数据的指标卡先画成「—」、联动与阈值状态最终稿才有（ADR-0115 评测 G1）。
+ * 这些差别编成 `update-components`，变量与蓝图整体换上；几何不动，草案不闪。
  */
 export function compileStreamDelta(
   current: ScreenDocument,
   previous: ScreenDocument,
   next: ScreenDocument,
+  options: { readonly final?: boolean } = {},
 ): readonly ProposalCommand[] | undefined {
+  const final = options.final === true;
   if (
     JSON.stringify(previous.canvas) !== JSON.stringify(next.canvas) ||
-    JSON.stringify(previous.variables) !== JSON.stringify(next.variables) ||
-    JSON.stringify(previous.blueprint) !== JSON.stringify(next.blueprint)
+    (!final &&
+      (JSON.stringify(previous.variables) !== JSON.stringify(next.variables) ||
+        JSON.stringify(previous.blueprint) !== JSON.stringify(next.blueprint)))
   ) {
     return undefined;
   }
   const before = new Map(previous.components.map((component) => [component.id, component]));
   const kept = new Set<string>();
+  const updated: ScreenComponentNode[] = [];
   for (const component of next.components) {
     const old = before.get(component.id);
     if (old === undefined) continue;
-    if (JSON.stringify(old) !== JSON.stringify(component)) return undefined;
+    if (JSON.stringify(old) !== JSON.stringify(component)) {
+      if (!final || !sameGeometry(old, component)) return undefined;
+      updated.push(component);
+    }
     kept.add(component.id);
   }
   const previousSources = adoptDataSources(current, previous);
@@ -650,10 +662,22 @@ export function compileStreamDelta(
     .filter((component) => !kept.has(component.id))
     .map((component) => component.id);
   if (removed.length > 0) commands.push({ type: 'remove-components', componentIds: removed });
+  // 变量先于数据源（数据源参数引用变量）。
+  if (final && JSON.stringify(previous.variables) !== JSON.stringify(next.variables)) {
+    commands.push({ type: 'replace-variables', variables: next.variables });
+  }
   if (JSON.stringify(previousSources.sources) !== JSON.stringify(nextSources.sources)) {
     // 数据源只会随新块增加；一帧里数据源反而没了，说明这不是同一份输出的续写。
     if (nextSources.sources === undefined) return undefined;
     commands.push({ type: 'replace-data-sources', dataSources: nextSources.sources });
+  }
+  for (const component of updated) {
+    const old = before.get(component.id) as ScreenComponentNode;
+    const patch = contentPatch(old, remapValueRef(component, nextSources.remapped));
+    if (patch === undefined) return undefined;
+    if (Object.keys(patch).length > 0) {
+      commands.push({ type: 'update-components', componentIds: [component.id], patch });
+    }
   }
   const zIndexBase = layerBase(current);
   for (const component of next.components) {
@@ -666,7 +690,57 @@ export function compileStreamDelta(
       },
     });
   }
+  if (final && JSON.stringify(previous.blueprint) !== JSON.stringify(next.blueprint)) {
+    commands.push({ type: 'replace-blueprint', blueprint: next.blueprint });
+  }
   return commands;
+}
+
+/** 收尾时共有组件不许动的部分：几何、层级、父级、类型与所属画布。 */
+const GEOMETRY_KEYS = [
+  'type',
+  'parentId',
+  'position',
+  'size',
+  'rotation',
+  'zIndex',
+  'canvasId',
+] as const;
+
+function sameGeometry(old: ScreenComponentNode, next: ScreenComponentNode): boolean {
+  const a = old as unknown as Record<string, unknown>;
+  const b = next as unknown as Record<string, unknown>;
+  return GEOMETRY_KEYS.every((key) => JSON.stringify(a[key]) === JSON.stringify(b[key]));
+}
+
+/** 收尾时共有组件可以换的字段；缺省可省的字段变没了写 `null`（命令里的「去掉」）。 */
+const CONTENT_KEYS = ['name', 'status', 'props', 'style'] as const;
+const OPTIONAL_CONTENT_KEYS = ['states', 'dataValue', 'dataBinding', 'belowSubCanvas'] as const;
+const KNOWN_KEYS = new Set<string>([
+  'id',
+  ...GEOMETRY_KEYS,
+  ...CONTENT_KEYS,
+  ...OPTIONAL_CONTENT_KEYS,
+]);
+
+function contentPatch(
+  old: ScreenComponentNode,
+  next: ScreenComponentNode,
+): Record<string, unknown> | undefined {
+  const a = old as unknown as Record<string, unknown>;
+  const b = next as unknown as Record<string, unknown>;
+  // 认不得的字段变了（例如 dataSource 旧写法）就不冒险，交给整屏提交。
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (!KNOWN_KEYS.has(key) && JSON.stringify(a[key]) !== JSON.stringify(b[key])) return undefined;
+  }
+  const patch: Record<string, unknown> = {};
+  for (const key of CONTENT_KEYS) {
+    if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) patch[key] = b[key];
+  }
+  for (const key of OPTIONAL_CONTENT_KEYS) {
+    if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) patch[key] = b[key] ?? null;
+  }
+  return patch;
 }
 
 /** 候选组件叠在当前文档最上层：层级整体抬到现有最大值之上。 */
@@ -1328,6 +1402,18 @@ function compileWholeScreenCommands(
     .map((component) => component.id);
   if (removable.length > 0) commands.push({ type: 'remove-components', componentIds: removable });
 
+  // 变量要先于数据源：筛选联动的数据源参数引用变量（ADR-0115），逐条校验时变量必须已经在。
+  // 先换成「旧 ∪ 新」（旧数据源此刻可能还引用旧变量），数据源与组件都换好后再收拢到新的。
+  const variablesChanged = JSON.stringify(current.variables) !== JSON.stringify(next.variables);
+  const incomingIds = new Set(next.variables.map((variable) => variable.id));
+  const union = [
+    ...next.variables,
+    ...current.variables.filter((variable) => !incomingIds.has(variable.id)),
+  ];
+  if (variablesChanged) {
+    commands.push({ type: 'replace-variables', variables: union });
+  }
+
   const { sources, remapped } = adoptDataSources(current, next);
   if (sources !== undefined) {
     commands.push({ type: 'replace-data-sources', dataSources: sources });
@@ -1341,7 +1427,7 @@ function compileWholeScreenCommands(
     });
   }
 
-  if (JSON.stringify(current.variables) !== JSON.stringify(next.variables)) {
+  if (variablesChanged && union.length !== next.variables.length) {
     commands.push({ type: 'replace-variables', variables: next.variables });
   }
   const blueprintBefore = clearBlueprint ? clearedBlueprint : current.blueprint;
@@ -1416,13 +1502,23 @@ function remapValueRef(
 function describeIncomingData(document: unknown, dataContext?: IntentDataContext): string {
   const sources =
     isRecord(document) && Array.isArray(document.dataSources) ? document.dataSources : [];
+  const variables = (
+    isRecord(document) && Array.isArray(document.variables) ? document.variables : []
+  ).filter(isRecord);
   const items: string[] = [];
   const used = new Set<string>();
   for (const source of sources) {
     if (!isRecord(source) || !isRecord(source.source) || source.source.kind !== 'dataset') continue;
     const params = isRecord(source.params)
       ? Object.entries(source.params)
-          .map(([name, value]) => `${name}=${isRecord(value) ? String(value.value) : ''}`)
+          .map(([name, value]) => {
+            // 联动推出的参数引用变量（ADR-0115）：写「随联动」，不是一个固定值。
+            if (isRecord(value) && value.kind === 'variable') {
+              const variable = variables.find((item) => item.id === value.variableId);
+              return `${name}=随联动（初始 ${String(variable?.initialValue ?? '')}）`;
+            }
+            return `${name}=${isRecord(value) ? String(value.value) : ''}`;
+          })
           .join('，')
       : '';
     items.push(`${String(source.name)}${params === '' ? '' : `（${params}）`}`);
@@ -1532,6 +1628,9 @@ const INTENT_WARNING_TEXT: Readonly<Record<string, string>> = {
   AGENT_INTERACTION_NO_EFFECT: '有联动点了也不会改变目标（来源取值都相同或不在可选值里），已去掉',
   AGENT_STATE_NEEDS_DATA: '阈值状态只对绑了真实数据的指标生效，示例数值的指标未加状态',
   AGENT_STATE_FIELD_TYPE: '有指标的阈值与字段类型不符，未加状态',
+  AGENT_STATE_LEVEL_SCALE_UNAVAILABLE:
+    '有指标要求按分级表生成状态，但宿主没有为该字段声明分级表，未加状态',
+  AGENT_INTERACTION_STATE_UNKNOWN: '有「设状态」联动指向目标没有的状态，已去掉',
   INTENT_FILTER_SHARED_SOURCE: '有模块与筛选目标共用同一数据源，会跟着一起筛选',
 };
 

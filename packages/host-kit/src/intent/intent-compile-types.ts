@@ -80,6 +80,19 @@ export interface IntentReferenceDataset {
    * 「点了之后参数会不会变」，只留在宿主里，不进提示词。缺省表示没有样本。
    */
   readonly values?: Readonly<Record<string, readonly (string | number | boolean)[]>>;
+  /**
+   * 宿主为字段声明的分级表（ADR-0115 D2「分级表来源」，形状同 ADR-0110 `ScreenLevelScale`，
+   * `path` 是字段 id 路径）。数据集字段的分级声明不在契约里（ADR-0110 D6 推迟），由宿主自己给；
+   * 缺省表示没有，指标写 `{ source: 'level-scale' }` 时不编译并说明。
+   */
+  readonly levelScales?: readonly {
+    readonly path: readonly string[];
+    readonly levels: readonly {
+      readonly value: string | number | boolean;
+      readonly label: string;
+      readonly tone: 'success' | 'warning' | 'danger' | 'info';
+    }[];
+  }[];
 }
 
 /** 本轮引用：用户指定的素材与数据集（列类型来自数据集 describe，供角色分配）。 */
@@ -140,7 +153,11 @@ export interface IntentStreamFrame {
 
 /** 编译出的一条联动 / 状态（ADR-0115 D5）：提案理由与评测据此如实说明「生成了哪些行为」。 */
 export interface IntentBehaviorSummary {
-  readonly kind: 'filter' | 'show' | 'state';
+  /**
+   * `filter` / `show` / `set-state` 是联动（谁驱动谁）；`state` 是挂在指标上的阈值或分级状态
+   * （`from` 与 `to` 都是这张指标卡）。
+   */
+  readonly kind: 'filter' | 'show' | 'set-state' | 'state';
   /** 模型原文路径：`interactions[0]` / `kpis[1]`。 */
   readonly origin: string;
   /** 来源块的名称（标题或物料名）。 */

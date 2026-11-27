@@ -31,7 +31,12 @@ import type {
  *   「来源组件事件 → 变量 set」，值取事件负载（表格行的字段、图表横轴值、页签选中值、数值）。
  *   只经数据集参数筛选，不做前端过滤。
  * - `show`：蓝图连「来源组件事件 → 目标块外壳 show / hide / toggle」；`show` 模式的目标初始隐藏。
+ * - `filter` 带 `reset`：中间插一个条件节点——点到的值等于变量当前值时恢复初始值，否则写入新值，
+ *   即「再点一次恢复」。
+ * - `state`（设状态）：蓝图连「来源组件事件 → 目标指标的数值组件 set-state / reset-state」，
+ *   状态必须是本屏已经给这张指标声明的（阈值或分级表生成的）。
  * - 阈值状态：绑了数据集字段的指标卡，数值组件按「第一行该字段」判定，命中的状态把文字色换成语义色位。
+ *   按分级表（`source: 'level-scale'`）时，等级与色调来自宿主为该字段声明的分级表。
  *
  * 采纳前模拟（D6）：用画像样本里该字段出现过的取值逐个造来源事件，交给 core 的
  * `simulateScreenBlueprint` 跑一遍级联，看目标实例的参数会不会变、变成的值在不在可选值里。
@@ -71,6 +76,7 @@ export const BEHAVIOR_REPAIRABLE: ReadonlySet<string> = new Set([
   'AGENT_INTERACTION_TARGET_INVALID',
   'AGENT_INTERACTION_NO_EFFECT',
   'AGENT_STATE_FIELD_TYPE',
+  'AGENT_INTERACTION_STATE_UNKNOWN',
 ]);
 
 /** 意图里的一项（指标卡或块）：联动按句柄或标题找到它。 */
@@ -238,12 +244,16 @@ export function compileIntentBehaviors(input: CompileIntentBehaviorsInput): Comp
   };
   const items = itemsOf(input.intent);
   const context = new Context(input, output);
+  // 设状态要指向已声明的状态：先编版面联动，再编状态，最后编「设状态」。
   for (const interaction of input.intent.interactions ?? []) {
     if (interaction.kind === 'filter') context.filter(interaction, items);
-    else context.show(interaction, items);
+    else if (interaction.kind === 'show') context.show(interaction, items);
   }
   for (const item of items) {
     if (item.kpi?.states !== undefined) context.states(item, item.kpi);
+  }
+  for (const interaction of input.intent.interactions ?? []) {
+    if (interaction.kind === 'state') context.setState(interaction, items);
   }
   return output;
 }
@@ -251,7 +261,13 @@ export function compileIntentBehaviors(input: CompileIntentBehaviorsInput): Comp
 class Context {
   #variables = 0;
   #edges = 0;
+  #conditions = 0;
   readonly #nodes = new Set<string>();
+  /** 本屏已编出的组件状态：组件 id → 状态（设状态联动按名称或色调找）。 */
+  readonly #states = new Map<
+    string,
+    { readonly id: string; readonly name: string; readonly tone: IntentStateRule['tone'] }[]
+  >();
 
   constructor(
     private readonly input: CompileIntentBehaviorsInput,
@@ -356,11 +372,18 @@ class Context {
   ): void {
     const source = this.sourceEvent(interaction, items);
     if (source === undefined) return;
-    const capability = this.missing([
+    const required: string[] = [
       SCREEN_BLUEPRINT_CAPABILITIES.materialEvent,
       SCREEN_BLUEPRINT_CAPABILITIES.eventPayload,
       SCREEN_BLUEPRINT_CAPABILITIES.setVariable,
-    ]);
+    ];
+    if (interaction.reset === true) {
+      required.push(
+        SCREEN_BLUEPRINT_CAPABILITIES.condition,
+        SCREEN_BLUEPRINT_CAPABILITIES.variable,
+      );
+    }
+    const capability = this.missing(required);
     if (capability !== undefined) {
       this.warn(
         'AGENT_INTERACTION_CAPABILITY_MISSING',
@@ -468,11 +491,41 @@ class Context {
     }
     this.#nodes.add(variableNode);
     this.output.blueprint.nodes.push({ kind: 'variable', id: variableNode, variableId });
-    this.edge({
-      from: { node: this.componentNode(source.component.id), port: `event:${interaction.event}` },
-      to: { node: variableNode, port: 'set' },
-      value: edgeValue,
-    });
+    const trigger = {
+      node: this.componentNode(source.component.id),
+      port: `event:${interaction.event}`,
+    };
+    if (interaction.reset === true) {
+      // 再点恢复：点到的值等于当前变量 → 恢复初始值；否则写入新值。
+      this.#conditions += 1;
+      const conditionNode = `agent:k:${this.#conditions}`;
+      this.#nodes.add(conditionNode);
+      this.output.blueprint.nodes.push({
+        kind: 'condition',
+        id: conditionNode,
+        name: this.input.language === 'en' ? 'Same item again?' : '再点同一项？',
+        condition: { left: edgeValue, operator: 'eq', right: { kind: 'variable', variableId } },
+      });
+      this.edge({ from: trigger, to: { node: conditionNode, port: 'judge' } });
+      this.edge({
+        from: { node: conditionNode, port: 'yes' },
+        to: { node: variableNode, port: 'set' },
+        value: { kind: 'literal', value: first.initial },
+      });
+      this.edge({
+        from: { node: conditionNode, port: 'no' },
+        to: { node: variableNode, port: 'set' },
+        value: edgeValue,
+      });
+    } else {
+      this.edge({ from: trigger, to: { node: variableNode, port: 'set' }, value: edgeValue });
+    }
+    const again =
+      interaction.reset === true
+        ? this.input.language === 'en'
+          ? ' (click again to reset)'
+          : '（再点恢复）'
+        : '';
     this.output.behaviors.push({
       kind: 'filter',
       origin: interaction.origin,
@@ -480,8 +533,8 @@ class Context {
       to: toNames,
       detail:
         this.input.language === 'en'
-          ? `${source.event.label ?? interaction.event} → filter by ${interaction.param}`
-          : `${source.event.label ?? interaction.event} → 按 ${interaction.param} 筛选`,
+          ? `${source.event.label ?? interaction.event} → filter by ${interaction.param}${again}`
+          : `${source.event.label ?? interaction.event} → 按 ${interaction.param} 筛选${again}`,
     });
   }
 
@@ -731,17 +784,45 @@ class Context {
       );
       return;
     }
-    const column = this.input.references?.datasets
-      .find((dataset) => dataset.datasetId === kpi.bind?.datasetId)
-      ?.columns.find((entry) => entry.id === kpi.bind?.field);
-    const numeric = states.rules.some((rule) => rule.op !== 'eq' && rule.op !== 'neq');
-    if (numeric && column !== undefined && column.type !== 'number') {
-      this.warn(
-        'AGENT_STATE_FIELD_TYPE',
-        item.origin,
-        `Field ${kpi.bind.field} is ${column.type}; compare it with eq / neq, not a numeric threshold.`,
+    const dataset = this.input.references?.datasets.find(
+      (entry) => entry.datasetId === kpi.bind?.datasetId,
+    );
+    const field = kpi.bind.field;
+    // 规则：阈值来自模型（或用户）；分级表来自宿主为该字段声明的等级（ADR-0110 §2.6.3 同一套）。
+    let rules: readonly IntentStateRule[] = states.rules;
+    /** 分级表的原始取值（判定按它比较；布尔等级在 `rules` 里只为显示转成了文字）。 */
+    let levelValues: readonly (string | number | boolean)[] | undefined;
+    if (states.source === 'level-scale') {
+      const scale = dataset?.levelScales?.find(
+        (entry) => entry.path.length === 1 && entry.path[0] === field,
       );
-      return;
+      if (scale === undefined || scale.levels.length === 0) {
+        this.warn(
+          'AGENT_STATE_LEVEL_SCALE_UNAVAILABLE',
+          item.origin,
+          `The host declares no level scale for field ${field}; level states were not generated.`,
+          { target: item.title, field },
+        );
+        return;
+      }
+      levelValues = scale.levels.slice(0, 8).map((level) => level.value);
+      rules = scale.levels.slice(0, 8).map((level) => ({
+        op: 'eq' as const,
+        value: typeof level.value === 'boolean' ? String(level.value) : level.value,
+        tone: level.tone,
+        label: level.label,
+      }));
+    } else {
+      const column = dataset?.columns.find((entry) => entry.id === field);
+      const numeric = rules.some((rule) => rule.op !== 'eq' && rule.op !== 'neq');
+      if (numeric && column !== undefined && column.type !== 'number') {
+        this.warn(
+          'AGENT_STATE_FIELD_TYPE',
+          item.origin,
+          `Field ${field} is ${column.type}; compare it with eq / neq, not a numeric threshold.`,
+        );
+        return;
+      }
     }
     const material = this.input.catalog.materials.find((entry) => entry.type === component.type);
     const colorable = material !== undefined && 'color' in material.defaults.style;
@@ -754,11 +835,19 @@ class Context {
       if (Object.keys(preset).length > 0) return preset;
       return colorable ? { color: screenThemeRef(tone) } : {};
     };
-    const stateItems = states.rules.map((rule, index) => ({
+    const stateItems = rules.map((rule, index) => ({
       id: `agent-state-${index + 1}`,
       name: rule.label ?? toneName(rule.tone, this.input.language),
       style: presetFor(rule.tone),
     }));
+    this.#states.set(
+      component.id,
+      stateItems.map((state, index) => ({
+        id: state.id,
+        name: state.name,
+        tone: (rules[index] as IntentStateRule).tone,
+      })),
+    );
     component.states = {
       items: stateItems,
       judge: {
@@ -766,16 +855,16 @@ class Context {
         input: {
           kind: 'data-source-field',
           dataSourceId: value.dataSourceId,
-          path: ['rows', '0', kpi.bind.field],
+          path: ['rows', '0', field],
         },
-        cases: states.rules.map((rule, index) => ({
+        cases: rules.map((rule, index) => ({
           operator: rule.op,
-          value: rule.value,
+          value: levelValues?.[index] ?? rule.value,
           stateId: `agent-state-${index + 1}`,
         })),
       },
     };
-    if (states.suggested === true) {
+    if (states.suggested === true && states.source !== 'level-scale') {
       this.warn(
         'INTENT_STATE_SUGGESTED',
         item.origin,
@@ -783,13 +872,118 @@ class Context {
         { target: item.title },
       );
     }
+    const described = rules.map((rule) => describeRule(rule, this.input.language)).join('；');
     this.output.behaviors.push({
       kind: 'state',
       origin: item.origin,
       from: item.title,
       to: [item.title],
-      detail: states.rules.map((rule) => describeRule(rule, this.input.language)).join('；'),
-      ...(states.suggested === true ? { suggested: true } : {}),
+      detail:
+        states.source === 'level-scale'
+          ? `${this.input.language === 'en' ? 'by host level scale: ' : '按宿主分级表：'}${described}`
+          : described,
+      ...(states.suggested === true && states.source !== 'level-scale' ? { suggested: true } : {}),
+    });
+  }
+
+  /**
+   * 设状态（ADR-0115 D2）：点来源 → 目标指标的数值组件切到某个已声明的状态（`set-state`），
+   * 或恢复按判定显示（`reset-state`）。状态按名称找，找不到再按色调（danger / 告警）找；
+   * 目标没有状态、状态名对不上都进修复（模型可以改名或先给目标声明状态）。
+   */
+  setState(
+    interaction: Extract<IntentInteraction, { kind: 'state' }>,
+    items: readonly Item[],
+  ): void {
+    const source = this.sourceEvent(interaction, items);
+    if (source === undefined) return;
+    const capability = this.missing([
+      SCREEN_BLUEPRINT_CAPABILITIES.materialEvent,
+      SCREEN_BLUEPRINT_CAPABILITIES.componentState,
+    ]);
+    if (capability !== undefined) {
+      this.warn(
+        'AGENT_INTERACTION_CAPABILITY_MISSING',
+        interaction.origin,
+        `The host has not granted ${capability}; the interaction was not compiled.`,
+        { capability },
+      );
+      return;
+    }
+    const reset = interaction.state.toLowerCase() === 'reset';
+    const targets: Item[] = [];
+    let stateName = '';
+    for (const ref of interaction.to) {
+      const item = findItem(items, ref);
+      const component = item === undefined ? undefined : this.mainOf(item);
+      if (item === undefined || component === undefined) {
+        this.warn(
+          'AGENT_INTERACTION_TARGET_UNKNOWN',
+          interaction.origin,
+          `No compiled block is addressed by "${ref}".`,
+        );
+        continue;
+      }
+      const declared = this.#states.get(component.id);
+      if (declared === undefined || declared.length === 0) {
+        this.warn(
+          'AGENT_INTERACTION_TARGET_INVALID',
+          interaction.origin,
+          `${this.nameOf(item)} declares no states; give the KPI "states" first, then set one of them.`,
+          { target: this.nameOf(item), reason: 'no-states' },
+        );
+        continue;
+      }
+      if (reset) {
+        this.edge({
+          from: {
+            node: this.componentNode(source.component.id),
+            port: `event:${interaction.event}`,
+          },
+          to: { node: this.componentNode(component.id), port: 'reset-state' },
+        });
+        targets.push(item);
+        continue;
+      }
+      const wanted = interaction.state.trim();
+      const state =
+        declared.find((entry) => entry.name === wanted) ??
+        declared.find(
+          (entry) => entry.tone === wanted || toneName(entry.tone, this.input.language) === wanted,
+        );
+      if (state === undefined) {
+        const names = declared.map((entry) => entry.name).join(', ');
+        this.warn(
+          'AGENT_INTERACTION_STATE_UNKNOWN',
+          interaction.origin,
+          `${this.nameOf(item)} has no state "${wanted}" (states: ${names}).`,
+          { target: this.nameOf(item), states: names },
+        );
+        continue;
+      }
+      stateName = state.name;
+      this.edge({
+        from: { node: this.componentNode(source.component.id), port: `event:${interaction.event}` },
+        to: { node: this.componentNode(component.id), port: 'set-state' },
+        stateId: state.id,
+      });
+      targets.push(item);
+    }
+    if (targets.length === 0) return;
+    const en = this.input.language === 'en';
+    const verb = reset
+      ? en
+        ? 'reset the state of'
+        : '恢复按判定显示'
+      : en
+        ? `set to "${stateName}":`
+        : `设为「${stateName}」`;
+    this.output.behaviors.push({
+      kind: 'set-state',
+      origin: interaction.origin,
+      from: this.nameOf(source.item),
+      to: targets.map((item) => this.nameOf(item)),
+      detail: `${source.event.label ?? interaction.event} → ${verb}`,
     });
   }
 }

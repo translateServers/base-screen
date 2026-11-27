@@ -1546,6 +1546,60 @@ describe('host intent streamed generation (ADR-0112 §2.5 / ADR-0113 §2.8)', ()
       }),
     ).toBeUndefined();
   });
+
+  it('lets the final candidate swap content but never geometry (bound KPIs, states, behaviors)', () => {
+    const current = document();
+    const final = filled();
+    const bound = {
+      ...final,
+      dataSources: [
+        {
+          id: 'agent-ds-1',
+          name: '产线概览',
+          source: { kind: 'dataset' as const, datasetId: 'monitor.line-summary' },
+          params: {},
+        },
+      ],
+      variables: [
+        { id: 'agent-var-1', name: 'line_1', type: 'static' as const, initialValue: 'A' },
+      ],
+      components: final.components.map((node) =>
+        node.id === 'agent-block-0-0'
+          ? {
+              ...node,
+              dataValue: {
+                kind: 'data-source-field' as const,
+                dataSourceId: 'agent-ds-1',
+                path: [],
+              },
+            }
+          : node,
+      ),
+    } as unknown as ScreenDocument;
+
+    // 流式帧之间仍然一字不差才接得上。
+    expect(compileStreamDelta(current, filled(), bound)).toBeUndefined();
+
+    const delta = compileStreamDelta(current, filled(), bound, { final: true });
+    // 变量先于数据源：数据源参数引用变量（ADR-0115 §8 B1）。
+    expect(delta).toEqual([
+      { type: 'replace-variables', variables: bound.variables },
+      { type: 'replace-data-sources', dataSources: bound.dataSources },
+      {
+        type: 'update-components',
+        componentIds: ['agent-block-0-0'],
+        patch: { dataValue: { kind: 'data-source-field', dataSourceId: 'agent-ds-1', path: [] } },
+      },
+    ]);
+
+    const moved = {
+      ...bound,
+      components: bound.components.map((node) =>
+        node.id === 'agent-title-0' ? { ...node, position: { x: 41, y: 32 } } : node,
+      ),
+    };
+    expect(compileStreamDelta(current, filled(), moved, { final: true })).toBeUndefined();
+  });
 });
 
 const HOSTS = ['vanilla-host', 'react-host', 'vue-host'] as const;

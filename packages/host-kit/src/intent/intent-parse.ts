@@ -876,6 +876,7 @@ function readKey(
 
 /**
  * 阈值状态：`[{ op, value, tone, label? }]` 或 `{ rules: [...], suggested?: true }`。
+ * 按宿主分级表：`{ source: 'level-scale' }`（规则由宿主分级表给，模型不写）。
  * 单条不合格只丢那一条并进修复（`INTENT_STATE_INVALID`）。
  */
 function readKpiStates(
@@ -885,6 +886,7 @@ function readKpiStates(
 ): IntentKpiStates | undefined {
   if (raw === undefined) return undefined;
   const record = asRecord(raw);
+  if (record?.source === 'level-scale') return { rules: [], source: 'level-scale' };
   const list = Array.isArray(raw) ? raw : Array.isArray(record?.rules) ? record.rules : undefined;
   const invalid = (message: string): undefined => {
     diagnostics.push({ severity: 'error', code: 'INTENT_STATE_INVALID', path: origin, message });
@@ -1030,6 +1032,7 @@ function readInteraction(raw: unknown, origin: string): IntentInteraction | stri
       to,
       param,
       ...(field === '' ? {} : { field }),
+      ...(record.reset === true ? { reset: true as const } : {}),
       origin,
     };
   }
@@ -1038,7 +1041,14 @@ function readInteraction(raw: unknown, origin: string): IntentInteraction | stri
       typeof record.mode === 'string' && SHOW_MODES.has(record.mode) ? record.mode : 'toggle';
     return { kind: 'show', from, event, to, mode: mode as 'show' | 'hide' | 'toggle', origin };
   }
-  return 'Interaction kind must be "filter" or "show".';
+  if (record.kind === 'state') {
+    const state = typeof record.state === 'string' ? clampText(record.state.trim(), 16) : '';
+    if (state === '') {
+      return 'A state interaction needs "state": a state name or tone of the target, or "reset".';
+    }
+    return { kind: 'state', from, event, to, state, origin };
+  }
+  return 'Interaction kind must be "filter", "show" or "state".';
 }
 
 function readRoot(input: unknown): Record<string, unknown> | undefined {
