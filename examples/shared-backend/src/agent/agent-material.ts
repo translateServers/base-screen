@@ -73,9 +73,10 @@ export function buildMaterialRepairPrompt(
 /**
  * few-shot：改写自 `tooling/verification/browser-harness/template-materials.ts`（ADR-0116 S5 对照用的
  * 6 种模板物料，均已通过体检）。挑单值仪表、多行折线、枚举状态灯三种，覆盖 arc / ticks / repeat /
- * polyline / pick / 动画 / 事件。那边的写法变了，这里要一起改。
+ * polyline / pick / 动画 / 事件。那边的写法变了，这里要一起改；`tests/examples/material-draft-agent.test.ts`
+ * 用 SDK 体检锁定它们零错误，提示词里的图元与函数清单也对照 SDK 常量。
  */
-const FEW_SHOT_SPECS: readonly unknown[] = [
+export const AGENT_MATERIAL_FEW_SHOT_SPECS: readonly unknown[] = [
   {
     type: 'host.online.example-gauge',
     name: '环形仪表',
@@ -416,7 +417,7 @@ const FEW_SHOT_SPECS: readonly unknown[] = [
   },
 ];
 
-const FEW_SHOT = FEW_SHOT_SPECS.map(
+const FEW_SHOT = AGENT_MATERIAL_FEW_SHOT_SPECS.map(
   (spec, index) => `示例 ${index + 1}：\n${JSON.stringify({ spec })}`,
 ).join('\n\n');
 
@@ -432,9 +433,9 @@ export const AGENT_MATERIAL_SYSTEM_PROMPT = `你是大屏设计器的组件作�
 - name：组件名（中文，≤ 16 字）；category：分类（如 指标 / 图表 / 状态 / 装饰）；keywords：2–5 个关键词数组。
 - defaultSize：{ width, height } 默认像素尺寸，通常在 600×300 以内。
 - rotate：可省略；不该旋转的（指示灯、读数）写 false。
-- numberFormat（可选，单值数字读数才用）：{ decimals, unit?: true | "%", prefix?, thousandsSeparator?: true }。开启后模板里用 format(value) 显示读数。
+- numberFormat（可选，单值数字读数才用）：{ decimals, unit?: true | "%", prefix?, thousandsSeparator?: true }。开启后模板里用 format(value) 显示读数。小数位、前缀、单位、千分位只在这里声明，fields 里不要再写 decimals / prefix / unit / thousandsSeparator 字段。
 - fields：可调项数组（≤ 24），每项 { key, label, section, kind, default, min?, max?, step?, unit?, options?, visibleWhen? }。
-  - key 小驼峰 ASCII；label 中文 ≤ 8 字，单位写进 unit 不写进 label。
+  - key 小驼峰 ASCII；label 中文 ≤ 8 字，单位写进 unit 不写进 label；颜色字段的 label 以「色」结尾（如「描边色」）。
   - section 决定落点：format（读数格式开关）/ structure（结构，进 props）/ text（文字，进 style）/ surface（填充与描边，进 style）/ semantic（语义色，进 style）/ motion（动效开关，进 props）。
   - kind：number / text / boolean / color / choice（choice 要 options，2–12 个）。颜色只能放 text / surface / semantic。
   - 样式键优先复用：color、fontSize、backgroundColor、fillColor、trackColor、strokeColor、strokeWidth、borderColor、accentColor、gridColor、labelColor、valueColor、waterColor、waveColor、runningColor、warningColor、criticalColor、offlineColor、positiveColor、negativeColor。
@@ -465,16 +466,18 @@ export const AGENT_MATERIAL_SYSTEM_PROMPT = `你是大屏设计器的组件作�
   - ticks { cx, cy, r, length, count, start, end }：一圈刻度；颜色写在 stroke；
   - wave { x, y, width, height, amplitude, wavelength, phase? }：波浪填充（水位、液面）。
   - text { x, y, fontSize, content, fontWeight?: 400|500|600|700, anchor?: start|middle|end, baseline?: auto|middle|hanging, fill, backdrop }。
-- 文字规则：fontSize 写屏幕像素（≥ 16，常用 style.fontSize 字段），只能是数字或 props / style 数字字段的四则运算；必须写 backdrop：文字底下那个填充节点的 id，或 "container"。文字与底板颜色要有足够对比度。
+- 文字规则：fontSize 写屏幕像素，每一段文字（含副标注、刻度值）换算后都要 ≥ 16——不要写 style.fontSize * 0.4 这种缩小系数，副文字另声明一个 labelFontSize 字段（min ≥ 16）；fontSize 只能是数字或 props / style 数字字段的四则运算；必须写 backdrop：文字底下那个填充节点的 id，或 "container"。文字与底板颜色要有足够对比度。
 - 颜色规则：fill / stroke / 色标只能是字面量颜色（#rrggbb、rgba(...)、none）、style.<颜色字段>、{ "gradient": "渐变 id" }，或用 pick(...) / 三元表达式在它们之间选；不能由数据算出颜色字符串，不能写 url(...)。
 - 渐变写在 defs：{ "kind": "linearGradient", "id", "x1"?, "y1"?, "x2"?, "y2"?, "stops": [{ "offset": 0–1, "color": 颜色, "opacity"? }…] }，radialGradient 用 cx / cy / r。
 - 动画（≤ 8，只在预览与运行时播放）：
-  - { "kind": "loop", "target": 节点 id, "property": translateX | translateY | rotate | scale | opacity, "from", "to", "duration": 100–20000, "easing"?, "alternate"?, "enabledBy"?: 表达式 }；
+  - { "kind": "loop", "target": 节点 id, "property": translateX | translateY | rotate | scale | opacity, "from", "to", "duration": 100–20000, "easing"?, "alternate"?, "enabledBy"?: 表达式 }；duration 必须是数字字面量，不能引用字段；
   - { "kind": "change", "target": 节点 id, "attributes": [该节点的数值参数…], "duration" }：读数变化时补间。
 - 不存在的东西：foreignObject、image、use、style、filter、script、href、任何 on 开头的属性。
 
 ## 表达式（字符串）
 - 数值属性、content、test、动画参数都可以写成表达式字符串；字面量数字直接写数字。
+- 引用的根由字段所在分区决定：structure / format / motion 的字段写 props.<键>，text / surface / semantic 的字段写 style.<键>，写错根同样算未声明。用到的每个字段都要先在 fields 里声明。
+- row.<角色id> 只能写在 source 为 "rows" 的 repeat（或 polyline 的 points）里面；要单独强调某一行（如最后一个点），在 repeat 里用 when 判断 index == count - 1，或用 maxOf / minOf 取值。
 - 能引用的只有：value（单值读数）、rows（全部行，只能交给聚合函数）、row.<角色id> / index / count（repeat 里）、props.<structure/format/motion 字段>、style.<text/surface/semantic 字段>、size.width / size.height。引用未声明的字段或角色会报错。
 - 运算：+ - * / %、比较、&& || !、三元 a ? b : c。+ 只做数值加法，拼字符串用 concat(...)。字符串字面量用单引号。
 - 函数：min max clamp(v, lo, hi) abs round(v, 位数?) floor ceil sqrt sin cos、scale(v, d0, d1, r0, r1) 线性映射、pct(v, lo?, hi?) 归一到 0–1、format(v) 按读数格式格式化、fixed(v, 位数)、concat(...)、len(s)、charAt(s, i)、pick(key, k1, v1, k2, v2, …, 缺省)、maxOf(rows, '角色') minOf(rows, '角色') sumOf(rows, '角色')。没有循环、变量、自定义函数。
@@ -484,6 +487,7 @@ export const AGENT_MATERIAL_SYSTEM_PROMPT = `你是大屏设计器的组件作�
 - 先画底板（rect 或 circle，填 style.backgroundColor），文字的 backdrop 指向它。
 - 读数用 text + format(value)；百分比、进度用 pct(...) 换算后乘长度或角度。
 - 多行数据用 repeat 或 polyline 的 points，坐标用 index 与 scale(...) 算，留出边距。
+- 横排重复（逐位数字、一排灯）时按最多会出现的个数排版：单元宽 × 个数 + 间距不能超过 viewBox 宽，必要时把 defaultSize 与 viewBox 一起放宽；按示例数据画出来的所有节点都要在 viewBox 里。
 - 告警变色写成 pick(...) 或三元，在 semantic 分区声明对应颜色字段。
 
 ## 示例（照这个形状写，不要照抄内容）
