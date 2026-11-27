@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>L2 模板物料对照 · Base Screen Harness</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #0b0f14;
+        color: #e6edf6;
+        font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      }
+      header { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
+      h1 { margin: 0; font-size: 18px; }
+      button {
+        padding: 6px 14px;
+        border: 1px solid #5297fc;
+        border-radius: 6px;
+        background: #5297fc;
+        color: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+      [data-events] { color: #a9c8ff; font-size: 12px; }
+      pre[data-audit] {
+        margin: 0 0 16px;
+        padding: 8px 12px;
+        border: 1px solid #263140;
+        border-radius: 8px;
+        background: #121820;
+        color: #94a3b8;
+        font: 12px/1.5 ui-monospace, Consolas, monospace;
+        white-space: pre-wrap;
+      }
+      [data-pairs] { display: grid; grid-template-columns: repeat(auto-fill, minmax(860px, 1fr)); gap: 16px; }
+      .pair { padding: 12px; border: 1px solid #263140; border-radius: 10px; background: #121820; }
+      .pair h2 { margin: 0 0 8px; font-size: 14px; }
+      .stage { width: 100%; overflow: hidden; border-radius: 6px; }
+      .stage > base-screen-viewer { display: block; width: 100%; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>L2 模板物料对照（ADR-0116 D9）</h1>
+      <button type="button" data-next>换一组读数</button>
+      <span data-events>点击模板里的读数 / 数据点会在这里显示事件</span>
+    </header>
+    <pre data-audit></pre>
+    <main data-pairs></main>
+    <script type="module" src="./templates.ts"></script>
+  </body>
+</html>

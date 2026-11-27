@@ -25,6 +25,11 @@ import {
   parseBaseScreenMaterialSpec,
 } from './material-spec.js';
 import {
+  type CompiledBaseScreenMaterialTemplate,
+  compileBaseScreenMaterialTemplate,
+} from './material-template.js';
+import { createBaseScreenMaterialTemplateRenderer } from './material-template-render.js';
+import {
   createBaseScreenMaterialEmptyView,
   createBaseScreenMaterialErrorView,
   createBaseScreenMaterialStateView,
@@ -180,15 +185,20 @@ export function formatBaseScreenMaterialNumber(input: unknown, props: ScreenJson
 export function createBaseScreenRenderedMaterialElement(options: {
   readonly manifest: BaseScreenMaterialManifest;
   readonly data: BaseScreenMaterialSpecData;
-  readonly render: BaseScreenMaterialRenderFunction;
+  readonly render: BaseScreenMaterialRenderFunction | (() => BaseScreenMaterialRenderFunction);
+  /** `render` 是工厂：每个实例调用一次取得自己的渲染函数（模板解释器要记上一帧做过渡）。 */
+  readonly renderPerInstance?: true;
 }): BaseScreenMaterialConstructor {
   const ElementBase =
     (globalThis as { readonly HTMLElement?: typeof HTMLElement }).HTMLElement ??
     (class {} as unknown as typeof HTMLElement);
-  const presenterOptions: BaseScreenRenderedMaterialOptions = {
+  const presenterOptions = (): BaseScreenRenderedMaterialOptions => ({
     data: options.data,
-    render: options.render,
-  };
+    render:
+      options.renderPerInstance === true
+        ? (options.render as () => BaseScreenMaterialRenderFunction)()
+        : (options.render as BaseScreenMaterialRenderFunction),
+  });
 
   class RenderedMaterialElement extends ElementBase {
     #model: BaseScreenMaterialModel | undefined;
@@ -215,7 +225,7 @@ export function createBaseScreenRenderedMaterialElement(options: {
       if (model === undefined || !this.isConnected) return;
       this.#presenter ??= createBaseScreenRenderedMaterialPresenter(
         this.shadowRoot ?? this.attachShadow({ mode: 'open' }),
-        presenterOptions,
+        presenterOptions(),
       );
       this.#presenter.update(model);
     }
@@ -235,10 +245,57 @@ export function createBaseScreenRenderedMaterialElement(options: {
 
 export interface CreateBaseScreenSpecMaterialDefinitionOptions {
   readonly spec: BaseScreenMaterialSpec;
-  readonly render: BaseScreenMaterialRenderFunction;
+  /** 代码物料的渲染函数；L2 模板物料（规格带 `template`）不给。 */
+  readonly render?: BaseScreenMaterialRenderFunction;
   readonly tagName: string;
   readonly libraryVisible?: boolean;
   readonly cover?: string;
+}
+
+/**
+ * 模板 → 渲染函数（L2，ADR-0116）。`createRender()` 每次返回一个新实例的解释器，
+ * 工坊预览与画布元素共用同一份解释器实现。
+ */
+export function createBaseScreenMaterialTemplateRender(
+  spec: BaseScreenMaterialSpec,
+): ScreenParseResult<() => BaseScreenMaterialRenderFunction> {
+  const compiled = compileSpecTemplate(spec);
+  if (!compiled.ok) return compiled;
+  const template = compiled.value;
+  return {
+    ok: true,
+    value: () => {
+      const renderer = createBaseScreenMaterialTemplateRenderer(template);
+      return (context) =>
+        renderer({
+          document: context.document,
+          root: context.root,
+          props: context.props,
+          style: context.style,
+          size: context.size,
+          interactive: context.mode !== 'design',
+          value: context.value,
+          rows: context.rows,
+          formatNumber: context.formatNumber,
+        });
+    },
+    diagnostics: [],
+  };
+}
+
+function compileSpecTemplate(
+  spec: BaseScreenMaterialSpec,
+): ScreenParseResult<CompiledBaseScreenMaterialTemplate> {
+  if (spec.template === undefined) {
+    return failure('PLUGIN_CORE_LIFECYCLE_INVALID', ['template'], '规格没有 template。');
+  }
+  return compileBaseScreenMaterialTemplate(spec.template, {
+    fields: spec.fields,
+    data: spec.data,
+    ...(spec.events === undefined ? {} : { events: spec.events }),
+    sectionTarget: (section) =>
+      section === 'text' || section === 'surface' || section === 'semantic' ? 'style' : 'props',
+  });
 }
 
 /**
@@ -248,21 +305,41 @@ export interface CreateBaseScreenSpecMaterialDefinitionOptions {
 export function createBaseScreenSpecMaterialDefinition(
   options: CreateBaseScreenSpecMaterialDefinitionOptions,
 ): ScreenParseResult<BaseScreenMaterialDefinition> {
-  if (typeof options.render !== 'function') {
-    return failure('PLUGIN_CORE_LIFECYCLE_INVALID', ['render'], '渲染函数必须是函数。');
-  }
   const spec = parseBaseScreenMaterialSpec(options.spec);
   if (!spec.ok) return spec;
+  const hasTemplate = spec.value.template !== undefined;
+  if (hasTemplate && options.render !== undefined) {
+    // ADR-0116 D1：L2 物料只有数据；没有「模板 + 补充代码」的混合形态。
+    return failure(
+      'PLUGIN_CORE_LIFECYCLE_INVALID',
+      ['render'],
+      'MATERIAL_TEMPLATE_RENDER_CONFLICT：规格带 template 时不能再给渲染函数。',
+    );
+  }
+  if (!hasTemplate && typeof options.render !== 'function') {
+    return failure('PLUGIN_CORE_LIFECYCLE_INVALID', ['render'], '渲染函数必须是函数。');
+  }
   const manifest = compileBaseScreenMaterialSpec(spec.value, {
     tagName: options.tagName,
     ...(options.libraryVisible === undefined ? {} : { libraryVisible: options.libraryVisible }),
     ...(options.cover === undefined ? {} : { cover: options.cover }),
   });
   if (!manifest.ok) return manifest;
+  if (hasTemplate) {
+    const render = createBaseScreenMaterialTemplateRender(spec.value);
+    if (!render.ok) return render;
+    const element = createBaseScreenRenderedMaterialElement({
+      manifest: manifest.value,
+      data: spec.value.data,
+      render: render.value,
+      renderPerInstance: true,
+    });
+    return createMaterialDefinition({ manifest: manifest.value, element });
+  }
   const element = createBaseScreenRenderedMaterialElement({
     manifest: manifest.value,
     data: spec.value.data,
-    render: options.render,
+    render: options.render as BaseScreenMaterialRenderFunction,
   });
   return createMaterialDefinition({ manifest: manifest.value, element });
 }

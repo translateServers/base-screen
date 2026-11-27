@@ -394,6 +394,9 @@ importers:
       '@base-screen/contracts':
         specifier: workspace:^
         version: link:../contracts
+      '@base-screen/core':
+        specifier: workspace:^
+        version: link:../core
       '@base-screen/plugin-core':
         specifier: workspace:^
         version: link:../plugin-core

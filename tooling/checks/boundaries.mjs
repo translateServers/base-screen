@@ -20,7 +20,8 @@ const ALLOWED_WORKSPACE_DEPENDENCIES = Object.freeze({
   core: ['contracts'],
   'plugin-core': ['contracts'],
   'plugin-manager': ['contracts', 'plugin-core'],
-  'plugin-sdk': ['contracts', 'plugin-core'],
+  // ADR-0116 D4：L2 模板体检复用 core 的字号下限与对比度（core 只依赖 contracts，不成环）。
+  'plugin-sdk': ['contracts', 'core', 'plugin-core'],
   'host-kit': ['contracts', 'core'],
   renderer: ['contracts', 'core', 'plugin-core'],
   engine: ['contracts', 'core', 'renderer', 'plugin-core', 'plugin-manager'],

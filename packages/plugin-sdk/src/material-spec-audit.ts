@@ -15,6 +15,7 @@ import {
   BASE_SCREEN_REGISTERED_STYLE_KEYS,
   BASE_SCREEN_STYLE_KEY_DICTIONARY,
 } from './material-style-keys.js';
+import { auditBaseScreenMaterialTemplate } from './material-template-audit.js';
 
 export interface AuditBaseScreenMaterialSpecOptions {
   /** 渲染函数源码：给出时一并做静态检查（`RENDER`）。 */
@@ -31,6 +32,8 @@ const DESCRIPTIVE_LABEL = /标题|副标题|说明|描述|备注|注释/;
 const STATE_TEXT_KEY = /^(?:empty|loading|error)(?:Text|Label|Message)$/;
 const LARGE_WIDTH = 1920;
 const LARGE_HEIGHT = 1080;
+/** 模板诊断的消息以规则号开头（`TPL4：…`，ADR-0116 §2.4）。 */
+const TEMPLATE_RULE = /^(TPL\d+)：/;
 
 /**
  * 原子组件体检（base-screen-docs ADR-0105 §2.5）：把 ADR-0099 / ADR-0102 的门禁搬到运行时，
@@ -46,6 +49,8 @@ const LARGE_HEIGHT = 1080;
  * - `D1`：多行组件没有示例行（预览与新插入组件只能显示空态）；
  * - `S1`：默认尺寸超过一整屏；
  * - `RENDER`：渲染代码自行取数、读写浏览器存储、改宿主元素、用 innerHTML 拼数据、开定时器。
+ * - `TPL1`–`TPL10`：L2 模板（ADR-0116 §2.4）：白名单、引用、上限、结构、颜色字号写法、底板、
+ *   字号下限、对比度、示例渲染、越界。
  */
 export function auditBaseScreenMaterialSpec(
   input: unknown,
@@ -53,12 +58,17 @@ export function auditBaseScreenMaterialSpec(
 ): readonly BaseScreenAuthoringFinding[] {
   const parsed = parseBaseScreenMaterialSpec(input);
   if (!parsed.ok) {
-    return parsed.diagnostics.map((item) => ({
-      rule: 'SPEC',
-      severity: 'error',
-      message: item.message,
-      path: item.path,
-    }));
+    return sortBaseScreenAuthoringFindings(
+      parsed.diagnostics.map((item) => {
+        const rule = TEMPLATE_RULE.exec(item.message)?.[1];
+        return {
+          rule: rule ?? 'SPEC',
+          severity: 'error' as const,
+          message: rule === undefined ? item.message : item.message.slice(rule.length + 1),
+          path: item.path,
+        };
+      }),
+    );
   }
   const spec = parsed.value;
   const findings: BaseScreenAuthoringFinding[] = [];
@@ -94,7 +104,19 @@ export function auditBaseScreenMaterialSpec(
       path: ['defaultSize'],
     });
   }
-  if (options.renderSource !== undefined) auditRenderSource(options.renderSource, spec, findings);
+  if (spec.template !== undefined) {
+    findings.push(...auditBaseScreenMaterialTemplate(spec));
+    if (options.renderSource !== undefined && options.renderSource.trim() !== '') {
+      findings.push({
+        rule: 'TPL1',
+        severity: 'error',
+        message: '规格带 template 时不能再写渲染代码：L2 物料只有数据（ADR-0116 D1）。',
+        path: ['template'],
+      });
+    }
+  } else if (options.renderSource !== undefined) {
+    auditRenderSource(options.renderSource, spec, findings);
+  }
   return sortBaseScreenAuthoringFindings(findings);
 }
 

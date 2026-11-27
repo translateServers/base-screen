@@ -17,6 +17,10 @@ export * from './material-package.js';
 export * from './material-rendered-element.js';
 export * from './material-spec.js';
 export * from './material-spec-audit.js';
+export * from './material-template.js';
+export * from './material-template-audit.js';
+export * from './material-template-expression.js';
+export * from './material-template-render.js';
 export {
   type BaseScreenMaterialStateViewOptions,
   createBaseScreenMaterialEmptyView,

@@ -1,5 +1,6 @@
 import {
   isScreenMaterialType,
+  SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY,
   type ScreenDatasetField,
   type ScreenDiagnostic,
   type ScreenJsonObject,
@@ -22,6 +23,12 @@ import {
   type BaseScreenNumberFormatConfigOptions,
   createBaseScreenNumberFormatConfig,
 } from './material-config-groups.js';
+import {
+  type BaseScreenMaterialSpecEvent,
+  type BaseScreenMaterialTemplate,
+  compileBaseScreenMaterialTemplate,
+  parseBaseScreenMaterialSpecEvents,
+} from './material-template.js';
 
 /**
  * 物料规格（base-screen-docs ADR-0105 §2.2）：作者只写「这个组件有哪些可调项、读什么数据」，
@@ -110,6 +117,15 @@ export interface BaseScreenMaterialSpec {
   readonly numberFormat?: BaseScreenMaterialSpecNumberFormat;
   readonly fields: readonly BaseScreenMaterialSpecField[];
   readonly data: BaseScreenMaterialSpecData;
+  /**
+   * L2 受限图元模板（ADR-0116）：给出时物料不需要渲染代码，在线包只有规格；
+   * 与渲染函数互斥（`createBaseScreenSpecMaterialDefinition` 同时收到两者即失败）。
+   */
+  readonly template?: BaseScreenMaterialTemplate;
+  /** 模板节点可派发的事件（ADR-0116 §2.6），进蓝图事件列表。 */
+  readonly events?: readonly BaseScreenMaterialSpecEvent[];
+  /** 状态外观预置会改写的样式字段（ADR-0115 D8），须是样式分区里声明的字段。 */
+  readonly statePresetKeys?: readonly string[];
 }
 
 /** 分区词汇：顺序、标签与落点（props / style）只在这里定义一份。 */
@@ -142,6 +158,9 @@ const SPEC_KEYS = new Set([
   'numberFormat',
   'fields',
   'data',
+  'template',
+  'events',
+  'statePresetKeys',
 ]);
 const FIELD_KEYS = new Set([
   'key',
@@ -239,6 +258,38 @@ export function parseBaseScreenMaterialSpec(
     parseNumberFormat(input.numberFormat, fields ?? [], add);
   }
   parseData(input.data, add);
+  parseBaseScreenMaterialSpecEvents(input.events, add);
+  if (input.statePresetKeys !== undefined) {
+    const styleKeys = new Set(
+      (fields ?? []).flatMap((field) =>
+        isRecord(field) &&
+        typeof field.key === 'string' &&
+        typeof field.section === 'string' &&
+        BASE_SCREEN_MATERIAL_SPEC_SECTIONS.find((section) => section.id === field.section)
+          ?.target === 'style'
+          ? [field.key]
+          : [],
+      ),
+    );
+    if (
+      !Array.isArray(input.statePresetKeys) ||
+      input.statePresetKeys.length > 8 ||
+      input.statePresetKeys.some((key) => typeof key !== 'string' || !styleKeys.has(key))
+    ) {
+      add(['statePresetKeys'], 'statePresetKeys 最多 8 个，每个都要是样式分区里声明的字段。');
+    }
+  }
+  if (input.template !== undefined && diagnostics.length === 0) {
+    // 模板只在规格其余部分合法时编译：引用范围依赖字段、角色与事件。
+    const spec = input as unknown as BaseScreenMaterialSpec;
+    const template = compileBaseScreenMaterialTemplate(input.template, {
+      fields: spec.fields,
+      data: spec.data,
+      ...(spec.events === undefined ? {} : { events: spec.events }),
+      sectionTarget: (section) => sectionTarget(section as BaseScreenMaterialSpecSection),
+    });
+    if (!template.ok) diagnostics.push(...template.diagnostics);
+  }
   if (diagnostics.length > 0) return { ok: false, diagnostics };
   return { ok: true, value: input as unknown as BaseScreenMaterialSpec, diagnostics: [] };
 }
@@ -581,14 +632,44 @@ export function compileBaseScreenMaterialSpec(
     propertyPanel: [],
     styleSchema: { kind: 'object', properties: style, required: Object.keys(style) },
     stylePanel: [],
-    ...(appearance.length === 0 ? {} : { editorDescriptor: { appearance } }),
-    events: [],
+    ...(appearance.length === 0 && (spec.events ?? []).length === 0
+      ? {}
+      : {
+          editorDescriptor: {
+            ...(appearance.length === 0 ? {} : { appearance }),
+            ...((spec.events ?? []).length === 0
+              ? {}
+              : { events: (spec.events ?? []).map(eventDescriptor) }),
+          },
+        }),
+    events: (spec.events ?? []).map((event) => event.name),
+    ...(spec.statePresetKeys === undefined || spec.statePresetKeys.length === 0
+      ? {}
+      : { statePresetKeys: [...spec.statePresetKeys] }),
     designCapabilities: { resize: true, rotate: spec.rotate ?? true, children: false },
     ...dataContract(spec.data),
     ...(options.libraryVisible === false ? { libraryVisible: false } : {}),
     ...(options.cover === undefined ? {} : { cover: options.cover }),
   };
   return parseBaseScreenMaterialManifest(manifest);
+}
+
+/** 规格事件 → 编辑器事件描述（只在蓝图里可用，负载形状由 payload 的类型决定）。 */
+function eventDescriptor(event: BaseScreenMaterialSpecEvent) {
+  return {
+    name: event.name,
+    label: event.label,
+    maxPayloadBytes: 4096,
+    triggerContexts: ['blueprint' as const],
+    requiredCapability: SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY,
+    payloadSchema: {
+      kind: 'object' as const,
+      properties: Object.fromEntries(
+        Object.entries(event.payload ?? {}).map(([key, item]) => [key, { kind: item.type }]),
+      ),
+      required: [],
+    },
+  };
 }
 
 function numberFormatOptions(
