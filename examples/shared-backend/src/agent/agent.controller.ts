@@ -7,12 +7,14 @@ import {
   type AgentComponentEditResult,
   type AgentGenerateResult,
   type AgentIntentResult,
+  type AgentMaterialDraftResult,
   AgentService,
 } from './agent.service';
 import { AgentActDto } from './dto/agent-act.dto';
 import { AgentCandidateDto } from './dto/agent-candidate.dto';
 import { AgentComponentEditDto } from './dto/agent-component-edit.dto';
 import { AgentGenerateDto } from './dto/agent-generate.dto';
+import { AgentMaterialDto } from './dto/agent-material.dto';
 
 @ApiTags('agent')
 @Controller('agent')
@@ -92,6 +94,25 @@ export class AgentController {
       signal: clientSignal(request),
       instruction: dto.instruction,
       components: dto.components,
+    });
+  }
+
+  /**
+   * 组件工坊「让智能体起草」（ADR-0116 D7）：返回模型原文（一份 L2 模板物料规格）。
+   * 解析与体检在宿主前端做；带 `repair` 时把上一轮原文与体检结论交给模型修复。不写任何东西。
+   */
+  @Post('material')
+  @ApiOperation({
+    summary: '起草一个 L2 模板物料规格（模型原文），不保存；带 repair 时返回修复后的整份原文',
+  })
+  async material(
+    @Body() dto: AgentMaterialDto,
+    @Req() request?: Request,
+  ): Promise<AgentMaterialDraftResult> {
+    return this.agent.draftMaterial({
+      signal: clientSignal(request),
+      instruction: dto.instruction,
+      ...(dto.repair === undefined ? {} : { repair: dto.repair }),
     });
   }
 

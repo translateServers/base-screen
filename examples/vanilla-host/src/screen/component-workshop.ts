@@ -24,6 +24,7 @@ import {
   type BaseScreenMaterialSpecRole,
   type BaseScreenRenderedMaterialPresenter,
   compileBaseScreenMaterialSpec,
+  createBaseScreenMaterialTemplateRender,
   createBaseScreenRenderedMaterialPresenter,
   createBaseScreenSpecMaterialDefinition,
   hasBaseScreenAuthoringErrors,
@@ -42,6 +43,9 @@ import {
  * 两类都先体检（SDK 的 `auditBaseScreenMaterialSpec` / `auditBaseScreenFragment`），有错误不能发布。
  * 存储与加载归宿主：本模块只经端口读写（`WorkshopMaterialStore` / `WorkshopFragmentStore`），
  * 代码加载走 `loadSpecMaterialEntry`（宿主 `import()` + SDK 定义，ADR-0090 §8 信任边界不变）。
+ *
+ * L2 模板物料（ADR-0116）：规格带 `template`、没有渲染代码。在线包只有 `export const spec`，
+ * 加载时只读规格、交给 SDK 的模板解释器，**不 `import()` 任何代码**。
  */
 
 // ———————————————————————————— 在线包格式 ————————————————————————————
@@ -64,8 +68,14 @@ export const SPEC_RENDER_CONTEXT_NAMES = [
   'formatNumber',
 ] as const;
 
-/** 规格 + 渲染函数体 → 在线包代码：一个导出 `spec` 与 `render` 的 ES 模块，可原样回读编辑。 */
+/**
+ * 规格 + 渲染函数体 → 在线包代码：一个导出 `spec` 与 `render` 的 ES 模块，可原样回读编辑。
+ * 规格带 `template`（L2，ADR-0116 D1）时只导出 `spec`，`renderBody` 被忽略：包里没有可执行代码。
+ */
 export function buildSpecMaterialModule(spec: BaseScreenMaterialSpec, renderBody: string): string {
+  if (spec.template !== undefined) {
+    return `${MODULE_HEADER}\nexport const spec = ${SPEC_BEGIN}${JSON.stringify(spec)}${SPEC_END};\n`;
+  }
   return `${MODULE_HEADER}
 export const spec = ${SPEC_BEGIN}${JSON.stringify(spec)}${SPEC_END};
 export function render(context) {
@@ -81,34 +91,68 @@ export function isSpecMaterialModule(code: string): boolean {
   return code.startsWith(MODULE_HEADER);
 }
 
-/** 不执行代码地回读规格与渲染函数体；不是规格模块或标记损坏时返回 undefined。 */
+/**
+ * 不执行代码地回读规格与渲染函数体；不是规格模块或标记损坏时返回 undefined。
+ * L2 模板模块没有渲染段：规格带 `template` 时 `renderBody` 为空串。
+ */
 export function readSpecMaterialModule(
   code: string,
 ): { readonly spec: unknown; readonly renderBody: string } | undefined {
   if (!isSpecMaterialModule(code)) return undefined;
   const specStart = code.indexOf(SPEC_BEGIN);
   const specEnd = code.indexOf(SPEC_END);
-  const bodyStart = code.indexOf(`${RENDER_BEGIN}\n`);
-  const bodyEnd = code.lastIndexOf(`\n${RENDER_END}`);
-  if (specStart < 0 || specEnd < specStart || bodyStart < 0 || bodyEnd < bodyStart)
-    return undefined;
+  if (specStart < 0 || specEnd < specStart) return undefined;
+  let spec: unknown;
   try {
-    return {
-      spec: JSON.parse(code.slice(specStart + SPEC_BEGIN.length, specEnd)) as unknown,
-      renderBody: code.slice(bodyStart + RENDER_BEGIN.length + 1, bodyEnd),
-    };
+    spec = JSON.parse(code.slice(specStart + SPEC_BEGIN.length, specEnd)) as unknown;
   } catch {
     return undefined;
   }
+  const bodyStart = code.indexOf(`${RENDER_BEGIN}\n`);
+  const bodyEnd = code.lastIndexOf(`\n${RENDER_END}`);
+  if (bodyStart < 0 && bodyEnd < 0) {
+    return isRecord(spec) && spec.template !== undefined ? { spec, renderBody: '' } : undefined;
+  }
+  if (bodyStart < 0 || bodyEnd < bodyStart) return undefined;
+  return { spec, renderBody: code.slice(bodyStart + RENDER_BEGIN.length + 1, bodyEnd) };
 }
 
-/** 宿主受控加载（ADR-0029）：blob `import()` 一个规格模块，校验导出形状。 */
+/**
+ * L2 模板模块 → 规格（ADR-0116）：不是模板模块时返回 undefined；是模板模块就只解析规格，
+ * 规格与模板的问题（含 TPL 诊断）照常失败关闭。全程不执行包里的任何东西。
+ */
+export function readTemplateMaterialModule(
+  code: string,
+): ScreenParseResult<BaseScreenMaterialSpec> | undefined {
+  const source = readSpecMaterialModule(code);
+  if (source === undefined || source.renderBody !== '' || !isRecord(source.spec)) return undefined;
+  if (source.spec.template === undefined) return undefined;
+  return parseBaseScreenMaterialSpec(source.spec);
+}
+
+/**
+ * 宿主受控加载（ADR-0029）：blob `import()` 一个规格模块，校验导出形状。
+ * L2 模板模块不 `import()`：渲染函数是 SDK 解释器，每次调用都用一份新解释器（预览、封面都是设计态，
+ * 没有跨次的动画状态要保留；画布上的实例由 `loadSpecMaterialEntry` 按实例各持一份）。
+ */
 export async function importSpecMaterialModule(code: string): Promise<
   ScreenParseResult<{
     readonly spec: BaseScreenMaterialSpec;
     readonly render: BaseScreenMaterialRenderFunction;
   }>
 > {
+  const template = readTemplateMaterialModule(code);
+  if (template !== undefined) {
+    if (!template.ok) return template;
+    const factory = createBaseScreenMaterialTemplateRender(template.value);
+    if (!factory.ok) return factory;
+    const create = factory.value;
+    return {
+      ok: true,
+      value: { spec: template.value, render: (context) => create()(context) },
+      diagnostics: [],
+    };
+  }
   const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
   try {
     const imported: unknown = await import(/* @vite-ignore */ url);
@@ -161,14 +205,27 @@ export async function loadSpecMaterialEntry(
     definedSpecEntries.set(manifest.value.tagName, entry);
     return ok(entry);
   }
-  const imported = await importSpecMaterialModule(code);
-  if (!imported.ok) return imported;
-  const definition = createBaseScreenSpecMaterialDefinition({
-    spec: imported.value.spec,
-    render: imported.value.render,
-    tagName: manifest.value.tagName,
-    ...(manifest.value.libraryVisible === false ? { libraryVisible: false } : {}),
-  });
+  const visibility = manifest.value.libraryVisible === false ? { libraryVisible: false } : {};
+  const template = readTemplateMaterialModule(code);
+  let definition: ReturnType<typeof createBaseScreenSpecMaterialDefinition>;
+  if (template !== undefined) {
+    // L2：只有规格，构造器由 SDK 用模板解释器生成（每个实例各持一份解释器）。
+    if (!template.ok) return template;
+    definition = createBaseScreenSpecMaterialDefinition({
+      spec: template.value,
+      tagName: manifest.value.tagName,
+      ...visibility,
+    });
+  } else {
+    const imported = await importSpecMaterialModule(code);
+    if (!imported.ok) return imported;
+    definition = createBaseScreenSpecMaterialDefinition({
+      spec: imported.value.spec,
+      render: imported.value.render,
+      tagName: manifest.value.tagName,
+      ...visibility,
+    });
+  }
   if (!definition.ok) return definition;
   if (!sameManifest(definition.value.manifest, manifest.value)) {
     return workshopFailure(
@@ -479,6 +536,13 @@ interface MaterialDraft {
   rowsSample: string;
   renderBody: string;
   libraryVisible: boolean;
+  /**
+   * L2 模板（ADR-0116）：JSON 文本，作者可直接改；给出时组件没有渲染代码。
+   * 不合法的 JSON 在体检里报出来，不阻止继续编辑。
+   */
+  template?: string;
+  /** 表单不编辑、但要原样保留的规格字段（模板物料的事件与状态预置键）。 */
+  passthrough?: Pick<BaseScreenMaterialSpec, 'events' | 'statePresetKeys'>;
 }
 
 interface FragmentDraft {
@@ -887,6 +951,11 @@ export function createComponentWorkshop(
       renderBody,
       libraryVisible:
         (pkg.manifest as { readonly libraryVisible?: unknown }).libraryVisible !== false,
+      ...(spec.template === undefined ? {} : { template: JSON.stringify(spec.template, null, 2) }),
+      passthrough: {
+        ...(spec.events === undefined ? {} : { events: spec.events }),
+        ...(spec.statePresetKeys === undefined ? {} : { statePresetKeys: spec.statePresetKeys }),
+      },
     };
   };
 
@@ -969,6 +1038,10 @@ export function createComponentWorkshop(
         };
       }),
       data,
+      ...(current.passthrough ?? {}),
+      ...(current.template === undefined
+        ? {}
+        : { template: readTemplateText(current.template).value }),
     };
   };
 
@@ -1221,19 +1294,33 @@ export function createComponentWorkshop(
     });
     fieldsSection.append(fieldList, addField);
 
-    // 渲染代码
-    const code = section(
-      '渲染代码',
-      `函数体可直接使用：${SPEC_RENDER_CONTEXT_NAMES.join('、')}。数据就绪时才会被调用；只在 root 里绘制。`,
-    );
+    // 渲染代码，或 L2 模板（二者互斥，ADR-0116 D1）
+    const code =
+      current.template === undefined
+        ? section(
+            '渲染代码',
+            `函数体可直接使用：${SPEC_RENDER_CONTEXT_NAMES.join('、')}。数据就绪时才会被调用；只在 root 里绘制。`,
+          )
+        : section(
+            '模板',
+            '受限 SVG 图元 + 绑定表达式（ADR-0116）：不含代码，在线包里只有规格。引用只能用上面声明的可调项与数据角色。',
+          );
     code.append(
-      codeField(
-        'render(context)',
-        current.renderBody,
-        (value) => (current.renderBody = value),
-        'renderBody',
-        18,
-      ),
+      current.template === undefined
+        ? codeField(
+            'render(context)',
+            current.renderBody,
+            (value) => (current.renderBody = value),
+            'renderBody',
+            18,
+          )
+        : codeField(
+            'template（JSON）',
+            current.template,
+            (value) => (current.template = value),
+            'template',
+            22,
+          ),
     );
 
     form.append(basics, data, format, fieldsSection, code);
@@ -1447,8 +1534,21 @@ export function createComponentWorkshop(
     if (current === undefined) return [];
     const spec = specFromDraft(current);
     const findings: BaseScreenAuthoringFinding[] = [
-      ...auditBaseScreenMaterialSpec(spec, { renderSource: current.renderBody }),
+      ...auditBaseScreenMaterialSpec(
+        spec,
+        current.template === undefined ? { renderSource: current.renderBody } : {},
+      ),
     ];
+    const templateText =
+      current.template === undefined ? undefined : readTemplateText(current.template);
+    if (templateText?.error !== undefined) {
+      findings.unshift({
+        rule: 'TPL4',
+        severity: 'error',
+        message: `模板不是合法 JSON：${templateText.error}`,
+        path: ['template'],
+      });
+    }
     const parsed = parseBaseScreenMaterialSpec(spec);
     const compiled = parsed.ok
       ? compileBaseScreenMaterialSpec(parsed.value, { tagName: PREVIEW_TAG })
@@ -2069,6 +2169,177 @@ export function createComponentWorkshop(
       host.remove();
     },
   };
+}
+
+// ———————————————————————— 让智能体起草（ADR-0116 D7 / S6） ————————————————————————
+
+/**
+ * 模板 JSON 文本 → 值。不合法时把原文交出去（规格解析会如实报「template 不是对象」），
+ * 另给一句 JSON 错误供体检显示。
+ */
+export function readTemplateText(text: string): {
+  readonly value: unknown;
+  readonly error?: string;
+} {
+  try {
+    return { value: JSON.parse(text) as unknown };
+  } catch (error) {
+    return { value: text, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** 回传给模型的一条体检结论：规则号、规格内路径（`template.nodes[2].fill`）与 SDK 的原话。 */
+export interface MaterialDraftAgentIssue {
+  readonly rule: string;
+  readonly path: string;
+  readonly message: string;
+}
+
+/** 一次起草 / 修复请求：首轮只有一句话；修复轮带上一轮模型原文与体检结论。 */
+export interface MaterialDraftAgentRequest {
+  readonly instruction: string;
+  readonly repair?: {
+    readonly output: string;
+    readonly issues: readonly MaterialDraftAgentIssue[];
+  };
+}
+
+export type MaterialDraftAgentReply =
+  | { readonly ok: true; readonly output: string }
+  | { readonly ok: false; readonly message: string };
+
+export type MaterialDraftAgentOutcome =
+  | {
+      readonly ok: true;
+      readonly spec: BaseScreenMaterialSpec;
+      /** 体检通过时剩下的警告。 */
+      readonly findings: readonly BaseScreenAuthoringFinding[];
+      readonly repairRounds: number;
+    }
+  | {
+      readonly ok: false;
+      readonly message: string;
+      /** 最后一轮的体检结论（模型调用失败时为空）。 */
+      readonly findings: readonly BaseScreenAuthoringFinding[];
+      readonly repairRounds: number;
+    };
+
+/** 修复最多 2 轮（与 ADR-0112 的修复回环同一上限）。 */
+export const MATERIAL_DRAFT_MAX_REPAIR_ROUNDS = 2;
+const MAX_DRAFT_ISSUES = 40;
+
+/**
+ * 让智能体起草一个 L2 模板物料（ADR-0116 D7）：模型调用归宿主后端，解析与体检在这里（宿主前端）。
+ *
+ * 每一轮：取模型原文 → 解析出规格（物料类型由宿主给定，模型写的不算）→ SDK 体检（含 TPL1–TPL10）→
+ * 无错误即交出；有错误把结论按规格路径回传修复，最多 2 轮，结论与上一轮相同就提前停。
+ * 修不好如实报告，**不交出半成品**；交出的规格也只是草稿，发布仍走原来的体检与人工发布。
+ */
+export async function draftTemplateMaterialWithAgent(input: {
+  readonly instruction: string;
+  /** 宿主分配的物料类型（文档里的身份，ADR-0090 §5）。 */
+  readonly type: string;
+  /** 模型没写分类时用这个。 */
+  readonly category?: string;
+  readonly request: (body: MaterialDraftAgentRequest) => Promise<MaterialDraftAgentReply>;
+  readonly onProgress?: (progress: {
+    readonly phase: 'drafting' | 'repairing';
+    readonly round: number;
+  }) => void;
+}): Promise<MaterialDraftAgentOutcome> {
+  let repair: MaterialDraftAgentRequest['repair'];
+  let previousKey: string | undefined;
+  for (let round = 0; ; round += 1) {
+    input.onProgress?.({ phase: round === 0 ? 'drafting' : 'repairing', round });
+    const reply = await input.request({
+      instruction: input.instruction,
+      ...(repair === undefined ? {} : { repair }),
+    });
+    if (!reply.ok) return { ok: false, message: reply.message, findings: [], repairRounds: round };
+    const candidate = readDraftOutput(reply.output, input.type, input.category);
+    const findings: readonly BaseScreenAuthoringFinding[] = candidate.ok
+      ? auditBaseScreenMaterialSpec(candidate.spec)
+      : [{ rule: candidate.rule, severity: 'error', message: candidate.error, path: [] }];
+    const errors = findings.filter((item) => item.severity === 'error');
+    if (errors.length === 0 && candidate.ok) {
+      const parsed = parseBaseScreenMaterialSpec(candidate.spec);
+      if (parsed.ok) return { ok: true, spec: parsed.value, findings, repairRounds: round };
+    }
+    const issues = errors.slice(0, MAX_DRAFT_ISSUES).map((item) => ({
+      rule: item.rule,
+      path: formatSpecPath(item.path ?? []),
+      message: item.message,
+    }));
+    const key = issues
+      .map((item) => `${item.rule}@${item.path}`)
+      .sort()
+      .join('|');
+    if (round >= MATERIAL_DRAFT_MAX_REPAIR_ROUNDS || key === previousKey) {
+      return {
+        ok: false,
+        message:
+          key === previousKey
+            ? `修复没有进展（体检结论与上一轮相同），还有 ${errors.length} 个错误，没有交出半成品。`
+            : `修复 ${round} 轮后体检仍有 ${errors.length} 个错误，没有交出半成品。`,
+        findings,
+        repairRounds: round,
+      };
+    }
+    previousKey = key;
+    repair = { output: reply.output, issues };
+  }
+}
+
+/** 模型原文 → 规格候选：容忍 ```json 围栏与 `{ "spec": … }` 外壳；类型一律换成宿主给的。 */
+function readDraftOutput(
+  output: string,
+  type: string,
+  category: string | undefined,
+):
+  | { readonly ok: true; readonly spec: Record<string, unknown> }
+  | { readonly ok: false; readonly error: string; readonly rule: string } {
+  const text = output
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text) as unknown;
+  } catch {
+    return {
+      ok: false,
+      rule: 'SPEC',
+      error: '输出不是合法 JSON：只输出一个 JSON 对象 { "spec": { … } }。',
+    };
+  }
+  const spec = isRecord(parsed) && isRecord(parsed.spec) ? parsed.spec : parsed;
+  if (!isRecord(spec)) {
+    return { ok: false, rule: 'SPEC', error: '输出必须是 { "spec": { … } } 形状的 JSON 对象。' };
+  }
+  if (spec.template === undefined) {
+    return {
+      ok: false,
+      rule: 'TPL1',
+      error: '规格没有 template：起草的组件必须是 L2 模板物料，用图元模板描述外观，不写渲染代码。',
+    };
+  }
+  return {
+    ok: true,
+    spec: {
+      ...spec,
+      type,
+      ...(typeof spec.category === 'string' || category === undefined ? {} : { category }),
+    },
+  };
+}
+
+/** `['template', 'nodes', 2, 'fill']` → `template.nodes[2].fill`（与模型看到的 JSON 同一写法）。 */
+function formatSpecPath(path: readonly (string | number)[]): string {
+  return path.reduce<string>(
+    (text, part) =>
+      typeof part === 'number' ? `${text}[${part}]` : text === '' ? part : `${text}.${part}`,
+    '',
+  );
 }
 
 // ———————————————————————————— 小工具 ————————————————————————————

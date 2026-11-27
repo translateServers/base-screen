@@ -25,6 +25,7 @@ import {
   deleteAtomicComponent,
   discardAtomicDraft,
   findingTarget,
+  isTemplateComponentSource,
   loadComponentLibrary,
   publishAtomicComponent,
   RENDER_CONTEXT_COMPLETIONS,
@@ -37,6 +38,7 @@ import {
   type PreviewDataMode,
   renderPreview,
 } from '../screen/component-preview';
+import { readTemplateText } from '../screen/component-workshop';
 import type { ComponentDraftShape, OnlineMaterialPackageShape } from '../types';
 
 /**
@@ -47,6 +49,7 @@ import type { ComponentDraftShape, OnlineMaterialPackageShape } from '../types';
  * - 右栏「检查器」：选中可调项时编辑它的定义；否则按编译出的描述符呈现检查器，并直接改默认值。
  *
  * 改动自动存为草稿（ADR-0106 D3），不影响已发布版本；「发布」先体检，再写在线物料包并热刷新。
+ * L2 模板物料（ADR-0116，规格带 `template`）没有渲染代码：底部面板换成模板 JSON，体检的 TPL 结论定位到这里。
  * 规格词汇（section / kind / visibleWhen …）不出现在界面上，作者用语见 `component-library.ts`。
  */
 type Field = BaseScreenMaterialSpecField;
@@ -86,6 +89,8 @@ export const componentAtomicEditView: ViewModule = {
     let type = '';
     let spec: BaseScreenMaterialSpec = template.build('host.online.pending').spec;
     let renderBody = '';
+    /** L2 模板的 JSON 文本；undefined 表示这是代码物料。组件的形态在打开时定下，页面内不切换。 */
+    let templateText: string | undefined;
     let pkg: OnlineMaterialPackageShape | undefined;
     let draft: ComponentDraftShape | undefined;
     let published: AtomicComponentSource | undefined;
@@ -219,7 +224,19 @@ export const componentAtomicEditView: ViewModule = {
 
     // ———————— 改动管线 ————————
 
-    const source = (): AtomicComponentSource => ({ spec, renderBody });
+    const source = (): AtomicComponentSource =>
+      templateText === undefined
+        ? { spec, renderBody }
+        : {
+            // 不合法的 JSON 原样交给规格解析：体检会如实报「template 不是对象」，不阻止继续编辑。
+            spec: {
+              ...spec,
+              template: readTemplateText(templateText).value as NonNullable<
+                BaseScreenMaterialSpec['template']
+              >,
+            },
+            renderBody: '',
+          };
 
     /** 一次改动：标脏 → 排草稿保存 → 排预览与体检；按需重画左右栏（正在输入的那一栏不重画）。 */
     const changed = (options: { readonly left: boolean; readonly right: boolean }): void => {
@@ -1502,7 +1519,10 @@ export const componentAtomicEditView: ViewModule = {
         const nextType = createAtomicComponentType(type.slice('host.online.'.length) || spec.name);
         const result = await saveAtomicDraft({
           type: nextType,
-          source: { spec: { ...spec, type: nextType, name: `${spec.name} 副本` }, renderBody },
+          source: {
+            ...source(),
+            spec: { ...source().spec, type: nextType, name: `${spec.name} 副本` },
+          },
           revision: 0,
         });
         if (!result.ok) {
@@ -1569,12 +1589,19 @@ export const componentAtomicEditView: ViewModule = {
     // ———————— 载入 ————————
 
     const applySource = (next: AtomicComponentSource): void => {
-      spec = next.spec;
+      const { template, ...rest } = next.spec;
+      spec = isTemplateComponentSource(next) ? (rest as BaseScreenMaterialSpec) : next.spec;
       renderBody = next.renderBody;
+      templateText =
+        template === undefined
+          ? undefined
+          : typeof template === 'string'
+            ? template
+            : JSON.stringify(template, null, 2);
       previewSize = isSize(spec.defaultSize)
         ? { ...spec.defaultSize }
         : { width: 240, height: 120 };
-      code?.setValue(renderBody);
+      code?.setValue(templateText ?? renderBody);
       selected = undefined;
     };
 
@@ -1635,11 +1662,24 @@ export const componentAtomicEditView: ViewModule = {
 
     const mountCode = (): void => {
       if (code !== undefined) return;
+      const template = templateText !== undefined;
+      codeHead.replaceChildren(
+        el('strong', { text: template ? '模板（JSON）' : '渲染代码' }),
+        el('span', {
+          class: 'component-code__hint',
+          text: template
+            ? '受限 SVG 图元 + 绑定表达式，不含代码 · Ctrl/⌘+S 保存草稿 · Ctrl/⌘+Enter 刷新预览'
+            : '只在 root 里绘制 · Ctrl/⌘+S 保存草稿 · Ctrl/⌘+Enter 刷新预览',
+        }),
+      );
+      codePanel.dataset.componentCodeMode = template ? 'template' : 'render';
       code = createCodeEditor({
-        value: renderBody,
-        completions: RENDER_CONTEXT_COMPLETIONS,
+        value: templateText ?? renderBody,
+        completions: template ? [] : RENDER_CONTEXT_COMPLETIONS,
+        language: template ? 'json' : 'javascript',
         onChange: (value) => {
-          renderBody = value;
+          if (templateText !== undefined) templateText = value;
+          else renderBody = value;
           changed({ left: false, right: false });
         },
         onSave: () => void saveDraft(),

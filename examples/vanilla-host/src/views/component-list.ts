@@ -14,6 +14,7 @@ import {
   createFragmentId,
   deleteAtomicComponent,
   deleteFragment,
+  draftAtomicComponentWithAgent,
   loadComponentLibrary,
   readComponentReturn,
   saveAtomicDraft,
@@ -154,6 +155,12 @@ export const componentListView: ViewModule = {
           text: '新建组合',
           attrs: { 'data-component-new-fragment': '' },
           on: { click: () => goToFragmentComponent(undefined) },
+        }),
+        el('button', {
+          class: 'button',
+          text: '让智能体起草',
+          attrs: { 'data-component-agent-draft': '' },
+          on: { click: () => openAgentDraft() },
         }),
         el('button', {
           class: 'button button--primary',
@@ -651,10 +658,138 @@ export const componentListView: ViewModule = {
       choices[0]?.focus();
     };
 
+    /**
+     * 让智能体起草（ADR-0116 D7）：一句话 → 后端起草 → 宿主体检与最多 2 轮修复 → 存成草稿并打开编辑器。
+     * 智能体只写规格与受限模板（不含代码），不能发布；修不好如实列出体检结论，不存半成品。
+     */
+    const openAgentDraft = (): void => {
+      const overlay = el('div', {
+        class: 'ds-overlay',
+        attrs: { 'data-component-agent-dialog': '' },
+      });
+      let running: AbortController | undefined;
+      const close = (): void => {
+        running?.abort();
+        overlay.remove();
+        document.removeEventListener('keydown', onKey);
+      };
+      const onKey = (event: KeyboardEvent): void => {
+        if (event.key === 'Escape') close();
+      };
+      const input = el('textarea', {
+        class: 'ds-field__area component-agent__input',
+        attrs: {
+          rows: '3',
+          maxlength: '300',
+          placeholder: '例如：环形进度，中间显示百分比，超过 90 变红',
+          'data-component-agent-input': '',
+        },
+      });
+      const status = el('p', {
+        class: 'component-agent__status',
+        attrs: { role: 'status', 'aria-live': 'polite', 'data-component-agent-status': '' },
+      });
+      const findingList = el('ul', {
+        class: 'component-agent__findings',
+        attrs: { 'data-component-agent-findings': '' },
+      });
+      const submit = el('button', {
+        class: 'button button--primary',
+        text: '起草',
+        attrs: { type: 'button', 'data-component-agent-submit': '' },
+      });
+      const cancel = el('button', { class: 'button', text: '取消', on: { click: close } });
+      const setStatus = (text: string, tone: 'info' | 'error' = 'info'): void => {
+        status.textContent = text;
+        status.dataset.tone = tone;
+      };
+      const run = async (): Promise<void> => {
+        const instruction = input.value.trim();
+        if (instruction.length < 2) {
+          setStatus('先用一句话说说要什么组件。', 'error');
+          input.focus();
+          return;
+        }
+        running = new AbortController();
+        submit.disabled = true;
+        input.disabled = true;
+        findingList.replaceChildren();
+        const result = await draftAtomicComponentWithAgent({
+          instruction,
+          signal: running.signal,
+          onProgress: ({ phase, round }) =>
+            setStatus(
+              phase === 'drafting'
+                ? '智能体起草中…（一般要半分钟到一分钟）'
+                : `体检没通过，智能体第 ${round} 轮修复中…`,
+            ),
+        });
+        if (!overlay.isConnected) return;
+        running = undefined;
+        if (result.ok) {
+          const rounds = result.outcome.repairRounds;
+          const warnings = result.outcome.findings.length;
+          close();
+          showToast(
+            `已起草并存为草稿${rounds > 0 ? `（修复 ${rounds} 轮）` : ''}${warnings > 0 ? `，${warnings} 条警告` : ''}：看过再发布`,
+            'success',
+          );
+          goToAtomicComponent(result.type);
+          return;
+        }
+        submit.disabled = false;
+        input.disabled = false;
+        setStatus(result.message, 'error');
+        const errors = (result.outcome?.findings ?? []).filter((item) => item.severity === 'error');
+        findingList.replaceChildren(
+          ...errors
+            .slice(0, 8)
+            .map((item) =>
+              el('li', { attrs: { 'data-rule': item.rule } }, [
+                el('span', { class: 'component-agent__rule', text: item.rule }),
+                el('span', { text: item.message }),
+              ]),
+            ),
+        );
+      };
+      submit.addEventListener('click', () => void run());
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) void run();
+      });
+      overlay.append(
+        el(
+          'div',
+          {
+            class: 'ds-dialog component-agent-dialog',
+            attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': '让智能体起草组件' },
+          },
+          [
+            el('h2', { class: 'ds-dialog__title', text: '让智能体起草原子组件' }),
+            el('p', {
+              class: 'ds-desc',
+              text: '智能体只写组件规格与受限图元模板，不写代码；结果存成草稿，体检与发布仍由你决定。',
+            }),
+            el('label', { class: 'ds-field' }, [el('span', { text: '要什么组件' }), input]),
+            status,
+            findingList,
+            el('div', { class: 'ds-dialog__actions' }, [cancel, submit]),
+          ],
+        ),
+      );
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay && running === undefined) close();
+      });
+      document.addEventListener('keydown', onKey);
+      document.body.append(overlay);
+      input.focus();
+    };
+
     void load();
     return () => {
       controller.abort();
-      for (const overlay of document.querySelectorAll('[data-component-templates]'))
+      for (const overlay of document.querySelectorAll(
+        '[data-component-templates], [data-component-agent-dialog]',
+      ))
         overlay.remove();
     };
   },

@@ -17,6 +17,11 @@ import {
 } from './material-package.types';
 
 const TAG_NAME_PATTERN = /^[a-z][a-z0-9._-]*-[a-z0-9._-]+$/;
+/**
+ * 组件工坊的规格模块（ADR-0105 / ADR-0116）：首行是固定标记，导出 `spec`（代码物料另导出 `render`，
+ * L2 模板物料只有 `spec`）。宿主按规格加载，没有 default export。标记与宿主 `component-workshop.ts` 一致。
+ */
+const SPEC_MODULE_HEADER = '// base-screen spec material module (ADR-0105)';
 const MAX_NAME_LENGTH = 80;
 
 @Injectable()
@@ -175,10 +180,11 @@ function normalizeManifest(dto: SaveMaterialPackageDto): Readonly<Record<string,
       message: 'ESM 代码超过 200 KiB。',
     });
   }
-  if (!/\bexport\s+default\b/.test(dto.code)) {
+  if (!isSpecMaterialModule(dto.code) && !/\bexport\s+default\b/.test(dto.code)) {
     throw new BadRequestException({
       error: 'MATERIAL_CODE_INVALID',
-      message: 'ESM 代码必须 default export Custom Element 构造器。',
+      message:
+        'ESM 代码必须 default export Custom Element 构造器，或是组件工坊的规格模块（导出 spec）。',
     });
   }
   return { ...manifest, libraryVisible: manifest.libraryVisible !== false };
@@ -214,4 +220,8 @@ function toShape(row: MaterialPackageRecord): MaterialPackageShape {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function isSpecMaterialModule(code: string): boolean {
+  return code.startsWith(SPEC_MODULE_HEADER) && /\bexport\s+const\s+spec\s*=/.test(code);
 }

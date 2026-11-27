@@ -1078,3 +1078,50 @@
   font: inherit;
   cursor: pointer;
 }
+
+/* 让智能体起草（ADR-0116 D7）：一句话输入、进度与修不好时的体检结论。 */
+.component-agent-dialog {
+  width: min(560px, 100%);
+}
+
+.component-agent__input {
+  min-height: 72px;
+}
+
+.component-agent__status {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.component-agent__status[data-tone="error"] {
+  color: var(--color-danger, #f87171);
+}
+
+.component-agent__findings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.component-agent__findings:empty {
+  display: none;
+}
+
+.component-agent__findings li {
+  display: flex;
+  gap: var(--spacing-2);
+  color: var(--color-text);
+}
+
+.component-agent__rule {
+  flex: none;
+  min-width: 44px;
+  color: var(--color-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

@@ -103,6 +103,25 @@ export interface AgentRepairRequestShape {
 }
 
 /**
+ * 组件工坊「让智能体起草」（ADR-0116 D7）：后端只回模型原文（一份 L2 模板物料规格），
+ * 解析、体检与修复回环在宿主前端（`component-workshop.ts` 的 `draftTemplateMaterialWithAgent`）。
+ */
+export interface AgentMaterialDraftShape {
+  readonly output: string;
+  readonly mode: 'llm';
+}
+
+/** 起草的修复轮：上一轮模型原文 + 按规格路径整理的体检结论。 */
+export interface AgentMaterialRepairShape {
+  readonly output: string;
+  readonly issues: readonly {
+    readonly rule: string;
+    readonly path: string;
+    readonly message: string;
+  }[];
+}
+
+/**
  * 智能体目录摘要：设计器当前可用的物料 + 素材库里的静态资源。
  *
  * 由宿主从 `runtime.catalog`（官方物料 + 宿主物料 + 在线物料包 + 插件贡献合并后的结果）
@@ -577,6 +596,17 @@ export const api = {
         ...(references === undefined || references.length === 0 ? {} : { references }),
         ...(repair === undefined ? {} : { repair }),
       },
+      ...(signal === undefined ? {} : { signal }),
+    }),
+  /** 起草一个 L2 模板物料（不保存）；带 `repair` 时返回修复后的整份原文。 */
+  draftMaterial: (
+    instruction: string,
+    repair?: AgentMaterialRepairShape,
+    signal?: AbortSignal,
+  ): Promise<ApiResult<AgentMaterialDraftShape>> =>
+    request('/agent/material', {
+      method: 'POST',
+      body: { instruction, ...(repair === undefined ? {} : { repair }) },
       ...(signal === undefined ? {} : { signal }),
     }),
   generateComponentCandidate: (

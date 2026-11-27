@@ -1656,7 +1656,7 @@ function describeIntentWarnings(
       add(
         `${item.code}:${wanted}`,
         item.code,
-        `你要的「${wanted}」目录里没有，已用「${used}」代替`,
+        `你要的「${wanted}」目录里没有，已用「${used}」代替；可以到组件库让智能体起草这种组件`,
       );
       continue;
     }

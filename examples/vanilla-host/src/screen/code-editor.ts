@@ -14,6 +14,8 @@ import { basicSetup } from 'codemirror';
  * - 渲染上下文变量（root / props / value …）以 JavaScript 语言数据追加补全，不覆盖语言自带补全；
  * - 语法错误直接读 Lezer 语法树里的错误节点标红，不需要执行代码；
  * - `Mod-S` 立即保存草稿，`Mod-Enter` 立即刷新预览。
+ * - `language: 'json'`：L2 模板物料的模板面板（ADR-0116）。沿用 JavaScript 的配色（JSON 是它的子集，
+ *   不为此新增依赖），错误改用 `JSON.parse` 判定，不提供渲染上下文补全。
  */
 export interface CodeEditorCompletion {
   readonly label: string;
@@ -23,6 +25,8 @@ export interface CodeEditorCompletion {
 export interface CodeEditorOptions {
   readonly value: string;
   readonly completions: readonly CodeEditorCompletion[];
+  /** 缺省 `javascript`（渲染代码）；`json` 用于模板。 */
+  readonly language?: 'javascript' | 'json';
   onChange(value: string): void;
   onSave?(): void;
   onRun?(): void;
@@ -80,7 +84,25 @@ function syntaxDiagnostics(state: EditorState): Diagnostic[] {
   return diagnostics.slice(0, 20);
 }
 
+/** JSON 的错误位置：V8 的消息带 `position N`，其余引擎退回文首。 */
+function jsonDiagnostics(state: EditorState): Diagnostic[] {
+  const text = state.doc.toString();
+  if (text.trim() === '') return [];
+  try {
+    JSON.parse(text);
+    return [];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const length = state.doc.length;
+    const at = Number(/position (\d+)/.exec(message)?.[1] ?? 0);
+    const from = Math.min(Math.max(0, at), Math.max(0, length - 1));
+    return [{ from, to: Math.min(from + 1, length), severity: 'error', message: 'JSON 语法错误' }];
+  }
+}
+
 export function createCodeEditor(options: CodeEditorOptions): CodeEditorHandle {
+  const json = options.language === 'json';
+  const diagnose = json ? jsonDiagnostics : syntaxDiagnostics;
   const element = document.createElement('div');
   element.className = 'component-code-editor';
   let silent = false;
@@ -92,17 +114,21 @@ export function createCodeEditor(options: CodeEditorOptions): CodeEditorHandle {
         basicSetup,
         javascript(),
         syntaxHighlighting(oneDarkHighlightStyle),
-        javascriptLanguage.data.of({
-          autocomplete: completeFromList(
-            options.completions.map((item) => ({
-              label: item.label,
-              detail: item.detail,
-              type: 'variable',
-              boost: 10,
-            })),
-          ),
-        }),
-        linter((current) => syntaxDiagnostics(current.state), { delay: 300 }),
+        ...(json
+          ? []
+          : [
+              javascriptLanguage.data.of({
+                autocomplete: completeFromList(
+                  options.completions.map((item) => ({
+                    label: item.label,
+                    detail: item.detail,
+                    type: 'variable',
+                    boost: 10,
+                  })),
+                ),
+              }),
+            ]),
+        linter((current) => diagnose(current.state), { delay: 300 }),
         lintGutter(),
         Prec.high(
           keymap.of([
@@ -145,7 +171,7 @@ export function createCodeEditor(options: CodeEditorOptions): CodeEditorHandle {
     },
     focus: () => view.focus(),
     firstErrorLine() {
-      const first = syntaxDiagnostics(view.state)[0];
+      const first = diagnose(view.state)[0];
       return first === undefined ? undefined : view.state.doc.lineAt(first.from).number;
     },
     destroy: () => view.destroy(),

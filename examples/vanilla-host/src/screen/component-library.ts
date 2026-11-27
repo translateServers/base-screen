@@ -21,8 +21,10 @@ import type {
 } from '../types';
 import {
   buildSpecMaterialModule,
+  draftTemplateMaterialWithAgent,
   importSpecMaterialModule,
   isSpecMaterialModule,
+  type MaterialDraftAgentOutcome,
   readSpecMaterialModule,
 } from './component-workshop';
 import { loadHostRuntime } from './host-runtime';
@@ -77,9 +79,17 @@ export const COMPONENT_DATA_OPTIONS: readonly {
 // ———————————————————————————— 模板 ————————————————————————————
 
 export interface AtomicComponentSource {
-  /** 规格（作者编辑中可能暂时不合法；发布前由 SDK 解析与体检把关）。 */
+  /**
+   * 规格（作者编辑中可能暂时不合法；发布前由 SDK 解析与体检把关）。
+   * 带 `template` 的是 L2 模板物料（ADR-0116）：没有渲染代码，`renderBody` 为空串。
+   */
   readonly spec: BaseScreenMaterialSpec;
   readonly renderBody: string;
+}
+
+/** 是否 L2 模板物料：编辑器据此把代码面板换成模板面板。 */
+export function isTemplateComponentSource(source: AtomicComponentSource): boolean {
+  return source.spec.template !== undefined;
 }
 
 export interface AtomicComponentTemplate {
@@ -511,6 +521,127 @@ export const ATOMIC_COMPONENT_TEMPLATES: readonly AtomicComponentTemplate[] = [
     }),
   },
   {
+    // L2 模板物料（ADR-0116）：没有渲染代码，外观由受限 SVG 图元模板描述。
+    id: 'gauge-template',
+    name: '环形仪表（无代码）',
+    hint: '模板物料：图元 + 绑定表达式描述外观，在线包里没有代码',
+    build: (type) => ({
+      spec: {
+        type,
+        name: '环形仪表',
+        category: '在线组件',
+        keywords: ['仪表盘', '环形', '进度'],
+        defaultSize: { width: 220, height: 220 },
+        numberFormat: { decimals: 0, unit: '%' },
+        fields: [
+          { key: 'min', label: '最小值', section: 'structure', kind: 'number', default: 0 },
+          { key: 'max', label: '最大值', section: 'structure', kind: 'number', default: 100 },
+          { key: 'warnAt', label: '告警线', section: 'structure', kind: 'number', default: 80 },
+          { key: 'color', label: '文字色', section: 'text', kind: 'color', default: '#e2e8f0' },
+          {
+            key: 'fontSize',
+            label: '字号',
+            section: 'text',
+            kind: 'number',
+            default: 36,
+            min: 16,
+            max: 72,
+            unit: 'px',
+          },
+          {
+            key: 'backgroundColor',
+            label: '背景色',
+            section: 'surface',
+            kind: 'color',
+            default: '#0b1220',
+          },
+          {
+            key: 'trackColor',
+            label: '轨道色',
+            section: 'surface',
+            kind: 'color',
+            default: '#1e293b',
+          },
+          {
+            key: 'fillColor',
+            label: '主色',
+            section: 'semantic',
+            kind: 'color',
+            default: '#22d3ee',
+          },
+          {
+            key: 'warningColor',
+            label: '告警色',
+            section: 'semantic',
+            kind: 'color',
+            default: '#f87171',
+          },
+        ],
+        statePresetKeys: ['fillColor'],
+        data: { kind: 'scalar', valueType: 'number', sample: 72 },
+        events: [
+          {
+            name: 'valueClick',
+            label: '点击读数',
+            payload: { value: { type: 'number', value: 'value' } },
+          },
+        ],
+        template: {
+          viewBox: [0, 0, 220, 220],
+          nodes: [
+            {
+              kind: 'rect',
+              id: 'bg',
+              x: 0,
+              y: 0,
+              width: 220,
+              height: 220,
+              fill: 'style.backgroundColor',
+            },
+            {
+              kind: 'arc',
+              id: 'track',
+              cx: 110,
+              cy: 116,
+              r: 88,
+              thickness: 14,
+              start: -135,
+              end: 135,
+              stroke: 'style.trackColor',
+            },
+            {
+              kind: 'arc',
+              id: 'fill',
+              cx: 110,
+              cy: 116,
+              r: 88,
+              thickness: 14,
+              start: -135,
+              end: '-135 + pct(value, props.min, props.max) * 270',
+              stroke: 'value >= props.warnAt ? style.warningColor : style.fillColor',
+              on: 'valueClick',
+            },
+            {
+              kind: 'text',
+              id: 'reading',
+              x: 110,
+              y: 116,
+              fontSize: 'style.fontSize',
+              fontWeight: 700,
+              anchor: 'middle',
+              baseline: 'middle',
+              content: 'format(value)',
+              fill: 'style.color',
+              backdrop: 'bg',
+            },
+          ],
+          animations: [{ kind: 'change', target: 'fill', attributes: ['end'], duration: 700 }],
+        },
+      },
+      renderBody: '',
+    }),
+  },
+  {
     id: 'blank',
     name: '空白',
     hint: '从零开始：一个填充色，其余自己加',
@@ -732,7 +863,9 @@ export type FindingTarget =
   | { readonly kind: 'general' };
 
 export function findingTarget(finding: BaseScreenAuthoringFinding): FindingTarget {
-  if (finding.rule === 'RENDER') return { kind: 'code' };
+  // 渲染代码与 L2 模板共用底部面板：TPL 规则指向模板。
+  if (finding.rule === 'RENDER' || /^TPL\d+$/.test(finding.rule)) return { kind: 'code' };
+  if (finding.path?.[0] === 'template') return { kind: 'code' };
   const [head, index] = finding.path ?? [];
   if (head === 'fields' && typeof index === 'number') return { kind: 'field', index };
   if (head === 'data') return { kind: 'data' };
@@ -780,6 +913,46 @@ export type LibraryResult<T> =
 export function createAtomicComponentType(name: string): string {
   const slug = slugify(name);
   return `${ONLINE_COMPONENT_TYPE_PREFIX}${/^[a-z]/.test(slug) ? slug : `c-${slug}`}-${randomToken(4)}`;
+}
+
+/**
+ * 让智能体起草一个原子组件（ADR-0116 D7 / S6）：后端调模型，宿主前端解析 + 体检 + 最多 2 轮修复，
+ * 通过后**只存成草稿**（新类型，不发布、不热刷新），作者在编辑器里看过、改过再发布。
+ * 修不好如实返回体检结论，不存半成品。
+ */
+export async function draftAtomicComponentWithAgent(input: {
+  readonly instruction: string;
+  readonly signal?: AbortSignal;
+  readonly onProgress?: (progress: {
+    readonly phase: 'drafting' | 'repairing';
+    readonly round: number;
+  }) => void;
+}): Promise<
+  | { readonly ok: true; readonly type: string; readonly outcome: MaterialDraftAgentOutcome }
+  | { readonly ok: false; readonly message: string; readonly outcome?: MaterialDraftAgentOutcome }
+> {
+  const type = createAtomicComponentType('draft');
+  const outcome = await draftTemplateMaterialWithAgent({
+    instruction: input.instruction,
+    type,
+    category: '在线组件',
+    ...(input.onProgress === undefined ? {} : { onProgress: input.onProgress }),
+    request: async (body) => {
+      const result = await api.draftMaterial(body.instruction, body.repair, input.signal);
+      return result.ok
+        ? { ok: true, output: result.data.output }
+        : { ok: false, message: result.error.message };
+    },
+  });
+  if (!outcome.ok) return { ok: false, message: outcome.message, outcome };
+  const saved = await saveAtomicDraft({
+    type,
+    source: { spec: outcome.spec, renderBody: '' },
+    revision: 0,
+  });
+  if (!saved.ok)
+    return { ok: false, message: `起草成功，但保存草稿失败：${saved.message}`, outcome };
+  return { ok: true, type, outcome };
 }
 
 /** 保存草稿：不影响已发布版本与正在使用的大屏（ADR-0106 D3）。 */

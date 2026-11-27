@@ -37,6 +37,12 @@ import {
 import { type ComposeReferences, composeScreenDocument } from './agent-compose';
 import { type PromptDataSummary, readDataSummary } from './agent-data-context';
 import {
+  AGENT_MATERIAL_SYSTEM_PROMPT,
+  buildMaterialRepairPrompt,
+  buildMaterialUserPrompt,
+  readMaterialRepairRequest,
+} from './agent-material';
+import {
   AGENT_MAX_REPAIR_ROUNDS,
   type AgentParseIssues,
   type AgentRepairIssue,
@@ -169,6 +175,15 @@ export type AgentStreamEvent =
       readonly layout: unknown;
     }
   | { readonly type: 'item'; readonly path: string; readonly value: unknown };
+
+/**
+ * 组件工坊起草的结果（ADR-0116 D7）：只有模型原文。解析、体检与修复回环在宿主前端做；
+ * 结果只进工坊草稿，发布仍由人做。
+ */
+export interface AgentMaterialDraftResult {
+  readonly output: string;
+  readonly mode: 'llm';
+}
 
 export interface AgentComponentEditResult {
   readonly summary: string;
@@ -677,6 +692,61 @@ export class AgentService {
       throw transportFailure(result.failure ?? 'AGENT_FAILED');
     }
     return { output: result.text, mode: 'llm', ...context };
+  }
+
+  /**
+   * 让智能体起草一个 L2 模板物料（ADR-0116 D7 / S6）：只做「模型 ⇄ 规格」。
+   *
+   * 没配置模型就如实说做不了（不退回模板「猜」一个组件）；模型调用失败如实报错。
+   * 用流式请求读：一份带模板的规格常要写一分多钟，按「两段输出之间」计空闲超时才不会被误杀。
+   */
+  async draftMaterial(input: {
+    instruction: string;
+    repair?: unknown;
+    signal?: AbortSignal;
+  }): Promise<AgentMaterialDraftResult> {
+    const instruction = input.instruction.trim();
+    const repair = input.repair === undefined ? undefined : readMaterialRepairRequest(input.repair);
+    if (repair === null) {
+      throw new BadRequestException({
+        error: 'AGENT_REPAIR_INVALID',
+        message: '修复请求需要上一轮输出与按规格路径整理的体检结论。',
+      });
+    }
+    const settings = resolveAgentLlmSettings(this.config);
+    if (settings === null) {
+      throw new HttpException(
+        {
+          error: 'AGENT_NOT_CONFIGURED',
+          message:
+            '没有配置模型（AGENT_LLM_BASE_URL / AGENT_LLM_API_KEY / AGENT_LLM_MODEL），不能让智能体起草组件。',
+        },
+        503,
+      );
+    }
+    const followUp: AgentChatMessage[] =
+      repair === undefined
+        ? []
+        : [
+            { role: 'assistant', content: repair.output },
+            { role: 'user', content: buildMaterialRepairPrompt(repair.issues, instruction) },
+          ];
+    const result = await requestAgentCompletionStream(
+      settings,
+      AGENT_MATERIAL_SYSTEM_PROMPT,
+      buildMaterialUserPrompt(instruction),
+      this.logger,
+      {
+        retry: true,
+        followUp,
+        onText: () => undefined,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      },
+    );
+    if (!result.ok || result.text === undefined) {
+      throw transportFailure(result.failure ?? 'AGENT_FAILED');
+    }
+    return { output: result.text, mode: 'llm' };
   }
 
   /**
