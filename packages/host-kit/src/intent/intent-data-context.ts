@@ -32,7 +32,23 @@ export interface IntentDataContext {
   readonly candidates: readonly IntentDataCandidate[];
   /** 给编译器的引用：列带完整类型 / 名称 / 单位，参数带定义，行数取自画像。 */
   readonly references: readonly IntentReferenceDataset[];
+  /**
+   * 画像时取到的样本，键为 `intentDatasetQueryKey(datasetId, params)`。只留在宿主里：采纳前的样例验证
+   * （`validateIntentData`）遇到同一组参数的实例直接复用，不再查一次；不进提示词，也不上送后端（D2）。
+   */
+  readonly samples: ReadonlyMap<string, ScreenTabularDataset>;
   readonly warnings: readonly IntentDiagnostic[];
+}
+
+/** 同一数据集 + 同一组参数的查询键：参数按名字排序，与声明顺序无关。 */
+export function intentDatasetQueryKey(
+  datasetId: string,
+  params: Readonly<Record<string, ScreenJsonObject[string]>>,
+): string {
+  const sorted = Object.keys(params)
+    .sort()
+    .map((name) => [name, params[name]]);
+  return JSON.stringify([datasetId, sorted]);
 }
 
 export interface PrepareIntentDataContextInput {
@@ -81,8 +97,13 @@ export async function prepareIntentDataContext(
     candidateMaterials(input.catalog),
     { maxPerDataset: input.maxCandidatesPerDataset ?? 12 },
   );
+  const samples = new Map<string, ScreenTabularDataset>();
+  for (const entry of entries) {
+    if (entry.sample !== undefined) samples.set(entry.sample.key, entry.sample.value);
+  }
   return {
     profiles,
+    samples,
     candidates: candidates.map((item) => ({
       id: item.id,
       fact: item.fact,
@@ -98,6 +119,7 @@ export async function prepareIntentDataContext(
 interface ProfiledDataset {
   readonly definition: ScreenDatasetDefinition;
   readonly profile: ScreenDatasetProfile;
+  readonly sample?: { readonly key: string; readonly value: ScreenTabularDataset };
 }
 
 async function profileOne(
@@ -146,7 +168,13 @@ async function profileOne(
         datasetWarning('AGENT_DATASET_SAMPLE_UNAVAILABLE', datasetId, 'sample query failed'),
       );
     }
-    return { definition, profile: profileScreenDataset(definition, sample) };
+    return {
+      definition,
+      profile: profileScreenDataset(definition, sample),
+      ...(sample === undefined
+        ? {}
+        : { sample: { key: intentDatasetQueryKey(datasetId, params), value: sample } }),
+    };
   } catch {
     warnings.push(datasetWarning('AGENT_DATASET_UNKNOWN', datasetId, 'describe failed'));
     return undefined;

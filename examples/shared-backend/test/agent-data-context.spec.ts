@@ -1,5 +1,6 @@
 import { FALLBACK_AGENT_CATALOG } from '../src/agent/agent-catalog';
 import { readDataSummary } from '../src/agent/agent-data-context';
+import { readRepairRequest } from '../src/agent/agent-repair';
 import { buildEditOpsSystemPrompt, readEditOps } from '../src/agent/agent-session';
 import { buildIntentSystemPrompt } from '../src/agent/agent-spec';
 
@@ -109,5 +110,19 @@ describe('agent data context', () => {
     });
     expect(withData).toContain('"op": "rebind"');
     expect(buildEditOpsSystemPrompt(FALLBACK_AGENT_CATALOG, digest)).not.toContain('rebind');
+  });
+
+  it('gives the model a concrete hint for sample-check and binding codes', () => {
+    const request = readRepairRequest({
+      output: '{}',
+      issues: [
+        { code: 'DATA_RESULT_EMPTY', path: 'regions[1].blocks[0]' },
+        { code: 'AGENT_BINDING_FIELD_UNKNOWN', path: 'blocks[0]' },
+      ],
+    });
+    expect(request?.issues.map((issue) => issue.hint)).toEqual([
+      expect.stringContaining('查不到数据'),
+      expect.stringContaining('画像里列出的'),
+    ]);
   });
 });

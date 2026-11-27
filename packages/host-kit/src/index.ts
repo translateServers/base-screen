@@ -47,6 +47,8 @@ export {
   type IntentCompileOutcome,
   type IntentCompileResult,
   type IntentDataCandidate,
+  type IntentDataCheckInput,
+  type IntentDataCheckResult,
   type IntentDataContext,
   type IntentDatasetPromptSummary,
   type IntentDiagnostic,
@@ -80,6 +82,7 @@ export {
   type IntentStylePresetId,
   type IntentTable,
   type IntentTableColumn,
+  intentDatasetQueryKey,
   isSessionUsable,
   type KpiValueInput,
   type LayoutCapacityIssue,
@@ -104,6 +107,7 @@ export {
   type SolveOutcome,
   solveLayout,
   summarizeIntentDataContext,
+  validateIntentData,
 } from './intent/index.js';
 export type {
   HostKitOperation,

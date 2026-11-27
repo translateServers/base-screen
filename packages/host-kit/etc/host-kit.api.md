@@ -10,6 +10,7 @@ import { ScreenDatasetEntries } from '@base-screen/contracts';
 import { ScreenDatasetProfile } from '@base-screen/core';
 import { ScreenHostDatasetPort } from '@base-screen/contracts';
 import type { ScreenHostSubscribeOptions } from '@base-screen/contracts';
+import type { ScreenJsonObject } from '@base-screen/contracts';
 import type { ScreenJsonValue } from '@base-screen/contracts';
 import { ScreenMigrationResult } from '@base-screen/contracts';
 import type { ScreenParseResult } from '@base-screen/contracts';
@@ -519,11 +520,38 @@ export interface IntentDataCandidate {
 }
 
 // @public
+export interface IntentDataCheckInput {
+    readonly context?: IntentDataContext;
+    readonly document: {
+        readonly components: readonly {
+            readonly id: string;
+            readonly dataValue?: unknown;
+            readonly dataBinding?: unknown;
+        }[];
+        readonly dataSources?: readonly unknown[];
+    };
+    // (undocumented)
+    readonly port: ScreenHostDatasetPort;
+    // (undocumented)
+    readonly signal: ScreenAbortSignal;
+    readonly sources: Readonly<Record<string, string>>;
+    readonly timeoutMs?: number;
+}
+
+// @public (undocumented)
+export interface IntentDataCheckResult {
+    readonly issues: readonly IntentRepairIssue[];
+    readonly unverified: readonly string[];
+    readonly verified: readonly string[];
+}
+
+// @public
 export interface IntentDataContext {
     readonly candidates: readonly IntentDataCandidate[];
     // (undocumented)
     readonly profiles: readonly ScreenDatasetProfile[];
     readonly references: readonly IntentReferenceDataset[];
+    readonly samples: ReadonlyMap<string, ScreenTabularDataset>;
     // (undocumented)
     readonly warnings: readonly IntentDiagnostic[];
 }
@@ -537,6 +565,9 @@ export interface IntentDatasetPromptSummary {
     // (undocumented)
     readonly profile: ScreenDatasetProfile;
 }
+
+// @public
+export function intentDatasetQueryKey(datasetId: string, params: Readonly<Record<string, ScreenJsonObject[string]>>): string;
 
 // @public
 export interface IntentDiagnostic {
@@ -1108,6 +1139,9 @@ export function toAbortSignal(source: ScreenAbortSignal | undefined): AbortSigna
 
 // @public
 export function toHostKitSearch(params: Readonly<Record<string, string | number | boolean | undefined>>): string;
+
+// @public (undocumented)
+export function validateIntentData(input: IntentDataCheckInput): Promise<IntentDataCheckResult>;
 
 // (No @packageDocumentation comment for this package)
 

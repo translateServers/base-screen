@@ -37,6 +37,7 @@ import {
   prepareIntentDataContext,
   repairKey,
   summarizeIntentDataContext,
+  validateIntentData,
 } from 'base-screen/host-kit';
 import type { BaseScreenMaterialCatalog } from 'base-screen/plugin-core';
 import {
@@ -414,7 +415,7 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
       // 修复过哪些问题：理由里要说清楚「为什么和你说的不一样」（例如为锁定背景换了风格）。
       const repairedFor = new Set<string>();
       for (;;) {
-        const attempt = attemptWholeScreen(
+        const attempt = await attemptWholeScreen(
           options,
           current,
           request.text,
@@ -424,6 +425,8 @@ export function createHostIntentHandler(options: HostIntentOptions): DesignerInt
           draft,
           repairedFor,
           dataContext,
+          staleReason,
+          streamAbort.signal,
         );
         if (attempt.ok) {
           remember(attempt.session);
@@ -766,12 +769,12 @@ function enrichReferences(
 }
 
 /**
- * 一轮：模型原文 → 解析 + 编译 → 文档校验 → 版面审计 → 提交提案。
+ * 一轮：模型原文 → 解析 + 编译 → 文档校验 → 版面审计 → 样例验证（引用了数据集时）→ 提交提案。
  *
  * 首轮且无任何问题时，流式草案接得上就原地收尾；修复过的轮次一律撤掉草案、整屏提交——
  * 修复后的输出是整份重来的，不是骨架的续写。
  */
-function attemptWholeScreen(
+async function attemptWholeScreen(
   options: HostIntentOptions,
   current: ScreenDocument,
   instruction: string,
@@ -781,7 +784,9 @@ function attemptWholeScreen(
   draft: StreamDraft | undefined,
   repairedFor: ReadonlySet<string> = new Set(),
   dataContext?: IntentDataContext,
-): WholeScreenAttempt {
+  stale: () => string | undefined = () => undefined,
+  signal?: AbortSignal,
+): Promise<WholeScreenAttempt> {
   const prepared = prepareIntent({
     output: data.output,
     catalog: toIntentCatalog(shape, data.assets, dataContext),
@@ -844,11 +849,35 @@ function attemptWholeScreen(
     );
   }
 
+  // 采纳前的样例验证（ADR-0114 D6）：候选里有数据集实例、宿主接了数据集端口时，提案挂出之前取一次数。
+  // 空结果 / 字段不在结果里 / 字段全空进修复回环；查询本身失败不怪模型，只在理由里说「未验证」。
+  const dataCheck =
+    options.datasetPort === undefined || !hasDatasetSources(parsed.value)
+      ? undefined
+      : await validateIntentData({
+          document: parsed.value,
+          sources,
+          port: options.datasetPort,
+          ...(dataContext === undefined ? {} : { context: dataContext }),
+          signal: signal ?? new AbortController().signal,
+        });
+  if (dataCheck !== undefined) {
+    // 取数期间用户可能改了文档、撤销或取消：过期结果不提交。
+    const late = stale();
+    if (late !== undefined) {
+      draft?.discard();
+      return failedAttempt([], [], late);
+    }
+  }
+  const dataIssues = dataCheck?.issues ?? [];
+  const issues = [...prepared.issues, ...dataIssues];
+
   const submit = (dropped: boolean): WholeScreenAttempt => {
     // 去项交出时，没修好的那几项照实写进理由：逐条列出被去掉的指标 / 块，块被去掉另加一句总括。
+    // 样例验证没过的块没有被去掉（照常交出、采纳后可能显示为空），也逐条写明。
     const droppedNotes: IntentDiagnostic[] = dropped
       ? [
-          ...prepared.issues.map((issue) => note(issue.code, issue.path)),
+          ...issues.map((issue) => note(issue.code, issue.path)),
           ...(prepared.issues.some((issue) => /blocks\[|main\[|rail\[/.test(issue.path))
             ? [note('AGENT_BLOCKS_DROPPED', '')]
             : []),
@@ -865,7 +894,7 @@ function attemptWholeScreen(
         : '';
     const repairedNote =
       rounds > 0 ? `；宿主校验未通过，已请模型修复 ${rounds} 次${backdropNote}` : '';
-    const rationale = `${describeMode(data.mode, data.failure, warnings)}${repairedNote}。布局由宿主前端按区域确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeIncomingData(document, dataContext)}${describeLocked(current)}`;
+    const rationale = `${describeMode(data.mode, data.failure, warnings)}${repairedNote}。布局由宿主前端按区域确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeIncomingData(document, dataContext)}${describeDataCheck(dataCheck)}${describeLocked(current)}`;
     // 流式草案接得上就原地收尾；接不上（最终结果与骨架对不上、或已修复过）先撤掉它，再整屏提交。
     // 提案一旦提交就留下它的会话；是否被采纳由下一次请求时对活文档判断。
     const kept = createIntentSession({
@@ -897,14 +926,38 @@ function attemptWholeScreen(
     return { ok: true, session: kept };
   };
 
-  if (prepared.issues.length === 0) return submit(false);
+  if (issues.length === 0) return submit(false);
   // 有值得修的诊断：先不提交，交给调用方决定修还是去项交出。
+  // 只有样例验证没过时内容本身是完整的，修不好也可以照常交出并说明。
+  const deliverable = prepared.issues.length === 0 || prepared.deliverable;
   return failedAttempt(
-    prepared.issues,
+    issues,
     [],
-    '智能体输出里有不合格的指标或模块，未生成变更。',
-    prepared.deliverable ? () => submit(true) : undefined,
+    prepared.issues.length === 0
+      ? '样例查询发现有模块取不到数据，未生成变更。'
+      : '智能体输出里有不合格的指标或模块，未生成变更。',
+    deliverable ? () => submit(true) : undefined,
   );
+}
+
+function hasDatasetSources(document: ScreenDocument): boolean {
+  return (document.dataSources ?? []).some((source) => source.source.kind === 'dataset');
+}
+
+/** 样例验证的结果写进理由：核对了几个实例、哪些没能核对。 */
+function describeDataCheck(
+  check:
+    | { readonly verified: readonly string[]; readonly unverified: readonly string[] }
+    | undefined,
+): string {
+  if (check === undefined) return '';
+  const verified =
+    check.verified.length === 0 ? '' : `已用样例查询核对 ${check.verified.length} 个数据源。`;
+  const unverified =
+    check.unverified.length === 0
+      ? ''
+      : `「${check.unverified.join('」「')}」样例查询失败，未验证，采纳后请留意是否有数据。`;
+  return `${verified}${unverified}`;
 }
 
 function note(code: string, path: string): IntentDiagnostic {
@@ -1418,6 +1471,10 @@ const INTENT_WARNING_TEXT: Readonly<Record<string, string>> = {
   AGENT_BLOCK_BINDING_UNSATISFIED: '有模块的列不满足绑定角色，已退化为无数据',
   AGENT_DATASET_UNKNOWN: '引用的数据集不在本轮上下文里，该模块已跳过',
   AGENT_DATASET_PARAM_REQUIRED: '引用的数据集需要先指定参数，该模块已跳过',
+  DATA_RESULT_EMPTY: '有模块的样例查询没有返回数据，采纳后可能显示为空',
+  DATA_FIELD_ABSENT: '有模块绑定的字段不在查询结果里，采纳后可能显示为空',
+  DATA_FIELD_ALL_NULL: '有模块绑定的字段在样例结果里全为空',
+  AGENT_KPI_MULTI_ROW: '有指标卡对应的数据不止一行，指标卡只能显示单行数据',
   AGENT_BLOCKS_DROPPED: '有模块经修复仍不可用，已去掉，其余照常交出',
   AGENT_KPI_INVALID: '有指标数值不合格，已去掉',
   AGENT_KPI_DELTA_DROPPED: '有指标的增减量不合格，已只保留数值',

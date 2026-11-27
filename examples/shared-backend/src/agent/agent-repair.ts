@@ -66,6 +66,24 @@ const LAYOUT_HINTS: Readonly<Record<string, string>> = {
   LAYOUT_CONTRAST_LOW: '文字与背景对比不足：换一种风格预设（style）。',
   LAYOUT_LOCKED_BACKDROP_DARK:
     '画布上有用户锁定保留的深色背景，浅色风格的深色文字压在上面看不清：style 改成深色系风格（如 deep-tech），其余内容不变。',
+  // ADR-0114：绑定与数据的诊断。前端只给码与路径，具体字段由模型对照数据段里的画像与候选自己找。
+  AGENT_BINDING_FIELD_UNKNOWN:
+    '这一块绑定的字段或角色不存在：字段只能用数据段画像里列出的 id，角色只能用该物料声明的；或改用一个候选（candidate）。',
+  AGENT_BINDING_TYPE_MISMATCH:
+    '这一块绑定的字段类型或个数不符合物料的角色要求：度量角色只收数值字段；或改用一个候选（candidate）。',
+  AGENT_DATASET_PARAM_INVALID:
+    '这一块写的数据集参数不存在或取值不在可选值里：只写数据段里列出的参数名，取值照抄可选值。',
+  AGENT_CANDIDATE_UNKNOWN: '这一块引用的候选编号不在本轮候选表里：只能用数据段里列出的 c 编号。',
+  AGENT_CANDIDATE_KPI_ONLY:
+    '单值候选不能当块用：把它写成指标带里的 bind，或给这一块换一个图表 / 表格候选。',
+  AGENT_BIND_CONFLICT:
+    '这一处既引用了数据集又写了示例数据：有数据集引用时只保留 datasetId / candidate / bind，去掉 table 与 value / delta。',
+  AGENT_KPI_MULTI_ROW:
+    '这个指标卡绑的数据集结果不止一行，指标卡只能显示一行：改成图表或表格块，或换一个单值候选。',
+  DATA_RESULT_EMPTY:
+    '这一块绑定的数据集按当前参数查不到数据：换一个参数取值（照抄可选值），或换一个候选 / 数据集。',
+  DATA_FIELD_ABSENT: '这一块绑定的字段不在查询结果里：改用画像里列出的字段，或换一个候选。',
+  DATA_FIELD_ALL_NULL: '这一块绑定的字段在查询结果里全是空值：换一个有值的字段，或换一个候选。',
   LAYOUT_LOCKED_BACKDROP_LIGHT:
     '画布上有用户锁定保留的浅色背景，深色风格的浅色文字压在上面看不清：style 改成浅色系风格（如 light-biz），其余内容不变。',
 };

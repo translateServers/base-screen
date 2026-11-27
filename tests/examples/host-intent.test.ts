@@ -867,6 +867,84 @@ describe('host intent whole-screen generation (ADR-0113 §2.7)', () => {
       expect(rationale).toContain('有模块用了目录里没有的组件，已跳过');
     });
 
+    describe('sample check before the proposal (ADR-0114 D6)', () => {
+      const WITH_DATASET = output({
+        blocks: [NOTE, { type: 'base.chart', title: '订单', span: 2, datasetId: 'orders' }],
+      });
+      const ORDERS = {
+        datasetId: 'orders',
+        name: '订单',
+        columns: [
+          { id: 'day', type: 'string' },
+          { id: 'amount', type: 'number' },
+        ],
+        parameters: [{ name: 'limit', required: false, defaultValue: 6 }],
+      };
+      const fields = [
+        { id: 'day', label: '日期', valueType: 'string' as const },
+        { id: 'amount', label: '金额', valueType: 'number' as const },
+      ];
+      const portOf = (rows: Record<string, unknown>[] | 'fail', queries: unknown[] = []) => ({
+        list: async () => ({ ok: true as const, value: { items: [] }, diagnostics: [] }),
+        describe: async () => ({ ok: false as const, diagnostics: [] }),
+        query: async (requested: unknown) => {
+          queries.push(requested);
+          if (rows === 'fail') throw new Error('down');
+          return { ok: true as const, value: { fields, rows }, diagnostics: [] };
+        },
+      });
+      const handlerWith = (element: ReturnType<typeof designer>, port: unknown) =>
+        createHostIntentHandler({
+          designer: element as unknown as BaseScreenDesignerElement,
+          screenId: 'screen-test',
+          catalog: () => GENERATION_CATALOG as never,
+          datasetPort: port as never,
+        });
+
+      it('asks for a repair when a bound dataset comes back empty, naming the block', async () => {
+        const fetch = stubFetch(
+          intentResponse({ output: WITH_DATASET, datasets: [ORDERS] }),
+          repairResponse(),
+        );
+        const queries: unknown[] = [];
+        const element = designer();
+
+        const result = await handlerWith(element, portOf([], queries))(request);
+
+        expect(result.ok).toBe(true);
+        expect(queries).toEqual([
+          { datasetId: 'orders', dataSourceId: 'agent-check-1', params: { limit: 6 } },
+        ]);
+        const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
+        expect(body.repair.issues).toEqual([{ code: 'DATA_RESULT_EMPTY', path: 'blocks[1]' }]);
+        expect(element.submitChangeProposal).toHaveBeenCalledOnce();
+      });
+
+      it('submits with a note when the bound data checks out', async () => {
+        stubFetch(intentResponse({ output: WITH_DATASET, datasets: [ORDERS] }));
+        const element = designer();
+
+        const result = await handlerWith(element, portOf([{ day: 'd1', amount: 3 }]))(request);
+
+        expect(result.ok).toBe(true);
+        const rationale = element.submitChangeProposal.mock.calls[0]?.[0]?.rationale as string;
+        expect(rationale).toContain('将接入的数据：订单（limit=6）');
+        expect(rationale).toContain('已用样例查询核对 1 个数据源');
+      });
+
+      it('does not blame the model when the sample query itself fails', async () => {
+        const fetch = stubFetch(intentResponse({ output: WITH_DATASET, datasets: [ORDERS] }));
+        const element = designer();
+
+        const result = await handlerWith(element, portOf('fail'))(request);
+
+        expect(result.ok).toBe(true);
+        expect(fetch).toHaveBeenCalledOnce();
+        const rationale = element.submitChangeProposal.mock.calls[0]?.[0]?.rationale as string;
+        expect(rationale).toContain('「订单」样例查询失败，未验证');
+      });
+    });
+
     it('gives up after two repair rounds when the output keeps changing but stays unusable', async () => {
       const fetch = stubFetch(
         intentResponse({ output: OVERFLOW }),

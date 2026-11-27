@@ -24,9 +24,15 @@ export type {
 } from './intent-compile-types.js';
 export { flatSkeleton } from './intent-compile-types.js';
 export {
+  type IntentDataCheckInput,
+  type IntentDataCheckResult,
+  validateIntentData,
+} from './intent-data-check.js';
+export {
   INTENT_MAX_REFERENCED_DATASETS,
   type IntentDataContext,
   type IntentDatasetPromptSummary,
+  intentDatasetQueryKey,
   type PrepareIntentDataContextInput,
   prepareIntentDataContext,
   summarizeIntentDataContext,

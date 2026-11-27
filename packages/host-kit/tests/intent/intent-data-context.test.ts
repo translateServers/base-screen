@@ -4,7 +4,11 @@ import type {
   ScreenTabularDataset,
 } from '@base-screen/contracts';
 import { describe, expect, it } from 'vitest';
-import { type IntentCatalog, prepareIntentDataContext } from '../../src/index.js';
+import {
+  type IntentCatalog,
+  intentDatasetQueryKey,
+  prepareIntentDataContext,
+} from '../../src/index.js';
 import { COMPILE_CATALOG } from './fixtures.js';
 
 /**
@@ -119,6 +123,11 @@ describe('prepareIntentDataContext', () => {
       ['crew', true],
       ['pipeline', true],
       ['broken', false],
+    ]);
+    // 取到的样本留在宿主里给采纳前验证复用，键与实例参数无关声明顺序。
+    expect([...context.samples.keys()]).toEqual([
+      intentDatasetQueryKey('crew', { line: 'LINE-A' }),
+      intentDatasetQueryKey('pipeline', { line: 'LINE-A' }),
     ]);
     // 代取样不改参数定义：编译时 pipeline 仍按缺参处理。
     expect(context.references[1]?.parameters?.[0]).not.toHaveProperty('defaultValue');

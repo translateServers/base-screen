@@ -38,6 +38,7 @@ const {
   prepareIntentDataContext,
   repairKey,
   summarizeIntentDataContext,
+  validateIntentData,
 } = await load('packages/host-kit/dist/index.js');
 
 const MAX_REPAIR_ROUNDS = 2;
@@ -167,7 +168,15 @@ if (args.data !== undefined) {
   for (const row of results) {
     console.log(
       `${row.id}: 画像 ${row.profiled?.join(' ') ?? '-'}；候选 ${row.candidates ?? '-'}（用了 ${row.usedCandidates ?? '-'}）；` +
-        `实例 ${row.datasetSources?.join(' ') || '无'}；绑数指标卡 ${row.boundKpis ?? 0}；告警 ${row.dataWarnings?.join(',') || '无'}`,
+        `实例 ${row.datasetSources?.join(' ') || '无'}；绑数指标卡 ${row.boundKpis ?? 0}；告警 ${row.dataWarnings?.join(',') || '无'}；` +
+        `样例验证 ${
+          (row.dataChecks ?? [])
+            .map(
+              (entry) =>
+                `第${entry.round}轮 核对${entry.verified}/未核对${entry.unverified}${entry.issues.length === 0 ? '' : ` ${entry.issues.join(',')}`}`,
+            )
+            .join('；') || '无'
+        }`,
     );
   }
 }
@@ -497,12 +506,20 @@ function dataFacts(piped, data) {
     datasetSources: sources,
     boundKpis: bound,
     dataWarnings: [...new Set(warnings)],
+    // 每一轮的样例验证：核对 / 未核对的实例数与诊断码。
+    dataChecks: (piped.checks ?? []).map((entry) => ({
+      round: entry.round,
+      verified: entry.verified.length,
+      unverified: entry.unverified.length,
+      issues: entry.issues.map((issue) => `${issue.code}@${issue.path}`),
+    })),
   };
 }
 
 async function pipeline(item, first, dataContext) {
   let data = first;
   let rounds = 0;
+  const checks = [];
   let calls = first.mode === 'llm' ? 1 : 0;
   let previous;
   const capacityRounds = [];
@@ -530,15 +547,43 @@ async function pipeline(item, first, dataContext) {
         );
       }
     }
+    // 与宿主同一口径（ADR-0114 D6）：版面审计过了、引用了数据集时，提案前做一次样例验证。
+    let check;
+    if (document !== undefined && audit.length === 0 && dataContext !== undefined) {
+      check = await validateIntentData({
+        document,
+        sources: prepared.compiled.sources,
+        port: datasetPort,
+        context: dataContext.context,
+        signal: AbortSignal.timeout(15_000),
+      });
+      issues.push(...check.issues);
+      checks.push({ round: rounds, ...check });
+    }
     if (issues.some((issue) => issue.code === 'LAYOUT_CAPACITY_EXCEEDED'))
       capacityRounds.push(rounds);
-    const view = { first, data, prepared, document, audit, rounds, calls, capacityRounds, issues };
+    const view = {
+      first,
+      data,
+      prepared,
+      document,
+      audit,
+      rounds,
+      calls,
+      capacityRounds,
+      issues,
+      checks,
+    };
     if (issues.length === 0 && document !== undefined) return { ...view, verdict: 'clean' };
 
     const key = repairKey(issues);
     const exhausted = issues.length === 0 || rounds >= MAX_REPAIR_ROUNDS || key === previous;
     if (exhausted) {
-      const deliverable = document !== undefined && audit.length === 0 && prepared.deliverable;
+      // 只有样例验证没过时内容是完整的，照常交出（与宿主一致）。
+      const deliverable =
+        document !== undefined &&
+        audit.length === 0 &&
+        (prepared.issues.length === 0 || prepared.deliverable);
       return { ...view, verdict: deliverable ? 'dropped' : 'failed' };
     }
     previous = key;
