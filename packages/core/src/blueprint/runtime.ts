@@ -3,6 +3,14 @@ export {
   SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY,
 } from './runtime-compile.js';
 export { dispatchScreenBlueprintEvent, traceScreenBlueprintEvent } from './runtime-dispatch.js';
+export {
+  SCREEN_BLUEPRINT_SIMULATION_MAX_DEPTH,
+  type ScreenBlueprintSimulation,
+  type ScreenBlueprintSimulationDispatch,
+  type ScreenBlueprintSimulationOptions,
+  type ScreenBlueprintSimulationParamChange,
+  simulateScreenBlueprint,
+} from './runtime-simulate.js';
 export type {
   ScreenBlueprintActionTrace,
   ScreenBlueprintCanvasEffect,

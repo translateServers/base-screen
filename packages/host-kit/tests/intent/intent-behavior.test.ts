@@ -58,6 +58,24 @@ const CATALOG: IntentCatalog = {
     return material;
   }),
 };
+(CATALOG.materials as IntentCatalog['materials'][number][]).push({
+  type: 'board.tabs',
+  name: '页签',
+  category: '看板',
+  data: 'tabular',
+  asset: false,
+  size: { width: 480, height: 56 },
+  props: {},
+  roles: [{ id: 'items', min: 1, max: 2, valueTypes: ['string', 'number'] }],
+  events: [
+    {
+      name: 'tabChange',
+      label: '切换标签',
+      payload: { index: 'number', label: 'string', value: 'string' },
+    },
+  ],
+  defaults: { props: {}, style: {} },
+});
 
 const REFERENCES: IntentReferences = {
   assets: [],
@@ -348,6 +366,53 @@ describe('gaps', () => {
     expect(parsed.diagnostics.filter((item) => item.code === 'INTENT_BEHAVIOR_GAP')).toHaveLength(
       1,
     );
+  });
+});
+
+describe('simulation through core (ADR-0115 D6)', () => {
+  const tabs = (datasetId: string) => [
+    {
+      type: 'board.tabs',
+      key: 'tabs',
+      title: '产线',
+      span: 4,
+      datasetId,
+      fields: { items: ['line'] },
+    },
+    {
+      type: 'base.table',
+      key: 'alarms',
+      title: '告警明细',
+      span: 4,
+      datasetId: 'monitor.alarms',
+      params: { line: 'LINE-A' },
+    },
+  ];
+  const TAB_FILTER = {
+    kind: 'filter',
+    from: 'tabs',
+    event: 'tabChange',
+    to: ['alarms'],
+    param: 'line',
+  };
+
+  it('wires a tab change to the target parameter when some tab changes it', () => {
+    const compiled = compile(screen({ interactions: [TAB_FILTER] }, tabs('monitor.lines')));
+    expect(compiled.behaviors.filter((item) => item.kind === 'filter')).toHaveLength(1);
+    expect(compiled.document.blueprint.edges[0]).toMatchObject({
+      value: { kind: 'event-payload', path: ['value'] },
+    });
+  });
+
+  it('drops a tab change that can never change anything', () => {
+    const compiled = compile(screen({ interactions: [TAB_FILTER] }, tabs('monitor.line-summary')));
+    expect(compiled.warnings).toContainEqual(
+      expect.objectContaining({
+        code: 'AGENT_INTERACTION_NO_EFFECT',
+        detail: expect.objectContaining({ reason: 'same' }),
+      }),
+    );
+    expect(compiled.document.blueprint.edges).toEqual([]);
   });
 });
 

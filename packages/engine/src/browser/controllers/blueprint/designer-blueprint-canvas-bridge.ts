@@ -1,13 +1,11 @@
 import {
   parseScreenDocument,
   readScreenBlueprintEventPort,
-  resolveScreenStartPageId,
   type ScreenBlueprint,
   type ScreenBlueprintAction,
   type ScreenBlueprintRuleStep,
   type ScreenDiagnostic,
   type ScreenDocument,
-  type ScreenJsonObject,
   type ScreenJsonValue,
   type ScreenParseResult,
   screenJsonEquals,
@@ -16,7 +14,7 @@ import {
   compileScreenBlueprint,
   type ScreenBlueprintEvent,
   type ScreenDocumentCommand,
-  traceScreenBlueprintEvent,
+  simulateScreenBlueprint,
 } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
@@ -62,8 +60,6 @@ import {
 } from './designer-blueprint-canvas-bridge-helpers.js';
 
 const MAX_PROCESSED_COMMANDS = 256;
-/** 与 viewer 的级联上限一致：变量写入引发的 data-updated 作为后续分派，最多 32 层。 */
-const MAX_SIMULATION_CASCADE = 32;
 const TEXT = DESIGNER_UI_TEXT.blueprint.graph;
 
 export interface DesignerBlueprintCanvasBridgeCallbacks {
@@ -377,70 +373,17 @@ export class DesignerBlueprintCanvasBridge {
     if (event === undefined) {
       return failure('AUTHORING_REQUEST_INVALID', DESIGNER_UI_TEXT.blueprint.invalidCommand);
     }
-    const compiled = compileScreenBlueprint(document, { hasBlueprintCapability: () => true });
-    if (!compiled.ok) return compiled;
-    const plan = compiled.value;
+    const simulated = simulateScreenBlueprint(document, event);
+    if (!simulated.ok) return simulated;
+    const { plan, dispatches } = simulated.value;
     const steps: BaseScreenBlueprintCanvasTraceStep[] = [];
     const executedEdgeIds = new Set<string>();
     const visitedNodeIds = new Set<string>([nodeId]);
     const titles = new Map(this.callbacks.getGraph().nodes.map((item) => [item.id, item.title]));
-    let variables: ScreenJsonObject = plan.initialVariables;
-    // 模拟里的从画布状态：弹框从全部关闭开始，页面从起始页开始；真正变化时才级联
-    // 「已打开 / 已关闭」与「页面已切换」（同查看器的顺序：先关弹框 → 旧页离开 → 新页进入）。
-    const openPopups = new Set<string>();
-    const pageIds = (document.subCanvases ?? [])
-      .filter((canvas) => canvas.display === 'page')
-      .map((canvas) => canvas.id);
-    let currentPage: string | null = resolveScreenStartPageId(document);
-    const pageHistory: string[] = [];
-    const enqueue = (next: ScreenBlueprintEvent, depth: number): void => {
-      queue.push({ event: next, depth });
-    };
-    const goPage = (
-      target: string | undefined,
-      payload: ScreenJsonValue | undefined,
-      remember: boolean,
-      depth: number,
-    ): void => {
-      if (target === undefined || target === currentPage || !pageIds.includes(target)) return;
-      for (const popupId of [...openPopups].reverse()) {
-        openPopups.delete(popupId);
-        enqueue({ type: 'canvas-event', canvasId: popupId, name: 'closed', payload: null }, depth);
-      }
-      const from = currentPage;
-      if (from !== null) {
-        if (remember) pageHistory.push(from);
-        enqueue({ type: 'canvas-event', canvasId: from, name: 'closed', payload: null }, depth);
-      }
-      currentPage = target;
-      enqueue(
-        { type: 'canvas-event', canvasId: target, name: 'opened', payload: payload ?? null },
-        depth,
-      );
-      enqueue({ type: 'page-changed', name: 'page-changed', payload: { from, to: target } }, depth);
-    };
-    let failed = false;
-    const queue: { readonly event: ScreenBlueprintEvent; readonly depth: number }[] = [
-      { event, depth: 0 },
-    ];
-    while (queue.length > 0) {
-      const { event: current, depth } = queue.shift()!;
-      if (depth > MAX_SIMULATION_CASCADE) {
-        steps.push({ kind: 'error', depth, text: TEXT.simulation.depthExceeded });
-        failed = true;
-        break;
-      }
-      const traced = traceScreenBlueprintEvent(plan, variables, current);
-      if (!traced.ok) {
-        steps.push({
-          kind: 'error',
-          depth,
-          text: traced.diagnostics[0]?.message ?? DESIGNER_UI_TEXT.blueprint.invalidCommand,
-        });
-        failed = true;
-        break;
-      }
-      for (const ruleTrace of traced.value.ruleTraces) {
+    // 级联（变量 data-updated、从画布开合与页面切换）由 core 的 `simulateScreenBlueprint` 展开，
+    // 这里只把每次分派的轨迹翻成工作台的步骤（ADR-0115 D6）。
+    for (const { depth, ruleTraces } of dispatches) {
+      for (const ruleTrace of ruleTraces) {
         if (!ruleTrace.triggerMatched) continue;
         const rule = plan.rules.find((candidate) => candidate.id === ruleTrace.ruleId);
         if (rule === undefined) continue;
@@ -496,62 +439,16 @@ export class DesignerBlueprintCanvasBridge {
         };
         walk(rule.steps, depth + 1);
       }
-      const next = traced.value.variables;
-      for (const [variableId, value] of Object.entries(next)) {
-        if (screenJsonEquals(value, variables[variableId] ?? null) && variableId in variables) {
-          continue;
-        }
-        queue.push({
-          event: { type: 'variable-event', variableId, name: 'data-updated', payload: value },
-          depth: depth + 1,
-        });
-      }
-      variables = next;
-      for (const effect of traced.value.canvasEffects) {
-        if (effect.type === 'page-navigation') {
-          if (effect.operation === 'back') {
-            goPage(pageHistory.pop(), undefined, false, depth + 1);
-          } else {
-            const index = currentPage === null ? -1 : pageIds.indexOf(currentPage);
-            goPage(
-              pageIds[effect.operation === 'next' ? index + 1 : index - 1],
-              undefined,
-              true,
-              depth + 1,
-            );
-          }
-          continue;
-        }
-        if (pageIds.includes(effect.canvasId)) {
-          const open =
-            effect.operation === 'open' ||
-            (effect.operation === 'toggle' && effect.canvasId !== currentPage);
-          if (open) goPage(effect.canvasId, effect.payload, true, depth + 1);
-          else if (effect.canvasId === currentPage) {
-            goPage(pageHistory.pop(), undefined, false, depth + 1);
-          }
-          continue;
-        }
-        const open =
-          effect.operation === 'open'
-            ? true
-            : effect.operation === 'close'
-              ? false
-              : !openPopups.has(effect.canvasId);
-        if (open === openPopups.has(effect.canvasId)) continue;
-        if (open) openPopups.add(effect.canvasId);
-        else openPopups.delete(effect.canvasId);
-        enqueue(
-          {
-            type: 'canvas-event',
-            canvasId: effect.canvasId,
-            name: open ? 'opened' : 'closed',
-            payload: open ? (effect.payload ?? null) : null,
-          },
-          depth + 1,
-        );
-      }
     }
+    const stopped = simulated.value.failure;
+    if (stopped !== undefined) {
+      steps.push({
+        kind: 'error',
+        depth: stopped.depth,
+        text: stopped.kind === 'depth-exceeded' ? TEXT.simulation.depthExceeded : stopped.message,
+      });
+    }
+    const failed = stopped !== undefined;
     this.#trace = {
       trigger: { nodeId, port },
       executedEdgeIds: [...executedEdgeIds],

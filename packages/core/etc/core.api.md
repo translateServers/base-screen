@@ -241,6 +241,9 @@ export interface RgbColor {
 export { SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY }
 
 // @public
+export const SCREEN_BLUEPRINT_SIMULATION_MAX_DEPTH = 32;
+
+// @public
 export const SCREEN_CATEGORY_MAX = 12;
 
 // @public
@@ -531,6 +534,57 @@ export interface ScreenBlueprintSetVariableActionTrace {
     readonly type: 'set-variable';
     // (undocumented)
     readonly variableId: string;
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintSimulation {
+    readonly changedVariableIds: readonly string[];
+    // (undocumented)
+    readonly componentDataRequests: readonly string[];
+    // (undocumented)
+    readonly currentPageId: string | null;
+    readonly dataSourceChanges: Readonly<Record<string, Readonly<Record<string, ScreenBlueprintSimulationParamChange>>>>;
+    // (undocumented)
+    readonly dispatches: readonly ScreenBlueprintSimulationDispatch[];
+    readonly failure?: {
+        readonly kind: 'depth-exceeded' | 'dispatch-failed';
+        readonly depth: number;
+        readonly message: string;
+    };
+    readonly openPopupIds: readonly string[];
+    // (undocumented)
+    readonly plan: ScreenBlueprintPlan;
+    readonly variableRequests: readonly string[];
+    // (undocumented)
+    readonly variables: ScreenJsonObject;
+    readonly visibility: Readonly<Record<string, boolean>>;
+}
+
+// @public
+export interface ScreenBlueprintSimulationDispatch {
+    // (undocumented)
+    readonly depth: number;
+    // (undocumented)
+    readonly event: ScreenBlueprintEvent;
+    // (undocumented)
+    readonly result: ScreenBlueprintTraceResult;
+    // (undocumented)
+    readonly ruleTraces: readonly ScreenBlueprintRuleTrace[];
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintSimulationOptions {
+    readonly capabilities?: ScreenBlueprintCapabilityIndex;
+    readonly plan?: ScreenBlueprintPlan;
+    readonly variables?: ScreenJsonObject;
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintSimulationParamChange {
+    // (undocumented)
+    readonly after: ScreenJsonValue;
+    // (undocumented)
+    readonly before: ScreenJsonValue;
 }
 
 // @public (undocumented)
@@ -1135,6 +1189,9 @@ export function setScreenJsonArrayItem(root: ScreenJsonObject, path: readonly (s
 
 // @public (undocumented)
 export function setScreenJsonPath(root: ScreenJsonObject, path: readonly (string | number)[], value: ScreenJsonValue): ScreenJsonObject | undefined;
+
+// @public (undocumented)
+export function simulateScreenBlueprint(document: ScreenDocument, event: ScreenBlueprintEvent, options?: ScreenBlueprintSimulationOptions): ScreenParseResult<ScreenBlueprintSimulation>;
 
 // @public
 export function suggestReadableColor(foreground: RgbColor, background: RgbColor, minRatio: number): RgbColor | undefined;

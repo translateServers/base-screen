@@ -1,4 +1,10 @@
-import { SCREEN_BLUEPRINT_CAPABILITIES, screenThemeRef } from '@base-screen/contracts';
+import {
+  SCREEN_BLUEPRINT_CAPABILITIES,
+  type ScreenDocument,
+  type ScreenJsonObject,
+  screenThemeRef,
+} from '@base-screen/contracts';
+import { simulateScreenBlueprint } from '@base-screen/core';
 import type { IntentCatalog, IntentCatalogEvent } from './intent-catalog.js';
 import type {
   CompiledComponent,
@@ -27,8 +33,9 @@ import type {
  * - `show`：蓝图连「来源组件事件 → 目标块外壳 show / hide / toggle」；`show` 模式的目标初始隐藏。
  * - 阈值状态：绑了数据集字段的指标卡，数值组件按「第一行该字段」判定，命中的状态把文字色换成语义色位。
  *
- * 采纳前模拟（D6，静态形式）：用画像样本里该字段出现过的取值走一遍——点了之后参数会不会变、
- * 取值在不在目标参数的可选值里。一个值都不会让目标变化的联动判 `AGENT_INTERACTION_NO_EFFECT` 进修复。
+ * 采纳前模拟（D6）：用画像样本里该字段出现过的取值逐个造来源事件，交给 core 的
+ * `simulateScreenBlueprint` 跑一遍级联，看目标实例的参数会不会变、变成的值在不在可选值里。
+ * 一个值都不会让目标变化的联动判 `AGENT_INTERACTION_NO_EFFECT` 进修复。
  * 宿主上送了已授权能力（D7）时，缺能力的联动不编译，原因写进告警，不进修复（模型修不了授权）。
  */
 
@@ -366,27 +373,60 @@ class Context {
     const path = this.payloadPath(interaction, source);
     if (path === undefined) return;
 
-    // 模拟用的取值：表格行的字段读样本；图表横轴读维度字段的样本；页签与数值无从预知，记「未模拟」。
+    // 模拟用的取值（ADR-0115 D6）：表格行读该字段的样本，图表横轴读维度字段，页签与数值类读物料
+    // 绑定的值字段；示例表格读模型给的行。拿不到样本的记「未模拟」，不拦。
     const field =
       path[0] === 'row'
         ? path[1]
         : path[0] === 'x'
           ? dimensionField(source.component)
-          : path[0] === 'value' || path.length !== 1
-            ? undefined
-            : path[0];
+          : path[0] === 'value'
+            ? valueField(source.component)
+            : undefined;
     const values = sourceValues(source.item, field, this.input.references);
 
-    const targets: { item: Item; dataSourceId: string; initial: string | number | boolean }[] = [];
+    const candidates: FilterTarget[] = [];
     for (const ref of interaction.to) {
-      const target = this.filterTarget(interaction, ref, items, values);
-      if (target !== undefined) targets.push(target);
+      const target = this.filterTarget(interaction, ref, items);
+      if (target !== undefined) candidates.push(target);
     }
+    if (candidates.length === 0) return;
+
+    const variableId = `agent-var-${this.#variables + 1}`;
+    const variableNode = `agent:v:${variableId}`;
+    const sourceNode = `agent:c:${source.component.id}`;
+    const edgeValue = { kind: 'event-payload', path };
+    // 采纳前用 core 的级联模拟走一遍：每个样本取值造一个事件，看目标实例的参数会不会变、
+    // 变成的值是否合法。都不会变或都不合法的目标不编进去。
+    const targets = candidates.filter((target) => {
+      const effect = this.simulateFilter({
+        interaction,
+        sourceComponentId: source.component.id,
+        sourceNode,
+        variableId,
+        variableNode,
+        edgeValue,
+        path,
+        values,
+        target,
+      });
+      if (effect === 'changes' || effect === 'unknown') return true;
+      this.warn(
+        'AGENT_INTERACTION_NO_EFFECT',
+        interaction.origin,
+        effect === 'not-allowed'
+          ? `None of the source values is an allowed value of ${interaction.param} (${(target.parameter.allowedValues ?? []).join(', ')}).`
+          : effect === 'failed'
+            ? `Simulating the interaction failed; it was not compiled.`
+            : `Every source value equals the current ${interaction.param} (${String(target.initial)}); clicking would change nothing.`,
+        { target: this.nameOf(target.item), param: interaction.param, reason: effect },
+      );
+      return false;
+    });
     if (targets.length === 0) return;
 
     this.#variables += 1;
-    const variableId = `agent-var-${this.#variables}`;
-    const first = targets[0] as (typeof targets)[number];
+    const first = targets[0] as FilterTarget;
     const fromName = this.nameOf(source.item);
     const toNames = targets.map((target) => this.nameOf(target.item));
     this.output.variables.push({
@@ -426,13 +466,12 @@ class Context {
         );
       }
     }
-    const variableNode = `agent:v:${variableId}`;
     this.#nodes.add(variableNode);
     this.output.blueprint.nodes.push({ kind: 'variable', id: variableNode, variableId });
     this.edge({
       from: { node: this.componentNode(source.component.id), port: `event:${interaction.event}` },
       to: { node: variableNode, port: 'set' },
-      value: { kind: 'event-payload', path },
+      value: edgeValue,
     });
     this.output.behaviors.push({
       kind: 'filter',
@@ -492,8 +531,7 @@ class Context {
     interaction: Extract<IntentInteraction, { kind: 'filter' }>,
     ref: string,
     items: readonly Item[],
-    values: readonly (string | number | boolean)[] | undefined,
-  ): { item: Item; dataSourceId: string; initial: string | number | boolean } | undefined {
+  ): FilterTarget | undefined {
     const item = findItem(items, ref);
     const component = item === undefined ? undefined : this.mainOf(item);
     if (item === undefined || component === undefined) {
@@ -539,19 +577,81 @@ class Context {
       );
       return undefined;
     }
-    const effect = simulate(values, parameter, initial);
-    if (effect !== 'changes' && effect !== 'unknown') {
-      this.warn(
-        'AGENT_INTERACTION_NO_EFFECT',
-        interaction.origin,
-        effect === 'not-allowed'
-          ? `None of the source values is an allowed value of ${interaction.param} (${(parameter.allowedValues ?? []).join(', ')}).`
-          : `Every source value equals the current ${interaction.param} (${String(initial)}); clicking would change nothing.`,
-        { target: this.nameOf(item), param: interaction.param, reason: effect },
-      );
-      return undefined;
+    return { item, dataSourceId, initial, parameter };
+  }
+
+  /**
+   * 用 core 的 `simulateScreenBlueprint` 模拟一条筛选（ADR-0115 D6）：只带这条联动自己的变量、节点、
+   * 连线与目标实例，逐个样本取值发一次来源事件，读模拟结束时目标实例参数的变化。
+   * - `changes`：至少一个样本让参数变成了不同的合法取值；
+   * - `same`：所有样本都让参数保持原值（例如来源各行的取值都是当前值）；
+   * - `not-allowed`：参数变了，但变成的值都不在可选值里；
+   * - `unknown`：没有样本；`failed`：模拟本身失败（结构问题，不该发生）。
+   */
+  simulateFilter(input: {
+    readonly interaction: Extract<IntentInteraction, { kind: 'filter' }>;
+    readonly sourceComponentId: string;
+    readonly sourceNode: string;
+    readonly variableId: string;
+    readonly variableNode: string;
+    readonly edgeValue: Record<string, unknown>;
+    readonly path: readonly string[];
+    readonly values: readonly (string | number | boolean)[] | undefined;
+    readonly target: FilterTarget;
+  }): 'changes' | 'same' | 'not-allowed' | 'unknown' | 'failed' {
+    const { interaction, target, values } = input;
+    if (values === undefined || values.length === 0) return 'unknown';
+    const entry = this.input.dataSources.find((item) => item.id === target.dataSourceId);
+    if (entry === undefined) return 'failed';
+    const document = {
+      canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
+      components: this.input.components,
+      variables: [
+        { id: input.variableId, name: 'probe', type: 'static', initialValue: target.initial },
+      ],
+      dataSources: [
+        {
+          ...entry,
+          params: {
+            ...(entry.params as Record<string, unknown>),
+            [interaction.param]: { kind: 'variable', variableId: input.variableId },
+          },
+        },
+      ],
+      blueprint: {
+        nodes: [
+          { kind: 'component', id: input.sourceNode, componentId: input.sourceComponentId },
+          { kind: 'variable', id: input.variableNode, variableId: input.variableId },
+        ],
+        edges: [
+          {
+            kind: 'flow',
+            id: 'agent-probe',
+            from: { node: input.sourceNode, port: `event:${interaction.event}` },
+            to: { node: input.variableNode, port: 'set' },
+            value: input.edgeValue,
+          },
+        ],
+      },
+    } as unknown as ScreenDocument;
+    const allowed = target.parameter.allowedValues;
+    let changed = false;
+    let legal = false;
+    for (const [index, value] of values.slice(0, 24).entries()) {
+      const simulated = simulateScreenBlueprint(document, {
+        componentId: input.sourceComponentId,
+        name: interaction.event,
+        payload: samplePayload(input.path, value, index),
+      });
+      if (!simulated.ok || simulated.value.failure !== undefined) return 'failed';
+      const change = simulated.value.dataSourceChanges[target.dataSourceId]?.[interaction.param];
+      if (change === undefined) continue;
+      changed = true;
+      const after = change.after;
+      if (isScalar(after) && (allowed === undefined || allowed.includes(after))) legal = true;
     }
-    return { item, dataSourceId, initial };
+    if (legal) return 'changes';
+    return changed ? 'not-allowed' : 'same';
   }
 
   show(interaction: Extract<IntentInteraction, { kind: 'show' }>, items: readonly Item[]): void {
@@ -685,32 +785,6 @@ class Context {
   }
 }
 
-/**
- * 采纳前模拟（D6）：来源可能给出的取值里，有没有能让目标参数变化的。
- * - `unknown`：没有样本（页签、数值、没画像的数据集），不拦；
- * - `not-allowed`：样本取值都不在目标参数的可选值里；
- * - `same`：合法取值都等于当前值（例如设备表只含当前产线，点哪行都是同一条线）。
- */
-function simulate(
-  values: readonly (string | number | boolean)[] | undefined,
-  parameter: NonNullable<IntentReferenceDataset['parameters']>[number],
-  initial: string | number | boolean,
-): 'changes' | 'unknown' | 'not-allowed' | 'same' {
-  if (values === undefined || values.length === 0) return 'unknown';
-  const typed = values.filter((value) =>
-    parameter.valueType === 'number'
-      ? typeof value === 'number'
-      : parameter.valueType === 'boolean'
-        ? typeof value === 'boolean'
-        : typeof value === 'string',
-  );
-  const allowed = typed.filter(
-    (value) => parameter.allowedValues === undefined || parameter.allowedValues.includes(value),
-  );
-  if (allowed.length === 0) return 'not-allowed';
-  return allowed.some((value) => value !== initial) ? 'changes' : 'same';
-}
-
 function boundFields(component: CompiledComponent): string[] | undefined {
   const fields = (component.dataBinding as { fields?: Record<string, unknown> } | undefined)
     ?.fields;
@@ -726,6 +800,36 @@ function boundFields(component: CompiledComponent): string[] | undefined {
       .filter((id): id is string => typeof id === 'string');
   }
   return undefined;
+}
+
+/** 一条筛选的目标：读数据集的那个实例、参数定义与起始取值。 */
+interface FilterTarget {
+  readonly item: Item;
+  readonly dataSourceId: string;
+  readonly initial: string | number | boolean;
+  readonly parameter: NonNullable<IntentReferenceDataset['parameters']>[number];
+}
+
+/** 模拟用的事件负载：只造路径上要读的那一层（`row` 是一行，其余是顶层字段）。 */
+function samplePayload(
+  path: readonly string[],
+  value: string | number | boolean,
+  index: number,
+): ScreenJsonObject {
+  if (path[0] === 'row' && path[1] !== undefined) {
+    return { rowIndex: index, row: { [path[1]]: value } };
+  }
+  return path[0] === undefined ? {} : { [path[0]]: value, index };
+}
+
+/** 页签、数值类物料的值字段：第一个绑定角色的最后一个字段（页签是 [标签, 值]，数值是 [值]）。 */
+function valueField(component: CompiledComponent): string | undefined {
+  const fields = (component.dataBinding as { fields?: Record<string, unknown> } | undefined)
+    ?.fields;
+  const first = fields === undefined ? undefined : Object.values(fields)[0];
+  return Array.isArray(first) && typeof first.at(-1) === 'string'
+    ? (first.at(-1) as string)
+    : undefined;
 }
 
 /** 图表横轴的字段：绑定里的维度角色，没有就取第一个角色的第一个字段。 */

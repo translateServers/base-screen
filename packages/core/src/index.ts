@@ -15,6 +15,7 @@ export {
   compileScreenBlueprint,
   dispatchScreenBlueprintEvent,
   SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY,
+  SCREEN_BLUEPRINT_SIMULATION_MAX_DEPTH,
   type ScreenBlueprintActionTrace,
   type ScreenBlueprintCanvasEffect,
   type ScreenBlueprintCanvasEvent,
@@ -32,9 +33,14 @@ export {
   type ScreenBlueprintPlan,
   type ScreenBlueprintRuleTrace,
   type ScreenBlueprintSetVariableActionTrace,
+  type ScreenBlueprintSimulation,
+  type ScreenBlueprintSimulationDispatch,
+  type ScreenBlueprintSimulationOptions,
+  type ScreenBlueprintSimulationParamChange,
   type ScreenBlueprintStateEffect,
   type ScreenBlueprintTraceResult,
   type ScreenBlueprintVisibilityEffect,
+  simulateScreenBlueprint,
   traceScreenBlueprintEvent,
 } from './blueprint/runtime.js';
 export { applyScreenDocumentCommand, applyScreenDocumentTransaction } from './commands/apply.js';
