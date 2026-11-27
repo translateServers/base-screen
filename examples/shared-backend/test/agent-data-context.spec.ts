@@ -116,12 +116,12 @@ describe('agent data context', () => {
     const request = readRepairRequest({
       output: '{}',
       issues: [
-        { code: 'DATA_RESULT_EMPTY', path: 'regions[1].blocks[0]' },
+        { code: 'DATA_FIELD_ALL_NULL', path: 'regions[1].blocks[0]' },
         { code: 'AGENT_BINDING_FIELD_UNKNOWN', path: 'blocks[0]' },
       ],
     });
     expect(request?.issues.map((issue) => issue.hint)).toEqual([
-      expect.stringContaining('查不到数据'),
+      expect.stringContaining('全是空值'),
       expect.stringContaining('画像里列出的'),
     ]);
   });

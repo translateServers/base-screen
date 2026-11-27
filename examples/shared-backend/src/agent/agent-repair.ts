@@ -80,8 +80,6 @@ const LAYOUT_HINTS: Readonly<Record<string, string>> = {
     '这一处既引用了数据集又写了示例数据：有数据集引用时只保留 datasetId / candidate / bind，去掉 table 与 value / delta。',
   AGENT_KPI_MULTI_ROW:
     '这个指标卡绑的数据集结果不止一行，指标卡只能显示一行：改成图表或表格块，或换一个单值候选。',
-  DATA_RESULT_EMPTY:
-    '这一块绑定的数据集按当前参数查不到数据：换一个参数取值（照抄可选值），或换一个候选 / 数据集。',
   DATA_FIELD_ABSENT: '这一块绑定的字段不在查询结果里：改用画像里列出的字段，或换一个候选。',
   DATA_FIELD_ALL_NULL: '这一块绑定的字段在查询结果里全是空值：换一个有值的字段，或换一个候选。',
   LAYOUT_LOCKED_BACKDROP_LIGHT:

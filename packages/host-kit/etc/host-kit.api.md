@@ -540,6 +540,7 @@ export interface IntentDataCheckInput {
 
 // @public (undocumented)
 export interface IntentDataCheckResult {
+    readonly empty: readonly string[];
     readonly issues: readonly IntentRepairIssue[];
     readonly unverified: readonly string[];
     readonly verified: readonly string[];

@@ -947,17 +947,26 @@ function hasDatasetSources(document: ScreenDocument): boolean {
 /** 样例验证的结果写进理由：核对了几个实例、哪些没能核对。 */
 function describeDataCheck(
   check:
-    | { readonly verified: readonly string[]; readonly unverified: readonly string[] }
+    | {
+        readonly verified: readonly string[];
+        readonly unverified: readonly string[];
+        readonly empty: readonly string[];
+      }
     | undefined,
 ): string {
   if (check === undefined) return '';
+  // 按当前条件查不到数据不算错（ADR-0114 §8.7）：照常交出，说清楚采纳后会怎样。
+  const empty =
+    check.empty.length === 0
+      ? ''
+      : `「${check.empty.join('」「')}」按当前条件暂无数据，采纳后有数据会自动显示。`;
   const verified =
     check.verified.length === 0 ? '' : `已用样例查询核对 ${check.verified.length} 个数据源。`;
   const unverified =
     check.unverified.length === 0
       ? ''
       : `「${check.unverified.join('」「')}」样例查询失败，未验证，采纳后请留意是否有数据。`;
-  return `${verified}${unverified}`;
+  return `${verified}${empty}${unverified}`;
 }
 
 function note(code: string, path: string): IntentDiagnostic {
@@ -1471,7 +1480,6 @@ const INTENT_WARNING_TEXT: Readonly<Record<string, string>> = {
   AGENT_BLOCK_BINDING_UNSATISFIED: '有模块的列不满足绑定角色，已退化为无数据',
   AGENT_DATASET_UNKNOWN: '引用的数据集不在本轮上下文里，该模块已跳过',
   AGENT_DATASET_PARAM_REQUIRED: '引用的数据集需要先指定参数，该模块已跳过',
-  DATA_RESULT_EMPTY: '有模块的样例查询没有返回数据，采纳后可能显示为空',
   DATA_FIELD_ABSENT: '有模块绑定的字段不在查询结果里，采纳后可能显示为空',
   DATA_FIELD_ALL_NULL: '有模块绑定的字段在样例结果里全为空',
   AGENT_KPI_MULTI_ROW: '有指标卡对应的数据不止一行，指标卡只能显示单行数据',

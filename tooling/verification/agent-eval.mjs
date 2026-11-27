@@ -511,6 +511,7 @@ function dataFacts(piped, data) {
       round: entry.round,
       verified: entry.verified.length,
       unverified: entry.unverified.length,
+      empty: entry.empty.length,
       issues: entry.issues.map((issue) => `${issue.code}@${issue.path}`),
     })),
   };

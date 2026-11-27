@@ -901,7 +901,7 @@ describe('host intent whole-screen generation (ADR-0113 §2.7)', () => {
           datasetPort: port as never,
         });
 
-      it('asks for a repair when a bound dataset comes back empty, naming the block', async () => {
+      it('asks for a repair when a bound field comes back all empty, naming the block', async () => {
         const fetch = stubFetch(
           intentResponse({ output: WITH_DATASET, datasets: [ORDERS] }),
           repairResponse(),
@@ -909,15 +909,31 @@ describe('host intent whole-screen generation (ADR-0113 §2.7)', () => {
         const queries: unknown[] = [];
         const element = designer();
 
-        const result = await handlerWith(element, portOf([], queries))(request);
+        const rows = [
+          { day: 'd1', amount: null },
+          { day: 'd2', amount: null },
+        ];
+        const result = await handlerWith(element, portOf(rows, queries))(request);
 
         expect(result.ok).toBe(true);
         expect(queries).toEqual([
           { datasetId: 'orders', dataSourceId: 'agent-check-1', params: { limit: 6 } },
         ]);
         const body = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body));
-        expect(body.repair.issues).toEqual([{ code: 'DATA_RESULT_EMPTY', path: 'blocks[1]' }]);
+        expect(body.repair.issues).toEqual([{ code: 'DATA_FIELD_ALL_NULL', path: 'blocks[1]' }]);
         expect(element.submitChangeProposal).toHaveBeenCalledOnce();
+      });
+
+      it('does not ask the model to change the user’s condition when it has no data yet', async () => {
+        const fetch = stubFetch(intentResponse({ output: WITH_DATASET, datasets: [ORDERS] }));
+        const element = designer();
+
+        const result = await handlerWith(element, portOf([]))(request);
+
+        expect(result.ok).toBe(true);
+        expect(fetch).toHaveBeenCalledOnce();
+        const rationale = element.submitChangeProposal.mock.calls[0]?.[0]?.rationale as string;
+        expect(rationale).toContain('「订单」按当前条件暂无数据，采纳后有数据会自动显示');
       });
 
       it('submits with a note when the bound data checks out', async () => {

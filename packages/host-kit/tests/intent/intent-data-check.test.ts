@@ -88,7 +88,12 @@ describe('validateIntentData', () => {
       signal,
     });
 
-    expect(result).toEqual({ issues: [], verified: ['班组绩效 LINE-B'], unverified: [] });
+    expect(result).toEqual({
+      issues: [],
+      verified: ['班组绩效 LINE-B'],
+      unverified: [],
+      empty: [],
+    });
     expect(queries).toEqual([{ line: 'LINE-B', limit: 6 }]);
   });
 
@@ -117,7 +122,7 @@ describe('validateIntentData', () => {
     expect(result.verified).toEqual(['班组绩效 LINE-A']);
   });
 
-  it('reports empty results, absent fields, all-null fields and multi-row KPI cards by model path', async () => {
+  it('reports absent fields, all-null fields and multi-row KPI cards by model path, but not empty results', async () => {
     const result = await validateIntentData({
       document: {
         components: [
@@ -153,8 +158,9 @@ describe('validateIntentData', () => {
       signal,
     });
 
+    // 按用户条件查不到数据不怪模型：不进修复，只记在 empty 里。
+    expect(result.empty).toEqual(['班组绩效 LINE-C']);
     expect(result.issues).toEqual([
-      { code: 'DATA_RESULT_EMPTY', path: 'regions[1].blocks[0]' },
       { code: 'DATA_FIELD_ABSENT', path: 'regions[1].blocks[1]' },
       { code: 'DATA_FIELD_ALL_NULL', path: 'regions[2].main[0]' },
       { code: 'AGENT_KPI_MULTI_ROW', path: 'regions[0].items[0]' },
@@ -180,6 +186,7 @@ describe('validateIntentData', () => {
       issues: [],
       verified: [],
       unverified: ['班组绩效 LINE-A', '班组绩效 LINE-B'],
+      empty: [],
     });
   });
 
@@ -204,6 +211,6 @@ describe('validateIntentData', () => {
     });
 
     expect(queries).toEqual([]);
-    expect(result).toEqual({ issues: [], verified: [], unverified: [] });
+    expect(result).toEqual({ issues: [], verified: [], unverified: [], empty: [] });
   });
 });
