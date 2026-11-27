@@ -20,7 +20,7 @@ try {
     client.listResourceTemplates(),
   ]);
   if (
-    tools.tools.length !== 16 ||
+    tools.tools.length !== 17 ||
     resources.resources.length !== 3 ||
     templates.resourceTemplates.length !== 0
   )
@@ -207,6 +207,61 @@ try {
       ],
     },
   });
+  // 行为（ADR-0115 D10）：点表格一行 → 变量 → 告警实例的 line 参数变了。
+  const simulated = await client.callTool({
+    name: 'simulate_blueprint',
+    arguments: {
+      document: {
+        canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
+        components: [
+          {
+            id: 'lines',
+            type: 'base.table',
+            name: '产线',
+            parentId: null,
+            position: { x: 0, y: 0 },
+            size: { width: 320, height: 160 },
+            rotation: 0,
+            zIndex: 0,
+            status: { locked: false, hidden: false },
+            props: {},
+            style: {},
+            dataSource: null,
+          },
+        ],
+        variables: [{ id: 'line', name: 'line', type: 'static', initialValue: 'LINE-A' }],
+        dataSources: [
+          {
+            id: 'alarms',
+            name: 'alarms',
+            source: { kind: 'dataset', datasetId: 'monitor.alarms' },
+            params: { line: { kind: 'variable', variableId: 'line' } },
+          },
+        ],
+        blueprint: {
+          nodes: [
+            { kind: 'component', id: 'n-lines', componentId: 'lines' },
+            { kind: 'variable', id: 'n-line', variableId: 'line' },
+          ],
+          edges: [
+            {
+              kind: 'flow',
+              id: 'e-1',
+              from: { node: 'n-lines', port: 'event:rowClick' },
+              to: { node: 'n-line', port: 'set' },
+              value: { kind: 'event-payload', path: ['row', 'line'] },
+            },
+          ],
+        },
+      },
+      event: { componentId: 'lines', name: 'rowClick', payload: { row: { line: 'LINE-B' } } },
+    },
+  });
+  if (
+    simulated.isError === true ||
+    simulated.structuredContent?.dataSourceChanges?.alarms?.line?.after !== 'LINE-B'
+  )
+    throw new Error('Screen MCP blueprint simulation smoke check failed.');
   if (
     profiled.isError === true ||
     profiled.structuredContent?.profile?.grain?.unique !== true ||
@@ -228,7 +283,7 @@ try {
     overflow.structuredContent?.issues?.[0]?.reason !== 'height'
   )
     throw new Error('Screen MCP intent compile / layout smoke check failed.');
-  console.log('Screen MCP smoke check passed: 3 resources, 16 tools.');
+  console.log('Screen MCP smoke check passed: 3 resources, 17 tools.');
 } finally {
   await client.close();
 }

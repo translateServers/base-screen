@@ -123,6 +123,7 @@ export {
   type BaseScreenMaterialLibraryStatus,
   parseBaseScreenMaterialLibraryState,
 } from '../common/operations/material-library/material-library-state.js';
+export { readDesignerStatePresetSource } from '../common/operations/style/designer-component-states.js';
 export {
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS,

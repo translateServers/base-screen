@@ -20,6 +20,7 @@ import type { ScreenPushCursor } from '@base-screen/contracts';
 import type { ScreenResourceExecutionContext } from '@base-screen/contracts';
 import type { ScreenSourcePushEvent } from '@base-screen/contracts';
 import type { ScreenSourcePushSink } from '@base-screen/contracts';
+import type { ScreenStatePresetSource } from '@base-screen/core';
 import { ScreenTabularDataset } from '@base-screen/contracts';
 
 // @public
@@ -526,6 +527,7 @@ export interface IntentCatalogMaterial {
         readonly width: number;
         readonly height: number;
     };
+    readonly statePreset?: ScreenStatePresetSource;
     // (undocumented)
     readonly type: string;
 }

@@ -31,6 +31,8 @@ const CORE_EXPORTS = [
   // 从数据出发（ADR-0114 D10）：字段画像与候选枚举，纯函数。
   'profileScreenDataset',
   'enumerateScreenDataCandidates',
+  // 行为（ADR-0115 D6 / D10）：蓝图级联模拟，与设计器工作台、智能体采纳前校验同一份实现。
+  'simulateScreenBlueprint',
 ];
 
 /** 意图层（ADR-0113）：编译与布局求解，与设计器宿主前端同一份实现。 */

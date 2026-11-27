@@ -1715,6 +1715,9 @@ export interface ScreenLayoutAuditOptions {
 }
 
 // @public
+type ScreenLevelTone = 'danger' | 'warning' | 'info' | 'success';
+
+// @public
 interface ScreenPageCanvas extends ScreenSubCanvasBase {
     // (undocumented)
     readonly background?: ScreenCanvasBackground;
@@ -1850,6 +1853,26 @@ export interface ScreenSnapCandidate {
     // (undocumented)
     readonly targetValue: number;
 }
+
+// @public
+export interface ScreenStatePresetField {
+    readonly color?: boolean;
+    // (undocumented)
+    readonly key: string;
+    readonly kind: string;
+}
+
+// @public (undocumented)
+export interface ScreenStatePresetSource {
+    readonly declared?: readonly {
+        readonly key: string;
+        readonly kind: string;
+    }[];
+    readonly fields: readonly ScreenStatePresetField[];
+}
+
+// @public (undocumented)
+export function screenStatePresetStyle(source: ScreenStatePresetSource, tone: ScreenLevelTone): ScreenJsonObject;
 
 // @public (undocumented)
 export interface ScreenStaticDataSource {

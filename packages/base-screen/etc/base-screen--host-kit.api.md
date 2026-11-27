@@ -508,6 +508,7 @@ export interface IntentCatalogMaterial {
         readonly width: number;
         readonly height: number;
     };
+    readonly statePreset?: ScreenStatePresetSource;
     // (undocumented)
     readonly type: string;
 }
@@ -2177,6 +2178,23 @@ type ScreenSourcePushEvent =
 interface ScreenSourcePushSink {
     // (undocumented)
     push(event: ScreenSourcePushEvent): void;
+}
+
+// @public
+interface ScreenStatePresetField {
+    readonly color?: boolean;
+    // (undocumented)
+    readonly key: string;
+    readonly kind: string;
+}
+
+// @public (undocumented)
+interface ScreenStatePresetSource {
+    readonly declared?: readonly {
+        readonly key: string;
+        readonly kind: string;
+    }[];
+    readonly fields: readonly ScreenStatePresetField[];
 }
 
 // @public (undocumented)

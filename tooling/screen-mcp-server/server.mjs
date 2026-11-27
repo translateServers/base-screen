@@ -190,13 +190,19 @@ export function createScreenMcpServer(provider) {
                   total: z.number().int().min(0).optional(),
                 })
                 .optional(),
+              // ADR-0115 D6：样本里各字段出现过的取值，联动采纳前模拟用。
+              values: z
+                .record(z.string(), z.array(z.union([z.string(), z.number(), z.boolean()])).max(24))
+                .optional(),
             }),
           ),
         })
         .optional(),
       mode: z.enum(['llm', 'deterministic']).optional().default('llm'),
+      // ADR-0115 D7：已授权的蓝图能力；给了就跳过缺能力的联动并记 AGENT_INTERACTION_CAPABILITY_MISSING。
+      capabilities: z.array(z.string().min(1)).max(64).optional(),
     },
-    'Compile an agent intent (the model output: title, subtitle, style, and either regions of band / grid / split or the flat kpis + blocks shape) into a Screen Document candidate, with the same parser, compiler and layout solver the designer host runs. Needs the material catalog (type, data kind, props, binding roles, defaults, and children for shell containers). Returns the candidate document, the component-id → model-path source table, repair issues keyed by model path (dropped items, LAYOUT_CAPACITY_EXCEEDED, unsatisfiable bindings, layout audit errors) and warnings (including INTENT_BLOCK_SUBSTITUTED gaps). Does not touch the loaded snapshot; persist the candidate yourself.',
+    'Compile an agent intent (the model output: title, subtitle, style, and either regions of band / grid / split or the flat kpis + blocks shape) into a Screen Document candidate, with the same parser, compiler and layout solver the designer host runs. Needs the material catalog (type, data kind, props, binding roles, defaults, and children for shell containers). The intent may also carry behaviors (ADR-0115): a key on blocks / KPI cards, interactions (filter: a source event value written into a target dataset parameter; show: show / hide / toggle a target block), threshold states on dataset-bound KPI cards, and gaps for requests that cannot be met. Variables and blueprint wiring are derived by the compiler, and every filter is simulated against the sample values before it is compiled; materials need their events (name, label, payload top-level kinds) for interactions, and optionally statePreset for state styles. Pass capabilities (granted blueprint capability ids) to skip interactions the host has not granted. Returns the candidate document, the component-id → model-path source table, the compiled behaviors, repair issues keyed by model path (dropped items, LAYOUT_CAPACITY_EXCEEDED, unsatisfiable bindings, interactions with no effect, layout audit errors) and warnings (including INTENT_BLOCK_SUBSTITUTED and INTENT_BEHAVIOR_GAP). Does not touch the loaded snapshot; persist the candidate yourself.',
     (input) => provider.compileScreenIntent(input),
   );
   registerTool(
@@ -275,6 +281,38 @@ export function createScreenMcpServer(provider) {
     },
     "Enumerate legal (fact, material, role binding) candidates from dataset profiles (output of profile_dataset) and the materials' binding roles. Facts are value, trend, categorization, proportion, rank, association and detail; detail-level (non-aggregated) data only yields detail and single-value candidates. Bindings follow the declared valueTypes and field counts, never role names. Candidates are numbered c1, c2, ... for the intent to reference.",
     (input) => provider.enumerateDataCandidates(input),
+  );
+  registerTool(
+    server,
+    'simulate_blueprint',
+    {
+      document: z.unknown().optional(),
+      event: z
+        .object({
+          type: z
+            .enum([
+              'material-event',
+              'variable-event',
+              'lifecycle',
+              'timer',
+              'canvas-event',
+              'page-changed',
+              'component-state-changed',
+            ])
+            .optional()
+            .default('material-event'),
+          componentId: z.string().min(1).optional(),
+          variableId: z.string().min(1).optional(),
+          canvasId: z.string().min(1).optional(),
+          intervalSeconds: z.number().positive().optional(),
+          name: z.string().min(1),
+          payload: z.unknown().optional().default(null),
+        })
+        .strict(),
+      capabilities: z.array(z.string().min(1)).max(64).optional(),
+    },
+    'Simulate one blueprint event and its cascade (variable data-updated, sub-canvas open / close, page changes) with the same implementation the designer workbench and the agent pre-adoption check use. Request actions are only recorded; nothing is fetched and no host action runs. Returns the rules fired per cascade depth, a failure when the cascade exceeds 32 levels or an expression fails, and the end state: changed variables, components whose visibility changed, data source parameters that reference a variable and changed (those instances would refetch), open popups and the current page. Omit document to simulate on the loaded snapshot; pass capabilities to compile the blueprint with only those granted.',
+    (input) => provider.simulateBlueprint(input),
   );
   registerTool(
     server,

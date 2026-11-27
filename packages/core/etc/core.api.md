@@ -34,6 +34,7 @@ import { ScreenDocument } from '@base-screen/contracts';
 import { ScreenHostResourceParameter } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
 import { ScreenJsonValue } from '@base-screen/contracts';
+import { ScreenLevelTone } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
 import { ScreenPosition } from '@base-screen/contracts';
 import { ScreenSize } from '@base-screen/contracts';
@@ -1068,6 +1069,26 @@ export interface ScreenSnapCandidate {
     // (undocumented)
     readonly targetValue: number;
 }
+
+// @public
+export interface ScreenStatePresetField {
+    readonly color?: boolean;
+    // (undocumented)
+    readonly key: string;
+    readonly kind: string;
+}
+
+// @public (undocumented)
+export interface ScreenStatePresetSource {
+    readonly declared?: readonly {
+        readonly key: string;
+        readonly kind: string;
+    }[];
+    readonly fields: readonly ScreenStatePresetField[];
+}
+
+// @public (undocumented)
+export function screenStatePresetStyle(source: ScreenStatePresetSource, tone: ScreenLevelTone): ScreenJsonObject;
 
 export { ScreenStaticDataSource }
 

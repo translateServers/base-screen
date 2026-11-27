@@ -162,6 +162,11 @@ export {
 } from './json/path-update.js';
 export type { ScreenInteractionAction, ScreenInteractionState } from './state/interaction.js';
 export { reduceScreenInteraction } from './state/interaction.js';
+export {
+  type ScreenStatePresetField,
+  type ScreenStatePresetSource,
+  screenStatePresetStyle,
+} from './state/state-preset.js';
 export type { ScreenViewportAction, ScreenViewportState } from './state/viewport.js';
 export { reduceScreenViewport } from './state/viewport.js';
 export * from './validation/contrast.js';

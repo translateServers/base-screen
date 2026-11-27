@@ -1,4 +1,5 @@
 import type { ScreenJsonValue } from '@base-screen/contracts';
+import type { ScreenStatePresetSource } from '@base-screen/core';
 
 /**
  * 意图层看到的组件目录（ADR-0113 §2.1）。
@@ -64,6 +65,11 @@ export interface IntentCatalogMaterial {
   readonly size: { readonly width: number; readonly height: number };
   readonly props: Readonly<Record<string, IntentCatalogProp>>;
   readonly roles: readonly IntentCatalogRole[];
+  /**
+   * 状态外观预置的键表（ADR-0115 D8，engine `readDesignerStatePresetSource` 的结果）：阈值状态按它
+   * 决定换哪些样式键，与设计器「按分级生成状态」同一套规则。缺省时只换文字色（有 `color` 才换）。
+   */
+  readonly statePreset?: ScreenStatePresetSource;
   /** 物料声明的事件；缺省表示宿主没上送（旧宿主），这一物料不能当联动来源。 */
   readonly events?: readonly IntentCatalogEvent[];
   readonly defaults: {

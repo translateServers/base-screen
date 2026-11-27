@@ -395,12 +395,13 @@ export async function createScreenProvider(screenFile) {
      * 意图层编译（ADR-0113 §2.9）：模型原文或已解析的意图 + 目录 → 文档候选与按模型路径整理的诊断。
      * 与设计器宿主前端的 `prepareIntent` 是同一份实现；不读也不改已加载的快照。
      */
-    compileScreenIntent({ intent, catalog, references, mode = 'llm' }) {
+    compileScreenIntent({ intent, catalog, references, mode = 'llm', capabilities }) {
       const prepared = apis.intent.prepareIntent({
         output: typeof intent === 'string' ? intent : JSON.stringify(intent),
         catalog: { materials: catalog.materials, assets: catalog.assets ?? [] },
         ...(references === undefined ? {} : { references }),
         mode,
+        ...(capabilities === undefined ? {} : { capabilities }),
       });
       const warnings = prepared.warnings;
       if (prepared.compiled === undefined) {
@@ -438,6 +439,7 @@ export async function createScreenProvider(screenFile) {
         document: normalized.document,
         sources: prepared.compiled.sources,
         materials: prepared.compiled.materials,
+        behaviors: prepared.compiled.behaviors,
         issues: [...prepared.issues, ...auditIssues],
         warnings,
         deliverable: prepared.deliverable && audit.length === 0,
@@ -459,6 +461,69 @@ export async function createScreenProvider(screenFile) {
           materials,
           maxPerDataset === undefined ? {} : { maxPerDataset },
         ),
+      });
+    },
+    /**
+     * 蓝图级联模拟（ADR-0115 D6 / D10）：与设计器工作台、智能体采纳前校验同一份实现（core
+     * `simulateScreenBlueprint`）。只登记请求、不取数；不读写已加载快照之外的任何东西。
+     */
+    simulateBlueprint({ document: candidate, event, capabilities } = {}) {
+      const target =
+        candidate === undefined
+          ? snapshotTarget(document)
+          : normalizeScreenDocument(apis, candidate);
+      if (!target.ok) return failure({ simulated: false, diagnostics: target.diagnostics });
+      const { type = 'material-event', ...rest } = event;
+      const runtimeEvent = type === 'material-event' ? rest : { type, ...rest };
+      const granted = capabilities === undefined ? undefined : new Set(capabilities);
+      const result = apis.simulateScreenBlueprint(target.document, runtimeEvent, {
+        ...(granted === undefined
+          ? {}
+          : { capabilities: { hasBlueprintCapability: (id) => granted.has(id) } }),
+      });
+      if (!result.ok) return failure({ simulated: false, diagnostics: result.diagnostics });
+      const simulation = result.value;
+      const summary = {
+        simulated: true,
+        dispatches: simulation.dispatches.map((dispatch) => ({
+          depth: dispatch.depth,
+          event: dispatch.event,
+          rules: dispatch.ruleTraces
+            .filter((trace) => trace.triggerMatched)
+            .map((trace) => ({
+              ruleId: trace.ruleId,
+              conditions: trace.conditions,
+              actions: trace.actions.map((action) => ({
+                type: action.type,
+                edgeId: action.edgeId,
+                output: action.output,
+              })),
+            })),
+        })),
+        variables: simulation.variables,
+        changedVariableIds: simulation.changedVariableIds,
+        visibility: simulation.visibility,
+        dataSourceChanges: simulation.dataSourceChanges,
+        openPopupIds: simulation.openPopupIds,
+        currentPageId: simulation.currentPageId,
+        variableRequests: simulation.variableRequests,
+        componentDataRequests: simulation.componentDataRequests,
+      };
+      if (simulation.failure === undefined) return ok(summary);
+      return failure({
+        ...summary,
+        failure: simulation.failure,
+        diagnostics: [
+          {
+            severity: 'error',
+            code:
+              simulation.failure.kind === 'depth-exceeded'
+                ? 'BLUEPRINT_SIMULATION_DEPTH_EXCEEDED'
+                : 'BLUEPRINT_SIMULATION_FAILED',
+            path: [],
+            message: simulation.failure.message,
+          },
+        ],
       });
     },
     /** 布局求解（ADR-0113 §2.3）：区域序列 + 每格内容量 → 像素矩形，装不下返回带差额的容量冲突。 */

@@ -130,6 +130,15 @@ export interface AgentCatalogMaterialShape {
     readonly max: number;
     readonly valueTypes?: readonly ('string' | 'number' | 'boolean' | 'date')[];
   }[];
+  /** 状态外观预置的键表（ADR-0115 D8）：阈值状态与设计器「按分级生成状态」同一套规则。 */
+  readonly statePreset?: {
+    readonly declared?: readonly { readonly key: string; readonly kind: string }[];
+    readonly fields: readonly {
+      readonly key: string;
+      readonly kind: string;
+      readonly color?: boolean;
+    }[];
+  };
   /** 物料事件与负载顶层字段（ADR-0115 D3）：联动按它选事件、取值。 */
   readonly events?: readonly {
     readonly name: string;

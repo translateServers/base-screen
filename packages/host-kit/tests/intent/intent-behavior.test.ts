@@ -465,6 +465,42 @@ describe('threshold states', () => {
     expect(parseScreenDocument(compiled.document).ok).toBe(true);
   });
 
+  it('uses the material state preset from the catalog, the same rule as the designer', () => {
+    const withPreset: IntentCatalog = {
+      ...CATALOG,
+      materials: CATALOG.materials.map((material) =>
+        material.type === 'base.text'
+          ? {
+              ...material,
+              statePreset: {
+                fields: [
+                  { key: 'color', kind: 'string', color: true },
+                  { key: 'borderColor', kind: 'string', color: true },
+                  { key: 'glow', kind: 'boolean' },
+                ],
+              },
+            }
+          : material,
+      ),
+    };
+    const outcome = compileScreenIntent({
+      intent: intentOf(screen({})),
+      catalog: withPreset,
+      references: REFERENCES,
+      mode: 'llm',
+    });
+    if (!outcome.ok) throw new Error('compile');
+    const value = outcome.value.document.components.find(
+      (component) => component.states !== undefined,
+    );
+    expect(
+      (value?.states as { items: { style: unknown }[] }).items.map((item) => item.style),
+    ).toEqual([
+      { color: 'theme:danger', borderColor: 'theme:danger', glow: true },
+      { color: 'theme:warning', borderColor: 'theme:warning' },
+    ]);
+  });
+
   it('does not judge a sample value', () => {
     const raw = screen({}) as { regions: { items?: unknown[] }[] };
     raw.regions[0]?.items?.push({

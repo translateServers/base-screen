@@ -12,6 +12,7 @@ import { BaseScreenFragmentDefinition } from '@base-screen/plugin-core';
 import { BaseScreenFragmentNode } from '@base-screen/plugin-core';
 import { BaseScreenFragmentShell } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import type { BaseScreenPluginCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginInspectorControlCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginPanelCatalog } from '@base-screen/plugin-core';
@@ -58,6 +59,7 @@ import type { ScreenProjectSnapshot } from '@base-screen/contracts';
 import type { ScreenProjectSnapshotPort } from '@base-screen/contracts';
 import type { ScreenProjectSummary } from '@base-screen/contracts';
 import { ScreenSize } from '@base-screen/contracts';
+import { ScreenStatePresetSource } from '@base-screen/core';
 import type { ScreenTargetDisplayProfile } from '@base-screen/contracts';
 import type { ScreenVariableHandle } from '@base-screen/contracts';
 import type { ScreenVariableRefreshOptions } from '@base-screen/contracts';
@@ -1296,6 +1298,9 @@ export function parseBaseScreenMaterialLibraryItems(input: unknown): ScreenParse
 
 // @public (undocumented)
 export function parseBaseScreenMaterialLibraryState(input: unknown): ScreenParseResult<BaseScreenMaterialLibraryState>;
+
+// @public
+export function readDesignerStatePresetSource(manifest: BaseScreenMaterialManifest): ScreenStatePresetSource;
 
 // @public (undocumented)
 export class ScreenProjectController {

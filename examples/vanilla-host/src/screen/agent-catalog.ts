@@ -1,3 +1,4 @@
+import { readDesignerStatePresetSource } from 'base-screen/engine';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialManifest,
@@ -68,6 +69,8 @@ function readMaterial(manifest: BaseScreenMaterialManifest): AgentCatalogMateria
       ...(Array.isArray(role.valueTypes) ? { valueTypes: [...role.valueTypes] } : {}),
     })),
     events: readEvents(manifest),
+    // 状态外观预置的键表（ADR-0115 D8）：从外观区读，规则在 core。
+    statePreset: readDesignerStatePresetSource(manifest),
     defaults: {
       props: scalarOnly(manifest.defaultProps),
       style: scalarOnly(manifest.defaultStyle),

@@ -4,7 +4,7 @@ import {
   type ScreenJsonObject,
   screenThemeRef,
 } from '@base-screen/contracts';
-import { simulateScreenBlueprint } from '@base-screen/core';
+import { screenStatePresetStyle, simulateScreenBlueprint } from '@base-screen/core';
 import type { IntentCatalog, IntentCatalogEvent } from './intent-catalog.js';
 import type {
   CompiledComponent,
@@ -745,10 +745,19 @@ class Context {
     }
     const material = this.input.catalog.materials.find((entry) => entry.type === component.type);
     const colorable = material !== undefined && 'color' in material.defaults.style;
+    // 外观预置走 core 的同一套规则（ADR-0115 D8）；宿主没上送键表或推不出键时退回只换文字色。
+    const presetFor = (tone: IntentStateRule['tone']): Record<string, unknown> => {
+      const preset =
+        material?.statePreset === undefined
+          ? {}
+          : screenStatePresetStyle(material.statePreset, tone);
+      if (Object.keys(preset).length > 0) return preset;
+      return colorable ? { color: screenThemeRef(tone) } : {};
+    };
     const stateItems = states.rules.map((rule, index) => ({
       id: `agent-state-${index + 1}`,
       name: rule.label ?? toneName(rule.tone, this.input.language),
-      style: colorable ? { color: screenThemeRef(rule.tone) } : {},
+      style: presetFor(rule.tone),
     }));
     component.states = {
       items: stateItems,

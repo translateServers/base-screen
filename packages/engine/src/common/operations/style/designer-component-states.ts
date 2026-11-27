@@ -18,9 +18,13 @@ import {
   type ScreenLevelTone,
   type ScreenParseResult,
   screenJsonEquals,
-  screenThemeRef,
 } from '@base-screen/contracts';
-import type { ScreenDocumentCommand, ScreenDocumentTransaction } from '@base-screen/core';
+import {
+  type ScreenDocumentCommand,
+  type ScreenDocumentTransaction,
+  type ScreenStatePresetSource,
+  screenStatePresetStyle,
+} from '@base-screen/core';
 import {
   type BaseScreenMaterialCatalog,
   type BaseScreenMaterialManifest,
@@ -350,38 +354,39 @@ export function findDesignerLevelScale(
   );
 }
 
-/** 生成状态时预置覆盖的样式键：清单显式声明优先，否则推断主色、描边色与发光。 */
+/**
+ * 状态外观预置的入参（ADR-0115 D8）：从 manifest 的外观区摊平出 core 要的键表。
+ * 宿主把它随智能体目录上送，智能体生成的阈值状态与「按分级生成状态」就用同一套规则。
+ */
+export function readDesignerStatePresetSource(
+  manifest: BaseScreenMaterialManifest,
+): ScreenStatePresetSource {
+  const declared = manifest.statePresetKeys;
+  if (declared !== undefined) {
+    return {
+      declared: declared.map((key) => ({
+        key,
+        // 宿主替身里的 manifest 可能不带 styleSchema：缺省当未知类型（不写这个键）。
+        kind: manifest.styleSchema?.properties?.[key]?.kind ?? 'unknown',
+      })),
+      fields: [],
+    };
+  }
+  return {
+    fields: designerMaterialEditorKeys(manifest, 'style').map((entry) => ({
+      key: entry.key,
+      kind: entry.schema.kind,
+      ...(entry.field.control === 'color' ? { color: true } : {}),
+    })),
+  };
+}
+
+/** 生成状态时预置覆盖的样式键：规则在 core（`screenStatePresetStyle`），这里只读出 manifest 的键表。 */
 export function designerStatePresetStyle(
   manifest: BaseScreenMaterialManifest,
   tone: ScreenLevelTone,
 ): ScreenJsonObject {
-  const style: Record<string, ScreenJsonValue> = {};
-  const ref = screenThemeRef(tone);
-  const declared = manifest.statePresetKeys;
-  if (declared !== undefined) {
-    for (const key of declared) {
-      const kind = manifest.styleSchema.properties[key]?.kind;
-      if (kind === 'string') style[key] = ref;
-      else if (kind === 'boolean' && tone === 'danger') style[key] = true;
-    }
-    return style;
-  }
-  const keys = designerMaterialEditorKeys(manifest, 'style');
-  const colors = keys
-    .filter((entry) => entry.field.control === 'color' && entry.schema.kind === 'string')
-    .map((entry) => entry.key);
-  const main =
-    colors.find((key) => !/border|stroke|glow|shadow|background/i.test(key)) ?? colors[0];
-  if (main !== undefined) style[main] = ref;
-  const border = colors.find((key) => /border|stroke/i.test(key));
-  if (border !== undefined) style[border] = ref;
-  if (tone === 'danger') {
-    const glow = keys.find((entry) => /glow/i.test(entry.key) && entry.schema.kind === 'boolean');
-    const glowColor = colors.find((key) => /glow|shadow/i.test(key));
-    if (glow !== undefined) style[glow.key] = true;
-    if (glowColor !== undefined) style[glowColor] = ref;
-  }
-  return style;
+  return screenStatePresetStyle(readDesignerStatePresetSource(manifest), tone);
 }
 
 /**
