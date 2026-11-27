@@ -1,4 +1,4 @@
-import { type AgentCatalog, renderCatalogPrompt } from './agent-catalog';
+import { type AgentCatalog, catalogHasEvents, renderCatalogPrompt } from './agent-catalog';
 import { type AgentPromptReferences, renderDataPrompt } from './agent-spec';
 
 /**
@@ -20,6 +20,20 @@ export interface AgentSessionItem {
   readonly title: string;
   /** 指标当前值的展示文本（模型改数字要参照它）。 */
   readonly value?: string;
+  /** 联动用的句柄（ADR-0115）。 */
+  readonly key?: string;
+}
+
+/** 当前的一条联动（ADR-0115 D9）：`unlink` 的 target 取它的 `target`。 */
+export interface AgentSessionInteraction {
+  readonly target: string;
+  readonly kind: 'filter' | 'show';
+  readonly from: string;
+  readonly to: readonly string[];
+  readonly event: string;
+  readonly field?: string;
+  readonly param?: string;
+  readonly mode?: string;
 }
 
 export interface AgentSessionRegion {
@@ -33,10 +47,11 @@ export interface AgentSessionDigest {
   readonly title: string;
   readonly subtitle: string;
   readonly regions: readonly AgentSessionRegion[];
+  readonly interactions?: readonly AgentSessionInteraction[];
 }
 
 export type AgentEditOp = Record<string, unknown> & {
-  readonly op: 'change' | 'swap' | 'delete' | 'add' | 'rebind';
+  readonly op: 'change' | 'swap' | 'delete' | 'add' | 'rebind' | 'link' | 'unlink';
 };
 
 export interface AgentEditOps {
@@ -53,7 +68,9 @@ const MAX_REGIONS = 6;
 const MAX_ITEMS = 8;
 const MAX_OPS = 8;
 const MAX_JSON_BYTES = 20_000;
-const OPS = new Set(['change', 'swap', 'delete', 'add', 'rebind']);
+const OPS = new Set(['change', 'swap', 'delete', 'add', 'rebind', 'link', 'unlink']);
+const INTERACTION_TARGET = /^interactions\[\d{1,2}\]$/;
+const MAX_INTERACTIONS = 8;
 
 export function readSessionDigest(raw: unknown): AgentSessionDigest | null {
   const root = asRecord(raw);
@@ -90,6 +107,7 @@ export function readSessionDigest(raw: unknown): AgentSessionDigest | null {
       }
       const type = text(entry.type, 64);
       const value = text(entry.value, 40);
+      const key = text(entry.key, 32);
       items.push({
         target,
         kind: entry.kind,
@@ -97,11 +115,49 @@ export function readSessionDigest(raw: unknown): AgentSessionDigest | null {
         title: text(entry.title, 40),
         ...(type === '' ? {} : { type }),
         ...(value === '' ? {} : { value }),
+        ...(key === '' ? {} : { key }),
       });
     }
     regions.push({ path, kind, items });
   }
-  return { title, subtitle, regions };
+  const interactions = readInteractions(root.interactions);
+  return { title, subtitle, regions, ...(interactions.length === 0 ? {} : { interactions }) };
+}
+
+function readInteractions(raw: unknown): AgentSessionInteraction[] {
+  if (!Array.isArray(raw)) return [];
+  const output: AgentSessionInteraction[] = [];
+  for (const item of raw.slice(0, MAX_INTERACTIONS)) {
+    const entry = asRecord(item);
+    const target = typeof entry?.target === 'string' ? entry.target : '';
+    const kind = entry?.kind;
+    if (
+      entry === null ||
+      !INTERACTION_TARGET.test(target) ||
+      (kind !== 'filter' && kind !== 'show')
+    )
+      continue;
+    const to = Array.isArray(entry.to)
+      ? entry.to
+          .map((ref) => text(ref, 40))
+          .filter((ref) => ref !== '')
+          .slice(0, 4)
+      : [];
+    const field = text(entry.field, 64);
+    const param = text(entry.param, 64);
+    const mode = text(entry.mode, 8);
+    output.push({
+      target,
+      kind,
+      from: text(entry.from, 40),
+      to,
+      event: text(entry.event, 64),
+      ...(field === '' ? {} : { field }),
+      ...(param === '' ? {} : { param }),
+      ...(mode === '' ? {} : { mode }),
+    });
+  }
+  return output;
 }
 
 export function buildEditOpsSystemPrompt(
@@ -134,6 +190,14 @@ ${renderSessionPrompt(digest)}${data}
       ? ''
       : `
 - 换数据：{ "op": "rebind", "target": "某个块或指标", "bind": { "candidate": "上面的候选编号" } }；需要参数时 bind 里加 "params"。指标写 { "datasetId": "…", "field": "字段 id" }。标题与位置保持原样，只换取值来源；用户说「用某数据集的数据」「换成真实数据」时用它。`
+  }${
+    catalogHasEvents(catalog)
+      ? `
+- 加联动：{ "op": "link", "interaction": { "kind": "filter", "from": "来源块的 target 或 key", "event": "目录里该组件的事件", "field": "来源行里的字段 id", "to": ["目标块的 target 或 key"], "param": "目标数据集的参数名" } }，
+  或 { "op": "link", "interaction": { "kind": "show", "from": "…", "event": "…", "to": ["…"], "mode": "show" } }；筛选只经数据集参数生效，目标必须读数据集。
+- 去掉联动：{ "op": "unlink", "target": "上面列出的 interactions[i]" }。
+- 改指标的阈值状态：{ "op": "change", "target": "某个绑了数据集字段的指标", "set": { "states": [{ "op": "gte", "value": 90, "tone": "danger", "label": "过载" }] } }；阈值是你补的就写 { "rules": [ … ], "suggested": true }。`
+      : ''
   }
 
 约束：
@@ -153,8 +217,17 @@ function renderSessionPrompt(digest: AgentSessionDigest): string {
         item.kind === 'kpi'
           ? `指标「${item.title}」${item.value === undefined ? '' : `，当前 ${item.value}`}`
           : `块「${item.title}」，type ${item.type ?? '未知'}${region.kind === 'split' ? `，在 ${item.part === 'rail' ? '侧栏' : '主区'}` : ''}`;
-      lines.push(`  - target: ${item.target} ｜ ${label}`);
+      lines.push(
+        `  - target: ${item.target} ｜ ${label}${item.key === undefined ? '' : `，key ${item.key}`}`,
+      );
     }
+  }
+  for (const item of digest.interactions ?? []) {
+    const what =
+      item.kind === 'filter'
+        ? `点「${item.from}」${item.event}${item.field === undefined ? '' : `（${item.field}）`} → 筛选 ${item.to.join('、')} 的 ${item.param ?? ''}`
+        : `点「${item.from}」${item.event} → ${item.mode ?? 'toggle'} ${item.to.join('、')}`;
+    lines.push(`联动 ${item.target}：${what}`);
   }
   const body = lines.join('\n').replace(/(?:<<<\s*UNTRUSTED|UNTRUSTED\s*>>>)/gi, '[removed]');
   return `当前屏的内容（可操作的目标）：\n<<<UNTRUSTED\n${body}\nUNTRUSTED>>>`;
@@ -188,12 +261,19 @@ export function readEditOps(raw: string): AgentEditOps | null {
   for (const item of root.ops) {
     const op = asRecord(item);
     if (op === null || typeof op.op !== 'string' || !OPS.has(op.op)) return null;
-    const needsTarget = op.op !== 'add';
+    const needsTarget = op.op !== 'add' && op.op !== 'link' && op.op !== 'unlink';
     if (needsTarget && (typeof op.target !== 'string' || !TARGET.test(op.target))) return null;
     if (op.op === 'change' && asRecord(op.set) === null) return null;
     if (op.op === 'swap' && (typeof op.type !== 'string' || op.type.trim() === '')) return null;
     // 换数据绑定（ADR-0114 D9）：只把形状，候选是否存在、字段是否合法交给宿主的 host-kit。
     if (op.op === 'rebind' && asRecord(op.bind) === null) return null;
+    // 联动（ADR-0115 D9）：形状把关；来源、事件、字段是否成立由宿主编译器判。
+    if (op.op === 'link' && asRecord(op.interaction) === null) return null;
+    if (
+      op.op === 'unlink' &&
+      (typeof op.target !== 'string' || !INTERACTION_TARGET.test(op.target))
+    )
+      return null;
     if (op.op === 'add') {
       if (typeof op.region !== 'string' || !REGION_PATH.test(op.region)) return null;
       if (asRecord(op.block) === null) return null;

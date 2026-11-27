@@ -37,7 +37,19 @@
           "flipY": false
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 线宽。范围 ≥ 1 且 ≤ 8。必填 */\n  lineWidth: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 线宽。范围 ≥ 1 且 ≤ 8。必填 */\n  lineWidth: number;\n}",
+      "events": [
+        {
+          "name": "pointClick",
+          "label": "点击数据点",
+          "payload": {
+            "seriesId": "string",
+            "pointIndex": "number",
+            "x": "string",
+            "y": "number"
+          }
+        }
+      ]
     },
     {
       "type": "base.ellipse",
@@ -67,7 +79,8 @@
           "shadowOffsetY": 0
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1。必填 */\n  opacity: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 填充色。必填 */\n  fill: string;\n  /** 边框颜色。必填 */\n  borderColor: string;\n  /** 边框宽度。范围 ≥ 0 且 ≤ 100。必填 */\n  borderWidth: number;\n  /** 范围 ≥ 0 且 ≤ 512 */\n  borderRadius?: number;\n  /** 阴影颜色 */\n  shadowColor?: string;\n  /** 阴影模糊。范围 ≥ 0 且 ≤ 100 */\n  shadowBlur?: number;\n  /** 阴影偏移 X。范围 ≥ -100 且 ≤ 100 */\n  shadowOffsetX?: number;\n  /** 阴影偏移 Y。范围 ≥ -100 且 ≤ 100 */\n  shadowOffsetY?: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1。必填 */\n  opacity: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 填充色。必填 */\n  fill: string;\n  /** 边框颜色。必填 */\n  borderColor: string;\n  /** 边框宽度。范围 ≥ 0 且 ≤ 100。必填 */\n  borderWidth: number;\n  /** 范围 ≥ 0 且 ≤ 512 */\n  borderRadius?: number;\n  /** 阴影颜色 */\n  shadowColor?: string;\n  /** 阴影模糊。范围 ≥ 0 且 ≤ 100 */\n  shadowBlur?: number;\n  /** 阴影偏移 X。范围 ≥ -100 且 ≤ 100 */\n  shadowOffsetX?: number;\n  /** 阴影偏移 Y。范围 ≥ -100 且 ≤ 100 */\n  shadowOffsetY?: number;\n}",
+      "events": []
     },
     {
       "type": "base.image",
@@ -96,7 +109,8 @@
           "flipY": false
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1。必填 */\n  opacity: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 适应方式。取值: \"contain\" | \"cover\" | \"fill\"。必填 */\n  objectFit: \"contain\" | \"cover\" | \"fill\";\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1。必填 */\n  opacity: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 适应方式。取值: \"contain\" | \"cover\" | \"fill\"。必填 */\n  objectFit: \"contain\" | \"cover\" | \"fill\";\n}",
+      "events": []
     },
     {
       "type": "base.rectangle",
@@ -126,7 +140,8 @@
           "shadowOffsetY": 0
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1。必填 */\n  opacity: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 填充色。必填 */\n  fill: string;\n  /** 边框颜色。必填 */\n  borderColor: string;\n  /** 边框宽度。范围 ≥ 0 且 ≤ 100。必填 */\n  borderWidth: number;\n  /** 圆角。范围 ≥ 0 且 ≤ 512 */\n  borderRadius?: number;\n  /** 阴影颜色 */\n  shadowColor?: string;\n  /** 阴影模糊。范围 ≥ 0 且 ≤ 100 */\n  shadowBlur?: number;\n  /** 阴影偏移 X。范围 ≥ -100 且 ≤ 100 */\n  shadowOffsetX?: number;\n  /** 阴影偏移 Y。范围 ≥ -100 且 ≤ 100 */\n  shadowOffsetY?: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1。必填 */\n  opacity: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 填充色。必填 */\n  fill: string;\n  /** 边框颜色。必填 */\n  borderColor: string;\n  /** 边框宽度。范围 ≥ 0 且 ≤ 100。必填 */\n  borderWidth: number;\n  /** 圆角。范围 ≥ 0 且 ≤ 512 */\n  borderRadius?: number;\n  /** 阴影颜色 */\n  shadowColor?: string;\n  /** 阴影模糊。范围 ≥ 0 且 ≤ 100 */\n  shadowBlur?: number;\n  /** 阴影偏移 X。范围 ≥ -100 且 ≤ 100 */\n  shadowOffsetX?: number;\n  /** 阴影偏移 Y。范围 ≥ -100 且 ≤ 100 */\n  shadowOffsetY?: number;\n}",
+      "events": []
     },
     {
       "type": "base.rule",
@@ -156,7 +171,8 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 线条颜色。必填 */\n  color: string;\n  /** 线宽。范围 ≥ 1 且 ≤ 24。必填 */\n  thickness: number;\n  /** 线型。取值: \"solid\" | \"dashed\" | \"dotted\"。必填 */\n  dash: \"solid\" | \"dashed\" | \"dotted\";\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 线条颜色。必填 */\n  color: string;\n  /** 线宽。范围 ≥ 1 且 ≤ 24。必填 */\n  thickness: number;\n  /** 线型。取值: \"solid\" | \"dashed\" | \"dotted\"。必填 */\n  dash: \"solid\" | \"dashed\" | \"dotted\";\n}",
+      "events": []
     },
     {
       "type": "base.table",
@@ -191,7 +207,26 @@
           "flipY": false
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 表头色。必填 */\n  headerBackgroundColor: string;\n  /** 边框色。必填 */\n  borderColor: string;\n  /** 字号。范围 ≥ 10 且 ≤ 32。必填 */\n  fontSize: number;\n  /** 行高。范围 ≥ 20 且 ≤ 96。必填 */\n  rowHeight: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 表头色。必填 */\n  headerBackgroundColor: string;\n  /** 边框色。必填 */\n  borderColor: string;\n  /** 字号。范围 ≥ 10 且 ≤ 32。必填 */\n  fontSize: number;\n  /** 行高。范围 ≥ 20 且 ≤ 96。必填 */\n  rowHeight: number;\n}",
+      "events": [
+        {
+          "name": "rowClick",
+          "label": "点击行",
+          "payload": {
+            "rowIndex": "number",
+            "row": "object"
+          }
+        },
+        {
+          "name": "cellClick",
+          "label": "点击单元格",
+          "payload": {
+            "rowIndex": "number",
+            "columnId": "string",
+            "value": "string"
+          }
+        }
+      ]
     },
     {
       "type": "base.text",
@@ -233,7 +268,13 @@
           "flipY": false
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 颜色。必填 */\n  color: string;\n  /** 字号。范围 ≥ 1 且 ≤ 512。必填 */\n  fontSize: number;\n  /** 字重。取值: \"400\" | \"700\"。必填 */\n  fontWeight: \"400\" | \"700\";\n  /** 水平对齐。取值: \"left\" | \"center\" | \"right\"。必填 */\n  textAlign: \"left\" | \"center\" | \"right\";\n  /** 垂直对齐。取值: \"top\" | \"middle\" | \"bottom\" */\n  verticalAlign?: \"top\" | \"middle\" | \"bottom\";\n  /** 字间距。范围 ≥ 0 且 ≤ 100 */\n  letterSpacing?: number;\n  /** 行高。范围 ≥ 1 且 ≤ 512 */\n  lineHeight?: number;\n  /** 行间距。范围 ≥ 0 且 ≤ 512 */\n  lineSpacing?: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 颜色。必填 */\n  color: string;\n  /** 字号。范围 ≥ 1 且 ≤ 512。必填 */\n  fontSize: number;\n  /** 字重。取值: \"400\" | \"700\"。必填 */\n  fontWeight: \"400\" | \"700\";\n  /** 水平对齐。取值: \"left\" | \"center\" | \"right\"。必填 */\n  textAlign: \"left\" | \"center\" | \"right\";\n  /** 垂直对齐。取值: \"top\" | \"middle\" | \"bottom\" */\n  verticalAlign?: \"top\" | \"middle\" | \"bottom\";\n  /** 字间距。范围 ≥ 0 且 ≤ 100 */\n  letterSpacing?: number;\n  /** 行高。范围 ≥ 1 且 ≤ 512 */\n  lineHeight?: number;\n  /** 行间距。范围 ≥ 0 且 ≤ 512 */\n  lineSpacing?: number;\n}",
+      "events": [
+        {
+          "name": "valueClick",
+          "payload": {}
+        }
+      ]
     },
     {
       "type": "board.border-box",
@@ -267,7 +308,8 @@
           "strokeWidth": 2
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 边框色。必填 */\n  borderColor: string;\n  /** 角标色 */\n  accentColor?: string;\n  /** 线宽。范围 ≥ 1 且 ≤ 8 */\n  strokeWidth?: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 边框色。必填 */\n  borderColor: string;\n  /** 角标色 */\n  accentColor?: string;\n  /** 线宽。范围 ≥ 1 且 ≤ 8 */\n  strokeWidth?: number;\n}",
+      "events": []
     },
     {
       "type": "board.capsule-progress",
@@ -313,7 +355,8 @@
           "fillGlow": true
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 读数色。必填 */\n  color: string;\n  /** 轨道色。必填 */\n  trackColor: string;\n  /** 填充色。必填 */\n  fillColor: string;\n  /** 读数字号。范围 ≥ 10 且 ≤ 72。必填 */\n  fontSize: number;\n  /** 启用发光 */\n  fillGlow?: boolean;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 读数色。必填 */\n  color: string;\n  /** 轨道色。必填 */\n  trackColor: string;\n  /** 填充色。必填 */\n  fillColor: string;\n  /** 读数字号。范围 ≥ 10 且 ≤ 72。必填 */\n  fontSize: number;\n  /** 启用发光 */\n  fillGlow?: boolean;\n}",
+      "events": []
     },
     {
       "type": "board.digital-flop",
@@ -366,7 +409,16 @@
           "fontSize": 48
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 数字色。必填 */\n  color: string;\n  /** 格底色。必填 */\n  accentColor: string;\n  /** 前缀/单位色 */\n  labelColor?: string;\n  /** 数字字号。范围 ≥ 12 且 ≤ 200。必填 */\n  fontSize: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 数字色。必填 */\n  color: string;\n  /** 格底色。必填 */\n  accentColor: string;\n  /** 前缀/单位色 */\n  labelColor?: string;\n  /** 数字字号。范围 ≥ 12 且 ≤ 200。必填 */\n  fontSize: number;\n}",
+      "events": [
+        {
+          "name": "valueClick",
+          "label": "点击读数",
+          "payload": {
+            "value": "string"
+          }
+        }
+      ]
     },
     {
       "type": "board.marquee",
@@ -405,7 +457,8 @@
           "fontSize": 14
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 字号。范围 ≥ 10 且 ≤ 48。必填 */\n  fontSize: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 字号。范围 ≥ 10 且 ≤ 48。必填 */\n  fontSize: number;\n}",
+      "events": []
     },
     {
       "type": "board.pipeline",
@@ -463,7 +516,8 @@
           "fontSize": 13
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 次级文字色。必填 */\n  labelColor: string;\n  /** 运行色。必填 */\n  runningColor: string;\n  /** 待机色。必填 */\n  standbyColor: string;\n  /** 故障色。必填 */\n  faultColor: string;\n  /** 离线色。必填 */\n  offlineColor: string;\n  /** 未知状态色。必填 */\n  unknownColor: string;\n  /** 节点底色。必填 */\n  nodeBackground: string;\n  /** 节点边框色。必填 */\n  nodeBorderColor: string;\n  /** 连接线色。必填 */\n  connectorColor: string;\n  /** 连接线粗细。范围 ≥ 1 且 ≤ 8 */\n  connectorWidth?: number;\n  /** 数值色。必填 */\n  valueColor: string;\n  /** 字号。范围 ≥ 10 且 ≤ 32 */\n  fontSize?: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 次级文字色。必填 */\n  labelColor: string;\n  /** 运行色。必填 */\n  runningColor: string;\n  /** 待机色。必填 */\n  standbyColor: string;\n  /** 故障色。必填 */\n  faultColor: string;\n  /** 离线色。必填 */\n  offlineColor: string;\n  /** 未知状态色。必填 */\n  unknownColor: string;\n  /** 节点底色。必填 */\n  nodeBackground: string;\n  /** 节点边框色。必填 */\n  nodeBorderColor: string;\n  /** 连接线色。必填 */\n  connectorColor: string;\n  /** 连接线粗细。范围 ≥ 1 且 ≤ 8 */\n  connectorWidth?: number;\n  /** 数值色。必填 */\n  valueColor: string;\n  /** 字号。范围 ≥ 10 且 ≤ 32 */\n  fontSize?: number;\n}",
+      "events": []
     },
     {
       "type": "board.scroll-board",
@@ -522,7 +576,17 @@
           "unknownColor": "#6b7d8f"
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 表头色。必填 */\n  headerColor: string;\n  /** 强调色。必填 */\n  accentColor: string;\n  /** 分隔线色。必填 */\n  borderColor: string;\n  /** 字号。范围 ≥ 10 且 ≤ 32 */\n  fontSize?: number;\n  /** 行高。范围 ≥ 20 且 ≤ 96 */\n  rowHeight?: number;\n  /** 严重色 */\n  criticalColor?: string;\n  /** 警告色 */\n  warningColor?: string;\n  /** 提示色 */\n  infoColor?: string;\n  /** 未知等级色 */\n  unknownColor?: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 表头色。必填 */\n  headerColor: string;\n  /** 强调色。必填 */\n  accentColor: string;\n  /** 分隔线色。必填 */\n  borderColor: string;\n  /** 字号。范围 ≥ 10 且 ≤ 32 */\n  fontSize?: number;\n  /** 行高。范围 ≥ 20 且 ≤ 96 */\n  rowHeight?: number;\n  /** 严重色 */\n  criticalColor?: string;\n  /** 警告色 */\n  warningColor?: string;\n  /** 提示色 */\n  infoColor?: string;\n  /** 未知等级色 */\n  unknownColor?: string;\n}",
+      "events": [
+        {
+          "name": "rowClick",
+          "label": "点击行",
+          "payload": {
+            "rowIndex": "number",
+            "row": "object"
+          }
+        }
+      ]
     },
     {
       "type": "board.status-grid",
@@ -577,7 +641,8 @@
           "fontSize": 11
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 次级文字色。必填 */\n  labelColor: string;\n  /** 运行色。必填 */\n  runningColor: string;\n  /** 待机色。必填 */\n  standbyColor: string;\n  /** 故障色。必填 */\n  faultColor: string;\n  /** 离线色。必填 */\n  offlineColor: string;\n  /** 未知状态色。必填 */\n  unknownColor: string;\n  /** 格间距。范围 ≥ 0 且 ≤ 24 */\n  tileGap?: number;\n  /** 圆角。范围 ≥ 0 且 ≤ 16 */\n  tileRadius?: number;\n  /** 字号。范围 ≥ 10 且 ≤ 32 */\n  fontSize?: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 次级文字色。必填 */\n  labelColor: string;\n  /** 运行色。必填 */\n  runningColor: string;\n  /** 待机色。必填 */\n  standbyColor: string;\n  /** 故障色。必填 */\n  faultColor: string;\n  /** 离线色。必填 */\n  offlineColor: string;\n  /** 未知状态色。必填 */\n  unknownColor: string;\n  /** 格间距。范围 ≥ 0 且 ≤ 24 */\n  tileGap?: number;\n  /** 圆角。范围 ≥ 0 且 ≤ 16 */\n  tileRadius?: number;\n  /** 字号。范围 ≥ 10 且 ≤ 32 */\n  fontSize?: number;\n}",
+      "events": []
     },
     {
       "type": "board.status-legend",
@@ -626,7 +691,8 @@
           "unknownColor": "#4f5d6b"
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 数值色 */\n  valueColor?: string;\n  /** 字号。范围 ≥ 10 且 ≤ 32。必填 */\n  fontSize: number;\n  /** 运行色 */\n  runningColor?: string;\n  /** 待机色 */\n  standbyColor?: string;\n  /** 故障色 */\n  faultColor?: string;\n  /** 离线色 */\n  offlineColor?: string;\n  /** 未知状态色 */\n  unknownColor?: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 数值色 */\n  valueColor?: string;\n  /** 字号。范围 ≥ 10 且 ≤ 32。必填 */\n  fontSize: number;\n  /** 运行色 */\n  runningColor?: string;\n  /** 待机色 */\n  standbyColor?: string;\n  /** 故障色 */\n  faultColor?: string;\n  /** 离线色 */\n  offlineColor?: string;\n  /** 未知状态色 */\n  unknownColor?: string;\n}",
+      "events": []
     },
     {
       "type": "board.tabs",
@@ -668,7 +734,18 @@
           "fontSize": 16
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 选中色。必填 */\n  accentColor: string;\n  /** 描边色 */\n  borderColor?: string;\n  /** 圆角。范围 ≥ 0 且 ≤ 24 */\n  borderRadius?: number;\n  /** 字号。范围 ≥ 10 且 ≤ 40。必填 */\n  fontSize: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 选中色。必填 */\n  accentColor: string;\n  /** 描边色 */\n  borderColor?: string;\n  /** 圆角。范围 ≥ 0 且 ≤ 24 */\n  borderRadius?: number;\n  /** 字号。范围 ≥ 10 且 ≤ 40。必填 */\n  fontSize: number;\n}",
+      "events": [
+        {
+          "name": "tabChange",
+          "label": "切换标签",
+          "payload": {
+            "index": "number",
+            "label": "string",
+            "value": "string"
+          }
+        }
+      ]
     },
     {
       "type": "board.title-decor",
@@ -698,7 +775,8 @@
           "strokeWidth": 2
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 强调色。必填 */\n  accentColor: string;\n  /** 辅线色。必填 */\n  borderColor: string;\n  /** 线宽。范围 ≥ 1 且 ≤ 8 */\n  strokeWidth?: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 强调色。必填 */\n  accentColor: string;\n  /** 辅线色。必填 */\n  borderColor: string;\n  /** 线宽。范围 ≥ 1 且 ≤ 8 */\n  strokeWidth?: number;\n}",
+      "events": []
     },
     {
       "type": "board.water-level",
@@ -749,7 +827,16 @@
           "fontSize": 22
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 读数色。必填 */\n  color: string;\n  /** 水体色。必填 */\n  waterColor: string;\n  /** 波纹色。必填 */\n  waveColor: string;\n  /** 边框色。必填 */\n  borderColor: string;\n  /** 读数字号。范围 ≥ 10 且 ≤ 96。必填 */\n  fontSize: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 读数色。必填 */\n  color: string;\n  /** 水体色。必填 */\n  waterColor: string;\n  /** 波纹色。必填 */\n  waveColor: string;\n  /** 边框色。必填 */\n  borderColor: string;\n  /** 读数字号。范围 ≥ 10 且 ≤ 96。必填 */\n  fontSize: number;\n}",
+      "events": [
+        {
+          "name": "valueClick",
+          "label": "点击读数",
+          "payload": {
+            "value": "number"
+          }
+        }
+      ]
     },
     {
       "type": "host-app.metric-value",
@@ -780,7 +867,8 @@
         },
         "style": {}
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n}",
+      "events": []
     },
     {
       "type": "plugin.chart.area",
@@ -831,7 +919,13 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}",
+      "events": [
+        {
+          "name": "seriesClick",
+          "payload": {}
+        }
+      ]
     },
     {
       "type": "plugin.chart.bar",
@@ -882,7 +976,13 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}",
+      "events": [
+        {
+          "name": "seriesClick",
+          "payload": {}
+        }
+      ]
     },
     {
       "type": "plugin.chart.donut",
@@ -933,7 +1033,13 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}",
+      "events": [
+        {
+          "name": "seriesClick",
+          "payload": {}
+        }
+      ]
     },
     {
       "type": "plugin.chart.gauge",
@@ -1000,7 +1106,13 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}",
+      "events": [
+        {
+          "name": "seriesClick",
+          "payload": {}
+        }
+      ]
     },
     {
       "type": "plugin.chart.hbar",
@@ -1051,7 +1163,13 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}",
+      "events": [
+        {
+          "name": "seriesClick",
+          "payload": {}
+        }
+      ]
     },
     {
       "type": "plugin.chart.heatmap",
@@ -1102,7 +1220,13 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}",
+      "events": [
+        {
+          "name": "seriesClick",
+          "payload": {}
+        }
+      ]
     },
     {
       "type": "plugin.chart.line",
@@ -1153,7 +1277,13 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}",
+      "events": [
+        {
+          "name": "seriesClick",
+          "payload": {}
+        }
+      ]
     },
     {
       "type": "plugin.chart.pie",
@@ -1204,7 +1334,13 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}",
+      "events": [
+        {
+          "name": "seriesClick",
+          "payload": {}
+        }
+      ]
     },
     {
       "type": "plugin.chart.radar",
@@ -1255,7 +1391,13 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}",
+      "events": [
+        {
+          "name": "seriesClick",
+          "payload": {}
+        }
+      ]
     },
     {
       "type": "plugin.chart.scatter",
@@ -1306,7 +1448,13 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}",
+      "events": [
+        {
+          "name": "seriesClick",
+          "payload": {}
+        }
+      ]
     },
     {
       "type": "plugin.echarts",
@@ -1358,7 +1506,13 @@
           "opacity": 1
         }
       },
-      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}"
+      "stylePrompt": "// 引擎级通用样式键（所有物料可用）: opacity, flipX, flipY, passThrough, hoverPointer, clip, blend, filterBlur, filterBrightness, filterContrast, filterSaturate, filterHueRotate\n// 颜色值可写 \"theme:<slot>\" 引用文档主题色板；槽位: \"primary\" | \"text\" | \"textSecondary\" | \"background\" | \"accent\" | \"accentSecondary\" | \"danger\" | \"warning\" | \"info\" | \"success\"\ninterface MaterialStyle {\n  /** 范围 ≥ 0 且 ≤ 1 */\n  opacity?: number;\n  flipX?: boolean;\n  flipY?: boolean;\n  passThrough?: boolean;\n  hoverPointer?: boolean;\n  clip?: boolean;\n  /** 取值: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\" */\n  blend?: \"normal\" | \"multiply\" | \"screen\" | \"overlay\" | \"darken\" | \"lighten\";\n  /** 范围 ≥ 0 且 ≤ 40 */\n  filterBlur?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterBrightness?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterContrast?: number;\n  /** 范围 ≥ 0 且 ≤ 300 */\n  filterSaturate?: number;\n  /** 范围 ≥ 0 且 ≤ 360 */\n  filterHueRotate?: number;\n  /** 背景色。必填 */\n  backgroundColor: string;\n  /** 文字色。必填 */\n  color: string;\n  /** 网格色。必填 */\n  gridColor: string;\n  /** 图形色。必填 */\n  seriesColor: string;\n}",
+      "events": [
+        {
+          "name": "seriesClick",
+          "payload": {}
+        }
+      ]
     }
   ]
 }

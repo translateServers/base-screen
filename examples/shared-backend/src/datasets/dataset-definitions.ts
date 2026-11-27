@@ -137,6 +137,16 @@ const CREW_FIELDS: readonly DatasetFieldDefinition[] = [
   { id: 'oee', label: 'OEE', valueType: 'number', unit: '%', nullable: false },
 ];
 
+/** 产线汇总的字段：一条产线一行（`monitor.lines` 全部产线，`monitor.line-summary` 只取一条）。 */
+const LINE_SUMMARY_FIELDS: readonly DatasetFieldDefinition[] = [
+  { id: 'line', label: '产线', valueType: 'string', nullable: false },
+  { id: 'devices', label: '设备数', valueType: 'number', unit: '台', nullable: false },
+  { id: 'running', label: '运行中', valueType: 'number', unit: '台', nullable: false },
+  { id: 'fault', label: '故障', valueType: 'number', unit: '台', nullable: false },
+  { id: 'avgLoad', label: '平均负载', valueType: 'number', unit: '%', nullable: false },
+  { id: 'alarms', label: '近 1 小时异常', valueType: 'number', unit: '条', nullable: false },
+];
+
 const LINE_PARAMETER: DatasetParameterDefinition = {
   name: 'line',
   label: '产线',
@@ -161,7 +171,7 @@ const DEVICE_LIMIT_PARAMETER: DatasetParameterDefinition = {
   maximum: 48,
 };
 
-/** 三个 P0 数据集 + 一个 P1 定义（`monitor.crew` 本轮只定义不接线）。 */
+/** 三个 P0 数据集 + 两个产线汇总（ADR-0115）+ 一个 P1 定义（`monitor.crew` 本轮只定义不接线）。 */
 export const DATASET_DEFINITIONS: readonly DatasetDefinition[] = [
   {
     datasetId: 'monitor.devices',
@@ -206,6 +216,24 @@ export const DATASET_DEFINITIONS: readonly DatasetDefinition[] = [
         maximum: 50,
       },
     ],
+  },
+  {
+    // 联动示例的来源（ADR-0115）：点一行把 `line` 写进其他数据集的产线参数。
+    datasetId: 'monitor.lines',
+    name: '产线概览',
+    description: '每条产线一行：设备数、运行与故障台数、平均负载与近 1 小时异常条数。',
+    groupId: 'production',
+    fields: LINE_SUMMARY_FIELDS,
+    parameters: [],
+  },
+  {
+    // 单行数据集（ADR-0114 F1 / ADR-0115）：指标卡能绑真实数据，阈值状态才有意义。
+    datasetId: 'monitor.line-summary',
+    name: '产线汇总',
+    description: '所选产线的单行汇总：设备数、运行与故障台数、平均负载与近 1 小时异常条数。',
+    groupId: 'production',
+    fields: LINE_SUMMARY_FIELDS,
+    parameters: [DEVICE_LINE_PARAMETER],
   },
   {
     datasetId: 'monitor.pipeline',

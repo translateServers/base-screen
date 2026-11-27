@@ -23,6 +23,8 @@ export interface CompiledComponent {
   dataSource: null;
   dataValue: Record<string, unknown> | null;
   dataBinding?: Record<string, unknown>;
+  /** 组件状态（ADR-0115 D2 阈值状态）。 */
+  states?: Record<string, unknown>;
 }
 
 export interface CompiledScreenDocument {
@@ -32,9 +34,13 @@ export interface CompiledScreenDocument {
     readonly backgroundColor: string;
   };
   readonly components: readonly CompiledComponent[];
-  readonly variables: readonly never[];
+  /** 编译器由联动推出的变量（ADR-0115 D1）；没有联动时为空。 */
+  readonly variables: readonly Record<string, unknown>[];
   readonly dataSources?: readonly Record<string, unknown>[];
-  readonly blueprint: { readonly nodes: readonly never[]; readonly edges: readonly never[] };
+  readonly blueprint: {
+    readonly nodes: readonly Record<string, unknown>[];
+    readonly edges: readonly Record<string, unknown>[];
+  };
 }
 
 /** 引用数据集的一个查询参数（来自数据集 describe 的 `parameters`）。 */
@@ -69,6 +75,11 @@ export interface IntentReferenceDataset {
    * 缺省等同于没有参数（旧宿主不上送这一项）。
    */
   readonly parameters?: readonly IntentReferenceParameter[];
+  /**
+   * 画像样本里各字段出现过的取值（去重，每个字段至多 24 个；ADR-0115 D6）。联动采纳前的模拟据此判断
+   * 「点了之后参数会不会变」，只留在宿主里，不进提示词。缺省表示没有样本。
+   */
+  readonly values?: Readonly<Record<string, readonly (string | number | boolean)[]>>;
 }
 
 /** 本轮引用：用户指定的素材与数据集（列类型来自数据集 describe，供角色分配）。 */
@@ -127,6 +138,21 @@ export interface IntentStreamFrame {
   readonly blocks: Readonly<Record<string, IntentBlock>>;
 }
 
+/** 编译出的一条联动 / 状态（ADR-0115 D5）：提案理由与评测据此如实说明「生成了哪些行为」。 */
+export interface IntentBehaviorSummary {
+  readonly kind: 'filter' | 'show' | 'state';
+  /** 模型原文路径：`interactions[0]` / `kpis[1]`。 */
+  readonly origin: string;
+  /** 来源块的名称（标题或物料名）。 */
+  readonly from: string;
+  /** 目标块的名称。 */
+  readonly to: readonly string[];
+  /** 可读说明（中文），例如「点行 → 按 line 筛选」「≥ 90 过载」。 */
+  readonly detail: string;
+  /** 阈值是模型补的（只在 `state` 上出现）。 */
+  readonly suggested?: boolean;
+}
+
 export interface IntentCompileResult {
   readonly document: CompiledScreenDocument;
   /** 用素材身份赋值的组件数。 */
@@ -140,6 +166,8 @@ export interface IntentCompileResult {
    * 修复回环靠它把文档诊断翻译回模型能看懂的位置（ADR-0112 §2.1）。
    */
   readonly sources: Readonly<Record<string, string>>;
+  /** 编译进文档的联动与状态（ADR-0115）；没有时为空数组。 */
+  readonly behaviors: readonly IntentBehaviorSummary[];
 }
 
 export type IntentCompileOutcome =

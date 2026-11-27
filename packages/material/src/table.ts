@@ -100,6 +100,35 @@ export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
       designCapabilities: { resize: true, rotate: true, children: false },
     },
     {
+      // 事件负载（ADR-0115 D3）：蓝图取值与智能体联动按它选字段。
+      events: [
+        {
+          name: 'rowClick',
+          label: '点击行',
+          hint: '负载带被点的行（键为绑定的字段 id）与行号。',
+          payloadSchema: {
+            kind: 'object',
+            properties: {
+              rowIndex: { kind: 'number' },
+              row: { kind: 'object', properties: {}, required: [] },
+            },
+            required: ['rowIndex', 'row'],
+          },
+        },
+        {
+          name: 'cellClick',
+          label: '点击单元格',
+          payloadSchema: {
+            kind: 'object',
+            properties: {
+              rowIndex: { kind: 'number' },
+              columnId: { kind: 'string' },
+              value: { kind: 'string' },
+            },
+            required: ['rowIndex', 'columnId'],
+          },
+        },
+      ],
       appearance: [
         {
           id: 'structure',

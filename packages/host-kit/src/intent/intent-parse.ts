@@ -3,11 +3,14 @@ import type {
   IntentBind,
   IntentBlock,
   IntentDiagnostic,
+  IntentInteraction,
   IntentItemResult,
   IntentKpi,
   IntentKpiDelta,
+  IntentKpiStates,
   IntentParseResult,
   IntentRegion,
+  IntentStateRule,
   IntentTable,
   IntentTableColumn,
   ScreenIntent,
@@ -60,8 +63,8 @@ const DELTA_DIRECTIONS = new Set(['up-good', 'down-good', 'neutral']);
 const SPLIT_RATIOS = new Set(['wide-narrow', 'even']);
 const RAIL_SIDES = new Set(['left', 'right']);
 
-/** 已预留、本阶段不编译的键（ADR-0113 §2.2）。 */
-const RESERVED_PARTS = ['pages', 'facts', 'variables', 'interactions', 'states'] as const;
+/** 已预留、本阶段不编译的键（ADR-0113 §2.2）。`interactions` 自 ADR-0115 起编译；变量由编译器推出。 */
+const RESERVED_PARTS = ['pages', 'facts', 'variables', 'states'] as const;
 
 export interface ParseScreenIntentOptions {
   readonly catalog: IntentCatalog;
@@ -133,11 +136,13 @@ export function parseScreenIntent(
   if (regions === undefined) return { intent: undefined, diagnostics };
 
   const style = typeof root.style === 'string' ? root.style.trim() : undefined;
+  const interactions = readInteractions(root.interactions, diagnostics);
   const intent: ScreenIntent = {
     title,
     subtitle,
     ...(style === undefined ? {} : { style }),
     regions,
+    ...(interactions === undefined ? {} : { interactions }),
   };
   if (!regions.some(hasBlocks)) {
     // 块全被丢掉：仍交出意图（标题与指标还在），由调用方决定是修复还是退回兜底。
@@ -346,6 +351,27 @@ export function parseIntentKpi(
   raw: unknown,
   origin: string,
   options: { readonly placeholders?: boolean } = {},
+): IntentItemResult<IntentKpi> {
+  const result = parseKpiBody(raw, origin, options);
+  if (result.value === undefined) return result;
+  const record = asRecord(raw) ?? {};
+  const diagnostics = [...result.diagnostics];
+  const key = readKey(record.key, origin, diagnostics);
+  const states = readKpiStates(record.states, origin, diagnostics);
+  return {
+    value: {
+      ...result.value,
+      ...(key === undefined ? {} : { key }),
+      ...(states === undefined ? {} : { states }),
+    },
+    diagnostics,
+  };
+}
+
+function parseKpiBody(
+  raw: unknown,
+  origin: string,
+  options: { readonly placeholders?: boolean },
 ): IntentItemResult<IntentKpi> {
   const diagnostics: IntentDiagnostic[] = [];
   const kpi = asRecord(raw);
@@ -586,6 +612,7 @@ export function parseIntentBlock(
   if (bind === undefined) return { value: undefined, diagnostics };
 
   const props = readProps(block.props, material, origin, diagnostics);
+  const key = readKey(block.key, origin, diagnostics);
   const substituteFor =
     typeof block.substituteFor === 'string'
       ? block.substituteFor.trim().slice(0, MAX_SUBSTITUTE)
@@ -600,6 +627,7 @@ export function parseIntentBlock(
       ...(props === undefined ? {} : { props }),
       ...(substituteFor === '' ? {} : { substituteFor }),
       ...(candidate === undefined ? {} : { candidate: candidate.id }),
+      ...(key === undefined ? {} : { key }),
       origin,
     },
     diagnostics,
@@ -812,6 +840,186 @@ function readTable(
 // ---------------------------------------------------------------------------
 
 /** 原文 → 对象：容忍模型偶尔加的代码块围栏。 */
+// ---------------------------------------------------------------------------
+// 行为（ADR-0115）：句柄、阈值状态、联动
+// ---------------------------------------------------------------------------
+
+const KEY_PATTERN = /^[a-z][a-z0-9-]{0,31}$/;
+const MAX_INTERACTIONS = 8;
+const MAX_INTERACTION_TARGETS = 4;
+const MAX_STATE_RULES = 4;
+const MAX_STATE_LABEL = 8;
+const STATE_OPS = new Set(['gt', 'gte', 'lt', 'lte', 'eq', 'neq']);
+const STATE_TONES = new Set(['success', 'warning', 'danger', 'info']);
+const SHOW_MODES = new Set(['show', 'hide', 'toggle']);
+const EVENT_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+const FIELD_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.:-]{0,127}$/;
+
+/** 句柄写错只丢句柄（块照常编译），联动按标题仍可能找到它。 */
+function readKey(
+  raw: unknown,
+  origin: string,
+  diagnostics: IntentDiagnostic[],
+): string | undefined {
+  if (raw === undefined) return undefined;
+  const key = typeof raw === 'string' ? raw.trim() : '';
+  if (KEY_PATTERN.test(key)) return key;
+  diagnostics.push({
+    severity: 'warning',
+    code: 'INTENT_KEY_INVALID',
+    path: origin,
+    message: 'A key must start with a lowercase letter and use letters, digits or hyphens (≤ 32).',
+  });
+  return undefined;
+}
+
+/**
+ * 阈值状态：`[{ op, value, tone, label? }]` 或 `{ rules: [...], suggested?: true }`。
+ * 单条不合格只丢那一条并进修复（`INTENT_STATE_INVALID`）。
+ */
+function readKpiStates(
+  raw: unknown,
+  origin: string,
+  diagnostics: IntentDiagnostic[],
+): IntentKpiStates | undefined {
+  if (raw === undefined) return undefined;
+  const record = asRecord(raw);
+  const list = Array.isArray(raw) ? raw : Array.isArray(record?.rules) ? record.rules : undefined;
+  const invalid = (message: string): undefined => {
+    diagnostics.push({ severity: 'error', code: 'INTENT_STATE_INVALID', path: origin, message });
+    return undefined;
+  };
+  if (list === undefined) return invalid('states must be a list of { op, value, tone } rules.');
+  const rules: IntentStateRule[] = [];
+  for (const item of list.slice(0, MAX_STATE_RULES)) {
+    const rule = asRecord(item);
+    const op = typeof rule?.op === 'string' ? rule.op : '';
+    const tone = typeof rule?.tone === 'string' ? rule.tone : '';
+    const value = rule?.value;
+    const valid =
+      STATE_OPS.has(op) &&
+      STATE_TONES.has(tone) &&
+      ((typeof value === 'number' && Number.isFinite(value)) ||
+        (typeof value === 'string' && value.trim() !== '' && (op === 'eq' || op === 'neq')));
+    if (!valid) {
+      invalid('Each state rule needs op (gt/gte/lt/lte/eq/neq), a value and a tone.');
+      continue;
+    }
+    const label =
+      typeof rule?.label === 'string' ? clampText(rule.label.trim(), MAX_STATE_LABEL) : '';
+    rules.push({
+      op: op as IntentStateRule['op'],
+      value: typeof value === 'string' ? value.trim() : (value as number),
+      tone: tone as IntentStateRule['tone'],
+      ...(label === '' ? {} : { label }),
+    });
+  }
+  if (list.length > MAX_STATE_RULES) {
+    diagnostics.push({
+      severity: 'warning',
+      code: 'INTENT_ITEMS_TRIMMED',
+      path: origin,
+      message: `Only the first ${MAX_STATE_RULES} state rules are kept.`,
+    });
+  }
+  if (rules.length === 0) return undefined;
+  return { rules, ...(record?.suggested === true ? { suggested: true } : {}) };
+}
+
+function readInteractions(
+  raw: unknown,
+  diagnostics: IntentDiagnostic[],
+): readonly IntentInteraction[] | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'INTENT_INTERACTION_INVALID',
+      path: 'interactions',
+      message: 'interactions must be an array.',
+    });
+    return undefined;
+  }
+  const output: IntentInteraction[] = [];
+  for (const [index, item] of raw.slice(0, MAX_INTERACTIONS).entries()) {
+    const origin = `interactions[${index}]`;
+    const parsed = readInteraction(item, origin);
+    if (typeof parsed === 'string') {
+      diagnostics.push({
+        severity: 'error',
+        code: 'INTENT_INTERACTION_INVALID',
+        path: origin,
+        message: parsed,
+      });
+    } else {
+      output.push(parsed);
+    }
+  }
+  if (raw.length > MAX_INTERACTIONS) {
+    diagnostics.push({
+      severity: 'warning',
+      code: 'INTENT_ITEMS_TRIMMED',
+      path: 'interactions',
+      message: `Only the first ${MAX_INTERACTIONS} interactions are kept.`,
+    });
+  }
+  return output.length === 0 ? undefined : output;
+}
+
+/**
+ * 单独解析联动（编辑时的 `link` 操作用）：编号从 `start` 起，与已有联动的 `interactions[i]` 接续。
+ * 不合格的项直接丢掉。
+ */
+export function parseScreenIntentInteractions(
+  raw: readonly unknown[],
+  start = 0,
+): IntentInteraction[] {
+  const output: IntentInteraction[] = [];
+  for (const [index, item] of raw.entries()) {
+    const parsed = readInteraction(item, `interactions[${start + index}]`);
+    if (typeof parsed !== 'string') output.push(parsed);
+  }
+  return output;
+}
+
+/** 合格返回联动，不合格返回给开发者的英文原因。 */
+function readInteraction(raw: unknown, origin: string): IntentInteraction | string {
+  const record = asRecord(raw);
+  if (record === null) return 'An interaction must be an object.';
+  const from = typeof record.from === 'string' ? record.from.trim() : '';
+  const event = typeof record.event === 'string' ? record.event.trim() : '';
+  const targets = (Array.isArray(record.to) ? record.to : [record.to])
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter((item) => item !== '');
+  if (from === '' || targets.length === 0) {
+    return 'An interaction needs "from" and "to" (block keys or titles).';
+  }
+  if (!EVENT_PATTERN.test(event)) return 'An interaction needs the event name of the source block.';
+  const to = [...new Set(targets)].slice(0, MAX_INTERACTION_TARGETS);
+  if (record.kind === 'filter') {
+    const param = typeof record.param === 'string' ? record.param.trim() : '';
+    if (!FIELD_PATTERN.test(param)) return 'A filter needs the target query parameter "param".';
+    const field = typeof record.field === 'string' ? record.field.trim() : '';
+    if (field !== '' && !FIELD_PATTERN.test(field)) return 'The filter field is not a field id.';
+    return {
+      kind: 'filter',
+      from,
+      event,
+      to,
+      param,
+      ...(field === '' ? {} : { field }),
+      origin,
+    };
+  }
+  if (record.kind === 'show') {
+    const mode =
+      typeof record.mode === 'string' && SHOW_MODES.has(record.mode) ? record.mode : 'toggle';
+    return { kind: 'show', from, event, to, mode: mode as 'show' | 'hide' | 'toggle', origin };
+  }
+  return 'Interaction kind must be "filter" or "show".';
+}
+
 function readRoot(input: unknown): Record<string, unknown> | undefined {
   let value = input;
   if (typeof input === 'string') {

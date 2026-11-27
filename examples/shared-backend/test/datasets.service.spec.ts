@@ -25,6 +25,8 @@ describe('DatasetsService', () => {
     expect(catalog.items.map((item) => item.datasetId)).toEqual([
       'monitor.devices',
       'monitor.alarms',
+      'monitor.lines',
+      'monitor.line-summary',
       'monitor.pipeline',
       'monitor.crew',
     ]);
@@ -46,12 +48,15 @@ describe('DatasetsService', () => {
     // groups 由命中条目反推：只剩 alarm 一组。
     expect(chinese.groups.map((group) => group.id)).toEqual(['alarm']);
 
-    expect(service.list('MONITOR', undefined, 20).items).toHaveLength(4);
+    expect(service.list('MONITOR', undefined, 20).items).toHaveLength(6);
     expect(service.list('monitor.dev', undefined, 20).items.map((item) => item.datasetId)).toEqual([
       'monitor.devices',
     ]);
+    // 产线汇总的说明里也有「设备数」，一起命中。
     expect(service.list('设备', undefined, 20).items.map((item) => item.datasetId)).toEqual([
       'monitor.devices',
+      'monitor.lines',
+      'monitor.line-summary',
     ]);
   });
 

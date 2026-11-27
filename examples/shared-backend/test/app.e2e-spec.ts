@@ -152,7 +152,7 @@ describe('host api (e2e)', () => {
    */
   it('serves the dataset catalog with query / groupId / limit', async () => {
     const all = await request(app.getHttpServer()).get('/api/datasets').expect(200);
-    expect((all.body.items as unknown[]).length).toBe(4);
+    expect((all.body.items as unknown[]).length).toBe(6);
     expect((all.body.groups as { id: string }[]).map((group) => group.id)).toEqual([
       'production',
       'alarm',

@@ -16,6 +16,9 @@ type ApplyOutcome = {
     readonly diagnostics: readonly IntentDiagnostic[];
 };
 
+// @public
+export const BEHAVIOR_REPAIRABLE: ReadonlySet<string>;
+
 // @public (undocumented)
 export interface Box {
     // (undocumented)
@@ -26,6 +29,19 @@ export interface Box {
     readonly x: number;
     // (undocumented)
     readonly y: number;
+}
+
+// @public (undocumented)
+export interface CompiledBehaviors {
+    // (undocumented)
+    readonly behaviors: IntentBehaviorSummary[];
+    // (undocumented)
+    readonly blueprint: {
+        readonly nodes: Record<string, unknown>[];
+        readonly edges: Record<string, unknown>[];
+    };
+    // (undocumented)
+    readonly variables: Record<string, unknown>[];
 }
 
 // @public
@@ -56,6 +72,7 @@ export interface CompiledComponent {
         width: number;
         height: number;
     };
+    states?: Record<string, unknown>;
     // (undocumented)
     status: {
         locked: boolean;
@@ -73,8 +90,8 @@ export interface CompiledComponent {
 export interface CompiledScreenDocument {
     // (undocumented)
     readonly blueprint: {
-        readonly nodes: readonly never[];
-        readonly edges: readonly never[];
+        readonly nodes: readonly Record<string, unknown>[];
+        readonly edges: readonly Record<string, unknown>[];
     };
     // (undocumented)
     readonly canvas: {
@@ -86,8 +103,30 @@ export interface CompiledScreenDocument {
     readonly components: readonly CompiledComponent[];
     // (undocumented)
     readonly dataSources?: readonly Record<string, unknown>[];
+    readonly variables: readonly Record<string, unknown>[];
+}
+
+// @public (undocumented)
+export function compileIntentBehaviors(input: CompileIntentBehaviorsInput): CompiledBehaviors;
+
+// @public
+export interface CompileIntentBehaviorsInput {
+    readonly capabilities: readonly string[] | undefined;
     // (undocumented)
-    readonly variables: readonly never[];
+    readonly catalog: IntentCatalog;
+    readonly components: CompiledComponent[];
+    // (undocumented)
+    readonly dataSources: Record<string, unknown>[];
+    // (undocumented)
+    readonly intent: ScreenIntent;
+    // (undocumented)
+    readonly language: IntentLanguage;
+    // (undocumented)
+    readonly references: IntentReferences | undefined;
+    // (undocumented)
+    readonly sources: Readonly<Record<string, string>>;
+    // (undocumented)
+    readonly warnings: IntentDiagnostic[];
 }
 
 // @public
@@ -95,6 +134,7 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
 
 // @public (undocumented)
 export interface CompileScreenIntentInput {
+    readonly capabilities?: readonly string[];
     // (undocumented)
     readonly catalog: IntentCatalog;
     // (undocumented)
@@ -364,6 +404,17 @@ export interface IntentBand {
 }
 
 // @public
+export interface IntentBehaviorSummary {
+    readonly detail: string;
+    readonly from: string;
+    // (undocumented)
+    readonly kind: 'filter' | 'show' | 'state';
+    readonly origin: string;
+    readonly suggested?: boolean;
+    readonly to: readonly string[];
+}
+
+// @public
 export type IntentBind = {
     readonly kind: 'table';
     readonly table: IntentTable;
@@ -388,6 +439,7 @@ export interface IntentBlock {
     readonly bind: IntentBind;
     readonly candidate?: string;
     readonly ident?: string;
+    readonly key?: IntentKey;
     // (undocumented)
     readonly note?: string;
     // (undocumented)
@@ -421,6 +473,16 @@ export interface IntentCatalogAsset {
 // @public
 export type IntentCatalogData = 'tabular' | 'scalar' | 'none';
 
+// @public
+export interface IntentCatalogEvent {
+    // (undocumented)
+    readonly label?: string;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly payload: Readonly<Record<string, IntentCatalogPayloadKind>>;
+}
+
 // @public (undocumented)
 export interface IntentCatalogMaterial {
     readonly asset: boolean;
@@ -434,6 +496,7 @@ export interface IntentCatalogMaterial {
         readonly props: Readonly<Record<string, ScreenJsonValue>>;
         readonly style: Readonly<Record<string, ScreenJsonValue>>;
     };
+    readonly events?: readonly IntentCatalogEvent[];
     // (undocumented)
     readonly name: string;
     // (undocumented)
@@ -448,6 +511,9 @@ export interface IntentCatalogMaterial {
     // (undocumented)
     readonly type: string;
 }
+
+// @public
+export type IntentCatalogPayloadKind = 'string' | 'number' | 'boolean' | 'object' | 'array';
 
 // @public (undocumented)
 export interface IntentCatalogProp {
@@ -479,6 +545,7 @@ export type IntentCompileOutcome = {
 
 // @public (undocumented)
 export interface IntentCompileResult {
+    readonly behaviors: readonly IntentBehaviorSummary[];
     // (undocumented)
     readonly document: CompiledScreenDocument;
     readonly imageCount: number;
@@ -511,6 +578,7 @@ export interface IntentDataCheckInput {
             readonly dataBinding?: unknown;
         }[];
         readonly dataSources?: readonly unknown[];
+        readonly variables?: readonly unknown[];
     };
     // (undocumented)
     readonly port: ScreenHostDatasetPort;
@@ -568,6 +636,8 @@ export interface IntentDiagnostic {
 // @public
 export interface IntentEditBaseline {
     // (undocumented)
+    readonly blueprint?: unknown;
+    // (undocumented)
     readonly canvas: {
         readonly width: number;
         readonly height: number;
@@ -579,6 +649,7 @@ export interface IntentEditBaseline {
     }[];
     // (undocumented)
     readonly dataSources?: readonly Record<string, unknown>[];
+    readonly variables?: readonly unknown[];
 }
 
 // @public
@@ -595,6 +666,12 @@ export type IntentEditCommand = {
 } | {
     readonly type: 'replace-data-sources';
     readonly dataSources: readonly Record<string, unknown>[];
+} | {
+    readonly type: 'replace-variables';
+    readonly variables: readonly Record<string, unknown>[];
+} | {
+    readonly type: 'replace-blueprint';
+    readonly blueprint: Readonly<Record<string, unknown>>;
 };
 
 // @public (undocumented)
@@ -624,6 +701,24 @@ export interface IntentGrid {
 }
 
 // @public
+export type IntentInteraction = {
+    readonly kind: 'filter';
+    readonly from: string;
+    readonly event: string;
+    readonly field?: string;
+    readonly to: readonly string[];
+    readonly param: string;
+    readonly origin: string;
+} | {
+    readonly kind: 'show';
+    readonly from: string;
+    readonly event: string;
+    readonly to: readonly string[];
+    readonly mode: 'show' | 'hide' | 'toggle';
+    readonly origin: string;
+};
+
+// @public
 export interface IntentItemResult<T> {
     // (undocumented)
     readonly diagnostics: readonly IntentDiagnostic[];
@@ -631,17 +726,22 @@ export interface IntentItemResult<T> {
     readonly value: T | undefined;
 }
 
+// @public
+export type IntentKey = string;
+
 // @public (undocumented)
 export interface IntentKpi {
     readonly bind?: IntentKpiBind;
     // (undocumented)
     readonly delta?: IntentKpiDelta;
     readonly ident?: string;
+    readonly key?: IntentKey;
     // (undocumented)
     readonly label: string;
     // (undocumented)
     readonly origin: string;
     readonly precision?: number;
+    readonly states?: IntentKpiStates;
     readonly unit?: string;
     readonly value: number | null;
 }
@@ -666,6 +766,13 @@ export interface IntentKpiDelta {
 }
 
 // @public
+export interface IntentKpiStates {
+    // (undocumented)
+    readonly rules: readonly IntentStateRule[];
+    readonly suggested?: boolean;
+}
+
+// @public
 export type IntentLanguage = 'zh' | 'en';
 
 // @public
@@ -686,6 +793,12 @@ export type IntentOp = {
     readonly region: string;
     readonly part?: 'main' | 'rail';
     readonly block: unknown;
+} | {
+    readonly op: 'link';
+    readonly interaction: unknown;
+} | {
+    readonly op: 'unlink';
+    readonly target: string;
 } | {
     readonly op: 'rebind';
     readonly target: string;
@@ -717,6 +830,7 @@ export interface IntentReferenceDataset {
         readonly sampled: number;
         readonly total?: number;
     };
+    readonly values?: Readonly<Record<string, readonly (string | number | boolean)[]>>;
 }
 
 // @public
@@ -768,6 +882,16 @@ export interface IntentSession {
 
 // @public
 export interface IntentSessionDigest {
+    readonly interactions?: readonly {
+        readonly target: string;
+        readonly kind: 'filter' | 'show';
+        readonly from: string;
+        readonly to: readonly string[];
+        readonly event: string;
+        readonly field?: string;
+        readonly param?: string;
+        readonly mode?: 'show' | 'hide' | 'toggle';
+    }[];
     // (undocumented)
     readonly regions: readonly {
         readonly path: string;
@@ -779,6 +903,7 @@ export interface IntentSessionDigest {
             readonly type?: string;
             readonly title: string;
             readonly value?: string;
+            readonly key?: string;
         }[];
     }[];
     // (undocumented)
@@ -832,6 +957,17 @@ export interface IntentSplit {
     readonly rail: readonly IntentBlock[];
     readonly railSide: 'left' | 'right';
     readonly ratio: 'wide-narrow' | 'even';
+}
+
+// @public
+export interface IntentStateRule {
+    readonly label?: string;
+    // (undocumented)
+    readonly op: 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'neq';
+    // (undocumented)
+    readonly tone: 'success' | 'warning' | 'danger' | 'info';
+    // (undocumented)
+    readonly value: number | string;
 }
 
 // @public (undocumented)
@@ -984,6 +1120,9 @@ export function parseIntentSkeleton(raw: unknown, catalog: IntentCatalog): Inten
 // @public
 export function parseScreenIntent(input: unknown, options: ParseScreenIntentOptions): IntentParseResult;
 
+// @public
+export function parseScreenIntentInteractions(raw: readonly unknown[], start?: number): IntentInteraction[];
+
 // @public (undocumented)
 export interface ParseScreenIntentOptions {
     // (undocumented)
@@ -1027,6 +1166,7 @@ export interface PrepareIntentDataContextInput {
 
 // @public (undocumented)
 export interface PrepareIntentInput {
+    readonly capabilities?: readonly string[];
     // (undocumented)
     readonly catalog: IntentCatalog;
     // (undocumented)
@@ -1755,6 +1895,7 @@ interface ScreenHostSubscribeOptions {
 
 // @public (undocumented)
 export interface ScreenIntent {
+    readonly interactions?: readonly IntentInteraction[];
     readonly regions: readonly IntentRegion[];
     readonly style?: string;
     // (undocumented)
@@ -2154,6 +2295,12 @@ interface ScreenVariableRecord {
     // (undocumented)
     readonly value: ScreenValueRef;
 }
+
+// @public
+export function seedFilterTargets(intent: ScreenIntent, references: IntentReferences | undefined): {
+    readonly intent: ScreenIntent;
+    readonly warnings: IntentDiagnostic[];
+};
 
 // @public
 export type SolvedRegion = {

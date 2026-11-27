@@ -35,6 +35,20 @@ export interface IntentDataCandidate {
   readonly fields: Readonly<Record<string, readonly string[]>>;
 }
 
+/** 事件负载顶层字段的形态（取自事件声明的 `payloadSchema`）。 */
+export type IntentCatalogPayloadKind = 'string' | 'number' | 'boolean' | 'object' | 'array';
+
+/**
+ * 物料事件（ADR-0115 D3）：manifest 的 `events` 加上编辑器描述符里的 `payloadSchema` 顶层字段。
+ * `row` 为对象且没有声明属性时表示「一行数据，键是绑定的字段 id」。没声明负载的事件 `payload` 为空：
+ * 可以触发显隐，不能带值筛选。
+ */
+export interface IntentCatalogEvent {
+  readonly name: string;
+  readonly label?: string;
+  readonly payload: Readonly<Record<string, IntentCatalogPayloadKind>>;
+}
+
 export interface IntentCatalogMaterial {
   readonly type: string;
   readonly name: string;
@@ -50,6 +64,8 @@ export interface IntentCatalogMaterial {
   readonly size: { readonly width: number; readonly height: number };
   readonly props: Readonly<Record<string, IntentCatalogProp>>;
   readonly roles: readonly IntentCatalogRole[];
+  /** 物料声明的事件；缺省表示宿主没上送（旧宿主），这一物料不能当联动来源。 */
+  readonly events?: readonly IntentCatalogEvent[];
   readonly defaults: {
     readonly props: Readonly<Record<string, ScreenJsonValue>>;
     readonly style: Readonly<Record<string, ScreenJsonValue>>;

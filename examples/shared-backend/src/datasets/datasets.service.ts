@@ -311,6 +311,13 @@ function projectRows(
         totalRowCount: stages.length,
       };
     }
+    case 'monitor.lines': {
+      const rows = LINE_IDS.map((line) => summarizeLine(line));
+      return { rows, totalRowCount: rows.length };
+    }
+    case 'monitor.line-summary': {
+      return { rows: [summarizeLine(requireLine(resolved))], totalRowCount: 1 };
+    }
     case 'monitor.crew': {
       const crews = listCrew(requireLine(resolved));
       const limit = requireLimit(resolved, 6);
@@ -331,6 +338,23 @@ function projectRows(
         message: `Dataset has no query implementation: ${definition.datasetId}`,
       });
   }
+}
+
+/** 一条产线的汇总行：设备、负载取自设备清单，告警按近 60 分钟窗口计数。 */
+function summarizeLine(line: LineId): DatasetRow {
+  const devices = listDevices(line);
+  const load =
+    devices.length === 0
+      ? 0
+      : devices.reduce((sum, device) => sum + device.load, 0) / devices.length;
+  return {
+    line,
+    devices: devices.length,
+    running: devices.filter((device) => device.status === 'running').length,
+    fault: devices.filter((device) => device.status === 'fault').length,
+    avgLoad: Math.round(load * 10) / 10,
+    alarms: sliceByWindow(listAlarms(line), 60).length,
+  };
 }
 
 /** 校验已在 `resolveParameters` 完成，这里的守卫只用于把联合类型收窄，不重复报错。 */

@@ -19,7 +19,7 @@ import { attachHostComponentWorkshop } from '../screen/fragment-shelf';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
-import { createHostIntentHandler } from '../screen/host-intent';
+import { createHostIntentHandler, readGrantedCapabilities } from '../screen/host-intent';
 import { createHostIntentReferenceCatalog } from '../screen/host-intent-reference';
 import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
@@ -128,6 +128,7 @@ export function ScreenEditorPage(): ReactElement {
         screenId,
         catalog: () => setup.runtime.catalog,
         datasetPort: setup.datasetPort,
+        capabilities: () => readGrantedCapabilities(setup.runtime),
       }),
     );
     handle.onDispose(() => element.setIntentHandler(undefined));

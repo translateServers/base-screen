@@ -19,7 +19,7 @@ import {
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
-import { createHostIntentHandler } from '../screen/host-intent';
+import { createHostIntentHandler, readGrantedCapabilities } from '../screen/host-intent';
 import { createHostIntentReferenceCatalog } from '../screen/host-intent-reference';
 import { loadHostRuntime } from '../screen/host-runtime';
 import { createRestProjectAdapter } from '../screen/project-adapter';
@@ -110,6 +110,7 @@ export const screenEditView: ViewModule = {
               screenId,
               catalog: () => runtime.catalog,
               datasetPort,
+              capabilities: () => readGrantedCapabilities(runtime),
             }),
           );
           handle.onDispose(() => element.setIntentHandler(undefined));

@@ -333,12 +333,13 @@ describe('regions shape', () => {
   });
 
   it('warns about reserved parts and ignores them', () => {
+    // `interactions` 自 ADR-0115 起编译，不再是预留键；根上的 `states` 仍预留（状态写在指标卡上）。
     const result = parse({ ...regions, pages: [{ id: 'p1' }], interactions: [], states: {} });
 
     expect(result.intent?.regions).toHaveLength(3);
+    expect(result.intent).not.toHaveProperty('interactions');
     expect(codes(result, 'warning')).toEqual([
       'INTENT_PART_NOT_SUPPORTED@pages',
-      'INTENT_PART_NOT_SUPPORTED@interactions',
       'INTENT_PART_NOT_SUPPORTED@states',
     ]);
   });

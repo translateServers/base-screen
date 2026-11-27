@@ -88,6 +88,18 @@ export const PLUGIN_BOARD_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
   editorDescriptor: parseBoardEditorDescriptor(
     'board.water-level',
     {
+      // 事件负载（ADR-0115 D3）：`value` 是当前百分比。
+      events: [
+        {
+          name: 'valueClick',
+          label: '点击读数',
+          payloadSchema: {
+            kind: 'object',
+            properties: { value: { kind: 'number' } },
+            required: ['value'],
+          },
+        },
+      ],
       appearance: [
         {
           id: 'format',
@@ -143,6 +155,7 @@ export const PLUGIN_BOARD_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
     },
     WATER_LEVEL_PROPS_SCHEMA,
     WATER_LEVEL_STYLE_SCHEMA,
+    ['valueClick'],
   ),
   events: ['valueClick'],
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],

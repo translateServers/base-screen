@@ -111,7 +111,9 @@ export async function prepareIntentDataContext(
       type: item.type,
       fields: item.fields,
     })),
-    references: entries.map((entry) => toReference(entry.definition, entry.profile)),
+    references: entries.map((entry) =>
+      toReference(entry.definition, entry.profile, entry.sample?.value),
+    ),
     warnings,
   };
 }
@@ -214,10 +216,35 @@ function candidateMaterials(catalog: IntentCatalog): ScreenCandidateMaterial[] {
     }));
 }
 
+/** 每个字段至多留多少个样本取值（联动模拟用，ADR-0115 D6）。 */
+const MAX_SAMPLE_VALUES = 24;
+
+/** 样本里各字段出现过的标量取值，去重、保持首次出现的顺序。 */
+function sampleValues(
+  sample: ScreenTabularDataset | undefined,
+): Record<string, (string | number | boolean)[]> | undefined {
+  if (sample === undefined || sample.rows.length === 0) return undefined;
+  const output: Record<string, (string | number | boolean)[]> = {};
+  for (const field of sample.fields) {
+    const seen = new Set<string | number | boolean>();
+    for (const row of sample.rows) {
+      const value = row[field.id];
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        seen.add(value);
+        if (seen.size >= MAX_SAMPLE_VALUES) break;
+      }
+    }
+    if (seen.size > 0) output[field.id] = [...seen];
+  }
+  return output;
+}
+
 function toReference(
   definition: ScreenDatasetDefinition,
   profile: ScreenDatasetProfile,
+  sample?: ScreenTabularDataset,
 ): IntentReferenceDataset {
+  const values = sampleValues(sample);
   return {
     datasetId: definition.datasetId,
     name: definition.name,
@@ -236,6 +263,7 @@ function toReference(
         ? {}
         : { allowedValues: [...parameter.allowedValues] }),
     })),
+    ...(values === undefined ? {} : { values }),
     ...(profile.sampled
       ? {
           rows: {

@@ -16,6 +16,8 @@
  *
  * 用法（仓库根目录，先 `pnpm build` 并启动示例后端，模型配置在 examples/shared-backend/.env.local）：
  *   node tooling/verification/agent-eval.mjs [--base http://127.0.0.1:3000/api] [--only id,id] [--out file.json]
+ *   [--data 1]      从数据出发的用例（ADR-0114 S7）
+ *   [--behavior 1]  行为生成的用例（ADR-0115 S8）：联动、阈值状态、能力缺口
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -126,6 +128,62 @@ export const DATA_EVAL_CASES = [
   },
 ];
 
+/**
+ * 行为生成（ADR-0115 S8，`--behavior`）：联动与阈值状态。`capabilities` 模拟宿主已授权的蓝图能力
+ * （缺省为全部授权）；看编进文档的联动 / 状态、采纳前模拟的拦截、能力缺口与缺口说明。
+ */
+const ALL_CAPABILITIES = [
+  'blueprint.trigger.material-event',
+  'blueprint.value.event-payload',
+  'blueprint.action.set-variable',
+  'blueprint.action.component-visibility',
+];
+export const BEHAVIOR_EVAL_CASES = [
+  {
+    id: 'b-filter',
+    kind: '行为',
+    text: '用产线概览和告警事件做一屏产线监控：点产线概览表里的一行，下面的告警明细只看这条产线',
+    datasets: ['monitor.lines', 'monitor.alarms'],
+    expect: { filter: 1 },
+  },
+  {
+    id: 'b-noeffect',
+    kind: '行为',
+    text: '用设备清单和告警事件做一屏设备监控：点设备表里的一行，告警明细只看这台设备所在的产线',
+    datasets: ['monitor.devices', 'monitor.alarms'],
+    expect: { filter: 0 },
+  },
+  {
+    id: 'b-threshold',
+    kind: '行为',
+    text: '用产线汇总做一屏 LINE-A 负载看板：平均负载超过 90 标红，超过 70 标黄',
+    datasets: ['monitor.line-summary'],
+    expect: { state: 1, suggested: false },
+  },
+  {
+    id: 'b-suggested',
+    kind: '行为',
+    text: '用产线汇总做一屏 LINE-A 产线看板，平均负载高的时候标红',
+    datasets: ['monitor.line-summary'],
+    expect: { state: 1, suggested: true },
+  },
+  {
+    id: 'b-nocap',
+    kind: '行为',
+    text: '用产线概览和告警事件做一屏产线监控：告警明细先不显示，点产线概览表里的一行再显示出来',
+    datasets: ['monitor.lines', 'monitor.alarms'],
+    capabilities: ALL_CAPABILITIES.filter((id) => id !== 'blueprint.action.component-visibility'),
+    expect: { show: 0, capabilityMissing: true },
+  },
+  {
+    id: 'b-gap',
+    kind: '行为',
+    text: '用 LINE-A 的班组绩效和设备清单做一屏：点班组绩效里的某个班组，设备清单只看这个班组的设备',
+    datasets: ['monitor.crew', 'monitor.devices'],
+    expect: { filter: 0 },
+  },
+];
+
 const args = readArgs(process.argv.slice(2));
 const base = (args.base ?? 'http://127.0.0.1:3000/api').replace(/\/+$/, '');
 const catalog = withShell(
@@ -133,9 +191,13 @@ const catalog = withShell(
 );
 const only = args.only === undefined ? undefined : new Set(args.only.split(','));
 const datasetPort = createRestDatasetPort({ baseUrl: base });
-const cases = (args.data !== undefined ? DATA_EVAL_CASES : AGENT_EVAL_CASES).filter(
-  (item) => only === undefined || only.has(item.id),
-);
+const cases = (
+  args.behavior !== undefined
+    ? BEHAVIOR_EVAL_CASES
+    : args.data !== undefined
+      ? DATA_EVAL_CASES
+      : AGENT_EVAL_CASES
+).filter((item) => only === undefined || only.has(item.id));
 
 if (args.edits !== undefined) {
   await runEdits();
@@ -177,6 +239,14 @@ if (args.data !== undefined) {
             )
             .join('；') || '无'
         }`,
+    );
+  }
+}
+if (args.behavior !== undefined) {
+  for (const row of results) {
+    console.log(
+      `${row.id}: 行为 ${row.behaviors?.join('；') || '无'}；联动 filter ${row.filters ?? 0} / show ${row.shows ?? 0}；状态 ${row.states ?? 0}；` +
+        `变量 ${row.variables ?? 0}、连线 ${row.edges ?? 0}；行为告警 ${row.behaviorWarnings?.join(',') || '无'}；符合预期 ${row.asExpected ? '是' : '否'}`,
     );
   }
 }
@@ -467,7 +537,47 @@ async function runCase(item) {
     ...summarize(piped),
     ...streamChecks(frames, piped.document),
     ...(data === undefined ? {} : dataFacts(piped, data)),
+    ...(args.behavior === undefined ? {} : behaviorFacts(piped, item)),
   };
+}
+
+/** 行为用例的事实：编进文档的联动 / 状态、变量与连线、行为相关告警，以及是否符合用例预期。 */
+function behaviorFacts(piped, item) {
+  const compiled = piped.prepared?.compiled;
+  const behaviors = compiled?.behaviors ?? [];
+  const warnings = (piped.prepared?.warnings ?? [])
+    .map((entry) => entry.code)
+    .filter((code) =>
+      /^(AGENT_INTERACTION_|AGENT_STATE_|INTENT_FILTER_|INTENT_STATE_|INTENT_INTERACTION_|INTENT_KEY_)/.test(
+        code,
+      ),
+    );
+  const count = (kind) => behaviors.filter((entry) => entry.kind === kind).length;
+  const expect = item.expect ?? {};
+  const facts = {
+    behaviors: behaviors.map(
+      (entry) => `${entry.kind}:${entry.from}→${entry.to.join('+')}（${entry.detail}）`,
+    ),
+    filters: count('filter'),
+    shows: count('show'),
+    states: count('state'),
+    suggested: behaviors.some((entry) => entry.suggested === true),
+    variables: piped.document?.variables?.length ?? 0,
+    edges: piped.document?.blueprint?.edges?.length ?? 0,
+    behaviorWarnings: [...new Set(warnings)],
+    // 模型写了什么联动（修复后的最终原文）：看它是否老实不写做不到的联动。
+    interactionsWritten: piped.prepared?.intent?.interactions?.length ?? 0,
+  };
+  const checks = [
+    expect.filter === undefined || facts.filters === expect.filter,
+    expect.show === undefined || facts.shows === expect.show,
+    expect.state === undefined || facts.states === expect.state,
+    expect.suggested === undefined || facts.suggested === expect.suggested,
+    expect.capabilityMissing === undefined ||
+      warnings.includes('AGENT_INTERACTION_CAPABILITY_MISSING') === expect.capabilityMissing ||
+      facts.interactionsWritten === 0,
+  ];
+  return { ...facts, asExpected: checks.every(Boolean) && piped.document !== undefined };
 }
 
 /**
@@ -530,6 +640,10 @@ async function pipeline(item, first, dataContext) {
       catalog: intentCatalogOf(data.assets, dataContext),
       references: { assets: data.assets, datasets: datasetsOf(data, dataContext) },
       mode: data.mode,
+      // 行为用例按用例给的能力表检查（缺省全部授权），与宿主上送已授权能力同口径（ADR-0115 D7）。
+      ...(args.behavior === undefined
+        ? {}
+        : { capabilities: item.capabilities ?? ALL_CAPABILITIES }),
     });
     const issues = [...prepared.issues];
     let document;

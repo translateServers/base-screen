@@ -90,6 +90,18 @@ export const PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
   editorDescriptor: parseBoardEditorDescriptor(
     'board.digital-flop',
     {
+      // 事件负载（ADR-0115 D3）：`value` 是显示中的读数文本。
+      events: [
+        {
+          name: 'valueClick',
+          label: '点击读数',
+          payloadSchema: {
+            kind: 'object',
+            properties: { value: { kind: 'string' } },
+            required: ['value'],
+          },
+        },
+      ],
       appearance: [
         { id: 'format', label: '读数格式', fields: DIGITAL_FLOP_NUMBER_FORMAT.fields },
         {
@@ -132,6 +144,7 @@ export const PLUGIN_BOARD_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
     },
     DIGITAL_FLOP_PROPS_SCHEMA,
     DIGITAL_FLOP_STYLE_SCHEMA,
+    ['valueClick'],
   ),
   events: ['valueClick'],
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],

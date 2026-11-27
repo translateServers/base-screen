@@ -149,6 +149,22 @@ export const PLUGIN_BOARD_SCROLL_BOARD_MANIFEST: BaseScreenMaterialManifest = {
 function parseScrollBoardEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
   const parsed = parseBaseScreenMaterialEditorDescriptor(
     {
+      // 事件负载（ADR-0115 D3）。
+      events: [
+        {
+          name: 'rowClick',
+          label: '点击行',
+          hint: '负载带被点的行（键为绑定的字段 id）与行号。',
+          payloadSchema: {
+            kind: 'object',
+            properties: {
+              rowIndex: { kind: 'number' },
+              row: { kind: 'object', properties: {}, required: [] },
+            },
+            required: ['rowIndex', 'row'],
+          },
+        },
+      ],
       appearance: [
         {
           id: 'structure',

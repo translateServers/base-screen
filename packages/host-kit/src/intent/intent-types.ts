@@ -26,6 +26,34 @@ export interface IntentKpiBind {
   readonly params?: Readonly<Record<string, string | number | boolean>>;
 }
 
+/**
+ * 一条阈值状态（ADR-0115 D2 状态来源 threshold）：数值满足 `op value` 时切到 `tone` 的外观。
+ * 规则按顺序判定、第一条命中即停，所以严重的写在前面。
+ */
+export interface IntentStateRule {
+  readonly op: 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'neq';
+  readonly value: number | string;
+  readonly tone: 'success' | 'warning' | 'danger' | 'info';
+  /** 状态名（「过载」「偏低」）；缺省按 tone 取默认名。 */
+  readonly label?: string;
+}
+
+/**
+ * 指标卡的状态（ADR-0115 D1 / D2）：只对绑定了数据集字段的指标卡编译——示例数值不是真实数据，
+ * 按它判定阈值没有意义（`AGENT_STATE_NEEDS_DATA`）。
+ */
+export interface IntentKpiStates {
+  readonly rules: readonly IntentStateRule[];
+  /** 阈值是模型补的（用户没说具体数）：提案理由里提示用户核对（`INTENT_STATE_SUGGESTED`）。 */
+  readonly suggested?: boolean;
+}
+
+/**
+ * 句柄（ADR-0115 D1）：模型给块 / 指标卡起的短名，联动按它（或按标题）指向组件。
+ * 小写字母开头，字母、数字、连字符，至多 32 字符。
+ */
+export type IntentKey = string;
+
 export interface IntentKpi {
   readonly label: string;
   /** `null` 表示没有数据（确定性兜底的占位），编译器画「—」而不是 0。 */
@@ -37,6 +65,10 @@ export interface IntentKpi {
   readonly delta?: IntentKpiDelta;
   /** 读数据集字段；有它时 `value` 为 `null`、没有 `delta` / `precision`。 */
   readonly bind?: IntentKpiBind;
+  /** 联动引用用的句柄。 */
+  readonly key?: IntentKey;
+  /** 阈值状态；只在 `bind` 存在时编译。 */
+  readonly states?: IntentKpiStates;
   readonly origin: string;
   /**
    * 稳定标识（会话里用）：编译出的组件 id 与层级按它分段，而不是按当前位置。
@@ -88,6 +120,8 @@ export interface IntentBlock {
   readonly substituteFor?: string;
   /** 由本轮候选表展开而来时的候选编号（`c3`）：提案理由与评测据此统计。 */
   readonly candidate?: string;
+  /** 联动引用用的句柄。 */
+  readonly key?: IntentKey;
   readonly origin: string;
   /** 稳定标识，见 `IntentKpi.ident`。 */
   readonly ident?: string;
@@ -123,6 +157,33 @@ export interface IntentSplit {
 
 export type IntentRegion = IntentBand | IntentGrid | IntentSplit;
 
+/**
+ * 联动（ADR-0115 D2）：一个块的事件驱动另一些块。`from` / `to` 写块或指标卡的 `key`，或它的标题。
+ *
+ * - `filter`：点了来源块，把事件里的一个值写进目标块数据集的查询参数（只经数据集参数，不做前端过滤）。
+ *   编译器推出一个变量承接这个值，目标实例的参数改为引用该变量；`field` 是来源行里的字段
+ *   （表格 / 滚动表的 `rowClick`），图表点击取横轴值、页签取选中值、数字类取数值时可省略。
+ * - `show`：点了来源块，显示 / 隐藏 / 切换目标块；`show` 模式的目标初始隐藏。
+ */
+export type IntentInteraction =
+  | {
+      readonly kind: 'filter';
+      readonly from: string;
+      readonly event: string;
+      readonly field?: string;
+      readonly to: readonly string[];
+      readonly param: string;
+      readonly origin: string;
+    }
+  | {
+      readonly kind: 'show';
+      readonly from: string;
+      readonly event: string;
+      readonly to: readonly string[];
+      readonly mode: 'show' | 'hide' | 'toggle';
+      readonly origin: string;
+    };
+
 export interface ScreenIntent {
   readonly title: string;
   readonly subtitle: string;
@@ -130,6 +191,8 @@ export interface ScreenIntent {
   readonly style?: string;
   /** 区域按从上到下的顺序。 */
   readonly regions: readonly IntentRegion[];
+  /** 联动（ADR-0115）；变量由编译器推出，模型不写。 */
+  readonly interactions?: readonly IntentInteraction[];
 }
 
 /**

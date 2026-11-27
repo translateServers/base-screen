@@ -84,13 +84,32 @@ const LAYOUT_HINTS: Readonly<Record<string, string>> = {
   DATA_FIELD_ALL_NULL: '这一块绑定的字段在查询结果里全是空值：换一个有值的字段，或换一个候选。',
   LAYOUT_LOCKED_BACKDROP_LIGHT:
     '画布上有用户锁定保留的浅色背景，深色风格的浅色文字压在上面看不清：style 改成浅色系风格（如 light-biz），其余内容不变。',
+  // ADR-0115：联动与状态。路径是 interactions[i]（联动）或指标的路径（状态）。
+  INTENT_INTERACTION_INVALID:
+    '这条联动结构不完整：filter 要 from / event / to / param（事件带 row 时还要 field），show 要 from / event / to / mode。',
+  INTENT_STATE_INVALID:
+    '这个指标的 states 不合格：每条写 { op: gt|gte|lt|lte|eq|neq, value: 数字, tone: danger|warning|success|info }。',
+  AGENT_INTERACTION_SOURCE_UNKNOWN:
+    '这条联动的 from 找不到对应的块：写块上的 key（或块标题原文），并确认那个块本身是合格的。',
+  AGENT_INTERACTION_TARGET_UNKNOWN:
+    '这条联动的 to 里有找不到的块：写块上的 key（或块标题原文），并确认那个块本身是合格的。',
+  AGENT_INTERACTION_EVENT_UNKNOWN:
+    '来源组件没有这个事件，或这个事件带不出能筛选的值：event 只能用目录里该组件「事件」列出的，筛选用带 row / value / x 的事件。',
+  AGENT_INTERACTION_FIELD_UNKNOWN:
+    '筛选的 field 不在来源块绑定的字段里：写来源数据里真实存在、且这个块显示出来的字段 id。',
+  AGENT_INTERACTION_TARGET_INVALID:
+    '筛选只能写进目标块数据集的查询参数：目标要读数据集、且数据集声明了 param 这个参数；做不到就删掉这条联动。',
+  AGENT_INTERACTION_NO_EFFECT:
+    '这条联动点了也不会改变目标：来源字段的取值要么都相同，要么不在目标参数的可选值里。换一个取值不同的来源字段或来源块；做不到就删掉这条联动。',
+  AGENT_STATE_FIELD_TYPE:
+    '这个指标绑的字段不是数值，不能按大于 / 小于判定：改用 eq / neq，或绑一个数值字段。',
 };
 
 /** 前端修复请求的上限：原文按模型一轮输出的量级收口，诊断与契约上限一致。 */
 const MAX_REPAIR_OUTPUT_CHARS = 64_000;
 /** 模型原文里的路径：整份、标题、平铺写法的指标 / 块、区域写法的区域与区域里的格子。 */
 const REPAIR_PATH =
-  /^(?:|title|subtitle|kpis\[[0-4]\]|blocks\[[0-3]\]|regions\[[0-5]\](?:\.(?:items|blocks|main|rail)\[[0-7]\])?)$/;
+  /^(?:|title|subtitle|kpis\[[0-4]\]|blocks\[[0-3]\]|interactions\[[0-7]\]|regions\[[0-5]\](?:\.(?:items|blocks|main|rail)\[[0-7]\])?)$/;
 const REPAIR_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 
 export interface AgentRepairRequest {

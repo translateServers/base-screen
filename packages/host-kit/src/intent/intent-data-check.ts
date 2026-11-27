@@ -32,6 +32,8 @@ export interface IntentDataCheckInput {
       readonly dataBinding?: unknown;
     }[];
     readonly dataSources?: readonly unknown[];
+    /** 文档变量：参数引用变量的实例按变量初值验证（联动推出的筛选变量，ADR-0115）。 */
+    readonly variables?: readonly unknown[];
   };
   /** 组件 id → 模型原文路径（编译产物的 `sources`）。 */
   readonly sources: Readonly<Record<string, string>>;
@@ -67,7 +69,10 @@ interface DatasetInstance {
 export async function validateIntentData(
   input: IntentDataCheckInput,
 ): Promise<IntentDataCheckResult> {
-  const instances = datasetInstances(input.document.dataSources ?? []);
+  const instances = datasetInstances(
+    input.document.dataSources ?? [],
+    initialValues(input.document.variables ?? []),
+  );
   const bound = new Set<string>();
   for (const component of input.document.components) {
     const source = dataSourceIdOf(component.dataValue);
@@ -157,8 +162,26 @@ async function resultOf(
   }
 }
 
-/** 文档里的数据集实例；参数全是常量（`inline`）的才验证——引用变量的实例取值要到运行时才定。 */
-function datasetInstances(dataSources: readonly unknown[]): DatasetInstance[] {
+/** 静态变量的初值：引用它的实例采纳后第一次取数就用这个值。 */
+function initialValues(variables: readonly unknown[]): ReadonlyMap<string, unknown> {
+  const output = new Map<string, unknown>();
+  for (const raw of variables) {
+    const entry = asRecord(raw);
+    if (entry !== null && typeof entry.id === 'string' && entry.type === 'static') {
+      output.set(entry.id, entry.initialValue);
+    }
+  }
+  return output;
+}
+
+/**
+ * 文档里的数据集实例。参数是常量（`inline`）或引用静态变量（按初值）的才验证——
+ * 引用其他变量的实例取值要到运行时才定。
+ */
+function datasetInstances(
+  dataSources: readonly unknown[],
+  variables: ReadonlyMap<string, unknown>,
+): DatasetInstance[] {
   const output: DatasetInstance[] = [];
   for (const raw of dataSources) {
     const entry = asRecord(raw);
@@ -169,7 +192,12 @@ function datasetInstances(dataSources: readonly unknown[]): DatasetInstance[] {
     let constant = true;
     for (const [name, value] of Object.entries(asRecord(entry.params) ?? {})) {
       const ref = asRecord(value);
-      const inline = ref?.kind === 'inline' ? ref.value : undefined;
+      const inline =
+        ref?.kind === 'inline'
+          ? ref.value
+          : ref?.kind === 'variable' && typeof ref.variableId === 'string'
+            ? variables.get(ref.variableId)
+            : undefined;
       if (typeof inline === 'string' || typeof inline === 'number' || typeof inline === 'boolean') {
         params[name] = inline;
       } else {

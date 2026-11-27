@@ -12,6 +12,7 @@ import {
   isScreenCanvasBackground,
   isScreenCanvasPaletteColor,
   parseScreenDocument,
+  SCREEN_BLUEPRINT_CAPABILITY_IDS,
 } from 'base-screen/contracts';
 import { auditScreenLayout, parseCssColor, relativeLuminance } from 'base-screen/core';
 import type { BaseScreenDesignerElement } from 'base-screen/designer';
@@ -26,6 +27,7 @@ import {
   createIntentStreamAssembler,
   describeSession,
   editIntent,
+  type IntentBehaviorSummary,
   type IntentCatalog,
   type IntentDataContext,
   type IntentDiagnostic,
@@ -79,6 +81,23 @@ export interface HostIntentOptions {
    * 在前端画像、枚举候选，摘要随引用上送写进提示词。不传则沿用阶段 2 的行为（只有列名与类型）。
    */
   readonly datasetPort?: ScreenHostDatasetPort;
+  /**
+   * 宿主已授权的蓝图能力（ADR-0115 D7）：联动只编译授权了的，缺能力的不编译并在理由里说明。
+   * 用函数读：运行时能力表随插件装配变化。不传则不检查。
+   */
+  readonly capabilities?: () => readonly string[] | undefined;
+}
+
+/**
+ * 运行时已授权的蓝图能力（ADR-0115 D7）：联动编译据此跳过宿主没开放的能力。
+ * 只要能力判定函数，不依赖运行时的完整类型。
+ */
+export function readGrantedCapabilities(runtime: {
+  readonly runtimeContributions: { hasBlueprintCapability(capability: string): boolean };
+}): readonly string[] {
+  return SCREEN_BLUEPRINT_CAPABILITY_IDS.filter((id) =>
+    runtime.runtimeContributions.hasBlueprintCapability(id),
+  );
 }
 
 /**
@@ -787,11 +806,13 @@ async function attemptWholeScreen(
   stale: () => string | undefined = () => undefined,
   signal?: AbortSignal,
 ): Promise<WholeScreenAttempt> {
+  const capabilities = options.capabilities?.();
   const prepared = prepareIntent({
     output: data.output,
     catalog: toIntentCatalog(shape, data.assets, dataContext),
     references: { assets: data.assets, datasets: intentDatasets(data, dataContext) },
     mode: data.mode,
+    ...(capabilities === undefined ? {} : { capabilities }),
   });
   if (prepared.compiled === undefined || prepared.intent === undefined) {
     logger.warn('agent intent not compilable', prepared.issues);
@@ -894,7 +915,7 @@ async function attemptWholeScreen(
         : '';
     const repairedNote =
       rounds > 0 ? `；宿主校验未通过，已请模型修复 ${rounds} 次${backdropNote}` : '';
-    const rationale = `${describeMode(data.mode, data.failure, warnings)}${repairedNote}。布局由宿主前端按区域确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeIncomingData(document, dataContext)}${describeDataCheck(dataCheck)}${describeLocked(current)}`;
+    const rationale = `${describeMode(data.mode, data.failure, warnings)}${repairedNote}。布局由宿主前端按区域确定性编译，本轮以整屏替换的形式作为候选，未写入文档。${describeIncomingData(document, dataContext)}${describeBehaviors(prepared.compiled?.behaviors ?? [])}${describeDataCheck(dataCheck)}${describeLocked(current)}`;
     // 流式草案接得上就原地收尾；接不上（最终结果与骨架对不上、或已修复过）先撤掉它，再整屏提交。
     // 提案一旦提交就留下它的会话；是否被采纳由下一次请求时对活文档判断。
     const kept = createIntentSession({
@@ -1019,6 +1040,9 @@ function submitScreenEdit(
     ...(current.dataSources === undefined
       ? {}
       : { dataSources: current.dataSources as unknown as readonly Record<string, unknown>[] }),
+    // 联动变化时只换智能体生成的那部分变量与连线（ADR-0115 D9）。
+    variables: current.variables,
+    blueprint: current.blueprint,
   });
   if (!edited.ok) {
     logger.warn('agent edit ops not applicable', edited.diagnostics);
@@ -1045,7 +1069,7 @@ function submitScreenEdit(
   ].filter((part) => part !== '');
   const submitted = options.designer.submitChangeProposal({
     title: `智能体 · ${truncate(instruction, 18)}`,
-    rationale: `${data.summary === '' ? '局部修改' : data.summary}。由模型生成；${counts.join('，')}，其余组件保持原样${kept === '' ? '' : `。${kept}`}。候选未写入文档。`,
+    rationale: `${data.summary === '' ? '局部修改' : data.summary}。由模型生成；${counts.length === 0 ? '组件不变' : counts.join('，')}，其余组件保持原样${kept === '' ? '' : `。${kept}`}。${JSON.stringify(refreshed.compiled.behaviors) === JSON.stringify(edited.session.compiled.behaviors) ? '' : describeBehaviors(edited.session.compiled.behaviors)}${describeEditWarnings(edited.warnings)}候选未写入文档。`,
     scope: '局部修改',
     commands: edited.commands as unknown as DesignerChangeProposalInput['commands'],
     origin: { author: '智能体' },
@@ -1492,6 +1516,20 @@ const INTENT_WARNING_TEXT: Readonly<Record<string, string>> = {
   INTENT_REGION_VALUE_DEFAULTED: '有版面取值不认识，已用默认值',
   INTENT_REGION_INVALID: '有区域结构不完整，已去掉',
   INTENT_SHELL_UNAVAILABLE: '目录里没有可容纳子组件的物料，卡片与模块已平铺，不能整体移动',
+  // ADR-0115 行为
+  INTENT_KEY_INVALID: '有模块的联动句柄不合格，已忽略',
+  INTENT_INTERACTION_INVALID: '有联动结构不完整，已去掉',
+  INTENT_STATE_INVALID: '有指标的阈值状态不合格，已去掉',
+  AGENT_INTERACTION_SOURCE_UNKNOWN: '有联动找不到来源模块，已去掉',
+  AGENT_INTERACTION_TARGET_UNKNOWN: '有联动找不到目标模块，已去掉',
+  AGENT_INTERACTION_EVENT_UNKNOWN: '有联动用了来源组件没有的事件，已去掉',
+  AGENT_INTERACTION_FIELD_UNKNOWN: '有联动的筛选字段不在来源数据里，已去掉',
+  AGENT_INTERACTION_TARGET_INVALID:
+    '有联动的目标不读数据集或没有该参数（筛选只经数据集参数生效），已去掉',
+  AGENT_INTERACTION_NO_EFFECT: '有联动点了也不会改变目标（来源取值都相同或不在可选值里），已去掉',
+  AGENT_STATE_NEEDS_DATA: '阈值状态只对绑了真实数据的指标生效，示例数值的指标未加状态',
+  AGENT_STATE_FIELD_TYPE: '有指标的阈值与字段类型不符，未加状态',
+  INTENT_FILTER_SHARED_SOURCE: '有模块与筛选目标共用同一数据源，会跟着一起筛选',
 };
 
 /**
@@ -1531,10 +1569,65 @@ function describeIntentWarnings(
       );
       continue;
     }
+    if (item.code === 'AGENT_INTERACTION_CAPABILITY_MISSING') {
+      const capability = String(item.detail?.capability ?? '');
+      add(
+        `${item.code}:${capability}`,
+        item.code,
+        `宿主没有授权蓝图能力 ${capability}，相关联动未生成`,
+      );
+      continue;
+    }
+    if (item.code === 'INTENT_FILTER_INITIAL_FROM_SOURCE') {
+      add(
+        `${item.code}:${String(item.detail?.target ?? '')}`,
+        item.code,
+        `「${String(item.detail?.target ?? '')}」的 ${String(item.detail?.param ?? '')} 先按来源第一行（${String(item.detail?.value ?? '')}）显示，点击后切换`,
+      );
+      continue;
+    }
+    if (item.code === 'INTENT_STATE_SUGGESTED') {
+      add(
+        `${item.code}:${String(item.detail?.target ?? '')}`,
+        item.code,
+        `「${String(item.detail?.target ?? '')}」的阈值是模型按常识补的，采纳前请核对`,
+      );
+      continue;
+    }
     add(item.code, item.code, INTENT_WARNING_TEXT[item.code] ?? '部分内容已降级');
   }
   for (const item of backend) add(item.code, item.code, item.message);
   return output;
+}
+
+/**
+ * 理由里的「生成的行为」（ADR-0115 D5）：整屏替换是一个采纳单元，评审面看不到联动与状态，
+ * 所以逐条写进理由——谁驱动谁、按什么参数、阈值是多少。
+ */
+function describeBehaviors(behaviors: readonly IntentBehaviorSummary[]): string {
+  if (behaviors.length === 0) return '';
+  const lines = behaviors.slice(0, 8).map((item) => {
+    if (item.kind === 'state') {
+      return `「${item.from}」状态：${item.detail}${item.suggested === true ? '（阈值为模型建议）' : ''}`;
+    }
+    return `点「${item.from}」${item.detail}「${item.to.join('」「')}」`;
+  });
+  return `生成的联动与状态：${lines.join('；')}。`;
+}
+
+/** 局部修改的降级说明（联动没编进去的原因等），只列行为相关的几条。 */
+function describeEditWarnings(warnings: readonly IntentDiagnostic[]): string {
+  const notes = describeIntentWarnings(
+    warnings.filter(
+      (item) =>
+        item.code.startsWith('AGENT_INTERACTION_') ||
+        item.code.startsWith('AGENT_STATE_') ||
+        item.code.startsWith('INTENT_FILTER_') ||
+        item.code === 'INTENT_STATE_SUGGESTED',
+    ),
+    [],
+  );
+  return notes.length === 0 ? '' : `${notes.map((item) => item.message).join('；')}。`;
 }
 
 function describeAgentFailure(failure: string | undefined): string {

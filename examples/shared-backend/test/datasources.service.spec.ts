@@ -249,15 +249,15 @@ describe('A1 · 列表排序与内置投影', () => {
 
     const all = await service.list('all', undefined, 200, 0);
     const builtin = all.items.filter((item) => item.type === 'builtin');
-    expect(builtin).toHaveLength(4);
-    expect(all.items.slice(all.items.length - 4).every((item) => item.type === 'builtin')).toBe(
+    expect(builtin).toHaveLength(6);
+    expect(all.items.slice(all.items.length - 6).every((item) => item.type === 'builtin')).toBe(
       true,
     );
     expect(builtin[0]).toMatchObject({ status: 'builtin', configSummary: '', lastTest: null });
 
     // type 过滤：只看内置
     const onlyBuiltin = await service.list('builtin', undefined, 200, 0);
-    expect(onlyBuiltin.total).toBe(4);
+    expect(onlyBuiltin.total).toBe(6);
     const onlyStatic = await service.list('static', undefined, 200, 0);
     expect(onlyStatic.items.every((item) => item.type === 'static')).toBe(true);
   }, 30_000);

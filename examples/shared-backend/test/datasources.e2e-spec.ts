@@ -212,7 +212,7 @@ describe('A1 · 台账列表', () => {
       total: number;
     };
     expect(body.total).toBe(body.items.length);
-    expect(body.items.filter((item) => item.type === 'builtin')).toHaveLength(4);
+    expect(body.items.filter((item) => item.type === 'builtin')).toHaveLength(6);
     // 内置在最后
     const firstBuiltinIndex = body.items.findIndex((item) => item.type === 'builtin');
     expect(body.items.slice(firstBuiltinIndex).every((item) => item.type === 'builtin')).toBe(true);

@@ -1,5 +1,6 @@
 import type { ScreenJsonValue } from '@base-screen/contracts';
 import { resolveScreenFontFloorPx } from '@base-screen/core';
+import { compileIntentBehaviors, seedFilterTargets } from './intent-behavior.js';
 import { type CompileSink, compileBlock, tokenStyle } from './intent-block.js';
 import {
   type IntentCatalog,
@@ -65,6 +66,11 @@ export interface CompileScreenIntentInput {
    * 骨架与内容对不上时以骨架为准——几何从第一帧起不变；对不上的整屏差异由宿主比对后整屏替换。
    */
   readonly stream?: IntentStreamFrame;
+  /**
+   * 宿主已授权的蓝图能力（ADR-0115 D7，`SCREEN_BLUEPRINT_CAPABILITY_IDS` 的子集）：给了就按它检查联动，
+   * 缺能力的联动不编译并记 `AGENT_INTERACTION_CAPABILITY_MISSING`。缺省不检查。
+   */
+  readonly capabilities?: readonly string[];
 }
 
 /** 最多 5 张指标卡（平铺写法）；区域写法的上限由求解器的最小卡宽决定。 */
@@ -119,10 +125,17 @@ type CompileRegion =
  * 4. 几何由布局求解器（`solveLayout`）按区域序列一次算定，装不下返回 `LAYOUT_CAPACITY_EXCEEDED`。
  */
 export function compileScreenIntent(input: CompileScreenIntentInput): IntentCompileOutcome {
-  const { intent, catalog, references, stream } = input;
+  const { catalog, references, stream } = input;
+  // 流式帧只排版面；联动与状态在最终编译时一次编出（它们要指向编好的组件）。
+  const seeded = stream === undefined ? seedFilterTargets(input.intent, references) : undefined;
+  const intent = seeded?.intent ?? input.intent;
   const palette = resolveIntentStyle(intent.style).palette;
   const language = detectIntentLanguage(intent.title, intent.subtitle);
-  const sink: CompileSink = { diagnostics: [], warnings: [], dataSources: [] };
+  const sink: CompileSink = {
+    diagnostics: [],
+    warnings: [...(seeded?.warnings ?? [])],
+    dataSources: [],
+  };
 
   const regions = stream === undefined ? regionsOf(intent) : regionsOfSkeleton(stream);
   const solved = solveLayout(regions.map((region) => region.layout));
@@ -345,6 +358,20 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
     });
   }
   if (sink.diagnostics.length > 0) return { ok: false, diagnostics: sink.diagnostics };
+  const behaviors =
+    stream === undefined
+      ? compileIntentBehaviors({
+          intent,
+          catalog,
+          references,
+          capabilities: input.capabilities,
+          language,
+          components,
+          dataSources: sink.dataSources,
+          sources,
+          warnings: sink.warnings,
+        })
+      : undefined;
   if (components.length === 0) {
     return {
       ok: false,
@@ -366,12 +393,13 @@ export function compileScreenIntent(input: CompileScreenIntentInput): IntentComp
       materials: [...used],
       warnings: sink.warnings,
       sources,
+      behaviors: behaviors?.behaviors ?? [],
       document: {
         canvas: { width: WIDTH, height: HEIGHT, backgroundColor: palette.canvas },
         components,
-        variables: [],
+        variables: behaviors?.variables ?? [],
         ...(sink.dataSources.length === 0 ? {} : { dataSources: sink.dataSources }),
-        blueprint: { nodes: [], edges: [] },
+        blueprint: behaviors?.blueprint ?? { nodes: [], edges: [] },
       },
     },
   };

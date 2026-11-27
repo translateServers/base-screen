@@ -111,6 +111,22 @@ export const PLUGIN_BOARD_TABS_MANIFEST: BaseScreenMaterialManifest = {
 function parseTabsEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
   const parsed = parseBaseScreenMaterialEditorDescriptor(
     {
+      // 事件负载（ADR-0115 D3）：`value` 是选中标签的取值，可直接写进数据集参数。
+      events: [
+        {
+          name: 'tabChange',
+          label: '切换标签',
+          payloadSchema: {
+            kind: 'object',
+            properties: {
+              index: { kind: 'number' },
+              label: { kind: 'string' },
+              value: { kind: 'string' },
+            },
+            required: ['index', 'label', 'value'],
+          },
+        },
+      ],
       appearance: [
         {
           id: 'structure',
@@ -191,7 +207,7 @@ function parseTabsEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
     },
     TABS_PROPS_SCHEMA,
     TABS_STYLE_SCHEMA,
-    undefined,
+    PLUGIN_BOARD_TABS_EVENTS,
     undefined,
   );
   if (!parsed.ok) {

@@ -38,6 +38,13 @@ export interface AgentCatalogRole {
   readonly valueTypes?: readonly ('string' | 'number' | 'boolean' | 'date')[];
 }
 
+/** 物料事件（ADR-0115 D3）：名称、可读名与负载顶层字段的形态；只用来写提示词，编译仍在宿主前端。 */
+export interface AgentCatalogEvent {
+  readonly name: string;
+  readonly label?: string;
+  readonly payload: Readonly<Record<string, 'string' | 'number' | 'boolean' | 'object' | 'array'>>;
+}
+
 export interface AgentCatalogMaterial {
   readonly type: string;
   readonly name: string;
@@ -51,6 +58,8 @@ export interface AgentCatalogMaterial {
   readonly size: { readonly width: number; readonly height: number };
   readonly props: Readonly<Record<string, AgentCatalogProp>>;
   readonly roles: readonly AgentCatalogRole[];
+  /** 宿主上送的事件声明；缺省表示宿主未提供（这一物料不能当联动来源）。 */
+  readonly events?: readonly AgentCatalogEvent[];
   readonly defaults: {
     readonly props: Readonly<Record<string, JsonValue>>;
     readonly style: Readonly<Record<string, JsonValue>>;
@@ -388,6 +397,8 @@ export function renderCatalogPrompt(catalog: AgentCatalog): string {
             .join('、')}`,
         );
       }
+      const events = renderEvents(material);
+      if (events !== '') parts.push(`事件：${events}`);
       const signature = renderTrustedStyleSignature(material);
       if (signature !== '') parts.push(`样式签名：${signature}`);
       const line = parts.join(' ｜ ');
@@ -406,6 +417,53 @@ export function renderCatalogPrompt(catalog: AgentCatalog): string {
     '可用静态素材（assetId）：',
     ...assetLines,
   ].join('\n');
+}
+
+/** 事件与负载：`rowClick(点击行，带 row=整行)`、`pointClick(点击数据点，带 x)`。 */
+function renderEvents(material: AgentCatalogMaterial): string {
+  return (material.events ?? [])
+    .map((event) => {
+      const carries =
+        event.payload.row === 'object'
+          ? '带 row=整行，筛选时写 field'
+          : ['value', 'x']
+              .filter((key) => event.payload[key] !== undefined)
+              .map((key) => `带 ${key}`)[0];
+      const notes = [event.label, carries].filter((item) => item !== undefined && item !== '');
+      return notes.length === 0 ? event.name : `${event.name}(${notes.join('，')})`;
+    })
+    .join('、');
+}
+
+/** 目录里有没有能当联动来源的物料（决定提示词要不要讲联动）。 */
+export function catalogHasEvents(catalog: AgentCatalog): boolean {
+  return catalog.materials.some((material) => (material.events ?? []).length > 0);
+}
+
+const EVENT_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+const PAYLOAD_KINDS = new Set(['string', 'number', 'boolean', 'object', 'array']);
+
+/** 事件声明宽容读取：单个不合格的事件只丢它自己，不让整份目录失败。 */
+function readEvents(input: unknown): AgentCatalogEvent[] | undefined {
+  if (!Array.isArray(input)) return undefined;
+  const events: AgentCatalogEvent[] = [];
+  for (const raw of input.slice(0, 16)) {
+    const event = asRecord(raw);
+    const name = typeof event?.name === 'string' ? event.name : '';
+    if (!EVENT_NAME_PATTERN.test(name)) continue;
+    const payload: Record<string, 'string' | 'number' | 'boolean' | 'object' | 'array'> = {};
+    for (const [key, kind] of Object.entries(asRecord(event?.payload) ?? {}).slice(0, 16)) {
+      if (EVENT_NAME_PATTERN.test(key) && typeof kind === 'string' && PAYLOAD_KINDS.has(kind)) {
+        payload[key] = kind as 'string' | 'number' | 'boolean' | 'object' | 'array';
+      }
+    }
+    const label =
+      typeof event?.label === 'string' && event.label.trim() !== ''
+        ? event.label.trim().slice(0, AGENT_CATALOG_LIMITS.labelLength)
+        : undefined;
+    events.push({ name, ...(label === undefined ? {} : { label }), payload });
+  }
+  return events;
 }
 
 function dataLabel(material: AgentCatalogMaterial): string {
@@ -544,6 +602,8 @@ function readMaterial(
   );
   if (defaultProps === null || defaultStyle === null) return null;
 
+  const events = readEvents(record.events);
+
   let stylePrompt: string | undefined;
   if (record.stylePrompt !== undefined) {
     const text = readString(
@@ -566,6 +626,7 @@ function readMaterial(
     size: { width, height },
     props,
     roles,
+    ...(events === undefined ? {} : { events }),
     defaults: { props: defaultProps, style: defaultStyle },
     ...(stylePrompt === undefined ? {} : { stylePrompt }),
   };

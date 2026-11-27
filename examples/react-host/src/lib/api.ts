@@ -130,6 +130,14 @@ export interface AgentCatalogMaterialShape {
     readonly max: number;
     readonly valueTypes?: readonly ('string' | 'number' | 'boolean' | 'date')[];
   }[];
+  /** 物料事件与负载顶层字段（ADR-0115 D3）：联动按它选事件、取值。 */
+  readonly events?: readonly {
+    readonly name: string;
+    readonly label?: string;
+    readonly payload: Readonly<
+      Record<string, 'string' | 'number' | 'boolean' | 'object' | 'array'>
+    >;
+  }[];
   readonly defaults: {
     readonly props: Readonly<Record<string, string | number | boolean | null>>;
     readonly style: Readonly<Record<string, string | number | boolean | null>>;

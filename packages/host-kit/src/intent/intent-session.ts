@@ -7,10 +7,16 @@ import type {
   IntentReferences,
 } from './intent-compile-types.js';
 import { detectIntentLanguage, formatKpiValue } from './intent-format.js';
-import { clampText, parseIntentBlock, parseIntentKpi } from './intent-parse.js';
+import {
+  clampText,
+  parseIntentBlock,
+  parseIntentKpi,
+  parseScreenIntentInteractions,
+} from './intent-parse.js';
 import type {
   IntentBlock,
   IntentDiagnostic,
+  IntentInteraction,
   IntentKpi,
   IntentRegion,
   ScreenIntent,
@@ -46,6 +52,16 @@ export type IntentOp =
       readonly block: unknown;
     }
   | {
+      /** 加一条联动（ADR-0115 D9）：`interaction` 与整屏生成时 `interactions[]` 的一项同形。 */
+      readonly op: 'link';
+      readonly interaction: unknown;
+    }
+  | {
+      /** 去掉一条联动：`target` 为 `interactions[i]`。 */
+      readonly op: 'unlink';
+      readonly target: string;
+    }
+  | {
       /**
        * 换数据绑定（ADR-0114 D9）：`bind` 为 `{ candidate: 'c5' }`（按本轮候选表换物料与字段），
        * 或 `{ datasetId, fields?, params?, type? }`；指标卡为 `{ datasetId, field, params? }`。
@@ -76,13 +92,18 @@ export type IntentEditCommand =
   | {
       readonly type: 'replace-data-sources';
       readonly dataSources: readonly Record<string, unknown>[];
-    };
+    }
+  | { readonly type: 'replace-variables'; readonly variables: readonly Record<string, unknown>[] }
+  | { readonly type: 'replace-blueprint'; readonly blueprint: Readonly<Record<string, unknown>> };
 
 /** 活文档里宿主只需要给的那一小部分：用来判断「用户改过没有」「哪些还在」。 */
 export interface IntentEditBaseline {
   readonly canvas: { readonly width: number; readonly height: number };
   readonly components: readonly { readonly id: string; readonly zIndex?: number }[];
   readonly dataSources?: readonly Record<string, unknown>[];
+  /** 活文档的变量与蓝图（ADR-0115 D9）：联动变化时只换智能体生成的那部分，用户自己连的线不动。 */
+  readonly variables?: readonly unknown[];
+  readonly blueprint?: unknown;
 }
 
 export type IntentEditOutcome =
@@ -195,8 +216,18 @@ export function editIntent(
     [...added, ...replaced, ...rebound],
     baseline.dataSources ?? [],
   );
-  if (dataSources.next !== undefined) {
-    commands.push({ type: 'replace-data-sources', dataSources: dataSources.next });
+  // 联动（ADR-0115 D9）：变量先扩成「新旧并集」，数据源才能引用新变量；蓝图先摘掉旧的智能体连线，
+  // 删组件、删变量才不会被悬空引用拦下。收尾再把变量收成新集合、换上新连线。
+  const behavior = behaviorEdit(before, after, baseline, live);
+  if (behavior.clearBlueprint !== undefined) {
+    commands.push({ type: 'replace-blueprint', blueprint: behavior.clearBlueprint });
+  }
+  if (behavior.widenVariables !== undefined) {
+    commands.push({ type: 'replace-variables', variables: behavior.widenVariables });
+  }
+  const nextSources = behavior.patchSources(dataSources.next ?? baseline.dataSources ?? []);
+  if (dataSources.next !== undefined || nextSources.changed) {
+    commands.push({ type: 'replace-data-sources', dataSources: nextSources.list });
   }
   const layerBase = baseline.components.reduce(
     (max, component) => Math.max(max, component.zIndex ?? 0),
@@ -231,6 +262,13 @@ export function editIntent(
       type: 'add-component',
       component: dataSources.apply({ ...component, zIndex: component.zIndex + layerBase }),
     });
+  }
+
+  if (behavior.finalVariables !== undefined) {
+    commands.push({ type: 'replace-variables', variables: behavior.finalVariables });
+  }
+  if (behavior.finalBlueprint !== undefined) {
+    commands.push({ type: 'replace-blueprint', blueprint: behavior.finalBlueprint });
   }
 
   return {
@@ -293,6 +331,8 @@ function applyOne(
   path: string,
 ): ApplyOutcome {
   if (op.op === 'add') return addBlock(intent, op, catalog, path);
+  if (op.op === 'link') return linkInteraction(intent, op, path);
+  if (op.op === 'unlink') return unlinkInteraction(intent, op, path);
 
   if (op.target === 'title' || op.target === 'subtitle') {
     if (op.op !== 'change') {
@@ -313,7 +353,8 @@ function applyOne(
   if (found === undefined) {
     return fail(path, 'INTENT_OP_TARGET_UNKNOWN', `No item is addressed by "${op.target}".`);
   }
-  if (op.op === 'delete') return { ok: true, intent: removeItem(intent, found) };
+  if (op.op === 'delete')
+    return { ok: true, intent: pruneInteractions(removeItem(intent, found), found) };
   if (op.op === 'rebind') return rebindItem(intent, found, op, catalog, path);
 
   // 不认识的字段整批拒绝：静默忽略会让「把名字改成订单量」写成 `name` 时看起来成功、实际什么也没改。
@@ -387,6 +428,8 @@ function rebindItem(
       {
         label: found.kpi.label,
         ...(found.kpi.unit === undefined ? {} : { unit: found.kpi.unit }),
+        ...(found.kpi.key === undefined ? {} : { key: found.kpi.key }),
+        ...(found.kpi.states === undefined ? {} : { states: found.kpi.states }),
         bind: op.bind,
       },
       found.kpi.origin,
@@ -482,8 +525,8 @@ function addBlock(
 // ---------------------------------------------------------------------------
 
 /** `change` 能改的字段：与提示词里写给模型的一致。 */
-const KPI_FIELDS = new Set(['label', 'value', 'unit', 'precision', 'delta']);
-const BLOCK_FIELDS = new Set(['title', 'note', 'text', 'table', 'props', 'substituteFor']);
+const KPI_FIELDS = new Set(['label', 'value', 'unit', 'precision', 'delta', 'states', 'key']);
+const BLOCK_FIELDS = new Set(['title', 'note', 'text', 'table', 'props', 'substituteFor', 'key']);
 
 interface Found {
   readonly regionIndex: number;
@@ -621,11 +664,16 @@ function withoutFields(raw: Record<string, unknown>): Record<string, unknown> {
 
 function kpiToRaw(kpi: IntentKpi): Record<string, unknown> {
   // 绑数据的指标卡没有字面量：写回 `bind`，不写 `value`（否则会被当成「既绑又写数」拒绝）。
+  const behavior = {
+    ...(kpi.key === undefined ? {} : { key: kpi.key }),
+    ...(kpi.states === undefined ? {} : { states: kpi.states }),
+  };
   if (kpi.bind !== undefined) {
     return {
       label: kpi.label,
       ...(kpi.unit === undefined ? {} : { unit: kpi.unit }),
       bind: kpi.bind,
+      ...behavior,
     };
   }
   return {
@@ -634,6 +682,7 @@ function kpiToRaw(kpi: IntentKpi): Record<string, unknown> {
     ...(kpi.unit === undefined ? {} : { unit: kpi.unit }),
     ...(kpi.precision === undefined ? {} : { precision: kpi.precision }),
     ...(kpi.delta === undefined ? {} : { delta: kpi.delta }),
+    ...behavior,
   };
 }
 
@@ -645,6 +694,7 @@ function blockToRaw(block: IntentBlock): Record<string, unknown> {
     ...(block.note === undefined ? {} : { note: block.note }),
     ...(block.props === undefined ? {} : { props: block.props }),
     ...(block.substituteFor === undefined ? {} : { substituteFor: block.substituteFor }),
+    ...(block.key === undefined ? {} : { key: block.key }),
     ...(block.bind.kind === 'table' ? { table: block.bind.table } : {}),
     ...(block.bind.kind === 'dataset'
       ? {
@@ -691,6 +741,10 @@ function readOp(raw: unknown): IntentOp | undefined {
       return target !== undefined && isRecord(op.bind)
         ? { op: 'rebind', target, bind: op.bind }
         : undefined;
+    case 'link':
+      return isRecord(op.interaction) ? { op: 'link', interaction: op.interaction } : undefined;
+    case 'unlink':
+      return target === undefined ? undefined : { op: 'unlink', target };
     default:
       return undefined;
   }
@@ -709,6 +763,193 @@ function fail(
 }
 
 // ---------------------------------------------------------------------------
+// 联动的编辑（ADR-0115 D9）
+// ---------------------------------------------------------------------------
+
+function linkInteraction(
+  intent: ScreenIntent,
+  op: Extract<IntentOp, { op: 'link' }>,
+  path: string,
+): ApplyOutcome {
+  const existing = intent.interactions ?? [];
+  const parsed = parseScreenIntentInteractions([op.interaction], existing.length);
+  const added = parsed[0];
+  if (added === undefined) {
+    return fail(path, 'INTENT_OP_INVALID', 'The interaction is not usable.');
+  }
+  return { ok: true, intent: { ...intent, interactions: [...existing, added] } };
+}
+
+function unlinkInteraction(
+  intent: ScreenIntent,
+  op: Extract<IntentOp, { op: 'unlink' }>,
+  path: string,
+): ApplyOutcome {
+  const existing = intent.interactions ?? [];
+  const kept = existing.filter((item) => item.origin !== op.target);
+  if (kept.length === existing.length) {
+    return fail(path, 'INTENT_OP_TARGET_UNKNOWN', `No interaction is addressed by "${op.target}".`);
+  }
+  return { ok: true, intent: withInteractions(intent, kept) };
+}
+
+/** 删掉一块之后，以它为来源的联动整条去掉，以它为目标的从目标里去掉。 */
+function pruneInteractions(intent: ScreenIntent, found: Found): ScreenIntent {
+  const item = found.kpi ?? found.block;
+  if (intent.interactions === undefined || item === undefined) return intent;
+  const title = found.kpi !== undefined ? found.kpi.label : (found.block?.title ?? '');
+  const refers = (ref: string): boolean => ref === item.key || (title !== '' && ref === title);
+  const kept: IntentInteraction[] = [];
+  for (const interaction of intent.interactions) {
+    if (refers(interaction.from)) continue;
+    const to = interaction.to.filter((ref) => !refers(ref));
+    if (to.length === 0) continue;
+    kept.push({ ...interaction, to });
+  }
+  return withInteractions(intent, kept);
+}
+
+function withInteractions(
+  intent: ScreenIntent,
+  interactions: readonly IntentInteraction[],
+): ScreenIntent {
+  const { interactions: _old, ...rest } = intent;
+  return interactions.length === 0 ? rest : { ...rest, interactions };
+}
+
+const isAgentNode = (id: unknown): boolean => typeof id === 'string' && id.startsWith('agent:');
+const isAgentEdge = (id: unknown): boolean =>
+  typeof id === 'string' && id.startsWith('agent-edge-');
+const isAgentVariable = (id: unknown): boolean =>
+  typeof id === 'string' && id.startsWith('agent-var-');
+
+interface BehaviorEdit {
+  readonly clearBlueprint?: Readonly<Record<string, unknown>>;
+  readonly widenVariables?: readonly Record<string, unknown>[];
+  readonly finalVariables?: readonly Record<string, unknown>[];
+  readonly finalBlueprint?: Readonly<Record<string, unknown>>;
+  /** 把联动带来的参数变化（常量 ⇄ 引用智能体变量）落到活文档的数据源实例上。 */
+  readonly patchSources: (sources: readonly Record<string, unknown>[]) => {
+    readonly list: readonly Record<string, unknown>[];
+    readonly changed: boolean;
+  };
+}
+
+/**
+ * 联动变化的差量：只动智能体生成的那部分（变量 `agent-var-*`、节点 `agent:*`、连线 `agent-edge-*`），
+ * 用户在蓝图里自己连的线与变量原样保留。
+ */
+function behaviorEdit(
+  before: CompiledScreenDocument,
+  after: CompiledScreenDocument,
+  baseline: IntentEditBaseline,
+  live: ReadonlyMap<string, { readonly id: string }>,
+): BehaviorEdit {
+  const liveBlueprint = isRecord(baseline.blueprint)
+    ? baseline.blueprint
+    : { nodes: [], edges: [] };
+  const liveNodes = Array.isArray(liveBlueprint.nodes) ? (liveBlueprint.nodes as unknown[]) : [];
+  const liveEdges = Array.isArray(liveBlueprint.edges) ? (liveBlueprint.edges as unknown[]) : [];
+  const liveVariables = (baseline.variables ?? []).filter(isRecord);
+  const own = liveVariables.filter((item) => !isAgentVariable(item.id));
+  const oldAgent = liveVariables.filter((item) => isAgentVariable(item.id));
+
+  // 参数补丁：编译产物里组件读的实例 → 活文档里同一组件读的实例。
+  const patches = new Map<string, Record<string, unknown>>();
+  const afterSources = new Map((after.dataSources ?? []).map((item) => [String(item.id), item]));
+  for (const component of after.components) {
+    const compiledId = (component.dataValue as { dataSourceId?: unknown } | null)?.dataSourceId;
+    const liveComponent = live.get(component.id) as { dataValue?: unknown } | undefined;
+    const liveId = (liveComponent?.dataValue as { dataSourceId?: unknown } | null | undefined)
+      ?.dataSourceId;
+    const compiled = typeof compiledId === 'string' ? afterSources.get(compiledId) : undefined;
+    if (compiled === undefined || typeof liveId !== 'string') continue;
+    const params = isRecord(compiled.params) ? compiled.params : {};
+    patches.set(liveId, { ...(patches.get(liveId) ?? {}), ...params });
+  }
+  // 不再存在的智能体变量：还引用它的实例（例如目标块被删、组件没了、实例还在）退回变量初值的常量，
+  // 否则收掉变量那一步会被悬空引用拦下。
+  const kept = new Set(after.variables.map((item) => String(item.id)));
+  const retired = new Map(
+    oldAgent
+      .filter((item) => !kept.has(String(item.id)))
+      .map((item) => [String(item.id), item.initialValue]),
+  );
+  const patchSources = (sources: readonly Record<string, unknown>[]) => {
+    let changed = false;
+    const list = sources.map((source) => {
+      const params = isRecord(source.params) ? source.params : {};
+      const patch: Record<string, unknown> = { ...(patches.get(String(source.id)) ?? {}) };
+      for (const [name, ref] of Object.entries(params)) {
+        if (
+          patch[name] === undefined &&
+          isRecord(ref) &&
+          ref.kind === 'variable' &&
+          retired.has(String(ref.variableId))
+        ) {
+          patch[name] = { kind: 'inline', value: retired.get(String(ref.variableId)) ?? null };
+        }
+      }
+      if (Object.keys(patch).length === 0) return source;
+      const next: Record<string, unknown> = { ...params };
+      for (const [name, value] of Object.entries(patch)) {
+        const old = params[name];
+        const agentRef = (ref: unknown): boolean =>
+          isRecord(ref) && ref.kind === 'variable' && isAgentVariable(ref.variableId);
+        // 只改联动相关的参数：新引用了智能体变量，或原来引用、现在不再引用。
+        if ((agentRef(value) || agentRef(old)) && canonical(old) !== canonical(value)) {
+          next[name] = value;
+        }
+      }
+      if (canonical(next) === canonical(params)) return source;
+      changed = true;
+      return { ...source, params: next };
+    });
+    return { list, changed };
+  };
+
+  const variablesChanged =
+    canonical(oldAgent) !== canonical(after.variables) ||
+    canonical(before.variables) !== canonical(after.variables);
+  const agentNodes = liveNodes.filter((node) => isRecord(node) && isAgentNode(node.id));
+  const agentEdges = liveEdges.filter((edge) => isRecord(edge) && isAgentEdge(edge.id));
+  const blueprintChanged =
+    canonical({ nodes: agentNodes, edges: agentEdges }) !== canonical(after.blueprint);
+  const stripped = {
+    ...liveBlueprint,
+    nodes: liveNodes.filter((node) => !(isRecord(node) && isAgentNode(node.id))),
+    edges: liveEdges.filter((edge) => !(isRecord(edge) && isAgentEdge(edge.id))),
+  };
+  const finalVariables = [...own, ...after.variables];
+  const widened = [
+    ...own,
+    ...oldAgent,
+    ...after.variables.filter((item) => !oldAgent.some((old) => old.id === item.id)),
+  ];
+  return {
+    ...(blueprintChanged && (agentNodes.length > 0 || agentEdges.length > 0)
+      ? { clearBlueprint: stripped }
+      : {}),
+    ...(variablesChanged && canonical(widened) !== canonical(liveVariables)
+      ? { widenVariables: widened }
+      : {}),
+    ...(variablesChanged && canonical(finalVariables) !== canonical(widened)
+      ? { finalVariables }
+      : {}),
+    ...(blueprintChanged && after.blueprint.nodes.length + after.blueprint.edges.length > 0
+      ? {
+          finalBlueprint: {
+            ...stripped,
+            nodes: [...stripped.nodes, ...after.blueprint.nodes],
+            edges: [...stripped.edges, ...after.blueprint.edges],
+          },
+        }
+      : {}),
+    patchSources,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // 做差
 // ---------------------------------------------------------------------------
 
@@ -724,6 +965,9 @@ const COMPARED = [
   'style',
   'dataValue',
   'dataBinding',
+  // 行为（ADR-0115）：阈值状态与初始显隐也是编译产物的一部分。
+  'states',
+  'status',
 ] as const;
 
 function sameComponent(a: CompiledComponent, b: CompiledComponent): boolean {
@@ -868,7 +1112,20 @@ export interface IntentSessionDigest {
       readonly type?: string;
       readonly title: string;
       readonly value?: string;
+      /** 联动用的句柄（有才带）。 */
+      readonly key?: string;
     }[];
+  }[];
+  /** 当前联动（ADR-0115 D9）：`unlink` 的 target 取它。 */
+  readonly interactions?: readonly {
+    readonly target: string;
+    readonly kind: 'filter' | 'show';
+    readonly from: string;
+    readonly to: readonly string[];
+    readonly event: string;
+    readonly field?: string;
+    readonly param?: string;
+    readonly mode?: 'show' | 'hide' | 'toggle';
   }[];
 }
 
@@ -881,10 +1138,22 @@ export function describeSession(session: IntentSession): IntentSessionDigest {
     part,
     type: item.type,
     title: item.title === '' ? item.type : item.title,
+    ...(item.key === undefined ? {} : { key: item.key }),
   });
+  const interactions = (intent.interactions ?? []).map((item) => ({
+    target: item.origin,
+    kind: item.kind,
+    from: item.from,
+    to: item.to,
+    event: item.event,
+    ...(item.kind === 'filter'
+      ? { param: item.param, ...(item.field === undefined ? {} : { field: item.field }) }
+      : { mode: item.mode }),
+  }));
   return {
     title: intent.title,
     subtitle: intent.subtitle,
+    ...(interactions.length === 0 ? {} : { interactions }),
     regions: intent.regions.map((region) => {
       if (region.kind === 'band') {
         return {
@@ -896,6 +1165,7 @@ export function describeSession(session: IntentSession): IntentSessionDigest {
             part: 'items' as const,
             title: kpi.label,
             value: formatKpiValue(kpi, language),
+            ...(kpi.key === undefined ? {} : { key: kpi.key }),
           })),
         };
       }

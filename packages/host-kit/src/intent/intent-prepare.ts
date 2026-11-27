@@ -1,3 +1,4 @@
+import { BEHAVIOR_REPAIRABLE } from './intent-behavior.js';
 import type { IntentCatalog } from './intent-catalog.js';
 import { compileScreenIntent } from './intent-compile.js';
 import type { IntentCompileResult, IntentReferences } from './intent-compile-types.js';
@@ -24,6 +25,8 @@ export interface PrepareIntentInput {
   readonly catalog: IntentCatalog;
   readonly references?: IntentReferences;
   readonly mode: 'llm' | 'deterministic';
+  /** 宿主已授权的蓝图能力（ADR-0115 D7）；缺省不检查。 */
+  readonly capabilities?: readonly string[];
 }
 
 export interface PreparedIntent {
@@ -42,7 +45,7 @@ export interface PreparedIntent {
 
 /** 单个指标 / 块的路径：这类问题可以「去掉那一项」收尾。 */
 const ITEM_PATH =
-  /^(?:kpis\[\d+\]|blocks\[\d+\]|regions\[\d+\]\.(?:items|blocks|main|rail)\[\d+\])$/;
+  /^(?:kpis\[\d+\]|blocks\[\d+\]|interactions\[\d+\]|regions\[\d+\]\.(?:items|blocks|main|rail)\[\d+\])$/;
 
 /** 编译期降级但值得修的码：块还在、只是退成了空图。 */
 const COMPILE_REPAIRABLE = new Set([
@@ -82,6 +85,7 @@ export function prepareIntent(input: PrepareIntentInput): PreparedIntent {
     catalog: input.catalog,
     mode: input.mode,
     ...(input.references === undefined ? {} : { references: input.references }),
+    ...(input.capabilities === undefined ? {} : { capabilities: input.capabilities }),
   });
   if (!outcome.ok) {
     for (const item of outcome.diagnostics) issues.push({ code: item.code, path: item.path });
@@ -95,7 +99,8 @@ export function prepareIntent(input: PrepareIntentInput): PreparedIntent {
   }
   for (const item of outcome.value.warnings) {
     warnings.push(item);
-    if (COMPILE_REPAIRABLE.has(item.code)) issues.push({ code: item.code, path: item.path });
+    if (COMPILE_REPAIRABLE.has(item.code) || BEHAVIOR_REPAIRABLE.has(item.code))
+      issues.push({ code: item.code, path: item.path });
   }
   const unique = dedupe(issues);
   return {

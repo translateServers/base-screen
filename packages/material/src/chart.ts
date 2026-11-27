@@ -85,6 +85,24 @@ export const BASE_SCREEN_CHART_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
       designCapabilities: { resize: true, rotate: true, children: false },
     },
     {
+      // 事件负载（ADR-0115 D3）：`x` 是被点数据点的维度取值。
+      events: [
+        {
+          name: 'pointClick',
+          label: '点击数据点',
+          hint: '负载带系列、点序号与该点的维度值 x、度量值 y。',
+          payloadSchema: {
+            kind: 'object',
+            properties: {
+              seriesId: { kind: 'string' },
+              pointIndex: { kind: 'number' },
+              x: { kind: 'string' },
+              y: { kind: 'number' },
+            },
+            required: ['seriesId', 'pointIndex', 'x', 'y'],
+          },
+        },
+      ],
       appearance: [
         {
           id: 'text',

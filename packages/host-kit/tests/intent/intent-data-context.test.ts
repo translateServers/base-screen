@@ -150,6 +150,8 @@ describe('prepareIntentDataContext', () => {
         { id: 'oee', type: 'number', label: 'OEE', unit: '%' },
       ],
       parameters: [{ name: 'line', required: true, valueType: 'string', defaultValue: 'LINE-A' }],
+      // 样本取值只留在宿主里，给联动的采纳前模拟用（ADR-0115 D6）。
+      values: { crew: ['甲班', '乙班'], oee: [86.5, 82.1] },
       rows: { sampled: 2, total: 2 },
     });
     // 取样失败的 broken 不带行数（不知道就不拦指标卡的多行判断）。
