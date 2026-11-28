@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-21T03:27:31Z",
-  "updated_at": "2026-11-28T11:33:04Z",
+  "updated_at": "2026-11-28T11:45:25Z",
   "files": {
     ".changeset/agent-layout-audit.md": {
       "role": "index",
@@ -455,9 +455,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "7b3a291b1baa2ffc6418bc657bc3fa6f505925cb059b465a427d6858769fda68",
-      "size": 411451,
-      "normalized_sha256": "7b3a291b1baa2ffc6418bc657bc3fa6f505925cb059b465a427d6858769fda68"
+      "sha256": "190918fac2516b2e9f54080e7c958eb22185da0b5fd431d9d91e0532bd4ac0ea",
+      "size": 411476,
+      "normalized_sha256": "190918fac2516b2e9f54080e7c958eb22185da0b5fd431d9d91e0532bd4ac0ea"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -10853,9 +10853,9 @@
     },
     "tooling/verification/browser-harness/vite.config.ts": {
       "role": "index",
-      "sha256": "59ae9b59cc8ad8d27427692f9924f5ac111eb8c72a989c86db040d1500022bf8",
-      "size": 2613,
-      "normalized_sha256": "59ae9b59cc8ad8d27427692f9924f5ac111eb8c72a989c86db040d1500022bf8"
+      "sha256": "182cb698f9e7f018c9d7f6fa4f71d9838265de8ec4097d390c2e47e36229dbc8",
+      "size": 2649,
+      "normalized_sha256": "182cb698f9e7f018c9d7f6fa4f71d9838265de8ec4097d390c2e47e36229dbc8"
     },
     "tooling/verification/browser-verification.mjs": {
       "role": "index",

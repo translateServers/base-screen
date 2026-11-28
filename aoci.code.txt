@@ -1644,7 +1644,7 @@ system.html[FB4T]: F:设计系统清单的页面 | R:code:tooling/verification/b
 template-materials.ts[FQ8L]: F:验证工程使用的六种 L2 模板物料规格 | R:code:tooling/verification/browser-harness/templates.ts,code:packages/plugin-sdk/src/material-template.ts | A:水位图 / 翻牌器 / 环形仪表 / 状态灯 / 折线 / 装饰边框 / 数据字段事件与动画 | S:规格只存在于验证工程且不含渲染代码；每份必须通过模板体检；用于验证受限图元、表达式与动画最小集够用，不得被产品运行时隐式依赖。
 templates.html[FQ5T]: F:L2 模板与手写物料对照页的静态外壳 | R:code:tooling/verification/browser-harness/templates.ts | A:换组读数按钮 / 事件提示 / 体检与反例输出 / 对照网格挂载点 | S:HTML 只提供外壳和挂载点；模板注册、反例体检、文档生成与事件展示全在 templates.ts，不得在页面内复制。
 templates.ts[TQ8M]: F:L2 模板物料与手写实现并排验收页 | R:code:tooling/verification/browser-harness/template-materials.ts,code:plugins/plugin-materials/src/index.ts | A:模板注册与体检 / 手写对照文档 / TPL 反例输出 / 换组读数 / 查看器诊断与事件 / 全局调试句柄 | S:每份模板规格发布前都必须零体检错误，否则页面直接失败；反例只展示诊断不注册；动画和事件只在交互态生效；结果暴露在 __templateHarness 供浏览器断言读取。
-vite.config.ts[FB5T]: F:浏览器验证的 Vite 源码别名、监听与 API 代理 | R:- | A:@base-screen 源码别名 / base-screen 子路径别名 / packages watcher / Vue define / /api 代理 | S:子路径别名必须先于裸包精确匹配；watcher 必须显式加入 packages；/api 代理到 127.0.0.1:3000，harness 不再自带临时沙箱路由。
+vite.config.ts[FB5T]: F:浏览器验证的 Vite 源码别名、监听与 API 代理 | R:- | A:@base-screen 源码别名 / base-screen 子路径别名 / packages watcher / Vue define / /api 代理 | S:产品子路径必须先于裸包精确匹配，base-screen/engine 也直连源码；watcher 显式加入 packages；/api 代理到 127.0.0.1:3000，harness 不自带临时沙箱路由
 
 ===/<repository>/tooling/verification/browser-harness/canvas/===
 assert-canvas.mjs[FB9L]: F:画布基础、内容裁剪与坐标精度的浏览器断言 | R:code:tooling/verification/browser-harness/run-browser-harness.mjs,code:tooling/verification/browser-harness/shared/harness-utils.mjs | A:初始指针与键盘焦点 / 基础手势与菜单 / 内容裁剪和预览 / 标尺参考线 / 缩放网格与 resize | S:指针聚焦无 focus ring、键盘聚焦有；内容 clip 不裁作者覆盖层，预览 hidden；参考线不改文档、置于所有组件之上并可双击删除；缩放锚定中心，标尺随缩放/resize 重绘；Alt 复制按当前组件数增量
