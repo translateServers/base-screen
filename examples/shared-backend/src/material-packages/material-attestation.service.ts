@@ -1,4 +1,3 @@
-import { Injectable, Logger } from '@nestjs/common';
 import {
   createHash,
   createPrivateKey,
@@ -9,6 +8,7 @@ import {
 } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { Injectable, Logger } from '@nestjs/common';
 
 /**
  * L3 隔离代码物料的发布签名（base-screen-docs ADR-0117 D11）：发布时宿主后端算出

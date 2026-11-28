@@ -44,9 +44,9 @@ const bad = params.get('bad') ?? '';
  * `default-src 'self'`（同源沙箱路由被放行）；`noframe`：另加 `frame-src 'none'`（沙箱路由被挡）。
  */
 const hostCsp = params.get('hostcsp') ?? '';
-/** 沙箱路由（ADR-0118）：`url` 走 vite 插件的 `/__l3-sandbox/`；`broken` 只返回地址、不上传（GET 404）。 */
+/** 沙箱路由（ADR-0118）：`url` 走真实 shared-backend 的 `/api/material-sandbox/`；`broken` 只返回地址、不上传（GET 404）。 */
 const sandboxMode = params.get('sandbox') ?? '';
-const SANDBOX_PREFIX = '/__l3-sandbox/';
+const SANDBOX_PREFIX = '/api/material-sandbox/';
 
 const sandboxHost =
   sandboxMode === ''

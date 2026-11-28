@@ -1096,7 +1096,7 @@
 }
 
 .component-agent__status[data-tone="error"] {
-  color: var(--color-danger, #f87171);
+  color: var(--color-danger);
 }
 
 .component-agent__findings {
@@ -1163,7 +1163,7 @@
   max-height: 240px;
   border: 1px solid var(--color-border);
   border-radius: var(--bs-host-radius-control);
-  background: #05080c;
+  background: var(--color-bg);
 }
 
 .component-review__shot figcaption,
@@ -1195,11 +1195,11 @@
 }
 
 .component-review__line--add {
-  background: color-mix(in srgb, #22c55e 16%, transparent);
+  background: color-mix(in srgb, var(--color-success) 16%, transparent);
 }
 
 .component-review__line--remove {
-  background: color-mix(in srgb, #ef4444 16%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 16%, transparent);
 }
 
 .component-review__line--gap {

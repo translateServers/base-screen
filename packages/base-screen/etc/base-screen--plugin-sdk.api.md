@@ -5,6 +5,9 @@
 ```ts
 
 // @public
+export function arcPath(cx: number, cy: number, r: number, start: number, end: number): string;
+
+// @public
 export function auditBaseScreenFragment(input: unknown, catalog?: BaseScreenMaterialCatalog): readonly BaseScreenAuthoringFinding[];
 
 // @public
@@ -19,7 +22,34 @@ export interface AuditBaseScreenMaterialSpecOptions {
 }
 
 // @public
+export function auditBaseScreenMaterialTemplate(spec: BaseScreenMaterialSpec): readonly BaseScreenAuthoringFinding[];
+
+// @public
 export const BASE_SCREEN_DESCRIPTIVE_TEXT_KEYS: readonly string[];
+
+// @public
+export const BASE_SCREEN_ISOLATED_DOCUMENT_HASH_PATTERN: RegExp;
+
+// @public (undocumented)
+export const BASE_SCREEN_ISOLATED_MATERIAL_SOURCE_MAX_BYTES: number;
+
+// @public
+export const BASE_SCREEN_ISOLATED_MAX_SCRIPT_HASHES = 16;
+
+// @public
+export const BASE_SCREEN_ISOLATED_SANDBOX_FIXED_DIRECTIVES: readonly ["default-src 'none'", "style-src 'unsafe-inline'", 'img-src data: blob:', 'font-src data:', "base-uri 'none'", "form-action 'none'"];
+
+// @public
+export const BASE_SCREEN_ISOLATED_SANDBOX_HEADERS: {
+    readonly 'Content-Type': 'text/html; charset=utf-8';
+    readonly 'X-Content-Type-Options': 'nosniff';
+    readonly 'Referrer-Policy': 'no-referrer';
+    readonly 'Cache-Control': 'public, max-age=31536000, immutable';
+    readonly 'Cross-Origin-Resource-Policy': 'same-site';
+};
+
+// @public
+export const BASE_SCREEN_ISOLATED_SCRIPT_HASH_PATTERN: RegExp;
 
 // @public
 export const BASE_SCREEN_MATERIAL_SPEC_SECTIONS: readonly {
@@ -29,6 +59,42 @@ export const BASE_SCREEN_MATERIAL_SPEC_SECTIONS: readonly {
     readonly collapsed?: true;
     readonly advanced?: true;
 }[];
+
+// @public
+export const BASE_SCREEN_MATERIAL_TEMPLATE_COLOR: RegExp;
+
+// @public (undocumented)
+export const BASE_SCREEN_MATERIAL_TEMPLATE_EXPRESSION_LIMITS: {
+    readonly sourceLength: 400;
+    readonly depth: 16;
+    readonly nodes: 64;
+    readonly concatLength: 256;
+};
+
+// @public
+export const BASE_SCREEN_MATERIAL_TEMPLATE_FUNCTIONS: readonly string[];
+
+// @public (undocumented)
+export const BASE_SCREEN_MATERIAL_TEMPLATE_LIMITS: {
+    readonly nodes: 300;
+    readonly repeat: 200;
+    readonly animations: 8;
+    readonly events: 4;
+    readonly gradients: 8;
+    readonly pathCommands: 64;
+    readonly dash: 6;
+    readonly minDuration: 100;
+    readonly maxDuration: 20000;
+};
+
+// @public
+export const BASE_SCREEN_MATERIAL_TEMPLATE_NODE_KINDS: readonly ['g', 'repeat', 'when', 'clip', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'path', 'text', 'arc', 'ticks', 'wave'];
+
+// @public
+export const BASE_SCREEN_MATERIAL_TEMPLATE_NUMBER_ATTRS: Readonly<Record<BaseScreenMaterialTemplateNodeKind, readonly string[]>>;
+
+// @public
+export const BASE_SCREEN_MATERIAL_TEMPLATE_STEP_BUDGET = 20000;
 
 // @public
 const BASE_SCREEN_PLUGIN_COMMAND_MENUS: readonly ['commandPalette', 'menu.tools', 'context.canvas', 'context.component', 'context.multi'];
@@ -113,6 +179,47 @@ interface BaseScreenFragmentNode extends BaseScreenFragmentEntry {
 
 // @public
 type BaseScreenFragmentShell = BaseScreenFragmentEntry;
+
+// @public (undocumented)
+export type BaseScreenIsolatedMaterialAuditKind = 'csp' | 'error' | 'protocol' | 'rate' | 'circuit';
+
+// @public (undocumented)
+export interface BaseScreenIsolatedMaterialAuditRecord {
+    // (undocumented)
+    readonly cause?: BaseScreenIsolatedMaterialCircuitCause;
+    // (undocumented)
+    readonly componentId?: string;
+    // (undocumented)
+    readonly kind: BaseScreenIsolatedMaterialAuditKind;
+    // (undocumented)
+    readonly message: string;
+    // (undocumented)
+    readonly tagName: string;
+}
+
+// @public
+export type BaseScreenIsolatedMaterialCircuitCause = 'host-csp' | 'sandbox-route' | 'startup' | 'handshake' | 'stall' | 'errors' | 'protocol';
+
+// @public
+export interface BaseScreenIsolatedMaterialLibrary {
+    readonly global: string;
+    readonly name: string;
+    readonly source: string;
+}
+
+// @public
+export interface BaseScreenIsolatedSandboxDocument {
+    readonly hash: string;
+    // (undocumented)
+    readonly html: string;
+    readonly scriptHashes: readonly string[];
+}
+
+// @public
+export interface BaseScreenIsolatedSandboxHost {
+    // (undocumented)
+    resolve(document: BaseScreenIsolatedSandboxDocument): Promise<string>;
+}
 
 // @public (undocumented)
 interface BaseScreenMaterialArraySchema {
@@ -523,14 +630,18 @@ export interface BaseScreenMaterialSpec {
     readonly data: BaseScreenMaterialSpecData;
     // (undocumented)
     readonly defaultSize: ScreenSize;
+    readonly events?: readonly BaseScreenMaterialSpecEvent[];
     // (undocumented)
     readonly fields: readonly BaseScreenMaterialSpecField[];
+    readonly isolated?: BaseScreenMaterialSpecIsolated;
     // (undocumented)
     readonly keywords: readonly string[];
     // (undocumented)
     readonly name: string;
     readonly numberFormat?: BaseScreenMaterialSpecNumberFormat;
     readonly rotate?: boolean;
+    readonly statePresetKeys?: readonly string[];
+    readonly template?: BaseScreenMaterialTemplate;
     // (undocumented)
     readonly type: string;
 }
@@ -547,6 +658,19 @@ export type BaseScreenMaterialSpecData = {
     readonly roles: readonly BaseScreenMaterialSpecRole[];
     readonly sample: readonly ScreenJsonObject[];
 };
+
+// @public
+export interface BaseScreenMaterialSpecEvent {
+    // (undocumented)
+    readonly label: string;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly payload?: Readonly<Record<string, {
+        readonly type: 'number' | 'string' | 'boolean';
+        readonly value: string;
+    }>>;
+}
 
 // @public (undocumented)
 export interface BaseScreenMaterialSpecField {
@@ -576,6 +700,11 @@ export interface BaseScreenMaterialSpecField {
 
 // @public (undocumented)
 export type BaseScreenMaterialSpecFieldKind = 'number' | 'text' | 'boolean' | 'color' | 'choice';
+
+// @public (undocumented)
+export interface BaseScreenMaterialSpecIsolated {
+    readonly libraries?: readonly string[];
+}
 
 // @public
 export interface BaseScreenMaterialSpecNumberFormat extends BaseScreenNumberFormatConfigOptions {
@@ -646,6 +775,221 @@ interface BaseScreenMaterialTabularDataAdapter {
         readonly dataset: ScreenTabularDataset;
         readonly fields: Readonly<Record<string, readonly ScreenDatasetField[]>>;
     }): ScreenParseResult<ScreenJsonValue>;
+}
+
+// @public (undocumented)
+export interface BaseScreenMaterialTemplate {
+    // (undocumented)
+    readonly animations?: readonly BaseScreenMaterialTemplateAnimation[];
+    // (undocumented)
+    readonly defs?: readonly BaseScreenMaterialTemplateGradient[];
+    // (undocumented)
+    readonly fit?: BaseScreenMaterialTemplateFit;
+    // (undocumented)
+    readonly nodes: readonly BaseScreenMaterialTemplateNode[];
+    // (undocumented)
+    readonly viewBox: readonly [number, number, number, number];
+}
+
+// @public (undocumented)
+export interface BaseScreenMaterialTemplateAnimation {
+    // (undocumented)
+    readonly [key: string]: unknown;
+    // (undocumented)
+    readonly kind: 'loop' | 'change';
+    // (undocumented)
+    readonly target: string;
+}
+
+// @public (undocumented)
+export type BaseScreenMaterialTemplateBinaryOperator = '+' | '-' | '*' | '/' | '%' | '==' | '!=' | '<' | '<=' | '>' | '>=' | '&&' | '||';
+
+// @public
+export class BaseScreenMaterialTemplateBudgetError extends Error {
+    constructor();
+}
+
+// @public
+export interface BaseScreenMaterialTemplateContext {
+    // (undocumented)
+    readonly data: {
+        readonly kind: 'none';
+    } | {
+        readonly kind: 'scalar';
+    } | {
+        readonly kind: 'rows';
+        readonly roles: readonly {
+            readonly id: string;
+        }[];
+    };
+    // (undocumented)
+    readonly events?: readonly BaseScreenMaterialSpecEvent[];
+    // (undocumented)
+    readonly fields: readonly {
+        readonly key: string;
+        readonly section: string;
+        readonly kind: string;
+    }[];
+    readonly sectionTarget: (section: string) => 'props' | 'style';
+}
+
+// @public (undocumented)
+export interface BaseScreenMaterialTemplateEnv {
+    readonly budget: {
+        steps: number;
+    };
+    // (undocumented)
+    readonly count?: number;
+    // (undocumented)
+    formatNumber(value: unknown): string;
+    // (undocumented)
+    readonly index?: number;
+    // (undocumented)
+    readonly props: ScreenJsonObject;
+    // (undocumented)
+    readonly row?: Readonly<Record<string, ScreenJsonValue>>;
+    // (undocumented)
+    readonly rows: readonly Readonly<Record<string, ScreenJsonValue>>[];
+    // (undocumented)
+    readonly size: {
+        readonly width: number;
+        readonly height: number;
+    };
+    // (undocumented)
+    readonly style: ScreenJsonObject;
+    // (undocumented)
+    readonly value: number | string | null;
+}
+
+// @public (undocumented)
+export type BaseScreenMaterialTemplateExpression = {
+    readonly k: 'lit';
+    readonly v: number | string | boolean | null;
+} | {
+    readonly k: 'ref';
+    readonly root: BaseScreenMaterialTemplateRefRoot;
+    readonly key?: string;
+} | {
+    readonly k: 'un';
+    readonly op: '-' | '!';
+    readonly a: BaseScreenMaterialTemplateExpression;
+} | {
+    readonly k: 'bin';
+    readonly op: BaseScreenMaterialTemplateBinaryOperator;
+    readonly a: BaseScreenMaterialTemplateExpression;
+    readonly b: BaseScreenMaterialTemplateExpression;
+} | {
+    readonly k: 'cond';
+    readonly t: BaseScreenMaterialTemplateExpression;
+    readonly a: BaseScreenMaterialTemplateExpression;
+    readonly b: BaseScreenMaterialTemplateExpression;
+} | {
+    readonly k: 'call';
+    readonly fn: string;
+    readonly args: readonly BaseScreenMaterialTemplateExpression[];
+};
+
+// @public (undocumented)
+export type BaseScreenMaterialTemplateExpressionResult = {
+    readonly ok: true;
+    readonly value: BaseScreenMaterialTemplateExpression;
+} | {
+    readonly ok: false;
+    readonly message: string;
+};
+
+// @public
+export type BaseScreenMaterialTemplateFit = 'contain' | 'cover' | 'stretch';
+
+// @public (undocumented)
+export interface BaseScreenMaterialTemplateGradient {
+    // (undocumented)
+    readonly [key: string]: unknown;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: 'linearGradient' | 'radialGradient';
+}
+
+// @public
+export interface BaseScreenMaterialTemplateNode {
+    // (undocumented)
+    readonly [key: string]: unknown;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: string;
+}
+
+// @public (undocumented)
+export type BaseScreenMaterialTemplateNodeKind = (typeof BASE_SCREEN_MATERIAL_TEMPLATE_NODE_KINDS)[number];
+
+// @public (undocumented)
+export type BaseScreenMaterialTemplatePaint = {
+    readonly k: 'color';
+    readonly v: string;
+} | {
+    readonly k: 'gradient';
+    readonly id: string;
+} | {
+    readonly k: 'expr';
+    readonly e: BaseScreenMaterialTemplateExpression;
+};
+
+// @public
+export type BaseScreenMaterialTemplateRefRoot = 'value' | 'index' | 'count' | 'rows' | 'row' | 'props' | 'style' | 'size';
+
+// @public (undocumented)
+export type BaseScreenMaterialTemplateRenderer = (input: BaseScreenMaterialTemplateRenderInput) => void;
+
+// @public
+export interface BaseScreenMaterialTemplateRenderInput {
+    // (undocumented)
+    readonly document: Document;
+    // (undocumented)
+    formatNumber(value: unknown): string;
+    // (undocumented)
+    readonly interactive: boolean;
+    // (undocumented)
+    readonly props: ScreenJsonObject;
+    // (undocumented)
+    readonly root: HTMLElement;
+    // (undocumented)
+    readonly rows: readonly Readonly<Record<string, ScreenJsonValue>>[];
+    // (undocumented)
+    readonly size: {
+        readonly width: number;
+        readonly height: number;
+    };
+    // (undocumented)
+    readonly style: ScreenJsonObject;
+    // (undocumented)
+    readonly value: number | string | null;
+}
+
+// @public (undocumented)
+export type BaseScreenMaterialTemplateRepeatSource = {
+    readonly k: 'rows';
+} | {
+    readonly k: 'range';
+    readonly n: BaseScreenMaterialTemplateExpression;
+};
+
+// @public (undocumented)
+export type BaseScreenMaterialTemplateScalar = number | string | boolean | null;
+
+// @public
+export interface BaseScreenMaterialTemplateScope {
+    // (undocumented)
+    readonly data: 'none' | 'scalar' | 'rows';
+    readonly inRepeat: boolean;
+    readonly inRowRepeat: boolean;
+    // (undocumented)
+    readonly props: ReadonlySet<string>;
+    // (undocumented)
+    readonly roles: ReadonlySet<string>;
+    // (undocumented)
+    readonly style: ReadonlySet<string>;
 }
 
 // @public (undocumented)
@@ -853,6 +1197,19 @@ export interface BaseScreenRenderedMaterialPresenter {
 }
 
 // @public
+export function buildBaseScreenIsolatedMetaCsp(scriptHashes: readonly string[]): string;
+
+// @public
+export function buildBaseScreenIsolatedSandboxCsp(scriptHashes: readonly unknown[], frameAncestors: string): string | undefined;
+
+// @public
+export function buildBaseScreenIsolatedSandboxDocument(options: {
+    readonly source: string;
+    readonly libraries?: readonly BaseScreenIsolatedMaterialLibrary[];
+    readonly maxFps?: number;
+}): Promise<BaseScreenIsolatedSandboxDocument>;
+
+// @public
 export function compileBaseScreenMaterialSpec(input: unknown, options: CompileBaseScreenMaterialSpecOptions): ScreenParseResult<BaseScreenMaterialManifest>;
 
 // @public (undocumented)
@@ -864,12 +1221,146 @@ export interface CompileBaseScreenMaterialSpecOptions {
 }
 
 // @public
+export function compileBaseScreenMaterialTemplate(input: unknown, context: BaseScreenMaterialTemplateContext): ScreenParseResult<CompiledBaseScreenMaterialTemplate>;
+
+// @public (undocumented)
+export interface CompiledBaseScreenMaterialTemplate {
+    // (undocumented)
+    readonly animations: readonly CompiledTemplateAnimation[];
+    // (undocumented)
+    readonly fit: BaseScreenMaterialTemplateFit;
+    // (undocumented)
+    readonly gradients: readonly CompiledTemplateGradient[];
+    readonly index: ReadonlyMap<string, CompiledTemplateNode>;
+    // (undocumented)
+    readonly nodes: readonly CompiledTemplateNode[];
+    // (undocumented)
+    readonly viewBox: readonly [number, number, number, number];
+}
+
+// @public (undocumented)
+export type CompiledTemplateAnimation = {
+    readonly kind: 'loop';
+    readonly target: string;
+    readonly property: string;
+    readonly from: BaseScreenMaterialTemplateExpression;
+    readonly to: BaseScreenMaterialTemplateExpression;
+    readonly duration: number;
+    readonly easing: string;
+    readonly alternate: boolean;
+    readonly enabledBy?: BaseScreenMaterialTemplateExpression;
+} | {
+    readonly kind: 'change';
+    readonly target: string;
+    readonly attributes: readonly string[];
+    readonly duration: number;
+    readonly easing: string;
+};
+
+// @public (undocumented)
+export interface CompiledTemplateEvent {
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly payload: readonly {
+        readonly key: string;
+        readonly type: 'number' | 'string' | 'boolean';
+        readonly value: BaseScreenMaterialTemplateExpression;
+    }[];
+}
+
+// @public (undocumented)
+export interface CompiledTemplateGradient {
+    // (undocumented)
+    readonly geometry: Readonly<Record<string, number>>;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: 'linearGradient' | 'radialGradient';
+    // (undocumented)
+    readonly stops: readonly {
+        readonly offset: number;
+        readonly color: BaseScreenMaterialTemplatePaint;
+        readonly opacity: number;
+    }[];
+}
+
+// @public (undocumented)
+export interface CompiledTemplateNode {
+    // (undocumented)
+    readonly anchor?: string;
+    // (undocumented)
+    readonly backdrop?: string;
+    // (undocumented)
+    readonly baseline?: string;
+    // (undocumented)
+    readonly children?: readonly CompiledTemplateNode[];
+    // (undocumented)
+    readonly clipShape?: CompiledTemplateNode;
+    // (undocumented)
+    readonly closed?: boolean;
+    // (undocumented)
+    readonly content?: BaseScreenMaterialTemplateExpression;
+    // (undocumented)
+    readonly d?: readonly (readonly [string, readonly BaseScreenMaterialTemplateExpression[]])[];
+    // (undocumented)
+    readonly dash?: readonly BaseScreenMaterialTemplateExpression[];
+    // (undocumented)
+    readonly fill?: BaseScreenMaterialTemplatePaint;
+    // (undocumented)
+    readonly fontWeight?: number;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: BaseScreenMaterialTemplateNodeKind;
+    // (undocumented)
+    readonly linecap?: string;
+    // (undocumented)
+    readonly num: Readonly<Record<string, BaseScreenMaterialTemplateExpression>>;
+    // (undocumented)
+    readonly on?: CompiledTemplateEvent;
+    readonly path: readonly (string | number)[];
+    // (undocumented)
+    readonly points?: {
+        readonly source: BaseScreenMaterialTemplateRepeatSource;
+        readonly x: BaseScreenMaterialTemplateExpression;
+        readonly y: BaseScreenMaterialTemplateExpression;
+    };
+    // (undocumented)
+    readonly source?: BaseScreenMaterialTemplateRepeatSource;
+    // (undocumented)
+    readonly stroke?: BaseScreenMaterialTemplatePaint;
+    // (undocumented)
+    readonly test?: BaseScreenMaterialTemplateExpression;
+}
+
+// @public
 export function createBaseScreenChartLegendConfig(options?: {
     readonly showLegend?: boolean;
 }): BaseScreenMaterialConfigGroup;
 
 // @public
 export function createBaseScreenChartTitleConfig(): BaseScreenMaterialConfigGroup;
+
+// @public (undocumented)
+export function createBaseScreenIsolatedMaterialDefinition(options: CreateBaseScreenIsolatedMaterialDefinitionOptions): ScreenParseResult<BaseScreenMaterialDefinition>;
+
+// @public (undocumented)
+export interface CreateBaseScreenIsolatedMaterialDefinitionOptions {
+    // (undocumented)
+    readonly cover?: string;
+    readonly libraries?: readonly BaseScreenIsolatedMaterialLibrary[];
+    // (undocumented)
+    readonly libraryVisible?: boolean;
+    readonly maxFps?: number;
+    readonly onAudit?: (record: BaseScreenIsolatedMaterialAuditRecord) => void;
+    readonly onFrame?: (componentId: string) => void;
+    readonly sandbox?: BaseScreenIsolatedSandboxHost;
+    readonly source: string;
+    readonly spec: BaseScreenMaterialSpec;
+    // (undocumented)
+    readonly tagName: string;
+}
 
 // @public
 export function createBaseScreenMaterialEditorDescriptor(input: unknown, options?: {
@@ -905,13 +1396,20 @@ export function createBaseScreenMaterialSpecSampleDataset(data: Extract<BaseScre
 export function createBaseScreenMaterialStateView(ownerDocument: Document, dataState: BaseScreenMaterialDataState, options?: BaseScreenMaterialStateViewOptions): HTMLElement | undefined;
 
 // @public
+export function createBaseScreenMaterialTemplateRender(spec: BaseScreenMaterialSpec): ScreenParseResult<() => BaseScreenMaterialRenderFunction>;
+
+// @public
+export function createBaseScreenMaterialTemplateRenderer(template: CompiledBaseScreenMaterialTemplate): BaseScreenMaterialTemplateRenderer;
+
+// @public
 export function createBaseScreenNumberFormatConfig(options?: BaseScreenNumberFormatConfigOptions): BaseScreenMaterialConfigGroup;
 
 // @public
 export function createBaseScreenRenderedMaterialElement(options: {
     readonly manifest: BaseScreenMaterialManifest;
     readonly data: BaseScreenMaterialSpecData;
-    readonly render: BaseScreenMaterialRenderFunction;
+    readonly render: BaseScreenMaterialRenderFunction | (() => BaseScreenMaterialRenderFunction);
+    readonly renderPerInstance?: true;
 }): BaseScreenMaterialConstructor;
 
 // @public
@@ -926,8 +1424,7 @@ export interface CreateBaseScreenSpecMaterialDefinitionOptions {
     readonly cover?: string;
     // (undocumented)
     readonly libraryVisible?: boolean;
-    // (undocumented)
-    readonly render: BaseScreenMaterialRenderFunction;
+    readonly render?: BaseScreenMaterialRenderFunction;
     // (undocumented)
     readonly spec: BaseScreenMaterialSpec;
     // (undocumented)
@@ -989,11 +1486,17 @@ export function defineBaseScreenFragment(definition: BaseScreenFragmentDefinitio
 // @public (undocumented)
 export function definePlugin(runtime: BaseScreenPluginRuntime): ScreenParseResult<BaseScreenPluginRuntime>;
 
+// @public (undocumented)
+export function evaluateBaseScreenMaterialTemplateExpression(expression: BaseScreenMaterialTemplateExpression, env: BaseScreenMaterialTemplateEnv): BaseScreenMaterialTemplateScalar;
+
 // @public
 export function formatBaseScreenMaterialNumber(input: unknown, props: ScreenJsonObject): string;
 
 // @public
 export function hasBaseScreenAuthoringErrors(findings: readonly BaseScreenAuthoringFinding[]): boolean;
+
+// @public (undocumented)
+export function isTemplateTruthy(value: BaseScreenMaterialTemplateScalar): boolean;
 
 // @public
 export function mergeBaseScreenMaterialConfigGroups(groups: readonly BaseScreenMaterialConfigGroup[]): {
@@ -1010,6 +1513,12 @@ export function normalizeBaseScreenMaterialSpecValue(data: BaseScreenMaterialSpe
 
 // @public
 export function parseBaseScreenMaterialSpec(input: unknown): ScreenParseResult<BaseScreenMaterialSpec>;
+
+// @public
+export function parseBaseScreenMaterialSpecEvents(input: unknown, add: (path: readonly (string | number)[], message: string) => void): void;
+
+// @public
+export function parseBaseScreenMaterialTemplateExpression(source: string, scope: BaseScreenMaterialTemplateScope): BaseScreenMaterialTemplateExpressionResult;
 
 // @public (undocumented)
 interface PluginCommandPort {
@@ -1794,7 +2303,13 @@ interface ScreenVariableRecord {
 }
 
 // @public
+export function sha256(message: Uint8Array): Uint8Array;
+
+// @public
 export function sortBaseScreenAuthoringFindings(findings: readonly BaseScreenAuthoringFinding[]): readonly BaseScreenAuthoringFinding[];
+
+// @public (undocumented)
+export function toTemplateNumber(value: BaseScreenMaterialTemplateScalar): number;
 
 // (No @packageDocumentation comment for this package)
 

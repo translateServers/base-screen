@@ -12,6 +12,7 @@ import { DatasourcesModule } from './datasources/datasources.module';
 import { DemoModule } from './demo/demo.module';
 import { HealthModule } from './health/health.module';
 import { MaterialPackagesModule } from './material-packages/material-packages.module';
+import { MaterialSandboxModule } from './material-sandbox/material-sandbox.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ScreensModule } from './screens/screens.module';
@@ -30,6 +31,8 @@ import { SqliteModule } from './sqlite/sqlite.module';
     MaterialPackagesModule,
     // 组件库（ADR-0106）：原子组件草稿与组合；已发布的原子组件仍在 MaterialPackage。
     ComponentsModule,
+    // L3 沙箱路由（ADR-0118）：按内容哈希存取沙箱文档，纯内存 LRU，不接触 Prisma。
+    MaterialSandboxModule,
     // 数据源管理（台账 / 测试 / 预览 / 受管目录）。必须排在 DatasetsModule 之前：
     // 后者依赖它导出的 DatasourceRuntime（test/preview 与设计器查询共用同一份取数实现）。
     DatasourcesModule,

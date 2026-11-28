@@ -63,7 +63,8 @@ export function buildIsolatedMaterialRepairPrompt(
   instruction: string,
 ): string {
   const lines = issues.map(
-    (issue) => `- [${issue.rule}] ${issue.path === '' ? '（整份 / 代码）' : issue.path}：${issue.message}`,
+    (issue) =>
+      `- [${issue.rule}] ${issue.path === '' ? '（整份 / 代码）' : issue.path}：${issue.message}`,
   );
   return [
     '上一份规格 + 代码没有通过体检或沙箱试运行，问题如下：',

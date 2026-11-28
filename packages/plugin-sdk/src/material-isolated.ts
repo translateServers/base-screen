@@ -1206,9 +1206,11 @@ function createIsolatedMaterialElement(config: ElementConfig): BaseScreenMateria
 
     receiveBitmap(bitmap: ImageBitmap): void {
       const state = this.#state;
-      // 位图不能比声明的画布大太多（宿主按尺寸 × 像素比给出画布）。
-      const limitW = Math.ceil((state?.w ?? 0) * (state?.dpr ?? 1) * 1.1) + 2;
-      const limitH = Math.ceil((state?.h ?? 0) * (state?.dpr ?? 1) * 1.1) + 2;
+      // 位图不能比声明的画布大太多。画布被缩小到 dpr < 1 时，库仍可能按 canonical 1×
+      // 渲染；下限按 1 算，既不放宽 3× 上限，也不会误杀合法的 1× 画面。
+      const pixelRatio = Math.max(1, state?.dpr ?? 1);
+      const limitW = Math.ceil((state?.w ?? 0) * pixelRatio * 1.1) + 2;
+      const limitH = Math.ceil((state?.h ?? 0) * pixelRatio * 1.1) + 2;
       if (
         state === undefined ||
         this.#shutdown !== undefined ||

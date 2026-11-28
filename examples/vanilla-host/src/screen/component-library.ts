@@ -21,8 +21,8 @@ import type {
 } from '../types';
 import {
   buildSpecMaterialModule,
-  draftTemplateMaterialWithAgent,
   draftIsolatedMaterialWithAgent,
+  draftTemplateMaterialWithAgent,
   type IsolatedMaterialDraftAgentOutcome,
   type IsolatedTrialResult,
   importSpecMaterialModule,
@@ -1348,7 +1348,11 @@ export async function draftIsolatedAtomicComponentWithAgent(input: {
       readonly type: string;
       readonly outcome: IsolatedMaterialDraftAgentOutcome;
     }
-  | { readonly ok: false; readonly message: string; readonly outcome?: IsolatedMaterialDraftAgentOutcome }
+  | {
+      readonly ok: false;
+      readonly message: string;
+      readonly outcome?: IsolatedMaterialDraftAgentOutcome;
+    }
 > {
   const type = createAtomicComponentType('draft');
   const outcome = await draftIsolatedMaterialWithAgent({

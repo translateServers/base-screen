@@ -21,6 +21,7 @@
       "!**/.output",
       "!**/generated",
       "!**/*.db",
+      "!examples/shared-backend/data/material-attestation-key.json",
       "!packages/engine/src/common/vendor",
       "!packages/engine/src/browser/styles/host/host-tokens.css",
       "!pnpm-lock.yaml"

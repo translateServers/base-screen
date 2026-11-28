@@ -752,7 +752,10 @@ export const componentListView: ViewModule = {
         kindTemplate.disabled = true;
         kindIsolated.disabled = true;
         findingList.replaceChildren();
-        const draft = draftKind === 'template' ? draftAtomicComponentWithAgent : draftIsolatedAtomicComponentWithAgent;
+        const draft =
+          draftKind === 'template'
+            ? draftAtomicComponentWithAgent
+            : draftIsolatedAtomicComponentWithAgent;
         const result = await draft({
           instruction,
           signal: running.signal,
@@ -772,9 +775,13 @@ export const componentListView: ViewModule = {
         if (result.ok) {
           const rounds = result.outcome.repairRounds;
           const warnings = result.outcome.findings.length;
+          const suggestReason =
+            'suggestReason' in result.outcome && typeof result.outcome.suggestReason === 'string'
+              ? result.outcome.suggestReason
+              : '';
           const suggest =
             'suggestTemplate' in result.outcome && result.outcome.suggestTemplate === true
-              ? `；智能体觉得这个用模板物料（L2）就能表达${result.outcome.suggestReason === undefined ? '' : `（${result.outcome.suggestReason}）`}，仅供参考`
+              ? `；智能体觉得这个用模板物料（L2）就能表达${suggestReason === '' ? '' : `（${suggestReason}）`}，仅供参考`
               : '';
           close();
           showToast(
@@ -814,7 +821,10 @@ export const componentListView: ViewModule = {
             el('h2', { class: 'ds-dialog__title', text: '让智能体起草原子组件' }),
             el(
               'div',
-              { class: 'ds-toolbar__filters', attrs: { role: 'group', 'aria-label': '起草哪一种' } },
+              {
+                class: 'ds-toolbar__filters',
+                attrs: { role: 'group', 'aria-label': '起草哪一种' },
+              },
               [kindTemplate, kindIsolated],
             ),
             desc,

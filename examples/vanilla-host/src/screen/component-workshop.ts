@@ -20,6 +20,8 @@ import {
   type BaseScreenAuthoringFinding,
   type BaseScreenIsolatedMaterialAuditRecord,
   type BaseScreenIsolatedMaterialLibrary,
+  type BaseScreenIsolatedSandboxDocument,
+  type BaseScreenIsolatedSandboxHost,
   type BaseScreenMaterialRenderFunction,
   type BaseScreenMaterialSpec,
   type BaseScreenMaterialSpecField,
@@ -34,6 +36,7 @@ import {
   parseBaseScreenMaterialSpec,
 } from 'base-screen/plugins';
 import { api } from '../lib/api';
+import { resolveApiBase } from '../lib/api-base';
 
 /**
  * 组件工坊（base-screen-docs ADR-0105）——三端逐字共享的宿主侧实现，browser-harness 也挂同一份。
@@ -183,17 +186,47 @@ let isolatedLibraries: readonly WorkshopIsolatedLibrary[] = DEFAULT_ISOLATED_LIB
 const librarySources = new Map<string, Promise<string>>();
 const isolatedAudit: BaseScreenIsolatedMaterialAuditRecord[] = [];
 let isolatedAuditSink: ((record: BaseScreenIsolatedMaterialAuditRecord) => void) | undefined;
+/** 沙箱路由（ADR-0118 D1）；未配置时沙箱 iframe 用 `srcdoc`。 */
+let isolatedSandbox: BaseScreenIsolatedSandboxHost | undefined;
 
 /** 宿主可换掉预置库清单、接管违规与异常记录（默认只留最近 200 条并打到控制台）。 */
 export function configureIsolatedMaterials(options: {
   readonly libraries?: readonly WorkshopIsolatedLibrary[];
   readonly onAudit?: (record: BaseScreenIsolatedMaterialAuditRecord) => void;
+  readonly sandbox?: BaseScreenIsolatedSandboxHost;
 }): void {
   if (options.libraries !== undefined) {
     isolatedLibraries = options.libraries;
     librarySources.clear();
   }
   if (options.onAudit !== undefined) isolatedAuditSink = options.onAudit;
+  if (options.sandbox !== undefined) isolatedSandbox = options.sandbox;
+}
+
+/**
+ * 按 ADR-0118 接的沙箱路由（示例后端 `material-sandbox`）：`resolve` 先 HEAD 探一次是否已存过
+ * 这份文档（按内容哈希寻址，同包多次起草/发布常常重复），没有才 PUT；地址用相对路径，
+ * 与 `resolveApiBase()` 的解析优先级一致（运行时注入 > 构建期环境变量 > 同源相对路径）。
+ */
+export function createApiMaterialSandboxHost(): BaseScreenIsolatedSandboxHost {
+  return {
+    async resolve(document: BaseScreenIsolatedSandboxDocument) {
+      const existing = await api.headMaterialSandboxDocument(document.hash);
+      if (!existing.ok) {
+        if (existing.error.status !== 404) {
+          throw new Error(`${existing.error.code}: ${existing.error.message}`);
+        }
+        const stored = await api.putMaterialSandboxDocument(document.hash, {
+          html: document.html,
+          scriptHashes: document.scriptHashes,
+        });
+        if (!stored.ok) {
+          throw new Error(`${stored.error.code}: ${stored.error.message}`);
+        }
+      }
+      return `${resolveApiBase().replace(/\/+$/, '')}/material-sandbox/${document.hash}`;
+    },
+  };
 }
 
 /** 最近的隔离组件违规与异常记录（新的在后）。 */
@@ -218,6 +251,10 @@ function recordIsolatedAudit(record: BaseScreenIsolatedMaterialAuditRecord): voi
 async function loadIsolatedLibraries(
   names: readonly string[],
 ): Promise<ScreenParseResult<readonly BaseScreenIsolatedMaterialLibrary[]>> {
+  const unknown = firstUnknownIsolatedLibrary(names);
+  if (unknown !== undefined) {
+    return workshopFailure('PLUGIN_CORE_LIFECYCLE_INVALID', `宿主没有预置库 ${unknown}。`);
+  }
   const out: BaseScreenIsolatedMaterialLibrary[] = [];
   for (const name of names) {
     const library = isolatedLibraries.find((item) => item.name === name);
@@ -240,6 +277,10 @@ async function loadIsolatedLibraries(
     }
   }
   return { ok: true, value: out, diagnostics: [] };
+}
+
+function firstUnknownIsolatedLibrary(names: readonly string[]): string | undefined {
+  return names.find((name) => !isolatedLibraries.some((library) => library.name === name));
 }
 
 /** 宿主预置库的名字（工坊的「运行环境」勾选项）。 */
@@ -328,6 +369,7 @@ export function isolatedPreviewDefinition(
       onAudit: (record) => {
         if (audits.length < 100) audits.push(record);
       },
+      ...(isolatedSandbox === undefined ? {} : { sandbox: isolatedSandbox }),
     });
     if (!definition.ok) return definition;
     const defined = definition.value.define();
@@ -399,6 +441,7 @@ export async function trialRunIsolatedMaterial(
     onFrame: (componentId) => {
       if (!frames.has(componentId)) frames.set(componentId, performance.now());
     },
+    ...(isolatedSandbox === undefined ? {} : { sandbox: isolatedSandbox }),
   });
   if (!definition.ok) return fail(definition.diagnostics[0]?.message ?? '组件定义无效。');
   const defined = definition.value.define();
@@ -698,9 +741,9 @@ async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function base64ToBytes(base64: string): Uint8Array {
+function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
   const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
   for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
   return bytes;
 }
@@ -780,6 +823,10 @@ export async function loadSpecMaterialEntry(
   if (isolated !== undefined) {
     // L3：代码以文本交给 SDK，放进按包共享的沙箱 iframe（ADR-0117）。
     if (!isolated.ok) return isolated;
+    const unknown = firstUnknownIsolatedLibrary(isolated.value.spec.isolated?.libraries ?? []);
+    if (unknown !== undefined) {
+      return workshopFailure('PLUGIN_CORE_LIFECYCLE_INVALID', `宿主没有预置库 ${unknown}。`);
+    }
     const verified = await verifyIsolatedMaterialAttestation(code, attestation);
     if (!verified.ok) {
       return workshopFailure(
@@ -795,6 +842,7 @@ export async function loadSpecMaterialEntry(
       tagName: manifest.value.tagName,
       libraries: libraries.value,
       onAudit: recordIsolatedAudit,
+      ...(isolatedSandbox === undefined ? {} : { sandbox: isolatedSandbox }),
       ...visibility,
     });
   } else if (template !== undefined) {
@@ -2999,7 +3047,7 @@ export async function draftIsolatedMaterialWithAgent(input: {
     if (candidate.ok && errors.length === 0) {
       input.onProgress?.({ phase: 'trial', round });
       const trial = await trialRunIsolatedMaterial(
-        candidate.spec as BaseScreenMaterialSpec,
+        candidate.spec as unknown as BaseScreenMaterialSpec,
         candidate.source,
       );
       findings = [...findings, ...trial.findings];

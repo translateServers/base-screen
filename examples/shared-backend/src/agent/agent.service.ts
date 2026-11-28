@@ -789,7 +789,10 @@ export class AgentService {
         ? []
         : [
             { role: 'assistant', content: repair.output },
-            { role: 'user', content: buildIsolatedMaterialRepairPrompt(repair.issues, instruction) },
+            {
+              role: 'user',
+              content: buildIsolatedMaterialRepairPrompt(repair.issues, instruction),
+            },
           ];
     const result = await requestAgentCompletionStream(
       settings,

@@ -14,8 +14,8 @@ import { AgentActDto } from './dto/agent-act.dto';
 import { AgentCandidateDto } from './dto/agent-candidate.dto';
 import { AgentComponentEditDto } from './dto/agent-component-edit.dto';
 import { AgentGenerateDto } from './dto/agent-generate.dto';
-import { AgentMaterialIsolatedDto } from './dto/agent-material-isolated.dto';
 import { AgentMaterialDto } from './dto/agent-material.dto';
+import { AgentMaterialIsolatedDto } from './dto/agent-material-isolated.dto';
 
 @ApiTags('agent')
 @Controller('agent')
@@ -123,7 +123,8 @@ export class AgentController {
    */
   @Post('material-isolated')
   @ApiOperation({
-    summary: '起草一个 L3 隔离代码物料（模型原文：规格 + 代码），不保存；带 repair 时返回修复后的整份原文',
+    summary:
+      '起草一个 L3 隔离代码物料（模型原文：规格 + 代码），不保存；带 repair 时返回修复后的整份原文',
   })
   async materialIsolated(
     @Body() dto: AgentMaterialIsolatedDto,

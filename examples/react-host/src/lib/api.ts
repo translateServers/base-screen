@@ -282,7 +282,7 @@ export type AgentActShape =
     };
 
 interface RequestOptions {
-  readonly method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  readonly method?: 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   readonly body?: unknown;
   /** 幂等 GET 的网络层重试次数（默认 1 次）。 */
   readonly retries?: number;
@@ -551,6 +551,12 @@ export interface OnlineMaterialPackageUpdateBody extends OnlineMaterialPackageSa
   readonly revision: number;
 }
 
+/** L3 沙箱路由的文档体（ADR-0118 D1/D4）：`hash` 走 URL，不重复放进请求体。 */
+export interface OnlineMaterialSandboxDocumentBody {
+  readonly html: string;
+  readonly scriptHashes: readonly string[];
+}
+
 export const api = {
   health: (): Promise<ApiResult<{ status: string }>> => request('/health'),
   listScreens: (): Promise<ApiResult<{ screens: ScreenSummaryShape[] }>> => request('/screens'),
@@ -718,6 +724,15 @@ export const api = {
     }),
   deleteMaterialPackage: (id: string): Promise<ApiResult<{ deleted: true; id: string }>> =>
     request(`/material-packages/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  // ---- L3 沙箱路由（ADR-0118）：按内容哈希寻址，PUT 幂等；HEAD 探是否已存过 ----
+  /** 204/200 视为已存在；404（及其他非 2xx）视为还没存过，调用方据此决定要不要 PUT。 */
+  headMaterialSandboxDocument: (hash: string): Promise<ApiResult<null>> =>
+    request(`/material-sandbox/${encodeURIComponent(hash)}`, { method: 'HEAD' }),
+  putMaterialSandboxDocument: (
+    hash: string,
+    body: OnlineMaterialSandboxDocumentBody,
+  ): Promise<ApiResult<null>> =>
+    request(`/material-sandbox/${encodeURIComponent(hash)}`, { method: 'PUT', body }),
   // ---- 组件库（ADR-0106）：原子组件草稿、组合与引用 ----
   listComponentDrafts: (
     signal?: AbortSignal,

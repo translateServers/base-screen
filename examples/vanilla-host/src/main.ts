@@ -7,10 +7,16 @@ import './styles/asset-library.css';
 import './styles/online-materials.css';
 import './styles/component-library.css';
 import { startRouter } from './router';
+import {
+  configureIsolatedMaterials,
+  createApiMaterialSandboxHost,
+} from './screen/component-workshop';
 import { registerHostMaterials } from './screen/register';
 
 // 1) 注册设计器/查看器/物料（公开入口，幂等）。
 registerHostMaterials();
+// L3 沙箱路由（ADR-0118）：配置了就用网络导航加载沙箱文档，不再继承宿主页面的 CSP。
+configureIsolatedMaterials({ sandbox: createApiMaterialSandboxHost() });
 
 // 2) 启动 hash 路由。容器只负责占位：宿主外壳属于宿主自有页面（见 views/screen-list.ts），
 //    嵌入基座的编辑/查看页把整个视口交给基座，不叠第二层布局。
