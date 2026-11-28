@@ -10,6 +10,7 @@
 - 门禁链以 `git diff --exit-code` 收尾，要求验证未改动任何受跟踪文件。链中没有会写文件的 `format` 步骤（格式修正先手动 `pnpm format`），也没有独立 `build` 步骤——包构建由 Turbo 依赖间接触发。
 - 改完功能先在 `tooling/verification/browser-harness` 的 `/cases.html` 按改动面筛专项案例验证；只改样式先看 `/system.html`。不要为此引入 Storybook。
 - 示例与 `tooling/screen-mcp-server` 的构建、浏览器级验证不进 `verify:m0`，只声明 `dev`/`build`/`typecheck`。
+- 发布 npm 新版本时，推送 `vX.Y.Z` 标签即视为创建 GitHub Release 的正式动作：发布前跑 `pnpm release:check`，发布后确认 `.github/workflows/release.yml` 已生成或更新对应 Release；不得只发 npm 或只推标签。
 
 ## 包边界
 
