@@ -1125,3 +1125,99 @@
   color: var(--color-text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+
+/* L3 隔离代码组件（ADR-0117 S3）：运行环境勾选与发布前的审核视图。 */
+.component-check-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2) var(--spacing-3);
+}
+
+.component-review {
+  width: min(880px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.component-review__heading {
+  margin: var(--spacing-3) 0 var(--spacing-2);
+  font-size: var(--bs-host-font-size-sm);
+}
+
+.component-review__shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+}
+
+.component-review__shot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.component-review__shot img {
+  display: block;
+  max-width: 360px;
+  max-height: 240px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--bs-host-radius-control);
+  background: #05080c;
+}
+
+.component-review__shot figcaption,
+.component-review__missing {
+  color: var(--color-text-muted);
+  font-size: var(--bs-host-font-size-xs);
+}
+
+.component-review__diff {
+  max-height: 280px;
+  margin: 0;
+  padding: var(--spacing-2) 0;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--bs-host-radius-control);
+  background: var(--color-surface-solid);
+  font:
+    12px / 1.5 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+.component-review__line {
+  display: block;
+  padding: 0 var(--spacing-2);
+  white-space: pre;
+}
+
+.component-review__line--add {
+  background: color-mix(in srgb, #22c55e 16%, transparent);
+}
+
+.component-review__line--remove {
+  background: color-mix(in srgb, #ef4444 16%, transparent);
+}
+
+.component-review__line--gap {
+  color: var(--color-text-muted);
+}
+
+.component-review__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px var(--spacing-3);
+  margin: var(--spacing-3) 0 0;
+  font-size: var(--bs-host-font-size-sm);
+}
+
+.component-review__facts dt {
+  color: var(--color-text-muted);
+}
+
+.component-review__facts dd {
+  margin: 0;
+}

@@ -22,11 +22,14 @@ import type {
 import {
   buildSpecMaterialModule,
   draftTemplateMaterialWithAgent,
+  type IsolatedTrialResult,
   importSpecMaterialModule,
   isSpecMaterialModule,
   type MaterialDraftAgentOutcome,
   readIsolatedMaterialModule,
   readSpecMaterialModule,
+  scanIsolatedSource,
+  trialRunIsolatedMaterial,
 } from './component-workshop';
 import { loadHostRuntime } from './host-runtime';
 import { METRIC_CARD_FRAGMENT } from './metric-value';
@@ -91,6 +94,14 @@ export interface AtomicComponentSource {
 /** 是否 L2 模板物料：编辑器据此把代码面板换成模板面板。 */
 export function isTemplateComponentSource(source: AtomicComponentSource): boolean {
   return source.spec.template !== undefined;
+}
+
+/**
+ * 是否 L3 隔离代码组件（ADR-0117，规格带 `isolated`）：`renderBody` 是组件代码全文（导出 `create(env)`），
+ * 只在沙箱 iframe 里运行；预览、试运行、画布都走 SDK 的隔离运行时。
+ */
+export function isIsolatedComponentSource(source: AtomicComponentSource): boolean {
+  return source.spec.isolated !== undefined;
 }
 
 export interface AtomicComponentTemplate {
@@ -203,6 +214,130 @@ if (props.showText) {
 
 const BLANK_RENDER = `// 在 root 里绘制。可用：document、root、props、style、size、mode、value、rows、formatNumber。
 root.style.cssText = \`display:grid;place-items:center;background:\${style.fill}\`;`;
+
+const ISO_CANVAS_SOURCE = `// 隔离代码组件（ADR-0117）：只在沙箱 iframe 里运行，不能联网、不能碰页面。
+// 宿主每帧调一次 frame(now)；画了返回 true，画面就交给页面显示。
+export function create(env) {
+  const canvas = env.canvas;
+  const context = canvas.getContext('2d');
+  let s = env;
+  let shown = typeof env.value === 'number' ? env.value : 0;
+  return {
+    update(next) {
+      s = next;
+    },
+    frame(now) {
+      const target = typeof s.value === 'number' ? s.value : 0;
+      shown += (target - shown) * 0.12;
+      const { width, height } = canvas;
+      const k = s.dpr;
+      const radius = Math.min(width, height) / 2 - 16 * k;
+      const cx = width / 2;
+      const cy = height / 2;
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.fillStyle = s.style.backgroundColor;
+      context.fillRect(0, 0, width, height);
+      context.lineCap = 'round';
+      context.lineWidth = 14 * k;
+      context.strokeStyle = s.style.trackColor;
+      context.beginPath();
+      context.arc(cx, cy, radius, 0.75 * Math.PI, 2.25 * Math.PI);
+      context.stroke();
+      const span = s.props.max - s.props.min || 1;
+      const ratio = Math.max(0, Math.min(1, (shown - s.props.min) / span));
+      context.strokeStyle = shown >= s.props.warnAt ? s.style.warningColor : s.style.fillColor;
+      context.beginPath();
+      context.arc(cx, cy, radius, 0.75 * Math.PI, (0.75 + 1.5 * ratio) * Math.PI);
+      context.stroke();
+      if (s.mode !== 'design') {
+        // 扫描亮点：只在预览 / 查看时转（设计态画面静止）。
+        const angle = (now / 1000) * Math.PI;
+        context.fillStyle = s.style.color;
+        context.beginPath();
+        context.arc(cx + Math.cos(angle) * (radius - 26 * k), cy + Math.sin(angle) * (radius - 26 * k), 3 * k, 0, 2 * Math.PI);
+        context.fill();
+      }
+      context.fillStyle = s.style.color;
+      context.font = \`700 \${Math.round(s.style.fontSize * k)}px system-ui, sans-serif\`;
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(env.formatNumber(Math.round(shown)), cx, cy);
+      return true;
+    },
+    click() {
+      env.emit('valueClick', { value: s.value });
+    },
+  };
+}`;
+
+const ISO_ECHARTS_SOURCE = `// 隔离代码组件（ADR-0117）：用宿主预置的 echarts，在沙箱里画、只在画面变化时交给页面。
+export function create(env) {
+  const echarts = env.libraries.echarts;
+  const container = env.createContainer();
+  let s = env;
+  const chart = echarts.init(container, null, {
+    renderer: 'canvas',
+    width: s.size.width,
+    height: s.size.height,
+    devicePixelRatio: s.dpr,
+  });
+  let dirty = true;
+  chart.getZr().on('rendered', () => {
+    dirty = true;
+  });
+  const option = () => ({
+    animation: s.mode !== 'design',
+    backgroundColor: s.style.backgroundColor,
+    grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: s.rows.map((row) => row.name),
+      axisLabel: { color: s.style.color, fontSize: s.style.fontSize },
+      axisLine: { lineStyle: { color: s.style.trackColor } },
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: s.style.color, fontSize: s.style.fontSize, formatter: (v) => env.formatNumber(v) },
+      splitLine: { lineStyle: { color: s.style.trackColor } },
+    },
+    series: [
+      {
+        type: 'bar',
+        data: s.rows.map((row) => row.value),
+        itemStyle: { color: s.style.fillColor, borderRadius: [4, 4, 0, 0] },
+        barMaxWidth: 28,
+      },
+    ],
+  });
+  chart.setOption(option());
+  return {
+    update(next) {
+      const resized =
+        next.size.width !== s.size.width || next.size.height !== s.size.height || next.dpr !== s.dpr;
+      s = next;
+      if (resized) chart.resize({ width: s.size.width, height: s.size.height, devicePixelRatio: s.dpr });
+      chart.setOption(option(), true);
+    },
+    frame() {
+      const painted = dirty;
+      dirty = false;
+      return painted;
+    },
+    surface() {
+      return container.querySelector('canvas');
+    },
+    click(x, y) {
+      // 沙箱不收指针事件：页面把点击换成组件坐标转进来，这里换算成第几根柱子。
+      const point = chart.convertFromPixel({ seriesIndex: 0 }, [x, y]);
+      const index = Math.round(Array.isArray(point) ? point[0] : Number.NaN);
+      const row = s.rows[index];
+      if (row !== undefined) env.emit('barClick', { name: String(row.name), value: Number(row.value) });
+    },
+    dispose() {
+      chart.dispose();
+    },
+  };
+}`;
 
 const baseSpec = (
   type: string,
@@ -642,6 +777,152 @@ export const ATOMIC_COMPONENT_TEMPLATES: readonly AtomicComponentTemplate[] = [
       renderBody: '',
     }),
   },
+  // L3 隔离代码组件（ADR-0117）：代码只在沙箱 iframe 里运行，能做逐帧动画、用宿主预置的 echarts。
+  {
+    id: 'iso-canvas',
+    name: '动画仪表（隔离代码）',
+    hint: '代码在沙箱里画 canvas，能逐帧动画；不能联网、不能碰页面',
+    build: (type) => ({
+      spec: {
+        type,
+        name: '动画仪表',
+        category: '在线组件',
+        keywords: ['仪表盘', '环形', '动画', '隔离'],
+        defaultSize: { width: 220, height: 220 },
+        numberFormat: { decimals: 0, unit: '%' },
+        fields: [
+          { key: 'min', label: '最小值', section: 'structure', kind: 'number', default: 0 },
+          { key: 'max', label: '最大值', section: 'structure', kind: 'number', default: 100 },
+          { key: 'warnAt', label: '告警线', section: 'structure', kind: 'number', default: 80 },
+          { key: 'color', label: '文字色', section: 'text', kind: 'color', default: '#e2e8f0' },
+          {
+            key: 'fontSize',
+            label: '字号',
+            section: 'text',
+            kind: 'number',
+            default: 36,
+            min: 12,
+            max: 72,
+            unit: 'px',
+          },
+          {
+            key: 'backgroundColor',
+            label: '背景色',
+            section: 'surface',
+            kind: 'color',
+            default: '#0b1220',
+          },
+          {
+            key: 'trackColor',
+            label: '轨道色',
+            section: 'surface',
+            kind: 'color',
+            default: '#1e293b',
+          },
+          {
+            key: 'fillColor',
+            label: '主色',
+            section: 'semantic',
+            kind: 'color',
+            default: '#22d3ee',
+          },
+          {
+            key: 'warningColor',
+            label: '告警色',
+            section: 'semantic',
+            kind: 'color',
+            default: '#f97316',
+          },
+        ],
+        statePresetKeys: ['fillColor'],
+        data: { kind: 'scalar', valueType: 'number', sample: 72 },
+        events: [
+          {
+            name: 'valueClick',
+            label: '点击读数',
+            payload: { value: { type: 'number', value: 'value' } },
+          },
+        ],
+        isolated: { libraries: [] },
+      },
+      renderBody: ISO_CANVAS_SOURCE,
+    }),
+  },
+  {
+    id: 'iso-echarts',
+    name: 'ECharts 柱状图（隔离代码）',
+    hint: '用宿主预置的 echarts 6，在沙箱里渲染一张「名称 + 数值」的表',
+    build: (type) => ({
+      spec: {
+        type,
+        name: '柱状图',
+        category: '在线组件',
+        keywords: ['柱状图', '图表', 'echarts', '隔离'],
+        defaultSize: { width: 360, height: 220 },
+        numberFormat: { decimals: 0, thousandsSeparator: true },
+        fields: [
+          { key: 'color', label: '文字色', section: 'text', kind: 'color', default: '#94a3b8' },
+          {
+            key: 'fontSize',
+            label: '字号',
+            section: 'text',
+            kind: 'number',
+            default: 12,
+            min: 10,
+            max: 24,
+            unit: 'px',
+          },
+          {
+            key: 'backgroundColor',
+            label: '背景色',
+            section: 'surface',
+            kind: 'color',
+            default: '#0b1220',
+          },
+          {
+            key: 'trackColor',
+            label: '网格色',
+            section: 'surface',
+            kind: 'color',
+            default: '#1e293b',
+          },
+          {
+            key: 'fillColor',
+            label: '柱色',
+            section: 'surface',
+            kind: 'color',
+            default: '#38bdf8',
+          },
+        ],
+        data: {
+          kind: 'rows',
+          roles: [
+            { id: 'name', label: '名称', valueType: 'string' },
+            { id: 'value', label: '数值', valueType: 'number' },
+          ],
+          sample: [
+            { name: '华东', value: 4820 },
+            { name: '华南', value: 3960 },
+            { name: '华北', value: 3410 },
+            { name: '西南', value: 2280 },
+            { name: '西北', value: 1240 },
+          ],
+        },
+        events: [
+          {
+            name: 'barClick',
+            label: '点击柱子',
+            payload: {
+              name: { type: 'string', value: 'name' },
+              value: { type: 'number', value: 'value' },
+            },
+          },
+        ],
+        isolated: { libraries: ['echarts'] },
+      },
+      renderBody: ISO_ECHARTS_SOURCE,
+    }),
+  },
   {
     id: 'blank',
     name: '空白',
@@ -675,6 +956,84 @@ export const RENDER_CONTEXT_COMPLETIONS: readonly {
   { label: 'formatNumber', detail: '按读数格式（小数位 / 单位 / 千分位）格式化' },
   { label: 'document', detail: '用来创建元素：document.createElement(...)' },
 ];
+
+/** L3 组件代码里 `env` 上可用的东西（代码编辑器的补全与悬停说明）。 */
+export const ISOLATED_CONTEXT_COMPLETIONS: readonly {
+  readonly label: string;
+  readonly detail: string;
+}[] = [
+  { label: 'env', detail: 'create(env) 收到的环境：只读，下面这些字段' },
+  { label: 'canvas', detail: 'env.canvas：要画的 OffscreenCanvas，像素尺寸 = size × dpr' },
+  { label: 'size', detail: 'env.size：组件尺寸 { width, height }（CSS 像素）' },
+  { label: 'dpr', detail: 'env.dpr：像素比（已含画布缩放），画字号、线宽时乘它' },
+  { label: 'props', detail: 'env.props：结构类可调项的当前值' },
+  { label: 'style', detail: 'env.style：外观类可调项的当前值' },
+  { label: 'mode', detail: "env.mode：'design' 编辑中（画面静止）/ 'preview' / 'viewer'" },
+  { label: 'value', detail: 'env.value：一个数值或文字（数据为单值时）' },
+  { label: 'rows', detail: 'env.rows：表格的行，键为列 id（数据为一张表时）' },
+  { label: 'formatNumber', detail: 'env.formatNumber(v)：按读数格式格式化' },
+  { label: 'emit', detail: "env.emit(name, payload)：派发组件声明过的事件（如 'valueClick'）" },
+  { label: 'libraries', detail: 'env.libraries：勾选的宿主预置库（如 env.libraries.echarts）' },
+  {
+    label: 'createContainer',
+    detail: 'env.createContainer()：沙箱里的离屏容器（echarts 这类库要 DOM 时用）',
+  },
+  { label: 'update', detail: 'update(next)：可调项、尺寸、数据变了；next 与 env 同形' },
+  { label: 'frame', detail: 'frame(now)：每帧调用；画了返回 true，没变化返回 false' },
+  { label: 'surface', detail: 'surface()：可选，返回要交给页面的画布（默认 env.canvas）' },
+  { label: 'click', detail: 'click(x, y)：可选，预览 / 查看时被点击（组件坐标）' },
+  { label: 'dispose', detail: 'dispose()：可选，组件移除时清理' },
+];
+
+/** 代码行的最小差异（审核视图用）：同一行 / 新增 / 删除。超过 2000 行时只给整段替换。 */
+export function diffSourceLines(
+  before: string,
+  after: string,
+): readonly { readonly kind: 'same' | 'add' | 'remove'; readonly text: string }[] {
+  const a = before === '' ? [] : before.split('\n');
+  const b = after === '' ? [] : after.split('\n');
+  if (a.length + b.length > 2000) {
+    return [
+      ...a.map((text) => ({ kind: 'remove' as const, text })),
+      ...b.map((text) => ({ kind: 'add' as const, text })),
+    ];
+  }
+  const table: number[][] = Array.from({ length: a.length + 1 }, () =>
+    new Array<number>(b.length + 1).fill(0),
+  );
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      (table[i] as number[])[j] =
+        a[i] === b[j]
+          ? ((table[i + 1] as number[])[j + 1] as number) + 1
+          : Math.max(
+              (table[i + 1] as number[])[j] as number,
+              (table[i] as number[])[j + 1] as number,
+            );
+    }
+  }
+  const out: { kind: 'same' | 'add' | 'remove'; text: string }[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      out.push({ kind: 'same', text: a[i] as string });
+      i++;
+      j++;
+    } else if (
+      ((table[i + 1] as number[])[j] as number) >= ((table[i] as number[])[j + 1] as number)
+    ) {
+      out.push({ kind: 'remove', text: a[i] as string });
+      i++;
+    } else {
+      out.push({ kind: 'add', text: b[j] as string });
+      j++;
+    }
+  }
+  while (i < a.length) out.push({ kind: 'remove', text: a[i++] as string });
+  while (j < b.length) out.push({ kind: 'add', text: b[j++] as string });
+  return out;
+}
 
 // ———————————————————————————— 组件列表 ————————————————————————————
 
@@ -753,11 +1112,6 @@ export async function loadComponentLibrary(
     if (pkg !== undefined && !isSpecMaterialModule(pkg.code)) {
       // 旧模板生成的在线物料（ADR-0090 初版）照常在物料库里工作，只是不能在组件库里编辑。
       warnings.push(`「${pkg.name}」是旧版在线物料，组件库不提供编辑。`);
-      continue;
-    }
-    if (pkg !== undefined && readIsolatedMaterialModule(pkg.code) !== undefined) {
-      // L3 隔离代码组件（ADR-0117）：代码只在沙箱里运行，物料库里照常可用；组件库暂不提供编辑。
-      warnings.push(`「${pkg.name}」是隔离代码组件，组件库暂不提供编辑。`);
       continue;
     }
     const published = pkg === undefined ? undefined : readSource(pkg.code);
@@ -841,6 +1195,12 @@ function presetFragmentItem(definition: BaseScreenFragmentDefinition): FragmentC
 }
 
 function readSource(code: string): AtomicComponentSource | undefined {
+  const isolated = readIsolatedMaterialModule(code);
+  if (isolated !== undefined) {
+    return isolated.ok
+      ? { spec: isolated.value.spec, renderBody: isolated.value.source }
+      : undefined;
+  }
   const read = readSpecMaterialModule(code);
   if (read === undefined || read.spec === null || typeof read.spec !== 'object') return undefined;
   return { spec: read.spec as BaseScreenMaterialSpec, renderBody: read.renderBody };
@@ -871,6 +1231,9 @@ export type FindingTarget =
 export function findingTarget(finding: BaseScreenAuthoringFinding): FindingTarget {
   // 渲染代码与 L2 模板共用底部面板：TPL 规则指向模板。
   if (finding.rule === 'RENDER' || /^TPL\d+$/.test(finding.rule)) return { kind: 'code' };
+  // L3：代码检查、沙箱试运行与预览运行时的结论都指向组件代码面板。
+  if (finding.rule === 'SOURCE' || finding.rule === 'L3SCAN' || finding.rule === 'SANDBOX')
+    return { kind: 'code' };
   if (finding.path?.[0] === 'template') return { kind: 'code' };
   const [head, index] = finding.path ?? [];
   if (head === 'fields' && typeof index === 'number') return { kind: 'field', index };
@@ -885,6 +1248,11 @@ export function findingTarget(finding: BaseScreenAuthoringFinding): FindingTarge
 export async function auditAtomicComponent(
   source: AtomicComponentSource,
 ): Promise<readonly BaseScreenAuthoringFinding[]> {
+  if (isIsolatedComponentSource(source)) {
+    // L3：规格体检 + 代码词法检查（只报告）。代码不在宿主页面加载；沙箱试运行在发布时做，
+    // 编辑时由预览本身（同一套隔离运行时）实时呈现。
+    return [...auditBaseScreenMaterialSpec(source.spec), ...scanIsolatedSource(source.renderBody)];
+  }
   const findings = [
     ...auditBaseScreenMaterialSpec(source.spec, { renderSource: source.renderBody }),
   ];
@@ -994,10 +1362,26 @@ export async function publishAtomicComponent(input: {
   readonly type: string;
   readonly source: AtomicComponentSource;
   readonly pkg: OnlineMaterialPackageShape | undefined;
+  /**
+   * L3：作者在审核视图里看过的那次试运行结果（ADR-0117 D11 第 3–4 步）。省略时这里再跑一次；
+   * 有 error 一律不发布。
+   */
+  readonly trial?: IsolatedTrialResult;
 }): Promise<LibraryResult<OnlineMaterialPackageShape>> {
   const findings = await auditAtomicComponent(input.source);
   if (hasBaseScreenAuthoringErrors(findings)) {
     return { ok: false, message: '体检有错误，修正后再发布。', findings };
+  }
+  if (isIsolatedComponentSource(input.source)) {
+    const trial =
+      input.trial ?? (await trialRunIsolatedMaterial(input.source.spec, input.source.renderBody));
+    if (hasBaseScreenAuthoringErrors(trial.findings)) {
+      return {
+        ok: false,
+        message: '沙箱试运行没有通过，修正后再发布。',
+        findings: [...findings, ...trial.findings],
+      };
+    }
   }
   const parsed = parseBaseScreenMaterialSpec(input.source.spec);
   if (!parsed.ok) return { ok: false, message: '组件定义不完整。', findings };

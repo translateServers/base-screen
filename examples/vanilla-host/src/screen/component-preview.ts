@@ -6,6 +6,7 @@ import type {
   BaseScreenMaterialManifest,
 } from 'base-screen/plugin-core';
 import {
+  type BaseScreenIsolatedMaterialAuditRecord,
   type BaseScreenMaterialRenderFunction,
   type BaseScreenMaterialSpec,
   compileBaseScreenMaterialSpec,
@@ -13,13 +14,20 @@ import {
   parseBaseScreenMaterialSpec,
 } from 'base-screen/plugins';
 import type { AtomicComponentSource } from './component-library';
-import { buildSpecMaterialModule, importSpecMaterialModule } from './component-workshop';
+import {
+  buildSpecMaterialModule,
+  importSpecMaterialModule,
+  isolatedPreviewDefinition,
+} from './component-workshop';
 
 /**
  * 组件预览（ADR-0106 §2.3）：组件库封面与原子组件编辑器的中栏共用。
  *
  * 用 SDK 的渲染骨架（`createBaseScreenRenderedMaterialPresenter`）呈现，与大屏画布上的表现一致；
  * 不注册 Custom Element，改代码不产生新标签。
+ *
+ * L3 隔离代码组件（ADR-0117）例外：代码只能在沙箱里跑，预览就是一个真正的隔离物料元素
+ * （同一份规格 + 代码注册一次标签），与画布上同一条路径。
  */
 export type PreviewDataMode = 'ready' | 'loading' | 'empty' | 'error';
 
@@ -29,6 +37,11 @@ export interface CompiledPreview {
   readonly spec: BaseScreenMaterialSpec;
   readonly manifest: BaseScreenMaterialManifest;
   readonly render: BaseScreenMaterialRenderFunction;
+  /** L3：预览用的隔离物料标签与它的违规 / 异常记录；同 realm 组件没有。 */
+  readonly isolated?: {
+    readonly tagName: string;
+    readonly audit: () => readonly BaseScreenIsolatedMaterialAuditRecord[];
+  };
 }
 
 export type CompilePreviewResult =
@@ -53,6 +66,25 @@ export async function compilePreview(source: AtomicComponentSource): Promise<Com
       ok: false,
       stage: 'spec',
       message: manifest.diagnostics[0]?.message ?? '组件定义有错误。',
+    };
+  }
+  if (parsed.value.isolated !== undefined) {
+    const entry = await isolatedPreviewDefinition(parsed.value, source.renderBody);
+    if (!entry.ok) {
+      return {
+        ok: false,
+        stage: 'code',
+        message: entry.diagnostics[0]?.message ?? '组件代码无法放进沙箱。',
+      };
+    }
+    return {
+      ok: true,
+      value: {
+        spec: parsed.value,
+        manifest: manifest.value,
+        render: () => {},
+        isolated: entry.value,
+      },
     };
   }
   const code = buildSpecMaterialModule(parsed.value, source.renderBody);
@@ -99,11 +131,38 @@ export interface PreviewRenderInput {
   /** 覆盖默认值（编辑器右栏改默认值时实时预览）；省略用 Manifest 默认值。 */
   readonly props?: BaseScreenMaterialManifest['defaultProps'];
   readonly style?: BaseScreenMaterialManifest['defaultStyle'];
+  /** 按预览态（会动）而不是设计态（静止）渲染；目前只影响 L3 组件。 */
+  readonly animate?: boolean;
 }
+
+const ISOLATED_PREVIEW_STYLE =
+  ':host{display:block}.isolated-preview{display:block;width:100%;height:100%}';
 
 /** 在 `mount` 里画一次；每次调用都重建 presenter（渲染函数可能换了）。 */
 export function renderPreview(mount: HTMLElement, input: PreviewRenderInput): void {
   const shadow = mount.shadowRoot ?? mount.attachShadow({ mode: 'open' });
+  const isolated = input.compiled.isolated;
+  if (isolated !== undefined) {
+    // 同一个标签复用同一个元素：沙箱实例不重建，改默认值、改尺寸只是一条 update。
+    let element = shadow.querySelector<HTMLElement & { model: unknown }>('.isolated-preview');
+    if (element === null || element.localName !== isolated.tagName) {
+      element = document.createElement(isolated.tagName) as HTMLElement & { model: unknown };
+      element.className = 'isolated-preview';
+      const sheet = document.createElement('style');
+      sheet.textContent = ISOLATED_PREVIEW_STYLE;
+      shadow.replaceChildren(sheet, element);
+    }
+    element.model = {
+      componentId: 'component-preview',
+      mode: input.animate === true ? 'preview' : 'design',
+      interactive: false,
+      props: input.props ?? input.compiled.manifest.defaultProps,
+      style: input.style ?? input.compiled.manifest.defaultStyle,
+      size: input.size,
+      dataState: previewDataState(input.compiled, input.mode),
+    };
+    return;
+  }
   const presenter = createBaseScreenRenderedMaterialPresenter(shadow, {
     data: input.compiled.spec.data,
     render: input.compiled.render,

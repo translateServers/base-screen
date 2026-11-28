@@ -241,6 +241,271 @@ async function loadIsolatedLibraries(
   return { ok: true, value: out, diagnostics: [] };
 }
 
+/** 宿主预置库的名字（工坊的「运行环境」勾选项）。 */
+export function listIsolatedLibraryNames(): readonly string[] {
+  return isolatedLibraries.map((library) => library.name);
+}
+
+// ———————————————————————————— L3：作者面（ADR-0117 S3） ————————————————————————————
+
+/**
+ * 组件代码的词法检查（ADR-0117 D11 第 2 步）：**只出 warning、不单独决定放行**——真正的门禁是沙箱本身
+ * 与试运行。唯一的 error 是没有导出 `create`（那样沙箱里什么也画不出来）。
+ */
+export function scanIsolatedSource(source: string): readonly BaseScreenAuthoringFinding[] {
+  const findings: BaseScreenAuthoringFinding[] = [];
+  if (
+    !/\bexport\s+(?:async\s+)?function\s+create\s*\(|\bexport\s+(?:const|let)\s+create\s*=/.test(
+      source,
+    )
+  ) {
+    findings.push({
+      rule: 'SOURCE',
+      severity: 'error',
+      message: '组件代码必须导出 create(env)，返回带 frame(now) 的对象。',
+    });
+  }
+  const checks: readonly (readonly [RegExp, string])[] = [
+    [
+      /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b|\bsendBeacon\b/,
+      '代码里有网络请求：沙箱没有网络，请求会被 CSP 拦下。',
+    ],
+    [
+      /\beval\s*\(|\bnew\s+Function\b|\bFunction\s*\(/,
+      '代码里有 eval / Function：沙箱的 CSP 不允许动态执行代码。',
+    ],
+    [/\bimport\s*\(/, '代码里有动态 import：沙箱不能加载其他代码，库请用宿主预置库。'],
+    [
+      /\b(?:localStorage|sessionStorage|indexedDB)\b|document\.cookie/,
+      '代码里读写浏览器存储：沙箱是不透明源，存储不可用。',
+    ],
+    [
+      /\bpostMessage\s*\(|\bwindow\.(?:parent|top)\b/,
+      '代码里直接给页面发消息：事件请用 env.emit，其他消息会被宿主丢弃。',
+    ],
+    [
+      /(?:sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|Bearer\s+[A-Za-z0-9._-]{16,})/,
+      '代码里像是有凭证：组件不能带凭证，数据只能经宿主注入。',
+    ],
+    [/["'`][A-Za-z0-9+/=]{200,}["'`]/, '代码里有很长的编码字符串：请确认不是夹带的脚本或数据。'],
+  ];
+  for (const [pattern, message] of checks) {
+    if (pattern.test(source)) findings.push({ rule: 'L3SCAN', severity: 'warning', message });
+  }
+  return findings;
+}
+
+interface IsolatedPreviewEntry {
+  readonly tagName: string;
+  readonly audit: () => readonly BaseScreenIsolatedMaterialAuditRecord[];
+}
+
+const isolatedPreviews = new Map<string, Promise<ScreenParseResult<IsolatedPreviewEntry>>>();
+let isolatedTagCounter = 0;
+
+/**
+ * 预览用的隔离组件定义：同一份规格 + 代码只注册一次（按内容缓存）。Custom Element 不能重定义，
+ * 每改一次代码就多一个标签；缓存只保留最近 32 份，旧标签留在注册表里（ADR-0090 的整页刷新兜底）。
+ */
+export function isolatedPreviewDefinition(
+  spec: BaseScreenMaterialSpec,
+  source: string,
+): Promise<ScreenParseResult<IsolatedPreviewEntry>> {
+  const key = `${JSON.stringify(spec)}\n${source}`;
+  const cached = isolatedPreviews.get(key);
+  if (cached !== undefined) return cached;
+  const pending = (async (): Promise<ScreenParseResult<IsolatedPreviewEntry>> => {
+    const libraries = await loadIsolatedLibraries(spec.isolated?.libraries ?? []);
+    if (!libraries.ok) return libraries;
+    const audits: BaseScreenIsolatedMaterialAuditRecord[] = [];
+    const tagName = `host-online-iso-preview-${++isolatedTagCounter}-${randomToken(4)}`;
+    const definition = createBaseScreenIsolatedMaterialDefinition({
+      spec,
+      source,
+      tagName,
+      libraries: libraries.value,
+      onAudit: (record) => {
+        if (audits.length < 100) audits.push(record);
+      },
+    });
+    if (!definition.ok) return definition;
+    const defined = definition.value.define();
+    if (!defined.ok) return defined;
+    return { ok: true, value: { tagName, audit: () => [...audits] }, diagnostics: [] };
+  })();
+  isolatedPreviews.set(key, pending);
+  if (isolatedPreviews.size > 32) {
+    isolatedPreviews.delete(isolatedPreviews.keys().next().value as string);
+  }
+  return pending;
+}
+
+export interface IsolatedTrialSnapshot {
+  readonly label: string;
+  readonly size: { readonly width: number; readonly height: number };
+  /** 试运行画面（PNG data URL）；没画出来时 undefined。 */
+  readonly image: string | undefined;
+  readonly firstFrameMs: number | undefined;
+}
+
+export interface IsolatedTrialResult {
+  readonly findings: readonly BaseScreenAuthoringFinding[];
+  readonly snapshots: readonly IsolatedTrialSnapshot[];
+}
+
+export const ISOLATED_TRIAL_FIRST_FRAME_MS = 2000;
+const ISOLATED_TRIAL_RUN_MS = 1200;
+
+/**
+ * 沙箱试运行（ADR-0117 D11 第 3 步）：用规格的示例数据在默认尺寸与 2 倍尺寸各跑一次，持续跑一小段
+ * 时间以捕获逐帧代码的错误。要求零异常、零 CSP 违规、2 秒内画出首帧；不满足的都是 error。
+ * 与画布上用的是同一套 SDK 隔离运行时，只是挂在页面上不可见的位置。
+ */
+export async function trialRunIsolatedMaterial(
+  spec: BaseScreenMaterialSpec,
+  source: string,
+  options: { readonly firstFrameMs?: number; readonly runMs?: number } = {},
+): Promise<IsolatedTrialResult> {
+  const parsed = parseBaseScreenMaterialSpec(spec);
+  if (!parsed.ok) {
+    return {
+      findings: parsed.diagnostics.map((item) => ({
+        rule: 'SPEC',
+        severity: 'error' as const,
+        message: item.message,
+        path: item.path,
+      })),
+      snapshots: [],
+    };
+  }
+  const fail = (message: string): IsolatedTrialResult => ({
+    findings: [{ rule: 'SANDBOX', severity: 'error', message }],
+    snapshots: [],
+  });
+  const libraries = await loadIsolatedLibraries(parsed.value.isolated?.libraries ?? []);
+  if (!libraries.ok) return fail(libraries.diagnostics[0]?.message ?? '预置库加载失败。');
+  const audits: BaseScreenIsolatedMaterialAuditRecord[] = [];
+  const frames = new Map<string, number>();
+  const tagName = `host-online-iso-trial-${++isolatedTagCounter}-${randomToken(4)}`;
+  const definition = createBaseScreenIsolatedMaterialDefinition({
+    spec: parsed.value,
+    source,
+    tagName,
+    libraries: libraries.value,
+    onAudit: (record) => {
+      if (audits.length < 200) audits.push(record);
+    },
+    onFrame: (componentId) => {
+      if (!frames.has(componentId)) frames.set(componentId, performance.now());
+    },
+  });
+  if (!definition.ok) return fail(definition.diagnostics[0]?.message ?? '组件定义无效。');
+  const defined = definition.value.define();
+  if (!defined.ok) return fail(defined.diagnostics[0]?.message ?? '组件注册失败。');
+
+  const manifest = defined.value.manifest;
+  const base = parsed.value.defaultSize;
+  const cases = [
+    { id: 'trial-1x', label: '默认尺寸', size: { width: base.width, height: base.height } },
+    {
+      id: 'trial-2x',
+      label: '2 倍尺寸',
+      size: { width: Math.min(4096, base.width * 2), height: Math.min(4096, base.height * 2) },
+    },
+  ];
+  const dataState: BaseScreenMaterialDataState =
+    parsed.value.data.kind === 'none'
+      ? { status: 'idle' }
+      : { status: 'ready', value: manifest.defaultData ?? null };
+  // 不可见但留在视口里：可见性判断与节流都按真实画布来（IntersectionObserver 照常为真）。
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.setAttribute('data-isolated-trial', tagName);
+  host.style.cssText =
+    'position:fixed;left:0;top:0;opacity:0;pointer-events:none;z-index:-1;display:flex;gap:8px';
+  document.body.append(host);
+  const started = performance.now();
+  const elements = cases.map((item) => {
+    const element = document.createElement(tagName) as HTMLElement & { model: unknown };
+    element.style.cssText = `display:block;flex:none;width:${item.size.width}px;height:${item.size.height}px`;
+    host.append(element);
+    element.model = {
+      componentId: item.id,
+      mode: 'preview',
+      interactive: false,
+      props: manifest.defaultProps,
+      style: manifest.defaultStyle,
+      size: item.size,
+      dataState,
+    };
+    return element;
+  });
+  const firstFrameMs = options.firstFrameMs ?? ISOLATED_TRIAL_FIRST_FRAME_MS;
+  const deadline = started + firstFrameMs;
+  const broken = (): boolean => audits.some((record) => record.kind === 'circuit');
+  while (performance.now() < deadline && frames.size < cases.length && !broken()) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  if (!broken())
+    await new Promise((resolve) => setTimeout(resolve, options.runMs ?? ISOLATED_TRIAL_RUN_MS));
+
+  const snapshots = cases.map((item, index): IsolatedTrialSnapshot => {
+    const at = frames.get(item.id);
+    return {
+      label: item.label,
+      size: item.size,
+      image: at === undefined ? undefined : snapshotIsolatedElement(elements[index]),
+      firstFrameMs: at === undefined ? undefined : Math.round(at - started),
+    };
+  });
+  host.remove();
+
+  const findings: BaseScreenAuthoringFinding[] = [];
+  const seen = new Set<string>();
+  const push = (finding: BaseScreenAuthoringFinding): void => {
+    const key = `${finding.severity}:${finding.message}`;
+    if (seen.has(key) || findings.length >= 12) return;
+    seen.add(key);
+    findings.push(finding);
+  };
+  for (const record of audits) {
+    if (record.kind === 'error')
+      push({ rule: 'SANDBOX', severity: 'error', message: `试运行出错：${record.message}` });
+    else if (record.kind === 'csp')
+      push({
+        rule: 'SANDBOX',
+        severity: 'error',
+        message: `试运行时被 CSP 拦下（${record.message}）：组件不能联网、不能动态加载或执行代码。`,
+      });
+    else if (record.kind === 'circuit')
+      push({ rule: 'SANDBOX', severity: 'error', message: `试运行被熔断：${record.message}` });
+    else push({ rule: 'SANDBOX', severity: 'warning', message: `试运行：${record.message}` });
+  }
+  for (const snapshot of snapshots) {
+    if (snapshot.firstFrameMs === undefined && !broken()) {
+      push({
+        rule: 'SANDBOX',
+        severity: 'error',
+        message: `${snapshot.label}（${snapshot.size.width} × ${snapshot.size.height}）在 ${firstFrameMs / 1000} 秒内没有画出第一帧。`,
+      });
+    }
+  }
+  return { findings, snapshots };
+}
+
+/** 读外层元素里那块位图画布（Shadow root 是 open 的）；拷一份成 PNG，避免引用随后被回收的画布。 */
+function snapshotIsolatedElement(element: HTMLElement | undefined): string | undefined {
+  const canvas = element?.shadowRoot?.querySelector('canvas');
+  if (canvas === null || canvas === undefined || canvas.width === 0) return undefined;
+  const copy = document.createElement('canvas');
+  copy.width = canvas.width;
+  copy.height = canvas.height;
+  const context = copy.getContext('2d');
+  if (context === null) return undefined;
+  context.drawImage(canvas, 0, 0);
+  return copy.toDataURL('image/png');
+}
+
 /**
  * 规格 + 组件代码 → 待保存的 L3 包（Manifest 按同一标签编译）。工坊发布与脚本发布共用这一份，
  * 保证存进去的包与加载器的规范格式校验一致。

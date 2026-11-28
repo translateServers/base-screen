@@ -8,6 +8,7 @@ import {
   readIsolatedMaterialModule,
   readSpecMaterialModule,
   readTemplateMaterialModule,
+  scanIsolatedSource,
 } from '../../examples/vanilla-host/src/screen/component-workshop';
 import type { BaseScreenMaterialSpec } from '../../packages/plugin-sdk/src/index';
 
@@ -124,5 +125,37 @@ describe('isolated material package format', () => {
     expect(
       buildIsolatedMaterialPackage(plain, SOURCE, { tagName: 'host-online-isolated-pkg-3' }).ok,
     ).toBe(false);
+  });
+});
+
+describe('isolated source scan (report only)', () => {
+  it('requires an exported create', () => {
+    expect(scanIsolatedSource('function create() {}').map((item) => item.rule)).toEqual(['SOURCE']);
+    expect(scanIsolatedSource('export const create = (env) => ({ frame: () => true });')).toEqual(
+      [],
+    );
+    expect(scanIsolatedSource(SOURCE)).toEqual([]);
+  });
+
+  it('only warns about risky APIs: the sandbox is the gate', () => {
+    const risky = [
+      "fetch('/api')",
+      'new WebSocket("ws://x")',
+      'eval("1")',
+      "import('x.js')",
+      'localStorage.getItem("a")',
+      'document.cookie',
+      "window.parent.postMessage('x', '*')",
+      "const key = 'sk-abcdefghijklmnopqrstuvwx';",
+    ];
+    for (const line of risky) {
+      const findings = scanIsolatedSource(
+        `export function create(env) { ${line}; return { frame() { return true; } }; }`,
+      );
+      expect(findings.length).toBeGreaterThan(0);
+      expect(findings.every((item) => item.severity === 'warning' && item.rule === 'L3SCAN')).toBe(
+        true,
+      );
+    }
   });
 });

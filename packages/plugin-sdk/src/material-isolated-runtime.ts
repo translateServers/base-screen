@@ -27,9 +27,17 @@ export function baseScreenIsolatedRuntime(config: BaseScreenIsolatedRuntimeConfi
   let port: MessagePort | null = null;
 
   const text = (value: unknown, limit: number): string => String(value).slice(0, limit);
+  // 握手前（作者模块的顶层代码在 load 之前就跑了）的错误与 CSP 拦截先排队，连上后补发：
+  // 否则模块顶层的越权尝试在试运行里看不见。只排这两类，最多 20 条。
+  const early: unknown[] = [];
   const send = (message: unknown, transfer: Transferable[] = []): void => {
+    if (port === null) {
+      const kind = (message as { type?: unknown } | null)?.type;
+      if ((kind === 'error' || kind === 'csp') && early.length < 20) early.push(message);
+      return;
+    }
     try {
-      port?.postMessage(message, transfer);
+      port.postMessage(message, transfer);
     } catch {
       // 不可克隆的负载（作者传了函数之类）：丢弃，宿主那边本来也会拒收。
     }
@@ -62,6 +70,7 @@ export function baseScreenIsolatedRuntime(config: BaseScreenIsolatedRuntimeConfi
       }
     };
     send({ type: 'ready' });
+    for (const message of early.splice(0)) send(message);
   });
 
   const libraries = (): unknown => {

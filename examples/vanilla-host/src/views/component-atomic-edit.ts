@@ -23,8 +23,11 @@ import {
   COMPONENT_SECTION_OPTIONS,
   createAtomicComponentType,
   deleteAtomicComponent,
+  diffSourceLines,
   discardAtomicDraft,
   findingTarget,
+  ISOLATED_CONTEXT_COMPLETIONS,
+  isIsolatedComponentSource,
   isTemplateComponentSource,
   loadComponentLibrary,
   publishAtomicComponent,
@@ -38,7 +41,12 @@ import {
   type PreviewDataMode,
   renderPreview,
 } from '../screen/component-preview';
-import { readTemplateText } from '../screen/component-workshop';
+import {
+  type IsolatedTrialResult,
+  listIsolatedLibraryNames,
+  readTemplateText,
+  trialRunIsolatedMaterial,
+} from '../screen/component-workshop';
 import type { ComponentDraftShape, OnlineMaterialPackageShape } from '../types';
 
 /**
@@ -50,6 +58,8 @@ import type { ComponentDraftShape, OnlineMaterialPackageShape } from '../types';
  *
  * 改动自动存为草稿（ADR-0106 D3），不影响已发布版本；「发布」先体检，再写在线物料包并热刷新。
  * L2 模板物料（ADR-0116，规格带 `template`）没有渲染代码：底部面板换成模板 JSON，体检的 TPL 结论定位到这里。
+ * L3 隔离代码组件（ADR-0117，规格带 `isolated`）：底部面板是组件代码（导出 `create(env)`），预览跑在沙箱里；
+ * 发布前在沙箱里试运行，再经审核视图（代码差异、试运行画面、预置库、事件）确认。
  * 规格词汇（section / kind / visibleWhen …）不出现在界面上，作者用语见 `component-library.ts`。
  */
 type Field = BaseScreenMaterialSpecField;
@@ -91,6 +101,8 @@ export const componentAtomicEditView: ViewModule = {
     let renderBody = '';
     /** L2 模板的 JSON 文本；undefined 表示这是代码物料。组件的形态在打开时定下，页面内不切换。 */
     let templateText: string | undefined;
+    /** L3 隔离代码组件：`renderBody` 是组件代码全文，只在沙箱里运行。打开时定下，页面内不切换。 */
+    let isolated = false;
     let pkg: OnlineMaterialPackageShape | undefined;
     let draft: ComponentDraftShape | undefined;
     let published: AtomicComponentSource | undefined;
@@ -155,6 +167,10 @@ export const componentAtomicEditView: ViewModule = {
       },
     });
     const menu = el('div', { class: 'component-editor__menu', attrs: { role: 'menu' } });
+    const kindBadge = el('span', {
+      class: 'ds-badge component-badge component-badge--atomic',
+      text: '原子',
+    });
     const publishButton = el('button', {
       class: 'button button--primary',
       text: '发布',
@@ -164,7 +180,7 @@ export const componentAtomicEditView: ViewModule = {
     const topbar = el('header', { class: 'component-editor__topbar' }, [
       back,
       nameInput,
-      el('span', { class: 'ds-badge component-badge component-badge--atomic', text: '原子' }),
+      kindBadge,
       saveBadge,
       el('span', { class: 'component-library__spacer' }),
       problemsButton,
@@ -263,6 +279,25 @@ export const componentAtomicEditView: ViewModule = {
       ]);
       if (disposed || token !== refreshToken) return;
       findings = nextFindings;
+      if (nextCompiled.ok && nextCompiled.value.isolated !== undefined) {
+        // 预览就是沙箱运行：把它记下的异常 / 拦截如实列出来（警告；发布前的试运行才是门禁）。
+        const seen = new Set<string>();
+        const runtime = nextCompiled.value.isolated
+          .audit()
+          .filter((record) => {
+            const key = `${record.kind}:${record.message}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .slice(-6)
+          .map((record) => ({
+            rule: 'SANDBOX',
+            severity: 'warning' as const,
+            message: `预览运行时${record.kind === 'csp' ? '被 CSP 拦下' : ''}：${record.message}`,
+          }));
+        findings = [...findings, ...runtime];
+      }
       if (nextCompiled.ok) {
         compiled = nextCompiled.value;
         compileError = undefined;
@@ -451,7 +486,50 @@ export const componentAtomicEditView: ViewModule = {
     // ———————— 左栏：结构 ————————
 
     const renderLeft = (): void => {
-      left.replaceChildren(renderDataBlock(), renderFormatBlock(), renderFieldList());
+      left.replaceChildren(
+        ...(isolated ? [renderIsolatedBlock()] : []),
+        renderDataBlock(),
+        renderFormatBlock(),
+        renderFieldList(),
+      );
+    };
+
+    /** L3：运行环境——说明沙箱的限制，勾选要用的宿主预置库（ADR-0117 D5 / D9）。 */
+    const renderIsolatedBlock = (): HTMLElement => {
+      const block = panelBlock('运行环境', 'isolated');
+      block.dataset.componentIsolated = '';
+      block.append(
+        el('p', {
+          class: 'component-hint',
+          text: '代码只在沙箱 iframe 里运行：不能联网、不能读写页面和浏览器存储；数据和可调项由页面注入，事件用 env.emit 派发。',
+        }),
+      );
+      const chosen = new Set(spec.isolated?.libraries ?? []);
+      const names = listIsolatedLibraryNames();
+      block.append(
+        row(
+          '预置库',
+          el(
+            'div',
+            { class: 'component-check-list' },
+            names.length === 0
+              ? [el('span', { class: 'component-hint', text: '宿主没有提供预置库' })]
+              : names.map((name) =>
+                  checkbox(name, chosen.has(name), (checked) => {
+                    const next = new Set(chosen);
+                    if (checked) next.add(name);
+                    else next.delete(name);
+                    spec = {
+                      ...spec,
+                      isolated: { libraries: names.filter((item) => next.has(item)) },
+                    };
+                    changed({ left: true, right: false });
+                  }),
+                ),
+          ),
+        ),
+      );
+      return block;
     };
 
     const renderDataBlock = (): HTMLElement => {
@@ -1361,7 +1439,7 @@ export const componentAtomicEditView: ViewModule = {
         return;
       }
       stageBox.dataset.broken = 'false';
-      renderPreview(stageMount, { compiled, size: previewSize, mode: previewMode });
+      renderPreview(stageMount, { compiled, size: previewSize, mode: previewMode, animate: true });
     };
 
     // 拖拽改尺寸：右下角手柄，Shift 保持比例。
@@ -1444,19 +1522,73 @@ export const componentAtomicEditView: ViewModule = {
           return;
         }
         const warnings = findings.length - errors.length;
-        const ok = await confirmDialog({
-          title: pkg === undefined ? `发布「${spec.name}」` : `发布「${spec.name}」的新版本`,
-          lines: [
-            pkg === undefined
-              ? '发布后出现在所有大屏的物料库里。'
-              : `正在被 ${references.length} 张大屏使用；打开这些大屏时会用新代码渲染，已有组件的配置保留。`,
-            ...(warnings > 0 ? [`体检有 ${warnings} 条警告（不阻止发布）。`] : []),
-            '改动不会自动回滚；之后可以继续修改再发布。',
-          ],
-          confirm: '发布',
-        });
+        let trial: IsolatedTrialResult | undefined;
+        if (isolated) {
+          // L3：先在沙箱里试运行（ADR-0117 D11 第 3 步），通过了再进审核视图（第 4 步）。
+          publishButton.textContent = '试运行中…';
+          try {
+            trial = await trialRunIsolatedMaterial(spec, renderBody);
+          } finally {
+            publishButton.textContent = '发布';
+          }
+          if (disposed) return;
+          const trialErrors = trial.findings.filter((item) => item.severity === 'error');
+          if (trialErrors.length > 0) {
+            findings = [...findings, ...trial.findings];
+            problemsOpen = true;
+            renderProblems();
+            showToast(
+              `沙箱试运行没有通过（${trialErrors.length} 个错误），修正后再发布。`,
+              'error',
+            );
+            return;
+          }
+          const approved = await reviewIsolatedDialog({
+            title:
+              pkg === undefined
+                ? `审核并发布「${spec.name}」`
+                : `审核并发布「${spec.name}」的新版本`,
+            lines: [
+              pkg === undefined
+                ? '发布后出现在所有大屏的物料库里。'
+                : `正在被 ${references.length} 张大屏使用；打开这些大屏时会用新代码渲染，已有组件的配置保留。`,
+              ...(warnings + trial.findings.length > 0
+                ? [`体检与试运行共有 ${warnings + trial.findings.length} 条警告（不阻止发布）。`]
+                : []),
+            ],
+            diff: diffSourceLines(
+              published !== undefined && isIsolatedComponentSource(published)
+                ? published.renderBody
+                : '',
+              renderBody,
+            ),
+            firstVersion: published === undefined || !isIsolatedComponentSource(published),
+            snapshots: trial.snapshots,
+            libraries: spec.isolated?.libraries ?? [],
+            events: (spec.events ?? []).map((event) => `${event.label}（${event.name}）`),
+          });
+          if (!approved) return;
+        }
+        const ok = isolated
+          ? true
+          : await confirmDialog({
+              title: pkg === undefined ? `发布「${spec.name}」` : `发布「${spec.name}」的新版本`,
+              lines: [
+                pkg === undefined
+                  ? '发布后出现在所有大屏的物料库里。'
+                  : `正在被 ${references.length} 张大屏使用；打开这些大屏时会用新代码渲染，已有组件的配置保留。`,
+                ...(warnings > 0 ? [`体检有 ${warnings} 条警告（不阻止发布）。`] : []),
+                '改动不会自动回滚；之后可以继续修改再发布。',
+              ],
+              confirm: '发布',
+            });
         if (!ok) return;
-        const result = await publishAtomicComponent({ type, source: source(), pkg });
+        const result = await publishAtomicComponent({
+          type,
+          source: source(),
+          pkg,
+          ...(trial === undefined ? {} : { trial }),
+        });
         if (!result.ok) {
           if (result.findings !== undefined) {
             findings = result.findings;
@@ -1592,6 +1724,7 @@ export const componentAtomicEditView: ViewModule = {
       const { template, ...rest } = next.spec;
       spec = isTemplateComponentSource(next) ? (rest as BaseScreenMaterialSpec) : next.spec;
       renderBody = next.renderBody;
+      isolated = isIsolatedComponentSource(next);
       templateText =
         template === undefined
           ? undefined
@@ -1663,19 +1796,32 @@ export const componentAtomicEditView: ViewModule = {
     const mountCode = (): void => {
       if (code !== undefined) return;
       const template = templateText !== undefined;
+      kindBadge.textContent = isolated ? '原子 · 隔离代码' : template ? '原子 · 无代码' : '原子';
       codeHead.replaceChildren(
-        el('strong', { text: template ? '模板（JSON）' : '渲染代码' }),
+        el('strong', {
+          text: template ? '模板（JSON）' : isolated ? '组件代码（沙箱运行）' : '渲染代码',
+        }),
         el('span', {
           class: 'component-code__hint',
           text: template
             ? '受限 SVG 图元 + 绑定表达式，不含代码 · Ctrl/⌘+S 保存草稿 · Ctrl/⌘+Enter 刷新预览'
-            : '只在 root 里绘制 · Ctrl/⌘+S 保存草稿 · Ctrl/⌘+Enter 刷新预览',
+            : isolated
+              ? '导出 create(env)，只在沙箱里运行，不能联网 · Ctrl/⌘+S 保存草稿 · Ctrl/⌘+Enter 刷新预览'
+              : '只在 root 里绘制 · Ctrl/⌘+S 保存草稿 · Ctrl/⌘+Enter 刷新预览',
         }),
       );
-      codePanel.dataset.componentCodeMode = template ? 'template' : 'render';
+      codePanel.dataset.componentCodeMode = template
+        ? 'template'
+        : isolated
+          ? 'isolated'
+          : 'render';
       code = createCodeEditor({
         value: templateText ?? renderBody,
-        completions: template ? [] : RENDER_CONTEXT_COMPLETIONS,
+        completions: template
+          ? []
+          : isolated
+            ? ISOLATED_CONTEXT_COMPLETIONS
+            : RENDER_CONTEXT_COMPLETIONS,
         language: template ? 'json' : 'javascript',
         onChange: (value) => {
           if (templateText !== undefined) templateText = value;
@@ -2044,6 +2190,127 @@ function defaultEditor(
 }
 
 // ———————————————————————————— 对话框 ————————————————————————————
+
+/**
+ * L3 发布前的人工审核（ADR-0117 D11 第 4 步）：代码差异、沙箱试运行画面、用到的预置库与事件。
+ * 审核人看完点「确认发布」才写包；智能体不能走到这一步。
+ */
+function reviewIsolatedDialog(options: {
+  readonly title: string;
+  readonly lines: readonly string[];
+  readonly diff: readonly { readonly kind: 'same' | 'add' | 'remove'; readonly text: string }[];
+  readonly firstVersion: boolean;
+  readonly snapshots: IsolatedTrialResult['snapshots'];
+  readonly libraries: readonly string[];
+  readonly events: readonly string[];
+}): Promise<boolean> {
+  return new Promise((resolve) => {
+    const overlay = el('div', { class: 'ds-overlay', attrs: { 'data-component-dialog': '' } });
+    const done = (value: boolean): void => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(value);
+    };
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') done(false);
+    };
+    const added = options.diff.filter((line) => line.kind === 'add').length;
+    const removed = options.diff.filter((line) => line.kind === 'remove').length;
+    // 只显示改动附近 2 行；首个版本整段都是新增。
+    const keep = options.diff.map((line, index) =>
+      options.diff.slice(Math.max(0, index - 2), index + 3).some((near) => near.kind !== 'same'),
+    );
+    const diffView = el(
+      'pre',
+      { class: 'component-review__diff', attrs: { 'data-component-review-diff': '' } },
+      options.diff.flatMap((line, index) =>
+        keep[index] === true
+          ? [
+              el('span', {
+                class: `component-review__line component-review__line--${line.kind}`,
+                text: `${line.kind === 'add' ? '+' : line.kind === 'remove' ? '-' : ' '} ${line.text}`,
+              }),
+            ]
+          : index > 0 && keep[index - 1] === true
+            ? [
+                el('span', {
+                  class: 'component-review__line component-review__line--gap',
+                  text: '  …',
+                }),
+              ]
+            : [],
+      ),
+    );
+    const shots = el(
+      'div',
+      { class: 'component-review__shots', attrs: { 'data-component-review-shots': '' } },
+      options.snapshots.map((shot) =>
+        el('figure', { class: 'component-review__shot' }, [
+          shot.image === undefined
+            ? el('span', { class: 'component-review__missing', text: '没有画面' })
+            : el('img', { attrs: { src: shot.image, alt: `${shot.label}试运行画面` } }),
+          el('figcaption', {
+            text: `${shot.label} ${shot.size.width} × ${shot.size.height} · 首帧 ${shot.firstFrameMs ?? '—'} ms`,
+          }),
+        ]),
+      ),
+    );
+    const confirmButton = el('button', {
+      class: 'button button--primary',
+      text: '确认发布',
+      attrs: { type: 'button', 'data-component-dialog-confirm': '' },
+      on: { click: () => done(true) },
+    });
+    overlay.append(
+      el(
+        'div',
+        {
+          class: 'ds-dialog component-review',
+          attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': options.title },
+        },
+        [
+          el('h2', { class: 'ds-dialog__title', text: options.title }),
+          el('div', { class: 'ds-dialog__body' }, [
+            ...options.lines.map((line) => el('p', { text: line })),
+            el('h3', { class: 'component-review__heading', text: '沙箱试运行（示例数据）' }),
+            shots,
+            el('h3', {
+              class: 'component-review__heading',
+              text: options.firstVersion
+                ? `组件代码（首个版本，${added} 行）`
+                : `代码改动（+${added} / -${removed} 行）`,
+            }),
+            added + removed === 0
+              ? el('p', { class: 'component-hint', text: '代码与已发布版本相同。' })
+              : diffView,
+            el('dl', { class: 'component-review__facts' }, [
+              el('dt', { text: '预置库' }),
+              el('dd', {
+                text: options.libraries.length === 0 ? '无' : options.libraries.join('、'),
+              }),
+              el('dt', { text: '事件' }),
+              el('dd', { text: options.events.length === 0 ? '无' : options.events.join('、') }),
+              el('dt', { text: '网络' }),
+              el('dd', { text: '无（沙箱断网）' }),
+            ]),
+          ]),
+          el('div', { class: 'ds-dialog__actions' }, [
+            el('button', {
+              class: 'button',
+              text: '取消',
+              attrs: { type: 'button' },
+              on: { click: () => done(false) },
+            }),
+            confirmButton,
+          ]),
+        ],
+      ),
+    );
+    document.addEventListener('keydown', onKey);
+    document.body.append(overlay);
+    confirmButton.focus();
+  });
+}
 
 function confirmDialog(options: {
   readonly title: string;
