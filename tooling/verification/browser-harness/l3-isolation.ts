@@ -39,6 +39,8 @@ import { HARNESS_TEMPLATE_MATERIAL_SPECS } from './template-materials.ts';
 const params = new URL(location.href).searchParams;
 const isolation = (params.get('iso') ?? 'realm') as L3Isolation | 'sdk';
 const bad = params.get('bad') ?? '';
+/** 宿主页面自己带 `<meta>` CSP（ADR-0117 §9.8：srcdoc 沙箱会继承它）。 */
+const hostCsp = params.get('hostcsp') === '1';
 const count = Math.max(0, Number(params.get('n') ?? '10'));
 const lib = params.get('lib') === 'echarts' ? 'echarts' : 'canvas';
 // 包级默认位图：OffscreenCanvas 转进不透明源 iframe 在 Edge 上会让整页崩溃（第一轮实测）。
@@ -270,6 +272,15 @@ const result: Record<string, unknown> = {
 async function run(): Promise<void> {
   // 先挂出统计：页面卡住或超时时，运行器还能读到走到了哪一步。
   (window as { __l3Bench?: unknown }).__l3Bench = { result, stats: l3Stats };
+  if (hostCsp) {
+    // 常见的宿主加固写法：脚本只许同源（开发服务器还要 eval）、样式允许内联。
+    const meta = document.createElement('meta');
+    meta.httpEquiv = 'Content-Security-Policy';
+    meta.content =
+      "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws:; font-src 'self' data:";
+    document.head.append(meta);
+    result.hostCsp = meta.content;
+  }
   const definition = await createDefinition();
   const defined = definition.define();
   if (!defined.ok)
@@ -295,8 +306,10 @@ async function run(): Promise<void> {
   host.document = documentFor();
   const allFirst = await waitFor(
     () =>
-      l3Stats.instances.size >= count &&
-      [...l3Stats.instances.values()].every((entry) => entry.first !== undefined),
+      (l3Stats.instances.size >= count &&
+        [...l3Stats.instances.values()].every((entry) => entry.first !== undefined)) ||
+      // 熔断了就不用再等首帧（诊断用例）。
+      audits.some((record) => record.kind === 'circuit'),
     30_000,
   );
   const firsts = [...l3Stats.instances.values()].map((entry) => (entry.first ?? Number.NaN) - t0);
@@ -394,7 +407,24 @@ async function run(): Promise<void> {
     result.audit = {
       kinds,
       sample: audits.slice(0, 12).map((record) => `${record.kind} ${record.message}`),
+      causes: [...new Set(audits.map((record) => record.cause).filter(Boolean))],
     };
+    // 组件里实际显示给作者的文字（错误视图）。
+    const shown: string[] = [];
+    const collect = (root: Document | ShadowRoot): void => {
+      for (const element of root.querySelectorAll('*')) {
+        if (element.localName === 'l3-bench-gauge') {
+          const text = element.shadowRoot?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+          if (text !== '' && !shown.includes(text)) shown.push(text.slice(0, 200));
+        }
+        if (element.shadowRoot !== null) collect(element.shadowRoot);
+      }
+    };
+    collect(document);
+    result.shownText = shown;
+    result.probeFramesLeft = document.querySelectorAll(
+      'iframe[data-base-screen-isolated-probe]',
+    ).length;
     result.isolatedElement =
       deepQuery(document, 'l3-bench-gauge')?.shadowRoot?.firstElementChild?.nextElementSibling
         ?.firstElementChild?.tagName ?? null;

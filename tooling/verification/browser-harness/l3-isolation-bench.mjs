@@ -68,6 +68,12 @@ const MATRIX = {
     { iso: 'realm', n: 40, lib: 'canvas' },
     { iso: 'realm', n: 40, lib: 'echarts' },
   ],
+  // 握手失败的诊断（ADR-0117 §9.8）：宿主 CSP 继承、模块顶层死循环，与一个正常对照。
+  sdkdiag: [
+    { iso: 'sdk', n: 2, lib: 'canvas' },
+    { iso: 'sdk', n: 2, lib: 'canvas', hostcsp: 1 },
+    { iso: 'sdk', n: 2, lib: 'canvas', bad: 'startup' },
+  ],
   // 恶意包：死循环、每帧抛错、刷事件——只有该包变成错误视图，页面与设计器不受影响。
   sdkbad: [
     { iso: 'sdk', n: 4, lib: 'canvas', bad: 'loop' },
@@ -147,6 +153,7 @@ function label(run) {
     run.cap ? `cap${run.cap}` : '',
     run.pframe ? `frame-${run.pframe}` : '',
     run.bad ? `bad-${run.bad}` : '',
+    run.hostcsp ? 'hostcsp' : '',
     run.clock,
     run.surface,
     run.shield === 0 ? 'noshield' : '',

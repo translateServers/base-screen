@@ -11,3 +11,4 @@
 - 桥协议只认握手交出的私有端口，入站消息类型白名单、字段精确匹配、64 KiB 上限；事件名须在 Manifest 里、每实例每秒最多 20 条；连续出错、握手超时与卡死触发熔断，整个包换成错误视图，`onAudit` 上报；
 - 规格新增 `isolated: { libraries? }`（宿主预置库名），与 `template` 互斥；带 `isolated` 的规格不能交给 `createBaseScreenSpecMaterialDefinition`；
 - 没有 `crypto.subtle`（非安全上下文）时用内置 `sha256` 计算 CSP 哈希。
+- 握手超时会先诊断再熔断（ADR-0117 §9.8）：沙箱文档没加载完记为 `startup`（组件代码在加载阶段没有结束）；加载完了就用最小探针沙箱试一次，探针也跑不起来记为 `host-csp`（srcdoc 沙箱继承了宿主页面的 CSP），错误视图直接写明原因；审计记录新增可选 `cause` 字段（`BaseScreenIsolatedMaterialCircuitCause`）。

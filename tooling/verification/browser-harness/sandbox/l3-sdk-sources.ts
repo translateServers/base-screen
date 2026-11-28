@@ -7,7 +7,8 @@ import { l3Probe } from './l3-runtime.ts';
  * - canvas：每帧重画的持续动画仪表；
  * - echarts：用宿主预置的 echarts 画仪表，只在变化时回传；
  * - probe：在仪表之外跑越权探测，并试图越过桥（未声明事件、刷事件）；
- * - bad=loop / throw / spam：死循环、每帧抛错、刷事件三种恶意包，检验熔断与限流。
+ * - bad=loop / throw / spam：死循环、每帧抛错、刷事件三种恶意包，检验熔断与限流；
+ * - bad=startup：模块顶层死循环（沙箱文档一直加载不完），检验握手超时的诊断（ADR-0117 §9.8）。
  */
 
 const CANVAS_GAUGE = String.raw`
@@ -168,6 +169,8 @@ function runProbe(env) {
 }`,
     );
   }
+  // 顶层死循环：模块永远执行不完，沙箱文档的 load 事件不会到。
+  if (options.bad === 'startup') parts.push('for (;;) {}');
   const wrap =
     options.bad === 'loop'
       ? // 2 秒后在 frame 里死循环：宿主 2 秒收不到 tock 就熔断。

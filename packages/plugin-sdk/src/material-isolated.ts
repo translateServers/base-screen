@@ -61,11 +61,28 @@ export interface BaseScreenIsolatedMaterialLibrary {
 
 export type BaseScreenIsolatedMaterialAuditKind = 'csp' | 'error' | 'protocol' | 'rate' | 'circuit';
 
+/**
+ * 熔断的原因（只在 `kind: 'circuit'` 上出现，便于宿主分类展示与上报）：
+ * - `host-csp`：沙箱文档加载完了，但宿主页面连最小的探针沙箱脚本都跑不起来——srcdoc 沙箱继承了
+ *   宿主页面自己的 CSP（ADR-0117 §9.7 / §9.8）；
+ * - `startup`：沙箱文档一直没有加载完——组件代码或预置库在加载阶段没有结束（顶层死循环、执行过久）；
+ * - `handshake`：加载完了、宿主也能跑沙箱脚本，但引导没有回应握手；
+ * - `stall` / `errors` / `protocol`：运行中卡死、连续出错、消息格式反复不合法。
+ */
+export type BaseScreenIsolatedMaterialCircuitCause =
+  | 'host-csp'
+  | 'startup'
+  | 'handshake'
+  | 'stall'
+  | 'errors'
+  | 'protocol';
+
 export interface BaseScreenIsolatedMaterialAuditRecord {
   readonly kind: BaseScreenIsolatedMaterialAuditKind;
   readonly tagName: string;
   readonly componentId?: string;
   readonly message: string;
+  readonly cause?: BaseScreenIsolatedMaterialCircuitCause;
 }
 
 export interface CreateBaseScreenIsolatedMaterialDefinitionOptions {
@@ -278,6 +295,85 @@ function randomToken(): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+const PROBE_TIMEOUT_MS = 1500;
+const sandboxProbes = new WeakMap<Document, Promise<boolean>>();
+
+/**
+ * 宿主页面能不能运行 srcdoc 沙箱里按哈希放行的脚本：用一个只有一行 `postMessage` 的最小沙箱试一次。
+ * 只在握手失败、且沙箱文档已经加载完时调用，用来区分「宿主 CSP 挡住了沙箱」和组件自身的问题。
+ * 每个文档只试一次；探针 iframe 用完即删。
+ */
+function probeSandboxScripts(ownerDocument: Document): Promise<boolean> {
+  const cached = sandboxProbes.get(ownerDocument);
+  if (cached !== undefined) return cached;
+  const pending = (async (): Promise<boolean> => {
+    const view = ownerDocument.defaultView;
+    if (view === null) return false;
+    const token = randomToken();
+    const script = escapeScript(
+      `parent.postMessage({ type: 'bs-sandbox-probe', token: ${JSON.stringify(token)} }, '*');`,
+    );
+    const hash = await scriptHash(script);
+    return new Promise<boolean>((resolve) => {
+      const iframe = ownerDocument.createElement('iframe');
+      iframe.setAttribute('sandbox', 'allow-scripts');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.setAttribute('tabindex', '-1');
+      iframe.setAttribute('data-base-screen-isolated-probe', '');
+      iframe.style.cssText =
+        'position:fixed;left:0;top:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
+      let settled = false;
+      const finish = (ok: boolean): void => {
+        if (settled) return;
+        settled = true;
+        view.removeEventListener('message', onMessage);
+        clearTimeout(timer);
+        iframe.remove();
+        resolve(ok);
+      };
+      const onMessage = (event: MessageEvent<unknown>): void => {
+        const data = event.data as { readonly type?: unknown; readonly token?: unknown } | null;
+        if (
+          event.source === iframe.contentWindow &&
+          data !== null &&
+          typeof data === 'object' &&
+          data.type === 'bs-sandbox-probe' &&
+          data.token === token
+        ) {
+          finish(true);
+        }
+      };
+      view.addEventListener('message', onMessage);
+      const timer = setTimeout(() => finish(false), PROBE_TIMEOUT_MS);
+      iframe.srcdoc = [
+        '<!doctype html><html><head><meta charset="utf-8">',
+        `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${hash}">`,
+        `</head><body><script>${script}</script></body></html>`,
+      ].join('');
+      (ownerDocument.body ?? ownerDocument.documentElement).appendChild(iframe);
+    });
+  })();
+  sandboxProbes.set(ownerDocument, pending);
+  return pending;
+}
+
+/** 宿主文档里 `<meta http-equiv="Content-Security-Policy">` 的内容（响应头里的 CSP 读不到）。 */
+function readHostMetaCsp(ownerDocument: Document): string | undefined {
+  const contents: string[] = [];
+  for (const meta of ownerDocument.querySelectorAll('meta[http-equiv]')) {
+    if (meta.getAttribute('http-equiv')?.trim().toLowerCase() !== 'content-security-policy')
+      continue;
+    const content = meta.getAttribute('content')?.trim();
+    if (content !== undefined && content !== '') contents.push(content);
+  }
+  return contents.length === 0 ? undefined : contents.join(' | ');
+}
+
+const HOST_CSP_MESSAGE =
+  '宿主页面的 CSP 挡住了沙箱脚本（srcdoc 沙箱会继承宿主页面的 CSP），需要改用带独立 CSP 的沙箱路由。';
+const STARTUP_MESSAGE = '组件代码加载后一直没有结束（可能在顶层死循环或执行过久）。';
+const HANDSHAKE_MESSAGE = '沙箱握手超时：沙箱脚本没有回应。';
+
 /** 一个包的代码与库：生成 srcdoc（口令每个 iframe 不同，其余脚本的哈希缓存复用）。 */
 class PackageBundle {
   readonly #classic: readonly string[];
@@ -474,6 +570,8 @@ class PackagePool {
   #recycleTimer: ReturnType<typeof setTimeout> | undefined;
   #lastDprCheck = 0;
   #lastFrame = 0;
+  /** 沙箱文档的 load 事件是否已到（作者模块顶层卡住时 load 不会到）。 */
+  #loaded = false;
   #protocolViolations = 0;
 
   readonly #release: () => void;
@@ -509,12 +607,47 @@ class PackagePool {
     iframe.style.cssText =
       'position:fixed;left:0;top:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
     iframe.srcdoc = html;
-    iframe.addEventListener('load', () => this.#connect(token), { once: true });
+    iframe.addEventListener(
+      'load',
+      () => {
+        this.#loaded = true;
+        this.#connect(token);
+      },
+      { once: true },
+    );
     this.#iframe = iframe;
     (this.#document.body ?? this.#document.documentElement).appendChild(iframe);
     this.#handshakeTimer = setTimeout(() => {
-      if (!this.#ready) this.fail('沙箱握手超时。');
+      if (!this.#ready) void this.#diagnoseHandshake();
     }, HANDSHAKE_TIMEOUT_MS);
+  }
+
+  /**
+   * 握手超时的诊断（ADR-0117 §9.8）：
+   * - 文档没加载完 → 组件代码或预置库在加载阶段没有结束；
+   * - 加载完了 → 用最小探针沙箱试一次：探针也跑不起来就是宿主页面的 CSP 挡住了（srcdoc 继承）；
+   *   探针能跑就是引导本身没有回应。
+   * 判断依据只靠 load 事件与探针，不读宿主的响应头（读不到）；`<meta>` CSP 有的话一并记进审计。
+   */
+  async #diagnoseHandshake(): Promise<void> {
+    if (!this.#loaded) {
+      this.fail(STARTUP_MESSAGE, 'startup');
+      return;
+    }
+    const scriptsRun = await probeSandboxScripts(this.#document);
+    if (this.#ready || this.#failed !== undefined) return;
+    if (scriptsRun) {
+      this.fail(HANDSHAKE_MESSAGE, 'handshake');
+      return;
+    }
+    const meta = readHostMetaCsp(this.#document);
+    this.fail(
+      HOST_CSP_MESSAGE,
+      'host-csp',
+      meta === undefined
+        ? '宿主页面没有 <meta> CSP，挡住沙箱的 CSP 多半在 HTTP 响应头里。'
+        : `宿主页面的 <meta> CSP：${meta.slice(0, 200)}`,
+    );
   }
 
   #connect(token: string): void {
@@ -527,12 +660,18 @@ class PackagePool {
     target.postMessage({ type: 'bs-connect', token }, '*', [channel.port2]);
   }
 
-  #audit(kind: BaseScreenIsolatedMaterialAuditKind, message: string, componentId?: string): void {
+  #audit(
+    kind: BaseScreenIsolatedMaterialAuditKind,
+    message: string,
+    componentId?: string,
+    cause?: BaseScreenIsolatedMaterialCircuitCause,
+  ): void {
     this.#config.onAudit?.({
       kind,
       tagName: this.#config.tagName,
       message,
       ...(componentId === undefined ? {} : { componentId }),
+      ...(cause === undefined ? {} : { cause }),
     });
   }
 
@@ -549,7 +688,8 @@ class PackagePool {
       }
       this.#protocolViolations += 1;
       this.#audit('protocol', '沙箱消息格式不合法，已丢弃。');
-      if (this.#protocolViolations > MAX_PROTOCOL_VIOLATIONS) this.fail('沙箱消息格式反复不合法。');
+      if (this.#protocolViolations > MAX_PROTOCOL_VIOLATIONS)
+        this.fail('沙箱消息格式反复不合法。', 'protocol');
       return;
     }
     switch (message.type) {
@@ -633,7 +773,7 @@ class PackagePool {
     if (this.#tickSentAt !== undefined) {
       if (resumed) this.#tickSentAt = wall;
       else if (wall - this.#tickSentAt > STALL_TIMEOUT_MS)
-        this.fail('组件代码长时间没有响应（疑似死循环）。');
+        this.fail('组件代码长时间没有响应（疑似死循环）。', 'stall');
       return;
     }
     if (wall - this.#lastDprCheck > DPR_RECHECK_MS) {
@@ -654,10 +794,13 @@ class PackagePool {
     this.#port?.postMessage({ type: 'tick', now, ids });
   }
 
-  fail(reason: string): void {
+  /**
+   * 熔断：整个包的实例换成错误视图。`reason` 是给作者看的短句（进错误视图）；`detail` 只进审计记录。
+   */
+  fail(reason: string, cause?: BaseScreenIsolatedMaterialCircuitCause, detail?: string): void {
     if (this.#failed !== undefined) return;
     this.#failed = reason;
-    this.#audit('circuit', reason);
+    this.#audit('circuit', detail === undefined ? reason : `${reason}${detail}`, undefined, cause);
     for (const member of this.#members.values()) member.shutdown(reason);
     this.#teardown();
   }
@@ -946,7 +1089,7 @@ function createIsolatedMaterialElement(config: ElementConfig): BaseScreenMateria
     receiveError(message: string): void {
       this.#consecutiveErrors += 1;
       if (this.#consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-        this.#pool?.fail(`组件代码连续出错：${message}`);
+        this.#pool?.fail(`组件代码连续出错：${message}`, 'errors');
         return;
       }
       this.#hasFrame = false;
