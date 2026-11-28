@@ -263,7 +263,12 @@ export async function assertDatasetAuthoring(designer, page) {
     const root = element.shadowRoot;
     const host = root.querySelector('[data-designer-overlay-host]');
     const popover = root.querySelector('[data-value-ref-popover]');
-    const panel = root.querySelector('[data-inspector-pane=data]');
+    const panels = [...root.querySelectorAll('[data-inspector-pane=data]')];
+    const panel = panels[0];
+    const triggerKeys = (scope) =>
+      [...(scope?.querySelectorAll('[data-value-ref-trigger^="parameter:"]') ?? [])].map(
+        (trigger) => trigger.dataset.valueRefTrigger,
+      );
     return {
       inOverlayHost: host !== null && popover !== null && host.contains(popover),
       insidePanel: panel?.contains(popover) ?? null,
@@ -273,8 +278,19 @@ export async function assertDatasetAuthoring(designer, page) {
         (option) => option.dataset.valueRefOption.split(':')[0],
       ),
       expanded: panel
-        ?.querySelector('[data-value-ref-trigger="parameter:region"]')
+        ?.querySelector(
+          '[data-dataset-parameter-row="region"] [data-dataset-parameter-mode="variable"]',
+        )
         ?.getAttribute('aria-expanded'),
+      panelCount: panels.length,
+      panelTriggerKeys: triggerKeys(panel),
+      rootTriggerKeys: triggerKeys(root),
+      activeControl: root.activeElement?.dataset.dsControl ?? null,
+      panelSections: [...(panel?.querySelectorAll('[data-ds-section]') ?? [])].map(
+        (section) => section.dataset.dsSection,
+      ),
+      sourceHtml:
+        panel?.querySelector('[data-ds-section="source"]')?.outerHTML.slice(0, 2400) ?? null,
     };
   });
   if (
@@ -296,9 +312,11 @@ export async function assertDatasetAuthoring(designer, page) {
     return {
       popoverGone: root.querySelector('[data-value-ref-popover]') === null,
       expanded: panel
-        ?.querySelector('[data-value-ref-trigger="parameter:region"]')
+        ?.querySelector(
+          '[data-dataset-parameter-row="region"] [data-dataset-parameter-mode="variable"]',
+        )
         ?.getAttribute('aria-expanded'),
-      focusReturned: root.activeElement?.dataset.valueRefTrigger === 'parameter:region',
+      focusReturned: root.activeElement?.closest('[data-dataset-parameter-row="region"]') !== null,
     };
   });
   if (
@@ -310,7 +328,7 @@ export async function assertDatasetAuthoring(designer, page) {
       `BROWSER_HARNESS_DATASET_PARAMETER_PICKER_CLOSE_FAILED:${JSON.stringify(pickerClosed)}`,
     );
   }
-  await dataPanel.locator('[data-value-ref-trigger="parameter:region"]').click();
+  await dataPanel.locator('[data-dataset-parameter-bind="region"]').click();
   await designer.locator('[data-value-ref-option="variable:region"]').click();
   const pickedVariable = await dataPanel.evaluate((panel) => ({
     badge: panel
@@ -381,16 +399,17 @@ export async function assertDatasetAuthoring(designer, page) {
     if (feedback !== null) feedback.__probeId = 'feedback-bar';
     const inline = panel.querySelector('[data-value-ref-inline="parameter:region"]');
     return {
-      badge: panel
-        .querySelector('[data-value-ref-trigger="parameter:region"] [data-value-ref-badge]')
-        ?.getAttribute('data-value-ref-badge'),
+      pickerTriggerAbsent:
+        panel.querySelector('[data-value-ref-trigger="parameter:region"]') === null,
+      bindPresent: panel.querySelector('[data-dataset-parameter-bind="region"]') !== null,
       inlineEditable: inline === null ? null : inline instanceof HTMLInputElement,
       inlineValue: inline instanceof HTMLInputElement ? inline.value : null,
       focusOnInline: inline !== null && (panel.getRootNode()?.activeElement ?? null) === inline,
     };
   });
   if (
-    backToInline.badge !== 'inline' ||
+    !backToInline.pickerTriggerAbsent ||
+    !backToInline.bindPresent ||
     backToInline.inlineEditable !== true ||
     // 切回固定值时恢复切走前的常量，而不是退回默认值；焦点直接落在输入框里。
     backToInline.inlineValue !== 'north' ||
@@ -833,9 +852,7 @@ export async function assertDatasetAuthoring(designer, page) {
   const interactionText = await interaction.textContent();
   if (
     interactionText === null ||
-    !['\u8c03\u6574\u5927\u5c0f', '\u9884\u89c8', 'itemClick'].every((value) =>
-      interactionText.includes(value),
-    )
+    !['\u8c03\u6574\u5927\u5c0f', 'itemClick'].every((value) => interactionText.includes(value))
   ) {
     throw new Error(`BROWSER_HARNESS_INTERACTION_CAPABILITY_FAILED:${interactionText}`);
   }

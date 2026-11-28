@@ -130,7 +130,46 @@ export function sectionContentKey(
  * 2. 两端都有的段**只在内容键变化时**替换——键没变就完全不碰，节点身份、光标、IME 组合态都靠它；
  * 3. 焦点按逻辑地址四级回落（同段同控件 → 同段首个可聚焦 → 同段容器 → 面板根），绝不落到 body。
  */
+interface SectionSyncState {
+  pending: DesignerDataPanelModel | undefined;
+}
+
+const sectionSyncStates = new WeakMap<HTMLElement, SectionSyncState>();
+const MAX_SECTION_SYNC_PASSES = 4;
+
+/**
+ * 段同步可能被控件 blur / change 再入：例如切到变量时，旧内联输入框失焦会先提交一次草稿，
+ * 其事件处理器再次调用本函数。直接递归会让内层先删掉外层手里的 `existing`，回到外层时
+ * `replaceWith` 就会抛 NotFoundError。这里把内层模型记成 pending，先让当前 DOM 遍历完整结束，
+ * 再用最新模型补一轮；连续多跳最多同步跑 4 轮，仍未稳定则排到微任务，避免无限递归。
+ */
 export function syncDatasetSections(root: HTMLElement, model: DesignerDataPanelModel): void {
+  const active = sectionSyncStates.get(root);
+  if (active !== undefined) {
+    active.pending = model;
+    return;
+  }
+
+  const state: SectionSyncState = { pending: undefined };
+  sectionSyncStates.set(root, state);
+  try {
+    let current = model;
+    for (let pass = 0; pass < MAX_SECTION_SYNC_PASSES; pass += 1) {
+      syncDatasetSectionsOnce(root, current);
+      if (state.pending === undefined) return;
+      current = state.pending;
+      state.pending = undefined;
+    }
+  } finally {
+    sectionSyncStates.delete(root);
+    const pending = state.pending;
+    if (pending !== undefined && root.isConnected) {
+      queueMicrotask(() => syncDatasetSections(root, pending));
+    }
+  }
+}
+
+function syncDatasetSectionsOnce(root: HTMLElement, model: DesignerDataPanelModel): void {
   // 只对**已经渲染过**的面板做 diff：没有任何段的 root 说明这块还没画过（或不是数据面板），
   // 创建段缺少宿主上下文，交给整块渲染处理。
   if (root.querySelector('[data-ds-section]') === null) return;

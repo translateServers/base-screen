@@ -90,6 +90,8 @@ export interface DesignerValueRefPickerOptions {
   readonly onCreateVariable?: () => void;
   readonly onManage?: () => void;
   readonly onSelect: (ref: ScreenValueRef) => void;
+  /** 浮层开合时同步到真正可见的入口；内部 trigger 在行内模式可能不挂进 DOM。 */
+  readonly onOpenChange?: (open: boolean, restoreFocus: boolean) => void;
 }
 
 /** 触发器的可见摘要：徽标 + 名称。 */

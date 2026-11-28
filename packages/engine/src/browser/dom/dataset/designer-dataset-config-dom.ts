@@ -344,6 +344,20 @@ function renderParameters(
     });
     const fixedButton = modeButtons.get('inline')!;
     const variableButton = modeButtons.get('variable')!;
+    let bind: HTMLButtonElement | undefined;
+    let pickerTrigger: HTMLButtonElement | null = null;
+    let pickerOpener: HTMLElement | undefined;
+    const syncPickerExpanded = (open: boolean, restoreFocus: boolean): void => {
+      const value = String(open);
+      variableButton.setAttribute('aria-expanded', value);
+      bind?.setAttribute('aria-expanded', value);
+      if (!open && restoreFocus) {
+        const target = pickerTrigger?.isConnected ? pickerTrigger : pickerOpener;
+        target?.focus({ preventScroll: true });
+      }
+    };
+    variableButton.setAttribute('aria-haspopup', 'dialog');
+    variableButton.setAttribute('aria-expanded', 'false');
     head.append(labelText, modeGroup);
 
     const control = ownerDocument.createElement('div');
@@ -360,8 +374,17 @@ function renderParameters(
       ariaLabel: DESIGNER_UI_TEXT.dataset.parameterVariableLabel(parameter.label),
       anchor: control,
       popoverHost: options.overlayHost,
+      onOpenChange: syncPickerExpanded,
       onSelect: (ref) => options.onSelectParameter?.(parameter.name, ref),
     });
+    pickerTrigger = picker.element.querySelector<HTMLButtonElement>('[data-value-ref-trigger]');
+    pickerTrigger?.addEventListener(
+      'click',
+      () => {
+        pickerOpener = pickerTrigger ?? undefined;
+      },
+      { capture: true },
+    );
     registerSectionDisposer(section, picker.dispose);
 
     if (mode === 'inline') {
@@ -379,14 +402,17 @@ function renderParameters(
       control.appendChild(editor);
       // 固定值不再渲染「固定值2」这种摘要触发器：输入框里已经有值，摘要只是把同一个数
       // 再说一遍。这里只留一个「改绑变量」图标入口，一行三件套收成两件。
-      const bind = createDesignerIconButton(ownerDocument, {
+      bind = createDesignerIconButton(ownerDocument, {
         className: 'designer-dataset-parameter-bind',
         icon: 'variable',
         label: DESIGNER_UI_TEXT.dataset.parameterVariableLabel(parameter.label),
       });
       bind.dataset.datasetParameterBind = parameter.name;
+      bind.setAttribute('aria-haspopup', 'dialog');
+      bind.setAttribute('aria-expanded', 'false');
       bind.addEventListener('click', () => {
-        picker.element.querySelector<HTMLButtonElement>('[data-value-ref-trigger]')?.click();
+        pickerOpener = bind;
+        pickerTrigger?.click();
       });
       control.appendChild(bind);
     } else {
@@ -428,7 +454,8 @@ function renderParameters(
     // 变量方式只有「选中一个变量」这一种落地：按钮与行内 `{ }` 打开的是同一个只列变量的浮层。
     // 走真实点击（而不是直接 picker.open）是为了让面板事件层照常取消未触发的自动应用。
     variableButton.addEventListener('click', () => {
-      picker.element.querySelector<HTMLButtonElement>('[data-value-ref-trigger]')?.click();
+      pickerOpener = variableButton;
+      pickerTrigger?.click();
     });
 
     section.appendChild(field);

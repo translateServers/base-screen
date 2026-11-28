@@ -550,7 +550,7 @@ export async function assertSemanticChartAuthoring(designer, page) {
       geometryControlHeight: xRect?.height,
       geometryColumnGap:
         xRect === undefined || yRect === undefined ? undefined : yRect.left - xRect.right,
-      zHiddenInBasic: zField?.hidden,
+      zVisibleInBasic: zField?.hidden === false,
       hasNameProperty: panel.querySelector('[data-property="name"]') !== null,
       densityDisplay: density === null ? undefined : getComputedStyle(density).display,
       quickStyleSections: panel.querySelectorAll('[data-quick-style-section]').length,
@@ -571,15 +571,15 @@ export async function assertSemanticChartAuthoring(designer, page) {
     boardChrome.searchWidth !== 26 ||
     !boardChrome.toolbarInsideTabs ||
     // 「几何」标题可见 + 一级切换 / 身份 / 属性页签三行依次压在上方。
-    boardChrome.geometryTopOffset < 152 ||
-    boardChrome.geometryTopOffset > 161 ||
-    boardChrome.geometryControlHeight !== 28 ||
+    boardChrome.geometryTopOffset < 220 ||
+    boardChrome.geometryTopOffset > 230 ||
+    boardChrome.geometryControlHeight !== 30 ||
     boardChrome.geometryColumnGap !== 14 ||
-    boardChrome.zHiddenInBasic !== true ||
+    boardChrome.zVisibleInBasic !== true ||
     boardChrome.hasNameProperty ||
     boardChrome.densityDisplay === 'none' ||
     boardChrome.quickStyleSections !== 1 ||
-    boardChrome.quickStyleOpen !== true ||
+    boardChrome.quickStyleOpen !== false ||
     !boardChrome.quickStyleHasPresets ||
     !boardChrome.quickStyleHasConfig ||
     boardChrome.xSymbolRight !== '8px' ||
@@ -589,12 +589,13 @@ export async function assertSemanticChartAuthoring(designer, page) {
   ) {
     throw new Error(`BROWSER_HARNESS_BOARD_INSPECTOR_CHROME_FAILED:${JSON.stringify(boardChrome)}`);
   }
+  // 层级是几何的一部分：ADR-0102 §7 明确规定基础 / 全量都可见，不能按单个字段隐藏。
   await designer.locator('[data-inspector-density="all"]').click();
   if (!(await appearance.locator('[data-property="zIndex"]').isVisible())) {
     throw new Error('BROWSER_HARNESS_BOARD_FULL_GEOMETRY_FAILED');
   }
   await designer.locator('[data-inspector-density="basic"]').click();
-  if (await appearance.locator('[data-property="zIndex"]').isVisible()) {
+  if (!(await appearance.locator('[data-property="zIndex"]').isVisible())) {
     throw new Error('BROWSER_HARNESS_BOARD_BASIC_GEOMETRY_FAILED');
   }
   const flipLabels = await appearance
@@ -650,6 +651,11 @@ export async function assertSemanticChartAuthoring(designer, page) {
       material.style.backgroundColor === 'transparent'
     );
   });
+  // 快捷样式默认收起，避免九宫格和三行配置挤占检查器首屏。
+  const quickStyleDetails = appearance.locator('[data-quick-style-section] details').first();
+  if (!(await quickStyleDetails.evaluate((details) => details.open))) {
+    await quickStyleDetails.locator('summary').click();
+  }
   await quickPresets.nth(1).click();
   await page.waitForFunction(() => {
     const style = window.baseScreenHarness.designer.document.components.find(

@@ -770,14 +770,16 @@ async function assertSnapWorkflow(designer, page) {
   };
   // y 轴验证：title top 对齐画布 top=0（差 2px 进入捕获阈值）→ 吸附 -100。
   // 吸上即显示参考线：ALIGN 阶段（dist 2）已吸附，画布 top 线随之出现。
+  const targetDeltaX = baseline.subtitle.position.x - baseline.title.position.x;
   const targetDeltaY = 0 - baseline.title.position.y;
   await page.mouse.move(startX, startY);
   await page.mouse.down();
   if ((await designer.locator('.canvas-measurement').count()) !== 0) {
     throw new Error('BROWSER_HARNESS_SNAP_MEASUREMENT_BEFORE_DRAG_FAILED');
   }
-  await page.mouse.move(startX, startY + targetDeltaY - 2, { steps: 5 });
+  await page.mouse.move(startX + targetDeltaX, startY + targetDeltaY - 2, { steps: 5 });
   let translate = await readTranslate('title');
+  await expectAxis(translate, 'x', targetDeltaX, 'ALIGN_X');
   await expectAxis(translate, 'y', targetDeltaY, 'ALIGN');
   if ((await designer.locator('.canvas-guide-snap[data-axis="y"]').count()) < 1) {
     throw new Error('BROWSER_HARNESS_SNAP_ALIGN_GUIDE_FAILED');
@@ -799,31 +801,34 @@ async function assertSnapWorkflow(designer, page) {
       `BROWSER_HARNESS_SNAP_MEASUREMENT_DURING_DRAG_FAILED:${JSON.stringify(dragMeasurements)}`,
     );
   }
-  // 捕获阈值内（4px ≤ 6px）每帧重新吸附：保持吸附目标（×1.0，无额外释放带，Moveable/Penpot 语义）。
-  await assertSnapOverlayReuse(designer, page, { x: startX, y: startY + targetDeltaY });
-  await page.mouse.move(startX, startY + targetDeltaY + 4, { steps: 2 });
+  // 捕获阈值随组件密度收紧（基础 6px，最密 3.6px）：用 2px 验证每帧重新吸附。
+  await assertSnapOverlayReuse(designer, page, {
+    x: startX + targetDeltaX,
+    y: startY + targetDeltaY,
+  });
+  await page.mouse.move(startX + targetDeltaX, startY + targetDeltaY + 2, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', targetDeltaY, 'HOLD');
   // 超出捕获阈值（9px > 6px）立即释放：translate 恢复原始位移。
-  await page.mouse.move(startX, startY + targetDeltaY + 9, { steps: 2 });
+  await page.mouse.move(startX + targetDeltaX, startY + targetDeltaY + 9, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', targetDeltaY + 9, 'RELEASE_BEYOND');
   // 没有组件、画布或用户参考线命中时，移动保持原始位移。
-  await page.mouse.move(startX, startY + targetDeltaY + 10, { steps: 2 });
+  await page.mouse.move(startX + targetDeltaX, startY + targetDeltaY + 10, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', targetDeltaY + 10, 'RAW_MOVE');
   // 超出画布边界吸附阈值后，bottom 锚点距 subtitle top（100）2px → 按距离重新吸附。
   const releaseDelta =
     baseline.subtitle.position.y - (baseline.title.position.y + baseline.title.size.height);
-  await page.mouse.move(startX, startY + targetDeltaY + 30, { steps: 2 });
+  await page.mouse.move(startX + targetDeltaX, startY + targetDeltaY + 30, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', releaseDelta, 'RELEASE');
-  // title 与 host-data 的 left=350 已精确重合：拖动虽没动 x，已重合的边同样画线（业界一致）。
+  // title 已吸附到 subtitle/host-data 的 left：即使 x 不再变化，重合的边同样持续画线。
   if ((await designer.locator('.canvas-guide-snap[data-axis="x"]').count()) < 1) {
     throw new Error('BROWSER_HARNESS_SNAP_EXACT_X_GUIDE_FAILED');
   }
   // 指针精确落在重合边界时两轴都保持重合，两轴都有线。
-  await page.mouse.move(startX, startY + releaseDelta, { steps: 2 });
+  await page.mouse.move(startX + targetDeltaX, startY + releaseDelta, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', releaseDelta, 'EXACT_BOUNDARY');
   if (
@@ -836,6 +841,7 @@ async function assertSnapWorkflow(designer, page) {
   if ((await designer.locator('.canvas-measurement').count()) !== 0) {
     throw new Error('BROWSER_HARNESS_SNAP_MEASUREMENT_RELEASE_FAILED');
   }
+  const commitTargetX = baseline.title.position.x + targetDeltaX;
   const commitTargetY = baseline.title.position.y + releaseDelta;
   const committedOk = await page
     .waitForFunction(
@@ -843,16 +849,20 @@ async function assertSnapWorkflow(designer, page) {
         const title = window.baseScreenHarness.designer.document.components.find(
           (item) => item.id === 'title',
         );
-        return title !== undefined && Math.abs(title.position.y - expected) < 0.01;
+        return (
+          title !== undefined &&
+          Math.abs(title.position.x - expected.x) < 0.01 &&
+          Math.abs(title.position.y - expected.y) < 0.01
+        );
       },
-      commitTargetY,
+      { x: commitTargetX, y: commitTargetY },
       { timeout: 3_000 },
     )
     .catch(() => false);
   if (!committedOk) {
     const committed = await componentPositions(page, ['title']);
     throw new Error(
-      `BROWSER_HARNESS_SNAP_COMMIT_FAILED:${JSON.stringify({ committed, targetDeltaY, commitTargetY, baseline: baseline.title.position })}`,
+      `BROWSER_HARNESS_SNAP_COMMIT_FAILED:${JSON.stringify({ committed, targetDeltaX, targetDeltaY, commitTargetX, commitTargetY, baseline: baseline.title.position })}`,
     );
   }
   // 旋转候选：subtitle 移到 title 左侧并转 90°，title 左边按其 visual bounds 右边缘吸附。
@@ -880,7 +890,7 @@ async function assertSnapWorkflow(designer, page) {
     return { centerX, height: subtitle.size.height };
   });
   const rotatedRight = rotated.centerX + rotated.height / 2;
-  const rotatedDelta = rotatedRight - baseline.title.position.x;
+  const rotatedDelta = rotatedRight - (baseline.title.position.x + targetDeltaX);
   const settledAfterCommit = await page
     .waitForFunction(
       (expected) => {
@@ -892,7 +902,7 @@ async function assertSnapWorkflow(designer, page) {
         if (box === undefined || canvasBox === undefined || canvas === undefined) return false;
         return Math.abs(box.x - (canvasBox.x + canvas.clientLeft) - expected) < 1;
       },
-      baseline.title.position.x,
+      baseline.title.position.x + targetDeltaX,
       { timeout: 3_000 },
     )
     .catch(() => false);
@@ -1060,7 +1070,8 @@ export async function assertPointSnapOverlay(designer, page) {
     });
     if (
       state.captured.left !== '0px' ||
-      state.captured.lines !== 0 ||
+      // 吸附后参考线按最终几何绘制：点一旦吸上，即使原始指针离目标 3px 也应显示。
+      state.captured.lines !== 1 ||
       state.nearLines !== 1 ||
       state.exactLines !== 1
     ) {

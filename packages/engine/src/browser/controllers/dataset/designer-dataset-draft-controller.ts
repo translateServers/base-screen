@@ -35,6 +35,7 @@ import {
 import { readDesignerDataSourceInstanceView } from './designer-dataset-instance-view.js';
 import {
   readDesignerPushDelivery,
+  syncDataPanelApplyBar,
   syncDatasetSurface,
 } from './designer-dataset-surface-controller.js';
 import {
@@ -495,8 +496,12 @@ export function updateDatasetParameterValue(
     kind: 'inline',
     value,
   });
-  markDatasetDraftChanged(context, ['source', 'preview'], () =>
-    restoreDatasetControlFocus(context, `[data-value-ref-inline="${controlKey}"]`, 'caret-end'),
+  markDatasetDraftChanged(
+    context,
+    ['source', 'preview'],
+    () =>
+      restoreDatasetControlFocus(context, `[data-value-ref-inline="${controlKey}"]`, 'caret-end'),
+    { deferSurfaceWhilePickerOpen: true },
   );
 }
 
@@ -525,10 +530,16 @@ export function updateDatasetBindingSelect(
   );
 }
 
+interface MarkDatasetDraftChangedOptions {
+  /** 变量选择器已打开时，blur 提交的内联值只更新草稿状态，不重建正在承载选择器的段。 */
+  readonly deferSurfaceWhilePickerOpen?: boolean;
+}
+
 export function markDatasetDraftChanged(
   context: DesignerDatasetControllerContext,
   _sections: readonly DesignerDataSectionKey[] = ['source', 'preview'],
   restoreFocus?: () => void,
+  options: MarkDatasetDraftChangedOptions = {},
 ): void {
   context.state.draftDirty = isDatasetDraftDirty(context);
   context.state.confirmClose = false;
@@ -537,8 +548,31 @@ export function markDatasetDraftChanged(
     ...emptyDatasetPreview(context.state.preview.open),
     tab: context.state.preview.tab,
   };
+  if (options.deferSurfaceWhilePickerOpen === true && hasOpenValueRefPicker(context)) {
+    context.state.clearAutoApply();
+    syncDataPanelApplyBar(context);
+    return;
+  }
   syncDatasetSurface(context, restoreFocus);
   if (context.state.mode === 'dataset') scheduleDatasetAutoApply(context);
+}
+
+function hasOpenValueRefPicker(context: DesignerDatasetControllerContext): boolean {
+  const root = context.state.workbenchOpen
+    ? context.callbacks.getWorkbenchHost?.()
+    : context.state.panel;
+  if (root === null || root === undefined) return false;
+  // 设计器控件在 ShadowRoot 里；只看 document.activeElement 会被重定向成宿主元素。
+  // 浮层已开时保留它；失焦目标正是“打开变量/绑定浮层”的控件时，也要先把这次
+  // change 留在同一份 DOM 上，否则即将到达的 click 会落在已经被替换掉的旧按钮。
+  const scope = root.getRootNode() as Document | ShadowRoot;
+  if (scope.querySelector('[data-value-ref-popover]') !== null) return true;
+  const active = scope.activeElement;
+  return (
+    active?.closest(
+      '[data-dataset-parameter-mode="variable"], [data-dataset-parameter-bind], [data-value-ref-trigger]',
+    ) !== null
+  );
 }
 
 /**

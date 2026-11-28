@@ -62,6 +62,7 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
   let query = '';
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let disposeListeners: (() => void) | undefined;
+  let disposed = false;
 
   function currentOptions(): readonly DesignerValueRefOption[] {
     return filterValueRefOptions(buildValueRefOptions(options.input, text), query);
@@ -74,6 +75,9 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
   }
 
   function open(focusSearch: boolean): void {
+    // 段被重绘时 picker 会先 dispose；随后可能还有已排队的 click 落在这个旧触发器上。
+    // 不能让它重新挂一个没有 DOM 触发器的孤儿浮层。
+    if (disposed) return;
     if (popover !== undefined) {
       if (focusSearch) search?.focus();
       return;
@@ -84,6 +88,7 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
     host.appendChild(popover);
     positionPopover();
     trigger.setAttribute('aria-expanded', 'true');
+    options.onOpenChange?.(true, false);
     const onPointerDown = (event: Event): void => {
       // 监听在 document 上，而设计器整棵树在 shadow root 里：到达 document 时 `event.target`
       // 已被重定向成宿主元素（`base-screen-designer`），拿它判断「是否点在浮层里」永远为假，
@@ -116,6 +121,7 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
     disposeListeners?.();
     disposeListeners = undefined;
     trigger.setAttribute('aria-expanded', 'false');
+    options.onOpenChange?.(false, restoreFocus);
     if (restoreFocus) trigger.focus();
   }
 
@@ -379,10 +385,11 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
   return {
     element: shell,
     dispose: () => {
+      if (disposed) return;
+      if (popover !== undefined) close(false);
+      disposed = true;
       if (debounceTimer !== undefined) clearTimeout(debounceTimer);
       disposeListeners?.();
-      popover?.remove();
-      popover = undefined;
       trigger.replaceChildren();
       shell.replaceChildren();
     },

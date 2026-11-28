@@ -128,13 +128,14 @@ export async function openViewport({ baseUrl, browser, viewport }) {
           warning.getBoundingClientRect().width > 0 &&
           warning.getBoundingClientRect().height > 0,
         overflows: element.scrollWidth > element.clientWidth,
+        actions: warning?.querySelectorAll('button').length ?? 0,
       };
     });
     if (
-      compact.text !==
-        '\u7f16\u8f91\u5927\u5c4f\u9700\u8981\u81f3\u5c11 896 \u00d7 640 \u7684\u53ef\u7528\u7a7a\u95f4\u3002' ||
+      compact.text?.includes('编辑大屏需要至少 896 × 640 的可用空间。') !== true ||
       !compact.visible ||
-      compact.overflows
+      compact.overflows ||
+      compact.actions !== 2
     ) {
       throw new Error('BROWSER_HARNESS_COMPACT_WORKBENCH_FAILED');
     }
