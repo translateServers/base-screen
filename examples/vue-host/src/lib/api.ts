@@ -540,6 +540,11 @@ export interface OnlineMaterialPackageSaveBody {
   readonly name: string;
   readonly manifest: Record<string, unknown>;
   readonly code: string;
+  /** L3 起草元信息（ADR-0117 D11/D12）：只在「让智能体起草」后发布时带上，供签名留痕。 */
+  readonly attestationMeta?: {
+    readonly model?: string;
+    readonly promptHash?: string;
+  };
 }
 
 export interface OnlineMaterialPackageUpdateBody extends OnlineMaterialPackageSaveBody {
@@ -689,6 +694,9 @@ export const api = {
     body: OnlineMaterialPackageUpdateBody,
   ): Promise<ApiResult<{ package: OnlineMaterialPackageShape }>> =>
     request(`/material-packages/${encodeURIComponent(id)}`, { method: 'PUT', body }),
+  /** L3 隔离代码物料发布签名的公钥（ADR-0117 D11），用于浏览器端 `SubtleCrypto.verify`。 */
+  getMaterialPackagePublicKey: (): Promise<ApiResult<{ jwk: Record<string, unknown> }>> =>
+    request('/material-packages/public-key'),
   setMaterialPackageVisibility: (
     id: string,
     visible: boolean,

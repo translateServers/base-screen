@@ -189,7 +189,8 @@ export async function validateOnlineMaterialDraft(
 export async function loadOnlineMaterialEntry(
   pkg: OnlineMaterialPackageShape,
 ): Promise<ScreenParseResult<BaseScreenMaterialCatalogEntry>> {
-  if (isSpecMaterialModule(pkg.code)) return loadSpecMaterialEntry(pkg.code, pkg.manifest);
+  if (isSpecMaterialModule(pkg.code))
+    return loadSpecMaterialEntry(pkg.code, pkg.manifest, pkg.attestation);
   const manifest = parseBaseScreenMaterialManifest(pkg.manifest);
   if (!manifest.ok) return manifest;
   const cached = definedOnlineConstructors.get(manifest.value.tagName);

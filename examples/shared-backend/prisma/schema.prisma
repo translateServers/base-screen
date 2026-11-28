@@ -56,6 +56,8 @@ model MaterialPackage {
   code      String
   /// JSON 字符串：完整 Manifest，必须与代码里的 static manifest 一致
   manifest  String
+  /// JSON 字符串：L3 隔离代码物料的发布签名（ADR-0117 D11），非 L3 物料为 null
+  attestation String?
   revision  Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

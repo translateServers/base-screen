@@ -33,6 +33,7 @@ import {
   hasBaseScreenAuthoringErrors,
   parseBaseScreenMaterialSpec,
 } from 'base-screen/plugins';
+import { api } from '../lib/api';
 
 /**
  * 组件工坊（base-screen-docs ADR-0105）——三端逐字共享的宿主侧实现，browser-harness 也挂同一份。
@@ -633,6 +634,119 @@ export async function importSpecMaterialModule(code: string): Promise<
 const definedSpecEntries = new Map<string, BaseScreenMaterialCatalogEntry>();
 
 /**
+ * L3 隔离代码组件的发布签名校验（ADR-0117 D11）。签名用 ECDSA P-256，和浏览器
+ * `SubtleCrypto` 的 `ECDSA` 曲线一致；后端用 `dsaEncoding: 'ieee-p1363'` 签的是 r‖s 拼接，
+ * 正是 `subtle.verify` 要的格式。公钥只取一次并缓存——它是公开数据，取不到就等于验不过。
+ */
+let attestationPublicKeyPromise: Promise<CryptoKey | undefined> | undefined;
+
+function loadAttestationPublicKey(): Promise<CryptoKey | undefined> {
+  attestationPublicKeyPromise ??= (async (): Promise<CryptoKey | undefined> => {
+    const result = await api.getMaterialPackagePublicKey();
+    if (!result.ok) return undefined;
+    try {
+      return await crypto.subtle.importKey(
+        'jwk',
+        result.data.jwk as JsonWebKey,
+        { name: 'ECDSA', namedCurve: 'P-256' },
+        false,
+        ['verify'],
+      );
+    } catch {
+      return undefined;
+    }
+  })();
+  return attestationPublicKeyPromise;
+}
+
+interface IsolatedMaterialAttestation {
+  readonly alg: string;
+  readonly contentHash: string;
+  readonly reviewer: string;
+  readonly signedAt: string;
+  readonly signature: string;
+  readonly model?: string;
+  readonly promptHash?: string;
+}
+
+const ATTESTATION_REQUIRED_KEYS = ['alg', 'contentHash', 'reviewer', 'signedAt', 'signature'];
+const ATTESTATION_OPTIONAL_KEYS = ['model', 'promptHash'];
+
+function readIsolatedMaterialAttestation(input: unknown): IsolatedMaterialAttestation | undefined {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) return undefined;
+  const record = input as Record<string, unknown>;
+  const keys = Object.keys(record);
+  const allowed = new Set([...ATTESTATION_REQUIRED_KEYS, ...ATTESTATION_OPTIONAL_KEYS]);
+  if (!ATTESTATION_REQUIRED_KEYS.every((key) => keys.includes(key))) return undefined;
+  if (!keys.every((key) => allowed.has(key))) return undefined;
+  if (
+    typeof record.alg !== 'string' ||
+    typeof record.contentHash !== 'string' ||
+    typeof record.reviewer !== 'string' ||
+    typeof record.signedAt !== 'string' ||
+    typeof record.signature !== 'string' ||
+    (record.model !== undefined && typeof record.model !== 'string') ||
+    (record.promptHash !== undefined && typeof record.promptHash !== 'string')
+  ) {
+    return undefined;
+  }
+  return record as unknown as IsolatedMaterialAttestation;
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+/**
+ * 内容哈希必须与当前代码逐字一致、签名必须用公钥验证通过，否则拒绝（失败关闭，不猜不跳过）。
+ * 这是加载时的门禁，不是体检——体检（SDK 的 `auditBaseScreenMaterialSpec`）管的是规格写得好不好，
+ * 这里管的是「这份代码到底有没有经过发布」。
+ */
+async function verifyIsolatedMaterialAttestation(
+  code: string,
+  attestation: unknown,
+): Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }> {
+  const parsed = readIsolatedMaterialAttestation(attestation);
+  if (parsed === undefined) return { ok: false, message: '没有有效的发布签名。' };
+  if (parsed.alg !== 'ECDSA-P256-SHA256') {
+    return { ok: false, message: `不认识的签名算法：${parsed.alg}。` };
+  }
+  const actualHash = await sha256Hex(code);
+  if (actualHash !== parsed.contentHash) {
+    return { ok: false, message: '内容哈希与签名不符（代码可能被篡改）。' };
+  }
+  const key = await loadAttestationPublicKey();
+  if (key === undefined) return { ok: false, message: '取不到验签公钥。' };
+  const payload = [
+    parsed.contentHash,
+    parsed.model ?? '',
+    parsed.promptHash ?? '',
+    parsed.reviewer,
+    parsed.signedAt,
+  ].join('.');
+  let valid: boolean;
+  try {
+    valid = await crypto.subtle.verify(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      key,
+      base64ToBytes(parsed.signature),
+      new TextEncoder().encode(payload),
+    );
+  } catch {
+    valid = false;
+  }
+  return valid ? { ok: true } : { ok: false, message: '签名校验未通过。' };
+}
+
+/**
  * 规格模块 → catalog 条目。持久化的 Manifest 是权威：它必须等于用同一标签重新编译规格的结果，
  * 否则说明包被改坏（清单与代码不一致），失败关闭。同一标签只定义一次（`customElements` 不能覆盖），
  * 只差 Manifest 的变化（上下架）就把新 Manifest 挂回已定义的构造器，不重挂载（ADR-0090 兼容矩阵）。
@@ -640,6 +754,7 @@ const definedSpecEntries = new Map<string, BaseScreenMaterialCatalogEntry>();
 export async function loadSpecMaterialEntry(
   code: string,
   storedManifest: unknown,
+  attestation?: unknown,
 ): Promise<ScreenParseResult<BaseScreenMaterialCatalogEntry>> {
   const manifest = parseBaseScreenMaterialManifest(storedManifest);
   if (!manifest.ok) return manifest;
@@ -665,6 +780,13 @@ export async function loadSpecMaterialEntry(
   if (isolated !== undefined) {
     // L3：代码以文本交给 SDK，放进按包共享的沙箱 iframe（ADR-0117）。
     if (!isolated.ok) return isolated;
+    const verified = await verifyIsolatedMaterialAttestation(code, attestation);
+    if (!verified.ok) {
+      return workshopFailure(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        `隔离代码组件的发布签名校验未通过，拒绝加载：${verified.message}`,
+      );
+    }
     const libraries = await loadIsolatedLibraries(isolated.value.spec.isolated?.libraries ?? []);
     if (!libraries.ok) return libraries;
     definition = createBaseScreenIsolatedMaterialDefinition({

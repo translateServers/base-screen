@@ -19,6 +19,14 @@ export class MaterialPackagesController {
     return { packages: await this.packages.list() };
   }
 
+  @Get('public-key')
+  @ApiOperation({
+    summary: 'L3 隔离代码物料发布签名的公钥（ECDSA P-256 JWK，ADR-0117 D11，可安全公开）',
+  })
+  publicKey(): { readonly jwk: Record<string, unknown> } {
+    return { jwk: this.packages.publicKeyJwk() };
+  }
+
   @Post()
   @ApiOperation({ summary: '新建在线物料包（type 必须使用 host.online.*）' })
   @ApiResponse({ status: 409, description: 'MATERIAL_TYPE_EXISTS' })

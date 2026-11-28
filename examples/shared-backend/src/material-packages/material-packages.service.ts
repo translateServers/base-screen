@@ -8,6 +8,8 @@ import type { MaterialPackage as MaterialPackageRecord } from '../generated/pris
 import { PrismaService } from '../prisma/prisma.service';
 import type { SaveMaterialPackageDto, UpdateMaterialPackageDto } from './dto/material-package.dto';
 import { ONLINE_MATERIAL_TYPE_PATTERN } from './dto/material-package.dto';
+import type { MaterialAttestation } from './material-attestation.service';
+import { MaterialAttestationService } from './material-attestation.service';
 import {
   MAX_MATERIAL_CODE_BYTES,
   MAX_MATERIAL_MANIFEST_BYTES,
@@ -17,6 +19,8 @@ import {
 } from './material-package.types';
 
 const TAG_NAME_PATTERN = /^[a-z][a-z0-9._-]*-[a-z0-9._-]+$/;
+/** L3 隔离代码物料的包代码里有这一行（ADR-0117 §3.6）；检测用，不解析规格。 */
+const ISOLATED_SOURCE_EXPORT = /\bexport\s+const\s+source\s*=/;
 /**
  * 组件工坊的规格模块（ADR-0105 / ADR-0116）：首行是固定标记，导出 `spec`（代码物料另导出 `render`，
  * L2 模板物料只有 `spec`）。宿主按规格加载，没有 default export。标记与宿主 `component-workshop.ts` 一致。
@@ -26,7 +30,10 @@ const MAX_NAME_LENGTH = 80;
 
 @Injectable()
 export class MaterialPackagesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly attestation: MaterialAttestationService,
+  ) {}
 
   async list(): Promise<readonly MaterialPackageShape[]> {
     const rows = await this.prisma.materialPackage.findMany({ orderBy: { updatedAt: 'desc' } });
@@ -42,12 +49,14 @@ export class MaterialPackagesService {
         message: '该物料类型已存在；请编辑已有机型或换一个类型。',
       });
     }
+    const attestation = this.signIfIsolated(dto.code, dto.attestationMeta);
     const row = await this.prisma.materialPackage.create({
       data: {
         type: dto.type,
         name: dto.name.trim(),
         code: dto.code,
         manifest: JSON.stringify(manifest),
+        attestation: attestation === undefined ? null : JSON.stringify(attestation),
       },
     });
     return toShape(row);
@@ -68,12 +77,14 @@ export class MaterialPackagesService {
       });
     }
     const manifest = normalizeManifest(dto);
+    const attestation = this.signIfIsolated(dto.code, dto.attestationMeta);
     const updated = await this.prisma.materialPackage.update({
       where: { id },
       data: {
         name: dto.name.trim(),
         code: dto.code,
         manifest: JSON.stringify(manifest),
+        attestation: attestation === undefined ? null : JSON.stringify(attestation),
         revision: { increment: 1 },
       },
     });
@@ -107,6 +118,11 @@ export class MaterialPackagesService {
     return { deleted: true, id };
   }
 
+  /** 供 `GET /material-packages/public-key` 转发，不单独开路由到签名服务。 */
+  publicKeyJwk(): Record<string, unknown> {
+    return this.attestation.publicKeyJwk();
+  }
+
   /** 文档里的 `component.type` 是物料引用的唯一依据。 */
   async screenReferences(materialType: string): Promise<readonly MaterialPackageReference[]> {
     const screens = await this.prisma.screen.findMany({
@@ -125,6 +141,23 @@ export class MaterialPackagesService {
       }
     }
     return references;
+  }
+
+  /**
+   * 只对 L3 隔离代码物料签名（ADR-0117 D11）；发布一律人工点按钮，所以审核人固定为
+   * `component-workshop`，模型/提示哈希只在「让智能体起草」后发布时由前端带上（S5）。
+   */
+  private signIfIsolated(
+    code: string,
+    meta: { readonly model?: string; readonly promptHash?: string } | undefined,
+  ): MaterialAttestation | undefined {
+    if (!ISOLATED_SOURCE_EXPORT.test(code)) return undefined;
+    return this.attestation.sign({
+      code,
+      reviewer: 'component-workshop',
+      ...(meta?.model === undefined ? {} : { model: meta.model }),
+      ...(meta?.promptHash === undefined ? {} : { promptHash: meta.promptHash }),
+    });
   }
 
   private async findRow(id: string): Promise<MaterialPackageRecord> {
@@ -201,6 +234,18 @@ function readManifest(row: MaterialPackageRecord): Record<string, unknown> {
   }
 }
 
+function readAttestation(row: MaterialPackageRecord): Record<string, unknown> | undefined {
+  if (row.attestation === null || row.attestation === undefined) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(row.attestation);
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function documentReferencesType(value: unknown, materialType: string): boolean {
   if (Array.isArray(value)) return value.some((item) => documentReferencesType(item, materialType));
   if (value === null || typeof value !== 'object') return false;
@@ -210,6 +255,7 @@ function documentReferencesType(value: unknown, materialType: string): boolean {
 }
 
 function toShape(row: MaterialPackageRecord): MaterialPackageShape {
+  const attestation = readAttestation(row);
   return {
     id: row.id,
     type: row.type,
@@ -217,6 +263,7 @@ function toShape(row: MaterialPackageRecord): MaterialPackageShape {
     code: row.code,
     manifest: readManifest(row),
     revision: row.revision,
+    ...(attestation === undefined ? {} : { attestation }),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

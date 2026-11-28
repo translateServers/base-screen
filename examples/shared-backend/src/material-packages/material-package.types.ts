@@ -5,6 +5,8 @@ export interface MaterialPackageShape {
   readonly name: string;
   readonly code: string;
   readonly manifest: Readonly<Record<string, unknown>>;
+  /** L3 隔离代码物料的发布签名（ADR-0117 D11）；非 L3 物料为 undefined。 */
+  readonly attestation?: Readonly<Record<string, unknown>>;
   readonly revision: number;
   readonly createdAt: string;
   readonly updatedAt: string;

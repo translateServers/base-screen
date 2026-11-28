@@ -20,6 +20,8 @@ packages/*/LICENSE
 *.db.bak-*
 /examples/shared-backend/src/generated/
 /examples/shared-backend/data/assets/
+# L3 物料签名私钥（ADR-0117 D11）：本机状态，随 screens.db 一样不进仓库
+/examples/shared-backend/data/material-attestation-key.json
 .env
 .env.local
 !/examples/shared-backend/.env
