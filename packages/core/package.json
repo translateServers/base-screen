@@ -1,6 +1,6 @@
 {
   "name": "@base-screen/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "文档命令、事务、历史与 Blueprint 运行时",
   "license": "MIT",

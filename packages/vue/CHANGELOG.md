@@ -1,5 +1,32 @@
 # @base-screen/vue
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [5e27baa]
+- Updated dependencies [7bfdce9]
+- Updated dependencies [6deb116]
+- Updated dependencies [d90e53e]
+- Updated dependencies [1d6b802]
+- Updated dependencies [6024825]
+- Updated dependencies [d90e53e]
+- Updated dependencies [3d0f236]
+- Updated dependencies [cb20d1f]
+- Updated dependencies [82cdf39]
+- Updated dependencies [2dd17d3]
+- Updated dependencies [e6e049d]
+- Updated dependencies [59747d6]
+- Updated dependencies [1b34cf4]
+- Updated dependencies [202ad20]
+- Updated dependencies [bc7613e]
+- Updated dependencies [f85f1ad]
+- Updated dependencies [20054a5]
+- Updated dependencies [e0fa844]
+- Updated dependencies [f006a00]
+- Updated dependencies [f85f1ad]
+  - base-screen@0.4.0
+
 ## 0.2.1
 
 ### Patch Changes

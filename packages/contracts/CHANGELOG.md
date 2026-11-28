@@ -1,5 +1,35 @@
 # @base-screen/contracts
 
+## 0.3.0
+
+### Minor Changes
+
+- 5e27baa: 生成产物的版面硬校验（ADR-0112 S1）：
+
+  - contracts 新增 4 个诊断码 `LAYOUT_FONT_TOO_SMALL`、`LAYOUT_OUT_OF_BOUNDS`、`LAYOUT_OVERLAP`、`LAYOUT_CONTRAST_LOW`。
+  - core 新增纯函数 `auditScreenLayout(document, options)`：字号下限、越界（含弹框从画布）、同级部分重叠（完整包住视为有意叠放）、能静态确定背景时的对比度；可按组件子集审计，严重级别默认 `error`。
+  - `computeMinimumLegibleFontPx` 从 engine 下沉到 core，新增 `resolveScreenFontFloorPx`（无目标屏参数时 1920 宽 16px 等比换算）；engine 改为从 core 导入。
+  - 渲染探针的字号检查默认开启，与静态审计同一口径。
+
+- 7bfdce9: 智能体提案评审收口（ADR-0111）：
+
+  - 契约新增 5 个诊断码 `CHANGE_DOCUMENT_UNAVAILABLE`、`CHANGE_PROPOSAL_EMPTY`、`CHANGE_PROPOSAL_NO_EFFECT`、`CHANGE_DRAFT_PENDING`、`CHANGE_PREVIEW_UNAVAILABLE`；`submitChangeProposal` 拒绝时至少带一条诊断。
+  - core `diffScreenDocuments` 的组件差异新增 `type`、`parentId`、`status`、`dataBinding`、`canvasId`、`belowSubCanvas` 六个字段；改了这些字段的组件此前不出现在差异里。
+  - 整屏替换合并为单一不可拆单元，只能整体采纳或放弃；提案区只读列出新增 / 移除 / 画布与数据源，单元徽标为「替换」。
+  - 草案层不透明：受影响的旧组件（含只读了被改数据源的组件）在草案期间隐藏，被移除的组件原位留虚线轮廓与「将移除」标记；整屏替换不画逐组件轮廓；画布级变化整份预览。
+  - 草案条「对比旧版 / 退出对比」改为「查看旧版 / 返回草案」两态切换。
+
+- 6deb116: 流式落稿的引擎侧（ADR-0112 S5）：
+
+  - 设计器新增 `beginChangeProposal` / `extendChangeProposal` / `finishChangeProposal`：骨架命令先挂成「草案 · 生成中」，生成中不可采纳、只能取消；追加命令整批重算，失败时保留上一版草案；追加的命令若改变已出现组件的位置或尺寸，按协议错误拒绝。
+  - 契约新增诊断码 `CHANGE_STREAM_NOT_ACTIVE`、`CHANGE_STREAM_GEOMETRY_CHANGED`。
+  - `readPendingChange()` 的摘要在生成中带 `streaming: true`。
+
+- 1d6b802: 示例数据标记（ADR-0112 S2 契约部分）：
+
+  - contracts：`ScreenValueRef` 的 `inline` 分支新增可选 `sample?: true`，只能写 `true`，缺省即普通常量；JSON Schema 黄金产物同步。新增诊断码 `PUBLISH_SAMPLE_DATA_PRESENT`。
+  - core：新增 `listSampleValueRefs(document)`，按文档顺序列出组件 `dataValue`、数据源参数、变量值三处带标记的取值，不深扫 props / style。
+
 ## 0.2.0
 
 ### Minor Changes

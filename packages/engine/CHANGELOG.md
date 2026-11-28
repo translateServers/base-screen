@@ -1,5 +1,87 @@
 # @base-screen/engine
 
+## 0.3.0
+
+### Minor Changes
+
+- 7bfdce9: 智能体提案评审收口（ADR-0111）：
+
+  - 契约新增 5 个诊断码 `CHANGE_DOCUMENT_UNAVAILABLE`、`CHANGE_PROPOSAL_EMPTY`、`CHANGE_PROPOSAL_NO_EFFECT`、`CHANGE_DRAFT_PENDING`、`CHANGE_PREVIEW_UNAVAILABLE`；`submitChangeProposal` 拒绝时至少带一条诊断。
+  - core `diffScreenDocuments` 的组件差异新增 `type`、`parentId`、`status`、`dataBinding`、`canvasId`、`belowSubCanvas` 六个字段；改了这些字段的组件此前不出现在差异里。
+  - 整屏替换合并为单一不可拆单元，只能整体采纳或放弃；提案区只读列出新增 / 移除 / 画布与数据源，单元徽标为「替换」。
+  - 草案层不透明：受影响的旧组件（含只读了被改数据源的组件）在草案期间隐藏，被移除的组件原位留虚线轮廓与「将移除」标记；整屏替换不画逐组件轮廓；画布级变化整份预览。
+  - 草案条「对比旧版 / 退出对比」改为「查看旧版 / 返回草案」两态切换。
+
+- 6deb116: 流式落稿的引擎侧（ADR-0112 S5）：
+
+  - 设计器新增 `beginChangeProposal` / `extendChangeProposal` / `finishChangeProposal`：骨架命令先挂成「草案 · 生成中」，生成中不可采纳、只能取消；追加命令整批重算，失败时保留上一版草案；追加的命令若改变已出现组件的位置或尺寸，按协议错误拒绝。
+  - 契约新增诊断码 `CHANGE_STREAM_NOT_ACTIVE`、`CHANGE_STREAM_GEOMETRY_CHANGED`。
+  - `readPendingChange()` 的摘要在生成中带 `streaming: true`。
+
+- 6024825: `finishChangeProposal(id, { rationale })`：结束流式生成时可换上最终理由（ADR-0112 §2.5）。降级告警这类信息只有整份结果到齐才知道，骨架挂出时的理由只能写「生成中」；只换理由、不改命令，几何与内容都不动。
+- cb20d1f: 文档级集合的按 id 局部命令与提案单元分组提示（ADR-0115 D4、D5）。
+
+  - `core` 新增六条命令：`add-data-sources`、`update-data-source-params`（合并参数，`null` 删除）、`add-variables`、`remove-variables`、`add-blueprint-elements`、`remove-blueprint-elements`（删节点连带删掉接在它上面的连线与布局位置）。只动点名的项，其余原样保留；新增遇到已有 id、删除 / 更新遇到不存在的 id 都失败；引用完整性仍由文档校验把关。整体替换命令不变。
+  - `engine`：`DesignerChangeProposalInput.groups` 可选分组提示（`label`、`commandIndexes`、`notes`），按它拆采纳单元；分组须恰好覆盖全部命令、互不重叠、每组能单独成立，否则忽略提示走默认拆分，整屏替换仍不拆。单元新增 `notes`，评审面逐行列出（文档级变化没有组件差异行时靠它说明）。新增 `remainingChangeProposalInput`，采纳 / 忽略一个单元后分组下标随剩余命令重排。
+  - `host-kit`：`editIntent` 改用上述局部命令写联动（不再整体替换变量、数据源与蓝图），版面与联动都变了时返回 `groups`（「版面与内容」「联动」，联动组带新增 / 去掉的说明）。`IntentEditCommand` 去掉三条整体替换命令，新增六条局部命令；新增 `IntentEditGroup`。
+
+- 82cdf39: 状态外观预置下沉 `core`，MCP 补行为工具（ADR-0115 D8、D10）。
+
+  - `core` 新增 `screenStatePresetStyle(source, tone)` 与 `ScreenStatePresetSource`：给语义色调算出状态要覆盖的样式键（清单声明的 `statePresetKeys` 优先，否则推断主色、描边色与 `danger` 时的发光），规则与原先 engine 的一致。
+  - `engine`：`designerStatePresetStyle` 改用 core 的规则；新增公开的 `readDesignerStatePresetSource(manifest)`，从外观区读出键表。
+  - `host-kit`：`IntentCatalogMaterial.statePreset` 可选；阈值状态按它生成外观，与设计器「按分级生成状态」一致，缺省退回只换文字色。三端示例宿主的目录摘要带上键表。
+  - `tooling/screen-mcp-server`：`compile_screen_intent` 接受 `capabilities` 与数据集样本 `values`，返回编译出的 `behaviors`，说明里写明联动、阈值状态与 `gaps`；新增 `simulate_blueprint`（一个事件及其级联的模拟，返回各层触发的规则与结束时变了的变量、显隐、数据源参数）。冒烟检查更新为 17 个工具。
+
+### Patch Changes
+
+- 5e27baa: 生成产物的版面硬校验（ADR-0112 S1）：
+
+  - contracts 新增 4 个诊断码 `LAYOUT_FONT_TOO_SMALL`、`LAYOUT_OUT_OF_BOUNDS`、`LAYOUT_OVERLAP`、`LAYOUT_CONTRAST_LOW`。
+  - core 新增纯函数 `auditScreenLayout(document, options)`：字号下限、越界（含弹框从画布）、同级部分重叠（完整包住视为有意叠放）、能静态确定背景时的对比度；可按组件子集审计，严重级别默认 `error`。
+  - `computeMinimumLegibleFontPx` 从 engine 下沉到 core，新增 `resolveScreenFontFloorPx`（无目标屏参数时 1920 宽 16px 等比换算）；engine 改为从 core 导入。
+  - 渲染探针的字号检查默认开启，与静态审计同一口径。
+
+- d90e53e: 示例数据的另外两个入口（ADR-0112 §2.3）：
+
+  - 检查器数据段：选中组件的取值是智能体给的示例数据时，在数据面板顶部说明，并给出「绑定数据集」（打开来源浮层）与「保留为常量」（一次事务、可撤销）两个入口。
+  - 发布被 `PUBLISH_SAMPLE_DATA_PRESENT` 拦截时，除通知外弹出逐项列表：列出还带示例数据的组件，点一项关闭弹窗并定位到画布上的组件；数据源参数与变量上的示例值只计数。不提供强制发布。
+
+- d90e53e: 拖动吸附与间距标注在密集场景下收敛（ADR-0103 §2.8、§2.9）：
+
+  - **吸附参数随组件密度自适应**：选区周围（约一屏可见区）的组件数超过 4 个后，捕获阈值从 6px 连续收紧到 3.6px、邻近范围从 180px 收紧到 81px（4–14 个平滑过渡）；稀疏布局保持原值。拖过不同密度的区域时参数跟着变，参考线与等间距只考虑附近的组件。
+  - **间距只认空档**：等间距候选只取相邻组件之间的真实空隙；中间夹着同排组件的跨度不再算间距，一列 16px 组件不再同时产出 32 / 48 / 64 这类伪间距。
+  - **等间距标注不再延伸整条链**：只画新间距与它参照的那一段（居中则两侧两段），同一轴有居中解时不再叠加复制标注；16px 列上不再出现一列相同读数。
+  - **对齐轨道间距改为四侧最近邻**：选区左 / 右 / 上 / 下各取一段最近间距（总计 ≤ 4），位置取两侧共享跨度的中心，不再沿三条轨道标出每一对相邻组件。
+  - **读数放不下就不画数字**：间距的屏幕长度不足一行读数（14px）时只画虚线与端点，缩小时不再叠字。
+
+- 3d0f236: 蓝图级联模拟下沉 `core`（ADR-0115 D6）。
+
+  - `core` 新增 `simulateScreenBlueprint(document, event, options)` 与 `SCREEN_BLUEPRINT_SIMULATION_MAX_DEPTH`：从一个事件出发逐次分派，变量值改变后分派它的 `data-updated`，从画布开合与页面导航按查看器的顺序级联；请求类动作只登记。结果给出每次分派的轨迹、级联超限或求值失败，以及模拟结束时变了的变量、显隐变了的组件、引用变量且求值结果变了的数据源参数。纯函数，不取数、不调宿主动作。
+  - `engine`：蓝图工作台的「模拟」改用它，轨迹与原先一致。
+  - `host-kit`：筛选联动采纳前，按画像样本逐个取值造来源事件交给 `simulateScreenBlueprint`，看目标实例参数会不会变成不同的合法取值；页签（`tabChange.value`）与数值类（`valueClick.value`）负载也纳入模拟，不再记「未模拟」。
+
+- 2dd17d3: 行为生成补齐 ADR-0115 D2 推迟项，修复浏览器核对中发现的问题。
+
+  - `host-kit`：
+    - 筛选联动支持 `reset: true`（再点同一项恢复原值，编译成蓝图条件分支）；
+    - 新增「设状态」联动 `{ kind: 'state', from, event, to, state }`，按状态名或色调指向指标已声明的状态，`reset` 恢复按判定显示；
+    - 指标状态支持 `{ source: 'level-scale' }`，按引用数据集上宿主给的 `levelScales` 生成，没有分级表时不编译并记 `AGENT_STATE_LEVEL_SCALE_UNAVAILABLE`；
+    - `IntentBehaviorSummary.kind` 增加 `set-state`；会话摘要带上指标已有的状态名；
+    - 局部修改里指标阈值的简写（`rules` / `suggested` 写在 set 顶层、`states` 写成数组）折成 `states`。
+  - `engine`：草案层渲染时带上变量取值（画布已有的沿用当前值，草案新增的取初值），智能体生成的联动参数在草案上不再报「变量没有值」。
+
+- Updated dependencies [5e27baa]
+- Updated dependencies [7bfdce9]
+- Updated dependencies [6deb116]
+- Updated dependencies [1d6b802]
+- Updated dependencies [3d0f236]
+- Updated dependencies [cb20d1f]
+- Updated dependencies [82cdf39]
+  - @base-screen/contracts@0.3.0
+  - @base-screen/core@0.3.0
+  - @base-screen/plugin-core@0.2.1
+  - @base-screen/renderer@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

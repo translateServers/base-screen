@@ -1,5 +1,31 @@
 # @base-screen/sdk
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [5e27baa]
+- Updated dependencies [7bfdce9]
+- Updated dependencies [6deb116]
+- Updated dependencies [d90e53e]
+- Updated dependencies [1d6b802]
+- Updated dependencies [6024825]
+- Updated dependencies [d90e53e]
+- Updated dependencies [3d0f236]
+- Updated dependencies [cb20d1f]
+- Updated dependencies [82cdf39]
+- Updated dependencies [2dd17d3]
+- Updated dependencies [e0fa844]
+- Updated dependencies [f006a00]
+  - @base-screen/contracts@0.3.0
+  - @base-screen/core@0.3.0
+  - @base-screen/engine@0.3.0
+  - @base-screen/plugin-sdk@0.3.0
+  - @base-screen/material@0.2.1
+  - @base-screen/plugin-core@0.2.1
+  - @base-screen/plugin-manager@0.2.1
+  - @base-screen/renderer@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

@@ -1,5 +1,15 @@
 # @base-screen/plugin-core
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [5e27baa]
+- Updated dependencies [7bfdce9]
+- Updated dependencies [6deb116]
+- Updated dependencies [1d6b802]
+  - @base-screen/contracts@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
