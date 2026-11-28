@@ -15,6 +15,7 @@ import {
   type BaseScreenMaterialDefinition,
   createMaterialDefinition,
 } from './material-definition.js';
+import { buildBaseScreenIsolatedMetaCsp } from './material-isolated-csp.js';
 import {
   type BaseScreenIsolatedRuntimeConfig,
   baseScreenIsolatedRuntime,
@@ -67,10 +68,14 @@ export type BaseScreenIsolatedMaterialAuditKind = 'csp' | 'error' | 'protocol' |
  *   宿主页面自己的 CSP（ADR-0117 §9.7 / §9.8）；
  * - `startup`：沙箱文档一直没有加载完——组件代码或预置库在加载阶段没有结束（顶层死循环、执行过久）；
  * - `handshake`：加载完了、宿主也能跑沙箱脚本，但引导没有回应握手；
+ * - `sandbox-route`：配置了沙箱路由（ADR-0118），但宿主没能把文档交给路由（`resolve` 失败或返回的地址不可用）；
  * - `stall` / `errors` / `protocol`：运行中卡死、连续出错、消息格式反复不合法。
+ *
+ * 配置了沙箱路由时，`host-csp` 指宿主页面的 CSP 没有放行沙箱路由（`frame-src`）。
  */
 export type BaseScreenIsolatedMaterialCircuitCause =
   | 'host-csp'
+  | 'sandbox-route'
   | 'startup'
   | 'handshake'
   | 'stall'
@@ -83,6 +88,24 @@ export interface BaseScreenIsolatedMaterialAuditRecord {
   readonly componentId?: string;
   readonly message: string;
   readonly cause?: BaseScreenIsolatedMaterialCircuitCause;
+}
+
+/** 一个包的沙箱文档（ADR-0118 §3.1）：同一个包恒定，可以按 `hash` 寻址与长期缓存。 */
+export interface BaseScreenIsolatedSandboxDocument {
+  readonly html: string;
+  /** `sha256(html)` 的小写十六进制。 */
+  readonly hash: string;
+  /** 文档里每段内联脚本的 CSP 哈希源（`'sha256-…'`），路由把它们写进响应头的 `script-src`。 */
+  readonly scriptHashes: readonly string[];
+}
+
+/**
+ * 沙箱宿主端口（ADR-0118 D1）：宿主把文档交给自己的沙箱路由，返回可以导航过去的 http(s) 地址。
+ * 配置了它，沙箱 iframe 用 `src` 加载这个地址，文档只受路由响应头里的 CSP 约束，不再继承宿主页面的
+ * CSP；没配就照旧用 `srcdoc`。Base Screen 自己不发请求。
+ */
+export interface BaseScreenIsolatedSandboxHost {
+  resolve(document: BaseScreenIsolatedSandboxDocument): Promise<string>;
 }
 
 export interface CreateBaseScreenIsolatedMaterialDefinitionOptions {
@@ -101,6 +124,8 @@ export interface CreateBaseScreenIsolatedMaterialDefinitionOptions {
   readonly onAudit?: (record: BaseScreenIsolatedMaterialAuditRecord) => void;
   /** 每画出一帧（宿主收到一张位图）调用一次；截图就绪判断与测量用。 */
   readonly onFrame?: (componentId: string) => void;
+  /** 沙箱路由（ADR-0118）；省略时用 `srcdoc`。 */
+  readonly sandbox?: BaseScreenIsolatedSandboxHost;
 }
 
 export const BASE_SCREEN_ISOLATED_MATERIAL_SOURCE_MAX_BYTES = 200 * 1024;
@@ -166,6 +191,9 @@ export function createBaseScreenIsolatedMaterialDefinition(
   if (!Number.isFinite(maxFps) || maxFps < 1 || maxFps > 120) {
     return failure('PLUGIN_CORE_LIFECYCLE_INVALID', ['maxFps'], 'maxFps 必须在 1–120 之间。');
   }
+  if (options.sandbox !== undefined && typeof options.sandbox.resolve !== 'function') {
+    return failure('PLUGIN_CORE_LIFECYCLE_INVALID', ['sandbox'], 'sandbox.resolve 必须是函数。');
+  }
   const manifest = compileBaseScreenMaterialSpec(spec.value, {
     tagName: options.tagName,
     ...(options.libraryVisible === undefined ? {} : { libraryVisible: options.libraryVisible }),
@@ -179,8 +207,25 @@ export function createBaseScreenIsolatedMaterialDefinition(
     tagName: options.tagName,
     ...(options.onAudit === undefined ? {} : { onAudit: options.onAudit }),
     ...(options.onFrame === undefined ? {} : { onFrame: options.onFrame }),
+    ...(options.sandbox === undefined ? {} : { sandbox: options.sandbox }),
   });
   return createMaterialDefinition({ manifest: manifest.value, element });
+}
+
+/**
+ * 生成与 `createBaseScreenIsolatedMaterialDefinition` 完全相同的沙箱文档（不注册任何东西）。
+ * 宿主可以用它预先把文档放进沙箱路由，测试也用它核对文档恒定。
+ */
+export function buildBaseScreenIsolatedSandboxDocument(options: {
+  readonly source: string;
+  readonly libraries?: readonly BaseScreenIsolatedMaterialLibrary[];
+  readonly maxFps?: number;
+}): Promise<BaseScreenIsolatedSandboxDocument> {
+  return new PackageBundle(
+    options.source,
+    options.libraries ?? [],
+    options.maxFps ?? DEFAULT_MAX_FPS,
+  ).document();
 }
 
 // ---------------------------------------------------------------------------
@@ -196,15 +241,18 @@ const hashCache = new Map<string, Promise<string>>();
  * 内联脚本的 CSP 哈希源（`'sha256-…'`）；库与作者代码按内容缓存。`crypto.subtle` 只在安全上下文
  * 里有：内网用 http 部署的大屏拿不到，退回 SDK 自带的实现。
  */
+function digestText(text: string): Promise<Uint8Array> {
+  const bytes = new TextEncoder().encode(text);
+  const subtle = (globalThis.crypto as Crypto | undefined)?.subtle;
+  return subtle === undefined
+    ? Promise.resolve(sha256(bytes))
+    : subtle.digest('SHA-256', bytes).then((buffer) => new Uint8Array(buffer));
+}
+
 function scriptHash(text: string): Promise<string> {
   let cached = hashCache.get(text);
   if (cached === undefined) {
-    const bytes = new TextEncoder().encode(text);
-    const subtle = (globalThis.crypto as Crypto | undefined)?.subtle;
-    const digest =
-      subtle === undefined
-        ? Promise.resolve(sha256(bytes))
-        : subtle.digest('SHA-256', bytes).then((buffer) => new Uint8Array(buffer));
+    const digest = digestText(text);
     cached = digest.then((value) => {
       let binary = '';
       for (const byte of value) binary += String.fromCharCode(byte);
@@ -373,55 +421,61 @@ const HOST_CSP_MESSAGE =
   '宿主页面的 CSP 挡住了沙箱脚本（srcdoc 沙箱会继承宿主页面的 CSP），需要改用带独立 CSP 的沙箱路由。';
 const STARTUP_MESSAGE = '组件代码加载后一直没有结束（可能在顶层死循环或执行过久）。';
 const HANDSHAKE_MESSAGE = '沙箱握手超时：沙箱脚本没有回应。';
+const ROUTE_HANDSHAKE_MESSAGE =
+  '沙箱握手超时：沙箱路由可能没有返回这份文档，或响应头里的 CSP 挡住了脚本。';
 
-/** 一个包的代码与库：生成 srcdoc（口令每个 iframe 不同，其余脚本的哈希缓存复用）。 */
+/**
+ * 一个包的代码与库 → 沙箱文档。文档对同一个包恒定（ADR-0118 D2：握手口令不进文档），只生成一次。
+ * 引导是第一段脚本：它最先读取并清空 `window.name` 里的口令，预置库与作者代码都在它之后运行。
+ */
 class PackageBundle {
-  readonly #classic: readonly string[];
-  readonly #module: string;
-  readonly #config: Omit<BaseScreenIsolatedRuntimeConfig, 'token'>;
+  readonly #source: string;
+  readonly #libraries: readonly BaseScreenIsolatedMaterialLibrary[];
+  readonly #config: BaseScreenIsolatedRuntimeConfig;
+  #document: Promise<BaseScreenIsolatedSandboxDocument> | undefined;
 
   constructor(
     source: string,
     libraries: readonly BaseScreenIsolatedMaterialLibrary[],
     maxFps: number,
   ) {
-    this.#classic = [
-      ...libraries.map((library) => escapeScript(library.source)),
-      escapeScript(`globalThis.__bsFormat = (${String(formatBaseScreenMaterialNumber)});`),
-    ];
-    // 作者代码是模块：`export function create` 在模块作用域里也是本地绑定，末尾挂到全局给引导取用。
-    // 模块脚本在经典脚本之后、load 之前执行；握手发生在 load 之后，所以挂载时 create 已就绪。
-    this.#module = escapeScript(
-      `${source}\n;globalThis.__bsCreate = typeof create === 'function' ? create : undefined;\n`,
-    );
+    this.#source = source;
+    this.#libraries = libraries;
     this.#config = {
       libraries: libraries.map((library) => [library.name, library.global] as const),
       maxFps,
     };
   }
 
-  async srcdoc(token: string): Promise<string> {
-    const config: BaseScreenIsolatedRuntimeConfig = { ...this.#config, token };
-    const boot = escapeScript(`(${String(baseScreenIsolatedRuntime)})(${JSON.stringify(config)});`);
-    const classic = [...this.#classic, boot];
-    const hashes = await Promise.all([...classic, this.#module].map(scriptHash));
-    const csp = [
-      "default-src 'none'",
-      `script-src ${hashes.join(' ')}`,
-      "style-src 'unsafe-inline'",
-      'img-src data: blob:',
-      'font-src data:',
-      "base-uri 'none'",
-    ].join('; ');
-    return [
+  document(): Promise<BaseScreenIsolatedSandboxDocument> {
+    this.#document ??= this.#build();
+    return this.#document;
+  }
+
+  async #build(): Promise<BaseScreenIsolatedSandboxDocument> {
+    const classic = [
+      escapeScript(`(${String(baseScreenIsolatedRuntime)})(${JSON.stringify(this.#config)});`),
+      ...this.#libraries.map((library) => escapeScript(library.source)),
+      escapeScript(`globalThis.__bsFormat = (${String(formatBaseScreenMaterialNumber)});`),
+    ];
+    // 作者代码是模块：`export function create` 在模块作用域里也是本地绑定，末尾挂到全局给引导取用。
+    // 模块脚本在经典脚本之后、load 之前执行；握手发生在 load 之后，所以挂载时 create 已就绪。
+    const module = escapeScript(
+      `${this.#source}\n;globalThis.__bsCreate = typeof create === 'function' ? create : undefined;\n`,
+    );
+    const scriptHashes = await Promise.all([...classic, module].map(scriptHash));
+    const html = [
       '<!doctype html><html><head><meta charset="utf-8">',
-      `<meta http-equiv="Content-Security-Policy" content="${csp}">`,
+      `<meta http-equiv="Content-Security-Policy" content="${buildBaseScreenIsolatedMetaCsp(scriptHashes)}">`,
       '<style>html,body{margin:0;overflow:hidden;background:transparent}</style>',
       '</head><body>',
       ...classic.map((script) => `<script>${script}</script>`),
-      `<script type="module">${this.#module}</script>`,
+      `<script type="module">${module}</script>`,
       '</body></html>',
     ].join('');
+    const digest = await digestText(html);
+    const hash = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    return { html, hash, scriptHashes };
   }
 }
 
@@ -553,6 +607,32 @@ interface ElementConfig {
   readonly tagName: string;
   readonly onAudit?: (record: BaseScreenIsolatedMaterialAuditRecord) => void;
   readonly onFrame?: (componentId: string) => void;
+  readonly sandbox?: BaseScreenIsolatedSandboxHost;
+}
+
+/** 沙箱路由返回的地址必须是 http(s)：`about:` / `blob:` / `data:` 会继承宿主 CSP，`javascript:` 更不行。 */
+function readSandboxUrl(input: unknown, ownerDocument: Document): URL {
+  if (typeof input !== 'string' || input.trim() === '') {
+    throw new Error('沙箱路由没有返回地址。');
+  }
+  const url = new URL(input, ownerDocument.baseURI);
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new Error(`沙箱路由返回的地址不是 http(s)：${url.protocol}`);
+  }
+  return url;
+}
+
+/** CSP 违规事件里被拦的地址是不是这个沙箱路由（比较来源与路径；跨源时浏览器可能只给来源）。 */
+function isSandboxTarget(blockedURI: string, target: URL): boolean {
+  try {
+    const blocked = new URL(blockedURI);
+    return (
+      blocked.origin === target.origin &&
+      (blocked.pathname === target.pathname || blocked.pathname === '/')
+    );
+  } catch {
+    return false;
+  }
 }
 
 class PackagePool {
@@ -572,6 +652,9 @@ class PackagePool {
   #lastFrame = 0;
   /** 沙箱文档的 load 事件是否已到（作者模块顶层卡住时 load 不会到）。 */
   #loaded = false;
+  /** 网络导航模式（ADR-0118）的沙箱地址；srcdoc 模式为 undefined。 */
+  #sandboxUrl: URL | undefined;
+  #stopWatchingFrames: (() => void) | undefined;
   #protocolViolations = 0;
 
   readonly #release: () => void;
@@ -589,14 +672,30 @@ class PackagePool {
 
   async #open(): Promise<void> {
     const token = randomToken();
-    let html: string;
+    let sandboxDocument: BaseScreenIsolatedSandboxDocument;
     try {
-      html = await this.#config.bundle.srcdoc(token);
+      sandboxDocument = await this.#config.bundle.document();
     } catch (error) {
       this.fail(`沙箱文档生成失败：${String((error as Error)?.message ?? error)}`);
       return;
     }
     if (this.#failed !== undefined) return;
+    const sandbox = this.#config.sandbox;
+    if (sandbox !== undefined) {
+      try {
+        this.#sandboxUrl = readSandboxUrl(await sandbox.resolve(sandboxDocument), this.#document);
+      } catch (error) {
+        this.fail(
+          `沙箱文档没能交给宿主的沙箱路由：${String((error as Error)?.message ?? error)}`.slice(
+            0,
+            200,
+          ),
+          'sandbox-route',
+        );
+        return;
+      }
+      if (this.#failed !== undefined) return;
+    }
     const iframe = this.#document.createElement('iframe');
     iframe.setAttribute('sandbox', 'allow-scripts');
     iframe.setAttribute('referrerpolicy', 'no-referrer');
@@ -606,7 +705,14 @@ class PackagePool {
     // 留在视口内、不可见：display:none / visibility:hidden 的跨源 iframe 会被节流。
     iframe.style.cssText =
       'position:fixed;left:0;top:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
-    iframe.srcdoc = html;
+    // 口令走 name 属性（ADR-0118 D2）：要在挂进文档、创建浏览上下文之前设好。
+    iframe.name = token;
+    if (this.#sandboxUrl !== undefined) {
+      this.#watchFrameViolations(this.#sandboxUrl);
+      iframe.src = this.#sandboxUrl.href;
+    } else {
+      iframe.srcdoc = sandboxDocument.html;
+    }
     iframe.addEventListener(
       'load',
       () => {
@@ -634,6 +740,16 @@ class PackagePool {
       this.fail(STARTUP_MESSAGE, 'startup');
       return;
     }
+    if (this.#sandboxUrl !== undefined) {
+      // 网络导航模式：宿主 CSP 挡 frame-src 的情况由违规监听当场判定；走到这里就是路由本身的问题。
+      // 不跑 srcdoc 探针：宿主带 CSP 时探针必然失败，那不是这条路径的故障原因。
+      this.fail(
+        ROUTE_HANDSHAKE_MESSAGE,
+        'handshake',
+        ` 沙箱地址：${this.#sandboxUrl.href.slice(0, 160)}`,
+      );
+      return;
+    }
     const scriptsRun = await probeSandboxScripts(this.#document);
     if (this.#ready || this.#failed !== undefined) return;
     if (scriptsRun) {
@@ -648,6 +764,28 @@ class PackagePool {
         ? '宿主页面没有 <meta> CSP，挡住沙箱的 CSP 多半在 HTTP 响应头里。'
         : `宿主页面的 <meta> CSP：${meta.slice(0, 200)}`,
     );
+  }
+
+  /**
+   * 握手完成前监听宿主文档的 `frame-src` 违规（ADR-0118 §3.6）：被拦的正是这个沙箱地址，就是宿主页面
+   * 的 CSP 没有放行沙箱路由，当场熔断并写明要放行的来源，不必等握手超时。
+   */
+  #watchFrameViolations(target: URL): void {
+    const listener = (event: SecurityPolicyViolationEvent): void => {
+      if (this.#ready || this.#failed !== undefined) return;
+      const directive = event.effectiveDirective;
+      if (directive !== 'frame-src' && directive !== 'child-src' && directive !== 'default-src')
+        return;
+      if (!isSandboxTarget(event.blockedURI, target)) return;
+      this.fail(
+        `宿主页面的 CSP 没有放行沙箱路由（${directive}），需要在宿主 CSP 的 frame-src 里放行 ${target.origin}。`,
+        'host-csp',
+        ` 被拦地址：${String(event.blockedURI).slice(0, 160)}`,
+      );
+    };
+    this.#document.addEventListener('securitypolicyviolation', listener);
+    this.#stopWatchingFrames = () =>
+      this.#document.removeEventListener('securitypolicyviolation', listener);
   }
 
   #connect(token: string): void {
@@ -697,6 +835,8 @@ class PackagePool {
         if (this.#ready) return;
         this.#ready = true;
         if (this.#handshakeTimer !== undefined) clearTimeout(this.#handshakeTimer);
+        this.#stopWatchingFrames?.();
+        this.#stopWatchingFrames = undefined;
         for (const [queued, transfer] of this.#queue.splice(0))
           this.#port?.postMessage(queued, transfer);
         hostClock(this.#document).add(this);
@@ -812,6 +952,8 @@ class PackagePool {
 
   #teardown(): void {
     hostClock(this.#document).delete(this);
+    this.#stopWatchingFrames?.();
+    this.#stopWatchingFrames = undefined;
     if (this.#handshakeTimer !== undefined) clearTimeout(this.#handshakeTimer);
     if (this.#recycleTimer !== undefined) clearTimeout(this.#recycleTimer);
     this.#port?.close();

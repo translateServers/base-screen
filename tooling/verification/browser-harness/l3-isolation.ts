@@ -39,8 +39,33 @@ import { HARNESS_TEMPLATE_MATERIAL_SPECS } from './template-materials.ts';
 const params = new URL(location.href).searchParams;
 const isolation = (params.get('iso') ?? 'realm') as L3Isolation | 'sdk';
 const bad = params.get('bad') ?? '';
-/** 宿主页面自己带 `<meta>` CSP（ADR-0117 §9.8：srcdoc 沙箱会继承它）。 */
-const hostCsp = params.get('hostcsp') === '1';
+/**
+ * 宿主页面自己带 `<meta>` CSP（ADR-0117 §9.8：srcdoc 沙箱会继承它）。`1`：常见加固，`frame-src` 落到
+ * `default-src 'self'`（同源沙箱路由被放行）；`noframe`：另加 `frame-src 'none'`（沙箱路由被挡）。
+ */
+const hostCsp = params.get('hostcsp') ?? '';
+/** 沙箱路由（ADR-0118）：`url` 走 vite 插件的 `/__l3-sandbox/`；`broken` 只返回地址、不上传（GET 404）。 */
+const sandboxMode = params.get('sandbox') ?? '';
+const SANDBOX_PREFIX = '/__l3-sandbox/';
+
+const sandboxHost =
+  sandboxMode === ''
+    ? undefined
+    : {
+        async resolve(document: { html: string; hash: string; scriptHashes: readonly string[] }) {
+          const url = `${SANDBOX_PREFIX}${document.hash}`;
+          if (sandboxMode === 'broken') return `${SANDBOX_PREFIX}${'0'.repeat(64)}`;
+          const head = await fetch(url, { method: 'HEAD' });
+          if (head.status === 200) return url;
+          const put = await fetch(url, {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ html: document.html, scriptHashes: document.scriptHashes }),
+          });
+          if (!put.ok) throw new Error(`沙箱路由拒收：${put.status} ${await put.text()}`);
+          return url;
+        },
+      };
 const count = Math.max(0, Number(params.get('n') ?? '10'));
 const lib = params.get('lib') === 'echarts' ? 'echarts' : 'canvas';
 // 包级默认位图：OffscreenCanvas 转进不透明源 iframe 在 Edge 上会让整页崩溃（第一轮实测）。
@@ -130,6 +155,7 @@ async function createDefinition(): Promise<BaseScreenMaterialDefinition> {
         if (audits.length < 500) audits.push(record);
       },
       onFrame: onSdkFrame,
+      ...(sandboxHost === undefined ? {} : { sandbox: sandboxHost }),
     });
     if (!definition.ok)
       throw new Error(
@@ -272,12 +298,11 @@ const result: Record<string, unknown> = {
 async function run(): Promise<void> {
   // 先挂出统计：页面卡住或超时时，运行器还能读到走到了哪一步。
   (window as { __l3Bench?: unknown }).__l3Bench = { result, stats: l3Stats };
-  if (hostCsp) {
+  if (hostCsp !== '') {
     // 常见的宿主加固写法：脚本只许同源（开发服务器还要 eval）、样式允许内联。
     const meta = document.createElement('meta');
     meta.httpEquiv = 'Content-Security-Policy';
-    meta.content =
-      "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws:; font-src 'self' data:";
+    meta.content = `default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws:; font-src 'self' data:${hostCsp === 'noframe' ? "; frame-src 'none'" : ''}`;
     document.head.append(meta);
     result.hostCsp = meta.content;
   }
@@ -425,6 +450,10 @@ async function run(): Promise<void> {
     result.probeFramesLeft = document.querySelectorAll(
       'iframe[data-base-screen-isolated-probe]',
     ).length;
+    result.sandboxMode = sandboxMode || 'srcdoc';
+    result.sandboxUrls = [
+      ...document.querySelectorAll<HTMLIFrameElement>('iframe[data-base-screen-isolated-package]'),
+    ].map((frame) => (frame.getAttribute('src') === null ? 'srcdoc' : frame.src));
     result.isolatedElement =
       deepQuery(document, 'l3-bench-gauge')?.shadowRoot?.firstElementChild?.nextElementSibling
         ?.firstElementChild?.tagName ?? null;

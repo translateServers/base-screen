@@ -68,6 +68,18 @@ const MATRIX = {
     { iso: 'realm', n: 40, lib: 'canvas' },
     { iso: 'realm', n: 40, lib: 'echarts' },
   ],
+  // ADR-0118 N1：沙箱路由（网络导航）与 srcdoc 对照；宿主 CSP、没放行 frame-src、路由 404、
+  // 越权探测、40 个 echarts，以及在顶层直接打开沙箱地址。
+  sdknet: [
+    { iso: 'sdk', n: 1, lib: 'canvas', probe: 1, click: true },
+    { iso: 'sdk', n: 1, lib: 'canvas', probe: 1, click: true, sandbox: 'url' },
+    { iso: 'sdk', n: 2, lib: 'canvas', sandbox: 'url' },
+    { iso: 'sdk', n: 2, lib: 'canvas', sandbox: 'url', hostcsp: '1', toplevel: true },
+    { iso: 'sdk', n: 2, lib: 'canvas', sandbox: 'url', hostcsp: 'noframe' },
+    { iso: 'sdk', n: 2, lib: 'canvas', sandbox: 'broken' },
+    { iso: 'sdk', n: 40, lib: 'echarts' },
+    { iso: 'sdk', n: 40, lib: 'echarts', sandbox: 'url', hostcsp: '1' },
+  ],
   // 握手失败的诊断（ADR-0117 §9.8）：宿主 CSP 继承、模块顶层死循环，与一个正常对照。
   sdkdiag: [
     { iso: 'sdk', n: 2, lib: 'canvas' },
@@ -140,7 +152,7 @@ function sampleProcesses() {
 function query(run) {
   const params = new URLSearchParams({ hold: String(hold) });
   for (const [key, value] of Object.entries(run))
-    if (key !== 'click') params.set(key, String(value));
+    if (key !== 'click' && key !== 'toplevel') params.set(key, String(value));
   return params.toString();
 }
 
@@ -153,7 +165,8 @@ function label(run) {
     run.cap ? `cap${run.cap}` : '',
     run.pframe ? `frame-${run.pframe}` : '',
     run.bad ? `bad-${run.bad}` : '',
-    run.hostcsp ? 'hostcsp' : '',
+    run.hostcsp ? `hostcsp${run.hostcsp === 'noframe' ? '-noframe' : ''}` : '',
+    run.sandbox ? `route-${run.sandbox}` : '',
     run.clock,
     run.surface,
     run.shield === 0 ? 'noshield' : '',
@@ -228,6 +241,7 @@ await withViteBrowser(
         if (run.n >= 10) await page.screenshot({ path: `tmp-l3-bench/${name}.png` });
         if (run.click) extra.click = await clickFirst(page, 'viewer');
         if (run.surface === 'designer') extra.designer = await designerInteraction(page, name);
+        if (run.toplevel) extra.toplevel = await openSandboxTopLevel(page);
         await page.waitForFunction(() => document.body.dataset.l3Phase === 'done', null, {
           timeout: (hold + 30) * 1000,
         });
@@ -296,6 +310,42 @@ await withViteBrowser(
     args: ['--start-maximized'],
   },
 );
+
+/**
+ * ADR-0118 §6 验收 3：在顶层直接打开沙箱地址，文档必须落在不透明源（响应头 CSP 的 `sandbox`），
+ * 读 cookie / localStorage 抛 SecurityError。
+ */
+async function openSandboxTopLevel(page) {
+  const url = await page.evaluate(
+    () => document.querySelector('iframe[data-base-screen-isolated-package][src]')?.src ?? null,
+  );
+  if (url === null) return { error: 'no-sandbox-url' };
+  const top = await page.context().newPage();
+  try {
+    const response = await top.goto(url);
+    const csp = response?.headers()['content-security-policy'] ?? null;
+    const state = await top.evaluate(() => {
+      const attempt = (read) => {
+        try {
+          read();
+          return 'readable';
+        } catch (error) {
+          return error?.name ?? 'Error';
+        }
+      };
+      return {
+        origin: self.origin,
+        cookie: attempt(() => document.cookie),
+        localStorage: attempt(() => window.localStorage.length),
+      };
+    });
+    return { url, status: response?.status() ?? null, csp, ...state };
+  } catch (error) {
+    return { url, error: String(error.message ?? error).slice(0, 200) };
+  } finally {
+    await top.close();
+  }
+}
 
 async function clickFirst(page) {
   const gauge = page.locator('l3-bench-gauge').first();

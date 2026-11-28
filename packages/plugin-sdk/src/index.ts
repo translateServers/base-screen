@@ -5,6 +5,7 @@ export * from './material-config-groups.js';
 export * from './material-definition.js';
 export * from './material-editor-audit.js';
 export * from './material-isolated.js';
+export * from './material-isolated-csp.js';
 export {
   type BaseScreenMaterialLoadingOptions,
   createBaseScreenMaterialLoadingElement,

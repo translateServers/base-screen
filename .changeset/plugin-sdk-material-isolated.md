@@ -12,3 +12,4 @@
 - 规格新增 `isolated: { libraries? }`（宿主预置库名），与 `template` 互斥；带 `isolated` 的规格不能交给 `createBaseScreenSpecMaterialDefinition`；
 - 没有 `crypto.subtle`（非安全上下文）时用内置 `sha256` 计算 CSP 哈希。
 - 握手超时会先诊断再熔断（ADR-0117 §9.8）：沙箱文档没加载完记为 `startup`（组件代码在加载阶段没有结束）；加载完了就用最小探针沙箱试一次，探针也跑不起来记为 `host-csp`（srcdoc 沙箱继承了宿主页面的 CSP），错误视图直接写明原因；审计记录新增可选 `cause` 字段（`BaseScreenIsolatedMaterialCircuitCause`）。
+- 沙箱文档改走网络导航（ADR-0118 N1）：新增可选的沙箱宿主端口 `sandbox.resolve(document)`，配置后沙箱 iframe 用宿主路由返回的 http(s) 地址加载，文档只受路由响应头里的 CSP 约束，不再继承宿主页面的 CSP；未配置时照旧用 `srcdoc`。握手口令改由 iframe 的 `name` 属性带入（引导读完即清空），沙箱文档因此每包恒定，可按内容哈希寻址；新增 `buildBaseScreenIsolatedSandboxDocument`、`BaseScreenIsolatedSandboxDocument` / `BaseScreenIsolatedSandboxHost`，以及无依赖的 `material-isolated-csp`（`buildBaseScreenIsolatedSandboxCsp` 只采纳严格校验过的脚本哈希，其余指令写死并带 `sandbox allow-scripts`）。网络导航模式下监听宿主的 `frame-src` 违规，熔断原因新增 `sandbox-route`。

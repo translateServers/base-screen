@@ -11,9 +11,11 @@
 
 /* biome-ignore-all lint/suspicious/noExplicitAny: 序列化进 iframe 的代码面对的是作者对象，没有类型。 */
 
+/**
+ * 引导配置只有这两项，对同一个包是常量：沙箱文档因此每包恒定，可以按内容哈希寻址（ADR-0118 D2）。
+ * 握手口令不在这里，由宿主经 iframe 的 `name` 属性带进来。
+ */
 export interface BaseScreenIsolatedRuntimeConfig {
-  /** 握手口令：每个 iframe 一个，只用于握手，不进 CSP。 */
-  readonly token: string;
   /** 作者可经 `env.libraries` 取用的宿主预置库：名字 → iframe 里的全局变量名。 */
   readonly libraries: readonly (readonly [string, string])[];
   /** 每实例每秒最多回传几帧。 */
@@ -25,6 +27,14 @@ export function baseScreenIsolatedRuntime(config: BaseScreenIsolatedRuntimeConfi
   const instances = new Map<string, any>();
   const minGap = 1000 / config.maxFps - 1;
   let port: MessagePort | null = null;
+  // 握手口令（ADR-0118 D2）：宿主写在 iframe 的 name 属性上。引导是文档里的第一段脚本，读完立刻清空，
+  // 预置库与作者代码随后都读不到。
+  const token = typeof window.name === 'string' ? window.name : '';
+  try {
+    window.name = '';
+  } catch {
+    // 读不到也清不掉时口令为空，下面的握手一律拒绝。
+  }
 
   const text = (value: unknown, limit: number): string => String(value).slice(0, limit);
   // 握手前（作者模块的顶层代码在 load 之前就跑了）的错误与 CSP 拦截先排队，连上后补发：
@@ -60,7 +70,7 @@ export function baseScreenIsolatedRuntime(config: BaseScreenIsolatedRuntimeConfi
     if (port !== null || event.source !== window.parent) return;
     const data = event.data;
     if (data === null || typeof data !== 'object' || data.type !== 'bs-connect') return;
-    if (data.token !== config.token || event.ports.length !== 1) return;
+    if (token === '' || data.token !== token || event.ports.length !== 1) return;
     port = event.ports[0] as MessagePort;
     port.onmessage = (message) => {
       try {

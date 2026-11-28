@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BASE_SCREEN_ISOLATED_DOCUMENT_HASH_PATTERN,
   BASE_SCREEN_ISOLATED_MATERIAL_SOURCE_MAX_BYTES,
   type BaseScreenMaterialSpec,
+  buildBaseScreenIsolatedSandboxCsp,
+  buildBaseScreenIsolatedSandboxDocument,
   createBaseScreenIsolatedMaterialDefinition,
   createBaseScreenSpecMaterialDefinition,
   parseBaseScreenMaterialSpec,
@@ -159,5 +162,80 @@ describe('isolated material definition', () => {
       });
       expect(result.ok).toBe(false);
     }
+  });
+});
+
+describe('sandbox document (ADR-0118)', () => {
+  const hex = (bytes: Uint8Array): string =>
+    Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+
+  it('is constant per package and addressed by the sha256 of its html', async () => {
+    const first = await buildBaseScreenIsolatedSandboxDocument({ source: SOURCE });
+    const second = await buildBaseScreenIsolatedSandboxDocument({ source: SOURCE });
+    expect(second.html).toBe(first.html);
+    expect(second.hash).toBe(first.hash);
+    expect(BASE_SCREEN_ISOLATED_DOCUMENT_HASH_PATTERN.test(first.hash)).toBe(true);
+    expect(first.hash).toBe(hex(sha256(new TextEncoder().encode(first.html))));
+    const other = await buildBaseScreenIsolatedSandboxDocument({ source: `${SOURCE}\n// v2` });
+    expect(other.hash).not.toBe(first.hash);
+  });
+
+  it('lists one script hash per inline script, boot first, and reads the token from window.name', async () => {
+    const plain = await buildBaseScreenIsolatedSandboxDocument({ source: SOURCE });
+    const withLibrary = await buildBaseScreenIsolatedSandboxDocument({
+      source: SOURCE,
+      libraries: [ECHARTS],
+    });
+    // 引导 + 读数格式 + 组件代码；每个预置库多一段。
+    expect(plain.scriptHashes).toHaveLength(3);
+    expect(withLibrary.scriptHashes).toHaveLength(4);
+    const scripts = plain.html.split('<script').slice(1);
+    expect(scripts[0]).toContain('window.name');
+    expect(plain.html).not.toMatch(/"token"\s*:/);
+    expect(withLibrary.html.indexOf('window.name')).toBeLessThan(
+      withLibrary.html.indexOf(ECHARTS.source),
+    );
+  });
+});
+
+describe('sandbox route CSP (ADR-0118 §3.3)', () => {
+  const HASH = `'sha256-${'A'.repeat(43)}='`;
+
+  it('writes every directive except the script hashes itself', () => {
+    const csp = buildBaseScreenIsolatedSandboxCsp([HASH], "'self'");
+    expect(csp).toBeDefined();
+    expect(csp?.startsWith('sandbox allow-scripts; ')).toBe(true);
+    expect(csp).toContain(`script-src ${HASH}`);
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("frame-ancestors 'self'");
+    expect(csp).not.toContain('connect-src');
+  });
+
+  it('rejects anything that is not a strict sha256 hash source', () => {
+    for (const hashes of [
+      [],
+      [`${HASH}; connect-src *`],
+      ["'unsafe-inline'"],
+      ['https://evil.example'],
+      [`'sha256-${'A'.repeat(42)}='`],
+      [HASH, 42],
+      Array.from({ length: 17 }, () => HASH),
+    ]) {
+      expect(buildBaseScreenIsolatedSandboxCsp(hashes, "'self'")).toBeUndefined();
+    }
+    expect(buildBaseScreenIsolatedSandboxCsp([HASH], "'self'; script-src *")).toBeUndefined();
+    expect(buildBaseScreenIsolatedSandboxCsp([HASH], ' ')).toBeUndefined();
+  });
+
+  it('requires a resolve function when a sandbox host is given', () => {
+    const result = createBaseScreenIsolatedMaterialDefinition({
+      spec: SPEC,
+      source: SOURCE,
+      tagName: 'host-online-isolated-test-7',
+      libraries: [ECHARTS],
+      sandbox: {} as never,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics[0]?.path).toEqual(['sandbox']);
   });
 });
