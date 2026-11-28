@@ -5,7 +5,7 @@
 .gitattributes[FC3T]: F:Git 行尾与二进制资产声明 | R:- | A:- | S:文本强制 LF 关闭 autocrlf；图片/字体/压缩包标 binary 防 eol 破坏
 .gitignore[FC4T]: F:版本库忽略规则 | R:- | A:- | S:忽略 node_modules/.turbo/dist、数据库快照与 material-attestation-key.json 等本机状态；忽略 .workbuddy/.qoder/.trae/.zcode/.base-screen 本地工作区与 *.backup.*；AOCI 提交面由 .aoci/.gitignore 独占，本节不重复声明以免双份漂移。
 .node-version[FV2T]: F:声明项目 Node 版本 | R:- | A:- | S:版本为 22
-AGENTS.md[SG8S]: F:仓库开发指南，只写 Agent 该怎么做的规范与不可推导决策，系统结构交给 aoci.txt | R:code:README.md,code:CONTEXT.md | A:环境搭建与验证 / 包边界 / 产品定位与宿主边界 / 目录结构与命名 / 分层与边界 / 契约与产物 / 代码与测试 / AOCI 与仓库门禁的交互 | S:托管区块由 aoci init 重写；engine/src 三层 designer-element→browser→common 单向；智能体产物一律写 dataValue+dataBinding、dataSource=null；认知进版本库但无门禁守护新鲜度
+AGENTS.md[SG8S]: F:仓库开发指南，只写 Agent 该怎么做的规范与不可推导决策，系统结构交给 aoci.txt | R:code:README.md,code:CONTEXT.md,code:.github/workflows/release.yml | A:环境搭建与验证 / 包边界 / 产品定位与宿主边界 / 目录结构与命名 / 分层与边界 / 契约与产物 / 代码与测试 / AOCI 与仓库门禁的交互 | S:托管区块禁手改；engine/src 三层单向；智能体产物写 dataValue+dataBinding、dataSource=null；推送 vX.Y.Z 必须自动生成 GitHub Release
 CONTEXT.md[SG6S]: F:Base Screen 领域词汇表，记录跨包须统一理解的概念及其唯一实现落点 | R:code:AGENTS.md,code:packages/engine/src/browser/styles/designer-tokens.css,code:tooling/verification/browser-harness/system/system-gallery.ts | A:契约与诊断 / 插件贡献词汇 / Designer 组合根 / 数据面板 / 物料 / 设计系统 | S:设计数值以 designer-tokens.css 为准，清单由 tests/tooling/design-system-contract.test.ts 锁定；主操作统一 button-primary-*，文档不得复制过期数值
 LICENSE[SZ3T]: F:MIT 开源许可证 | R:- | A:- | S:Copyright 2026 zhouan190
 README.md[SG9M]: F:Base Screen 项目总览与接入指南 | R:code:CONTEXT.md,code:AGENTS.md | A:适用场景 / 核心能力 / 快速体验 / 在你的应用中使用 / 核心模型 / 与宿主的职责划分 / 示例 / 包结构 | S:以 Screen Document 为统一文档、Web Components 为浏览器集成边界；发布面只有单包 base-screen，packages 下 12 个包均 private 构建期内联；项目、数据、资产、发布与长任务由宿主负责
@@ -30,6 +30,7 @@ feature_request.md[SQ2T]: F:功能建议 issue 模板 | R:- | A:- | S:要求先�
 
 ===/<repository>/.github/workflows/===
 ci.yml[OV8S]: F:主干与 PR 的 CI 校验流水线 | R:- | A:verify-m0 / coverage-signal / browser-verification | S:固定 Node 22.23.2 与 pnpm 11.18.0；verify:m0 后须 git diff --exit-code 确保验证不改 tracked 文件
+release.yml[OV8T]: F:发布标签触发的 GitHub Release 自动创建 | R:code:.github/workflows/ci.yml,code:packages/base-screen/CHANGELOG.md | A:v* 标签触发 / 变更日志抽取 / 幂等创建 Release | S:推送 v* 标签后从 base-screen CHANGELOG 抽取对应版本，使用 contents:write 创建 GitHub Release；已存在则幂等跳过
 
 ===/<repository>/examples/===
 README.md[SG9L]: F:三端示例总览与数据、智能体和 L3 沙箱接入说明 | R:code:examples/react-host/README.md | A:三端技术对照 / 页面与状态流 / REST 与数据层接入 / 组件工坊和物料生成 / L3 沙箱网络导航与验收 | S:三端共享源文件须逐字一致并同批落地；datasetPort 只决定数据集选项可用性，数据源页只有一条渲染路径；宿主资源、审核、存储和 L3 沙箱路由归宿主，不向大屏注入样式或传输配置。

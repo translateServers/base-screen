@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-11-21T03:27:31Z",
-  "updated_at": "2026-11-28T11:45:25Z",
+  "updated_at": "2026-11-28T12:15:58Z",
   "files": {
     ".changeset/agent-layout-audit.md": {
       "role": "index",
@@ -417,6 +417,12 @@
       "size": 6832,
       "normalized_sha256": "fb68d829eeac32e37f107db52d54f50d97f5986a17069cf064bf3f23cd26301d"
     },
+    ".github/workflows/release.yml": {
+      "role": "index",
+      "sha256": "64beff7b98a65b9eb8de3aa58da88345826ccd1c411529301a849d2a1d825cf7",
+      "size": 1190,
+      "normalized_sha256": "64beff7b98a65b9eb8de3aa58da88345826ccd1c411529301a849d2a1d825cf7"
+    },
     ".gitignore": {
       "role": "index",
       "sha256": "fca29c701088e48c4817ef68ac01c9904fb7d1d827256d6e01d3401b4352db4e",
@@ -431,9 +437,9 @@
     },
     "AGENTS.md": {
       "role": "index",
-      "sha256": "b65ae909940ed93d0cc7ba3e487141f700a24c31ea6cd6a4cc40c471b06edd6f",
-      "size": 29647,
-      "normalized_sha256": "b65ae909940ed93d0cc7ba3e487141f700a24c31ea6cd6a4cc40c471b06edd6f"
+      "sha256": "0be38cc0151406cc5525c4a0cc8b652f81a69dfe4f806eeb3b1b8e4019b235c8",
+      "size": 29901,
+      "normalized_sha256": "0be38cc0151406cc5525c4a0cc8b652f81a69dfe4f806eeb3b1b8e4019b235c8"
     },
     "CONTEXT.md": {
       "role": "index",
@@ -455,9 +461,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "190918fac2516b2e9f54080e7c958eb22185da0b5fd431d9d91e0532bd4ac0ea",
-      "size": 411476,
-      "normalized_sha256": "190918fac2516b2e9f54080e7c958eb22185da0b5fd431d9d91e0532bd4ac0ea"
+      "sha256": "3026f52ba62033fa42042c46f1e0cb98b7e6e49a34b7a86419b7f71b31b454bc",
+      "size": 411808,
+      "normalized_sha256": "3026f52ba62033fa42042c46f1e0cb98b7e6e49a34b7a86419b7f71b31b454bc"
     },
     "aoci.meta.txt": {
       "role": "index",
