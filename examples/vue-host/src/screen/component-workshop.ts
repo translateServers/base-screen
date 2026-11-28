@@ -2943,6 +2943,178 @@ function formatSpecPath(path: readonly (string | number)[]): string {
   );
 }
 
+export type IsolatedMaterialDraftAgentOutcome =
+  | {
+      readonly ok: true;
+      readonly spec: BaseScreenMaterialSpec;
+      readonly source: string;
+      /** 体检与沙箱试运行通过后剩下的警告。 */
+      readonly findings: readonly BaseScreenAuthoringFinding[];
+      readonly repairRounds: number;
+      /** 模型判断「这个其实不用代码，L2 模板就能表达」（ADR-0117 D12）；仍然交出了一份 L3 方案。 */
+      readonly suggestTemplate?: boolean;
+      readonly suggestReason?: string;
+    }
+  | {
+      readonly ok: false;
+      readonly message: string;
+      readonly findings: readonly BaseScreenAuthoringFinding[];
+      readonly repairRounds: number;
+    };
+
+/**
+ * 让智能体起草一个 L3 隔离代码物料（ADR-0117 D12）：模型调用归宿主后端，解析、体检（SDK 的
+ * `auditBaseScreenMaterialSpec`）、代码词法检查（`scanIsolatedSource`，只警告）与沙箱试运行
+ * （`trialRunIsolatedMaterial`）都在这里（宿主前端）。
+ *
+ * 每一轮：取模型原文 → 解析出规格 + 代码 → 规格体检 + 代码词法检查，有错误先不跑沙箱；两者都干净
+ * 才跑沙箱试运行，试运行的异常与 CSP 违规也算错误。全无错误即交出；有错误把结论按路径回传修复，
+ * 最多 2 轮，结论与上一轮相同就提前停。修不好如实报告，不交出半成品；交出的也只是草稿，发布仍要
+ * 走人工审核（`publishAtomicComponent` 的沙箱试运行门禁与审核视图）。
+ */
+export async function draftIsolatedMaterialWithAgent(input: {
+  readonly instruction: string;
+  readonly type: string;
+  readonly category?: string;
+  readonly request: (body: MaterialDraftAgentRequest) => Promise<MaterialDraftAgentReply>;
+  readonly onProgress?: (progress: {
+    readonly phase: 'drafting' | 'repairing' | 'trial';
+    readonly round: number;
+  }) => void;
+}): Promise<IsolatedMaterialDraftAgentOutcome> {
+  let repair: MaterialDraftAgentRequest['repair'];
+  let previousKey: string | undefined;
+  for (let round = 0; ; round += 1) {
+    input.onProgress?.({ phase: round === 0 ? 'drafting' : 'repairing', round });
+    const reply = await input.request({
+      instruction: input.instruction,
+      ...(repair === undefined ? {} : { repair }),
+    });
+    if (!reply.ok) return { ok: false, message: reply.message, findings: [], repairRounds: round };
+    const candidate = readIsolatedDraftOutput(reply.output, input.type, input.category);
+    let findings: readonly BaseScreenAuthoringFinding[] = candidate.ok
+      ? [...auditBaseScreenMaterialSpec(candidate.spec), ...scanIsolatedSource(candidate.source)]
+      : [{ rule: candidate.rule, severity: 'error', message: candidate.error, path: [] }];
+    let errors = findings.filter((item) => item.severity === 'error');
+    if (candidate.ok && errors.length === 0) {
+      input.onProgress?.({ phase: 'trial', round });
+      const trial = await trialRunIsolatedMaterial(
+        candidate.spec as BaseScreenMaterialSpec,
+        candidate.source,
+      );
+      findings = [...findings, ...trial.findings];
+      errors = trial.findings.filter((item) => item.severity === 'error');
+      if (errors.length === 0) {
+        const parsed = parseBaseScreenMaterialSpec(candidate.spec);
+        if (parsed.ok) {
+          return {
+            ok: true,
+            spec: parsed.value,
+            source: candidate.source,
+            findings,
+            repairRounds: round,
+            ...(candidate.suggestTemplate ? { suggestTemplate: true as const } : {}),
+            ...(candidate.suggestReason === undefined
+              ? {}
+              : { suggestReason: candidate.suggestReason }),
+          };
+        }
+      }
+    }
+    const issues = errors.slice(0, MAX_DRAFT_ISSUES).map((item) => ({
+      rule: item.rule,
+      path: formatSpecPath(item.path ?? []),
+      message: item.message,
+    }));
+    const key = issues
+      .map((item) => `${item.rule}@${item.path}`)
+      .sort()
+      .join('|');
+    if (round >= MATERIAL_DRAFT_MAX_REPAIR_ROUNDS || key === previousKey) {
+      return {
+        ok: false,
+        message:
+          key === previousKey
+            ? `修复没有进展（体检/试运行结论与上一轮相同），还有 ${errors.length} 个错误，没有交出半成品。`
+            : `修复 ${round} 轮后仍有 ${errors.length} 个错误，没有交出半成品。`,
+        findings,
+        repairRounds: round,
+      };
+    }
+    previousKey = key;
+    repair = { output: reply.output, issues };
+  }
+}
+
+/** 模型原文 → 规格 + 代码候选：容忍 ```json 围栏；类型一律换成宿主给的。 */
+function readIsolatedDraftOutput(
+  output: string,
+  type: string,
+  category: string | undefined,
+):
+  | {
+      readonly ok: true;
+      readonly spec: Record<string, unknown>;
+      readonly source: string;
+      readonly suggestTemplate?: boolean;
+      readonly suggestReason?: string;
+    }
+  | { readonly ok: false; readonly error: string; readonly rule: string } {
+  const text = output
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text) as unknown;
+  } catch {
+    return {
+      ok: false,
+      rule: 'SPEC',
+      error: '输出不是合法 JSON：只输出一个 JSON 对象 { "spec": {...}, "source": "..." }。',
+    };
+  }
+  if (!isRecord(parsed)) {
+    return {
+      ok: false,
+      rule: 'SPEC',
+      error: '输出必须是 { "spec": {...}, "source": "..." } 形状的 JSON 对象。',
+    };
+  }
+  const spec = isRecord(parsed.spec) ? parsed.spec : undefined;
+  const source = typeof parsed.source === 'string' ? parsed.source : undefined;
+  if (spec === undefined) {
+    return { ok: false, rule: 'SPEC', error: '输出里没有 spec 字段。' };
+  }
+  if (source === undefined || source.trim() === '') {
+    return {
+      ok: false,
+      rule: 'SOURCE',
+      error: '输出里没有 source（组件代码全文）字段，或是空字符串。',
+    };
+  }
+  if (spec.isolated === undefined) {
+    return {
+      ok: false,
+      rule: 'SPEC',
+      error: '规格没有 isolated：起草的组件必须是 L3 隔离代码物料，带 isolated.libraries。',
+    };
+  }
+  const suggestTemplate = parsed.suggestTemplate === true;
+  const suggestReason = typeof parsed.suggestReason === 'string' ? parsed.suggestReason : undefined;
+  return {
+    ok: true,
+    spec: {
+      ...spec,
+      type,
+      ...(typeof spec.category === 'string' || category === undefined ? {} : { category }),
+    },
+    source,
+    ...(suggestTemplate ? { suggestTemplate: true as const } : {}),
+    ...(suggestReason === undefined ? {} : { suggestReason }),
+  };
+}
+
 // ———————————————————————————— 小工具 ————————————————————————————
 
 /** 选区提取失败的宿主文案：没选中是最常见的情况，其余沿用引擎诊断。 */

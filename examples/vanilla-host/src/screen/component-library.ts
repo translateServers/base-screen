@@ -22,6 +22,8 @@ import type {
 import {
   buildSpecMaterialModule,
   draftTemplateMaterialWithAgent,
+  draftIsolatedMaterialWithAgent,
+  type IsolatedMaterialDraftAgentOutcome,
   type IsolatedTrialResult,
   importSpecMaterialModule,
   isSpecMaterialModule,
@@ -1322,6 +1324,49 @@ export async function draftAtomicComponentWithAgent(input: {
   const saved = await saveAtomicDraft({
     type,
     source: { spec: outcome.spec, renderBody: '' },
+    revision: 0,
+  });
+  if (!saved.ok)
+    return { ok: false, message: `起草成功，但保存草稿失败：${saved.message}`, outcome };
+  return { ok: true, type, outcome };
+}
+
+/**
+ * 让智能体起草一个「代码组件（隔离）」（ADR-0117 D12）：与 L2 的起草入口并列。通过后只存成草稿
+ * （新类型，不发布、不热刷新），作者在编辑器里看过、改过再发布——沙箱试运行门禁与审核视图照旧。
+ */
+export async function draftIsolatedAtomicComponentWithAgent(input: {
+  readonly instruction: string;
+  readonly signal?: AbortSignal;
+  readonly onProgress?: (progress: {
+    readonly phase: 'drafting' | 'repairing' | 'trial';
+    readonly round: number;
+  }) => void;
+}): Promise<
+  | {
+      readonly ok: true;
+      readonly type: string;
+      readonly outcome: IsolatedMaterialDraftAgentOutcome;
+    }
+  | { readonly ok: false; readonly message: string; readonly outcome?: IsolatedMaterialDraftAgentOutcome }
+> {
+  const type = createAtomicComponentType('draft');
+  const outcome = await draftIsolatedMaterialWithAgent({
+    instruction: input.instruction,
+    type,
+    category: '在线组件',
+    ...(input.onProgress === undefined ? {} : { onProgress: input.onProgress }),
+    request: async (body) => {
+      const result = await api.draftMaterialIsolated(body.instruction, body.repair, input.signal);
+      return result.ok
+        ? { ok: true, output: result.data.output }
+        : { ok: false, message: result.error.message };
+    },
+  });
+  if (!outcome.ok) return { ok: false, message: outcome.message, outcome };
+  const saved = await saveAtomicDraft({
+    type,
+    source: { spec: outcome.spec, renderBody: outcome.source },
     revision: 0,
   });
   if (!saved.ok)

@@ -15,6 +15,7 @@ import {
   deleteAtomicComponent,
   deleteFragment,
   draftAtomicComponentWithAgent,
+  draftIsolatedAtomicComponentWithAgent,
   loadComponentLibrary,
   readComponentReturn,
   saveAtomicDraft,
@@ -668,6 +669,7 @@ export const componentListView: ViewModule = {
         attrs: { 'data-component-agent-dialog': '' },
       });
       let running: AbortController | undefined;
+      let draftKind: 'template' | 'isolated' = 'template';
       const close = (): void => {
         running?.abort();
         overlay.remove();
@@ -676,6 +678,40 @@ export const componentListView: ViewModule = {
       const onKey = (event: KeyboardEvent): void => {
         if (event.key === 'Escape') close();
       };
+      const desc = el('p', {
+        class: 'ds-desc',
+        text: '智能体只写组件规格与受限图元模板，不写代码；结果存成草稿，体检与发布仍由你决定。',
+      });
+      const kindTemplate = el('button', {
+        class: 'button ds-filter ds-filter--active',
+        text: '模板物料（L2）',
+        attrs: { type: 'button', 'aria-pressed': 'true' },
+      });
+      const kindIsolated = el('button', {
+        class: 'button ds-filter',
+        text: '代码组件（隔离）',
+        attrs: { type: 'button', 'aria-pressed': 'false' },
+      });
+      const syncKind = (): void => {
+        kindTemplate.classList.toggle('ds-filter--active', draftKind === 'template');
+        kindTemplate.setAttribute('aria-pressed', String(draftKind === 'template'));
+        kindIsolated.classList.toggle('ds-filter--active', draftKind === 'isolated');
+        kindIsolated.setAttribute('aria-pressed', String(draftKind === 'isolated'));
+        desc.textContent =
+          draftKind === 'template'
+            ? '智能体只写组件规格与受限图元模板，不写代码；结果存成草稿，体检与发布仍由你决定。'
+            : '智能体写组件规格与组件代码，代码只在沙箱里跑；每轮都会在沙箱里试运行一次，比模板慢一些；结果存成草稿，体检、试运行与发布仍由你决定。';
+      };
+      kindTemplate.addEventListener('click', () => {
+        if (running !== undefined) return;
+        draftKind = 'template';
+        syncKind();
+      });
+      kindIsolated.addEventListener('click', () => {
+        if (running !== undefined) return;
+        draftKind = 'isolated';
+        syncKind();
+      });
       const input = el('textarea', {
         class: 'ds-field__area component-agent__input',
         attrs: {
@@ -713,25 +749,36 @@ export const componentListView: ViewModule = {
         running = new AbortController();
         submit.disabled = true;
         input.disabled = true;
+        kindTemplate.disabled = true;
+        kindIsolated.disabled = true;
         findingList.replaceChildren();
-        const result = await draftAtomicComponentWithAgent({
+        const draft = draftKind === 'template' ? draftAtomicComponentWithAgent : draftIsolatedAtomicComponentWithAgent;
+        const result = await draft({
           instruction,
           signal: running.signal,
           onProgress: ({ phase, round }) =>
             setStatus(
               phase === 'drafting'
                 ? '智能体起草中…（一般要半分钟到一分钟）'
-                : `体检没通过，智能体第 ${round} 轮修复中…`,
+                : phase === 'trial'
+                  ? '体检通过，沙箱里试运行中…'
+                  : `体检或试运行没通过，智能体第 ${round} 轮修复中…`,
             ),
         });
         if (!overlay.isConnected) return;
         running = undefined;
+        kindTemplate.disabled = false;
+        kindIsolated.disabled = false;
         if (result.ok) {
           const rounds = result.outcome.repairRounds;
           const warnings = result.outcome.findings.length;
+          const suggest =
+            'suggestTemplate' in result.outcome && result.outcome.suggestTemplate === true
+              ? `；智能体觉得这个用模板物料（L2）就能表达${result.outcome.suggestReason === undefined ? '' : `（${result.outcome.suggestReason}）`}，仅供参考`
+              : '';
           close();
           showToast(
-            `已起草并存为草稿${rounds > 0 ? `（修复 ${rounds} 轮）` : ''}${warnings > 0 ? `，${warnings} 条警告` : ''}：看过再发布`,
+            `已起草并存为草稿${rounds > 0 ? `（修复 ${rounds} 轮）` : ''}${warnings > 0 ? `，${warnings} 条警告` : ''}：看过再发布${suggest}`,
             'success',
           );
           goToAtomicComponent(result.type);
@@ -765,10 +812,12 @@ export const componentListView: ViewModule = {
           },
           [
             el('h2', { class: 'ds-dialog__title', text: '让智能体起草原子组件' }),
-            el('p', {
-              class: 'ds-desc',
-              text: '智能体只写组件规格与受限图元模板，不写代码；结果存成草稿，体检与发布仍由你决定。',
-            }),
+            el(
+              'div',
+              { class: 'ds-toolbar__filters', attrs: { role: 'group', 'aria-label': '起草哪一种' } },
+              [kindTemplate, kindIsolated],
+            ),
+            desc,
             el('label', { class: 'ds-field' }, [el('span', { text: '要什么组件' }), input]),
             status,
             findingList,

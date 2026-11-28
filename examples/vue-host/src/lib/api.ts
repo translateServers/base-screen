@@ -614,6 +614,17 @@ export const api = {
       body: { instruction, ...(repair === undefined ? {} : { repair }) },
       ...(signal === undefined ? {} : { signal }),
     }),
+  /** 起草一个 L3 隔离代码物料（规格 + 代码，ADR-0117 D12），不保存；带 `repair` 时返回修复后的整份原文。 */
+  draftMaterialIsolated: (
+    instruction: string,
+    repair?: AgentMaterialRepairShape,
+    signal?: AbortSignal,
+  ): Promise<ApiResult<AgentMaterialDraftShape>> =>
+    request('/agent/material-isolated', {
+      method: 'POST',
+      body: { instruction, ...(repair === undefined ? {} : { repair }) },
+      ...(signal === undefined ? {} : { signal }),
+    }),
   generateComponentCandidate: (
     instruction: string,
     components: readonly AgentEditableComponentShape[],

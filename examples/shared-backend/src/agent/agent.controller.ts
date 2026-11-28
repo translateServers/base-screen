@@ -14,6 +14,7 @@ import { AgentActDto } from './dto/agent-act.dto';
 import { AgentCandidateDto } from './dto/agent-candidate.dto';
 import { AgentComponentEditDto } from './dto/agent-component-edit.dto';
 import { AgentGenerateDto } from './dto/agent-generate.dto';
+import { AgentMaterialIsolatedDto } from './dto/agent-material-isolated.dto';
 import { AgentMaterialDto } from './dto/agent-material.dto';
 
 @ApiTags('agent')
@@ -110,6 +111,25 @@ export class AgentController {
     @Req() request?: Request,
   ): Promise<AgentMaterialDraftResult> {
     return this.agent.draftMaterial({
+      signal: clientSignal(request),
+      instruction: dto.instruction,
+      ...(dto.repair === undefined ? {} : { repair: dto.repair }),
+    });
+  }
+
+  /**
+   * 组件工坊「代码组件（隔离）」的「让智能体起草」（ADR-0117 D12）：返回模型原文（一份 L3 规格 + 代码）。
+   * 解析、体检、代码词法检查与沙箱试运行都在宿主前端做；带 `repair` 时把上一轮原文交给模型修复。
+   */
+  @Post('material-isolated')
+  @ApiOperation({
+    summary: '起草一个 L3 隔离代码物料（模型原文：规格 + 代码），不保存；带 repair 时返回修复后的整份原文',
+  })
+  async materialIsolated(
+    @Body() dto: AgentMaterialIsolatedDto,
+    @Req() request?: Request,
+  ): Promise<AgentMaterialDraftResult> {
+    return this.agent.draftIsolatedMaterial({
       signal: clientSignal(request),
       instruction: dto.instruction,
       ...(dto.repair === undefined ? {} : { repair: dto.repair }),

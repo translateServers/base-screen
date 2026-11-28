@@ -43,6 +43,12 @@ import {
   readMaterialRepairRequest,
 } from './agent-material';
 import {
+  AGENT_MATERIAL_ISOLATED_SYSTEM_PROMPT,
+  buildIsolatedMaterialRepairPrompt,
+  buildIsolatedMaterialUserPrompt,
+  readIsolatedMaterialRepairRequest,
+} from './agent-material-isolated';
+import {
   AGENT_MAX_REPAIR_ROUNDS,
   type AgentParseIssues,
   type AgentRepairIssue,
@@ -735,6 +741,60 @@ export class AgentService {
       settings,
       AGENT_MATERIAL_SYSTEM_PROMPT,
       buildMaterialUserPrompt(instruction),
+      this.logger,
+      {
+        retry: true,
+        followUp,
+        onText: () => undefined,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      },
+    );
+    if (!result.ok || result.text === undefined) {
+      throw transportFailure(result.failure ?? 'AGENT_FAILED');
+    }
+    return { output: result.text, mode: 'llm' };
+  }
+
+  /**
+   * 让智能体起草 L3 隔离代码物料（ADR-0117 D12）：只做「模型 ⇄ 规格+代码」。解析、体检、代码词法
+   * 检查、沙箱试运行与修复回环都在宿主前端；没配置模型就如实说做不了。
+   */
+  async draftIsolatedMaterial(input: {
+    instruction: string;
+    repair?: unknown;
+    signal?: AbortSignal;
+  }): Promise<AgentMaterialDraftResult> {
+    const instruction = input.instruction.trim();
+    const repair =
+      input.repair === undefined ? undefined : readIsolatedMaterialRepairRequest(input.repair);
+    if (repair === null) {
+      throw new BadRequestException({
+        error: 'AGENT_REPAIR_INVALID',
+        message: '修复请求需要上一轮输出与按规格或代码路径整理的体检结论。',
+      });
+    }
+    const settings = resolveAgentLlmSettings(this.config);
+    if (settings === null) {
+      throw new HttpException(
+        {
+          error: 'AGENT_NOT_CONFIGURED',
+          message:
+            '没有配置模型（AGENT_LLM_BASE_URL / AGENT_LLM_API_KEY / AGENT_LLM_MODEL），不能让智能体起草组件。',
+        },
+        503,
+      );
+    }
+    const followUp: AgentChatMessage[] =
+      repair === undefined
+        ? []
+        : [
+            { role: 'assistant', content: repair.output },
+            { role: 'user', content: buildIsolatedMaterialRepairPrompt(repair.issues, instruction) },
+          ];
+    const result = await requestAgentCompletionStream(
+      settings,
+      AGENT_MATERIAL_ISOLATED_SYSTEM_PROMPT,
+      buildIsolatedMaterialUserPrompt(instruction),
       this.logger,
       {
         retry: true,
