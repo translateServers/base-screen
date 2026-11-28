@@ -122,10 +122,21 @@ export interface BaseScreenMaterialSpec {
    * 与渲染函数互斥（`createBaseScreenSpecMaterialDefinition` 同时收到两者即失败）。
    */
   readonly template?: BaseScreenMaterialTemplate;
+  /**
+   * L3 隔离代码物料（ADR-0117）：给出时渲染代码只在沙箱 iframe 里运行，由
+   * `createBaseScreenIsolatedMaterialDefinition` 注册。与 `template` 互斥，也不能交给
+   * `createBaseScreenSpecMaterialDefinition`（同 realm 渲染函数）。
+   */
+  readonly isolated?: BaseScreenMaterialSpecIsolated;
   /** 模板节点可派发的事件（ADR-0116 §2.6），进蓝图事件列表。 */
   readonly events?: readonly BaseScreenMaterialSpecEvent[];
   /** 状态外观预置会改写的样式字段（ADR-0115 D8），须是样式分区里声明的字段。 */
   readonly statePresetKeys?: readonly string[];
+}
+
+export interface BaseScreenMaterialSpecIsolated {
+  /** 用到的宿主预置库名（如 `echarts`），最多 4 个、不重复；包不能自带依赖（ADR-0117 D9）。 */
+  readonly libraries?: readonly string[];
 }
 
 /** 分区词汇：顺序、标签与落点（props / style）只在这里定义一份。 */
@@ -159,6 +170,7 @@ const SPEC_KEYS = new Set([
   'fields',
   'data',
   'template',
+  'isolated',
   'events',
   'statePresetKeys',
 ]);
@@ -277,6 +289,29 @@ export function parseBaseScreenMaterialSpec(
       input.statePresetKeys.some((key) => typeof key !== 'string' || !styleKeys.has(key))
     ) {
       add(['statePresetKeys'], 'statePresetKeys 最多 8 个，每个都要是样式分区里声明的字段。');
+    }
+  }
+  if (input.isolated !== undefined) {
+    const isolated = input.isolated;
+    const libraries = isRecord(isolated) ? isolated.libraries : undefined;
+    if (
+      !isRecord(isolated) ||
+      Object.keys(isolated).some((key) => key !== 'libraries') ||
+      (libraries !== undefined &&
+        (!Array.isArray(libraries) ||
+          libraries.length > 4 ||
+          new Set(libraries).size !== libraries.length ||
+          libraries.some(
+            (name) => typeof name !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(name),
+          )))
+    ) {
+      add(['isolated'], 'isolated 只能有 libraries：最多 4 个不重复的预置库名。');
+    }
+    if (input.template !== undefined) {
+      add(
+        ['isolated'],
+        'MATERIAL_ISOLATED_CONFLICT：template 与 isolated 互斥（L2 与 L3 只能二选一）。',
+      );
     }
   }
   if (input.template !== undefined && diagnostics.length === 0) {

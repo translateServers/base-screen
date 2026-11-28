@@ -57,6 +57,23 @@ const MATRIX = {
     { iso: 'package', n: 40, lib: 'echarts', transport: 'bitmap', pframe: 'full', cap: 60 },
     { iso: 'package', n: 40, lib: 'canvas', transport: 'bitmap', pframe: 'full', cap: 60 },
   ],
+  // ADR-0117 S1：plugin-sdk 实现复跑探测、多实例、设计态，与同轮的同 realm 对照。
+  sdk: [
+    { iso: 'sdk', n: 1, lib: 'canvas', probe: 1, click: true },
+    { iso: 'sdk', n: 10, lib: 'canvas' },
+    { iso: 'sdk', n: 40, lib: 'canvas' },
+    { iso: 'sdk', n: 10, lib: 'echarts' },
+    { iso: 'sdk', n: 40, lib: 'echarts' },
+    { iso: 'sdk', n: 4, lib: 'canvas', surface: 'designer' },
+    { iso: 'realm', n: 40, lib: 'canvas' },
+    { iso: 'realm', n: 40, lib: 'echarts' },
+  ],
+  // 恶意包：死循环、每帧抛错、刷事件——只有该包变成错误视图，页面与设计器不受影响。
+  sdkbad: [
+    { iso: 'sdk', n: 4, lib: 'canvas', bad: 'loop' },
+    { iso: 'sdk', n: 4, lib: 'canvas', bad: 'throw' },
+    { iso: 'sdk', n: 4, lib: 'canvas', bad: 'spam' },
+  ],
   // 宿主下发时钟能否绕开 iframe 内 rAF 掉速（echarts 自己的绘制仍走 iframe 内 rAF）。
   clockdiag: [
     { iso: 'package', n: 10, lib: 'echarts', transport: 'bitmap', clock: 'host' },
@@ -129,6 +146,7 @@ function label(run) {
     run.transport,
     run.cap ? `cap${run.cap}` : '',
     run.pframe ? `frame-${run.pframe}` : '',
+    run.bad ? `bad-${run.bad}` : '',
     run.clock,
     run.surface,
     run.shield === 0 ? 'noshield' : '',

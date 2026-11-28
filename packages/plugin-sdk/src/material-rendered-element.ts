@@ -307,6 +307,14 @@ export function createBaseScreenSpecMaterialDefinition(
 ): ScreenParseResult<BaseScreenMaterialDefinition> {
   const spec = parseBaseScreenMaterialSpec(options.spec);
   if (!spec.ok) return spec;
+  if (spec.value.isolated !== undefined) {
+    // ADR-0117 D8：L3 代码只在沙箱里运行，不能当同 realm 渲染函数注册。
+    return failure(
+      'PLUGIN_CORE_LIFECYCLE_INVALID',
+      ['spec', 'isolated'],
+      'MATERIAL_ISOLATED_CONFLICT：规格带 isolated 时用 createBaseScreenIsolatedMaterialDefinition 注册。',
+    );
+  }
   const hasTemplate = spec.value.template !== undefined;
   if (hasTemplate && options.render !== undefined) {
     // ADR-0116 D1：L2 物料只有数据；没有「模板 + 补充代码」的混合形态。

@@ -1,8 +1,13 @@
 import type { ScreenComponent, ScreenDocument } from '../../../packages/contracts/src/index.ts';
 import { createBaseScreenMaterialCatalog } from '../../../packages/plugin-core/src/index.ts';
-import type { BaseScreenMaterialSpec } from '../../../packages/plugin-sdk/src/index.ts';
+import type {
+  BaseScreenIsolatedMaterialAuditRecord,
+  BaseScreenMaterialDefinition,
+  BaseScreenMaterialSpec,
+} from '../../../packages/plugin-sdk/src/index.ts';
 import {
   compileBaseScreenMaterialSpec,
+  createBaseScreenIsolatedMaterialDefinition,
   createMaterialDefinition,
 } from '../../../packages/plugin-sdk/src/index.ts';
 import type {
@@ -20,18 +25,20 @@ import {
   l3Stats,
 } from './sandbox/l3-isolated-material.ts';
 import { l3CanvasGaugeMaterial, l3EchartsGaugeMaterial } from './sandbox/l3-runtime.ts';
+import { l3SdkSource } from './sandbox/l3-sdk-sources.ts';
 import { HARNESS_TEMPLATE_MATERIAL_SPECS } from './template-materials.ts';
 
 /**
  * L3 隔离技术验证测量页（research/l3-code-material-sandbox-2026-11-28.md §8 下一步）。
  *
- * 参数：`iso=realm|instance|package`、`n` 组件数、`lib=canvas|echarts`、`transport=offscreen|bitmap`、
+ * 参数：`iso=realm|instance|package|sdk`（sdk = ADR-0117 S1 的 plugin-sdk 实现）、`bad=loop|throw|spam`（sdk 恶意包）、`n` 组件数、`lib=canvas|echarts`、`transport=offscreen|bitmap`、
  * `clock=iframe|host`、`surface=viewer|designer`、`shield=1|0`（设计态 iframe 关指针）、`probe=1`、
  * `hold` 秒（留给外部采样进程内存）、`updates` 次数。结果写到 `window.__l3Bench.result` 与 `<pre data-result>`。
  */
 
 const params = new URL(location.href).searchParams;
-const isolation = (params.get('iso') ?? 'realm') as L3Isolation;
+const isolation = (params.get('iso') ?? 'realm') as L3Isolation | 'sdk';
+const bad = params.get('bad') ?? '';
 const count = Math.max(0, Number(params.get('n') ?? '10'));
 const lib = params.get('lib') === 'echarts' ? 'echarts' : 'canvas';
 // 包级默认位图：OffscreenCanvas 转进不透明源 iframe 在 Edge 上会让整页崩溃（第一轮实测）。
@@ -49,13 +56,114 @@ const fpsSeconds = Number(params.get('fps') ?? '4');
 const elements = defineBaseScreenElements();
 if (!elements.ok) throw new Error('Base Screen 元素注册失败。');
 
+function loadEchartsSource(): Promise<string> {
+  return import('echarts/dist/echarts.min.js?raw').then((item) => item.default as string);
+}
+
+// SDK 形态的测量：SDK 不暴露内部统计，按 `onFrame` 回调在宿主侧记首帧、帧数与更新延迟。
+const audits: BaseScreenIsolatedMaterialAuditRecord[] = [];
+const sdkFrames = new Map<string, number>();
+const pendingSince = new Map<string, number>();
+
+function sdkEntry(componentId: string) {
+  let entry = l3Stats.instances.get(componentId);
+  if (entry === undefined) {
+    entry = {
+      created: performance.now(),
+      first: undefined,
+      fps: undefined,
+      shipMs: undefined,
+      latencies: [],
+      displayLatencies: [],
+      displaySentAt: undefined,
+      sentAt: new Map(),
+    };
+    l3Stats.instances.set(componentId, entry);
+  }
+  return entry;
+}
+
+function onSdkFrame(componentId: string): void {
+  const entry = sdkEntry(componentId);
+  const now = performance.now();
+  entry.first ??= now;
+  sdkFrames.set(componentId, (sdkFrames.get(componentId) ?? 0) + 1);
+  const since = pendingSince.get(componentId);
+  if (since !== undefined) {
+    entry.latencies.push(now - since);
+    entry.displayLatencies.push(now - since);
+    pendingSince.delete(componentId);
+  }
+}
+
+function markSdkWrite(): void {
+  if (isolation !== 'sdk') return;
+  const now = performance.now();
+  for (let index = 0; index < count; index++) pendingSince.set(`g${index}`, now);
+}
+
+async function createDefinition(): Promise<BaseScreenMaterialDefinition> {
+  if (isolation === 'sdk') {
+    const libraries =
+      lib === 'echarts'
+        ? [{ name: 'echarts', global: 'echarts', source: await loadEchartsSource() }]
+        : [];
+    const definition = createBaseScreenIsolatedMaterialDefinition({
+      spec: {
+        ...gaugeWithoutTemplate,
+        type: 'bench.l3-gauge',
+        name: 'L3 隔离仪表',
+        isolated: { libraries: lib === 'echarts' ? ['echarts'] : [] },
+      },
+      source: l3SdkSource({
+        lib,
+        probe,
+        bad,
+        probeUrl: `${location.origin}/`,
+        probeWs: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/`,
+      }),
+      tagName: 'l3-bench-gauge',
+      libraries,
+      onAudit: (record) => {
+        if (audits.length < 500) audits.push(record);
+      },
+      onFrame: onSdkFrame,
+    });
+    if (!definition.ok)
+      throw new Error(
+        `物料定义失败：${definition.diagnostics.map((item) => `${item.path.join('.')} ${item.message}`).join('；')}`,
+      );
+    return definition.value;
+  }
+  const pkg = await loadPackage();
+  const options: L3ElementOptions = {
+    manifest,
+    pkg,
+    isolation,
+    transport,
+    clock,
+    designShield: shield,
+    shipFps,
+    packageFrame,
+  };
+  const definition = createMaterialDefinition({
+    manifest,
+    element: createL3MaterialElement(options),
+  });
+  if (!definition.ok)
+    throw new Error(
+      `物料定义失败：${definition.diagnostics.map((item) => item.message).join('；')}`,
+    );
+  return definition.value;
+}
+
 async function loadPackage(): Promise<L3Package> {
   if (lib === 'canvas') {
     return { id: 'canvas-gauge', kind: 'canvas', factory: l3CanvasGaugeMaterial, libraries: [] };
   }
   // 库源码与对照组的模块都只在需要时加载：canvas 组不付 echarts 的解析成本。
   const [source, module] = await Promise.all([
-    import('echarts/dist/echarts.min.js?raw').then((item) => item.default as string),
+    loadEchartsSource(),
     isolation === 'realm' ? import('echarts') : Promise.resolve(undefined),
   ]);
   return {
@@ -162,26 +270,8 @@ const result: Record<string, unknown> = {
 async function run(): Promise<void> {
   // 先挂出统计：页面卡住或超时时，运行器还能读到走到了哪一步。
   (window as { __l3Bench?: unknown }).__l3Bench = { result, stats: l3Stats };
-  const pkg = await loadPackage();
-  const options: L3ElementOptions = {
-    manifest,
-    pkg,
-    isolation,
-    transport,
-    clock,
-    designShield: shield,
-    shipFps,
-    packageFrame,
-  };
-  const definition = createMaterialDefinition({
-    manifest,
-    element: createL3MaterialElement(options),
-  });
-  if (!definition.ok)
-    throw new Error(
-      `物料定义失败：${definition.diagnostics.map((item) => item.message).join('；')}`,
-    );
-  const defined = definition.value.define();
+  const definition = await createDefinition();
+  const defined = definition.define();
   if (!defined.ok)
     throw new Error(`物料注册失败：${defined.diagnostics.map((item) => item.message).join('；')}`);
   const catalog = createBaseScreenMaterialCatalog([defined.value]);
@@ -220,9 +310,16 @@ async function run(): Promise<void> {
   await sleep(1000);
   const longBefore = longTasks.length;
   const frames0 = hostFrames;
+  const sdkFrames0 = new Map(sdkFrames);
   const fpsStart = performance.now();
   await sleep(fpsSeconds * 1000);
   const fpsElapsed = (performance.now() - fpsStart) / 1000;
+  if (isolation === 'sdk') {
+    for (const [componentId, entry] of l3Stats.instances) {
+      entry.fps =
+        ((sdkFrames.get(componentId) ?? 0) - (sdkFrames0.get(componentId) ?? 0)) / fpsElapsed;
+    }
+  }
   const instanceFps = [...l3Stats.instances.values()].map((entry) => entry.fps ?? 0);
   const windowTasks = longTasks.slice(longBefore);
   result.steady = {
@@ -242,6 +339,7 @@ async function run(): Promise<void> {
   const longBeforeUpdates = longTasks.length;
   for (let index = 0; index < updateRounds; index++) {
     round += 1;
+    markSdkWrite();
     host.document = documentFor();
     await sleep(700);
   }
@@ -272,7 +370,10 @@ async function run(): Promise<void> {
     ),
   };
 
-  result.iframes = l3Stats.iframes;
+  result.iframes =
+    isolation === 'sdk'
+      ? document.querySelectorAll('iframe[data-base-screen-isolated-package]').length
+      : l3Stats.iframes;
   result.heap = {
     beforeMb: heapBefore === null ? null : Math.round(heapBefore / 1e5) / 10,
     afterMb:
@@ -287,7 +388,54 @@ async function run(): Promise<void> {
   result.inbound = l3Stats.inbound;
   result.transportFallbacks = l3Stats.transportFallbacks;
 
-  if (probe && count > 0) {
+  if (isolation === 'sdk') {
+    const kinds: Record<string, number> = {};
+    for (const record of audits) kinds[record.kind] = (kinds[record.kind] ?? 0) + 1;
+    result.audit = {
+      kinds,
+      sample: audits.slice(0, 12).map((record) => `${record.kind} ${record.message}`),
+    };
+    result.isolatedElement =
+      deepQuery(document, 'l3-bench-gauge')?.shadowRoot?.firstElementChild?.nextElementSibling
+        ?.firstElementChild?.tagName ?? null;
+  }
+
+  if (probe && count > 0 && isolation === 'sdk') {
+    await waitFor(
+      () =>
+        l3Stats.events.some(
+          (item) =>
+            (item as { detail?: { payload?: { probe?: unknown } } }).detail?.payload?.probe !==
+            undefined,
+        ),
+      8000,
+    );
+    await sleep(1500);
+    const engineEvents = l3Stats.events.filter(
+      (item) => (item as { source?: string }).source === 'engine',
+    );
+    const found = engineEvents.find(
+      (item) =>
+        (item as { detail?: { payload?: { probe?: unknown } } }).detail?.payload?.probe !==
+        undefined,
+    ) as { detail: { payload: { probe: unknown } } } | undefined;
+    result.probe = found?.detail.payload.probe ?? 'no-probe-event';
+    result.engineEvents = {
+      total: engineEvents.length,
+      names: [
+        ...new Set(
+          engineEvents.map((item) => (item as { detail?: { name?: string } }).detail?.name),
+        ),
+      ],
+    };
+    const kinds: Record<string, number> = {};
+    for (const record of audits) kinds[record.kind] = (kinds[record.kind] ?? 0) + 1;
+    result.audit = {
+      kinds,
+      sample: audits.slice(0, 16).map((record) => `${record.kind} ${record.message}`),
+    };
+    result.hostCookieStill = document.cookie;
+  } else if (probe && count > 0) {
     const target =
       document.querySelector('l3-bench-gauge') ?? deepQuery(document, 'l3-bench-gauge');
     result.probe =
