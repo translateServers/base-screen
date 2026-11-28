@@ -26,6 +26,7 @@ const MONOREPO_PACKAGES = [
 const PRODUCT_ALIASES = [
   ['base-screen/contracts', 'contracts'],
   ['base-screen/plugin-core', 'plugin-core'],
+  ['base-screen/engine', 'engine'],
   ['base-screen/plugin-sdk', 'plugin-sdk'],
   ['base-screen', 'sdk'],
 ] as const;
