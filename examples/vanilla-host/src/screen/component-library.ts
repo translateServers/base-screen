@@ -25,6 +25,7 @@ import {
   importSpecMaterialModule,
   isSpecMaterialModule,
   type MaterialDraftAgentOutcome,
+  readIsolatedMaterialModule,
   readSpecMaterialModule,
 } from './component-workshop';
 import { loadHostRuntime } from './host-runtime';
@@ -752,6 +753,11 @@ export async function loadComponentLibrary(
     if (pkg !== undefined && !isSpecMaterialModule(pkg.code)) {
       // 旧模板生成的在线物料（ADR-0090 初版）照常在物料库里工作，只是不能在组件库里编辑。
       warnings.push(`「${pkg.name}」是旧版在线物料，组件库不提供编辑。`);
+      continue;
+    }
+    if (pkg !== undefined && readIsolatedMaterialModule(pkg.code) !== undefined) {
+      // L3 隔离代码组件（ADR-0117）：代码只在沙箱里运行，物料库里照常可用；组件库暂不提供编辑。
+      warnings.push(`「${pkg.name}」是隔离代码组件，组件库暂不提供编辑。`);
       continue;
     }
     const published = pkg === undefined ? undefined : readSource(pkg.code);

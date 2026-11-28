@@ -18,12 +18,15 @@ import {
   auditBaseScreenMaterialSpec,
   BASE_SCREEN_MATERIAL_SPEC_SECTIONS,
   type BaseScreenAuthoringFinding,
+  type BaseScreenIsolatedMaterialAuditRecord,
+  type BaseScreenIsolatedMaterialLibrary,
   type BaseScreenMaterialRenderFunction,
   type BaseScreenMaterialSpec,
   type BaseScreenMaterialSpecField,
   type BaseScreenMaterialSpecRole,
   type BaseScreenRenderedMaterialPresenter,
   compileBaseScreenMaterialSpec,
+  createBaseScreenIsolatedMaterialDefinition,
   createBaseScreenMaterialTemplateRender,
   createBaseScreenRenderedMaterialPresenter,
   createBaseScreenSpecMaterialDefinition,
@@ -46,6 +49,10 @@ import {
  *
  * L2 模板物料（ADR-0116）：规格带 `template`、没有渲染代码。在线包只有 `export const spec`，
  * 加载时只读规格、交给 SDK 的模板解释器，**不 `import()` 任何代码**。
+ *
+ * L3 隔离代码组件（ADR-0117）：规格带 `isolated`，代码以文本存在 `export const source` 里。加载时按标记
+ * 回读，交给 SDK 放进沙箱 iframe；宿主页面**既不 `import()` 也不执行**它（`importSpecMaterialModule`
+ * 对这类包直接拒绝）。
  */
 
 // ———————————————————————————— 在线包格式 ————————————————————————————
@@ -55,6 +62,8 @@ const SPEC_BEGIN = '/*spec:begin*/';
 const SPEC_END = '/*spec:end*/';
 const RENDER_BEGIN = '//render:begin';
 const RENDER_END = '//render:end';
+const SOURCE_BEGIN = '/*source:begin*/';
+const SOURCE_END = '/*source:end*/';
 /** 渲染函数体可直接使用的上下文变量；顺序即界面提示顺序。 */
 export const SPEC_RENDER_CONTEXT_NAMES = [
   'document',
@@ -73,6 +82,8 @@ export const SPEC_RENDER_CONTEXT_NAMES = [
  * 规格带 `template`（L2，ADR-0116 D1）时只导出 `spec`，`renderBody` 被忽略：包里没有可执行代码。
  */
 export function buildSpecMaterialModule(spec: BaseScreenMaterialSpec, renderBody: string): string {
+  // L3：`renderBody` 就是组件代码全文（导出 `create(env)`），以文本存进包。
+  if (spec.isolated !== undefined) return buildIsolatedMaterialModule(spec, renderBody);
   if (spec.template !== undefined) {
     return `${MODULE_HEADER}\nexport const spec = ${SPEC_BEGIN}${JSON.stringify(spec)}${SPEC_END};\n`;
   }
@@ -89,6 +100,176 @@ ${RENDER_END}
 
 export function isSpecMaterialModule(code: string): boolean {
   return code.startsWith(MODULE_HEADER);
+}
+
+/**
+ * L3 隔离代码组件 → 在线包代码（ADR-0117 §3.6）：只有两个字面量导出，组件代码是 JSON 字符串。
+ * 包里没有宿主会执行的东西；代码只在沙箱里以文本形式注入。
+ */
+export function buildIsolatedMaterialModule(spec: BaseScreenMaterialSpec, source: string): string {
+  return `${MODULE_HEADER}
+export const spec = ${SPEC_BEGIN}${JSON.stringify(spec)}${SPEC_END};
+export const source = ${SOURCE_BEGIN}${JSON.stringify(source)}${SOURCE_END};
+`;
+}
+
+/**
+ * 不执行代码地回读 L3 包：不是 L3 包（规格不带 `isolated`）时返回 undefined；是 L3 包就严格校验——
+ * 包必须与按回读结果重新生成的文本逐字相同（夹带任何额外代码都失败关闭），规格照常解析。
+ */
+export function readIsolatedMaterialModule(
+  code: string,
+):
+  | ScreenParseResult<{ readonly spec: BaseScreenMaterialSpec; readonly source: string }>
+  | undefined {
+  if (!isSpecMaterialModule(code)) return undefined;
+  const specStart = code.indexOf(SPEC_BEGIN);
+  const specEnd = code.indexOf(SPEC_END);
+  if (specStart < 0 || specEnd < specStart) return undefined;
+  let spec: unknown;
+  try {
+    spec = JSON.parse(code.slice(specStart + SPEC_BEGIN.length, specEnd)) as unknown;
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(spec) || spec.isolated === undefined) return undefined;
+  const sourceStart = code.indexOf(SOURCE_BEGIN, specEnd);
+  const sourceEnd = code.lastIndexOf(SOURCE_END);
+  let source: unknown;
+  try {
+    source =
+      sourceStart < 0 || sourceEnd < sourceStart
+        ? undefined
+        : (JSON.parse(code.slice(sourceStart + SOURCE_BEGIN.length, sourceEnd)) as unknown);
+  } catch {
+    source = undefined;
+  }
+  if (typeof source !== 'string') {
+    return workshopFailure(
+      'PLUGIN_CORE_LIFECYCLE_INVALID',
+      '隔离代码组件的包里没有可读的组件代码。',
+    );
+  }
+  if (buildIsolatedMaterialModule(spec as unknown as BaseScreenMaterialSpec, source) !== code) {
+    return workshopFailure(
+      'PLUGIN_CORE_IDENTITY_CONFLICT',
+      '隔离代码组件的包不是规范格式（可能被改动过）：请在组件工坊里重新发布。',
+    );
+  }
+  const parsed = parseBaseScreenMaterialSpec(spec);
+  if (!parsed.ok) return parsed;
+  return { ok: true, value: { spec: parsed.value, source }, diagnostics: [] };
+}
+
+/** 宿主预置库（ADR-0117 D9）：固定版本，随宿主应用发布；包只能按名字引用，不能自带依赖。 */
+export interface WorkshopIsolatedLibrary {
+  readonly name: string;
+  /** 库脚本在沙箱里定义的全局变量名。 */
+  readonly global: string;
+  load(): Promise<string>;
+}
+
+const DEFAULT_ISOLATED_LIBRARIES: readonly WorkshopIsolatedLibrary[] = [
+  {
+    name: 'echarts',
+    global: 'echarts',
+    load: () =>
+      import('echarts/dist/echarts.min.js?raw').then((module) => module.default as string),
+  },
+];
+
+let isolatedLibraries: readonly WorkshopIsolatedLibrary[] = DEFAULT_ISOLATED_LIBRARIES;
+const librarySources = new Map<string, Promise<string>>();
+const isolatedAudit: BaseScreenIsolatedMaterialAuditRecord[] = [];
+let isolatedAuditSink: ((record: BaseScreenIsolatedMaterialAuditRecord) => void) | undefined;
+
+/** 宿主可换掉预置库清单、接管违规与异常记录（默认只留最近 200 条并打到控制台）。 */
+export function configureIsolatedMaterials(options: {
+  readonly libraries?: readonly WorkshopIsolatedLibrary[];
+  readonly onAudit?: (record: BaseScreenIsolatedMaterialAuditRecord) => void;
+}): void {
+  if (options.libraries !== undefined) {
+    isolatedLibraries = options.libraries;
+    librarySources.clear();
+  }
+  if (options.onAudit !== undefined) isolatedAuditSink = options.onAudit;
+}
+
+/** 最近的隔离组件违规与异常记录（新的在后）。 */
+export function readIsolatedMaterialAudit(): readonly BaseScreenIsolatedMaterialAuditRecord[] {
+  return [...isolatedAudit];
+}
+
+function recordIsolatedAudit(record: BaseScreenIsolatedMaterialAuditRecord): void {
+  isolatedAudit.push(record);
+  if (isolatedAudit.length > 200) isolatedAudit.splice(0, isolatedAudit.length - 200);
+  if (isolatedAuditSink !== undefined) isolatedAuditSink(record);
+  else
+    console.warn(
+      '[isolated-material]',
+      record.kind,
+      record.tagName,
+      record.componentId ?? '',
+      record.message,
+    );
+}
+
+async function loadIsolatedLibraries(
+  names: readonly string[],
+): Promise<ScreenParseResult<readonly BaseScreenIsolatedMaterialLibrary[]>> {
+  const out: BaseScreenIsolatedMaterialLibrary[] = [];
+  for (const name of names) {
+    const library = isolatedLibraries.find((item) => item.name === name);
+    if (library === undefined) {
+      return workshopFailure('PLUGIN_CORE_LIFECYCLE_INVALID', `宿主没有预置库 ${name}。`);
+    }
+    let pending = librarySources.get(name);
+    if (pending === undefined) {
+      pending = library.load();
+      librarySources.set(name, pending);
+    }
+    try {
+      out.push({ name, global: library.global, source: await pending });
+    } catch (error) {
+      librarySources.delete(name);
+      return workshopFailure(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        `预置库 ${name} 加载失败：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  return { ok: true, value: out, diagnostics: [] };
+}
+
+/**
+ * 规格 + 组件代码 → 待保存的 L3 包（Manifest 按同一标签编译）。工坊发布与脚本发布共用这一份，
+ * 保证存进去的包与加载器的规范格式校验一致。
+ */
+export function buildIsolatedMaterialPackage(
+  spec: BaseScreenMaterialSpec,
+  source: string,
+  options: { readonly tagName: string; readonly libraryVisible?: boolean },
+): ScreenParseResult<WorkshopMaterialSaveInput> {
+  const parsed = parseBaseScreenMaterialSpec(spec);
+  if (!parsed.ok) return parsed;
+  if (parsed.value.isolated === undefined) {
+    return workshopFailure('PLUGIN_CORE_LIFECYCLE_INVALID', '隔离代码组件的规格必须带 isolated。');
+  }
+  const manifest = compileBaseScreenMaterialSpec(parsed.value, {
+    tagName: options.tagName,
+    ...(options.libraryVisible === false ? { libraryVisible: false } : {}),
+  });
+  if (!manifest.ok) return manifest;
+  return {
+    ok: true,
+    value: {
+      type: parsed.value.type,
+      name: parsed.value.name,
+      manifest: manifest.value as unknown as Record<string, unknown>,
+      code: buildIsolatedMaterialModule(parsed.value, source),
+    },
+    diagnostics: [],
+  };
 }
 
 /**
@@ -141,6 +322,13 @@ export async function importSpecMaterialModule(code: string): Promise<
     readonly render: BaseScreenMaterialRenderFunction;
   }>
 > {
+  // L3：组件代码只能进沙箱。即使包被改成「同时带 render」，也不在宿主页面加载。
+  if (readIsolatedMaterialModule(code) !== undefined) {
+    return workshopFailure(
+      'PLUGIN_CORE_LIFECYCLE_INVALID',
+      '隔离代码组件只在沙箱里运行，宿主页面不加载它的代码。',
+    );
+  }
   const template = readTemplateMaterialModule(code);
   if (template !== undefined) {
     if (!template.ok) return template;
@@ -206,9 +394,23 @@ export async function loadSpecMaterialEntry(
     return ok(entry);
   }
   const visibility = manifest.value.libraryVisible === false ? { libraryVisible: false } : {};
-  const template = readTemplateMaterialModule(code);
+  const isolated = readIsolatedMaterialModule(code);
+  const template = isolated === undefined ? readTemplateMaterialModule(code) : undefined;
   let definition: ReturnType<typeof createBaseScreenSpecMaterialDefinition>;
-  if (template !== undefined) {
+  if (isolated !== undefined) {
+    // L3：代码以文本交给 SDK，放进按包共享的沙箱 iframe（ADR-0117）。
+    if (!isolated.ok) return isolated;
+    const libraries = await loadIsolatedLibraries(isolated.value.spec.isolated?.libraries ?? []);
+    if (!libraries.ok) return libraries;
+    definition = createBaseScreenIsolatedMaterialDefinition({
+      spec: isolated.value.spec,
+      source: isolated.value.source,
+      tagName: manifest.value.tagName,
+      libraries: libraries.value,
+      onAudit: recordIsolatedAudit,
+      ...visibility,
+    });
+  } else if (template !== undefined) {
     // L2：只有规格，构造器由 SDK 用模板解释器生成（每个实例各持一份解释器）。
     if (!template.ok) return template;
     definition = createBaseScreenSpecMaterialDefinition({
@@ -888,6 +1090,18 @@ export function createComponentWorkshop(
   };
 
   const openPackage = (pkg: WorkshopMaterialPackage): void => {
+    if (readIsolatedMaterialModule(pkg.code) !== undefined) {
+      draft = undefined;
+      renderList();
+      main.replaceChildren(
+        el(
+          'p',
+          'ws-empty',
+          `「${pkg.name}」是隔离代码组件：它的代码只在沙箱里运行，可以在物料库里直接使用；这里暂不提供编辑。`,
+        ),
+      );
+      return;
+    }
     const source = readSpecMaterialModule(pkg.code);
     const spec = source === undefined ? undefined : parseBaseScreenMaterialSpec(source.spec);
     if (source === undefined || spec === undefined || !spec.ok) {
